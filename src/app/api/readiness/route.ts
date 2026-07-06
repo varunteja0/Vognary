@@ -24,7 +24,7 @@ export async function GET() {
     tokenVault,
     auth: {
       session,
-      workspaceAuthorization: database.status === "ready" && session.status === "ready" ? "ready" : "not-ready",
+      workspaceAuthorization: database.status === "ready" && session.status === "ready" ? "primitives-ready-no-login" : "not-ready",
     },
     connectors: {
       summary: connectorSummary,
@@ -36,7 +36,7 @@ export async function GET() {
       oauthStateValidation: "ready",
       securityHeaders: "configured",
       sessionCookies: session.status,
-      workspaceAuthorization: database.status === "ready" && session.status === "ready" ? "ready" : "not-ready",
+      workspaceAuthorization: database.status === "ready" && session.status === "ready" ? "primitives-ready-no-login" : "not-ready",
       persistentTokenVault: tokenVault.status,
       connectorTokenStore: database.status === "ready" && tokenVault.status === "ready" ? "ready" : "not-ready",
       directAdapterRegistry: connectorAdapters.length > 0 ? "ready" : "not-configured",

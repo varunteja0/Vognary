@@ -34,7 +34,7 @@ The current implementation is a stateless audit product plus a connector control
 
 ### Not Included Yet
 
-- User accounts, sessions, and workspace authorization.
+- Production identity provider or magic-link login. Signed session and workspace authorization primitives exist, but users cannot authenticate until a login issuer is wired.
 - Application database wiring and migrations.
 - Encrypted token vault and refresh-token rotation.
 - Durable connector adapters that persist evidence through authenticated per-workspace sync. The OpenAI adapter can call the provider today as a stateless env-gated preview.

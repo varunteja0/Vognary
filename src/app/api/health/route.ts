@@ -37,7 +37,7 @@ export function GET() {
       apiRateLimiting: "ready-in-memory",
       gmailOAuthStateProtection: "ready",
       sessionCookies: session.status,
-      workspaceAuthorization: isDatabaseConfigured() && session.status === "ready" ? "configured" : "not-configured",
+      workspaceAuthorization: isDatabaseConfigured() && session.status === "ready" ? "primitives-ready-no-login" : "not-configured",
       connectorTargets: connectorSyncSummary.total,
       realtimeCapableTargets: connectorSyncSummary.realtimeCapable,
       tokenVault: tokenVault.status,
