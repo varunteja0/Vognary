@@ -117,7 +117,7 @@ export default function ProfileClient() {
             Vognary
           </Link>
           <div className="flex flex-wrap gap-2">
-            <Link href="/" className="btn btn-primary">Audit workspace</Link>
+            <Link href="/app" className="btn btn-primary">Audit workspace</Link>
             <Link href="/private-audit" className="btn btn-ghost">Private audit</Link>
             <button type="button" onClick={signOut} className="btn btn-ghost">Sign out</button>
           </div>

@@ -118,7 +118,7 @@ export default function LoginClient() {
           </Link>
           <div className="flex flex-wrap gap-2">
             <Link href="/private-audit" className="btn btn-ghost">Private audit</Link>
-            <Link href="/" className="btn btn-primary">Open audit app</Link>
+            <Link href="/app" className="btn btn-primary">Open audit app</Link>
           </div>
         </div>
 
@@ -154,7 +154,7 @@ export default function LoginClient() {
                 <p className="mt-1 text-sm text-(--muted)">Workspace: {session.session?.workspaceId ?? "not selected"}</p>
                 <p className="mt-1 text-sm text-(--muted)">Expires: {session.session ? new Date(session.session.expiresAt).toLocaleString("en-IN") : "unknown"}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Link href="/" className="btn btn-primary">Open audit app</Link>
+                  <Link href="/app" className="btn btn-primary">Open audit app</Link>
                   <Link href="/profile" className="btn btn-ghost">View profile</Link>
                   <button type="button" onClick={signOut} className="btn btn-ghost">Sign out</button>
                 </div>

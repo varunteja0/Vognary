@@ -10,7 +10,7 @@ export default function BetaReadinessPage() {
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/" className="btn btn-ghost">Back to app</Link>
+          <Link href="/app" className="btn btn-ghost">Back to app</Link>
         </div>
         <article className="panel p-6 sm:p-8 rise">
           <span className="folio" data-folio="Status">Beta status</span>

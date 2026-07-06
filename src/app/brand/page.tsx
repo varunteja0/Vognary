@@ -31,7 +31,7 @@ export default function BrandPage() {
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/" className="btn btn-ghost">Back to app</Link>
+          <Link href="/app" className="btn btn-ghost">Back to app</Link>
         </div>
 
         <article className="panel overflow-hidden rise">

@@ -61,7 +61,7 @@ export function GET() {
       connectorTokenStore: isDatabaseConfigured() && tokenVault.status === "ready" ? "configured" : "not-configured",
       checkout: process.env.PAYMENT_LINK_FOUNDER_PRO ? "configured" : "ready-with-payment-link-env",
       persistentStorage: "not-configured",
-      gmailReceipts: process.env.GOOGLE_CLIENT_ID ? "configured" : "not-configured",
+      gmailReceipts: process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_AUTH_CLIENT_ID ? "configured" : "not-configured",
       cloudSaasConnectors: "planned-with-contracts",
       accountAggregator: normalizePartnerRailStatus(process.env.ACCOUNT_AGGREGATOR_PARTNER_STATUS) ?? "not-configured",
       upiMandates: normalizePartnerRailStatus(process.env.UPI_MANDATE_PARTNER_STATUS) ?? "not-configured",

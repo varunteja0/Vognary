@@ -96,23 +96,6 @@ type CoverageSignal = {
   done: boolean;
 };
 
-type AuditModeId = "founder" | "personal" | "household" | "cloud" | "mandates" | "appStores";
-type AuditActionId = "manual" | "receipt" | "statement" | "gmail" | "review";
-
-type AuditMode = {
-  id: AuditModeId;
-  label: string;
-  title: string;
-  promise: string;
-  bestFor: string;
-};
-
-type AuditModeSignal = {
-  label: string;
-  done: boolean;
-  action: AuditActionId;
-};
-
 type ConnectorStartPayload = {
   status?: string;
   state?: string;
@@ -123,62 +106,8 @@ type ConnectorStartPayload = {
   authUrl?: string;
 };
 
-type ActivationState = {
-  headline: string;
-  detail: string;
-  primaryAction: {
-    id: AuditActionId;
-    label: string;
-  };
-  secondaryMetric: string;
-};
-
 const workspaceStorageKey = "vognary.workspace.v1";
-
-const auditModes: AuditMode[] = [
-  {
-    id: "founder",
-    label: "Founder stack",
-    title: "Check my work tools",
-    promise: "Find paid tools, cloud bills, domains, app-store charges, cards, and UPI AutoPay before they renew.",
-    bestFor: "Founders and small teams with many tools.",
-  },
-  {
-    id: "personal",
-    label: "Personal subscriptions",
-    title: "Check my subscriptions",
-    promise: "Use receipts, app stores, card statements, and manual entries to find what keeps renewing.",
-    bestFor: "One person looking for forgotten charges.",
-  },
-  {
-    id: "household",
-    label: "Household auto-debits",
-    title: "Check household auto-debits",
-    promise: "Track utilities, insurance, telecom, EMIs, SIPs, app stores, and mandates in one place.",
-    bestFor: "Families and shared budgets.",
-  },
-  {
-    id: "cloud",
-    label: "Cloud/SaaS spend",
-    title: "Check cloud and SaaS spend",
-    promise: "Review AI tools, cloud, developer tools, domains, hosting, and paid seats.",
-    bestFor: "Engineering, AI, and product teams.",
-  },
-  {
-    id: "mandates",
-    label: "UPI/card mandates",
-    title: "Check UPI and card mandates",
-    promise: "Add visible mandates manually when banks or payment apps do not expose them yet.",
-    bestFor: "People worried about AutoPay or card mandates.",
-  },
-  {
-    id: "appStores",
-    label: "App stores",
-    title: "Review app-store renewals",
-    promise: "Check Apple, Google Play, iCloud, and app receipts without needing a direct app-store connection.",
-    bestFor: "Mobile subscriptions and family app purchases.",
-  },
-];
+const gmailReceiptStorageKey = "vognary.gmail.receipts.v1";
 
 function getInitialWorkspace(): WorkspaceBackup | null {
   if (typeof window === "undefined") return null;
@@ -291,7 +220,6 @@ export default function VognaryMvpClient() {
   const [reviewCompletedAt, setReviewCompletedAt] = useState<string | null>(null);
   const [localSaveEnabled, setLocalSaveEnabled] = useState(Boolean(initialWorkspace));
   const [notice, setNotice] = useState<string | null>(null);
-  const [selectedAuditMode, setSelectedAuditMode] = useState<AuditModeId>("founder");
   const [statementFallbackOpen, setStatementFallbackOpen] = useState(false);
   const [serverSession, setServerSession] = useState<ServerSessionPayload | null>(null);
   const [serverSaveStatus, setServerSaveStatus] = useState<string | null>(null);
@@ -308,9 +236,6 @@ export default function VognaryMvpClient() {
   const coverageSignals = useMemo(() => getCoverageSignals(statementSources, manualItems, receiptText), [statementSources, manualItems, receiptText]);
   const coverageScore = Math.round((coverageSignals.filter((signal) => signal.done).length / coverageSignals.length) * 100);
   const priorityItems = useMemo(() => getPriorityItems(audit.recurringItems, userActions), [audit.recurringItems, userActions]);
-  const modeSignals = useMemo(() => getAuditModeSignals(selectedAuditMode, statementSources, manualItems, receiptText, audit), [audit, manualItems, receiptText, selectedAuditMode, statementSources]);
-  const activationState = useMemo(() => getActivationState(selectedAuditMode, modeSignals, audit, statementSources, manualItems, receiptText), [audit, manualItems, modeSignals, receiptText, selectedAuditMode, statementSources]);
-
   useEffect(() => {
     if (!localSaveEnabled || typeof window === "undefined") return;
     const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText });
@@ -334,6 +259,53 @@ export default function VognaryMvpClient() {
     return () => {
       ignore = true;
     };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const raw = window.localStorage.getItem(gmailReceiptStorageKey);
+    if (!raw) return;
+
+    try {
+      const payload = JSON.parse(raw) as { candidates?: ReceiptCandidate[]; messageCount?: number };
+      const candidates = Array.isArray(payload.candidates) ? payload.candidates.filter(isReceiptCandidate) : [];
+
+      if (!candidates.length) {
+        queueMicrotask(() => {
+          setNotice(`Gmail connected. Scanned ${payload.messageCount ?? 0} receipt-like message(s), but no recurring candidates were found yet.`);
+        });
+        return;
+      }
+
+      const importedAt = Date.now();
+      queueMicrotask(() => {
+        setManualItems((current) => {
+          const existing = new Set(current.map((item) => recurringIdentity(item)));
+          const nextItems = candidates
+            .filter((candidate) => !existing.has(recurringIdentity(candidate)))
+            .map((candidate, index) => ({
+              id: `gmail-${importedAt}-${index}-${candidate.id}`,
+              merchant: candidate.merchant,
+              amount: candidate.amount,
+              frequency: candidate.frequency,
+              nextExpectedDate: candidate.nextExpectedDate,
+              category: candidate.category,
+              sourceName: "Gmail receipt sync",
+            }));
+          return [...current, ...nextItems];
+        });
+        setReceiptText((current) => current || candidates.map((candidate) => candidate.evidenceText).join("\n\n"));
+        setNotice(`Gmail connected. Imported ${candidates.length} recurring candidate(s) from receipt history.`);
+      });
+    } catch {
+      queueMicrotask(() => {
+        setNotice("Gmail returned receipt data, but Vognary could not import it into this browser.");
+      });
+    } finally {
+      window.localStorage.removeItem(gmailReceiptStorageKey);
+      if (window.location.search.includes("gmail=")) window.history.replaceState(null, "", "/app");
+    }
   }, []);
 
   async function handleFiles(event: React.ChangeEvent<HTMLInputElement>) {
@@ -481,8 +453,8 @@ export default function VognaryMvpClient() {
       generatedAt: new Date().toISOString(),
       product: "Vognary Recurring Audit",
       mode: "self-serve-stateless-audit",
-      readiness: getReadinessItems(statementSources.length, manualItems.length),
-      sourceCoverage: getCoverageItems(statementSources.length, manualItems.length),
+      readiness: getReadinessItems(),
+      sourceCoverage: getCoverageItems(),
       summary: audit.summary,
       sources: statementSources.map(({ name, rowCount }) => ({ name, rowCount })),
       manualItems,
@@ -740,21 +712,6 @@ export default function VognaryMvpClient() {
     setNotice("Saved browser workspace deleted from this device.");
   }
 
-  function focusAuditAction(action: AuditActionId) {
-    if (action === "statement") setStatementFallbackOpen(true);
-
-    const targetId = {
-      manual: "source-inputs",
-      statement: "statement-fallback",
-      receipt: "receipt-intelligence",
-      gmail: "source-inputs",
-      review: "recurring-ledger",
-    }[action];
-
-    document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    setNotice(getActionNotice(action, selectedAuditMode));
-  }
-
   async function startConnector(connector: Connector) {
     setConnectingConnectorId(connector.id);
 
@@ -819,6 +776,16 @@ export default function VognaryMvpClient() {
             </div>
           </div>
         </div>
+
+        <AutoDebitCommandPanel
+          audit={audit}
+          bulkEntryText={bulkEntryText}
+          onBulkEntryText={setBulkEntryText}
+          onImportBulk={addBulkSubscriptions}
+          onLoadFounderStack={loadFounderStackTemplate}
+          onReviewItem={selectAndReviewItem}
+          onJumpToLedger={() => selectAndReviewItem()}
+        />
 
         <IntegrationCommandCenter
           audit={audit}
@@ -898,12 +865,40 @@ export default function VognaryMvpClient() {
 
         <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]" data-reveal>
           <div className="flex flex-col gap-5">
+            <DataSourcesPanel
+              sources={statementSources}
+              manualItems={manualItems}
+              pastedCsv={pastedCsv}
+              pastedName={pastedName}
+              manualDraft={manualDraft}
+              notice={notice}
+              warnings={audit.warnings}
+              onFiles={handleFiles}
+              onRemoveSource={removeSource}
+              onPastedCsv={setPastedCsv}
+              onPastedName={setPastedName}
+              onAddPastedStatement={addPastedStatement}
+              statementFallbackOpen={statementFallbackOpen}
+              onStatementFallbackOpen={setStatementFallbackOpen}
+              onManualDraft={setManualDraft}
+              onAddManualItem={addManualItem}
+              onRemoveManualItem={removeManualItem}
+              onNotice={setNotice}
+              onConnectGmail={startGmailConnection}
+            />
             <ConnectedSourcePanel
               connectorStartResults={connectorStartResults}
               onStartConnector={startConnector}
               connectingConnectorId={connectingConnectorId}
             />
-            <CoveragePanel statementCount={statementSources.length} manualCount={manualItems.length} />
+            <ReceiptIntelligencePanel
+              receiptText={receiptText}
+              candidates={receiptCandidates}
+              onReceiptText={setReceiptText}
+              onImportCandidate={importReceiptCandidate}
+              onImportAll={importAllReceiptCandidates}
+            />
+            <CoveragePanel />
           </div>
 
           <div className="flex flex-col gap-5">
@@ -950,7 +945,7 @@ export default function VognaryMvpClient() {
           onCompleteReview={markMonthlyReviewComplete}
         />
 
-        <ReadinessPanel statementCount={statementSources.length} manualCount={manualItems.length} />
+        <ReadinessPanel />
         <footer className="panel flex flex-col items-center gap-3 px-5 py-5 text-center" data-reveal>
           <div className="flex items-center gap-2.5">
             <VognaryMark size={22} className="text-(--ink)" />
@@ -1093,9 +1088,9 @@ function IntegrationCommandCenter({
   return (
     <section className="grid gap-5 xl:grid-cols-[0.78fr_1.22fr]" data-reveal>
       <div className="dossier p-6 sm:p-7">
-        <span className="folio" data-folio="Connect" style={{ color: "var(--dossier-muted)" }}>Integration-first</span>
-        <h1 className="mt-4 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-5xl">Connect sources, then watch one ledger.</h1>
-        <p className="mt-4 text-sm leading-7 muted-on-dark">The product direction is not file upload. Users should connect official sources and let Vognary keep recurring payments current. This beta launchpad starts that flow with provider handoffs and honest setup states.</p>
+        <span className="folio" data-folio="Start" style={{ color: "var(--dossier-muted)" }}>Your recurring list</span>
+        <h1 className="mt-4 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-5xl">Add what you know, then review one ledger.</h1>
+        <p className="mt-4 text-sm leading-7 muted-on-dark">Start with manual entries for Claude, Render, Kling, X, UPI AutoPay, card mandates, domains, insurance, EMIs, or SIPs. Use provider connections only when they are truly available.</p>
         <div className="mt-6 grid gap-2 sm:grid-cols-3">
           <DossierStat label="Integration targets" value={`${integrationConnectors.length}`} />
           <DossierStat label="Live/setup-ready" value={`${liveCount}`} />
@@ -1113,9 +1108,9 @@ function IntegrationCommandCenter({
         <SectionHead
           folio="01"
           kicker="Sources"
-          title="Click to integrate official sources"
-          desc="Each button starts the Vognary connector route and opens the official provider page or consent flow when available. No CSV upload is part of the primary path."
-          right={<span className="pill pill-ready">No upload path</span>}
+          title="Official connections, when available"
+          desc="These buttons open the provider path or explain what access is still required. They are optional; the manual source panel below is the fastest way to start today."
+          right={<span className="pill pill-partial">Optional</span>}
         />
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           {integrationConnectors.slice(0, 12).map((connector) => (
@@ -1152,7 +1147,7 @@ function ConnectedSourcePanel({
         folio="03"
         kicker="Integrations"
         title="Connection queue"
-        desc="Start with identity/email, then cloud/SaaS, then regulated money rails. Items become true auto-sync only after the official provider grants API, OAuth, or partner access."
+        desc="Optional provider handoffs. Items become true auto-sync only after the official provider grants API, OAuth, or partner access."
         right={<a href="/integrations" className="btn btn-ghost">All integrations</a>}
       />
 
@@ -1264,90 +1259,6 @@ function trackSpotlightPointer(event: React.MouseEvent<HTMLElement>) {
   const rect = event.currentTarget.getBoundingClientRect();
   event.currentTarget.style.setProperty("--mx", `${((event.clientX - rect.left) / rect.width) * 100}%`);
   event.currentTarget.style.setProperty("--my", `${((event.clientY - rect.top) / rect.height) * 100}%`);
-}
-
-function GuidedAuditLauncher({
-  selectedMode,
-  modeSignals,
-  audit,
-  activationState,
-  coverageScore,
-  onSelectMode,
-  onAction,
-}: {
-  selectedMode: AuditModeId;
-  modeSignals: AuditModeSignal[];
-  audit: AuditResult;
-  activationState: ActivationState;
-  coverageScore: number;
-  onSelectMode: (mode: AuditModeId) => void;
-  onAction: (action: AuditActionId) => void;
-}) {
-  const selectedModeConfig = auditModes.find((mode) => mode.id === selectedMode) ?? auditModes[0];
-  const completedSignals = modeSignals.filter((signal) => signal.done).length;
-  const progressPercent = Math.round((completedSignals / modeSignals.length) * 100);
-
-  return (
-    <section className="panel overflow-hidden p-5 sm:p-6" data-reveal>
-      <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-        <div>
-          <span className="folio" data-folio="Start">Guided review</span>
-          <h1 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-4xl">Start a recurring payment review</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-(--muted)">Choose what you want to check. Add one real source, then Vognary will show repeated payments, proof, and the next action.</p>
-
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            {auditModes.map((mode) => {
-              const selected = mode.id === selectedMode;
-              return (
-                <button
-                  key={mode.id}
-                  type="button"
-                  onClick={() => onSelectMode(mode.id)}
-                  className={`inset p-3 text-left transition ${selected ? "border-ember bg-(--ember-tint)" : "hover:border-line-strong"}`}
-                  aria-pressed={selected}
-                >
-                  <p className="font-display text-sm font-semibold text-(--ink)">{mode.label}</p>
-                  <p className="mt-1 text-xs leading-5 text-(--muted)">{mode.bestFor}</p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="dossier p-5">
-          <span className="folio" data-folio="§ PATH" style={{ color: "var(--dossier-muted)" }}>{selectedModeConfig.label}</span>
-          <h2 className="mt-3 font-display text-2xl font-semibold tracking-tight text-(--dossier-ink)">{selectedModeConfig.title}</h2>
-          <p className="mt-2 text-sm leading-6 muted-on-dark">{selectedModeConfig.promise}</p>
-
-          <div className="mt-5 grid gap-2 sm:grid-cols-3">
-            <DossierStat label="Mode progress" value={`${completedSignals}/${modeSignals.length}`} />
-            <DossierStat label="Coverage" value={`${coverageScore}%`} />
-            <DossierStat label="Found" value={`${audit.summary.recurringCount}`} />
-          </div>
-
-          <div className="mt-5 rounded-[11px] border p-3" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
-            <div className="flex items-center justify-between gap-3">
-              <p className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Next step</p>
-              <span className="font-data text-xs tnum" style={{ color: "var(--dossier-ink)" }}>{progressPercent}%</span>
-            </div>
-            <h3 className="mt-2 font-display text-lg font-semibold text-(--dossier-ink)">{activationState.headline}</h3>
-            <p className="mt-1 text-sm leading-6 muted-on-dark">{activationState.detail}</p>
-            <button type="button" onClick={() => onAction(activationState.primaryAction.id)} className="btn btn-primary mt-3">{activationState.primaryAction.label}</button>
-            <p className="mt-3 font-data text-[0.62rem] uppercase tracking-[0.14em] muted-on-dark">{activationState.secondaryMetric}</p>
-          </div>
-
-          <div className="mt-4 grid gap-2">
-            {modeSignals.map((signal) => (
-              <button key={signal.label} type="button" onClick={() => onAction(signal.action)} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition" style={{ borderColor: "var(--dossier-line)", background: signal.done ? "rgba(67,198,160,0.09)" : "rgba(243,234,214,0.03)" }}>
-                <span className="text-sm font-semibold text-(--dossier-ink)">{signal.label}</span>
-                <span className={signal.done ? "stamp stamp-keep" : "stamp stamp-watch"}>{signal.done ? "done" : "next"}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
 }
 
 function DataSourcesPanel({
@@ -1547,10 +1458,10 @@ function DataSourcesPanel({
 
 function QuickStartPanel() {
   const steps = [
-    ["1", "Choose a provider", "Start with Gmail, Claude, Kling, Vercel, Render, X, bank rails, UPI, cards, or wallets."],
-    ["2", "Use official consent", "Vognary opens the provider path or tells you exactly what partner/API access is still required."],
-    ["3", "Sync into one ledger", "Connected evidence becomes one recurring-payment list with renewal dates, source, and confidence."],
-    ["4", "Review and save", "Choose keep, watch, downgrade, cancel, or investigate, then save an encrypted snapshot."],
+    ["1", "Add 3 payments", "Use the manual templates for Claude, Render, Kling, X, UPI, cards, insurance, EMIs, or SIPs."],
+    ["2", "Add evidence", "Paste receipt text or import a statement only when you have it."],
+    ["3", "Review the ledger", "See one recurring-payment list with renewal dates, source, and confidence."],
+    ["4", "Save or delete", "Save an encrypted snapshot from the account panel, or delete your data from Profile."],
   ];
 
   return (
@@ -1699,12 +1610,12 @@ function ReceiptIntelligencePanel({
   );
 }
 
-function CoveragePanel({ statementCount, manualCount }: { statementCount: number; manualCount: number }) {
+function CoveragePanel() {
   return (
     <section className="panel p-5 sm:p-6">
       <SectionHead folio="05" kicker="Sources" title="What has been checked" desc="Shows what you added and what still needs a manual check." />
       <div className="mt-4 grid gap-2">
-        {getCoverageItems(statementCount, manualCount).map((item) => <StatusRow key={item.label} {...item} />)}
+        {getCoverageItems().map((item) => <StatusRow key={item.label} {...item} />)}
       </div>
     </section>
   );
@@ -1972,7 +1883,7 @@ function TeamReviewPanel({
   );
 }
 
-function ReadinessPanel({ statementCount, manualCount }: { statementCount: number; manualCount: number }) {
+function ReadinessPanel() {
   return (
     <section className="panel p-5 sm:p-6" data-reveal>
       <SectionHead
@@ -1983,7 +1894,7 @@ function ReadinessPanel({ statementCount, manualCount }: { statementCount: numbe
         right={<span className="pill pill-ready">Ready to use</span>}
       />
       <div className="mt-4 grid gap-2 md:grid-cols-2">
-        {getReadinessItems(statementCount, manualCount).map((item) => <StatusRow key={item.label} {...item} />)}
+        {getReadinessItems().map((item) => <StatusRow key={item.label} {...item} />)}
       </div>
     </section>
   );
@@ -2126,7 +2037,7 @@ function StatusRow({ label, value, state }: { label: string; value: string; stat
   );
 }
 
-function getCoverageItems(statementCount: number, manualCount: number) {
+function getCoverageItems() {
   return [
     { label: "Google identity", value: "Ready for private beta login and workspace sessions", state: "ready" as const },
     { label: "Gmail receipts", value: "OAuth path exists; production Gmail receipt sync needs Google app verification", state: "partial" as const },
@@ -2137,7 +2048,7 @@ function getCoverageItems(statementCount: number, manualCount: number) {
   ];
 }
 
-function getReadinessItems(statementCount: number, manualCount: number) {
+function getReadinessItems() {
   return [
     { label: "Integration launchpad", value: "Users start from official provider connection cards, not upload-first flows", state: "ready" as const },
     { label: "Recurring ledger", value: "Connected evidence lands in one review table with next debit and action labels", state: "ready" as const },
@@ -2181,89 +2092,21 @@ function getPriorityItems(items: RecurringItem[], userActions: Record<string, Re
     .slice(0, 5);
 }
 
-function getAuditModeSignals(mode: AuditModeId, statementSources: StatementFile[], manualItems: ManualRecurringInput[], receiptText: string, audit: AuditResult): AuditModeSignal[] {
-  const evidenceText = buildEvidenceText(statementSources, manualItems, receiptText);
-  const hasStatement = statementSources.length > 0;
-  const hasReceipt = receiptText.trim().length > 0;
-  const hasRecurringItem = audit.recurringItems.length > 0;
-  const hasManual = manualItems.length > 0;
-
-  const signals: Record<AuditModeId, AuditModeSignal[]> = {
-    founder: [
-      { label: "AI or SaaS evidence", done: /openai|anthropic|claude|cursor|github|notion|slack|figma|zoom/i.test(evidenceText), action: hasReceipt ? "manual" : "receipt" },
-      { label: "Cloud or hosting source", done: /aws|vercel|render|cloudflare|google cloud|gcp|hosting|domain|namecheap|godaddy/i.test(evidenceText), action: hasStatement ? "manual" : "statement" },
-      { label: "App-store or mandate check", done: /apple|google play|upi|autopay|mandate|card/i.test(evidenceText), action: "manual" },
-      { label: "At least one recurring item", done: hasRecurringItem, action: hasManual || hasStatement || hasReceipt ? "review" : "manual" },
-    ],
-    personal: [
-      { label: "Email receipt evidence", done: hasReceipt, action: "receipt" },
-      { label: "Card or bank fallback", done: hasStatement, action: "statement" },
-      { label: "App-store subscriptions", done: /apple|google play|app store|icloud/i.test(evidenceText), action: "manual" },
-      { label: "Recurring result", done: hasRecurringItem, action: hasRecurringItem ? "review" : "manual" },
-    ],
-    household: [
-      { label: "Utilities or telecom", done: /utility|utilities|telecom|airtel|jio|electric|broadband/i.test(evidenceText), action: "manual" },
-      { label: "Insurance or EMI/SIP", done: /insurance|emi|loan|sip|investment|policy/i.test(evidenceText), action: "manual" },
-      { label: "Statement fallback", done: hasStatement, action: "statement" },
-      { label: "Exportable audit", done: hasRecurringItem, action: hasRecurringItem ? "review" : "manual" },
-    ],
-    cloud: [
-      { label: "AI provider cost", done: /openai|anthropic|claude|cursor/i.test(evidenceText), action: "manual" },
-      { label: "Cloud provider spend", done: /aws|google cloud|gcp|cloudflare|vercel|render/i.test(evidenceText), action: hasStatement ? "manual" : "statement" },
-      { label: "Developer tools or domains", done: /github|domain|namecheap|godaddy|hosting/i.test(evidenceText), action: "manual" },
-      { label: "Reviewable cloud item", done: audit.recurringItems.some((item) => /ai|cloud|developer|domain/i.test(item.category)), action: hasRecurringItem ? "review" : "receipt" },
-    ],
-    mandates: [
-      { label: "UPI AutoPay check", done: /upi|autopay/i.test(evidenceText), action: "manual" },
-      { label: "Card mandate check", done: /card|mandate/i.test(evidenceText), action: "manual" },
-      { label: "Bank or card statement fallback", done: hasStatement, action: "statement" },
-      { label: "Mandate payment found", done: audit.recurringItems.some((item) => /upi|card|mandate/i.test(item.category + item.merchant)), action: hasRecurringItem ? "review" : "manual" },
-    ],
-    appStores: [
-      { label: "Apple subscription check", done: /apple|icloud/i.test(evidenceText), action: "manual" },
-      { label: "Google Play check", done: /google play|play store|playstore/i.test(evidenceText), action: "manual" },
-      { label: "Receipt evidence", done: hasReceipt, action: "receipt" },
-      { label: "App-store payment found", done: audit.recurringItems.some((item) => /app store|apple|google play/i.test(item.category + item.merchant)), action: hasRecurringItem ? "review" : "manual" },
-    ],
-  };
-
-  return signals[mode];
+function isReceiptCandidate(value: unknown): value is ReceiptCandidate {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<ReceiptCandidate>;
+  return typeof candidate.id === "string"
+    && typeof candidate.merchant === "string"
+    && typeof candidate.amount === "number"
+    && Number.isFinite(candidate.amount)
+    && typeof candidate.frequency === "string"
+    && typeof candidate.nextExpectedDate === "string"
+    && typeof candidate.category === "string"
+    && typeof candidate.evidenceText === "string";
 }
 
-function getActivationState(mode: AuditModeId, signals: AuditModeSignal[], audit: AuditResult, statementSources: StatementFile[], manualItems: ManualRecurringInput[], receiptText: string): ActivationState {
-  const firstMissing = signals.find((signal) => !signal.done);
-  const selectedMode = auditModes.find((item) => item.id === mode) ?? auditModes[0];
-
-  if (audit.recurringItems.length > 0) {
-    return {
-      headline: `${audit.recurringItems.length} recurring commitment${audit.recurringItems.length === 1 ? "" : "s"} found`,
-      detail: `Monthly recurring total is ${formatCurrency(audit.summary.monthlyRecurringSpend)}. Review the top item and choose keep, watch, change, cancel, or investigate.`,
-      primaryAction: { id: "review", label: "Review payments" },
-      secondaryMetric: `${audit.summary.renewalsNextTenDays} renewal${audit.summary.renewalsNextTenDays === 1 ? "" : "s"} in the next 10 days`,
-    };
-  }
-
-  if (statementSources.length || manualItems.length || receiptText.trim()) {
-    return {
-      headline: "Source added, no recurring pattern yet",
-      detail: firstMissing ? `Next best action for ${selectedMode.label}: ${firstMissing.label}.` : "Add more history or one manual commitment to make the recurring pattern visible.",
-      primaryAction: { id: firstMissing?.action ?? "manual", label: firstMissing ? `Complete: ${firstMissing.label}` : "Add one commitment" },
-      secondaryMetric: `${statementSources.length} source${statementSources.length === 1 ? "" : "s"} · ${manualItems.length} manual commitment${manualItems.length === 1 ? "" : "s"}`,
-    };
-  }
-
-  return {
-    headline: "Get the first useful result in under 5 minutes",
-    detail: firstMissing ? `Start with ${firstMissing.label.toLowerCase()}. Vognary will update this checklist as soon as a source is added.` : "Start by adding one real source.",
-    primaryAction: { id: firstMissing?.action ?? "manual", label: firstMissing ? `Start: ${firstMissing.label}` : "Start audit" },
-    secondaryMetric: "Goal: add 1 source, find 1 item, download 1 report",
-  };
-}
-
-function buildEvidenceText(statementSources: StatementFile[], manualItems: ManualRecurringInput[], receiptText: string) {
-  const statementText = statementSources.map((source) => `${source.name} ${source.text.slice(0, 3000)}`).join(" ");
-  const manualText = manualItems.map((item) => `${item.merchant} ${item.category} ${item.sourceName ?? ""}`).join(" ");
-  return `${statementText} ${manualText} ${receiptText}`;
+function recurringIdentity(item: Pick<ManualRecurringInput, "merchant" | "amount" | "frequency">) {
+  return `${item.merchant.trim().toLowerCase()}::${Math.round(item.amount * 100)}::${item.frequency}`;
 }
 
 function parseBulkSubscriptionLines(text: string): { items: Omit<ManualRecurringInput, "id">[]; skipped: string[] } {
@@ -2366,18 +2209,6 @@ function inferBulkCategory(text: string): string {
   if (/emi|loan/i.test(text)) return "Debt";
   if (/sip|mutual fund|investment/i.test(text)) return "Investments";
   return "Other";
-}
-
-function getActionNotice(action: AuditActionId, mode: AuditModeId) {
-  const selectedMode = auditModes.find((item) => item.id === mode)?.label ?? "selected audit";
-  const notices: Record<AuditActionId, string> = {
-    manual: `Add one real ${selectedMode} commitment you can verify in the source app or dashboard.`,
-    receipt: `Paste one real renewal or invoice snippet for the ${selectedMode} audit.`,
-    statement: `Use statement import only when the provider cannot connect directly yet.`,
-    gmail: `Gmail needs OAuth configuration before public receipt sync. Receipt paste works now.`,
-    review: `Review the recurring payments and choose an action before the next billing cycle.`,
-  };
-  return notices[action];
 }
 
 function buildWorkspaceBackup({

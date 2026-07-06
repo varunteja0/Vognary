@@ -17,7 +17,7 @@ export default function NotFound() {
           The page you&rsquo;re looking for is not here. Go back to the app or open the brand page.
         </p>
         <div className="mt-7 flex flex-wrap justify-center gap-2.5">
-          <Link href="/" className="btn btn-primary">Back to app</Link>
+          <Link href="/" className="btn btn-primary">Back home</Link>
           <Link href="/brand" className="btn btn-ghost">Brand</Link>
         </div>
       </div>

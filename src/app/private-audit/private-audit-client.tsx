@@ -118,7 +118,7 @@ export default function PrivateAuditClient() {
           </Link>
           <div className="flex flex-wrap gap-2">
             <Link href="/sources" className="btn btn-ghost">Source guide</Link>
-            <Link href="/" className="btn btn-primary">Open audit app</Link>
+            <Link href="/app" className="btn btn-primary">Open audit app</Link>
           </div>
         </div>
 

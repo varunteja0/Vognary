@@ -43,11 +43,28 @@ export type ConnectorAdapter = {
   sync(connection: ConnectorConnection): Promise<ConnectorEvidence[]>;
 };
 
-const configuredEnv = (connector: Connector) =>
-  connector.envVars?.filter((envVar) => Boolean(process.env[envVar])) ?? [];
+const configuredEnv = (connector: Connector) => {
+  if (connector.id === "gmail-readonly") {
+    return [
+      process.env.GOOGLE_CLIENT_ID ? "GOOGLE_CLIENT_ID" : process.env.GOOGLE_AUTH_CLIENT_ID ? "GOOGLE_AUTH_CLIENT_ID" : null,
+      process.env.GOOGLE_CLIENT_SECRET ? "GOOGLE_CLIENT_SECRET" : process.env.GOOGLE_AUTH_CLIENT_SECRET ? "GOOGLE_AUTH_CLIENT_SECRET" : null,
+      process.env.GOOGLE_REDIRECT_URI ? "GOOGLE_REDIRECT_URI" : null,
+    ].filter((value): value is string => Boolean(value));
+  }
 
-const missingEnv = (connector: Connector) =>
-  connector.envVars?.filter((envVar) => !process.env[envVar]) ?? [];
+  return connector.envVars?.filter((envVar) => Boolean(process.env[envVar])) ?? [];
+};
+
+const missingEnv = (connector: Connector) => {
+  if (connector.id === "gmail-readonly") {
+    return [
+      process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_AUTH_CLIENT_ID ? null : "GOOGLE_CLIENT_ID or GOOGLE_AUTH_CLIENT_ID",
+      process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_AUTH_CLIENT_SECRET ? null : "GOOGLE_CLIENT_SECRET or GOOGLE_AUTH_CLIENT_SECRET",
+    ].filter((value): value is string => Boolean(value));
+  }
+
+  return connector.envVars?.filter((envVar) => !process.env[envVar]) ?? [];
+};
 
 export function getConnectorStartState(connector: Connector | undefined): ConnectorStartState {
   if (!connector) return "unknown-connector";

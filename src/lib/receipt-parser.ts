@@ -7,7 +7,7 @@ export type ReceiptCandidate = ManualRecurringInput & {
 
 const merchantPatterns = [
   /(?:merchant|seller|vendor|from)[:\s]+([A-Z][A-Za-z0-9 .&+-]{2,60})/i,
-  /(OpenAI|ChatGPT|Anthropic|Claude|Cursor|GitHub|Vercel|Render|AWS|Google Cloud|Apple|Google Play|Netflix|Spotify|Adobe|Canva|Figma|Notion|Slack|Zoom)/i,
+  /(OpenAI|ChatGPT|Anthropic|Claude|Kling|Cursor|GitHub|Vercel|Render|AWS|Google Cloud|Apple|Google Play|Netflix|Spotify|Adobe|Canva|Figma|Notion|Slack|Zoom|X Premium|X\.com)/i,
 ];
 
 const amountPattern = /(?:₹|Rs\.?|INR|USD|\$)\s*([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i;
@@ -48,13 +48,14 @@ function extractReceiptCandidate(message: string, index: number): ReceiptCandida
 }
 
 function inferCategory(merchant: string): string {
-  if (/OpenAI|ChatGPT|Anthropic|Claude|Cursor/i.test(merchant)) return "AI tools";
+  if (/OpenAI|ChatGPT|Anthropic|Claude|Kling|Cursor/i.test(merchant)) return "AI tools";
   if (/GitHub/i.test(merchant)) return "Developer tools";
   if (/Vercel|Render|AWS|Cloud/i.test(merchant)) return "Cloud hosting";
   if (/Apple|Google Play/i.test(merchant)) return "App store";
   if (/Netflix|Spotify|YouTube/i.test(merchant)) return "Streaming";
   if (/Adobe|Canva|Figma/i.test(merchant)) return "Creative tools";
   if (/Notion|Slack|Zoom/i.test(merchant)) return "Productivity";
+  if (/X Premium|X\.com/i.test(merchant)) return "Social tools";
   return "Other";
 }
 

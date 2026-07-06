@@ -8,14 +8,19 @@ const gmailReadonlyScope = "https://www.googleapis.com/auth/gmail.readonly";
 export function GET(request: Request) {
   const url = new URL(request.url);
   const wantsJson = url.searchParams.get("mode") === "json";
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+  const clientId = getGmailClientId();
+  const clientSecret = getGmailClientSecret();
+  const redirectUri = getGmailRedirectUri(url.origin);
+  const missingEnv = [
+    clientId ? null : "GOOGLE_CLIENT_ID or GOOGLE_AUTH_CLIENT_ID",
+    clientSecret ? null : "GOOGLE_CLIENT_SECRET or GOOGLE_AUTH_CLIENT_SECRET",
+  ].filter((value): value is string => Boolean(value));
 
-  if (!clientId || !redirectUri) {
+  if (missingEnv.length) {
     const payload = {
       status: "not-configured",
       integration: "gmail-readonly",
-      requiredEnv: ["GOOGLE_CLIENT_ID", "GOOGLE_REDIRECT_URI"],
+      requiredEnv: missingEnv,
       scope: gmailReadonlyScope,
     };
 
@@ -51,4 +56,17 @@ export function GET(request: Request) {
   const response = NextResponse.redirect(authUrl);
   response.cookies.set(gmailOAuthStateCookie, state, oauthStateCookieOptions());
   return response;
+}
+
+function getGmailClientId() {
+  return process.env.GOOGLE_CLIENT_ID?.trim() || process.env.GOOGLE_AUTH_CLIENT_ID?.trim() || "";
+}
+
+function getGmailClientSecret() {
+  return process.env.GOOGLE_CLIENT_SECRET?.trim() || process.env.GOOGLE_AUTH_CLIENT_SECRET?.trim() || "";
+}
+
+function getGmailRedirectUri(origin: string) {
+  const appOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || origin.replace(/\/$/, "");
+  return process.env.GOOGLE_REDIRECT_URI?.trim() || `${appOrigin}/api/integrations/gmail/callback`;
 }

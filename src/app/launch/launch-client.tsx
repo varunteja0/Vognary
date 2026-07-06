@@ -30,7 +30,7 @@ export default function LaunchClient() {
             <VognaryMark size={22} />
             Vognary
           </span>
-          <Link href="/" className="btn btn-ghost">Open app</Link>
+          <Link href="/app" className="btn btn-ghost">Open app</Link>
         </div>
         <section className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
           <div
@@ -70,7 +70,7 @@ export default function LaunchClient() {
               <button type="submit" className="btn btn-ember">Request audit</button>
             </div>
             {status ? <p className="mt-4 rounded-md border border-indigo bg-(--indigo-tint) px-3 py-2 text-sm text-indigo">{status}</p> : null}
-            <Link href="/" className="mt-4 inline-flex text-sm font-semibold text-ember">Open Vognary</Link>
+            <Link href="/app" className="mt-4 inline-flex text-sm font-semibold text-ember">Open Vognary</Link>
           </form>
         </section>
       </div>
