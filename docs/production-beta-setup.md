@@ -270,7 +270,16 @@ Expected success message:
 Encrypted server snapshot loaded into this browser.
 ```
 
-If this works, Vognary is private-beta usable.
+Then verify profile and data controls:
+
+1. Open `https://www.vognary.com/profile`.
+2. Confirm your email is shown.
+3. Confirm your workspace is shown.
+4. Confirm stored data counts are visible.
+5. Confirm pending integrations are listed.
+6. Do not click delete unless you intentionally want to remove the beta account.
+
+If login, save/load snapshot, and profile all work, Vognary is private-beta usable.
 
 ## What To Share With Users
 
@@ -300,6 +309,8 @@ After that I will tell you the safest minimum source to share. You can redact se
 | Google sign-in says not configured | Missing Google OAuth envs | Set `GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`, `GOOGLE_AUTH_REDIRECT_URI`. |
 | Google says redirect URI mismatch | Google Console URI does not match | Add `https://www.vognary.com/api/auth/google/callback` exactly in Google OAuth client. |
 | `/login` shows not configured | Missing envs | Set `DATABASE_URL`, `SESSION_SECRET`, `PRIVATE_BETA_ACCESS_CODE`. |
+| `/` opens login instead of app | You are signed out | Sign in with Google first; anonymous users cannot access the audit workspace. |
+| `/profile` opens login instead of profile | You are signed out | Sign in with Google first. |
 | Save encrypted snapshot fails | Missing token key or DB | Set `TOKEN_ENCRYPTION_KEY`, verify `DATABASE_URL`, apply schema. |
 | Intake says preview/local only | Missing webhook | Set `AUDIT_INTAKE_WEBHOOK_URL` or `WAITLIST_WEBHOOK_URL`. |
 | `--strict` fails | Expected today | Use `--beta`; strict is for full production maturity. |
@@ -312,4 +323,5 @@ Stop and fix before inviting users if:
 - `npm run production:check -- https://www.vognary.com --beta` fails.
 - You cannot log in with the beta access code.
 - You cannot save and load an encrypted snapshot.
+- You cannot open `/profile` after login.
 - Lead intake does not persist anywhere you can read.
