@@ -22,6 +22,23 @@ curl -X POST http://localhost:3000/api/audit \
 
 The API returns an audit result and stores nothing. This gives us a clean bridge from browser-local MVP to backend workers later.
 
+### Stateless File Ingestion API
+
+```bash
+curl -X POST http://localhost:3000/api/ingest \
+	-F 'files=@public/sample-founder-stack.csv'
+```
+
+The ingestion API accepts CSV and PDF. CSV is passed through directly. PDF text is extracted and converted through a conservative transaction-line heuristic, and any warnings are returned to the UI.
+
+### Gmail Read-Only OAuth
+
+```bash
+curl http://localhost:3000/api/integrations/gmail/start
+```
+
+Without Google OAuth env vars, this returns a `not-configured` response. With `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`, it starts the Gmail read-only consent flow and returns receipt candidates from recent invoice/subscription emails without storing tokens.
+
 ## Local Production Run
 
 ```bash
@@ -48,7 +65,7 @@ Recommended first hosted options:
 
 ## Production Boundary
 
-This MVP can be shown to users and investors as a working private-beta audit product. It should not be marketed as a regulated financial-data production system until the following are complete:
+This product can be sold as a self-serve stateless audit tool. It should not be marketed as a regulated connected-account financial-data system until the following are complete:
 
 - Authentication and account deletion.
 - Encrypted database and object storage.

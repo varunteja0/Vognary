@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { jsPDF } from "jspdf";
 import {
   analyzeStatements,
   type AuditResult,
@@ -10,6 +11,7 @@ import {
   type RecurringItem,
   type StatementSource,
 } from "@/lib/recurring-audit";
+import { extractReceiptCandidates, type ReceiptCandidate } from "@/lib/receipt-parser";
 
 const sampleStatement = `Date,Description,Debit,Credit
 2026-01-05,OPENAI CHATGPT PLUS,1999,
@@ -79,11 +81,11 @@ const categoryOptions = [
 const frequencyOptions: Frequency[] = ["weekly", "biweekly", "monthly", "bimonthly", "quarterly", "yearly", "irregular"];
 
 const statusStyles: Record<RecommendationType, string> = {
-  keep: "border-emerald-700/20 bg-emerald-50 text-emerald-800",
-  watch: "border-blue-700/20 bg-blue-50 text-blue-800",
-  downgrade: "border-amber-700/20 bg-amber-50 text-amber-800",
-  cancel: "border-red-700/20 bg-red-50 text-red-800",
-  investigate: "border-stone-700/20 bg-stone-100 text-stone-800",
+  keep: "stamp stamp-keep",
+  watch: "stamp stamp-watch",
+  downgrade: "stamp stamp-downgrade",
+  cancel: "stamp stamp-cancel",
+  investigate: "stamp stamp-investigate",
 };
 
 type ManualDraft = {
@@ -98,7 +100,70 @@ type ManualDraft = {
 type StatementFile = StatementSource & {
   id: string;
   rowCount: number;
+  kind?: "csv" | "pdf";
+  warnings?: string[];
 };
+
+type TeamMember = {
+  id: string;
+  name: string;
+  role: string;
+};
+
+type BetaLead = {
+  id: string;
+  name: string;
+  segment: string;
+  uploadedSources: boolean;
+  foundWaste: boolean;
+  willingToPay: boolean;
+  estimatedAnnualSavings: number;
+  notes: string;
+};
+
+type BetaLeadDraft = {
+  name: string;
+  segment: string;
+  estimatedAnnualSavings: string;
+  uploadedSources: boolean;
+  foundWaste: boolean;
+  willingToPay: boolean;
+  notes: string;
+};
+
+type WorkspaceBackup = {
+  version: 1;
+  exportedAt: string;
+  statementSources: StatementFile[];
+  manualItems: ManualRecurringInput[];
+  userActions: Record<string, RecommendationType>;
+  itemOwners: Record<string, string>;
+  reviewNotes: Record<string, string>;
+  teamMembers: TeamMember[];
+  receiptText?: string;
+};
+
+type CoverageSignal = {
+  label: string;
+  done: boolean;
+};
+
+const workspaceStorageKey = "vognary.workspace.v1";
+
+function getInitialWorkspace(): WorkspaceBackup | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const saved = window.localStorage.getItem(workspaceStorageKey);
+    if (!saved) return null;
+    const backup = JSON.parse(saved) as Partial<WorkspaceBackup>;
+    if (backup.version !== 1 || !Array.isArray(backup.statementSources) || !Array.isArray(backup.manualItems)) return null;
+    return backup as WorkspaceBackup;
+  } catch {
+    window.localStorage.removeItem(workspaceStorageKey);
+    return null;
+  }
+}
 
 const emptyManualDraft: ManualDraft = {
   merchant: "",
@@ -109,43 +174,96 @@ const emptyManualDraft: ManualDraft = {
   sourceName: "manual entry",
 };
 
+const emptyBetaLeadDraft: BetaLeadDraft = {
+  name: "",
+  segment: "Founder / builder",
+  estimatedAnnualSavings: "",
+  uploadedSources: false,
+  foundWaste: false,
+  willingToPay: false,
+  notes: "",
+};
+
+const manualTemplates = [
+  { label: "Apple", merchant: "Apple / iCloud", amount: "749", category: "App store", sourceName: "Apple subscriptions" },
+  { label: "Google Play", merchant: "Google Play subscription", amount: "499", category: "App store", sourceName: "Google Play" },
+  { label: "UPI AutoPay", merchant: "UPI AutoPay mandate", amount: "999", category: "UPI AutoPay", sourceName: "UPI app mandate" },
+  { label: "Card Mandate", merchant: "Card merchant mandate", amount: "1999", category: "Card mandate", sourceName: "card recurring payments" },
+  { label: "Domain", merchant: "Domain renewal", amount: "1200", category: "Domains", sourceName: "registrar dashboard" },
+  { label: "Insurance", merchant: "Insurance premium", amount: "3000", category: "Insurance", sourceName: "policy dashboard" },
+];
+
+const pricingPlans = [
+  { name: "Free Audit", price: "₹0", detail: "First 10 recurring items, local audit, export JSON." },
+  { name: "Founder Pro", price: "₹999/mo", detail: "Unlimited audits, renewal review, PDF/CSV exports, founder stack labels." },
+  { name: "Team", price: "₹4,999/mo", detail: "Team owners, monthly review workflow, accountant export, shared action list." },
+  { name: "Annual Audit", price: "₹1,999", detail: "One-time private recurring spend report for founders and households." },
+];
+
 export default function VognaryMvpClient() {
-  const [statementSources, setStatementSources] = useState<StatementFile[]>([]);
-  const [manualItems, setManualItems] = useState<ManualRecurringInput[]>([]);
+  const [initialWorkspace] = useState<WorkspaceBackup | null>(() => getInitialWorkspace());
+  const [statementSources, setStatementSources] = useState<StatementFile[]>(initialWorkspace?.statementSources ?? []);
+  const [manualItems, setManualItems] = useState<ManualRecurringInput[]>(initialWorkspace?.manualItems ?? []);
   const [manualDraft, setManualDraft] = useState<ManualDraft>(emptyManualDraft);
   const [pastedCsv, setPastedCsv] = useState("");
   const [pastedName, setPastedName] = useState("pasted-statement.csv");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [userActions, setUserActions] = useState<Record<string, RecommendationType>>({});
+  const [userActions, setUserActions] = useState<Record<string, RecommendationType>>(initialWorkspace?.userActions ?? {});
+  const [itemOwners, setItemOwners] = useState<Record<string, string>>(initialWorkspace?.itemOwners ?? {});
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>(initialWorkspace?.reviewNotes ?? {});
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(initialWorkspace?.teamMembers?.length ? initialWorkspace.teamMembers : [{ id: "founder", name: "Founder", role: "Owner" }]);
+  const [memberDraft, setMemberDraft] = useState({ name: "", role: "Finance / Ops" });
+  const [receiptText, setReceiptText] = useState(initialWorkspace?.receiptText ?? "");
+  const [betaLeadDraft, setBetaLeadDraft] = useState<BetaLeadDraft>(emptyBetaLeadDraft);
+  const [betaLeads, setBetaLeads] = useState<BetaLead[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState("Founder Pro");
+  const [reviewCompletedAt, setReviewCompletedAt] = useState<string | null>(null);
+  const [localSaveEnabled, setLocalSaveEnabled] = useState(Boolean(initialWorkspace));
   const [notice, setNotice] = useState<string | null>(null);
 
   const audit = useMemo<AuditResult>(
     () => analyzeStatements(statementSources.map(({ name, text }) => ({ name, text })), manualItems),
     [statementSources, manualItems],
   );
+  const receiptCandidates = useMemo(() => extractReceiptCandidates(splitReceiptText(receiptText)), [receiptText]);
   const selectedItem = audit.recurringItems.find((item) => item.id === selectedItemId) ?? audit.recurringItems[0] ?? null;
   const hasRealData = statementSources.length > 0 || manualItems.length > 0;
+  const coverageSignals = useMemo(() => getCoverageSignals(statementSources, manualItems, receiptText), [statementSources, manualItems, receiptText]);
+  const coverageScore = Math.round((coverageSignals.filter((signal) => signal.done).length / coverageSignals.length) * 100);
+  const priorityItems = useMemo(() => getPriorityItems(audit.recurringItems, userActions), [audit.recurringItems, userActions]);
+
+  useEffect(() => {
+    if (!localSaveEnabled || typeof window === "undefined") return;
+    const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText });
+    window.localStorage.setItem(workspaceStorageKey, JSON.stringify(backup));
+  }, [itemOwners, localSaveEnabled, manualItems, receiptText, reviewNotes, statementSources, teamMembers, userActions]);
 
   async function handleFiles(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     if (!files.length) return;
 
-    const csvFiles = files.filter((file) => file.name.toLowerCase().endsWith(".csv"));
-    const rejectedCount = files.length - csvFiles.length;
-    const nextSources = await Promise.all(
-      csvFiles.map(async (file) => {
-        const text = await file.text();
-        return {
-          id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
-          name: file.name,
-          text,
-          rowCount: countRows(text),
-        } satisfies StatementFile;
-      }),
-    );
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+
+    const response = await fetch("/api/ingest", {
+      method: "POST",
+      body: formData,
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      setNotice(payload.error ?? "File ingestion failed.");
+      return;
+    }
+
+    const nextSources = (payload.sources ?? []).map((source: Omit<StatementFile, "id">) => ({
+      ...source,
+      id: `${source.name}-${Date.now()}-${crypto.randomUUID()}`,
+    }));
 
     setStatementSources((current) => [...current, ...nextSources]);
-    setNotice(rejectedCount ? `${rejectedCount} non-CSV file was skipped. PDF ingestion is the next backend slice.` : `${nextSources.length} statement source added.`);
+    const warningCount = nextSources.reduce((count: number, source: StatementFile) => count + (source.warnings?.length ?? 0), 0);
+    setNotice(`${nextSources.length} source(s) ingested${warningCount ? ` with ${warningCount} warning(s)` : ""}.`);
     event.target.value = "";
   }
 
@@ -162,6 +280,8 @@ export default function VognaryMvpClient() {
         name: pastedName || "pasted-statement.csv",
         text: pastedCsv,
         rowCount: countRows(pastedCsv),
+        kind: "csv",
+        warnings: [],
       },
     ]);
     setPastedCsv("");
@@ -219,7 +339,10 @@ export default function VognaryMvpClient() {
     setStatementSources([]);
     setManualItems([]);
     setUserActions({});
+    setItemOwners({});
+    setReviewNotes({});
     setSelectedItemId(null);
+    setReceiptText("");
     setNotice("Workspace cleared. No user data is stored by this MVP.");
   }
 
@@ -241,9 +364,16 @@ export default function VognaryMvpClient() {
       summary: audit.summary,
       sources: statementSources.map(({ name, rowCount }) => ({ name, rowCount })),
       manualItems,
+      selectedPlan,
+      teamMembers,
+      itemOwners,
+      reviewNotes,
+      betaLeads,
       recurringItems: audit.recurringItems.map((item) => ({
         ...item,
         userAction: userActions[item.id] ?? item.recommendationType,
+        owner: getOwnerName(itemOwners[item.id], teamMembers),
+        reviewNote: reviewNotes[item.id] ?? "",
       })),
       warnings: audit.warnings,
     };
@@ -256,33 +386,258 @@ export default function VognaryMvpClient() {
     URL.revokeObjectURL(url);
   }
 
+  function exportWorkspaceBackup() {
+    const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText });
+    downloadText("vognary-workspace-backup.json", JSON.stringify(backup, null, 2), "application/json");
+    setNotice("Workspace backup downloaded. It includes your source text, so keep it private.");
+  }
+
+  async function importWorkspaceBackup(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const backup = JSON.parse(await file.text()) as Partial<WorkspaceBackup>;
+      if (backup.version !== 1 || !Array.isArray(backup.statementSources) || !Array.isArray(backup.manualItems)) {
+        setNotice("This is not a valid Vognary workspace backup.");
+        return;
+      }
+
+      setStatementSources(backup.statementSources);
+      setManualItems(backup.manualItems);
+      setUserActions(backup.userActions ?? {});
+      setItemOwners(backup.itemOwners ?? {});
+      setReviewNotes(backup.reviewNotes ?? {});
+      setTeamMembers(backup.teamMembers?.length ? backup.teamMembers : [{ id: "founder", name: "Founder", role: "Owner" }]);
+      setReceiptText(backup.receiptText ?? "");
+      setNotice("Workspace backup imported on this device.");
+    } catch {
+      setNotice("Could not import this workspace backup.");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  function exportCsvReport() {
+    const rows = [
+      ["Merchant", "Category", "Frequency", "Monthly Cost", "Annual Cost", "Next Debit", "Confidence", "Action", "Owner", "Review Note"],
+      ...audit.recurringItems.map((item) => [
+        item.merchant,
+        item.category,
+        item.frequency,
+        Math.round(item.monthlyCost).toString(),
+        Math.round(item.annualCost).toString(),
+        item.nextExpectedDate,
+        `${item.confidenceScore}%`,
+        userActions[item.id] ?? item.recommendationType,
+        getOwnerName(itemOwners[item.id], teamMembers),
+        reviewNotes[item.id] ?? "",
+      ]),
+    ];
+    downloadText("vognary-recurring-audit.csv", rows.map((row) => row.map(csvEscape).join(",")).join("\n"), "text/csv");
+  }
+
+  function exportPdfReport() {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const margin = 42;
+    let y = 48;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.text("Vognary Recurring Audit", margin, y);
+    y += 28;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString("en-IN")}`, margin, y);
+    y += 24;
+    doc.setFontSize(12);
+    doc.text(`Monthly recurring: ${formatCurrency(audit.summary.monthlyRecurringSpend)} | Annual run-rate: ${formatCurrency(audit.summary.annualRecurringSpend)}`, margin, y);
+    y += 18;
+    doc.text(`Reviewable burn: ${formatCurrency(audit.summary.reviewableMonthlySpend)} | Items: ${audit.summary.recurringCount}`, margin, y);
+    y += 28;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Recurring commitments", margin, y);
+    y += 18;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+
+    for (const item of audit.recurringItems.slice(0, 18)) {
+      const line = `${item.merchant} | ${formatCurrency(item.monthlyCost)}/mo | ${item.frequency} | next ${item.nextExpectedDate} | ${userActions[item.id] ?? item.recommendationType} | ${getOwnerName(itemOwners[item.id], teamMembers)}`;
+      const wrapped = doc.splitTextToSize(line, 510) as string[];
+      if (y + wrapped.length * 12 > 760) {
+        doc.addPage();
+        y = 48;
+      }
+      doc.text(wrapped, margin, y);
+      y += wrapped.length * 12 + 8;
+    }
+
+    doc.save("vognary-recurring-audit.pdf");
+  }
+
+  function importReceiptCandidate(candidate: ReceiptCandidate) {
+    setManualItems((current) => [
+      ...current,
+      {
+        id: `${candidate.id}-${Date.now()}`,
+        merchant: candidate.merchant,
+        amount: candidate.amount,
+        frequency: candidate.frequency,
+        nextExpectedDate: candidate.nextExpectedDate,
+        category: candidate.category,
+        sourceName: candidate.sourceName,
+      },
+    ]);
+    setNotice(`${candidate.merchant} imported from receipt evidence.`);
+  }
+
+  function importAllReceiptCandidates() {
+    receiptCandidates.forEach(importReceiptCandidate);
+    if (!receiptCandidates.length) setNotice("No receipt candidates found. Paste invoice or renewal snippets with merchant and amount.");
+  }
+
+  function addTeamMember() {
+    if (!memberDraft.name.trim()) {
+      setNotice("Add a team member name before adding them to the review workflow.");
+      return;
+    }
+    setTeamMembers((current) => [...current, { id: `member-${Date.now()}`, name: memberDraft.name.trim(), role: memberDraft.role.trim() || "Member" }]);
+    setMemberDraft({ name: "", role: "Finance / Ops" });
+  }
+
+  function removeTeamMember(id: string) {
+    if (id === "founder") return;
+    setTeamMembers((current) => current.filter((member) => member.id !== id));
+    setItemOwners((current) => Object.fromEntries(Object.entries(current).filter(([, ownerId]) => ownerId !== id)));
+  }
+
+  function addBetaLead() {
+    if (!betaLeadDraft.name.trim()) {
+      setNotice("Add a beta user or company name before recording evidence.");
+      return;
+    }
+    setBetaLeads((current) => [
+      ...current,
+      {
+        id: `lead-${Date.now()}`,
+        name: betaLeadDraft.name.trim(),
+        segment: betaLeadDraft.segment,
+        estimatedAnnualSavings: Number.parseFloat(betaLeadDraft.estimatedAnnualSavings) || 0,
+        uploadedSources: betaLeadDraft.uploadedSources,
+        foundWaste: betaLeadDraft.foundWaste,
+        willingToPay: betaLeadDraft.willingToPay,
+        notes: betaLeadDraft.notes,
+      },
+    ]);
+    setBetaLeadDraft(emptyBetaLeadDraft);
+  }
+
+  function exportBetaEvidence() {
+    const rows = [
+      ["Name", "Segment", "Uploaded Sources", "Found Waste", "Willing To Pay", "Estimated Annual Savings", "Notes"],
+      ...betaLeads.map((lead) => [lead.name, lead.segment, String(lead.uploadedSources), String(lead.foundWaste), String(lead.willingToPay), String(lead.estimatedAnnualSavings), lead.notes]),
+    ];
+    downloadText("vognary-beta-evidence.csv", rows.map((row) => row.map(csvEscape).join(",")).join("\n"), "text/csv");
+  }
+
+  function markMonthlyReviewComplete() {
+    setReviewCompletedAt(new Date().toISOString());
+    setNotice("Monthly review marked complete for this local workspace. Export the audit pack for evidence.");
+  }
+
+  function enableLocalSave() {
+    setLocalSaveEnabled(true);
+    const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText });
+    window.localStorage.setItem(workspaceStorageKey, JSON.stringify(backup));
+    setNotice("Local save enabled on this device. Do not use it on shared computers.");
+  }
+
+  function disableLocalSave() {
+    setLocalSaveEnabled(false);
+    window.localStorage.removeItem(workspaceStorageKey);
+    setNotice("Saved browser workspace deleted from this device.");
+  }
+
   return (
-    <main className="min-h-screen px-5 py-5 text-[var(--foreground)] sm:px-8 lg:px-10">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <header className="rounded-[8px] border border-[var(--line)] bg-[var(--surface)]/90 p-5 shadow-sm backdrop-blur">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="font-mono text-xs font-semibold uppercase tracking-[0.24em] text-[var(--accent)]">Vognary Private Beta</p>
-              <h1 className="mt-3 max-w-4xl text-3xl font-semibold tracking-normal text-[#12140f] sm:text-5xl">
-                Recurring money control for founders before money leaves.
-              </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)] sm:text-base">
-                Upload real statements, add missing mandates manually, inspect evidence, mark actions, and export an audit pack. This is the production-MVP path: usable now for private audits, transparent about integrations still pending.
-              </p>
+    <main id="ledger-main" className="relative px-4 pb-12 pt-4 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
+        {/* Instrument bar — live money tape */}
+        <div className="sticky top-3 z-30 rise">
+          <div className="dossier tape flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3 sm:px-5">
+            <div className="flex items-center gap-3">
+              <span className="grid size-9 place-items-center rounded-lg border border-(--dossier-line) font-display text-xl font-semibold text-(--dossier-ink)">V</span>
+              <div className="leading-tight">
+                <p className="font-display text-lg font-semibold tracking-tight text-(--dossier-ink)">Vognary</p>
+                <p className="eyebrow muted-on-dark" style={{ fontSize: "0.54rem", letterSpacing: "0.24em" }}>The Silent Ledger</p>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={loadSample} className="h-10 rounded-[6px] border border-[var(--line)] bg-white px-4 text-sm font-semibold transition hover:border-[var(--accent)]">
-                Load Example
-              </button>
-              <button type="button" onClick={clearWorkspace} className="h-10 rounded-[6px] border border-[var(--line)] bg-white px-4 text-sm font-semibold transition hover:border-[var(--danger)]">
-                Clear Workspace
-              </button>
-              <button type="button" onClick={exportReport} className="h-10 rounded-[6px] bg-[var(--accent)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)]">
-                Export Audit Pack
-              </button>
+            <div className="hidden h-8 w-px bg-(--dossier-line) lg:block" />
+            <div className="flex flex-1 flex-wrap items-center gap-x-6 gap-y-2">
+              <TickerStat label="Monthly burn" value={formatCurrency(audit.summary.monthlyRecurringSpend)} tone="ember" />
+              <TickerStat label="Annual run-rate" value={formatCurrency(audit.summary.annualRecurringSpend)} tone="paper" />
+              <TickerStat label="Reviewable" value={formatCurrency(audit.summary.reviewableMonthlySpend)} tone="ochre" />
+              <TickerStat label="Renewals ≤10d" value={`${audit.summary.renewalsNextTenDays}`} tone="paper" />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="live-dot" aria-hidden />
+              <span className="eyebrow muted-on-dark" style={{ fontSize: "0.54rem" }}>Local · Live</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Masthead — the case file cover */}
+        <header className="panel overflow-hidden rise">
+          <div className="grid gap-0 lg:grid-cols-[1.35fr_1fr]">
+            <div className="p-6 sm:p-8">
+              <span className="folio" data-folio="§ 00">Recurring money</span>
+              <h1 className="mt-5 font-display text-4xl font-semibold leading-[1.02] tracking-[-0.02em] text-(--ink) sm:text-6xl">
+                Catch the debits
+                <br />
+                <em className="font-display italic text-ember">before they debit.</em>
+              </h1>
+              <p className="mt-5 max-w-xl text-sm leading-7 text-(--muted) sm:text-base">
+                Upload statements, add the mandates your bank never shows, and read every recurring commitment as evidence. Then issue a verdict on each one. Nothing leaves this browser session unless you choose to export it.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-2">
+                <button type="button" onClick={loadSample} className="btn btn-ghost">Load example file</button>
+                <button type="button" onClick={clearWorkspace} className="btn btn-ghost">Clear workspace</button>
+                <button type="button" onClick={exportReport} className="btn btn-primary">Export audit pack</button>
+              </div>
+            </div>
+            <div className="border-t border-line bg-(--card-2) p-6 sm:p-8 lg:border-l lg:border-t-0">
+              <p className="eyebrow">Exports &amp; workspace</p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <button type="button" onClick={exportPdfReport} className="btn btn-ghost w-full">PDF report</button>
+                <button type="button" onClick={exportCsvReport} className="btn btn-ghost w-full">CSV report</button>
+                <button type="button" onClick={exportWorkspaceBackup} className="btn btn-ghost w-full">Backup file</button>
+                <label className="btn btn-ghost w-full cursor-pointer">
+                  Import backup
+                  <input type="file" accept="application/json,.json" onChange={importWorkspaceBackup} className="sr-only" />
+                </label>
+              </div>
+              <div className="mt-5 rounded-[11px] border border-dashed border-(--line-strong) bg-card p-4">
+                <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Verdict legend</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="stamp stamp-keep">Keep</span>
+                  <span className="stamp stamp-watch">Watch</span>
+                  <span className="stamp stamp-downgrade">Downgrade</span>
+                  <span className="stamp stamp-cancel">Cancel</span>
+                  <span className="stamp stamp-investigate">Investigate</span>
+                </div>
+              </div>
             </div>
           </div>
         </header>
+
+        <QuickStartPanel />
+        <UserControlPanel
+          coverageScore={coverageScore}
+          coverageSignals={coverageSignals}
+          localSaveEnabled={localSaveEnabled}
+          onEnableLocalSave={enableLocalSave}
+          onDisableLocalSave={disableLocalSave}
+        />
 
         <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
           <div className="flex flex-col gap-5">
@@ -303,7 +658,21 @@ export default function VognaryMvpClient() {
               onAddManualItem={addManualItem}
               onRemoveManualItem={removeManualItem}
             />
+            <ReceiptIntelligencePanel
+              receiptText={receiptText}
+              candidates={receiptCandidates}
+              onReceiptText={setReceiptText}
+              onImportCandidate={importReceiptCandidate}
+              onImportAll={importAllReceiptCandidates}
+            />
             <CoveragePanel statementCount={statementSources.length} manualCount={manualItems.length} />
+            <BetaEvidencePanel
+              betaLeadDraft={betaLeadDraft}
+              betaLeads={betaLeads}
+              onBetaLeadDraft={setBetaLeadDraft}
+              onAddBetaLead={addBetaLead}
+              onExportBetaEvidence={exportBetaEvidence}
+            />
           </div>
 
           <div className="flex flex-col gap-5">
@@ -321,6 +690,8 @@ export default function VognaryMvpClient() {
               userActions={userActions}
               onSelect={setSelectedItemId}
             />
+            <PriorityActionPanel priorityItems={priorityItems} userActions={userActions} onSelect={setSelectedItemId} />
+            <PricingPanel selectedPlan={selectedPlan} onSelectedPlan={setSelectedPlan} />
           </div>
         </section>
 
@@ -332,7 +703,40 @@ export default function VognaryMvpClient() {
           />
         ) : null}
 
+        <TeamReviewPanel
+          audit={audit}
+          teamMembers={teamMembers}
+          memberDraft={memberDraft}
+          itemOwners={itemOwners}
+          reviewNotes={reviewNotes}
+          reviewCompletedAt={reviewCompletedAt}
+          onMemberDraft={setMemberDraft}
+          onAddTeamMember={addTeamMember}
+          onRemoveTeamMember={removeTeamMember}
+          onItemOwner={(itemId, ownerId) => setItemOwners((current) => ({ ...current, [itemId]: ownerId }))}
+          onReviewNote={(itemId, note) => setReviewNotes((current) => ({ ...current, [itemId]: note }))}
+          onCompleteReview={markMonthlyReviewComplete}
+        />
+
         <ReadinessPanel statementCount={statementSources.length} manualCount={manualItems.length} />
+        <footer className="panel flex flex-col items-center gap-3 px-5 py-5 text-center">
+          <span className="font-display text-base font-semibold text-(--ink)">Vognary <span className="text-(--muted)">· The Silent Ledger</span></span>
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-data text-[0.66rem] uppercase tracking-[0.16em] text-(--muted)">
+            <a className="transition hover:text-ember" href="/privacy">Privacy</a>
+            <span className="text-(--line-strong)">·</span>
+            <a className="transition hover:text-ember" href="/security">Security</a>
+            <span className="text-(--line-strong)">·</span>
+            <a className="transition hover:text-ember" href="/sources">Source guide</a>
+            <span className="text-(--line-strong)">·</span>
+            <a className="transition hover:text-ember" href="/integrations">Integrations</a>
+            <span className="text-(--line-strong)">·</span>
+            <a className="transition hover:text-ember" href="/terms">Terms</a>
+            <span className="text-(--line-strong)">·</span>
+            <a className="transition hover:text-ember" href="/beta-readiness">Beta readiness</a>
+            <span className="text-(--line-strong)">·</span>
+            <a className="transition hover:text-ember" href="/launch">Launch</a>
+          </div>
+        </footer>
       </div>
     </main>
   );
@@ -372,84 +776,88 @@ function DataSourcesPanel({
   onRemoveManualItem: (id: string) => void;
 }) {
   return (
-    <section className="rounded-[8px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-[#151712]">Audit Workspace</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">Add multiple card, bank, and manual sources. The current MVP keeps all processing in the browser.</p>
-        </div>
-        <span className="rounded-[999px] border border-[var(--line)] bg-[var(--surface-soft)] px-3 py-1 font-mono text-[11px] font-semibold text-[var(--accent-strong)]">
-          Local-first
-        </span>
-      </div>
+    <section className="panel p-5 sm:p-6">
+      <SectionHead
+        folio="§ 03"
+        kicker="Intake"
+        title="Audit workspace"
+        desc="Add card, bank, and manual sources. Everything is parsed here in your browser."
+        right={<span className="pill pill-ready">Local-first</span>}
+      />
 
-      <label className="mt-5 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[8px] border border-dashed border-[var(--accent)] bg-[#f4fbf7] px-4 py-7 text-center transition hover:bg-[#eef8f2]">
-        <span className="text-sm font-semibold text-[#172018]">Upload one or more CSV statements</span>
-        <span className="max-w-sm text-xs leading-5 text-[var(--muted)]">Use exported bank/card CSVs with Date, Description, Amount or Debit/Credit columns.</span>
-        <input type="file" multiple accept=".csv,text/csv" onChange={onFiles} className="sr-only" />
+      <label className="mt-5 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[11px] border border-dashed border-(--line-strong) bg-(--card-2) px-4 py-8 text-center transition hover:border-ember hover:bg-(--ember-tint)">
+        <span className="font-display text-base font-semibold text-(--ink)">Drop one or more CSV statements</span>
+        <span className="max-w-sm text-xs leading-5 text-(--muted)">Exported bank/card CSVs or readable PDFs. CSV stays the highest-confidence source.</span>
+        <input type="file" multiple accept=".csv,text/csv,.pdf,application/pdf" onChange={onFiles} className="sr-only" />
       </label>
 
       <div className="mt-4 grid gap-2">
         {sources.length ? sources.map((source) => (
-          <div key={source.id} className="flex items-center justify-between gap-3 rounded-[6px] border border-[var(--line)] bg-[#fbfcf8] px-3 py-2">
+          <div key={source.id} className="inset flex items-center justify-between gap-3 px-3 py-2.5">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[#20251d]">{source.name}</p>
-              <p className="font-mono text-[11px] text-[var(--muted)]">{source.rowCount} data rows</p>
+              <p className="truncate text-sm font-semibold text-(--ink)">{source.name}</p>
+              <p className="font-data text-[11px] text-(--muted)">{source.rowCount} rows · {source.kind ?? "csv"}</p>
+              {source.warnings?.length ? <p className="mt-1 text-xs text-ochre">{source.warnings[0]}</p> : null}
             </div>
-            <button type="button" onClick={() => onRemoveSource(source.id)} className="rounded-[6px] border border-[var(--line)] px-3 py-1 text-xs font-semibold text-[var(--muted)] hover:border-[var(--danger)] hover:text-[var(--danger)]">
+            <button type="button" onClick={() => onRemoveSource(source.id)} className="rounded-md border border-line px-3 py-1 text-xs font-semibold text-(--muted) transition hover:border-ember hover:text-ember">
               Remove
             </button>
           </div>
-        )) : <p className="rounded-[6px] border border-[var(--line)] bg-[#fbfcf8] px-3 py-3 text-sm text-[var(--muted)]">No real statement sources added yet.</p>}
+        )) : <p className="inset px-3 py-3 text-sm text-(--muted)">No real statement sources added yet.</p>}
       </div>
 
-      <div className="mt-5 rounded-[8px] border border-[var(--line)] bg-[#fbfcf8] p-4">
-        <div className="grid gap-3 sm:grid-cols-[0.55fr_1.45fr]">
-          <input
-            value={pastedName}
-            onChange={(event) => onPastedName(event.target.value)}
-            className="h-11 rounded-[6px] border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--accent)]"
-            placeholder="source-name.csv"
-          />
-          <button type="button" onClick={onAddPastedStatement} className="h-11 rounded-[6px] bg-[#151712] px-4 text-sm font-semibold text-white transition hover:bg-[#2b3026]">
-            Add Pasted CSV
-          </button>
+      <div className="mt-5 inset p-4">
+        <p className="eyebrow">Paste a statement</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-[0.55fr_1.45fr]">
+          <input value={pastedName} onChange={(event) => onPastedName(event.target.value)} className="field" placeholder="source-name.csv" />
+          <button type="button" onClick={onAddPastedStatement} className="btn btn-primary">Add pasted CSV</button>
         </div>
-        <textarea
-          value={pastedCsv}
-          onChange={(event) => onPastedCsv(event.target.value)}
-          className="mt-3 min-h-28 w-full resize-y rounded-[6px] border border-[var(--line)] bg-white p-3 font-mono text-xs leading-5 outline-none focus:border-[var(--accent)]"
-          placeholder="Paste CSV text here when a user cannot upload a file."
-        />
+        <textarea value={pastedCsv} onChange={(event) => onPastedCsv(event.target.value)} className="field field-mono mt-3 min-h-28" placeholder="Paste CSV text here when a user cannot upload a file." />
       </div>
 
-      <div className="mt-5 rounded-[8px] border border-[var(--line)] bg-[#fbfcf8] p-4">
-        <h3 className="text-sm font-semibold text-[#151712]">Manual recurring commitment</h3>
-        <p className="mt-1 text-xs leading-5 text-[var(--muted)]">Use this for Apple, Google Play, UPI AutoPay, insurance, domains, or cloud subscriptions not visible in a CSV.</p>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <input value={manualDraft.merchant} onChange={(event) => onManualDraft({ ...manualDraft, merchant: event.target.value })} className="h-11 rounded-[6px] border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--accent)]" placeholder="Merchant, e.g. Apple iCloud" />
-          <input value={manualDraft.amount} onChange={(event) => onManualDraft({ ...manualDraft, amount: event.target.value })} className="h-11 rounded-[6px] border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--accent)]" placeholder="Amount in INR" inputMode="decimal" />
-          <select value={manualDraft.frequency} onChange={(event) => onManualDraft({ ...manualDraft, frequency: event.target.value as Frequency })} className="h-11 rounded-[6px] border border-[var(--line)] bg-white px-3 text-sm capitalize outline-none focus:border-[var(--accent)]">
+      <div className="mt-4 inset p-4">
+        <p className="eyebrow">Manual commitment</p>
+        <p className="mt-1 text-xs leading-5 text-(--muted)">For Apple, Google Play, UPI AutoPay, insurance, domains, or cloud not visible in a CSV.</p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {manualTemplates.map((template) => (
+            <button
+              key={template.label}
+              type="button"
+              onClick={() => onManualDraft({
+                ...manualDraft,
+                merchant: template.merchant,
+                amount: template.amount,
+                category: template.category,
+                sourceName: template.sourceName,
+              })}
+              className="rounded-full border border-line bg-card px-3 py-1 text-xs font-semibold text-(--muted) transition hover:border-ember hover:text-ember"
+            >
+              {template.label}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          <input value={manualDraft.merchant} onChange={(event) => onManualDraft({ ...manualDraft, merchant: event.target.value })} className="field" placeholder="Merchant, e.g. Apple iCloud" />
+          <input value={manualDraft.amount} onChange={(event) => onManualDraft({ ...manualDraft, amount: event.target.value })} className="field" placeholder="Amount in INR" inputMode="decimal" />
+          <select value={manualDraft.frequency} onChange={(event) => onManualDraft({ ...manualDraft, frequency: event.target.value as Frequency })} className="field capitalize">
             {frequencyOptions.map((frequency) => <option key={frequency} value={frequency}>{frequency}</option>)}
           </select>
-          <input value={manualDraft.nextExpectedDate} onChange={(event) => onManualDraft({ ...manualDraft, nextExpectedDate: event.target.value })} type="date" className="h-11 rounded-[6px] border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--accent)]" />
-          <select value={manualDraft.category} onChange={(event) => onManualDraft({ ...manualDraft, category: event.target.value })} className="h-11 rounded-[6px] border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--accent)]">
+          <input value={manualDraft.nextExpectedDate} onChange={(event) => onManualDraft({ ...manualDraft, nextExpectedDate: event.target.value })} type="date" className="field" />
+          <select value={manualDraft.category} onChange={(event) => onManualDraft({ ...manualDraft, category: event.target.value })} className="field">
             {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
           </select>
-          <input value={manualDraft.sourceName} onChange={(event) => onManualDraft({ ...manualDraft, sourceName: event.target.value })} className="h-11 rounded-[6px] border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--accent)]" placeholder="Source, e.g. phone check" />
+          <input value={manualDraft.sourceName} onChange={(event) => onManualDraft({ ...manualDraft, sourceName: event.target.value })} className="field" placeholder="Source, e.g. phone check" />
         </div>
-        <button type="button" onClick={onAddManualItem} className="mt-3 h-11 w-full rounded-[6px] bg-[var(--accent)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--accent-strong)]">
-          Add Manual Commitment
-        </button>
+        <button type="button" onClick={onAddManualItem} className="btn btn-ember mt-3 w-full">Add manual commitment</button>
         {manualItems.length ? (
           <div className="mt-3 grid gap-2">
             {manualItems.map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-3 rounded-[6px] border border-[var(--line)] bg-white px-3 py-2">
+              <div key={item.id} className="flex items-center justify-between gap-3 rounded-md border border-line bg-card px-3 py-2">
                 <div>
-                  <p className="text-sm font-semibold text-[#20251d]">{item.merchant}</p>
-                  <p className="text-xs text-[var(--muted)]">{formatCurrency(item.amount)} | {item.frequency} | {item.category}</p>
+                  <p className="text-sm font-semibold text-(--ink)">{item.merchant}</p>
+                  <p className="font-data text-xs text-(--muted)">{formatCurrency(item.amount)} · {item.frequency} · {item.category}</p>
                 </div>
-                <button type="button" onClick={() => onRemoveManualItem(item.id)} className="rounded-[6px] border border-[var(--line)] px-3 py-1 text-xs font-semibold text-[var(--muted)] hover:border-[var(--danger)] hover:text-[var(--danger)]">
+                <button type="button" onClick={() => onRemoveManualItem(item.id)} className="rounded-md border border-line px-3 py-1 text-xs font-semibold text-(--muted) transition hover:border-ember hover:text-ember">
                   Remove
                 </button>
               </div>
@@ -458,9 +866,9 @@ function DataSourcesPanel({
         ) : null}
       </div>
 
-      {notice ? <p className="mt-4 rounded-[6px] border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">{notice}</p> : null}
+      {notice ? <p className="mt-4 rounded-md border border-indigo bg-(--indigo-tint) px-3 py-2 text-sm text-indigo">{notice}</p> : null}
       {warnings.length ? (
-        <div className="mt-3 rounded-[6px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+        <div className="mt-3 rounded-md border border-ochre bg-(--ochre-tint) px-3 py-2 text-xs leading-5 text-ochre">
           {warnings.slice(0, 4).map((warning) => <p key={warning}>{warning}</p>)}
         </div>
       ) : null}
@@ -468,13 +876,212 @@ function DataSourcesPanel({
   );
 }
 
+function QuickStartPanel() {
+  const steps = [
+    ["1", "Upload sources", "Add CSV/PDF statements from cards or banks. CSV is most accurate."],
+    ["2", "Add missing mandates", "Use manual templates for Apple, Google Play, UPI AutoPay, card mandates, domains, insurance, and cloud."],
+    ["3", "Review evidence", "Open each recurring item, verify the proof, then mark keep, watch, downgrade, cancel, or investigate."],
+    ["4", "Export actions", "Download PDF/CSV reports or a private workspace backup for later review."],
+  ];
+
+  return (
+    <section className="panel p-5 sm:p-6">
+      <span className="folio" data-folio="§ 01">Procedure</span>
+      <div className="mt-5 grid gap-5 md:grid-cols-4">
+        {steps.map(([number, title, body], index) => (
+          <div key={title} className="relative">
+            {index < steps.length - 1 ? <span className="absolute -right-4 top-4 hidden h-px w-7 bg-(--line-strong) md:block" aria-hidden /> : null}
+            <span className="font-display text-4xl font-semibold leading-none text-ember">{number}</span>
+            <h2 className="mt-3 font-display text-base font-semibold text-(--ink)">{title}</h2>
+            <p className="mt-1.5 text-xs leading-5 text-(--muted)">{body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function UserControlPanel({
+  coverageScore,
+  coverageSignals,
+  localSaveEnabled,
+  onEnableLocalSave,
+  onDisableLocalSave,
+}: {
+  coverageScore: number;
+  coverageSignals: CoverageSignal[];
+  localSaveEnabled: boolean;
+  onEnableLocalSave: () => void;
+  onDisableLocalSave: () => void;
+}) {
+  return (
+    <section className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr]">
+      <div className="panel p-5 sm:p-6">
+        <p className="eyebrow">Audit completeness</p>
+        <div className="mt-3 flex items-end gap-3">
+          <p className="font-display text-6xl font-semibold leading-none text-ember">{coverageScore}<span className="text-3xl">%</span></p>
+          <p className="pb-2 text-sm text-(--muted)">source coverage</p>
+        </div>
+        <div className="mt-4 grid gap-2">
+          {coverageSignals.map((signal) => (
+            <div key={signal.label} className="inset flex items-center justify-between px-3 py-2 text-sm">
+              <span className="font-semibold text-(--ink)">{signal.label}</span>
+              <span className={signal.done ? "pill pill-ready" : "pill pill-planned"}>{signal.done ? "Added" : "Check"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel p-5 sm:p-6">
+        <SectionHead folio="§ 02" kicker="Chain of custody" title="Use it safely" desc="By default Vognary needs no account and stores nothing on a backend. Export a backup file, or opt in to save this workspace in this browser only." />
+        <div className="mt-4 flex flex-wrap gap-2">
+          {localSaveEnabled ? (
+            <button type="button" onClick={onDisableLocalSave} className="btn btn-ghost" style={{ borderColor: "var(--ember)", color: "var(--ember)" }}>
+              Delete browser save
+            </button>
+          ) : (
+            <button type="button" onClick={onEnableLocalSave} className="btn btn-primary">
+              Save on this device
+            </button>
+          )}
+          <a href="/sources" className="btn btn-ghost">Open source guide</a>
+        </div>
+        <p className="mt-3 text-xs leading-5 text-(--muted)">Do not enable browser save on shared machines. Backups contain source text — keep them private.</p>
+      </div>
+    </section>
+  );
+}
+
+function ReceiptIntelligencePanel({
+  receiptText,
+  candidates,
+  onReceiptText,
+  onImportCandidate,
+  onImportAll,
+}: {
+  receiptText: string;
+  candidates: ReceiptCandidate[];
+  onReceiptText: (value: string) => void;
+  onImportCandidate: (candidate: ReceiptCandidate) => void;
+  onImportAll: () => void;
+}) {
+  return (
+    <section className="panel p-5 sm:p-6">
+      <SectionHead
+        folio="§ 04"
+        kicker="Receipts"
+        title="Receipt intelligence"
+        desc="Paste invoice or renewal snippets. Gmail OAuth can feed this parser after verification."
+        right={<button type="button" onClick={onImportAll} className="btn btn-primary">Import all</button>}
+      />
+      <textarea
+        value={receiptText}
+        onChange={(event) => onReceiptText(event.target.value)}
+        className="field mt-4 min-h-28 leading-6"
+        placeholder="Paste email snippets: Your Claude subscription renewed for ₹1,700. Next billing 2026-08-08."
+      />
+      <div className="mt-3 grid gap-2">
+        {candidates.length ? candidates.map((candidate) => (
+          <div key={candidate.id} className="inset p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-(--ink)">{candidate.merchant}</p>
+                <p className="font-data text-xs text-(--muted)">{formatCurrency(candidate.amount)} · {candidate.frequency} · {candidate.category} · {candidate.confidenceScore}%</p>
+              </div>
+              <button type="button" onClick={() => onImportCandidate(candidate)} className="btn btn-ember" style={{ height: "2.1rem", padding: "0 0.85rem" }}>
+                Add
+              </button>
+            </div>
+            <p className="mt-2 line-clamp-2 text-xs leading-5 text-(--muted)">{candidate.evidenceText}</p>
+          </div>
+        )) : <p className="inset px-3 py-3 text-sm text-(--muted)">No receipt candidates yet.</p>}
+      </div>
+    </section>
+  );
+}
+
 function CoveragePanel({ statementCount, manualCount }: { statementCount: number; manualCount: number }) {
   return (
-    <section className="rounded-[8px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-[#151712]">Coverage Map</h2>
-      <p className="mt-1 text-sm text-[var(--muted)]">This is how we avoid fake completeness claims. Vognary shows exactly what is and is not connected.</p>
+    <section className="panel p-5 sm:p-6">
+      <SectionHead folio="§ 05" kicker="Sources" title="Connected sources" desc="What is connected and what still needs a manual check, so the audit stays honest." />
       <div className="mt-4 grid gap-2">
         {getCoverageItems(statementCount, manualCount).map((item) => <StatusRow key={item.label} {...item} />)}
+      </div>
+    </section>
+  );
+}
+
+function BetaEvidencePanel({
+  betaLeadDraft,
+  betaLeads,
+  onBetaLeadDraft,
+  onAddBetaLead,
+  onExportBetaEvidence,
+}: {
+  betaLeadDraft: BetaLeadDraft;
+  betaLeads: BetaLead[];
+  onBetaLeadDraft: (draft: BetaLeadDraft) => void;
+  onAddBetaLead: () => void;
+  onExportBetaEvidence: () => void;
+}) {
+  const uploadedCount = betaLeads.filter((lead) => lead.uploadedSources).length;
+  const wasteCount = betaLeads.filter((lead) => lead.foundWaste).length;
+  const payCount = betaLeads.filter((lead) => lead.willingToPay).length;
+
+  return (
+    <section className="panel p-5 sm:p-6">
+      <SectionHead
+        folio="§ 06"
+        kicker="Evidence"
+        title="Beta evidence tracker"
+        desc="Track the day-90 validation gates from real founder and user audits."
+        right={<button type="button" onClick={onExportBetaEvidence} className="btn btn-ghost">Export CSV</button>}
+      />
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <MiniStat label="Uploaded" value={`${uploadedCount}/${betaLeads.length}`} />
+        <MiniStat label="Found waste" value={`${wasteCount}/${betaLeads.length}`} />
+        <MiniStat label="Would pay" value={`${payCount}/${betaLeads.length}`} />
+      </div>
+      <div className="mt-4 grid gap-2.5">
+        <input value={betaLeadDraft.name} onChange={(event) => onBetaLeadDraft({ ...betaLeadDraft, name: event.target.value })} className="field" placeholder="User or company name" />
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          <input value={betaLeadDraft.segment} onChange={(event) => onBetaLeadDraft({ ...betaLeadDraft, segment: event.target.value })} className="field" placeholder="Segment" />
+          <input value={betaLeadDraft.estimatedAnnualSavings} onChange={(event) => onBetaLeadDraft({ ...betaLeadDraft, estimatedAnnualSavings: event.target.value })} className="field" placeholder="Estimated annual savings" inputMode="decimal" />
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <CheckboxLine label="Uploaded sources" checked={betaLeadDraft.uploadedSources} onChange={(checked) => onBetaLeadDraft({ ...betaLeadDraft, uploadedSources: checked })} />
+          <CheckboxLine label="Found waste" checked={betaLeadDraft.foundWaste} onChange={(checked) => onBetaLeadDraft({ ...betaLeadDraft, foundWaste: checked })} />
+          <CheckboxLine label="Would pay" checked={betaLeadDraft.willingToPay} onChange={(checked) => onBetaLeadDraft({ ...betaLeadDraft, willingToPay: checked })} />
+        </div>
+        <textarea value={betaLeadDraft.notes} onChange={(event) => onBetaLeadDraft({ ...betaLeadDraft, notes: event.target.value })} className="field min-h-20" placeholder="Quote, objection, or follow-up" />
+        <button type="button" onClick={onAddBetaLead} className="btn btn-ember">Add beta evidence</button>
+      </div>
+      {betaLeads.length ? (
+        <div className="mt-4 grid gap-2">
+          {betaLeads.slice(-4).map((lead) => (
+            <div key={lead.id} className="inset p-3 text-sm">
+              <p className="font-semibold text-(--ink)">{lead.name} <span className="font-normal text-(--muted)">· {lead.segment}</span></p>
+              <p className="mt-1 font-data text-xs text-(--muted)">Savings {formatCurrency(lead.estimatedAnnualSavings)} · uploaded {String(lead.uploadedSources)} · waste {String(lead.foundWaste)} · pay {String(lead.willingToPay)}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function PricingPanel({ selectedPlan, onSelectedPlan }: { selectedPlan: string; onSelectedPlan: (plan: string) => void }) {
+  return (
+    <section className="panel p-5 sm:p-6">
+      <SectionHead folio="§ 09" kicker="Pricing" title="Willingness-to-pay test" desc="Use this during founder calls to test pricing before building billing." />
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        {pricingPlans.map((plan) => (
+          <button key={plan.name} type="button" onClick={() => onSelectedPlan(plan.name)} className={`rounded-[11px] border p-4 text-left transition ${selectedPlan === plan.name ? "border-ember bg-(--ember-tint)" : "border-line bg-(--card-2) hover:border-ember"}`}>
+            <p className="text-sm font-semibold text-(--ink)">{plan.name}</p>
+            <p className="font-display mt-2 text-3xl font-semibold text-ember">{plan.price}</p>
+            <p className="mt-2 text-xs leading-5 text-(--muted)">{plan.detail}</p>
+          </button>
+        ))}
       </div>
     </section>
   );
@@ -494,42 +1101,41 @@ function RecurringGraph({
   onSelect: (id: string) => void;
 }) {
   return (
-    <section className="rounded-[8px] border border-[var(--line)] bg-[var(--surface)] shadow-sm">
-      <div className="flex flex-col gap-2 border-b border-[var(--line)] px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+    <section className="panel overflow-hidden">
+      <div className="flex flex-col gap-2 border-b border-(--line) px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-[#151712]">Recurring Money Graph</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            {audit.summary.recurringCount} recurring items from {audit.summary.transactionCount} debit transactions.
-          </p>
+          <span className="folio" data-folio="§ 07">The ledger</span>
+          <h2 className="mt-2 font-display text-xl font-semibold tracking-tight text-(--ink)">Recurring money graph</h2>
+          <p className="mt-1 text-sm text-(--muted)">{audit.summary.recurringCount} recurring items from {audit.summary.transactionCount} debit transactions.</p>
         </div>
-        <p className="font-mono text-xs text-[var(--muted)]">Avg confidence {Math.round(audit.summary.averageConfidence)}%</p>
+        <p className="font-data text-xs text-(--muted)">Avg confidence {Math.round(audit.summary.averageConfidence)}%</p>
       </div>
 
       {audit.recurringItems.length ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
-            <thead className="bg-[#f5f7f0] text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+          <table className="w-full min-w-[46rem] border-separate border-spacing-0 text-left text-sm">
+            <thead>
               <tr>
-                <th className="px-5 py-3 font-semibold">Merchant</th>
-                <th className="px-5 py-3 font-semibold">Frequency</th>
-                <th className="px-5 py-3 font-semibold">Monthly</th>
-                <th className="px-5 py-3 font-semibold">Next debit</th>
-                <th className="px-5 py-3 font-semibold">Signal</th>
+                <th className="border-b border-(--line) bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Merchant</th>
+                <th className="border-b border-(--line) bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Cadence</th>
+                <th className="border-b border-(--line) bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Monthly</th>
+                <th className="border-b border-(--line) bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Next debit</th>
+                <th className="border-b border-(--line) bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Verdict</th>
               </tr>
             </thead>
             <tbody>
               {audit.recurringItems.map((item) => {
                 const action = userActions[item.id] ?? item.recommendationType;
                 return (
-                  <tr key={item.id} onClick={() => onSelect(item.id)} className={`cursor-pointer transition hover:bg-[#f8fbf4] ${selectedItem?.id === item.id ? "bg-[#eef8f2]" : "bg-white"}`}>
-                    <td className="border-b border-[var(--line)] px-5 py-4">
-                      <p className="font-semibold text-[#151712]">{item.merchant}</p>
-                      <p className="mt-1 text-xs text-[var(--muted)]">{item.category} | {item.confidenceScore}% confidence</p>
+                  <tr key={item.id} onClick={() => onSelect(item.id)} data-active={selectedItem?.id === item.id} className="ledger-row cursor-pointer">
+                    <td className="border-b border-(--line) px-5 py-3.5">
+                      <p className="font-semibold text-(--ink)">{item.merchant}</p>
+                      <p className="mt-0.5 font-data text-[11px] text-(--muted)">{item.category} · {item.confidenceScore}% confidence</p>
                     </td>
-                    <td className="border-b border-[var(--line)] px-5 py-4 capitalize">{item.frequency}</td>
-                    <td className="border-b border-[var(--line)] px-5 py-4 font-semibold">{formatCurrency(item.monthlyCost)}</td>
-                    <td className="border-b border-[var(--line)] px-5 py-4 font-mono text-xs">{item.nextExpectedDate}</td>
-                    <td className="border-b border-[var(--line)] px-5 py-4"><span className={`rounded-[999px] border px-3 py-1 text-xs font-semibold capitalize ${statusStyles[action]}`}>{action}</span></td>
+                    <td className="border-b border-(--line) px-5 py-3.5 capitalize text-(--ink-soft)">{item.frequency}</td>
+                    <td className="border-b border-(--line) px-5 py-3.5 font-data font-semibold tnum text-(--ink)">{formatCurrency(item.monthlyCost)}</td>
+                    <td className="border-b border-(--line) px-5 py-3.5 font-data text-xs text-(--muted)">{item.nextExpectedDate}</td>
+                    <td className="border-b border-(--line) px-5 py-3.5"><span className={statusStyles[action]}>{action}</span></td>
                   </tr>
                 );
               })}
@@ -537,9 +1143,10 @@ function RecurringGraph({
           </table>
         </div>
       ) : (
-        <div className="px-5 py-12 text-center">
-          <h3 className="text-xl font-semibold text-[#151712]">{hasRealData ? "No recurring pattern found yet" : "Start with real sources"}</h3>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[var(--muted)]">
+        <div className="px-5 py-14 text-center">
+          <p className="font-data text-xs uppercase tracking-[0.2em] text-(--muted)">{hasRealData ? "No pattern yet" : "Awaiting evidence"}</p>
+          <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">{hasRealData ? "No recurring pattern found yet" : "Start with real sources"}</h3>
+          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">
             {hasRealData ? "Add more months of statements or use manual entries for app-store, UPI, insurance, cloud, or domain commitments that do not appear in this statement." : "Upload CSV statements or add manual commitments. The sample is optional and only for demos."}
           </p>
         </div>
@@ -548,22 +1155,54 @@ function RecurringGraph({
   );
 }
 
+function PriorityActionPanel({
+  priorityItems,
+  userActions,
+  onSelect,
+}: {
+  priorityItems: RecurringItem[];
+  userActions: Record<string, RecommendationType>;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <section className="panel p-5 sm:p-6">
+      <SectionHead folio="§ 08" kicker="Priority" title="Priority action plan" desc="Start with these before the next billing cycle." />
+      <div className="mt-4 grid gap-2">
+        {priorityItems.length ? priorityItems.map((item) => {
+          const action = userActions[item.id] ?? item.recommendationType;
+          return (
+            <button key={item.id} type="button" onClick={() => onSelect(item.id)} className="inset w-full p-3 text-left transition hover:border-(--ember)">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-(--ink)">{item.merchant}</p>
+                  <p className="mt-0.5 font-data text-xs leading-5 text-(--muted)">{formatCurrency(item.monthlyCost)}/mo · renews {item.nextExpectedDate} · {item.confidenceScore}%</p>
+                </div>
+                <span className={statusStyles[action]}>{action}</span>
+              </div>
+            </button>
+          );
+        }) : <p className="inset px-3 py-3 text-sm text-(--muted)">Add sources to generate an action plan.</p>}
+      </div>
+    </section>
+  );
+}
+
 function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; action: RecommendationType; onAction: (action: RecommendationType) => void }) {
   return (
     <section className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr]">
-      <div className="rounded-[8px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
-        <p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Selected recurring item</p>
-        <h2 className="mt-3 text-2xl font-semibold text-[#151712]">{item.merchant}</h2>
-        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{item.recommendationReason}</p>
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <MiniStat label="Average debit" value={formatCurrency(item.averageAmount)} />
-          <MiniStat label="Annual cost" value={formatCurrency(item.annualCost)} />
-          <MiniStat label="Amount range" value={`${formatCurrency(item.amountMin)} - ${formatCurrency(item.amountMax)}`} />
-          <MiniStat label="Evidence rows" value={`${item.evidence.length}`} />
+      <div className="dossier p-6">
+        <span className="folio" data-folio="§ 10" style={{ color: "var(--dossier-muted)" }}>Exhibit</span>
+        <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight text-(--dossier-ink)">{item.merchant}</h2>
+        <p className="mt-2 text-sm leading-6 muted-on-dark">{item.recommendationReason}</p>
+        <div className="mt-5 grid grid-cols-2 gap-2.5">
+          <DossierStat label="Average debit" value={formatCurrency(item.averageAmount)} />
+          <DossierStat label="Annual cost" value={formatCurrency(item.annualCost)} />
+          <DossierStat label="Amount range" value={`${formatCurrency(item.amountMin)} – ${formatCurrency(item.amountMax)}`} />
+          <DossierStat label="Evidence rows" value={`${item.evidence.length}`} />
         </div>
         <div className="mt-5">
-          <label className="block text-sm font-semibold text-[#20251d]" htmlFor="action-select">Founder action</label>
-          <select id="action-select" value={action} onChange={(event) => onAction(event.target.value as RecommendationType)} className="mt-2 h-11 w-full rounded-[6px] border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--accent)]">
+          <label className="font-data text-[0.62rem] uppercase tracking-[0.18em]" style={{ color: "var(--dossier-muted)" }} htmlFor="action-select">Issue verdict</label>
+          <select id="action-select" value={action} onChange={(event) => onAction(event.target.value as RecommendationType)} className="mt-2 h-11 w-full rounded-[9px] border px-3 text-sm outline-none" style={{ background: "rgba(243,234,214,0.06)", borderColor: "var(--dossier-line)", color: "var(--dossier-ink)" }}>
             <option value="keep">Keep</option>
             <option value="watch">Watch</option>
             <option value="downgrade">Downgrade</option>
@@ -572,33 +1211,27 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
           </select>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          {item.riskTags.length ? item.riskTags.map((tag) => <span key={tag} className="rounded-[999px] border border-[var(--line)] bg-[#f8faf4] px-3 py-1 text-xs font-semibold text-[var(--muted)]">{tag}</span>) : <span className="text-sm text-[var(--muted)]">No risk tags yet.</span>}
+          {item.riskTags.length ? item.riskTags.map((tag) => <span key={tag} className="rounded-full border px-3 py-1 font-data text-[0.6rem] uppercase tracking-[0.12em]" style={{ borderColor: "var(--dossier-line)", color: "var(--dossier-muted)" }}>{tag}</span>) : <span className="text-sm muted-on-dark">No risk tags yet.</span>}
         </div>
       </div>
 
-      <div className="rounded-[8px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-[#151712]">Evidence Trail</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">Every recommendation has transaction-level proof.</p>
-          </div>
-          <span className="rounded-[999px] bg-[#edf3e8] px-3 py-1 font-mono text-xs text-[var(--muted)]">{item.sourceNames.join(", ")}</span>
-        </div>
-        <div className="mt-4 overflow-hidden rounded-[8px] border border-[var(--line)]">
+      <div className="panel p-5 sm:p-6">
+        <SectionHead folio="§ 10" kicker="Proof" title="Evidence trail" desc="Every verdict traces back to transaction-level proof." right={<span className="pill pill-partial">{item.sourceNames.join(", ")}</span>} />
+        <div className="mt-4 overflow-hidden rounded-[11px] border border-(--line)">
           <table className="w-full border-separate border-spacing-0 text-left text-sm">
-            <thead className="bg-[#f5f7f0] text-xs uppercase tracking-[0.14em] text-[var(--muted)]">
+            <thead>
               <tr>
-                <th className="px-4 py-3 font-semibold">Date</th>
-                <th className="px-4 py-3 font-semibold">Amount</th>
-                <th className="px-4 py-3 font-semibold">Statement text</th>
+                <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Date</th>
+                <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Amount</th>
+                <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Statement text</th>
               </tr>
             </thead>
             <tbody>
               {item.evidence.map((evidence) => (
-                <tr key={`${evidence.source}-${evidence.rowNumber}-${evidence.date}`} className="bg-white">
-                  <td className="border-t border-[var(--line)] px-4 py-3 font-mono text-xs">{evidence.date}</td>
-                  <td className="border-t border-[var(--line)] px-4 py-3 font-semibold">{formatCurrency(evidence.amount)}</td>
-                  <td className="border-t border-[var(--line)] px-4 py-3 text-[var(--muted)]">{evidence.description}</td>
+                <tr key={`${evidence.source}-${evidence.rowNumber}-${evidence.date}`}>
+                  <td className="border-t border-(--line) px-4 py-3 font-data text-xs text-(--muted)">{evidence.date}</td>
+                  <td className="border-t border-(--line) px-4 py-3 font-data font-semibold tnum text-(--ink)">{formatCurrency(evidence.amount)}</td>
+                  <td className="border-t border-(--line) px-4 py-3 text-(--ink-soft)">{evidence.description}</td>
                 </tr>
               ))}
             </tbody>
@@ -609,16 +1242,123 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
   );
 }
 
+function DossierStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[9px] border px-3 py-2.5" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
+      <p className="font-data text-[0.54rem] uppercase tracking-[0.18em]" style={{ color: "var(--dossier-muted)" }}>{label}</p>
+      <p className="font-data mt-1.5 text-sm font-semibold tnum text-(--dossier-ink)">{value}</p>
+    </div>
+  );
+}
+
+function TeamReviewPanel({
+  audit,
+  teamMembers,
+  memberDraft,
+  itemOwners,
+  reviewNotes,
+  reviewCompletedAt,
+  onMemberDraft,
+  onAddTeamMember,
+  onRemoveTeamMember,
+  onItemOwner,
+  onReviewNote,
+  onCompleteReview,
+}: {
+  audit: AuditResult;
+  teamMembers: TeamMember[];
+  memberDraft: { name: string; role: string };
+  itemOwners: Record<string, string>;
+  reviewNotes: Record<string, string>;
+  reviewCompletedAt: string | null;
+  onMemberDraft: (draft: { name: string; role: string }) => void;
+  onAddTeamMember: () => void;
+  onRemoveTeamMember: (id: string) => void;
+  onItemOwner: (itemId: string, ownerId: string) => void;
+  onReviewNote: (itemId: string, note: string) => void;
+  onCompleteReview: () => void;
+}) {
+  const assignedCount = audit.recurringItems.filter((item) => itemOwners[item.id]).length;
+  const actionedCount = audit.recurringItems.filter((item) => ["cancel", "downgrade", "investigate", "watch"].includes(item.recommendationType)).length;
+
+  return (
+    <section className="panel p-5 sm:p-6">
+      <SectionHead
+        folio="§ 11"
+        kicker="Review"
+        title="Team monthly review"
+        desc="Assign recurring spend to owners, record notes, and close the monthly review."
+        right={<button type="button" onClick={onCompleteReview} className="btn btn-primary">Mark review complete</button>}
+      />
+      <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
+        <MiniStat label="Team members" value={`${teamMembers.length}`} />
+        <MiniStat label="Assigned items" value={`${assignedCount}/${audit.recurringItems.length}`} />
+        <MiniStat label="Needs review" value={`${actionedCount}`} />
+      </div>
+      {reviewCompletedAt ? <p className="mt-3 rounded-md border border-(--verdict) bg-(--verdict-tint) px-3 py-2 text-sm text-(--verdict)">Review completed at {new Date(reviewCompletedAt).toLocaleString("en-IN")}.</p> : null}
+
+      <div className="mt-4 inset p-4">
+        <p className="eyebrow">Review team</p>
+        <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+          <input value={memberDraft.name} onChange={(event) => onMemberDraft({ ...memberDraft, name: event.target.value })} className="field" placeholder="Name" />
+          <input value={memberDraft.role} onChange={(event) => onMemberDraft({ ...memberDraft, role: event.target.value })} className="field" placeholder="Role" />
+          <button type="button" onClick={onAddTeamMember} className="btn btn-primary">Add</button>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {teamMembers.map((member) => (
+            <span key={member.id} className="inline-flex items-center gap-2 rounded-full border border-(--line) bg-(--card) px-3 py-1 text-xs font-semibold text-(--muted)">
+              {member.name} · {member.role}
+              {member.id !== "founder" ? <button type="button" onClick={() => onRemoveTeamMember(member.id)} className="text-(--ember)">Remove</button> : null}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 overflow-x-auto rounded-[11px] border border-(--line)">
+        <table className="w-full min-w-[46rem] border-separate border-spacing-0 text-left text-sm">
+          <thead>
+            <tr>
+              <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Merchant</th>
+              <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Monthly</th>
+              <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Signal</th>
+              <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Owner</th>
+              <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Review note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {audit.recurringItems.map((item) => (
+              <tr key={item.id}>
+                <td className="border-t border-(--line) px-4 py-3 font-semibold text-(--ink)">{item.merchant}</td>
+                <td className="border-t border-(--line) px-4 py-3 font-data tnum text-(--ink-soft)">{formatCurrency(item.monthlyCost)}</td>
+                <td className="border-t border-(--line) px-4 py-3"><span className={statusStyles[item.recommendationType]}>{item.recommendationType}</span></td>
+                <td className="border-t border-(--line) px-4 py-3">
+                  <select value={itemOwners[item.id] ?? ""} onChange={(event) => onItemOwner(item.id, event.target.value)} className="field" style={{ height: "2.3rem", fontSize: "0.78rem" }}>
+                    <option value="">Unassigned</option>
+                    {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+                  </select>
+                </td>
+                <td className="border-t border-(--line) px-4 py-3">
+                  <input value={reviewNotes[item.id] ?? ""} onChange={(event) => onReviewNote(item.id, event.target.value)} className="field" style={{ height: "2.3rem", fontSize: "0.78rem" }} placeholder="Usage, cancel path, decision" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function ReadinessPanel({ statementCount, manualCount }: { statementCount: number; manualCount: number }) {
   return (
-    <section className="rounded-[8px] border border-[var(--line)] bg-[var(--surface)] p-5 shadow-sm">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-[#151712]">Production Readiness Track</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">This is the honest investor view: what works now, what must be built before regulated financial production.</p>
-        </div>
-        <span className="rounded-[999px] border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">Private beta MVP</span>
-      </div>
+    <section className="panel p-5 sm:p-6">
+      <SectionHead
+        folio="§ 12"
+        kicker="Readiness"
+        title="User readiness"
+        desc="What works in this self-serve audit and which connected features still need setup or partners."
+        right={<span className="pill pill-ready">Self-serve ready</span>}
+      />
       <div className="mt-4 grid gap-2 md:grid-cols-2">
         {getReadinessItems(statementCount, manualCount).map((item) => <StatusRow key={item.label} {...item} />)}
       </div>
@@ -626,47 +1366,83 @@ function ReadinessPanel({ statementCount, manualCount }: { statementCount: numbe
   );
 }
 
+function TickerStat({ label, value, tone }: { label: string; value: string; tone: "ember" | "ochre" | "paper" }) {
+  const color = tone === "ember" ? "#f0906f" : tone === "ochre" ? "#e6c07a" : "var(--dossier-ink)";
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="eyebrow muted-on-dark" style={{ fontSize: "0.54rem", letterSpacing: "0.16em" }}>{label}</span>
+      <span className="font-data text-sm font-semibold tnum" style={{ color }}>{value}</span>
+    </div>
+  );
+}
+
+function SectionHead({ folio, kicker, title, desc, right }: { folio: string; kicker: string; title: string; desc?: string; right?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <span className="folio" data-folio={folio}>{kicker}</span>
+        <h2 className="mt-2 font-display text-xl font-semibold tracking-tight text-(--ink)">{title}</h2>
+        {desc ? <p className="mt-1 max-w-xl text-sm leading-6 text-(--muted)">{desc}</p> : null}
+      </div>
+      {right ? <div className="shrink-0">{right}</div> : null}
+    </div>
+  );
+}
+
 function Metric({ label, value, tone }: { label: string; value: string; tone: "ink" | "blue" | "caution" | "accent" }) {
-  const toneClass = {
-    ink: "text-[#151712]",
-    blue: "text-[var(--blue)]",
-    caution: "text-[var(--caution)]",
-    accent: "text-[var(--accent)]",
+  const color = {
+    ink: "var(--ink)",
+    blue: "var(--indigo)",
+    caution: "var(--ochre)",
+    accent: "var(--verdict)",
   }[tone];
 
   return (
-    <div className="rounded-[8px] border border-[var(--line)] bg-[var(--surface)] px-4 py-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">{label}</p>
-      <p className={`mt-3 text-2xl font-semibold tracking-normal ${toneClass}`}>{value}</p>
+    <div className="panel-flat relative overflow-hidden px-4 py-4">
+      <div className="flex items-center justify-between">
+        <p className="eyebrow" style={{ fontSize: "0.58rem" }}>{label}</p>
+        <span className="size-1.5 rounded-full" style={{ background: color }} />
+      </div>
+      <p className="font-data mt-3 text-[1.7rem] font-semibold leading-none tnum" style={{ color }}>{value}</p>
+      <span className="mt-3 block h-px w-full" style={{ background: `color-mix(in srgb, ${color} 45%, var(--line))` }} />
     </div>
   );
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[6px] border border-[var(--line)] bg-[#fbfcf8] p-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-[#151712]">{value}</p>
+    <div className="inset px-3 py-2.5">
+      <p className="eyebrow" style={{ fontSize: "0.54rem" }}>{label}</p>
+      <p className="font-data mt-1.5 text-sm font-semibold tnum text-(--ink)">{value}</p>
     </div>
   );
 }
 
 function StatusRow({ label, value, state }: { label: string; value: string; state: "ready" | "partial" | "blocked" | "planned" }) {
-  const stateClass = {
-    ready: "bg-emerald-50 text-emerald-800 border-emerald-200",
-    partial: "bg-blue-50 text-blue-800 border-blue-200",
-    blocked: "bg-amber-50 text-amber-900 border-amber-200",
-    planned: "bg-stone-100 text-stone-800 border-stone-200",
+  const pillClass = {
+    ready: "pill pill-ready",
+    partial: "pill pill-partial",
+    blocked: "pill pill-blocked",
+    planned: "pill pill-planned",
   }[state];
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[6px] border border-[var(--line)] bg-[#fbfcf8] px-3 py-2">
+    <div className="inset flex items-center justify-between gap-3 px-3 py-2.5">
       <div>
-        <p className="text-sm font-semibold text-[#20251d]">{label}</p>
-        <p className="text-xs leading-5 text-[var(--muted)]">{value}</p>
+        <p className="text-sm font-semibold text-(--ink)">{label}</p>
+        <p className="text-xs leading-5 text-(--muted)">{value}</p>
       </div>
-      <span className={`shrink-0 rounded-[999px] border px-2 py-1 text-[11px] font-semibold capitalize ${stateClass}`}>{state}</span>
+      <span className={`${pillClass} shrink-0`}>{state}</span>
     </div>
+  );
+}
+
+function CheckboxLine({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className={`flex h-11 cursor-pointer items-center gap-2 rounded-[9px] border px-3 text-sm font-semibold transition ${checked ? "border-verdict bg-(--verdict-tint) text-(--ink)" : "border-line bg-card text-(--ink-soft)"}`}>
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="size-4" style={{ accentColor: "var(--verdict)" }} />
+      {label}
+    </label>
   );
 }
 
@@ -674,10 +1450,10 @@ function getCoverageItems(statementCount: number, manualCount: number) {
   return [
     { label: "CSV statements", value: statementCount ? `${statementCount} source(s) connected` : "Connect bank/card exports", state: statementCount ? "ready" as const : "planned" as const },
     { label: "Manual commitments", value: manualCount ? `${manualCount} item(s) added` : "Use for Apple, UPI, domains, insurance", state: manualCount ? "ready" as const : "partial" as const },
-    { label: "Gmail receipts", value: "Needs OAuth app verification and read-only scope", state: "blocked" as const },
-    { label: "PDF statements", value: "Backend parser next; CSV is live now", state: "planned" as const },
-    { label: "Account Aggregator", value: "Requires partner/TSP route and compliance review", state: "blocked" as const },
-    { label: "UPI/card mandates", value: "Requires provider or issuer integrations", state: "blocked" as const },
+    { label: "PDF statements", value: "Readable PDFs are supported with verification warnings", state: "partial" as const },
+    { label: "Receipt snippets", value: "Paste invoice snippets now; Gmail OAuth needs setup", state: "partial" as const },
+    { label: "Connected bank data", value: "Requires Account Aggregator partner route", state: "blocked" as const },
+    { label: "UPI/card mandates", value: "Manual today; provider APIs required for direct sync", state: "blocked" as const },
   ];
 }
 
@@ -685,15 +1461,105 @@ function getReadinessItems(statementCount: number, manualCount: number) {
   return [
     { label: "Audit engine", value: "Deterministic recurring detection, confidence, next debit, evidence", state: "ready" as const },
     { label: "Real-user workflow", value: statementCount || manualCount ? "Real sources can be audited now" : "Add sources to run a real audit", state: statementCount || manualCount ? "ready" as const : "partial" as const },
-    { label: "Data handling", value: "Browser-local; no server storage in this MVP", state: "ready" as const },
-    { label: "Export pack", value: "JSON audit pack for founder/user validation", state: "ready" as const },
-    { label: "Persistent accounts", value: "Needs auth, encrypted storage, deletion flow", state: "planned" as const },
-    { label: "Regulated production", value: "Needs legal, security review, privacy policy, integration approvals", state: "blocked" as const },
+    { label: "Data handling", value: "Session-local by default; backup file is user-controlled", state: "ready" as const },
+    { label: "Exports", value: "PDF, CSV, JSON audit pack, and private workspace backup", state: "ready" as const },
+    { label: "Accounts", value: "Optional future layer for encrypted cloud sync", state: "planned" as const },
+    { label: "Direct integrations", value: "Gmail, AA, and mandate APIs need credentials/partners", state: "blocked" as const },
   ];
+}
+
+function getCoverageSignals(statementSources: StatementFile[], manualItems: ManualRecurringInput[], receiptText: string): CoverageSignal[] {
+  const sourceNames = statementSources.map((source) => `${source.name} ${source.kind ?? "csv"}`.toLowerCase()).join(" ");
+  const manualText = manualItems.map((item) => `${item.category} ${item.sourceName} ${item.merchant}`.toLowerCase()).join(" ");
+
+  return [
+    { label: "Bank/card statements", done: statementSources.length > 0 },
+    { label: "PDF/CSV source coverage", done: statementSources.some((source) => source.kind === "pdf") || statementSources.some((source) => source.kind === "csv" || source.name.endsWith(".csv")) },
+    { label: "UPI/card mandates", done: /upi|mandate|card/.test(manualText) },
+    { label: "Apple/Google app stores", done: /apple|google play|app store/.test(manualText + sourceNames) },
+    { label: "Email receipts", done: receiptText.trim().length > 0 },
+    { label: "Cloud/SaaS tools", done: /openai|anthropic|claude|cursor|github|vercel|render|aws|cloud|domain/.test(manualText + sourceNames) },
+    { label: "EMI/SIP/insurance/utilities", done: /emi|sip|insurance|utility|utilities|telecom|debt|investment/.test(manualText + sourceNames) },
+  ];
+}
+
+function getPriorityItems(items: RecurringItem[], userActions: Record<string, RecommendationType>): RecurringItem[] {
+  const actionWeight: Record<RecommendationType, number> = {
+    cancel: 5,
+    downgrade: 4,
+    investigate: 3,
+    watch: 2,
+    keep: 0,
+  };
+
+  return [...items]
+    .sort((left, right) => {
+      const leftAction = userActions[left.id] ?? left.recommendationType;
+      const rightAction = userActions[right.id] ?? right.recommendationType;
+      return (actionWeight[rightAction] - actionWeight[leftAction]) || (right.monthlyCost - left.monthlyCost);
+    })
+    .slice(0, 5);
+}
+
+function buildWorkspaceBackup({
+  statementSources,
+  manualItems,
+  userActions,
+  itemOwners,
+  reviewNotes,
+  teamMembers,
+  receiptText,
+}: {
+  statementSources: StatementFile[];
+  manualItems: ManualRecurringInput[];
+  userActions: Record<string, RecommendationType>;
+  itemOwners: Record<string, string>;
+  reviewNotes: Record<string, string>;
+  teamMembers: TeamMember[];
+  receiptText: string;
+}): WorkspaceBackup {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    statementSources,
+    manualItems,
+    userActions,
+    itemOwners,
+    reviewNotes,
+    teamMembers,
+    receiptText,
+  };
 }
 
 function countRows(text: string): number {
   return Math.max(0, text.split(/\r?\n/).filter((row) => row.trim()).length - 1);
+}
+
+function splitReceiptText(text: string): string[] {
+  return text
+    .split(/\n\s*\n|---+|={3,}/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function getOwnerName(ownerId: string | undefined, teamMembers: TeamMember[]): string {
+  if (!ownerId) return "Unassigned";
+  return teamMembers.find((member) => member.id === ownerId)?.name ?? "Unassigned";
+}
+
+function csvEscape(value: string): string {
+  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
+
+function downloadText(fileName: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function formatCurrency(value: number): string {

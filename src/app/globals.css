@@ -1,33 +1,99 @@
 @import "tailwindcss";
 
+/*
+  VOGNARY — "The Silent Ledger"
+  A forensic finance system: warm archival paper, ink, and inked verdicts.
+  Tokens intentionally re-point the legacy variable names so existing
+  utilities (bg-(--surface), border-(--line), text-(--muted)...) adopt the
+  new palette, while new tokens power the signature ledger devices.
+*/
+
 :root {
-  --background: #f6f8f3;
-  --foreground: #151712;
-  --surface: #ffffff;
-  --surface-soft: #edf3e8;
-  --line: #d7dfd1;
-  --muted: #68715f;
-  --accent: #0f766e;
-  --accent-strong: #0b5d56;
-  --caution: #b45309;
-  --danger: #b42318;
-  --blue: #2457c5;
+  /* Paper + ink foundation */
+  --paper: #f1ead9;
+  --paper-2: #ece3cf;
+  --card: #fbf7ec;
+  --card-2: #f5eede;
+  --ink: #1c1811;
+  --ink-soft: #443c2e;
+  --line: #d9ceb2;
+  --line-strong: #c6b795;
+
+  /* Verdict accents */
+  --ember: #bf3a1d;     /* money leaving / cancel / alert */
+  --ember-tint: #f6e3d8;
+  --verdict: #0f6a55;   /* kept / saved */
+  --verdict-tint: #dcece4;
+  --ochre: #a9741a;     /* watch */
+  --ochre-tint: #f2e6cd;
+  --indigo: #33478c;    /* info */
+  --indigo-tint: #dfe2f0;
+
+  /* Dossier (dark contrast surfaces) */
+  --dossier: #211c14;
+  --dossier-2: #2c2519;
+  --dossier-ink: #f3ead6;
+  --dossier-muted: #b9ab8e;
+  --dossier-line: #453c29;
+
+  /* Legacy aliases — re-pointed to the new system */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --surface: var(--card);
+  --surface-soft: var(--card-2);
+  --muted: #6c6350;
+  --accent: var(--verdict);
+  --accent-strong: #0b5040;
+  --caution: var(--ochre);
+  --danger: var(--ember);
+  --blue: var(--indigo);
+
+  --radius: 14px;
+  --shadow-ink: 0 1px 0 rgba(28, 24, 17, 0.04), 0 14px 34px -22px rgba(28, 24, 17, 0.42);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.86' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-sora);
-  --font-mono: var(--font-plex-mono);
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-line: var(--line);
+  --color-ember: var(--ember);
+  --color-verdict: var(--verdict);
+  --color-ochre: var(--ochre);
+  --color-indigo: var(--indigo);
+  --font-sans: var(--font-grotesk);
+  --font-mono: var(--font-mono-data);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.14), transparent 32rem),
-    radial-gradient(circle at 85% 10%, rgba(180, 83, 9, 0.1), transparent 26rem),
-    linear-gradient(135deg, #f6f8f3 0%, #eef4ef 48%, #f9f7f0 100%);
-  color: var(--foreground);
-  font-family: var(--font-sora), sans-serif;
+    radial-gradient(120% 90% at 8% -10%, rgba(191, 58, 29, 0.06), transparent 46%),
+    radial-gradient(120% 90% at 100% 0%, rgba(15, 106, 85, 0.07), transparent 42%),
+    linear-gradient(178deg, #f4eddc 0%, var(--paper) 40%, #efe6d2 100%);
+  color: var(--ink);
+  font-family: var(--font-grotesk), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Paper grain — sits behind content, multiplies over the paper gradient */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--grain);
+  background-size: 180px 180px;
+  opacity: 0.05;
+  mix-blend-mode: multiply;
 }
 
 button,
@@ -35,6 +101,365 @@ input,
 textarea,
 select {
   font: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 3px solid var(--paper);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-soft);
+}
+
+/* ------------------------------------------------------------------ *
+ * Typographic devices
+ * ------------------------------------------------------------------ */
+
+.font-display {
+  font-family: var(--font-display), Georgia, serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.012em;
+}
+
+.font-data {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.eyebrow {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* § folio index eyebrow */
+.folio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.folio::before {
+  content: attr(data-folio);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.42rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  color: var(--ink);
+  background: var(--card-2);
+  letter-spacing: 0.12em;
+}
+
+.hairline {
+  height: 1px;
+  width: 100%;
+  background: repeating-linear-gradient(
+    to right,
+    var(--line) 0,
+    var(--line) 6px,
+    transparent 6px,
+    transparent 11px
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Surfaces
+ * ------------------------------------------------------------------ */
+
+.panel {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-ink);
+}
+.panel-flat {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.inset {
+  background:
+    linear-gradient(var(--card-2), var(--card-2)) padding-box;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+
+/* Dark dossier surface */
+.dossier {
+  position: relative;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(191, 58, 29, 0.16), transparent 55%),
+    linear-gradient(200deg, var(--dossier-2), var(--dossier));
+  color: var(--dossier-ink);
+  border: 1px solid var(--dossier-line);
+  border-radius: var(--radius);
+  box-shadow: 0 26px 60px -34px rgba(20, 16, 9, 0.9);
+}
+.dossier .muted-on-dark {
+  color: var(--dossier-muted);
+}
+
+/* Perforated receipt edge */
+.receipt-edge {
+  -webkit-mask:
+    radial-gradient(6px at 6px 100%, transparent 96%, #000) 0 100% / 18px 12px repeat-x;
+  mask:
+    radial-gradient(6px at 6px 100%, transparent 96%, #000) 0 100% / 18px 12px repeat-x;
+  padding-bottom: 14px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Buttons
+ * ------------------------------------------------------------------ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.6rem;
+  padding: 0 1.05rem;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: transform 0.14s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+  user-select: none;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+  box-shadow: 0 12px 24px -16px rgba(28, 24, 17, 0.8);
+}
+.btn-primary:hover {
+  background: #302819;
+}
+.btn-ember {
+  background: var(--ember);
+  color: #fff5ef;
+  border-color: color-mix(in srgb, var(--ember) 82%, #000);
+  box-shadow: 0 12px 26px -16px rgba(191, 58, 29, 0.75);
+}
+.btn-ember:hover {
+  background: #a83218;
+}
+.btn-ghost {
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+.btn-ghost:hover {
+  border-color: var(--ink);
+  background: var(--card);
+}
+.btn-ondark {
+  background: transparent;
+  color: var(--dossier-ink);
+  border-color: var(--dossier-line);
+}
+.btn-ondark:hover {
+  border-color: var(--dossier-ink);
+  background: rgba(243, 234, 214, 0.08);
+}
+
+/* ------------------------------------------------------------------ *
+ * Form fields
+ * ------------------------------------------------------------------ */
+
+.field {
+  height: 2.85rem;
+  width: 100%;
+  padding: 0 0.8rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 0.9rem;
+  color: var(--ink);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  outline: none;
+}
+textarea.field {
+  height: auto;
+  padding: 0.7rem 0.8rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+.field::placeholder {
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+}
+.field:focus {
+  border-color: var(--ember);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ember) 18%, transparent);
+}
+.field-mono {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+}
+
+/* ------------------------------------------------------------------ *
+ * Rubber-stamp verdict chips
+ * ------------------------------------------------------------------ */
+
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 6px;
+  border: 1.5px solid currentColor;
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  line-height: 1;
+  transform: rotate(-1.4deg);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, currentColor 12%, transparent);
+  transition: transform 0.16s ease;
+}
+.stamp::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+}
+.stamp-keep {
+  color: var(--verdict);
+  background: var(--verdict-tint);
+}
+.stamp-watch {
+  color: var(--indigo);
+  background: var(--indigo-tint);
+}
+.stamp-downgrade {
+  color: var(--ochre);
+  background: var(--ochre-tint);
+}
+.stamp-cancel {
+  color: var(--ember);
+  background: var(--ember-tint);
+}
+.stamp-investigate {
+  color: var(--ink-soft);
+  background: var(--card-2);
+}
+
+/* Status pills (readiness / coverage) */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.pill-ready { color: var(--verdict); background: var(--verdict-tint); }
+.pill-partial { color: var(--indigo); background: var(--indigo-tint); }
+.pill-blocked { color: var(--ember); background: var(--ember-tint); }
+.pill-planned { color: var(--ink-soft); background: var(--card-2); }
+
+/* ------------------------------------------------------------------ *
+ * Instrument ticker
+ * ------------------------------------------------------------------ */
+
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #4ade80;
+  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+  animation: pulse-dot 2.4s ease-out infinite;
+}
+
+.tape {
+  position: relative;
+  overflow: hidden;
+}
+.tape::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--ember) 65%, transparent),
+    transparent
+  );
+  background-size: 42% 100%;
+  background-repeat: no-repeat;
+  animation: tape-run 5.5s linear infinite;
+}
+
+/* Ledger table interactions */
+.ledger-row {
+  transition: background 0.16s ease, box-shadow 0.16s ease;
+}
+.ledger-row:hover {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--ochre-tint) 70%, transparent), transparent 62%);
+}
+.ledger-row[data-active="true"] {
+  background: color-mix(in srgb, var(--verdict-tint) 60%, transparent);
+  box-shadow: inset 3px 0 0 var(--ember);
+}
+
+/* ------------------------------------------------------------------ *
+ * Motion
+ * ------------------------------------------------------------------ */
+
+.rise {
+  animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes rise-in {
@@ -42,9 +467,41 @@ select {
     opacity: 0;
     transform: translateY(14px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes pulse-dot {
+  0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.55); }
+  70% { box-shadow: 0 0 0 7px rgba(74, 222, 128, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+}
+
+@keyframes tape-run {
+  from { background-position: -60% 0; }
+  to { background-position: 160% 0; }
+}
+
+@keyframes stamp-in {
+  0% { opacity: 0; transform: rotate(-1.4deg) scale(1.4); }
+  60% { opacity: 1; transform: rotate(-1.4deg) scale(0.94); }
+  100% { transform: rotate(-1.4deg) scale(1); }
+}
+.stamp-animate {
+  animation: stamp-in 0.28s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
   }
 }

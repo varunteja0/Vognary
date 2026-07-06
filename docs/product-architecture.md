@@ -25,8 +25,8 @@ The current implementation is a browser-local audit app. It intentionally avoids
 
 ### Not Included Yet
 
-- PDF statement parsing.
-- Gmail OAuth receipt scan.
+- PDF text extraction and conservative transaction conversion.
+- Gmail OAuth receipt scan endpoint and receipt candidate parser.
 - Account Aggregator integration.
 - UPI/card mandate APIs.
 - Cloud/SaaS direct connectors.
@@ -60,8 +60,8 @@ flowchart TD
 ## Build Order
 
 1. Prove local CSV recurring detection.
-2. Add PDF statement parsing.
-3. Add Gmail read-only invoice scan.
+2. Improve PDF table parsing beyond the current text heuristic.
+3. Complete Gmail OAuth verification and connect the receipt candidates into the UI.
 4. Add user accounts and encrypted storage.
 5. Add team workspaces and shared audit reports.
 6. Add cloud/SaaS connectors for OpenAI, Anthropic, GitHub, Vercel, Render, AWS, and domains.

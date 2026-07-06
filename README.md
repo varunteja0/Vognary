@@ -5,11 +5,14 @@ Vognary is a recurring-money audit MVP for founders, builders, freelancers, and 
 ## Current MVP
 
 - Browser-local CSV upload and paste flow.
+- PDF upload through stateless ingestion.
 - Deterministic recurring-payment detector.
 - Merchant normalization for AI tools, cloud hosting, SaaS, app stores, utilities, SIPs, EMIs, and insurance.
 - Recurring Money Graph dashboard.
 - Confidence scores, next debit prediction, evidence trail, and founder action labels.
 - JSON export for audit reports.
+- PDF report export, CSV export, and private workspace backup/import.
+- Source guide, completeness score, receipt snippet parsing, and priority actions.
 
 ## Quick Start
 
@@ -22,11 +25,16 @@ Open http://localhost:3000.
 
 The app opens with a sample founder stack. To test upload, use [public/sample-founder-stack.csv](public/sample-founder-stack.csv).
 
+Launch page: http://localhost:3000/launch
+Source guide: http://localhost:3000/sources
+Integration hub: http://localhost:3000/integrations
+
 ## Validation Command
 
 ```bash
 npm run build
 npm run lint
+npm run smoke
 ```
 
 ## Health Check
@@ -51,4 +59,13 @@ See [docs/deployment-plan.md](docs/deployment-plan.md). The current app is deplo
 
 Vognary should not become a generic budget app. The wedge is recurring financial commitments: subscriptions, card e-mandates, UPI AutoPay, EMIs, SIPs, insurance, SaaS, cloud bills, domains, app-store subscriptions, and utilities.
 
-See [docs/product-architecture.md](docs/product-architecture.md) and [docs/validation-playbook.md](docs/validation-playbook.md).
+See:
+
+- [docs/product-architecture.md](docs/product-architecture.md)
+- [docs/validation-playbook.md](docs/validation-playbook.md)
+- [docs/deployment-plan.md](docs/deployment-plan.md)
+- [docs/phase-roadmap.md](docs/phase-roadmap.md)
+- [docs/integration-checklist.md](docs/integration-checklist.md)
+- [docs/investor-demo-script.md](docs/investor-demo-script.md)
+- [docs/day-90-completion-report.md](docs/day-90-completion-report.md)
+- [docs/production-standard-report.md](docs/production-standard-report.md)
