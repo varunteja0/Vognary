@@ -127,7 +127,7 @@ const merchantRules: MerchantRule[] = [
   { pattern: /RAZORPAY/i, merchant: "Razorpay", category: "Payments" },
   { pattern: /CASHFREE/i, merchant: "Cashfree", category: "Payments" },
   { pattern: /HOSTINGER|GODADDY|NAMECHEAP|CLOUDFLARE/i, merchant: "Domain or hosting provider", category: "Domains" },
-  { pattern: /LOAN|EMI|ECS|NACH/i, merchant: "Loan or EMI", category: "Debt" },
+  { pattern: /\b(?:LOAN|EMI|ECS|NACH)\b/i, merchant: "Loan or EMI", category: "Debt" },
   { pattern: /SIP|MUTUAL FUND|ZERODHA|GROWW|KUVERA/i, merchant: "Investment SIP", category: "Investments" },
   { pattern: /INSURANCE|POLICY|LIC|HDFC LIFE|ICICI PRU/i, merchant: "Insurance", category: "Insurance" },
   { pattern: /AIRTEL|JIO|VI |VODAFONE/i, merchant: "Telecom", category: "Utilities" },
