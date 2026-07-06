@@ -1,13 +1,15 @@
 rail,provider,provider_type,contact_url_or_email,status,next_action,owner,notes
-account_aggregator,Setu / Pine Labs,TSP / open-finance,to-be-filled,outreach-started,Send sandbox access email,Varun,Verify current AA/TSP offering and FIU partner route
-account_aggregator,FinBox,TSP / open-finance,to-be-filled,outreach-started,Send sandbox access email,Varun,Ask for consented statement data for recurring audit
-account_aggregator,Decentro,TSP / open-finance,to-be-filled,outreach-started,Send sandbox access email,Varun,Ask for AA/FIU enablement or partner route
-account_aggregator,Perfios,TSP / open-finance,to-be-filled,outreach-started,Send sandbox access email,Varun,Ask for sandbox and compliance requirements
-upi_mandates,Razorpay,Payment aggregator,to-be-filled,outreach-started,Ask mandate visibility question,Varun,Clarify merchant-side vs user-wide mandate visibility
-upi_mandates,Cashfree,Payment aggregator,to-be-filled,outreach-started,Ask mandate visibility question,Varun,Clarify UPI AutoPay read APIs and merchant scope
-upi_mandates,Juspay,Payments infrastructure,to-be-filled,outreach-started,Ask PSP/mandate data route,Varun,Ask for bank/PSP partner route
-upi_mandates,PhonePe,UPI / PSP,to-be-filled,outreach-started,Ask partner access route,Varun,Ask if user-authorized mandate visibility exists
-card_mandates,Razorpay,Payment aggregator,to-be-filled,outreach-started,Ask card e-mandate visibility question,Varun,Clarify merchant-only versus issuer/network visibility
-card_mandates,Cashfree,Payment aggregator,to-be-filled,outreach-started,Ask card mandate visibility question,Varun,Ask for recurring/card mandate data fields
-card_mandates,PayU,Payment aggregator,to-be-filled,outreach-started,Ask card mandate visibility question,Varun,Ask sandbox and recurring payments metadata
-card_mandates,Juspay,Payments infrastructure,to-be-filled,outreach-started,Ask issuer/processor route,Varun,Ask for card e-mandate evidence access
+account_aggregator,Setu / Pine Labs,TSP / open-finance,https://www.pinelabs.com/contact-sales,outreach-started,Submit contact-sales form with Setu/Pine Labs copy,Varun,"Also reference https://api-playground.setu.co/ and https://www.pinelabs.com/fintech-infrastructure/account-aggregator-gateway"
+account_aggregator,FinBox,TSP / open-finance,sales@finbox.in,outreach-started,Send email with FinBox copy,Varun,"Official contact page: https://finbox.in/contact-us; ask about BankConnect and Account Aggregator"
+account_aggregator,Decentro,TSP / open-finance,hello@decentro.tech,outreach-started,Send email with Decentro copy,Varun,"Docs: https://docs.decentro.tech; signup: https://decentro.tech/signup"
+account_aggregator,Perfios,TSP / open-finance,https://perfios.ai/contact-us/,outreach-started,Submit contact form with Perfios copy,Varun,"Alternate free sandbox signup: https://hub.perfios.ai/app/register"
+account_aggregator,Digio,TSP / consent / mandates,support@digio.in,outreach-started,Send email with Digio copy,Varun,"Docs: https://documentation.digio.in/ and FIU-TSP sandbox: https://documentation.digio.in/fiu-tsp/environment/"
+account_aggregator,Sahamati,AA ecosystem routing,https://sahamati.org.in/contact/,outreach-started,Submit contact form asking for right TSP/FIU enablement contacts,Varun,"Use this to route AA ecosystem questions; TSP page: https://sahamati.org.in/tsp/"
+upi_mandates,Razorpay,Payment aggregator,https://razorpay.com/support/payments/#request,outreach-started,Raise prospective-client payments ticket with Razorpay copy,Varun,"Reference mandate docs: https://razorpay.com/docs/api/payments/tpap-pro/mandate-flow/"
+upi_mandates,Cashfree,Payment aggregator,https://www.cashfree.com/contact-sales/,outreach-started,Submit sales form with Cashfree copy,Varun,"Reference subscription docs: https://www.cashfree.com/docs/api-reference/payments/latest/subscription/overview"
+upi_mandates,Juspay,Payments infrastructure,https://juspay.io/contact,outreach-started,Submit contact form with Juspay copy,Varun,"Reference mandate docs: https://docs.juspay.io/ec-api-global/docs/mandates/introduction"
+upi_mandates,PhonePe,UPI / PSP,https://business.phonepe.com/pg/register,outreach-started,Start PG registration/contact with PhonePe copy,Varun,"Reference Autopay docs: https://developer.phonepe.com/payment-gateway/autopay/api-integration/introduction"
+card_mandates,Razorpay,Payment aggregator,https://razorpay.com/support/payments/#request,outreach-started,Raise prospective-client payments ticket with Razorpay card-mandate copy,Varun,"Clarify merchant-side subscription/mandate visibility versus consumer-wide visibility"
+card_mandates,Cashfree,Payment aggregator,https://www.cashfree.com/contact-sales/,outreach-started,Submit sales form with Cashfree card-mandate copy,Varun,"Ask for subscription fetch/payment summary/failure metadata in sandbox"
+card_mandates,PayU,Payment aggregator,https://onboarding.payu.in/app/account/signup,outreach-started,Create/submit PayU merchant inquiry with PayU copy,Varun,"Reference recurring docs: https://docs.payu.in/docs/using-api-integration-recurring-payments"
+card_mandates,Juspay,Payments infrastructure,https://juspay.io/contact,outreach-started,Submit contact form with Juspay card-mandate copy,Varun,"Ask about mandate analytics/status fields and processor routes"
