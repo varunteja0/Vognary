@@ -36,26 +36,38 @@ export default function BrandPage() {
 
         <article className="panel overflow-hidden rise">
           <div className="grid gap-0 md:grid-cols-[0.9fr_1.1fr]">
-            <div className="flex items-center justify-center border-b border-(--line) bg-(--card-2) p-12 md:border-b-0 md:border-r">
+            <div className="flex items-center justify-center border-b border-line bg-(--card-2) p-12 md:border-b-0 md:border-r">
               <VognaryMark size={140} className="text-(--ink)" animated title="Vognary mark" />
             </div>
             <div className="p-7 sm:p-9">
               <span className="folio" data-folio="§ ID">Identity</span>
               <h1 className="mt-4 font-display text-4xl font-semibold tracking-[-0.03em] text-(--ink) sm:text-5xl">
-                The Resolve
+                The Convergence
               </h1>
               <p className="mt-4 text-sm leading-7 text-(--muted)">
-                The mark is a geometric <strong className="text-(--ink)">V</strong> whose two strokes converge into a single{" "}
-                <span className="glow-num font-semibold">gold node</span> — every recurring charge, brought to one clear
-                verdict. Platinum for the instrument; champagne gold for money and the decision.
+                Two platinum strokes funnel downward and resolve into a single{" "}
+                <span className="glow-num font-semibold">faceted gold diamond</span> — every scattered recurring charge,
+                brought to one decision. Platinum is the instrument; champagne gold is money and the verdict.
               </p>
               <p className="mt-3 text-sm leading-7 text-(--muted)">
-                It reads as the letter V, a funnel of debits narrowing to a point, and a mark of judgement. Pure geometry —
-                so it stays sharp from a favicon to a billboard.
+                The diamond makes the mark unmistakably ours — it holds its shape and meaning even in a single ink, from a
+                16px favicon to a billboard. A funnel of debits, narrowing to resolved value.
               </p>
             </div>
           </div>
         </article>
+
+        <section className="panel mt-6 p-5 sm:p-6" data-reveal>
+          <span className="folio" data-folio="§ USE">The mark in use</span>
+          <h2 className="mt-2 font-display text-[1.35rem] font-semibold tracking-[-0.02em] text-(--ink)">One shape, every surface</h2>
+          <p className="mt-1 text-sm leading-6 text-(--muted)">The diamond keeps the mark unmistakable on graphite, on a gold plate, on paper, or knocked back to a single ink — no gradients, no dependencies.</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <MarkTile label="On graphite" bg="var(--card-2)" markClass="text-(--ink)" />
+            <MarkTile label="On gold" bg="var(--gold)" markClass="text-[#14161b]" mono />
+            <MarkTile label="On paper" bg="#f4f1ea" markClass="text-[#17181c]" />
+            <MarkTile label="Single ink" bg="#0b0c0f" markClass="text-(--gold)" mono />
+          </div>
+        </section>
 
         <section className="panel mt-6 p-5 sm:p-6" data-reveal>
           <span className="folio" data-folio="§ 01">Palette</span>
@@ -118,6 +130,19 @@ export default function BrandPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+function MarkTile({ label, bg, markClass, mono }: { label: string; bg: string; markClass: string; mono?: boolean }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-line">
+      <div className="flex h-28 items-center justify-center" style={{ background: bg }}>
+        <VognaryMark size={46} className={markClass} mono={mono} />
+      </div>
+      <div className="border-t border-line bg-(--card-2) px-3 py-2">
+        <p className="font-data text-[0.58rem] uppercase tracking-[0.16em] text-(--muted)">{label}</p>
+      </div>
+    </div>
   );
 }
 
