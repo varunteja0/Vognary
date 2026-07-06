@@ -1,0 +1,7 @@
+<!-- Vognary horizontal lockup — mark + wordmark. For dark backgrounds. -->
+<svg width="248" height="60" viewBox="0 0 248 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M14 19 28 43 42 19" fill="none" stroke="#e9eaee" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="28" cy="43" r="4.2" fill="#d8b87a"/>
+  <circle cx="26.5" cy="41.5" r="1.2" fill="#efdcae"/>
+  <text x="66" y="39" font-family="Geist, 'Geist Sans', ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="30" font-weight="600" letter-spacing="-0.7" fill="#e9eaee">Vognary</text>
+</svg>

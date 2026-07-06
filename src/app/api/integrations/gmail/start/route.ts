@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { gmailOAuthStateCookie, oauthStateCookieOptions } from "@/lib/oauth-state";
+
+export const dynamic = "force-dynamic";
 
 const gmailReadonlyScope = "https://www.googleapis.com/auth/gmail.readonly";
 
@@ -25,7 +28,10 @@ export function GET() {
   authUrl.searchParams.set("scope", gmailReadonlyScope);
   authUrl.searchParams.set("access_type", "offline");
   authUrl.searchParams.set("prompt", "consent");
-  authUrl.searchParams.set("state", crypto.randomUUID());
+  const state = crypto.randomUUID();
+  authUrl.searchParams.set("state", state);
 
-  return NextResponse.redirect(authUrl);
+  const response = NextResponse.redirect(authUrl);
+  response.cookies.set(gmailOAuthStateCookie, state, oauthStateCookieOptions());
+  return response;
 }

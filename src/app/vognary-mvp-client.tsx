@@ -12,6 +12,7 @@ import {
   type StatementSource,
 } from "@/lib/recurring-audit";
 import { extractReceiptCandidates, type ReceiptCandidate } from "@/lib/receipt-parser";
+import { VognaryMark } from "./brand";
 
 const categoryOptions = [
   "AI tools",
@@ -418,15 +419,15 @@ export default function VognaryMvpClient() {
 
   return (
     <main id="ledger-main" className="relative px-4 pb-12 pt-4 text-foreground sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         {/* Instrument bar — live money tape */}
         <div className="sticky top-3 z-30 rise">
           <div className="dossier glass tape flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3 sm:px-5">
-            <div className="flex items-center gap-3">
-              <span className="grid size-9 place-items-center rounded-lg border border-(--dossier-line) font-display text-xl font-semibold text-(--dossier-ink)">V</span>
+            <div className="flex items-center gap-2.5">
+              <VognaryMark size={30} className="text-(--dossier-ink)" />
               <div className="leading-tight">
-                <p className="font-display text-lg font-semibold tracking-tight text-(--dossier-ink)">Vognary</p>
-                <p className="eyebrow muted-on-dark" style={{ fontSize: "0.54rem", letterSpacing: "0.24em" }}>Blacklight for money</p>
+                <p className="font-display text-lg font-semibold tracking-[-0.02em] text-(--dossier-ink)">Vognary</p>
+                <p className="eyebrow muted-on-dark" style={{ fontSize: "0.54rem", letterSpacing: "0.18em" }}>Recurring money, audited</p>
               </div>
             </div>
             <div className="hidden h-8 w-px bg-(--dossier-line) lg:block" />
@@ -487,7 +488,7 @@ export default function VognaryMvpClient() {
                   <input type="file" accept="application/json,.json" onChange={importWorkspaceBackup} className="sr-only" />
                 </label>
               </div>
-              <div className="mt-5 rounded-[12px] border border-dashed p-4" style={{ borderColor: "var(--dossier-line)" }}>
+              <div className="mt-5 rounded-xl border border-dashed p-4" style={{ borderColor: "var(--dossier-line)" }}>
                 <p className="eyebrow muted-on-dark" style={{ fontSize: "0.6rem" }}>Verdict spectrum</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="stamp stamp-keep">Keep</span>
@@ -586,21 +587,26 @@ export default function VognaryMvpClient() {
 
         <ReadinessPanel statementCount={statementSources.length} manualCount={manualItems.length} />
         <footer className="panel flex flex-col items-center gap-3 px-5 py-5 text-center" data-reveal>
-          <span className="font-display text-base font-semibold text-(--ink)">Vognary <span className="text-(--muted)">· Blacklight for money</span></span>
+          <div className="flex items-center gap-2.5">
+            <VognaryMark size={22} className="text-(--ink)" />
+            <span className="font-display text-base font-semibold text-(--ink)">Vognary <span className="font-normal text-(--muted)">· Recurring money, audited</span></span>
+          </div>
           <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-data text-[0.66rem] uppercase tracking-[0.16em] text-(--muted)">
-            <a className="transition hover:text-ember" href="/privacy">Privacy</a>
+            <a className="transition hover:text-(--ink)" href="/privacy">Privacy</a>
             <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-ember" href="/security">Security</a>
+            <a className="transition hover:text-(--ink)" href="/security">Security</a>
             <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-ember" href="/sources">Source guide</a>
+            <a className="transition hover:text-(--ink)" href="/sources">Source guide</a>
             <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-ember" href="/integrations">Integrations</a>
+            <a className="transition hover:text-(--ink)" href="/integrations">Integrations</a>
             <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-ember" href="/terms">Terms</a>
+            <a className="transition hover:text-(--ink)" href="/terms">Terms</a>
             <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-ember" href="/beta-readiness">Beta readiness</a>
+            <a className="transition hover:text-(--ink)" href="/beta-readiness">Beta readiness</a>
             <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-ember" href="/launch">Launch</a>
+            <a className="transition hover:text-(--ink)" href="/launch">Launch</a>
+            <span className="text-(--line-strong)">·</span>
+            <a className="transition hover:text-(--ink)" href="/brand">Brand</a>
           </div>
         </footer>
       </div>
@@ -1227,7 +1233,7 @@ function SpendSpectrum({ audit, userActions, onSelect }: { audit: AuditResult; u
   const total = items.reduce((sum, item) => sum + item.monthlyCost, 0);
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="§ 06"
         kicker="Spectrum"
@@ -1260,7 +1266,7 @@ function SpendSpectrum({ audit, userActions, onSelect }: { audit: AuditResult; u
               const pct = total > 0 ? (item.monthlyCost / total) * 100 : 0;
               const color = verdictColor(action);
               return (
-                <button key={item.id} type="button" onClick={() => onSelect(item.id)} className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left transition hover:bg-white/[0.04]">
+                <button key={item.id} type="button" onClick={() => onSelect(item.id)} className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left transition hover:bg-white/4">
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="size-2 shrink-0 rounded-full" style={{ background: color, boxShadow: `0 0 8px 0 ${color}` }} />
                     <span className="truncate text-sm text-(--ink)">{item.merchant}</span>
@@ -1280,11 +1286,10 @@ function SpendSpectrum({ audit, userActions, onSelect }: { audit: AuditResult; u
 
 function TickerStat({ label, value, tone }: { label: string; value: string; tone: "ember" | "ochre" | "paper" }) {
   const color = tone === "ember" ? "var(--ember)" : tone === "ochre" ? "var(--ochre)" : "var(--dossier-ink)";
-  const textShadow = tone === "paper" ? "none" : `0 0 16px color-mix(in srgb, ${color} 45%, transparent)`;
   return (
     <div className="flex items-baseline gap-2">
-      <span className="eyebrow muted-on-dark" style={{ fontSize: "0.54rem", letterSpacing: "0.16em" }}>{label}</span>
-      <span className="font-data text-sm font-semibold tnum" style={{ color, textShadow }}>{value}</span>
+      <span className="eyebrow muted-on-dark" style={{ fontSize: "0.54rem", letterSpacing: "0.14em" }}>{label}</span>
+      <span className="font-data text-sm font-medium tnum" style={{ color }}>{value}</span>
     </div>
   );
 }
@@ -1294,7 +1299,7 @@ function SectionHead({ folio, kicker, title, desc, right }: { folio: string; kic
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <span className="folio" data-folio={folio}>{kicker}</span>
-        <h2 className="mt-2 font-display text-xl font-semibold tracking-tight text-(--ink)">{title}</h2>
+        <h2 className="mt-2 font-display text-[1.35rem] font-semibold tracking-[-0.02em] text-(--ink)">{title}</h2>
         {desc ? <p className="mt-1 max-w-xl text-sm leading-6 text-(--muted)">{desc}</p> : null}
       </div>
       {right ? <div className="shrink-0">{right}</div> : null}
@@ -1314,10 +1319,10 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: "i
     <div className="panel-flat lift relative overflow-hidden px-4 py-4">
       <div className="flex items-center justify-between">
         <p className="eyebrow" style={{ fontSize: "0.58rem" }}>{label}</p>
-        <span className="size-1.5 rounded-full" style={{ background: color, boxShadow: `0 0 10px 0 ${color}` }} />
+        <span className="size-1.5 rounded-full" style={{ background: color }} />
       </div>
-      <p className="font-data mt-3 text-[1.7rem] font-semibold leading-none tnum" style={{ color, textShadow: `0 0 20px color-mix(in srgb, ${color} 40%, transparent)` }}>{value}</p>
-      <span className="mt-3 block h-px w-full" style={{ background: `color-mix(in srgb, ${color} 45%, var(--line))` }} />
+      <p className="font-data mt-3 text-[1.7rem] font-medium leading-none tnum" style={{ color }}>{value}</p>
+      <span className="mt-3 block h-px w-full" style={{ background: `color-mix(in srgb, ${color} 40%, var(--line))` }} />
     </div>
   );
 }

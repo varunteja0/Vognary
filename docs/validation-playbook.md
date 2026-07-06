@@ -32,7 +32,7 @@ For each beta audit, record:
 3. When was the last time you checked all recurring payments in one place?
 4. Have you ever discovered a subscription or mandate late?
 5. What would be worth paying for: detection, reminders, cancellation help, usage analysis, team reports, or cloud/SaaS optimization?
-6. Would you upload a CSV statement for a private audit?
+6. Would you connect a live source or upload a structured statement export for a private audit where no connector exists?
 7. Would you connect Gmail read-only for invoice detection?
 8. What would make you not trust this product?
 9. If this saved you Rs 10,000/year, what would you pay?

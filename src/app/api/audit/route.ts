@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { analyzeStatements, type ManualRecurringInput, type StatementSource } from "@/lib/recurring-audit";
+
+export const dynamic = "force-dynamic";
 
 const maxSourceCount = 8;
 const maxSourceCharacters = 1_000_000;
@@ -10,6 +13,9 @@ type AuditRequestBody = {
 };
 
 export async function POST(request: NextRequest) {
+  const limit = rateLimit(request, { namespace: "audit", limit: 30, windowMs: 60_000 });
+  if (!limit.allowed) return rateLimitExceeded(limit);
+
   let body: AuditRequestBody;
 
   try {

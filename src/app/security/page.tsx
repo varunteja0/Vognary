@@ -1,11 +1,15 @@
 import Link from "next/link";
+import { VognaryMark } from "../brand";
 
 export default function SecurityPage() {
   return (
     <main className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="font-display text-lg font-semibold text-(--ink)">Vognary <span className="text-(--muted)">· The Silent Ledger</span></Link>
+          <Link href="/" className="inline-flex items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
+            <VognaryMark size={22} />
+            Vognary
+          </Link>
           <Link href="/" className="btn btn-ghost">Back to ledger</Link>
         </div>
         <article className="panel p-6 sm:p-8 rise">

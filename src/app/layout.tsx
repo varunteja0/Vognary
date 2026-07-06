@@ -1,30 +1,60 @@
-import type { Metadata } from "next";
-import { Syne, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import RevealController from "./reveal-controller";
 
-const display = Syne({
-  variable: "--font-display",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const grotesk = Space_Grotesk({
+const grotesk = Geist({
   variable: "--font-grotesk",
   subsets: ["latin"],
   display: "swap",
 });
 
-const monoData = JetBrains_Mono({
+const monoData = Geist_Mono({
   variable: "--font-mono-data",
   subsets: ["latin"],
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Vognary — See the money leaving in the dark",
+  metadataBase: new URL("https://www.vognary.com"),
+  applicationName: "Vognary",
+  title: {
+    default: "Vognary — Recurring money, audited",
+    template: "%s — Vognary",
+  },
   description:
-    "Vognary is a blacklight for your money: it reveals the silent recurring charges you can't see, shows the evidence, and helps you cut them before the next debit.",
+    "Vognary finds every silent subscription, mandate, and recurring charge, shows the evidence, and helps you cut it before the next debit.",
+  keywords: [
+    "recurring payments",
+    "subscription audit",
+    "recurring money",
+    "mandates",
+    "UPI AutoPay",
+    "cancel subscriptions",
+    "spend audit",
+    "Vognary",
+  ],
+  authors: [{ name: "Vognary" }],
+  creator: "Vognary",
+  openGraph: {
+    type: "website",
+    siteName: "Vognary",
+    url: "/",
+    title: "Vognary — Recurring money, audited",
+    description:
+      "Find every silent subscription and mandate, read the evidence, and cut it before the next debit.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Vognary — Recurring money, audited",
+    description:
+      "Find every silent subscription and mandate, read the evidence, and cut it before the next debit.",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0c0f",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -35,7 +65,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${display.variable} ${grotesk.variable} ${monoData.variable} h-full antialiased`}
+      className={`${grotesk.variable} ${monoData.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <a

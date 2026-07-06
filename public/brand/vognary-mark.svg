@@ -1,0 +1,6 @@
+<!-- Vognary mark — platinum V + gold resolution node. For dark backgrounds. -->
+<svg width="96" height="96" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M13 14 24 34 35 14" fill="none" stroke="#e9eaee" stroke-width="5.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="24" cy="34" r="4" fill="#d8b87a"/>
+  <circle cx="22.6" cy="32.7" r="1.15" fill="#efdcae"/>
+</svg>

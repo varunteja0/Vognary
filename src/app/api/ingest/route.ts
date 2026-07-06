@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFParse } from "pdf-parse";
+import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 
+export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const maxFiles = 6;
@@ -16,6 +18,9 @@ type IngestedSource = {
 };
 
 export async function POST(request: NextRequest) {
+  const limit = rateLimit(request, { namespace: "ingest", limit: 10, windowMs: 5 * 60_000 });
+  if (!limit.allowed) return rateLimitExceeded(limit);
+
   const formData = await request.formData();
   const files = formData.getAll("files").filter((value): value is File => value instanceof File);
 

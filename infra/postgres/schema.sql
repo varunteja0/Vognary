@@ -21,6 +21,39 @@ create type recurring_status as enum (
   'unknown'
 );
 
+create type connector_auth_type as enum (
+  'oauth',
+  'api-key',
+  'iam-role',
+  'partner-api',
+  'manual',
+  'file-fallback'
+);
+
+create type token_status as enum (
+  'active',
+  'expired',
+  'revoked',
+  'rotation_required'
+);
+
+create type sync_job_status as enum (
+  'queued',
+  'running',
+  'succeeded',
+  'failed',
+  'paused',
+  'blocked'
+);
+
+create type webhook_event_status as enum (
+  'received',
+  'verified',
+  'processed',
+  'failed',
+  'ignored'
+);
+
 create table users (
   id uuid primary key default gen_random_uuid(),
   email text unique not null,
@@ -59,6 +92,107 @@ create table data_sources (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create table connected_accounts (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  source_id uuid references data_sources(id) on delete set null,
+  connector_id text not null,
+  auth_type connector_auth_type not null,
+  provider_account_id text,
+  display_name text not null,
+  scopes text[] not null default '{}',
+  status text not null default 'active' check (status in ('active', 'needs_reauth', 'blocked', 'revoked', 'manual')),
+  consent_expires_at timestamptz,
+  last_synced_at timestamptz,
+  last_error text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique nulls not distinct (workspace_id, connector_id, provider_account_id)
+);
+
+create index connected_accounts_workspace_connector_idx on connected_accounts(workspace_id, connector_id);
+create index connected_accounts_status_idx on connected_accounts(status);
+
+create table connector_token_refs (
+  id uuid primary key default gen_random_uuid(),
+  connected_account_id uuid not null references connected_accounts(id) on delete cascade,
+  token_kind text not null check (token_kind in ('access', 'refresh', 'api_key', 'iam_role', 'partner_secret')),
+  secret_ref text not null,
+  encrypted_payload jsonb not null default '{}'::jsonb,
+  key_fingerprint text,
+  scopes text[] not null default '{}',
+  expires_at timestamptz,
+  status token_status not null default 'active',
+  last_rotated_at timestamptz,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (connected_account_id, token_kind)
+);
+
+create index connector_token_refs_account_status_idx on connector_token_refs(connected_account_id, status);
+
+create table connector_sync_jobs (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  connected_account_id uuid references connected_accounts(id) on delete cascade,
+  connector_id text not null,
+  job_type text not null check (job_type in ('initial_sync', 'incremental_sync', 'backfill', 'webhook_replay', 'manual_refresh')),
+  status sync_job_status not null default 'queued',
+  schedule_cron text,
+  priority integer not null default 100,
+  cursor_state jsonb not null default '{}'::jsonb,
+  next_run_at timestamptz,
+  locked_at timestamptz,
+  locked_by text,
+  last_error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index connector_sync_jobs_due_idx on connector_sync_jobs(status, next_run_at, priority);
+create index connector_sync_jobs_workspace_idx on connector_sync_jobs(workspace_id, connector_id);
+
+create table connector_sync_runs (
+  id uuid primary key default gen_random_uuid(),
+  sync_job_id uuid references connector_sync_jobs(id) on delete set null,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  connected_account_id uuid references connected_accounts(id) on delete set null,
+  connector_id text not null,
+  status sync_job_status not null default 'running',
+  started_at timestamptz not null default now(),
+  finished_at timestamptz,
+  records_seen integer not null default 0,
+  records_written integer not null default 0,
+  evidence_written integer not null default 0,
+  next_cursor_state jsonb not null default '{}'::jsonb,
+  error_code text,
+  error_message text
+);
+
+create index connector_sync_runs_workspace_started_idx on connector_sync_runs(workspace_id, started_at desc);
+create index connector_sync_runs_connector_status_idx on connector_sync_runs(connector_id, status);
+
+create table connector_webhook_events (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid references workspaces(id) on delete cascade,
+  connected_account_id uuid references connected_accounts(id) on delete set null,
+  connector_id text not null,
+  provider_event_id text,
+  event_type text not null,
+  signature_valid boolean not null default false,
+  status webhook_event_status not null default 'received',
+  payload_hash text not null,
+  payload jsonb not null default '{}'::jsonb,
+  received_at timestamptz not null default now(),
+  processed_at timestamptz,
+  error_message text
+);
+
+create index connector_webhook_events_status_idx on connector_webhook_events(status, received_at);
+create unique index connector_webhook_events_provider_event_idx on connector_webhook_events(connector_id, provider_event_id) where provider_event_id is not null;
 
 create table uploaded_files (
   id uuid primary key default gen_random_uuid(),
@@ -131,6 +265,52 @@ create table evidence_links (
   amount numeric(14, 2),
   created_at timestamptz not null default now()
 );
+
+create table connector_evidence (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  connected_account_id uuid references connected_accounts(id) on delete set null,
+  sync_run_id uuid references connector_sync_runs(id) on delete set null,
+  source_id uuid references data_sources(id) on delete set null,
+  recurring_item_id uuid references recurring_items(id) on delete set null,
+  connector_id text not null,
+  provider text not null,
+  evidence_type text not null,
+  external_id text,
+  observed_at timestamptz not null,
+  merchant_raw text,
+  amount numeric(14, 2),
+  currency char(3),
+  cadence_hint text,
+  next_debit_hint date,
+  confidence_score integer not null check (confidence_score between 0 and 100),
+  payload_hash text not null,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index connector_evidence_workspace_observed_idx on connector_evidence(workspace_id, observed_at desc);
+create index connector_evidence_recurring_item_idx on connector_evidence(recurring_item_id);
+create unique index connector_evidence_external_idx on connector_evidence(workspace_id, connector_id, external_id) where external_id is not null;
+
+create table usage_observations (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  connected_account_id uuid references connected_accounts(id) on delete set null,
+  recurring_item_id uuid references recurring_items(id) on delete set null,
+  connector_id text not null,
+  provider text not null,
+  metric_name text not null,
+  metric_value numeric(18, 6) not null,
+  metric_unit text not null,
+  window_start timestamptz not null,
+  window_end timestamptz not null,
+  payload_hash text,
+  created_at timestamptz not null default now()
+);
+
+create index usage_observations_workspace_window_idx on usage_observations(workspace_id, window_end desc);
+create index usage_observations_recurring_item_idx on usage_observations(recurring_item_id);
 
 create table recommendations (
   id uuid primary key default gen_random_uuid(),

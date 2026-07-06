@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { VognaryMark } from "../brand";
 
 const sourceGroups = [
   {
@@ -32,7 +33,10 @@ export default function SourcesPage() {
     <main className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="font-display text-lg font-semibold text-(--ink)">Vognary <span className="text-(--muted)">· The Silent Ledger</span></Link>
+          <Link href="/" className="inline-flex items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
+            <VognaryMark size={22} />
+            Vognary
+          </Link>
           <Link href="/" className="btn btn-ghost">Back to ledger</Link>
         </div>
         <article className="panel p-6 sm:p-8 rise">
@@ -41,7 +45,7 @@ export default function SourcesPage() {
           <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">No app can truthfully see every subscription without source access. Use this checklist to connect live sources first, then add fallback evidence only where providers are still closed.</p>
           <div className="mt-8 grid gap-3 md:grid-cols-2">
             {sourceGroups.map((group, index) => (
-              <section key={group.title} className="inset p-4">
+              <section key={group.title} className="inset p-4" data-reveal style={{ ["--reveal-delay"]: `${index * 60}ms` } as React.CSSProperties}>
                 <div className="flex items-center gap-2.5">
                   <span className="font-display text-2xl font-semibold text-ember">{String(index + 1).padStart(2, "0")}</span>
                   <h2 className="font-display text-base font-semibold text-(--ink)">{group.title}</h2>

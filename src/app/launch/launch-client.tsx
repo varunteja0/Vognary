@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { VognaryMark } from "../brand";
 
 const segments = ["Founder / builder", "Freelancer", "Small team", "Household", "Investor", "Accountant / CFO"];
 
@@ -25,7 +26,10 @@ export default function LaunchClient() {
     <main className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <span className="font-display text-lg font-semibold text-(--ink)">Vognary <span className="text-(--muted)">· Blacklight for money</span></span>
+          <span className="inline-flex items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
+            <VognaryMark size={22} />
+            Vognary
+          </span>
           <Link href="/" className="btn btn-ghost">Open the ledger</Link>
         </div>
         <section className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
@@ -38,7 +42,7 @@ export default function LaunchClient() {
             }}
           >
             <span className="folio" data-folio="§ 00" style={{ color: "var(--dossier-muted)" }}>Recurring intelligence</span>
-            <h1 className="mt-5 font-display text-4xl font-bold leading-[1.0] tracking-[-0.03em] text-(--dossier-ink) sm:text-6xl">Find the money<br /><span className="glow-num">leaking in silence.</span></h1>
+            <h1 className="mt-5 font-display text-4xl font-bold leading-none tracking-[-0.03em] text-(--dossier-ink) sm:text-6xl">Find the money<br /><span className="glow-num">leaking in silence.</span></h1>
             <p className="mt-5 max-w-2xl text-base leading-7 muted-on-dark">Vognary audits statements, receipts, and manual mandates to show every recurring commitment, upcoming debit, confidence score, and cancel or downgrade action.</p>
             <div className="mt-8 grid gap-2.5 sm:grid-cols-3">
               <Proof label="Self-serve audit" value="Live" />
