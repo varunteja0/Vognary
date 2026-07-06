@@ -76,6 +76,17 @@ type WorkspaceBackup = {
   receiptText?: string;
 };
 
+type ServerSessionPayload = {
+  authenticated: boolean;
+  configuration: { status: "not-configured" | "ready"; cookieName: string };
+  session: null | {
+    userId: string;
+    email: string;
+    workspaceId: string | null;
+    expiresAt: string;
+  };
+};
+
 type CoverageSignal = {
   label: string;
   done: boolean;
@@ -207,6 +218,8 @@ export default function VognaryMvpClient() {
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedAuditMode, setSelectedAuditMode] = useState<AuditModeId>("founder");
   const [statementFallbackOpen, setStatementFallbackOpen] = useState(false);
+  const [serverSession, setServerSession] = useState<ServerSessionPayload | null>(null);
+  const [serverSaveStatus, setServerSaveStatus] = useState<string | null>(null);
 
   const audit = useMemo<AuditResult>(
     () => analyzeStatements(statementSources.map(({ name, text }) => ({ name, text })), manualItems),
@@ -226,6 +239,25 @@ export default function VognaryMvpClient() {
     const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText });
     window.localStorage.setItem(workspaceStorageKey, JSON.stringify(backup));
   }, [itemOwners, localSaveEnabled, manualItems, receiptText, reviewNotes, statementSources, teamMembers, userActions]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadSession() {
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store" });
+        const payload = await response.json() as ServerSessionPayload;
+        if (!ignore) setServerSession(payload);
+      } catch {
+        if (!ignore) setServerSession(null);
+      }
+    }
+
+    loadSession();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   async function handleFiles(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -368,6 +400,93 @@ export default function VognaryMvpClient() {
     const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText });
     downloadText("vognary-workspace-backup.json", JSON.stringify(backup, null, 2), "application/json");
     setNotice("Workspace backup downloaded. It includes your source text, so keep it private.");
+  }
+
+  async function saveServerWorkspace() {
+    if (!serverSession?.authenticated) {
+      setNotice("Sign in before saving an encrypted server snapshot.");
+      return;
+    }
+
+    setServerSaveStatus("Saving encrypted snapshot...");
+    const snapshot = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText });
+    const response = await fetch("/api/workspaces/current/audit-snapshot", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: "Vognary workspace snapshot",
+        snapshot,
+        summary: {
+          recurringCount: audit.summary.recurringCount,
+          monthlyRecurringSpend: audit.summary.monthlyRecurringSpend,
+          annualRecurringSpend: audit.summary.annualRecurringSpend,
+          reviewableMonthlySpend: audit.summary.reviewableMonthlySpend,
+          sourceCount: statementSources.length,
+          manualCount: manualItems.length,
+        },
+      }),
+    });
+    const payload = await response.json();
+    const message = response.ok
+      ? "Encrypted server snapshot saved to your beta workspace."
+      : payload.message ?? payload.error ?? "Could not save server snapshot.";
+    setServerSaveStatus(message);
+    setNotice(message);
+  }
+
+  async function loadServerWorkspace() {
+    if (!serverSession?.authenticated) {
+      setNotice("Sign in before loading an encrypted server snapshot.");
+      return;
+    }
+
+    setServerSaveStatus("Loading encrypted snapshot...");
+    const response = await fetch("/api/workspaces/current/audit-snapshot", { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) {
+      const message = payload.message ?? payload.error ?? "Could not load server snapshot.";
+      setServerSaveStatus(message);
+      setNotice(message);
+      return;
+    }
+    if (payload.status === "empty" || !payload.snapshot?.snapshot) {
+      setServerSaveStatus("No saved server snapshot yet.");
+      setNotice("No saved server snapshot yet.");
+      return;
+    }
+
+    const snapshot = payload.snapshot.snapshot as Partial<WorkspaceBackup>;
+    if (snapshot.version !== 1 || !Array.isArray(snapshot.statementSources) || !Array.isArray(snapshot.manualItems)) {
+      setServerSaveStatus("Saved snapshot is not a valid Vognary workspace backup.");
+      return;
+    }
+
+    setStatementSources(snapshot.statementSources);
+    setManualItems(snapshot.manualItems);
+    setUserActions(snapshot.userActions ?? {});
+    setItemOwners(snapshot.itemOwners ?? {});
+    setReviewNotes(snapshot.reviewNotes ?? {});
+    setTeamMembers(snapshot.teamMembers?.length ? snapshot.teamMembers : [{ id: "founder", name: "Founder", role: "Owner" }]);
+    setReceiptText(snapshot.receiptText ?? "");
+    setSelectedItemId(null);
+    setServerSaveStatus("Encrypted server snapshot loaded into this browser.");
+    setNotice("Encrypted server snapshot loaded into this browser.");
+  }
+
+  async function deleteServerWorkspace() {
+    if (!serverSession?.authenticated) {
+      setNotice("Sign in before deleting server snapshots.");
+      return;
+    }
+
+    setServerSaveStatus("Deleting server snapshots...");
+    const response = await fetch("/api/workspaces/current/audit-snapshot", { method: "DELETE" });
+    const payload = await response.json();
+    const message = response.ok
+      ? `Deleted ${payload.deletedCount ?? 0} server snapshot(s).`
+      : payload.message ?? payload.error ?? "Could not delete server snapshots.";
+    setServerSaveStatus(message);
+    setNotice(message);
   }
 
   async function importWorkspaceBackup(event: React.ChangeEvent<HTMLInputElement>) {
@@ -622,8 +741,13 @@ export default function VognaryMvpClient() {
           coverageScore={coverageScore}
           coverageSignals={coverageSignals}
           localSaveEnabled={localSaveEnabled}
+          serverSession={serverSession}
+          serverSaveStatus={serverSaveStatus}
           onEnableLocalSave={enableLocalSave}
           onDisableLocalSave={disableLocalSave}
+          onSaveServerWorkspace={saveServerWorkspace}
+          onLoadServerWorkspace={loadServerWorkspace}
+          onDeleteServerWorkspace={deleteServerWorkspace}
         />
 
         <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]" data-reveal>
@@ -721,6 +845,8 @@ export default function VognaryMvpClient() {
             <a className="transition hover:text-(--ink)" href="/terms">Terms</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/beta-readiness">Beta readiness</a>
+            <span className="text-(--line-strong)">·</span>
+            <a className="transition hover:text-(--ink)" href="/login">Login</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/launch">Launch</a>
             <span className="text-(--line-strong)">·</span>
@@ -1064,15 +1190,27 @@ function UserControlPanel({
   coverageScore,
   coverageSignals,
   localSaveEnabled,
+  serverSession,
+  serverSaveStatus,
   onEnableLocalSave,
   onDisableLocalSave,
+  onSaveServerWorkspace,
+  onLoadServerWorkspace,
+  onDeleteServerWorkspace,
 }: {
   coverageScore: number;
   coverageSignals: CoverageSignal[];
   localSaveEnabled: boolean;
+  serverSession: ServerSessionPayload | null;
+  serverSaveStatus: string | null;
   onEnableLocalSave: () => void;
   onDisableLocalSave: () => void;
+  onSaveServerWorkspace: () => void;
+  onLoadServerWorkspace: () => void;
+  onDeleteServerWorkspace: () => void;
 }) {
+  const signedInEmail = serverSession?.authenticated ? serverSession.session?.email : null;
+
   return (
     <section className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
       <div className="panel p-5 sm:p-6">
@@ -1092,7 +1230,7 @@ function UserControlPanel({
       </div>
 
       <div className="panel p-5 sm:p-6">
-        <SectionHead folio="§ 02" kicker="Chain of custody" title="Use it safely" desc="By default Vognary needs no account and stores nothing on a backend. Export a backup file, or opt in to save this workspace in this browser only." />
+        <SectionHead folio="§ 02" kicker="Chain of custody" title="Use it safely" desc="By default Vognary stores nothing on a backend. Signed-in beta users can save an encrypted server snapshot, or keep everything local to this browser." />
         <div className="mt-4 flex flex-wrap gap-2">
           {localSaveEnabled ? (
             <button type="button" onClick={onDisableLocalSave} className="btn btn-ghost" style={{ borderColor: "var(--ember)", color: "var(--ember)" }}>
@@ -1105,7 +1243,25 @@ function UserControlPanel({
           )}
           <a href="/sources" className="btn btn-ghost">Open source guide</a>
         </div>
-        <p className="mt-3 text-xs leading-5 text-(--muted)">Do not enable browser save on shared machines. Backups contain source text — keep them private.</p>
+        <div className="mt-4 rounded-[11px] border border-line bg-(--card-2) p-3">
+          <p className="font-data text-[0.62rem] uppercase tracking-[0.16em] text-(--muted)">Beta account</p>
+          <p className="mt-2 text-sm leading-6 text-(--muted)">
+            {signedInEmail ? <>Signed in as <strong className="text-(--ink)">{signedInEmail}</strong>.</> : <>Not signed in. Use login to save encrypted snapshots across devices.</>}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {signedInEmail ? (
+              <>
+                <button type="button" onClick={onSaveServerWorkspace} className="btn btn-primary">Save encrypted snapshot</button>
+                <button type="button" onClick={onLoadServerWorkspace} className="btn btn-ghost">Load latest</button>
+                <button type="button" onClick={onDeleteServerWorkspace} className="btn btn-ghost" style={{ borderColor: "var(--ember)", color: "var(--ember)" }}>Delete server copies</button>
+              </>
+            ) : (
+              <a href="/login" className="btn btn-primary">Login</a>
+            )}
+          </div>
+          {serverSaveStatus ? <p className="mt-3 text-xs leading-5 text-(--muted)">{serverSaveStatus}</p> : null}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-(--muted)">Do not enable browser save on shared machines. Local backups contain source text. Server snapshots require configured login, database, and TOKEN_ENCRYPTION_KEY.</p>
       </div>
     </section>
   );

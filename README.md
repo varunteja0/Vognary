@@ -35,6 +35,7 @@ Open http://localhost:3000.
 Copy `.env.example` to `.env.local` when enabling waitlist persistence, payment links, Gmail OAuth, or future connected-account storage.
 
 Launch page: http://localhost:3000/launch
+Private beta login: http://localhost:3000/login
 Private audit intake: http://localhost:3000/private-audit
 Source guide: http://localhost:3000/sources
 Integration hub: http://localhost:3000/integrations
@@ -98,10 +99,18 @@ Auth/workspace route shape:
 
 ```bash
 curl http://localhost:3000/api/auth/session
+curl -X POST http://localhost:3000/api/auth/login \
+	-H 'Content-Type: application/json' \
+	-d '{"email":"founder@example.com","accessCode":"<PRIVATE_BETA_ACCESS_CODE>"}'
+curl -X POST http://localhost:3000/api/auth/logout
 curl http://localhost:3000/api/workspaces
+curl http://localhost:3000/api/workspaces/current/audit-snapshot
+curl -X POST http://localhost:3000/api/workspaces/current/audit-snapshot \
+	-H 'Content-Type: application/json' \
+	-d '{"title":"Vognary snapshot","summary":{"recurringCount":0},"snapshot":{"version":1,"exportedAt":"2026-07-06T00:00:00.000Z","statementSources":[],"manualItems":[],"userActions":{},"itemOwners":{},"reviewNotes":{},"teamMembers":[]}}'
 ```
 
-Without a signed `vognary_session` cookie, workspace routes return `401`. Public login still needs an identity provider or magic-link email delivery before this becomes a user-facing auth flow.
+Without a signed `vognary_session` cookie, workspace routes return `401`. The `/login` page is a private-beta access-code flow backed by `SESSION_SECRET`, `DATABASE_URL`, and `PRIVATE_BETA_ACCESS_CODE`. Encrypted server snapshots additionally require `TOKEN_ENCRYPTION_KEY`. Public login still needs an identity provider or magic-link email delivery before open self-serve launch.
 
 Generate a future token-vault key with:
 
@@ -123,6 +132,7 @@ See:
 - [docs/production-activation-runbook.md](docs/production-activation-runbook.md)
 - [docs/validation-playbook.md](docs/validation-playbook.md)
 - [docs/market-entry-research.md](docs/market-entry-research.md)
+- [docs/current-state-and-market-gap-analysis.md](docs/current-state-and-market-gap-analysis.md)
 - [docs/private-audit-outreach-kit.md](docs/private-audit-outreach-kit.md)
 - [docs/private-audit-pipeline-template.csv](docs/private-audit-pipeline-template.csv)
 - [docs/deployment-plan.md](docs/deployment-plan.md)

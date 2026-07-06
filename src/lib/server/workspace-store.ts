@@ -7,6 +7,12 @@ export type WorkspaceMembership = {
   plan: string;
 };
 
+export type WorkspaceUser = {
+  id: string;
+  email: string;
+  displayName: string | null;
+};
+
 export function assertDatabaseReadyForWorkspaces() {
   if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is required for workspace authorization.");
 }
@@ -25,6 +31,36 @@ export async function listWorkspacesForUser(userId: string): Promise<WorkspaceMe
   );
 
   return result.rows.map(mapWorkspaceMembership);
+}
+
+export async function getOrCreateUserByEmail(input: { email: string; displayName?: string }): Promise<WorkspaceUser> {
+  assertDatabaseReadyForWorkspaces();
+
+  const result = await getDatabasePool().query<WorkspaceUserRow>(
+    `insert into users (email, display_name)
+     values ($1, nullif($2, ''))
+     on conflict (email) do update
+       set display_name = coalesce(nullif(excluded.display_name, ''), users.display_name),
+           updated_at = now(),
+           deleted_at = null
+     returning id, email, display_name`,
+    [input.email, input.displayName?.trim() ?? ""],
+  );
+
+  const row = result.rows[0];
+  if (!row) throw new Error("User upsert did not return a user.");
+  return { id: row.id, email: row.email, displayName: row.display_name };
+}
+
+export async function getOrCreateDefaultWorkspaceForUser(input: { userId: string; workspaceName?: string }) {
+  const existing = await listWorkspacesForUser(input.userId);
+  if (existing[0]) return existing[0];
+
+  return createWorkspaceForUser({
+    userId: input.userId,
+    name: input.workspaceName?.trim() || "Vognary Workspace",
+    plan: "private_beta",
+  });
 }
 
 export async function getWorkspaceMembership(userId: string, workspaceId: string) {
@@ -84,6 +120,12 @@ type WorkspaceMembershipRow = {
   workspace_name: string;
   role: WorkspaceMembership["role"];
   plan: string;
+};
+
+type WorkspaceUserRow = {
+  id: string;
+  email: string;
+  display_name: string | null;
 };
 
 function mapWorkspaceMembership(row: WorkspaceMembershipRow): WorkspaceMembership {

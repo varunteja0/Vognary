@@ -13,6 +13,7 @@ await assertOk("/integrations");
 await assertOk("/privacy");
 await assertOk("/security");
 await assertOk("/private-audit");
+await assertOk("/login");
 
 const health = await (await assertOk("/api/health")).json();
 if (health.status !== "ok") throw new Error("Health endpoint did not return ok");
@@ -26,8 +27,21 @@ if (!readiness.auth?.session?.status) throw new Error("Readiness endpoint did no
 const authSession = await (await assertOk("/api/auth/session")).json();
 if (typeof authSession.authenticated !== "boolean") throw new Error("Auth session endpoint did not return authenticated state");
 
+const loginWithoutSetup = await fetch(`${baseUrl}/api/auth/login`, {
+  method: "POST",
+  headers: { "content-type": "application/json", "x-forwarded-for": `login-smoke-${Date.now()}` },
+  body: JSON.stringify({ email: "smoke@example.com", accessCode: "wrong" }),
+});
+if (![401, 501].includes(loginWithoutSetup.status)) throw new Error(`Login endpoint returned ${loginWithoutSetup.status}`);
+
+const logoutResponse = await fetch(`${baseUrl}/api/auth/logout`, { method: "POST" });
+if (!logoutResponse.ok) throw new Error(`Logout endpoint returned ${logoutResponse.status}`);
+
 const workspaceWithoutSession = await fetch(`${baseUrl}/api/workspaces`);
 if (workspaceWithoutSession.status !== 401) throw new Error(`Workspace endpoint without session returned ${workspaceWithoutSession.status}`);
+
+const snapshotWithoutSession = await fetch(`${baseUrl}/api/workspaces/current/audit-snapshot`);
+if (snapshotWithoutSession.status !== 401) throw new Error(`Audit snapshot endpoint without session returned ${snapshotWithoutSession.status}`);
 
 const connectors = await (await assertOk("/api/connectors")).json();
 if (!connectors.connectors?.length) throw new Error("Connector registry is empty");

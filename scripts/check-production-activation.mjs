@@ -34,6 +34,18 @@ const groups = [
     why: "Enables encrypted connected accounts, token storage, sync jobs, and workspace sessions.",
   },
   {
+    id: "private-beta-login",
+    label: "Private beta login",
+    required: ["DATABASE_URL", "SESSION_SECRET", "PRIVATE_BETA_ACCESS_CODE"],
+    why: "Enables invited beta users to sign in and create a workspace envelope.",
+  },
+  {
+    id: "encrypted-snapshots",
+    label: "Encrypted server snapshots",
+    required: ["DATABASE_URL", "TOKEN_ENCRYPTION_KEY", "SESSION_SECRET", "PRIVATE_BETA_ACCESS_CODE"],
+    why: "Enables signed-in beta users to save encrypted audit snapshots server-side.",
+  },
+  {
     id: "openai-costs",
     label: "OpenAI cost sync",
     required: ["OPENAI_ADMIN_API_KEY"],
@@ -74,10 +86,28 @@ const groups = [
 const endpointChecks = [
   { id: "home", path: "/", expected: [200] },
   { id: "private-audit", path: "/private-audit", expected: [200] },
+  { id: "login", path: "/login", expected: [200] },
   { id: "health", path: "/api/health", expected: [200] },
   { id: "readiness", path: "/api/readiness", expected: [200] },
   { id: "connectors", path: "/api/connectors", expected: [200] },
   { id: "auth-session", path: "/api/auth/session", expected: [200] },
+  {
+    id: "auth-login-guard",
+    path: "/api/auth/login",
+    expected: [401, 501],
+    init: {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": `activation-login-${Date.now()}` },
+      body: JSON.stringify({ email: "activation@example.com", accessCode: "wrong" }),
+    },
+  },
+  {
+    id: "auth-logout",
+    path: "/api/auth/logout",
+    expected: [200],
+    init: { method: "POST" },
+  },
+  { id: "audit-snapshot-auth-guard", path: "/api/workspaces/current/audit-snapshot", expected: [401] },
   {
     id: "audit-api",
     path: "/api/audit",
