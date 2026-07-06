@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
+import { isLeadDatabaseConfigured, persistAuditLead } from "@/lib/server/lead-store";
 
 export const dynamic = "force-dynamic";
 
@@ -79,11 +80,11 @@ export async function POST(request: NextRequest) {
   const name = cleanText(body.name, 120);
   const email = body.email?.trim().toLowerCase() ?? "";
   const contact = cleanText(body.contact, 160);
-  const persona = allowedPersonas.has(body.persona ?? "") ? body.persona : "Other";
+  const persona = typeof body.persona === "string" && allowedPersonas.has(body.persona) ? body.persona : "Other";
   const spendGuess = cleanText(body.spendGuess, 80);
   const paymentTypes = cleanList(body.paymentTypes, allowedPaymentTypes);
   const sourceTypes = cleanList(body.sourceTypes, allowedSourceTypes);
-  const biggestConcern = allowedConcerns.has(body.biggestConcern ?? "") ? body.biggestConcern : "Other";
+  const biggestConcern = typeof body.biggestConcern === "string" && allowedConcerns.has(body.biggestConcern) ? body.biggestConcern : "Other";
   const message = cleanText(body.message, 1200);
 
   if (!name) return NextResponse.json({ error: "Name is required." }, { status: 400 });
@@ -115,12 +116,22 @@ export async function POST(request: NextRequest) {
     score: scoreLead({ persona, paymentTypes, sourceTypes }),
   };
 
+  if (isLeadDatabaseConfigured()) {
+    try {
+      const leadId = await persistAuditLead(payload);
+      await mirrorToWebhook(process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL, payload);
+      return NextResponse.json({ status: "accepted", persisted: true, storage: "database", leadId, score: payload.score });
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Audit lead database persistence failed." }, { status: 502 });
+    }
+  }
+
   const webhookUrl = process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL;
   if (!webhookUrl) {
     return NextResponse.json({
       status: "accepted-preview",
       persisted: false,
-      nextStep: "Set AUDIT_INTAKE_WEBHOOK_URL or WAITLIST_WEBHOOK_URL to persist public audit requests.",
+      nextStep: "Set DATABASE_URL for free database lead storage, or set AUDIT_INTAKE_WEBHOOK_URL / WAITLIST_WEBHOOK_URL for webhook persistence.",
       lead: payload,
     });
   }
@@ -136,6 +147,15 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ status: "accepted", persisted: true, score: payload.score });
+}
+
+async function mirrorToWebhook(webhookUrl: string | undefined, payload: Record<string, unknown>) {
+  if (!webhookUrl) return;
+  await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  }).catch(() => null);
 }
 
 function cleanText(value: unknown, maxLength: number) {

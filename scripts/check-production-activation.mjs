@@ -16,9 +16,9 @@ const groups = [
   {
     id: "lead-persistence",
     label: "Lead persistence",
-    requiredAny: ["AUDIT_INTAKE_WEBHOOK_URL", "WAITLIST_WEBHOOK_URL"],
+    requiredAny: ["DATABASE_URL", "AUDIT_INTAKE_WEBHOOK_URL", "WAITLIST_WEBHOOK_URL"],
     probe: isLeadPersistenceReady,
-    why: "Persists private audit and waitlist leads instead of preview-only responses.",
+    why: "Persists private audit and waitlist leads in Postgres or a webhook instead of preview-only responses.",
   },
   {
     id: "payments",
@@ -318,7 +318,8 @@ function isLeadPersistenceReady({ endpointPayloads }) {
   const intake = endpointPayloads["audit-intake"];
   if (typeof intake?.persisted === "boolean") return intake.persisted;
   const readiness = endpointPayloads.readiness;
-  return readiness?.hardening?.leadPersistence === "configured";
+  const status = readiness?.hardening?.leadPersistence;
+  return typeof status === "string" ? status.startsWith("configured") : undefined;
 }
 
 function isPaymentReady({ endpointPayloads }) {

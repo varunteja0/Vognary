@@ -1,15 +1,21 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { readSession } from "@/lib/server/session";
-import VognaryMvpClient from "./vognary-mvp-client";
+import ProfileClient from "./profile-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+export const metadata: Metadata = {
+  title: "Profile And Data",
+  description: "Review your Vognary profile, workspace, integrations, saved data, pending sources, and deletion controls.",
+};
+
+export default async function ProfilePage() {
   const session = await readRequestSession();
   if (!session) redirect("/login");
 
-  return <VognaryMvpClient />;
+  return <ProfileClient />;
 }
 
 async function readRequestSession() {

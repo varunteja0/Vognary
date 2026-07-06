@@ -4,6 +4,7 @@ import { getConnectorSyncSummary } from "@/lib/connectors";
 import { listConnectorAdapters } from "@/lib/connectors/adapter-registry";
 import { isDatabaseConfigured } from "@/lib/server/database";
 import { checkGoogleAuthConfiguration } from "@/lib/server/google-auth";
+import { isLeadDatabaseConfigured } from "@/lib/server/lead-store";
 import { checkMagicLinkConfiguration } from "@/lib/server/magic-link-auth";
 import { getMonitoringBackendStatus } from "@/lib/server/monitoring";
 import { checkSessionConfiguration } from "@/lib/server/session";
@@ -35,7 +36,7 @@ export function GET() {
       manualCommitments: "ready",
       reportExport: "ready",
       receiptParser: "ready-beta",
-      waitlist: process.env.WAITLIST_WEBHOOK_URL ? "configured" : "preview-not-persisted",
+      waitlist: getLeadPersistenceStatus(),
       connectorRegistry: "ready",
       connectorRuntime: "ready",
       connectorStartApi: "ready",
@@ -45,7 +46,7 @@ export function GET() {
       apiRateLimiting: rateLimitBackend === "upstash-rest" ? "ready-shared-upstash" : "ready-in-memory",
       redisRateLimiting: getRedisRateLimitStatus(rateLimitBackend),
       gmailOAuthStateProtection: "ready",
-      leadPersistence: process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL ? "configured" : "not-configured",
+      leadPersistence: getLeadPersistenceStatus(),
       monitoring: getMonitoringStatus(monitoringBackend),
       backups: getBackupStatus(),
       identityProvider: getIdentityProviderStatus(magicLink, googleAuth),
@@ -100,5 +101,11 @@ function getBackupStatus() {
   if (hasStorage && restoreDrillPassed) return "configured";
   if (hasStorage) return "storage-configured-restore-drill-required";
   if (restoreDrillPassed) return "restore-drill-recorded-needs-storage";
+  return "not-configured";
+}
+
+function getLeadPersistenceStatus() {
+  if (isLeadDatabaseConfigured()) return "configured-database";
+  if (process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL) return "configured-webhook";
   return "not-configured";
 }

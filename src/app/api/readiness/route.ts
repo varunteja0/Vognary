@@ -3,6 +3,7 @@ import { getRateLimitBackendStatus } from "@/lib/rate-limit";
 import { listConnectorAdapters } from "@/lib/connectors/adapter-registry";
 import { checkDatabaseConnection } from "@/lib/server/database";
 import { checkGoogleAuthConfiguration } from "@/lib/server/google-auth";
+import { isLeadDatabaseConfigured } from "@/lib/server/lead-store";
 import { checkMagicLinkConfiguration } from "@/lib/server/magic-link-auth";
 import { getMonitoringBackendStatus } from "@/lib/server/monitoring";
 import { checkSessionConfiguration } from "@/lib/server/session";
@@ -44,7 +45,7 @@ export async function GET() {
       redisRateLimiting: getRedisRateLimitStatus(rateLimitBackend),
       oauthStateValidation: "ready",
       securityHeaders: "configured",
-      leadPersistence: process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL ? "configured" : "not-configured",
+      leadPersistence: getLeadPersistenceStatus(),
       payments: process.env.PAYMENT_LINK_FOUNDER_PRO ? "configured" : "not-configured",
       monitoring: getMonitoringStatus(monitoringBackend),
       backups: getBackupStatus(),
@@ -92,5 +93,11 @@ function getBackupStatus() {
   if (hasStorage && restoreDrillPassed) return "configured";
   if (hasStorage) return "storage-configured-restore-drill-required";
   if (restoreDrillPassed) return "restore-drill-recorded-needs-storage";
+  return "not-configured";
+}
+
+function getLeadPersistenceStatus() {
+  if (isLeadDatabaseConfigured()) return "configured-database";
+  if (process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL) return "configured-webhook";
   return "not-configured";
 }

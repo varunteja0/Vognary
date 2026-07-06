@@ -28,12 +28,28 @@ TOKEN_ENCRYPTION_KEY
 GOOGLE_AUTH_CLIENT_ID
 GOOGLE_AUTH_CLIENT_SECRET
 GOOGLE_AUTH_REDIRECT_URI
-AUDIT_INTAKE_WEBHOOK_URL
 ```
 
 Keep `PRIVATE_BETA_ACCESS_CODE` as a fallback if you still want code-based beta access.
 
-`AUDIT_INTAKE_WEBHOOK_URL` can be replaced by `WAITLIST_WEBHOOK_URL` if you already have a generic lead webhook.
+Lead capture is free with the same Postgres database. `AUDIT_INTAKE_WEBHOOK_URL` or `WAITLIST_WEBHOOK_URL` is optional if you also want to mirror leads into a spreadsheet or automation tool.
+
+## Free-Tier Pieces To Use Now
+
+These can be activated without monthly software spend, though some still require account setup or KYC:
+
+| Need | Free path | Can be completed in code? | What still blocks it |
+| --- | --- | --- | --- |
+| Database and lead persistence | Neon Postgres free tier | Yes, code now stores leads in Postgres | You must create the Neon DB, set `DATABASE_URL`, and apply schema. |
+| Private beta login | Google OAuth basic identity, or beta access code | Yes | You must create Google OAuth credentials or set `PRIVATE_BETA_ACCESS_CODE`. |
+| Magic-link login | Resend free tier | Yes | You must verify a sender/domain and set `RESEND_API_KEY`, `RESEND_FROM_EMAIL`. |
+| Gmail receipt sync | Google OAuth + Gmail API | Yes for preview sync | You must create OAuth credentials and complete Google verification before public users. |
+| Shared rate limiting | Upstash Redis free tier | Yes | You must create Upstash Redis and set REST URL/token. |
+| Monitoring | Sentry or Better Stack free tier | Yes | You must create the project/source and set DSN/token. |
+| Backups | Neon PITR/free backup controls where available | Partly | You must run a restore drill and set `BACKUP_RESTORE_DRILL_STATUS=passed`. |
+| Payment links | Razorpay/Stripe has no monthly fee | No | You must complete account/KYC and create real links. |
+| OpenAI cost sync | No free substitute for org admin cost data | No | Needs a real OpenAI admin key. |
+| AA/UPI/card mandate rails | No free self-serve substitute | No | Needs partner/sandbox approval. |
 
 ## Generate Secret Values Locally
 
@@ -179,7 +195,6 @@ TOKEN_ENCRYPTION_KEY=<generated locally>
 GOOGLE_AUTH_CLIENT_ID=<Google OAuth Client ID>
 GOOGLE_AUTH_CLIENT_SECRET=<Google OAuth Client Secret>
 GOOGLE_AUTH_REDIRECT_URI=https://www.vognary.com/api/auth/google/callback
-AUDIT_INTAKE_WEBHOOK_URL=<your lead webhook>
 ```
 
 Optional beta code fallback:
@@ -191,6 +206,7 @@ PRIVATE_BETA_ACCESS_CODE=<your invite code>
 Optional but useful now:
 
 ```text
+AUDIT_INTAKE_WEBHOOK_URL=<optional lead webhook mirror>
 WAITLIST_WEBHOOK_URL=<same lead webhook if you want launch page leads persisted>
 PAYMENT_LINK_PERSONAL_PRO=<Razorpay/Stripe payment link>
 PAYMENT_LINK_FOUNDER_PRO=<Razorpay/Stripe payment link>

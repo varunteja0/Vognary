@@ -76,6 +76,38 @@ create table auth_magic_links (
 
 create index auth_magic_links_expires_idx on auth_magic_links(expires_at);
 
+create table private_audit_leads (
+  id uuid primary key default gen_random_uuid(),
+  source text not null,
+  name text not null,
+  email text not null,
+  contact text,
+  persona text not null,
+  spend_guess text,
+  payment_types text[] not null default '{}',
+  source_types text[] not null default '{}',
+  biggest_concern text,
+  message text,
+  score integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index private_audit_leads_created_idx on private_audit_leads(created_at desc);
+create index private_audit_leads_email_idx on private_audit_leads(email);
+
+create table waitlist_leads (
+  id uuid primary key default gen_random_uuid(),
+  source text not null,
+  email text not null,
+  name text,
+  segment text,
+  message text,
+  created_at timestamptz not null default now()
+);
+
+create index waitlist_leads_created_idx on waitlist_leads(created_at desc);
+create index waitlist_leads_email_idx on waitlist_leads(email);
+
 create table workspaces (
   id uuid primary key default gen_random_uuid(),
   owner_user_id uuid not null references users(id),
