@@ -5,7 +5,9 @@ export const dynamic = "force-dynamic";
 
 const gmailReadonlyScope = "https://www.googleapis.com/auth/gmail.readonly";
 
-export function GET() {
+export function GET(request: Request) {
+  const url = new URL(request.url);
+  const wantsJson = url.searchParams.get("mode") === "json";
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const redirectUri = process.env.GOOGLE_REDIRECT_URI;
 
@@ -30,6 +32,17 @@ export function GET() {
   authUrl.searchParams.set("prompt", "consent");
   const state = crypto.randomUUID();
   authUrl.searchParams.set("state", state);
+
+  if (wantsJson) {
+    const response = NextResponse.json({
+      status: "ready",
+      integration: "gmail-readonly",
+      authUrl: authUrl.toString(),
+      scope: gmailReadonlyScope,
+    });
+    response.cookies.set(gmailOAuthStateCookie, state, oauthStateCookieOptions());
+    return response;
+  }
 
   const response = NextResponse.redirect(authUrl);
   response.cookies.set(gmailOAuthStateCookie, state, oauthStateCookieOptions());

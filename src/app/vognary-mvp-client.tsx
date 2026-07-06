@@ -256,6 +256,20 @@ export default function VognaryMvpClient() {
     event.target.value = "";
   }
 
+  async function startGmailConnection() {
+    const response = await fetch("/api/integrations/gmail/start?mode=json");
+    const payload = await response.json().catch(() => null) as { status?: string; authUrl?: string; requiredEnv?: string[] } | null;
+
+    if (response.ok && payload?.authUrl) {
+      window.location.href = payload.authUrl;
+      return;
+    }
+
+    setNotice(payload?.requiredEnv?.length
+      ? `Gmail connection needs setup first: ${payload.requiredEnv.join(", ")}. Receipt paste works now.`
+      : "Gmail connection is not ready yet. Paste receipt evidence for now.");
+  }
+
   function addPastedStatement() {
     if (!pastedCsv.trim()) {
       setNotice("Paste statement export rows before adding them as a source.");
@@ -633,6 +647,7 @@ export default function VognaryMvpClient() {
               onAddManualItem={addManualItem}
               onRemoveManualItem={removeManualItem}
               onNotice={setNotice}
+              onConnectGmail={startGmailConnection}
             />
             <ReceiptIntelligencePanel
               receiptText={receiptText}
@@ -820,6 +835,7 @@ function DataSourcesPanel({
   onAddManualItem,
   onRemoveManualItem,
   onNotice,
+  onConnectGmail,
 }: {
   sources: StatementFile[];
   manualItems: ManualRecurringInput[];
@@ -839,6 +855,7 @@ function DataSourcesPanel({
   onAddManualItem: () => void;
   onRemoveManualItem: (id: string) => void;
   onNotice: (notice: string) => void;
+  onConnectGmail: () => void;
 }) {
   const liveSources = [
     {
@@ -846,7 +863,7 @@ function DataSourcesPanel({
       state: "Ready with OAuth",
       body: "Read-only receipt discovery is wired. Configure Google OAuth to make this live for users.",
       action: "Connect Gmail",
-      href: "/api/integrations/gmail/start",
+      onAction: onConnectGmail,
     },
     {
       name: "Bank accounts",
@@ -891,11 +908,7 @@ function DataSourcesPanel({
               </div>
               <span className="pill pill-partial shrink-0">{source.state}</span>
             </div>
-            {source.href ? (
-              <a href={source.href} className="btn btn-ghost mt-3 inline-flex h-9 items-center px-3 text-xs">{source.action}</a>
-            ) : (
-              <button type="button" onClick={() => onNotice(source.notice ?? "Connector requires setup.")} className="btn btn-ghost mt-3 h-9 px-3 text-xs">{source.action}</button>
-            )}
+            <button type="button" onClick={source.onAction ?? (() => onNotice(source.notice ?? "Connector requires setup."))} className="btn btn-ghost mt-3 h-9 px-3 text-xs">{source.action}</button>
           </div>
         ))}
       </div>
