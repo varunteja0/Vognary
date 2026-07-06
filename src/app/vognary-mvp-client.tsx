@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
+import { connectors, type Connector, type ConnectorStatus } from "@/lib/connectors";
 import {
   analyzeStatements,
   type AuditResult,
@@ -112,6 +113,16 @@ type AuditModeSignal = {
   action: AuditActionId;
 };
 
+type ConnectorStartPayload = {
+  status?: string;
+  state?: string;
+  missingEnv?: string[];
+  nextSteps?: string[];
+  requiredEnv?: string[];
+  message?: string;
+  authUrl?: string;
+};
+
 type ActivationState = {
   headline: string;
   detail: string;
@@ -207,6 +218,61 @@ const manualTemplates = [
   { label: "Insurance", merchant: "Insurance premium", amount: "3000", category: "Insurance", sourceName: "policy dashboard" },
 ];
 
+const integrationConnectorIds = [
+  "gmail-readonly",
+  "claude-subscription",
+  "kling-subscription",
+  "openai-costs",
+  "vercel-platform",
+  "render-platform",
+  "x-premium-subscription",
+  "github-billing",
+  "github-copilot",
+  "cloudflare-billing",
+  "aws-cost-explorer",
+  "paypal-automatic-payments",
+  "apple-receipt-evidence",
+  "google-play-receipt-evidence",
+  "account-aggregator",
+  "upi-autopay-mandates",
+  "card-emandates",
+];
+
+const connectorLaunchTargets: Record<string, { label: string; url: string }> = {
+  "gmail-readonly": { label: "Google OAuth", url: "https://console.cloud.google.com/apis/credentials" },
+  "claude-subscription": { label: "Claude account", url: "https://claude.ai/settings/billing" },
+  "kling-subscription": { label: "Kling account", url: "https://klingai.com/" },
+  "openai-costs": { label: "OpenAI usage", url: "https://platform.openai.com/settings/organization/usage" },
+  "anthropic-usage": { label: "Anthropic console", url: "https://console.anthropic.com/settings/billing" },
+  "vercel-platform": { label: "Vercel dashboard", url: "https://vercel.com/dashboard" },
+  "render-platform": { label: "Render dashboard", url: "https://dashboard.render.com/" },
+  "x-premium-subscription": { label: "X settings", url: "https://x.com/settings/subscription" },
+  "github-billing": { label: "GitHub billing", url: "https://github.com/settings/billing" },
+  "github-copilot": { label: "GitHub Copilot", url: "https://github.com/settings/copilot" },
+  "cloudflare-billing": { label: "Cloudflare dashboard", url: "https://dash.cloudflare.com/" },
+  "aws-cost-explorer": { label: "AWS Cost Explorer", url: "https://console.aws.amazon.com/costmanagement/home" },
+  "paypal-automatic-payments": { label: "PayPal automatic payments", url: "https://www.paypal.com/myaccount/autopay/" },
+  "apple-receipt-evidence": { label: "Apple subscriptions", url: "https://support.apple.com/en-in/118428" },
+  "google-play-receipt-evidence": { label: "Google Play subscriptions", url: "https://play.google.com/store/account/subscriptions" },
+  "account-aggregator": { label: "AA ecosystem", url: "https://sahamati.org.in/" },
+  "upi-autopay-mandates": { label: "UPI AutoPay help", url: "https://support.google.com/pay/india/answer/10797278" },
+  "card-emandates": { label: "RBI e-mandate overview", url: "https://www.rbi.org.in/" },
+};
+
+const connectorStatusLabels: Record<ConnectorStatus, string> = {
+  live: "Live",
+  "ready-with-env": "Needs setup",
+  "partner-required": "Needs partner",
+  planned: "Planned",
+};
+
+const connectorStatusClass: Record<ConnectorStatus, string> = {
+  live: "pill pill-ready",
+  "ready-with-env": "pill pill-partial",
+  "partner-required": "pill pill-blocked",
+  planned: "pill pill-planned",
+};
+
 export default function VognaryMvpClient() {
   const [initialWorkspace] = useState<WorkspaceBackup | null>(() => getInitialWorkspace());
   const [statementSources, setStatementSources] = useState<StatementFile[]>(initialWorkspace?.statementSources ?? []);
@@ -229,6 +295,8 @@ export default function VognaryMvpClient() {
   const [statementFallbackOpen, setStatementFallbackOpen] = useState(false);
   const [serverSession, setServerSession] = useState<ServerSessionPayload | null>(null);
   const [serverSaveStatus, setServerSaveStatus] = useState<string | null>(null);
+  const [connectorStartResults, setConnectorStartResults] = useState<Record<string, ConnectorStartPayload>>({});
+  const [connectingConnectorId, setConnectingConnectorId] = useState<string | null>(null);
 
   const audit = useMemo<AuditResult>(
     () => analyzeStatements(statementSources.map(({ name, text }) => ({ name, text })), manualItems),
@@ -687,6 +755,42 @@ export default function VognaryMvpClient() {
     setNotice(getActionNotice(action, selectedAuditMode));
   }
 
+  async function startConnector(connector: Connector) {
+    setConnectingConnectorId(connector.id);
+
+    try {
+      if (connector.id === "gmail-readonly") {
+        const response = await fetch("/api/integrations/gmail/start?mode=json", { cache: "no-store" });
+        const payload = await response.json().catch(() => ({})) as ConnectorStartPayload;
+        setConnectorStartResults((current) => ({ ...current, [connector.id]: payload }));
+
+        if (response.ok && payload.authUrl) {
+          window.location.href = payload.authUrl;
+          return;
+        }
+
+        openOfficialConnectorTarget(connector.id);
+        setNotice(payload.requiredEnv?.length
+          ? `Gmail needs production OAuth setup first: ${payload.requiredEnv.join(", ")}. Opening the official setup page.`
+          : "Opening the official Gmail setup path.");
+        return;
+      }
+
+      const response = await fetch(`/api/connectors/${connector.id}/start`, { cache: "no-store" });
+      const payload = await response.json().catch(() => ({})) as ConnectorStartPayload;
+      setConnectorStartResults((current) => ({ ...current, [connector.id]: payload }));
+
+      openOfficialConnectorTarget(connector.id);
+      const missing = payload.missingEnv?.length ? ` Missing setup: ${payload.missingEnv.join(", ")}.` : "";
+      const state = payload.state ? ` State: ${payload.state}.` : "";
+      setNotice(`${connector.name} integration started through the official provider path.${state}${missing}`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not start this integration.");
+    } finally {
+      setConnectingConnectorId(null);
+    }
+  }
+
   return (
     <main id="ledger-main" className="relative px-4 pb-12 pt-4 text-foreground sm:px-6 lg:px-8">
       <GlobalNotice notice={notice} onDismiss={() => setNotice(null)} />
@@ -716,23 +820,11 @@ export default function VognaryMvpClient() {
           </div>
         </div>
 
-        <GuidedAuditLauncher
-          selectedMode={selectedAuditMode}
-          modeSignals={modeSignals}
+        <IntegrationCommandCenter
           audit={audit}
-          activationState={activationState}
-          coverageScore={coverageScore}
-          onSelectMode={setSelectedAuditMode}
-          onAction={focusAuditAction}
-        />
-
-        <AutoDebitCommandPanel
-          audit={audit}
-          bulkEntryText={bulkEntryText}
-          onBulkEntryText={setBulkEntryText}
-          onImportBulk={addBulkSubscriptions}
-          onLoadFounderStack={loadFounderStackTemplate}
-          onReviewItem={selectAndReviewItem}
+          connectorStartResults={connectorStartResults}
+          connectingConnectorId={connectingConnectorId}
+          onStartConnector={startConnector}
           onJumpToLedger={() => selectAndReviewItem()}
         />
 
@@ -752,7 +844,7 @@ export default function VognaryMvpClient() {
                 they <span className="glow-num">renew.</span>
               </h2>
               <p className="mt-6 max-w-xl text-sm leading-7 muted-on-dark sm:text-base">
-                Add statements, receipts, or manual entries. Vognary lists repeated charges, shows where each one came from, and helps you decide what to keep, change, or cancel.
+                Connect official sources first. Vognary turns provider evidence into one recurring-payment ledger, then shows renewals, proof, owners, and actions.
               </p>
               <div className="mt-7 flex flex-wrap gap-2.5">
                 <button type="button" onClick={exportReport} className="btn btn-primary">Download report</button>
@@ -806,33 +898,10 @@ export default function VognaryMvpClient() {
 
         <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]" data-reveal>
           <div className="flex flex-col gap-5">
-            <DataSourcesPanel
-              sources={statementSources}
-              manualItems={manualItems}
-              pastedCsv={pastedCsv}
-              pastedName={pastedName}
-              manualDraft={manualDraft}
-              notice={notice}
-              warnings={audit.warnings}
-              onFiles={handleFiles}
-              onRemoveSource={removeSource}
-              onPastedCsv={setPastedCsv}
-              onPastedName={setPastedName}
-              onAddPastedStatement={addPastedStatement}
-              statementFallbackOpen={statementFallbackOpen}
-              onStatementFallbackOpen={setStatementFallbackOpen}
-              onManualDraft={setManualDraft}
-              onAddManualItem={addManualItem}
-              onRemoveManualItem={removeManualItem}
-              onNotice={setNotice}
-              onConnectGmail={startGmailConnection}
-            />
-            <ReceiptIntelligencePanel
-              receiptText={receiptText}
-              candidates={receiptCandidates}
-              onReceiptText={setReceiptText}
-              onImportCandidate={importReceiptCandidate}
-              onImportAll={importAllReceiptCandidates}
+            <ConnectedSourcePanel
+              connectorStartResults={connectorStartResults}
+              onStartConnector={startConnector}
+              connectingConnectorId={connectingConnectorId}
             />
             <CoveragePanel statementCount={statementSources.length} manualCount={manualItems.length} />
           </div>
@@ -1002,6 +1071,175 @@ function AutoDebitCommandPanel({
       </div>
     </section>
   );
+}
+
+function IntegrationCommandCenter({
+  audit,
+  connectorStartResults,
+  connectingConnectorId,
+  onStartConnector,
+  onJumpToLedger,
+}: {
+  audit: AuditResult;
+  connectorStartResults: Record<string, ConnectorStartPayload>;
+  connectingConnectorId: string | null;
+  onStartConnector: (connector: Connector) => void;
+  onJumpToLedger: () => void;
+}) {
+  const integrationConnectors = getIntegrationConnectors();
+  const liveCount = integrationConnectors.filter((connector) => connector.status === "live" || connector.status === "ready-with-env").length;
+  const partnerCount = integrationConnectors.filter((connector) => connector.status === "partner-required").length;
+
+  return (
+    <section className="grid gap-5 xl:grid-cols-[0.78fr_1.22fr]" data-reveal>
+      <div className="dossier p-6 sm:p-7">
+        <span className="folio" data-folio="Connect" style={{ color: "var(--dossier-muted)" }}>Integration-first</span>
+        <h1 className="mt-4 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-5xl">Connect sources, then watch one ledger.</h1>
+        <p className="mt-4 text-sm leading-7 muted-on-dark">The product direction is not file upload. Users should connect official sources and let Vognary keep recurring payments current. This beta launchpad starts that flow with provider handoffs and honest setup states.</p>
+        <div className="mt-6 grid gap-2 sm:grid-cols-3">
+          <DossierStat label="Integration targets" value={`${integrationConnectors.length}`} />
+          <DossierStat label="Live/setup-ready" value={`${liveCount}`} />
+          <DossierStat label="Partner-gated" value={`${partnerCount}`} />
+        </div>
+        <div className="mt-5 rounded-[11px] border p-3" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
+          <p className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Current result</p>
+          <p className="mt-2 font-display text-2xl font-semibold text-(--dossier-ink)">{audit.summary.recurringCount} recurring item{audit.summary.recurringCount === 1 ? "" : "s"}</p>
+          <p className="mt-1 text-sm leading-6 muted-on-dark">{formatCurrency(audit.summary.monthlyRecurringSpend)} per month · {formatCurrency(audit.summary.annualRecurringSpend)} per year</p>
+          <button type="button" onClick={onJumpToLedger} className="btn btn-primary mt-3">Open recurring ledger</button>
+        </div>
+      </div>
+
+      <div className="panel p-5 sm:p-6">
+        <SectionHead
+          folio="01"
+          kicker="Sources"
+          title="Click to integrate official sources"
+          desc="Each button starts the Vognary connector route and opens the official provider page or consent flow when available. No CSV upload is part of the primary path."
+          right={<span className="pill pill-ready">No upload path</span>}
+        />
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {integrationConnectors.slice(0, 12).map((connector) => (
+            <ConnectorCard
+              key={connector.id}
+              connector={connector}
+              result={connectorStartResults[connector.id]}
+              busy={connectingConnectorId === connector.id}
+              onStart={() => onStartConnector(connector)}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ConnectedSourcePanel({
+  connectorStartResults,
+  connectingConnectorId,
+  onStartConnector,
+}: {
+  connectorStartResults: Record<string, ConnectorStartPayload>;
+  connectingConnectorId: string | null;
+  onStartConnector: (connector: Connector) => void;
+}) {
+  const integrationConnectors = getIntegrationConnectors();
+  const mandateConnectors = integrationConnectors.filter((connector) => ["account-aggregator", "upi-autopay-mandates", "card-emandates", "paypal-automatic-payments"].includes(connector.id));
+  const cloudConnectors = integrationConnectors.filter((connector) => /Cloud|AI|Developer|Consumer SaaS/.test(connector.category)).slice(0, 8);
+
+  return (
+    <section id="source-inputs" className="panel scroll-mt-24 p-5 sm:p-6">
+      <SectionHead
+        folio="03"
+        kicker="Integrations"
+        title="Connection queue"
+        desc="Start with identity/email, then cloud/SaaS, then regulated money rails. Items become true auto-sync only after the official provider grants API, OAuth, or partner access."
+        right={<a href="/integrations" className="btn btn-ghost">All integrations</a>}
+      />
+
+      <div className="mt-5 grid gap-4">
+        <ConnectorGroup title="Cloud, SaaS, and AI tools" connectors={cloudConnectors} connectorStartResults={connectorStartResults} connectingConnectorId={connectingConnectorId} onStartConnector={onStartConnector} />
+        <ConnectorGroup title="Banks, UPI, cards, wallets" connectors={mandateConnectors} connectorStartResults={connectorStartResults} connectingConnectorId={connectingConnectorId} onStartConnector={onStartConnector} />
+      </div>
+    </section>
+  );
+}
+
+function ConnectorGroup({
+  title,
+  connectors: connectorItems,
+  connectorStartResults,
+  connectingConnectorId,
+  onStartConnector,
+}: {
+  title: string;
+  connectors: Connector[];
+  connectorStartResults: Record<string, ConnectorStartPayload>;
+  connectingConnectorId: string | null;
+  onStartConnector: (connector: Connector) => void;
+}) {
+  return (
+    <div className="inset p-4">
+      <h3 className="font-display text-base font-semibold text-(--ink)">{title}</h3>
+      <div className="mt-3 grid gap-2">
+        {connectorItems.map((connector) => (
+          <ConnectorCard
+            key={connector.id}
+            connector={connector}
+            result={connectorStartResults[connector.id]}
+            busy={connectingConnectorId === connector.id}
+            compact
+            onStart={() => onStartConnector(connector)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ConnectorCard({ connector, result, busy, compact, onStart }: { connector: Connector; result?: ConnectorStartPayload; busy?: boolean; compact?: boolean; onStart: () => void }) {
+  const launchTarget = connectorLaunchTargets[connector.id];
+  const state = result?.state;
+  const missing = result?.missingEnv ?? result?.requiredEnv ?? [];
+
+  return (
+    <div className={`inset ${compact ? "p-3" : "p-4"}`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="eyebrow" style={{ fontSize: "0.56rem" }}>{connector.category} · {connector.authType}</p>
+          <h3 className="mt-1 font-display text-base font-semibold text-(--ink)">{connector.name}</h3>
+          {!compact ? <p className="mt-1 text-xs leading-5 text-(--muted)">{connector.userValue}</p> : null}
+          {state ? <p className="mt-2 font-data text-[0.68rem] text-(--muted)">State: {state}</p> : null}
+          {missing.length ? <p className="mt-1 text-xs leading-5 text-ochre">Needs setup: {missing.join(", ")}</p> : null}
+        </div>
+        <span className={`${connectorStatusClass[connector.status]} w-fit shrink-0`}>{connectorStatusLabels[connector.status]}</span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={onStart} disabled={busy} className="btn btn-primary h-9 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60">
+          {busy ? "Starting..." : getConnectorActionLabel(connector)}
+        </button>
+        {launchTarget ? <a href={launchTarget.url} target="_blank" rel="noreferrer" className="btn btn-ghost h-9 px-3 text-xs">Open {launchTarget.label}</a> : null}
+      </div>
+      {connector.limitation && !compact ? <p className="mt-3 text-xs leading-5 text-(--muted)">Boundary: {connector.limitation}</p> : null}
+    </div>
+  );
+}
+
+function getIntegrationConnectors() {
+  const selected = new Set(integrationConnectorIds);
+  return connectors.filter((connector) => selected.has(connector.id));
+}
+
+function getConnectorActionLabel(connector: Connector) {
+  if (connector.status === "partner-required") return "Request partner path";
+  if (connector.status === "planned") return "Open official source";
+  if (connector.status === "ready-with-env") return "Start setup";
+  return "Connect";
+}
+
+function openOfficialConnectorTarget(connectorId: string) {
+  const target = connectorLaunchTargets[connectorId];
+  if (!target) return;
+  window.open(target.url, "_blank", "noopener,noreferrer");
 }
 
 function GlobalNotice({ notice, onDismiss }: { notice: string | null; onDismiss: () => void }) {
@@ -1309,10 +1547,10 @@ function DataSourcesPanel({
 
 function QuickStartPanel() {
   const steps = [
-    ["1", "Add one source", "Use a statement, receipt text, or a manual payment you can verify."],
-    ["2", "Add missing payments", "Use templates for app stores, UPI, cards, domains, insurance, and cloud."],
-    ["3", "Check each item", "Open a payment, confirm the proof, then choose keep, watch, change, cancel, or investigate."],
-    ["4", "Download a report", "Export a PDF, spreadsheet, or backup file for later review."],
+    ["1", "Choose a provider", "Start with Gmail, Claude, Kling, Vercel, Render, X, bank rails, UPI, cards, or wallets."],
+    ["2", "Use official consent", "Vognary opens the provider path or tells you exactly what partner/API access is still required."],
+    ["3", "Sync into one ledger", "Connected evidence becomes one recurring-payment list with renewal dates, source, and confidence."],
+    ["4", "Review and save", "Choose keep, watch, downgrade, cancel, or investigate, then save an encrypted snapshot."],
   ];
 
   return (
@@ -1890,23 +2128,23 @@ function StatusRow({ label, value, state }: { label: string; value: string; stat
 
 function getCoverageItems(statementCount: number, manualCount: number) {
   return [
-    { label: "Statement exports", value: statementCount ? `${statementCount} source(s) connected` : "Use only when live source access is unavailable", state: statementCount ? "ready" as const : "planned" as const },
-    { label: "Manual commitments", value: manualCount ? `${manualCount} item(s) added` : "Use for Apple, UPI, domains, insurance", state: manualCount ? "ready" as const : "partial" as const },
-    { label: "PDF statements", value: "Readable PDFs are supported with verification warnings", state: "partial" as const },
-    { label: "Receipt snippets", value: "Paste invoice snippets now; Gmail OAuth needs setup", state: "partial" as const },
-    { label: "Connected bank data", value: "Requires Account Aggregator partner route", state: "blocked" as const },
-    { label: "UPI/card mandates", value: "Manual today; provider APIs required for direct sync", state: "blocked" as const },
+    { label: "Google identity", value: "Ready for private beta login and workspace sessions", state: "ready" as const },
+    { label: "Gmail receipts", value: "OAuth path exists; production Gmail receipt sync needs Google app verification", state: "partial" as const },
+    { label: "Cloud and AI tools", value: "OpenAI adapter exists; Claude, Kling, Vercel, Render, GitHub, and X are connector targets", state: "partial" as const },
+    { label: "App-store subscriptions", value: "Apple and Google Play need official source access or provider-supported evidence", state: "planned" as const },
+    { label: "Bank/card data", value: "Needs Account Aggregator, issuer, network, or payment partner access", state: "blocked" as const },
+    { label: "UPI/card mandates", value: "Needs PSP, issuer, bank, network, or regulated partner API access", state: "blocked" as const },
   ];
 }
 
 function getReadinessItems(statementCount: number, manualCount: number) {
   return [
-    { label: "Payment detection", value: "Finds repeated charges, confidence, next debit, and proof", state: "ready" as const },
-    { label: "User workflow", value: statementCount || manualCount ? "Your sources can be reviewed now" : "Add sources to run a real review", state: statementCount || manualCount ? "ready" as const : "partial" as const },
-    { label: "Data handling", value: "Session-local by default; backup file is user-controlled", state: "ready" as const },
-    { label: "Exports", value: "PDF, spreadsheet, JSON audit pack, and private workspace backup", state: "ready" as const },
-    { label: "Accounts", value: "Private beta sign-in exists; public login still needs an identity provider", state: "partial" as const },
-    { label: "Direct integrations", value: "Gmail, bank, and mandate sync need credentials or partners", state: "partial" as const },
+    { label: "Integration launchpad", value: "Users start from official provider connection cards, not upload-first flows", state: "ready" as const },
+    { label: "Recurring ledger", value: "Connected evidence lands in one review table with next debit and action labels", state: "ready" as const },
+    { label: "Data handling", value: "Private beta login, database, token vault, and encrypted snapshots are configured", state: "ready" as const },
+    { label: "Exports", value: "PDF, spreadsheet, JSON audit pack, and private workspace backup remain available", state: "ready" as const },
+    { label: "Provider APIs", value: "Each real auto-sync needs OAuth, API keys, or provider partnership per source", state: "partial" as const },
+    { label: "Regulated rails", value: "Bank, UPI, and card mandate discovery cannot be universal without approved partners", state: "blocked" as const },
   ];
 }
 
