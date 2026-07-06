@@ -45,6 +45,7 @@ Integration hub: http://localhost:3000/integrations
 npm run build
 npm run lint
 npm run smoke
+npm run production:check -- https://www.vognary.com
 ```
 
 ## Health Check
@@ -119,6 +120,7 @@ Vognary should not become a generic budget app. The wedge is recurring financial
 See:
 
 - [docs/product-architecture.md](docs/product-architecture.md)
+- [docs/production-activation-runbook.md](docs/production-activation-runbook.md)
 - [docs/validation-playbook.md](docs/validation-playbook.md)
 - [docs/market-entry-research.md](docs/market-entry-research.md)
 - [docs/private-audit-outreach-kit.md](docs/private-audit-outreach-kit.md)
