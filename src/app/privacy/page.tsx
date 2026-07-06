@@ -5,8 +5,8 @@ export default function PrivacyPage() {
 }
 
 const sections = [
-  ["Current MVP", "CSV/PDF ingestion and audit calculations are stateless. The browser workflow and stateless APIs do not persist uploaded financial documents, Gmail tokens, or report outputs."],
-  ["Data Sources", "Users may upload CSV/PDF statements, paste CSV text, or manually enter recurring commitments. Gmail is only available when read-only OAuth credentials are configured."],
+  ["Current Product", "Statement/PDF ingestion and audit calculations are stateless. The browser workflow and stateless APIs do not persist uploaded financial documents, Gmail tokens, or report outputs."],
+  ["Data Sources", "Users may connect available sources, upload fallback statement exports, paste receipt text, or manually enter recurring commitments. Gmail is only available when read-only OAuth credentials are configured."],
   ["No Credential Collection", "Vognary does not ask for bank passwords, card numbers, UPI PINs, or netbanking credentials."],
   ["Future Storage", "When accounts and storage are added, uploaded files must be encrypted at rest, deletable by the user, and access-audited."],
   ["Connected Account Boundary", "The self-serve audit works without accounts. Connected-account sync requires auth, encryption, reviewed legal terms, and approved integrations before storing financial documents."],

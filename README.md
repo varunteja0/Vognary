@@ -4,8 +4,8 @@ Vognary is a recurring-money audit MVP for founders, builders, freelancers, and 
 
 ## Current MVP
 
-- Browser-local CSV upload and paste flow.
-- PDF upload through stateless ingestion.
+- Live-source-first audit workflow with fallback statement import.
+- PDF/statement export ingestion through stateless processing when direct sources are unavailable.
 - Deterministic recurring-payment detector.
 - Merchant normalization for AI tools, cloud hosting, SaaS, app stores, utilities, SIPs, EMIs, and insurance.
 - Recurring Money Graph dashboard.

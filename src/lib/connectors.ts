@@ -13,12 +13,12 @@ export type Connector = {
 
 export const connectors: Connector[] = [
   {
-    id: "csv-statements",
-    name: "CSV Statements",
+    id: "statement-imports",
+    name: "Statement Imports",
     phase: "Phase 1",
     category: "Statements",
     status: "live",
-    userValue: "Upload bank and card exports for high-confidence recurring detection.",
+    userValue: "Import bank and card statement exports only when direct source access is unavailable.",
     evidence: "Implemented through /api/ingest and browser upload.",
     requirements: ["User-exported CSV statement"],
   },

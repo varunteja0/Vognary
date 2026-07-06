@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   const files = formData.getAll("files").filter((value): value is File => value instanceof File);
 
   if (!files.length) {
-    return NextResponse.json({ error: "Attach at least one CSV or PDF file as files." }, { status: 400 });
+    return NextResponse.json({ error: "Attach at least one statement export or PDF file as files." }, { status: 400 });
   }
 
   if (files.length > maxFiles) {
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    return NextResponse.json({ error: `${file.name} is not supported. Upload CSV or PDF files.` }, { status: 400 });
+    return NextResponse.json({ error: `${file.name} is not supported. Upload a supported statement export or PDF file.` }, { status: 400 });
   }
 
   return NextResponse.json({
@@ -90,7 +90,7 @@ function convertPdfTextToCsv(text: string): { csv: string; warnings: string[] } 
   }
 
   if (rows.length === 1) {
-    warnings.push("PDF text was extracted, but no transaction rows matched the private-beta parser. Export CSV from the bank if possible.");
+    warnings.push("PDF text was extracted, but no transaction rows matched the parser. Export structured statement data from the provider if possible.");
   } else {
     warnings.push("PDF rows were converted using a conservative text heuristic. Verify evidence before acting on recommendations.");
   }

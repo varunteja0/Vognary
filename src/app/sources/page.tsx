@@ -3,7 +3,7 @@ import Link from "next/link";
 const sourceGroups = [
   {
     title: "Cards And Bank Statements",
-    steps: ["Export last 6-12 months of credit card and bank statements as CSV when available.", "If CSV is unavailable, upload a readable PDF and verify converted rows.", "Check your card app for Recurring Payments, Standing Instructions, AutoPay, Merchant Mandates, or e-mandates."],
+    steps: ["Check your card app for Recurring Payments, Standing Instructions, AutoPay, Merchant Mandates, or e-mandates.", "Use connected-bank access when an approved Account Aggregator or issuer path is available.", "Use statement exports only as fallback evidence when a direct source is unavailable."],
   },
   {
     title: "UPI AutoPay",
@@ -37,8 +37,8 @@ export default function SourcesPage() {
         </div>
         <article className="panel p-6 sm:p-8 rise">
           <span className="folio" data-folio="§ SG">Field kit</span>
-          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-(--ink) sm:text-5xl">Collect every recurring-payment source</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">No app can magically see every subscription without source access. Use this checklist to make your Vognary audit complete and evidence-backed.</p>
+          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-(--ink) sm:text-5xl">Connect every recurring-payment source</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">No app can truthfully see every subscription without source access. Use this checklist to connect live sources first, then add fallback evidence only where providers are still closed.</p>
           <div className="mt-8 grid gap-3 md:grid-cols-2">
             {sourceGroups.map((group, index) => (
               <section key={group.title} className="inset p-4">

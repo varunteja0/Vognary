@@ -39,7 +39,7 @@ export default function BetaReadinessPage() {
 }
 
 const rows = [
-  { capability: "CSV audits", status: "Ready", next: "Run 30 private founder audits." },
+  { capability: "Self-serve audits", status: "Ready", next: "Run 30 real recurring-payment audits." },
   { capability: "PDF ingestion", status: "Beta heuristic", next: "Improve bank-specific table extraction." },
   { capability: "Manual commitments", status: "Ready", next: "Add source-specific templates for Apple, UPI, domains, and insurance." },
   { capability: "Gmail receipts", status: "OAuth scaffold", next: "Configure Google OAuth, pass app verification, connect candidates to UI." },

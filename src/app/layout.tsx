@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
-import { Fraunces, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Syne, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import RevealController from "./reveal-controller";
 
-const display = Fraunces({
+const display = Syne({
   variable: "--font-display",
   subsets: ["latin"],
-  style: ["normal", "italic"],
   display: "swap",
 });
 
-const grotesk = Hanken_Grotesk({
+const grotesk = Space_Grotesk({
   variable: "--font-grotesk",
   subsets: ["latin"],
   display: "swap",
@@ -22,9 +22,9 @@ const monoData = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Vognary — The Silent Ledger",
+  title: "Vognary — See the money leaving in the dark",
   description:
-    "A forensic audit for recurring money. Vognary finds silent subscriptions and mandates, shows the evidence, and helps you issue a verdict before the next debit.",
+    "Vognary is a blacklight for your money: it reveals the silent recurring charges you can't see, shows the evidence, and helps you cut them before the next debit.",
 };
 
 export default function RootLayout({
@@ -40,11 +40,12 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <a
           href="#ledger-main"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-(--ink) focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-(--paper)"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-(--glow) focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[#0a0c10]"
         >
           Skip to audit
         </a>
         <div className="relative z-10 flex min-h-full flex-col">{children}</div>
+        <RevealController />
       </body>
     </html>
   );

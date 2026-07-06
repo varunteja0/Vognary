@@ -6,7 +6,7 @@ Vognary is now sell-ready as a self-serve, stateless recurring-payment audit pro
 
 - Open the launch page.
 - Join/request an audit through the waitlist API.
-- Upload CSV or PDF statements.
+- Connect available sources or import fallback statement/PDF evidence.
 - Paste CSV exports.
 - Add manual recurring commitments for app stores, UPI AutoPay, card mandates, domains, insurance, SIPs, EMIs, and utilities.
 - Paste receipt snippets.

@@ -1,56 +1,71 @@
 @import "tailwindcss";
 
 /*
-  VOGNARY — "The Silent Ledger"
-  A forensic finance system: warm archival paper, ink, and inked verdicts.
-  Tokens intentionally re-point the legacy variable names so existing
-  utilities (bg-(--surface), border-(--line), text-(--muted)...) adopt the
-  new palette, while new tokens power the signature ledger devices.
+  VOGNARY — "BLACKLIGHT"
+  Ordinary in daylight; glowing under the right light. A spectral,
+  instrument-grade dark system: deep base, a rare uranium-glass glow
+  signal, and an infrared -> UV verdict spectrum. Legacy token names are
+  re-pointed here so the whole app re-skins from one file.
 */
 
 :root {
-  /* Paper + ink foundation */
-  --paper: #f1ead9;
-  --paper-2: #ece3cf;
-  --card: #fbf7ec;
-  --card-2: #f5eede;
-  --ink: #1c1811;
-  --ink-soft: #443c2e;
-  --line: #d9ceb2;
-  --line-strong: #c6b795;
+  /* ---- BLACKLIGHT / Spectral ---------------------------------------
+     Vognary reads the money leaving in the dark. A deep spectral base,
+     a rare uranium-glass glow signal, and an infrared -> UV verdict
+     spectrum. Legacy token names are re-pointed so the whole app
+     re-skins from here. -------------------------------------------- */
 
-  /* Verdict accents */
-  --ember: #bf3a1d;     /* money leaving / cancel / alert */
-  --ember-tint: #f6e3d8;
-  --verdict: #0f6a55;   /* kept / saved */
-  --verdict-tint: #dcece4;
-  --ochre: #a9741a;     /* watch */
-  --ochre-tint: #f2e6cd;
-  --indigo: #33478c;    /* info */
-  --indigo-tint: #dfe2f0;
+  /* Deep spectral base */
+  --void: #06070c;
+  --paper: #090b12;      /* body base */
+  --paper-2: #0b0e17;
+  --card: #10131f;       /* raised panel */
+  --card-2: #0b0e18;     /* recessed inset */
 
-  /* Dossier (dark contrast surfaces) */
-  --dossier: #211c14;
-  --dossier-2: #2c2519;
-  --dossier-ink: #f3ead6;
-  --dossier-muted: #b9ab8e;
-  --dossier-line: #453c29;
+  /* Light on dark */
+  --ink: #e9efe6;        /* primary text */
+  --ink-soft: #a8b1ad;   /* secondary text */
+  --line: #232a39;       /* hairline */
+  --line-strong: #33405a;
 
-  /* Legacy aliases — re-pointed to the new system */
+  /* Signature — uranium glow */
+  --glow: #c8f43a;
+  --glow-soft: #e0fb84;
+  --glow-deep: #9ac91f;
+
+  /* Verdict spectrum */
+  --ember: #ff5a45;      /* infrared — money out / cancel / danger */
+  --ember-tint: rgba(255, 90, 69, 0.13);
+  --verdict: #4ce6b0;    /* mint — kept / safe */
+  --verdict-tint: rgba(76, 230, 176, 0.13);
+  --ochre: #ffb13c;      /* amber — watch */
+  --ochre-tint: rgba(255, 177, 60, 0.13);
+  --indigo: #8f6bff;     /* UV violet — info / downgrade */
+  --indigo-tint: rgba(143, 107, 255, 0.15);
+
+  /* Featured dark panels */
+  --dossier: #080a12;
+  --dossier-2: #0d1020;
+  --dossier-ink: #eef3ea;
+  --dossier-muted: #97a19c;
+  --dossier-line: #263049;
+
+  /* Legacy aliases — re-pointed to the spectral system */
   --background: var(--paper);
   --foreground: var(--ink);
   --surface: var(--card);
   --surface-soft: var(--card-2);
-  --muted: #6c6350;
-  --accent: var(--verdict);
-  --accent-strong: #0b5040;
+  --muted: #8b938f;
+  --accent: var(--glow);
+  --accent-strong: var(--glow-deep);
   --caution: var(--ochre);
   --danger: var(--ember);
   --blue: var(--indigo);
 
-  --radius: 14px;
-  --shadow-ink: 0 1px 0 rgba(28, 24, 17, 0.04), 0 14px 34px -22px rgba(28, 24, 17, 0.42);
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.86' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --radius: 16px;
+  --shadow-ink: 0 1px 0 rgba(255, 255, 255, 0.03), 0 24px 60px -30px rgba(0, 0, 0, 0.9);
+  --glow-ring: 0 0 0 1px color-mix(in srgb, var(--glow) 40%, transparent), 0 0 30px -6px color-mix(in srgb, var(--glow) 55%, transparent);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 @theme inline {
@@ -74,16 +89,18 @@ html {
 
 body {
   background:
-    radial-gradient(120% 90% at 8% -10%, rgba(191, 58, 29, 0.06), transparent 46%),
-    radial-gradient(120% 90% at 100% 0%, rgba(15, 106, 85, 0.07), transparent 42%),
-    linear-gradient(178deg, #f4eddc 0%, var(--paper) 40%, #efe6d2 100%);
+    radial-gradient(58% 48% at 12% -6%, rgba(143, 107, 255, 0.12), transparent 60%),
+    radial-gradient(52% 44% at 104% 4%, rgba(200, 244, 58, 0.09), transparent 58%),
+    radial-gradient(80% 60% at 50% 118%, rgba(255, 90, 69, 0.07), transparent 62%),
+    var(--paper);
   color: var(--ink);
   font-family: var(--font-grotesk), ui-sans-serif, system-ui, sans-serif;
-  font-feature-settings: "ss01", "cv01";
+  font-feature-settings: "ss01";
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Paper grain — sits behind content, multiplies over the paper gradient */
+/* Spectral grain — fine luminous noise over the deep base */
 body::before {
   content: "";
   position: fixed;
@@ -91,9 +108,19 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background-image: var(--grain);
-  background-size: 180px 180px;
-  opacity: 0.05;
-  mix-blend-mode: multiply;
+  background-size: 170px 170px;
+  opacity: 0.06;
+  mix-blend-mode: screen;
+}
+
+/* Vignette — seats content in the dark */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 100% at 50% 28%, transparent 55%, rgba(0, 0, 0, 0.5));
 }
 
 button,
@@ -105,12 +132,12 @@ select {
 }
 
 ::selection {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--glow);
+  color: #0a0c10;
 }
 
 :focus-visible {
-  outline: 2px solid var(--ember);
+  outline: 2px solid var(--glow);
   outline-offset: 2px;
 }
 
@@ -122,12 +149,12 @@ select {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--line-strong);
+  background: #2a3344;
   border: 3px solid var(--paper);
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-soft);
+  background: color-mix(in srgb, var(--glow) 55%, #2a3344);
 }
 
 /* ------------------------------------------------------------------ *
@@ -135,9 +162,9 @@ select {
  * ------------------------------------------------------------------ */
 
 .font-display {
-  font-family: var(--font-display), Georgia, serif;
+  font-family: var(--font-display), "Space Grotesk", ui-sans-serif, sans-serif;
   font-optical-sizing: auto;
-  letter-spacing: -0.012em;
+  letter-spacing: -0.02em;
 }
 
 .font-data {
@@ -202,7 +229,9 @@ select {
 
 .panel {
   position: relative;
-  background: var(--card);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.024), transparent 42%),
+    var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow-ink);
@@ -213,22 +242,23 @@ select {
   border-radius: var(--radius);
 }
 .inset {
-  background:
-    linear-gradient(var(--card-2), var(--card-2)) padding-box;
+  background: var(--card-2);
   border: 1px solid var(--line);
-  border-radius: 11px;
+  border-radius: 12px;
 }
 
-/* Dark dossier surface */
+/* Featured panel — the deep spectral chamber (hero / exhibit) */
 .dossier {
   position: relative;
+  overflow: hidden;
   background:
-    radial-gradient(120% 140% at 100% 0%, rgba(191, 58, 29, 0.16), transparent 55%),
+    radial-gradient(90% 120% at 100% -10%, rgba(143, 107, 255, 0.20), transparent 55%),
+    radial-gradient(70% 90% at -8% 112%, rgba(200, 244, 58, 0.10), transparent 55%),
     linear-gradient(200deg, var(--dossier-2), var(--dossier));
   color: var(--dossier-ink);
   border: 1px solid var(--dossier-line);
   border-radius: var(--radius);
-  box-shadow: 0 26px 60px -34px rgba(20, 16, 9, 0.9);
+  box-shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .dossier .muted-on-dark {
   color: var(--dossier-muted);
@@ -267,31 +297,34 @@ select {
   transform: translateY(1px);
 }
 .btn-primary {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
-  box-shadow: 0 12px 24px -16px rgba(28, 24, 17, 0.8);
+  background: var(--glow);
+  color: #0a0c10;
+  border-color: var(--glow);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--glow) 40%, transparent), 0 14px 40px -14px color-mix(in srgb, var(--glow) 70%, transparent);
 }
 .btn-primary:hover {
-  background: #302819;
+  background: var(--glow-soft);
+  border-color: var(--glow-soft);
 }
 .btn-ember {
-  background: var(--ember);
-  color: #fff5ef;
-  border-color: color-mix(in srgb, var(--ember) 82%, #000);
-  box-shadow: 0 12px 26px -16px rgba(191, 58, 29, 0.75);
+  background: color-mix(in srgb, var(--ember) 16%, transparent);
+  color: var(--ember);
+  border-color: color-mix(in srgb, var(--ember) 55%, transparent);
 }
 .btn-ember:hover {
-  background: #a83218;
+  background: color-mix(in srgb, var(--ember) 26%, transparent);
+  border-color: var(--ember);
+  box-shadow: 0 12px 34px -16px color-mix(in srgb, var(--ember) 70%, transparent);
 }
 .btn-ghost {
-  background: color-mix(in srgb, var(--card) 70%, transparent);
+  background: rgba(255, 255, 255, 0.02);
   color: var(--ink);
   border-color: var(--line-strong);
 }
 .btn-ghost:hover {
-  border-color: var(--ink);
-  background: var(--card);
+  border-color: color-mix(in srgb, var(--glow) 60%, var(--line-strong));
+  color: var(--glow);
+  background: rgba(200, 244, 58, 0.05);
 }
 .btn-ondark {
   background: transparent;
@@ -311,9 +344,9 @@ select {
   height: 2.85rem;
   width: 100%;
   padding: 0 0.8rem;
-  background: var(--card);
+  background: var(--card-2);
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 10px;
   font-size: 0.9rem;
   color: var(--ink);
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
@@ -329,8 +362,8 @@ textarea.field {
   color: color-mix(in srgb, var(--muted) 78%, transparent);
 }
 .field:focus {
-  border-color: var(--ember);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ember) 18%, transparent);
+  border-color: color-mix(in srgb, var(--glow) 70%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--glow) 20%, transparent);
 }
 .field-mono {
   font-family: var(--font-mono-data), ui-monospace, monospace;
@@ -345,38 +378,37 @@ textarea.field {
 .stamp {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.28rem 0.6rem;
-  border-radius: 6px;
-  border: 1.5px solid currentColor;
+  gap: 0.4rem;
+  padding: 0.26rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
   font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   line-height: 1;
-  transform: rotate(-1.4deg);
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, currentColor 12%, transparent);
-  transition: transform 0.16s ease;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
 }
 .stamp::before {
   content: "";
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 999px;
   background: currentColor;
+  box-shadow: 0 0 10px 0 currentColor;
 }
 .stamp-keep {
   color: var(--verdict);
   background: var(--verdict-tint);
 }
 .stamp-watch {
-  color: var(--indigo);
-  background: var(--indigo-tint);
-}
-.stamp-downgrade {
   color: var(--ochre);
   background: var(--ochre-tint);
+}
+.stamp-downgrade {
+  color: var(--indigo);
+  background: var(--indigo-tint);
 }
 .stamp-cancel {
   color: var(--ember);
@@ -384,7 +416,7 @@ textarea.field {
 }
 .stamp-investigate {
   color: var(--ink-soft);
-  background: var(--card-2);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 /* Status pills (readiness / coverage) */
@@ -403,7 +435,7 @@ textarea.field {
 .pill-ready { color: var(--verdict); background: var(--verdict-tint); }
 .pill-partial { color: var(--indigo); background: var(--indigo-tint); }
 .pill-blocked { color: var(--ember); background: var(--ember-tint); }
-.pill-planned { color: var(--ink-soft); background: var(--card-2); }
+.pill-planned { color: var(--ink-soft); background: rgba(255, 255, 255, 0.05); }
 
 /* ------------------------------------------------------------------ *
  * Instrument ticker
@@ -414,8 +446,8 @@ textarea.field {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: #4ade80;
-  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+  background: var(--glow);
+  box-shadow: 0 0 12px 0 var(--glow);
   animation: pulse-dot 2.4s ease-out infinite;
 }
 
@@ -433,11 +465,12 @@ textarea.field {
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--ember) 65%, transparent),
+    var(--glow),
     transparent
   );
   background-size: 42% 100%;
   background-repeat: no-repeat;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--glow) 60%, transparent));
   animation: tape-run 5.5s linear infinite;
 }
 
@@ -446,12 +479,11 @@ textarea.field {
   transition: background 0.16s ease, box-shadow 0.16s ease;
 }
 .ledger-row:hover {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--ochre-tint) 70%, transparent), transparent 62%);
+  background: linear-gradient(90deg, rgba(200, 244, 58, 0.06), transparent 62%);
 }
 .ledger-row[data-active="true"] {
-  background: color-mix(in srgb, var(--verdict-tint) 60%, transparent);
-  box-shadow: inset 3px 0 0 var(--ember);
+  background: rgba(200, 244, 58, 0.07);
+  box-shadow: inset 3px 0 0 var(--glow);
 }
 
 /* ------------------------------------------------------------------ *
@@ -474,9 +506,9 @@ textarea.field {
 }
 
 @keyframes pulse-dot {
-  0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.55); }
-  70% { box-shadow: 0 0 0 7px rgba(74, 222, 128, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+  0% { box-shadow: 0 0 12px 0 var(--glow), 0 0 0 0 rgba(200, 244, 58, 0.5); }
+  70% { box-shadow: 0 0 12px 0 var(--glow), 0 0 0 8px rgba(200, 244, 58, 0); }
+  100% { box-shadow: 0 0 12px 0 var(--glow), 0 0 0 0 rgba(200, 244, 58, 0); }
 }
 
 @keyframes tape-run {
@@ -493,9 +525,147 @@ textarea.field {
   animation: stamp-in 0.28s ease-out both;
 }
 
+/* ------------------------------------------------------------------ *
+ * Spectral signatures
+ * ------------------------------------------------------------------ */
+
+/* Glowing numerals for detected money */
+.glow-num {
+  color: var(--glow);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--glow) 45%, transparent);
+}
+
+/* The scanner spectrum — UV violet -> glow -> infrared */
+.spectral {
+  background: linear-gradient(90deg, var(--indigo), var(--glow) 52%, var(--ember));
+}
+
+/* Hero pointer spotlight — a UV lamp that follows attention */
+.spotlight {
+  position: relative;
+  isolation: isolate;
+}
+.spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(
+    26rem 26rem at var(--mx, 78%) var(--my, 8%),
+    rgba(200, 244, 58, 0.16),
+    rgba(143, 107, 255, 0.08) 38%,
+    transparent 62%
+  );
+  transition: background 0.2s ease;
+}
+.spotlight > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* A thin sweeping scan line for reveal moments */
+.scan {
+  position: relative;
+  overflow: hidden;
+}
+.scan::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(200, 244, 58, 0.10), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: scan-run 4.6s ease-in-out infinite;
+}
+
+@keyframes scan-run {
+  0% { background-position: -50% 0; }
+  60%, 100% { background-position: 160% 0; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Depth, glass, reveal & data-viz
+ * ------------------------------------------------------------------ */
+
+/* Frosted glass (sticky instrument bar) */
+.glass {
+  background: color-mix(in srgb, var(--dossier) 74%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.35);
+  backdrop-filter: blur(16px) saturate(1.35);
+}
+
+/* Interactive lift */
+.lift {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+}
+.lift:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--glow) 34%, var(--line));
+  box-shadow: 0 30px 70px -38px rgba(0, 0, 0, 0.95), 0 0 0 1px color-mix(in srgb, var(--glow) 16%, transparent);
+}
+
+/* Fluid type */
+.hero-title {
+  font-size: clamp(3rem, 7.6vw, 5.6rem);
+  line-height: 0.92;
+  letter-spacing: -0.038em;
+}
+
+/* Scroll reveal — progressive; without JS everything stays visible */
+.reveal-ready [data-reveal] {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+.reveal-ready [data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Spend spectrum — a glowing heat bar of recurring money */
+.spectrum-track {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+  height: 2.9rem;
+  padding: 3px;
+  border-radius: 13px;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+}
+.spectrum-seg {
+  position: relative;
+  height: 100%;
+  min-width: 5px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: filter 0.16s ease, transform 0.16s ease;
+}
+.spectrum-seg:hover {
+  filter: brightness(1.32);
+  transform: translateY(-2px);
+  z-index: 1;
+}
+.seg-keep { background: color-mix(in srgb, var(--verdict) 44%, #0c111a); box-shadow: inset 0 0 14px color-mix(in srgb, var(--verdict) 45%, transparent); }
+.seg-watch { background: color-mix(in srgb, var(--ochre) 44%, #0c111a); box-shadow: inset 0 0 14px color-mix(in srgb, var(--ochre) 45%, transparent); }
+.seg-downgrade { background: color-mix(in srgb, var(--indigo) 44%, #0c111a); box-shadow: inset 0 0 14px color-mix(in srgb, var(--indigo) 45%, transparent); }
+.seg-cancel { background: color-mix(in srgb, var(--ember) 48%, #0c111a); box-shadow: inset 0 0 16px color-mix(in srgb, var(--ember) 52%, transparent); }
+.seg-investigate { background: color-mix(in srgb, var(--ink-soft) 30%, #0c111a); box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.08); }
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+  .reveal-ready [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
   }
   *,
   *::before,

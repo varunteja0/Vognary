@@ -9,7 +9,7 @@ export function GET() {
     components: {
       web: "ready",
       auditEngine: "ready",
-      csvIngestion: "ready",
+      statementIngestion: "ready",
       auditApi: "ready",
       pdfIngestion: "ready-beta",
       manualCommitments: "ready",

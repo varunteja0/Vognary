@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
   const invalidSource = sources.find((source) => !source?.name || !source?.text || source.text.length > maxSourceCharacters);
   if (invalidSource) {
-    return NextResponse.json({ error: "Each source needs a name, CSV text, and must stay under the request size limit." }, { status: 400 });
+    return NextResponse.json({ error: "Each source needs a name, statement text, and must stay under the request size limit." }, { status: 400 });
   }
 
   const audit = analyzeStatements(sources, manualItems);
