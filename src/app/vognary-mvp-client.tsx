@@ -668,6 +668,7 @@ export default function VognaryMvpClient() {
             <div className="flex items-center gap-2">
               <span className="live-dot" aria-hidden />
               <span className="eyebrow muted-on-dark" style={{ fontSize: "0.58rem" }}>On this device</span>
+              <a href="/profile" className="btn btn-ondark h-9 px-3 text-xs">Profile</a>
             </div>
           </div>
         </div>
@@ -845,6 +846,8 @@ export default function VognaryMvpClient() {
             <a className="transition hover:text-(--ink)" href="/terms">Terms</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/beta-readiness">Beta status</a>
+            <span className="text-(--line-strong)">·</span>
+            <a className="transition hover:text-(--ink)" href="/profile">Profile</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/login">Sign in</a>
             <span className="text-(--line-strong)">·</span>

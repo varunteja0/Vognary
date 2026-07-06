@@ -29,12 +29,8 @@ export async function GET(request: NextRequest) {
   const limit = await rateLimit(request, { namespace: "profile-read", limit: 60, windowMs: 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
-  const session = requireSession(request);
+  const session = requireConfiguredProfileSession(request);
   if (session instanceof Response) return session;
-
-  if (!isDatabaseConfigured()) {
-    return NextResponse.json({ status: "not-configured", requiredEnv: ["DATABASE_URL"] }, { status: 501 });
-  }
 
   const workspaces = await listWorkspacesForUser(session.userId);
   const activeWorkspace = workspaces.find((workspace) => workspace.workspaceId === session.workspaceId) ?? workspaces[0] ?? null;
@@ -68,12 +64,8 @@ export async function DELETE(request: NextRequest) {
   const limit = await rateLimit(request, { namespace: "profile-delete", limit: 4, windowMs: 60 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
-  const session = requireSession(request);
+  const session = requireConfiguredProfileSession(request);
   if (session instanceof Response) return session;
-
-  if (!isDatabaseConfigured()) {
-    return NextResponse.json({ status: "not-configured", requiredEnv: ["DATABASE_URL"] }, { status: 501 });
-  }
 
   const body = await readJson(request);
   if (body.confirm !== deleteConfirmation) {
@@ -90,6 +82,17 @@ export async function DELETE(request: NextRequest) {
     secure: process.env.NODE_ENV === "production",
   });
   return response;
+}
+
+function requireConfiguredProfileSession(request: NextRequest) {
+  const session = requireSession(request);
+  if (session instanceof Response) return session;
+
+  if (!isDatabaseConfigured()) {
+    return NextResponse.json({ status: "not-configured", requiredEnv: ["DATABASE_URL"] }, { status: 501 });
+  }
+
+  return session;
 }
 
 async function getProfileData(userId: string, workspaceId: string | null) {

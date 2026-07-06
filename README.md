@@ -37,6 +37,7 @@ Copy `.env.example` to `.env.local` when enabling waitlist persistence, payment 
 
 Launch page: http://localhost:3000/launch
 Private beta login: http://localhost:3000/login
+Profile and data controls: http://localhost:3000/profile
 Private audit intake: http://localhost:3000/private-audit
 Source guide: http://localhost:3000/sources
 Integration hub: http://localhost:3000/integrations
@@ -107,6 +108,7 @@ curl -X POST http://localhost:3000/api/auth/magic-link/request \
 	-H 'Content-Type: application/json' \
 	-d '{"email":"founder@example.com","redirectPath":"/"}'
 curl -X POST http://localhost:3000/api/auth/logout
+curl http://localhost:3000/api/profile
 curl http://localhost:3000/api/workspaces
 curl http://localhost:3000/api/workspaces/current/audit-snapshot
 curl -X POST http://localhost:3000/api/workspaces/current/audit-snapshot \

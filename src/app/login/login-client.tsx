@@ -155,6 +155,7 @@ export default function LoginClient() {
                 <p className="mt-1 text-sm text-(--muted)">Expires: {session.session ? new Date(session.session.expiresAt).toLocaleString("en-IN") : "unknown"}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Link href="/" className="btn btn-primary">Open audit app</Link>
+                  <Link href="/profile" className="btn btn-ghost">View profile</Link>
                   <button type="button" onClick={signOut} className="btn btn-ghost">Sign out</button>
                 </div>
               </div>
