@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const sourceGroups = [
   {
     title: "Cards And Bank Statements",
@@ -27,22 +29,31 @@ const sourceGroups = [
 
 export default function SourcesPage() {
   return (
-    <main className="min-h-screen px-5 py-10 text-foreground sm:px-8">
-      <article className="mx-auto max-w-5xl rounded-lg border border-line bg-(--surface) p-6 shadow-sm">
-        <p className="font-mono text-xs font-semibold uppercase tracking-[0.22em] text-(--accent)">Vognary Source Guide</p>
-        <h1 className="mt-3 text-4xl font-semibold text-[#151712]">How to collect every recurring-payment source</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-(--muted)">No app can magically see every subscription without source access. Use this checklist to make your Vognary audit complete and evidence-backed.</p>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {sourceGroups.map((group) => (
-            <section key={group.title} className="rounded-lg border border-line bg-[#fbfcf8] p-4">
-              <h2 className="text-lg font-semibold text-[#151712]">{group.title}</h2>
-              <ol className="mt-3 grid gap-2 text-sm leading-6 text-(--muted)">
-                {group.steps.map((step, index) => <li key={step}>{index + 1}. {step}</li>)}
-              </ol>
-            </section>
-          ))}
+    <main className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <Link href="/" className="font-display text-lg font-semibold text-(--ink)">Vognary <span className="text-(--muted)">· The Silent Ledger</span></Link>
+          <Link href="/" className="btn btn-ghost">Back to ledger</Link>
         </div>
-      </article>
+        <article className="panel p-6 sm:p-8 rise">
+          <span className="folio" data-folio="§ SG">Field kit</span>
+          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-(--ink) sm:text-5xl">Collect every recurring-payment source</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">No app can magically see every subscription without source access. Use this checklist to make your Vognary audit complete and evidence-backed.</p>
+          <div className="mt-8 grid gap-3 md:grid-cols-2">
+            {sourceGroups.map((group, index) => (
+              <section key={group.title} className="inset p-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-display text-2xl font-semibold text-ember">{String(index + 1).padStart(2, "0")}</span>
+                  <h2 className="font-display text-base font-semibold text-(--ink)">{group.title}</h2>
+                </div>
+                <ol className="mt-3 grid gap-2 text-sm leading-6 text-(--muted)">
+                  {group.steps.map((step, stepIndex) => <li key={step} className="flex gap-2"><span className="font-data text-xs text-ember">{stepIndex + 1}.</span><span>{step}</span></li>)}
+                </ol>
+              </section>
+            ))}
+          </div>
+        </article>
+      </div>
     </main>
   );
 }

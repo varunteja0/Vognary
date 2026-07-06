@@ -13,53 +13,6 @@ import {
 } from "@/lib/recurring-audit";
 import { extractReceiptCandidates, type ReceiptCandidate } from "@/lib/receipt-parser";
 
-const sampleStatement = `Date,Description,Debit,Credit
-2026-01-05,OPENAI CHATGPT PLUS,1999,
-2026-02-05,OPENAI CHATGPT PLUS,1999,
-2026-03-05,OPENAI CHATGPT PLUS,1999,
-2026-04-05,OPENAI CHATGPT PLUS,1999,
-2026-05-05,OPENAI CHATGPT PLUS,1999,
-2026-06-05,OPENAI CHATGPT PLUS,1999,
-2026-01-08,ANTHROPIC CLAUDE PRO,1700,
-2026-02-08,ANTHROPIC CLAUDE PRO,1700,
-2026-03-08,ANTHROPIC CLAUDE PRO,1700,
-2026-04-08,ANTHROPIC CLAUDE PRO,1700,
-2026-05-08,ANTHROPIC CLAUDE PRO,1700,
-2026-06-08,ANTHROPIC CLAUDE PRO,1700,
-2026-01-12,RENDER.COM HOSTING,2240,
-2026-02-12,RENDER.COM HOSTING,2260,
-2026-03-12,RENDER.COM HOSTING,2280,
-2026-04-12,RENDER.COM HOSTING,2310,
-2026-05-12,RENDER.COM HOSTING,2480,
-2026-06-12,RENDER.COM HOSTING,2710,
-2026-01-14,VERCEL PRO PLAN,1650,
-2026-02-14,VERCEL PRO PLAN,1650,
-2026-03-14,VERCEL PRO PLAN,1650,
-2026-04-14,VERCEL PRO PLAN,1650,
-2026-05-14,VERCEL PRO PLAN,1650,
-2026-06-14,VERCEL PRO PLAN,1650,
-2026-01-18,NETFLIX INDIA,649,
-2026-02-18,NETFLIX INDIA,649,
-2026-03-18,NETFLIX INDIA,649,
-2026-04-18,NETFLIX INDIA,649,
-2026-05-18,NETFLIX INDIA,649,
-2026-06-18,NETFLIX INDIA,649,
-2026-01-21,ADOBE CREATIVE CLOUD,4230,
-2026-02-21,ADOBE CREATIVE CLOUD,4230,
-2026-03-21,ADOBE CREATIVE CLOUD,4230,
-2026-04-21,ADOBE CREATIVE CLOUD,4230,
-2026-05-21,ADOBE CREATIVE CLOUD,4230,
-2026-06-21,ADOBE CREATIVE CLOUD,4230,
-2026-01-25,SIP ZERODHA MUTUAL FUND,5000,
-2026-02-25,SIP ZERODHA MUTUAL FUND,5000,
-2026-03-25,SIP ZERODHA MUTUAL FUND,5000,
-2026-04-25,SIP ZERODHA MUTUAL FUND,5000,
-2026-05-25,SIP ZERODHA MUTUAL FUND,5000,
-2026-06-25,SIP ZERODHA MUTUAL FUND,5000,
-2026-06-28,SWIGGY ORDER,620,
-2026-06-30,UBER TRIP,440,
-2026-06-30,SALARY CREDIT,,180000`;
-
 const categoryOptions = [
   "AI tools",
   "Cloud hosting",
@@ -110,27 +63,6 @@ type TeamMember = {
   role: string;
 };
 
-type BetaLead = {
-  id: string;
-  name: string;
-  segment: string;
-  uploadedSources: boolean;
-  foundWaste: boolean;
-  willingToPay: boolean;
-  estimatedAnnualSavings: number;
-  notes: string;
-};
-
-type BetaLeadDraft = {
-  name: string;
-  segment: string;
-  estimatedAnnualSavings: string;
-  uploadedSources: boolean;
-  foundWaste: boolean;
-  willingToPay: boolean;
-  notes: string;
-};
-
 type WorkspaceBackup = {
   version: 1;
   exportedAt: string;
@@ -174,16 +106,6 @@ const emptyManualDraft: ManualDraft = {
   sourceName: "manual entry",
 };
 
-const emptyBetaLeadDraft: BetaLeadDraft = {
-  name: "",
-  segment: "Founder / builder",
-  estimatedAnnualSavings: "",
-  uploadedSources: false,
-  foundWaste: false,
-  willingToPay: false,
-  notes: "",
-};
-
 const manualTemplates = [
   { label: "Apple", merchant: "Apple / iCloud", amount: "749", category: "App store", sourceName: "Apple subscriptions" },
   { label: "Google Play", merchant: "Google Play subscription", amount: "499", category: "App store", sourceName: "Google Play" },
@@ -191,13 +113,6 @@ const manualTemplates = [
   { label: "Card Mandate", merchant: "Card merchant mandate", amount: "1999", category: "Card mandate", sourceName: "card recurring payments" },
   { label: "Domain", merchant: "Domain renewal", amount: "1200", category: "Domains", sourceName: "registrar dashboard" },
   { label: "Insurance", merchant: "Insurance premium", amount: "3000", category: "Insurance", sourceName: "policy dashboard" },
-];
-
-const pricingPlans = [
-  { name: "Free Audit", price: "₹0", detail: "First 10 recurring items, local audit, export JSON." },
-  { name: "Founder Pro", price: "₹999/mo", detail: "Unlimited audits, renewal review, PDF/CSV exports, founder stack labels." },
-  { name: "Team", price: "₹4,999/mo", detail: "Team owners, monthly review workflow, accountant export, shared action list." },
-  { name: "Annual Audit", price: "₹1,999", detail: "One-time private recurring spend report for founders and households." },
 ];
 
 export default function VognaryMvpClient() {
@@ -214,9 +129,6 @@ export default function VognaryMvpClient() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(initialWorkspace?.teamMembers?.length ? initialWorkspace.teamMembers : [{ id: "founder", name: "Founder", role: "Owner" }]);
   const [memberDraft, setMemberDraft] = useState({ name: "", role: "Finance / Ops" });
   const [receiptText, setReceiptText] = useState(initialWorkspace?.receiptText ?? "");
-  const [betaLeadDraft, setBetaLeadDraft] = useState<BetaLeadDraft>(emptyBetaLeadDraft);
-  const [betaLeads, setBetaLeads] = useState<BetaLead[]>([]);
-  const [selectedPlan, setSelectedPlan] = useState("Founder Pro");
   const [reviewCompletedAt, setReviewCompletedAt] = useState<string | null>(null);
   const [localSaveEnabled, setLocalSaveEnabled] = useState(Boolean(initialWorkspace));
   const [notice, setNotice] = useState<string | null>(null);
@@ -311,30 +223,6 @@ export default function VognaryMvpClient() {
     setNotice("Manual recurring commitment added.");
   }
 
-  function loadSample() {
-    setStatementSources([
-      {
-        id: "sample-founder-stack",
-        name: "sample-founder-stack.csv",
-        text: sampleStatement,
-        rowCount: countRows(sampleStatement),
-      },
-    ]);
-    setManualItems([
-      {
-        id: "manual-apple-icloud",
-        merchant: "Apple iCloud Storage",
-        amount: 749,
-        frequency: "monthly",
-        nextExpectedDate: "2026-07-10",
-        category: "App store",
-        sourceName: "manual app-store check",
-      },
-    ]);
-    setUserActions({});
-    setNotice("Loaded sample data. Clear workspace before auditing a real user.");
-  }
-
   function clearWorkspace() {
     setStatementSources([]);
     setManualItems([]);
@@ -358,17 +246,15 @@ export default function VognaryMvpClient() {
     const report = {
       generatedAt: new Date().toISOString(),
       product: "Vognary Recurring Audit",
-      mode: "private-beta-local-audit",
+      mode: "self-serve-stateless-audit",
       readiness: getReadinessItems(statementSources.length, manualItems.length),
       sourceCoverage: getCoverageItems(statementSources.length, manualItems.length),
       summary: audit.summary,
       sources: statementSources.map(({ name, rowCount }) => ({ name, rowCount })),
       manualItems,
-      selectedPlan,
       teamMembers,
       itemOwners,
       reviewNotes,
-      betaLeads,
       recurringItems: audit.recurringItems.map((item) => ({
         ...item,
         userAction: userActions[item.id] ?? item.recommendationType,
@@ -512,35 +398,6 @@ export default function VognaryMvpClient() {
     setItemOwners((current) => Object.fromEntries(Object.entries(current).filter(([, ownerId]) => ownerId !== id)));
   }
 
-  function addBetaLead() {
-    if (!betaLeadDraft.name.trim()) {
-      setNotice("Add a beta user or company name before recording evidence.");
-      return;
-    }
-    setBetaLeads((current) => [
-      ...current,
-      {
-        id: `lead-${Date.now()}`,
-        name: betaLeadDraft.name.trim(),
-        segment: betaLeadDraft.segment,
-        estimatedAnnualSavings: Number.parseFloat(betaLeadDraft.estimatedAnnualSavings) || 0,
-        uploadedSources: betaLeadDraft.uploadedSources,
-        foundWaste: betaLeadDraft.foundWaste,
-        willingToPay: betaLeadDraft.willingToPay,
-        notes: betaLeadDraft.notes,
-      },
-    ]);
-    setBetaLeadDraft(emptyBetaLeadDraft);
-  }
-
-  function exportBetaEvidence() {
-    const rows = [
-      ["Name", "Segment", "Uploaded Sources", "Found Waste", "Willing To Pay", "Estimated Annual Savings", "Notes"],
-      ...betaLeads.map((lead) => [lead.name, lead.segment, String(lead.uploadedSources), String(lead.foundWaste), String(lead.willingToPay), String(lead.estimatedAnnualSavings), lead.notes]),
-    ];
-    downloadText("vognary-beta-evidence.csv", rows.map((row) => row.map(csvEscape).join(",")).join("\n"), "text/csv");
-  }
-
   function markMonthlyReviewComplete() {
     setReviewCompletedAt(new Date().toISOString());
     setNotice("Monthly review marked complete for this local workspace. Export the audit pack for evidence.");
@@ -600,7 +457,6 @@ export default function VognaryMvpClient() {
                 Upload statements, add the mandates your bank never shows, and read every recurring commitment as evidence. Then issue a verdict on each one. Nothing leaves this browser session unless you choose to export it.
               </p>
               <div className="mt-6 flex flex-wrap gap-2">
-                <button type="button" onClick={loadSample} className="btn btn-ghost">Load example file</button>
                 <button type="button" onClick={clearWorkspace} className="btn btn-ghost">Clear workspace</button>
                 <button type="button" onClick={exportReport} className="btn btn-primary">Export audit pack</button>
               </div>
@@ -666,13 +522,6 @@ export default function VognaryMvpClient() {
               onImportAll={importAllReceiptCandidates}
             />
             <CoveragePanel statementCount={statementSources.length} manualCount={manualItems.length} />
-            <BetaEvidencePanel
-              betaLeadDraft={betaLeadDraft}
-              betaLeads={betaLeads}
-              onBetaLeadDraft={setBetaLeadDraft}
-              onAddBetaLead={addBetaLead}
-              onExportBetaEvidence={exportBetaEvidence}
-            />
           </div>
 
           <div className="flex flex-col gap-5">
@@ -691,7 +540,6 @@ export default function VognaryMvpClient() {
               onSelect={setSelectedItemId}
             />
             <PriorityActionPanel priorityItems={priorityItems} userActions={userActions} onSelect={setSelectedItemId} />
-            <PricingPanel selectedPlan={selectedPlan} onSelectedPlan={setSelectedPlan} />
           </div>
         </section>
 
@@ -1011,82 +859,6 @@ function CoveragePanel({ statementCount, manualCount }: { statementCount: number
   );
 }
 
-function BetaEvidencePanel({
-  betaLeadDraft,
-  betaLeads,
-  onBetaLeadDraft,
-  onAddBetaLead,
-  onExportBetaEvidence,
-}: {
-  betaLeadDraft: BetaLeadDraft;
-  betaLeads: BetaLead[];
-  onBetaLeadDraft: (draft: BetaLeadDraft) => void;
-  onAddBetaLead: () => void;
-  onExportBetaEvidence: () => void;
-}) {
-  const uploadedCount = betaLeads.filter((lead) => lead.uploadedSources).length;
-  const wasteCount = betaLeads.filter((lead) => lead.foundWaste).length;
-  const payCount = betaLeads.filter((lead) => lead.willingToPay).length;
-
-  return (
-    <section className="panel p-5 sm:p-6">
-      <SectionHead
-        folio="§ 06"
-        kicker="Evidence"
-        title="Beta evidence tracker"
-        desc="Track the day-90 validation gates from real founder and user audits."
-        right={<button type="button" onClick={onExportBetaEvidence} className="btn btn-ghost">Export CSV</button>}
-      />
-      <div className="mt-4 grid gap-2 sm:grid-cols-3">
-        <MiniStat label="Uploaded" value={`${uploadedCount}/${betaLeads.length}`} />
-        <MiniStat label="Found waste" value={`${wasteCount}/${betaLeads.length}`} />
-        <MiniStat label="Would pay" value={`${payCount}/${betaLeads.length}`} />
-      </div>
-      <div className="mt-4 grid gap-2.5">
-        <input value={betaLeadDraft.name} onChange={(event) => onBetaLeadDraft({ ...betaLeadDraft, name: event.target.value })} className="field" placeholder="User or company name" />
-        <div className="grid gap-2.5 sm:grid-cols-2">
-          <input value={betaLeadDraft.segment} onChange={(event) => onBetaLeadDraft({ ...betaLeadDraft, segment: event.target.value })} className="field" placeholder="Segment" />
-          <input value={betaLeadDraft.estimatedAnnualSavings} onChange={(event) => onBetaLeadDraft({ ...betaLeadDraft, estimatedAnnualSavings: event.target.value })} className="field" placeholder="Estimated annual savings" inputMode="decimal" />
-        </div>
-        <div className="grid gap-2 sm:grid-cols-3">
-          <CheckboxLine label="Uploaded sources" checked={betaLeadDraft.uploadedSources} onChange={(checked) => onBetaLeadDraft({ ...betaLeadDraft, uploadedSources: checked })} />
-          <CheckboxLine label="Found waste" checked={betaLeadDraft.foundWaste} onChange={(checked) => onBetaLeadDraft({ ...betaLeadDraft, foundWaste: checked })} />
-          <CheckboxLine label="Would pay" checked={betaLeadDraft.willingToPay} onChange={(checked) => onBetaLeadDraft({ ...betaLeadDraft, willingToPay: checked })} />
-        </div>
-        <textarea value={betaLeadDraft.notes} onChange={(event) => onBetaLeadDraft({ ...betaLeadDraft, notes: event.target.value })} className="field min-h-20" placeholder="Quote, objection, or follow-up" />
-        <button type="button" onClick={onAddBetaLead} className="btn btn-ember">Add beta evidence</button>
-      </div>
-      {betaLeads.length ? (
-        <div className="mt-4 grid gap-2">
-          {betaLeads.slice(-4).map((lead) => (
-            <div key={lead.id} className="inset p-3 text-sm">
-              <p className="font-semibold text-(--ink)">{lead.name} <span className="font-normal text-(--muted)">· {lead.segment}</span></p>
-              <p className="mt-1 font-data text-xs text-(--muted)">Savings {formatCurrency(lead.estimatedAnnualSavings)} · uploaded {String(lead.uploadedSources)} · waste {String(lead.foundWaste)} · pay {String(lead.willingToPay)}</p>
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function PricingPanel({ selectedPlan, onSelectedPlan }: { selectedPlan: string; onSelectedPlan: (plan: string) => void }) {
-  return (
-    <section className="panel p-5 sm:p-6">
-      <SectionHead folio="§ 09" kicker="Pricing" title="Willingness-to-pay test" desc="Use this during founder calls to test pricing before building billing." />
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {pricingPlans.map((plan) => (
-          <button key={plan.name} type="button" onClick={() => onSelectedPlan(plan.name)} className={`rounded-[11px] border p-4 text-left transition ${selectedPlan === plan.name ? "border-ember bg-(--ember-tint)" : "border-line bg-(--card-2) hover:border-ember"}`}>
-            <p className="text-sm font-semibold text-(--ink)">{plan.name}</p>
-            <p className="font-display mt-2 text-3xl font-semibold text-ember">{plan.price}</p>
-            <p className="mt-2 text-xs leading-5 text-(--muted)">{plan.detail}</p>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function RecurringGraph({
   audit,
   hasRealData,
@@ -1102,7 +874,7 @@ function RecurringGraph({
 }) {
   return (
     <section className="panel overflow-hidden">
-      <div className="flex flex-col gap-2 border-b border-(--line) px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-2 border-b border-line px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <span className="folio" data-folio="§ 07">The ledger</span>
           <h2 className="mt-2 font-display text-xl font-semibold tracking-tight text-(--ink)">Recurring money graph</h2>
@@ -1113,14 +885,14 @@ function RecurringGraph({
 
       {audit.recurringItems.length ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[46rem] border-separate border-spacing-0 text-left text-sm">
+          <table className="w-full min-w-184 border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr>
-                <th className="border-b border-(--line) bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Merchant</th>
-                <th className="border-b border-(--line) bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Cadence</th>
-                <th className="border-b border-(--line) bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Monthly</th>
-                <th className="border-b border-(--line) bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Next debit</th>
-                <th className="border-b border-(--line) bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Verdict</th>
+                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Merchant</th>
+                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Cadence</th>
+                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Monthly</th>
+                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Next debit</th>
+                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Verdict</th>
               </tr>
             </thead>
             <tbody>
@@ -1128,14 +900,14 @@ function RecurringGraph({
                 const action = userActions[item.id] ?? item.recommendationType;
                 return (
                   <tr key={item.id} onClick={() => onSelect(item.id)} data-active={selectedItem?.id === item.id} className="ledger-row cursor-pointer">
-                    <td className="border-b border-(--line) px-5 py-3.5">
+                    <td className="border-b border-line px-5 py-3.5">
                       <p className="font-semibold text-(--ink)">{item.merchant}</p>
                       <p className="mt-0.5 font-data text-[11px] text-(--muted)">{item.category} · {item.confidenceScore}% confidence</p>
                     </td>
-                    <td className="border-b border-(--line) px-5 py-3.5 capitalize text-(--ink-soft)">{item.frequency}</td>
-                    <td className="border-b border-(--line) px-5 py-3.5 font-data font-semibold tnum text-(--ink)">{formatCurrency(item.monthlyCost)}</td>
-                    <td className="border-b border-(--line) px-5 py-3.5 font-data text-xs text-(--muted)">{item.nextExpectedDate}</td>
-                    <td className="border-b border-(--line) px-5 py-3.5"><span className={statusStyles[action]}>{action}</span></td>
+                    <td className="border-b border-line px-5 py-3.5 capitalize text-(--ink-soft)">{item.frequency}</td>
+                    <td className="border-b border-line px-5 py-3.5 font-data font-semibold tnum text-(--ink)">{formatCurrency(item.monthlyCost)}</td>
+                    <td className="border-b border-line px-5 py-3.5 font-data text-xs text-(--muted)">{item.nextExpectedDate}</td>
+                    <td className="border-b border-line px-5 py-3.5"><span className={statusStyles[action]}>{action}</span></td>
                   </tr>
                 );
               })}
@@ -1147,7 +919,7 @@ function RecurringGraph({
           <p className="font-data text-xs uppercase tracking-[0.2em] text-(--muted)">{hasRealData ? "No pattern yet" : "Awaiting evidence"}</p>
           <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">{hasRealData ? "No recurring pattern found yet" : "Start with real sources"}</h3>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">
-            {hasRealData ? "Add more months of statements or use manual entries for app-store, UPI, insurance, cloud, or domain commitments that do not appear in this statement." : "Upload CSV statements or add manual commitments. The sample is optional and only for demos."}
+            {hasRealData ? "Add more months of statements or use manual entries for app-store, UPI, insurance, cloud, or domain commitments that do not appear in this statement." : "Upload CSV/PDF statements or add manual commitments to start your audit."}
           </p>
         </div>
       )}
@@ -1171,7 +943,7 @@ function PriorityActionPanel({
         {priorityItems.length ? priorityItems.map((item) => {
           const action = userActions[item.id] ?? item.recommendationType;
           return (
-            <button key={item.id} type="button" onClick={() => onSelect(item.id)} className="inset w-full p-3 text-left transition hover:border-(--ember)">
+            <button key={item.id} type="button" onClick={() => onSelect(item.id)} className="inset w-full p-3 text-left transition hover:border-ember">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-(--ink)">{item.merchant}</p>
@@ -1217,21 +989,21 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
 
       <div className="panel p-5 sm:p-6">
         <SectionHead folio="§ 10" kicker="Proof" title="Evidence trail" desc="Every verdict traces back to transaction-level proof." right={<span className="pill pill-partial">{item.sourceNames.join(", ")}</span>} />
-        <div className="mt-4 overflow-hidden rounded-[11px] border border-(--line)">
+        <div className="mt-4 overflow-hidden rounded-[11px] border border-line">
           <table className="w-full border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr>
-                <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Date</th>
-                <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Amount</th>
-                <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Statement text</th>
+                <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Date</th>
+                <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Amount</th>
+                <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Statement text</th>
               </tr>
             </thead>
             <tbody>
               {item.evidence.map((evidence) => (
                 <tr key={`${evidence.source}-${evidence.rowNumber}-${evidence.date}`}>
-                  <td className="border-t border-(--line) px-4 py-3 font-data text-xs text-(--muted)">{evidence.date}</td>
-                  <td className="border-t border-(--line) px-4 py-3 font-data font-semibold tnum text-(--ink)">{formatCurrency(evidence.amount)}</td>
-                  <td className="border-t border-(--line) px-4 py-3 text-(--ink-soft)">{evidence.description}</td>
+                  <td className="border-t border-line px-4 py-3 font-data text-xs text-(--muted)">{evidence.date}</td>
+                  <td className="border-t border-line px-4 py-3 font-data font-semibold tnum text-(--ink)">{formatCurrency(evidence.amount)}</td>
+                  <td className="border-t border-line px-4 py-3 text-(--ink-soft)">{evidence.description}</td>
                 </tr>
               ))}
             </tbody>
@@ -1295,7 +1067,7 @@ function TeamReviewPanel({
         <MiniStat label="Assigned items" value={`${assignedCount}/${audit.recurringItems.length}`} />
         <MiniStat label="Needs review" value={`${actionedCount}`} />
       </div>
-      {reviewCompletedAt ? <p className="mt-3 rounded-md border border-(--verdict) bg-(--verdict-tint) px-3 py-2 text-sm text-(--verdict)">Review completed at {new Date(reviewCompletedAt).toLocaleString("en-IN")}.</p> : null}
+      {reviewCompletedAt ? <p className="mt-3 rounded-md border border-verdict bg-(--verdict-tint) px-3 py-2 text-sm text-verdict">Review completed at {new Date(reviewCompletedAt).toLocaleString("en-IN")}.</p> : null}
 
       <div className="mt-4 inset p-4">
         <p className="eyebrow">Review team</p>
@@ -1306,38 +1078,38 @@ function TeamReviewPanel({
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {teamMembers.map((member) => (
-            <span key={member.id} className="inline-flex items-center gap-2 rounded-full border border-(--line) bg-(--card) px-3 py-1 text-xs font-semibold text-(--muted)">
+            <span key={member.id} className="inline-flex items-center gap-2 rounded-full border border-line bg-card px-3 py-1 text-xs font-semibold text-(--muted)">
               {member.name} · {member.role}
-              {member.id !== "founder" ? <button type="button" onClick={() => onRemoveTeamMember(member.id)} className="text-(--ember)">Remove</button> : null}
+              {member.id !== "founder" ? <button type="button" onClick={() => onRemoveTeamMember(member.id)} className="text-ember">Remove</button> : null}
             </span>
           ))}
         </div>
       </div>
 
-      <div className="mt-4 overflow-x-auto rounded-[11px] border border-(--line)">
-        <table className="w-full min-w-[46rem] border-separate border-spacing-0 text-left text-sm">
+      <div className="mt-4 overflow-x-auto rounded-[11px] border border-line">
+        <table className="w-full min-w-184 border-separate border-spacing-0 text-left text-sm">
           <thead>
             <tr>
-              <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Merchant</th>
-              <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Monthly</th>
-              <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Signal</th>
-              <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Owner</th>
-              <th className="border-b border-(--line) bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Review note</th>
+              <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Merchant</th>
+              <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Monthly</th>
+              <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Signal</th>
+              <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Owner</th>
+              <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Review note</th>
             </tr>
           </thead>
           <tbody>
             {audit.recurringItems.map((item) => (
               <tr key={item.id}>
-                <td className="border-t border-(--line) px-4 py-3 font-semibold text-(--ink)">{item.merchant}</td>
-                <td className="border-t border-(--line) px-4 py-3 font-data tnum text-(--ink-soft)">{formatCurrency(item.monthlyCost)}</td>
-                <td className="border-t border-(--line) px-4 py-3"><span className={statusStyles[item.recommendationType]}>{item.recommendationType}</span></td>
-                <td className="border-t border-(--line) px-4 py-3">
+                <td className="border-t border-line px-4 py-3 font-semibold text-(--ink)">{item.merchant}</td>
+                <td className="border-t border-line px-4 py-3 font-data tnum text-(--ink-soft)">{formatCurrency(item.monthlyCost)}</td>
+                <td className="border-t border-line px-4 py-3"><span className={statusStyles[item.recommendationType]}>{item.recommendationType}</span></td>
+                <td className="border-t border-line px-4 py-3">
                   <select value={itemOwners[item.id] ?? ""} onChange={(event) => onItemOwner(item.id, event.target.value)} className="field" style={{ height: "2.3rem", fontSize: "0.78rem" }}>
                     <option value="">Unassigned</option>
                     {teamMembers.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
                   </select>
                 </td>
-                <td className="border-t border-(--line) px-4 py-3">
+                <td className="border-t border-line px-4 py-3">
                   <input value={reviewNotes[item.id] ?? ""} onChange={(event) => onReviewNote(item.id, event.target.value)} className="field" style={{ height: "2.3rem", fontSize: "0.78rem" }} placeholder="Usage, cancel path, decision" />
                 </td>
               </tr>
@@ -1434,15 +1206,6 @@ function StatusRow({ label, value, state }: { label: string; value: string; stat
       </div>
       <span className={`${pillClass} shrink-0`}>{state}</span>
     </div>
-  );
-}
-
-function CheckboxLine({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return (
-    <label className={`flex h-11 cursor-pointer items-center gap-2 rounded-[9px] border px-3 text-sm font-semibold transition ${checked ? "border-verdict bg-(--verdict-tint) text-(--ink)" : "border-line bg-card text-(--ink-soft)"}`}>
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="size-4" style={{ accentColor: "var(--verdict)" }} />
-      {label}
-    </label>
   );
 }
 

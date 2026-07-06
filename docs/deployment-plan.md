@@ -26,7 +26,7 @@ The API returns an audit result and stores nothing. This gives us a clean bridge
 
 ```bash
 curl -X POST http://localhost:3000/api/ingest \
-	-F 'files=@public/sample-founder-stack.csv'
+	-F 'files=@/path/to/your-statement.csv'
 ```
 
 The ingestion API accepts CSV and PDF. CSV is passed through directly. PDF text is extracted and converted through a conservative transaction-line heuristic, and any warnings are returned to the UI.

@@ -1,6 +1,6 @@
 # Vognary Phase Roadmap
 
-## Phase 0: Working Private Beta
+## Phase 0: Self-Serve Stateless Audit
 
 Status: Implemented
 

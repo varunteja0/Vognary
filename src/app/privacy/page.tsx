@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function PrivacyPage() {
   return <TrustPage title="Privacy" intro="Vognary is built for self-serve recurring-payment audits with a data-minimization posture from day one." sections={sections} />;
 }
@@ -12,20 +14,26 @@ const sections = [
 
 function TrustPage({ title, intro, sections }: { title: string; intro: string; sections: string[][] }) {
   return (
-    <main className="min-h-screen px-5 py-10 text-foreground sm:px-8">
-      <article className="mx-auto max-w-3xl rounded-lg border border-line bg-(--surface) p-6 shadow-sm">
-        <p className="font-mono text-xs font-semibold uppercase tracking-[0.22em] text-(--accent)">Vognary Trust</p>
-        <h1 className="mt-3 text-4xl font-semibold text-[#151712]">{title}</h1>
-        <p className="mt-3 text-sm leading-6 text-(--muted)">{intro}</p>
-        <div className="mt-8 grid gap-5">
-          {sections.map(([heading, body]) => (
-            <section key={heading}>
-              <h2 className="text-lg font-semibold text-[#151712]">{heading}</h2>
-              <p className="mt-2 text-sm leading-6 text-(--muted)">{body}</p>
-            </section>
-          ))}
+    <main className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-3xl">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <Link href="/" className="font-display text-lg font-semibold text-(--ink)">Vognary <span className="text-(--muted)">· The Silent Ledger</span></Link>
+          <Link href="/" className="btn btn-ghost">Back to ledger</Link>
         </div>
-      </article>
+        <article className="panel p-6 sm:p-8 rise">
+          <span className="folio" data-folio="§ T2">Trust</span>
+          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-(--ink) sm:text-5xl">{title}</h1>
+          <p className="mt-3 text-sm leading-7 text-(--muted)">{intro}</p>
+          <div className="mt-8 grid gap-5">
+            {sections.map(([heading, body]) => (
+              <section key={heading}>
+                <h2 className="font-display text-lg font-semibold text-(--ink)">{heading}</h2>
+                <p className="mt-2 text-sm leading-6 text-(--muted)">{body}</p>
+              </section>
+            ))}
+          </div>
+        </article>
+      </div>
     </main>
   );
 }

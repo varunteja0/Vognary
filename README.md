@@ -23,8 +23,6 @@ npm run dev
 
 Open http://localhost:3000.
 
-The app opens with a sample founder stack. To test upload, use [public/sample-founder-stack.csv](public/sample-founder-stack.csv).
-
 Launch page: http://localhost:3000/launch
 Source guide: http://localhost:3000/sources
 Integration hub: http://localhost:3000/integrations
@@ -53,7 +51,7 @@ curl -X POST http://localhost:3000/api/audit \
 
 ## Deployment
 
-See [docs/deployment-plan.md](docs/deployment-plan.md). The current app is deployable for private beta audits. It intentionally does not store financial documents server-side yet.
+See [docs/deployment-plan.md](docs/deployment-plan.md). The current app is deployable for self-serve stateless audits. It intentionally does not store financial documents server-side yet.
 
 ## Product Direction
 

@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
   for (const file of files) {
     if (file.size > maxFileBytes) {
-      return NextResponse.json({ error: `${file.name} is too large. Keep files below 8 MB for private beta ingestion.` }, { status: 413 });
+      return NextResponse.json({ error: `${file.name} is too large. Keep files below 8 MB for stateless ingestion.` }, { status: 413 });
     }
 
     const lowerName = file.name.toLowerCase();

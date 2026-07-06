@@ -8,7 +8,7 @@ Vognary finds and explains every recurring financial commitment before money lea
 
 1. Open the app.
 2. Show the empty workspace: Vognary does not pretend it has universal coverage.
-3. Upload `public/sample-founder-stack.csv` or click Load Example.
+3. Upload a real anonymized CSV statement or paste a short CSV export.
 4. Add one manual commitment such as Apple iCloud or UPI AutoPay.
 5. Show monthly recurring spend, annual run-rate, reviewable burn, and renewals in 10 days.
 6. Click a high-cost item such as Render or Adobe.
@@ -22,7 +22,7 @@ Vognary finds and explains every recurring financial commitment before money lea
 - The audit engine runs today.
 - The ingestion API runs today.
 - The audit API runs today.
-- No server-side storage is required for private beta.
+- No server-side storage is required for the stateless audit product.
 - The schema and deployment path are ready for persistent accounts.
 
 ## What We Are Raising For

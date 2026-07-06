@@ -1,31 +1,39 @@
+import Link from "next/link";
+
 export default function BetaReadinessPage() {
   return (
-    <main className="min-h-screen px-5 py-10 text-foreground sm:px-8">
-      <article className="mx-auto max-w-4xl rounded-lg border border-line bg-(--surface) p-6 shadow-sm">
-        <p className="font-mono text-xs font-semibold uppercase tracking-[0.22em] text-(--accent)">Vognary Operating Plan</p>
-        <h1 className="mt-3 text-4xl font-semibold text-[#151712]">Beta Readiness</h1>
-        <p className="mt-3 text-sm leading-6 text-(--muted)">The product is ready for self-serve stateless audits. The table below is the honest path to connected-account production.</p>
-        <div className="mt-8 overflow-hidden rounded-lg border border-line">
-          <table className="w-full border-separate border-spacing-0 text-left text-sm">
-            <thead className="bg-[#f5f7f0] text-xs uppercase tracking-[0.14em] text-(--muted)">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Capability</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold">Next Gate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.capability} className="bg-white">
-                  <td className="border-t border-line px-4 py-3 font-semibold text-[#151712]">{row.capability}</td>
-                  <td className="border-t border-line px-4 py-3 text-(--muted)">{row.status}</td>
-                  <td className="border-t border-line px-4 py-3 text-(--muted)">{row.next}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <main className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-4xl">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <Link href="/" className="font-display text-lg font-semibold text-(--ink)">Vognary <span className="text-(--muted)">· The Silent Ledger</span></Link>
+          <Link href="/" className="btn btn-ghost">Back to ledger</Link>
         </div>
-      </article>
+        <article className="panel p-6 sm:p-8 rise">
+          <span className="folio" data-folio="§ OP">Operating plan</span>
+          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-(--ink) sm:text-5xl">Beta readiness</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">The product is ready for self-serve stateless audits. The table below is the honest path to connected-account production.</p>
+          <div className="mt-8 overflow-x-auto rounded-[11px] border border-line">
+            <table className="w-full min-w-160 border-separate border-spacing-0 text-left text-sm">
+              <thead>
+                <tr>
+                  <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Capability</th>
+                  <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Status</th>
+                  <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Next gate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.capability}>
+                    <td className="border-t border-line px-4 py-3 font-semibold text-(--ink)">{row.capability}</td>
+                    <td className="border-t border-line px-4 py-3 font-data text-xs text-(--ink-soft)">{row.status}</td>
+                    <td className="border-t border-line px-4 py-3 text-(--muted)">{row.next}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </div>
     </main>
   );
 }

@@ -1,19 +1,27 @@
+import Link from "next/link";
+
 export default function SecurityPage() {
   return (
-    <main className="min-h-screen px-5 py-10 text-foreground sm:px-8">
-      <article className="mx-auto max-w-3xl rounded-lg border border-line bg-(--surface) p-6 shadow-sm">
-        <p className="font-mono text-xs font-semibold uppercase tracking-[0.22em] text-(--accent)">Vognary Trust</p>
-        <h1 className="mt-3 text-4xl font-semibold text-[#151712]">Security Model</h1>
-        <p className="mt-3 text-sm leading-6 text-(--muted)">Vognary runs self-serve stateless audits today, then graduates to encrypted persistence only when connected-account sync is enabled.</p>
-        <div className="mt-8 grid gap-4">
-          {items.map((item) => (
-            <div key={item.title} className="rounded-md border border-line bg-[#fbfcf8] p-4">
-              <h2 className="text-base font-semibold text-[#151712]">{item.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-(--muted)">{item.body}</p>
-            </div>
-          ))}
+    <main className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-3xl">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <Link href="/" className="font-display text-lg font-semibold text-(--ink)">Vognary <span className="text-(--muted)">· The Silent Ledger</span></Link>
+          <Link href="/" className="btn btn-ghost">Back to ledger</Link>
         </div>
-      </article>
+        <article className="panel p-6 sm:p-8 rise">
+          <span className="folio" data-folio="§ T1">Trust</span>
+          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-(--ink) sm:text-5xl">Security model</h1>
+          <p className="mt-3 text-sm leading-7 text-(--muted)">Vognary runs self-serve stateless audits today, then graduates to encrypted persistence only when connected-account sync is enabled.</p>
+          <div className="mt-8 grid gap-3">
+            {items.map((item) => (
+              <div key={item.title} className="inset p-4">
+                <h2 className="font-display text-base font-semibold text-(--ink)">{item.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-(--muted)">{item.body}</p>
+              </div>
+            ))}
+          </div>
+        </article>
+      </div>
     </main>
   );
 }
