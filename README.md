@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vognary
 
-## Getting Started
+Vognary is a recurring-money audit MVP for founders, builders, freelancers, and modern households. The first product finds recurring payments from a CSV statement, normalizes merchants, predicts the next debit, estimates annual burn, and shows evidence for each recommendation.
 
-First, run the development server:
+## Current MVP
+
+- Browser-local CSV upload and paste flow.
+- Deterministic recurring-payment detector.
+- Merchant normalization for AI tools, cloud hosting, SaaS, app stores, utilities, SIPs, EMIs, and insurance.
+- Recurring Money Graph dashboard.
+- Confidence scores, next debit prediction, evidence trail, and founder action labels.
+- JSON export for audit reports.
+
+## Quick Start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The app opens with a sample founder stack. To test upload, use [public/sample-founder-stack.csv](public/sample-founder-stack.csv).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Validation Command
 
-## Learn More
+```bash
+npm run build
+npm run lint
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Health Check
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+curl http://localhost:3000/api/health
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Stateless Audit API
 
-## Deploy on Vercel
+```bash
+curl -X POST http://localhost:3000/api/audit \
+	-H 'Content-Type: application/json' \
+	-d '{"sources":[{"name":"statement.csv","text":"Date,Description,Debit,Credit\n2026-01-01,OPENAI CHATGPT,1999,"}],"manualItems":[]}'
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deployment
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See [docs/deployment-plan.md](docs/deployment-plan.md). The current app is deployable for private beta audits. It intentionally does not store financial documents server-side yet.
+
+## Product Direction
+
+Vognary should not become a generic budget app. The wedge is recurring financial commitments: subscriptions, card e-mandates, UPI AutoPay, EMIs, SIPs, insurance, SaaS, cloud bills, domains, app-store subscriptions, and utilities.
+
+See [docs/product-architecture.md](docs/product-architecture.md) and [docs/validation-playbook.md](docs/validation-playbook.md).

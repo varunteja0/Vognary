@@ -1,0 +1,22 @@
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+  postgres:
+    image: postgres:17-alpine
+    profiles: ["future-backend"]
+    environment:
+      POSTGRES_USER: vognary
+      POSTGRES_PASSWORD: vognary
+      POSTGRES_DB: vognary
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
