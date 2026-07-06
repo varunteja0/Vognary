@@ -361,6 +361,7 @@ export default function VognaryMvpClient() {
     link.download = "vognary-private-beta-audit.json";
     link.click();
     URL.revokeObjectURL(url);
+    setNotice("Audit pack exported as JSON. Keep it private; it contains your source evidence.");
   }
 
   function exportWorkspaceBackup() {
@@ -412,6 +413,7 @@ export default function VognaryMvpClient() {
       ]),
     ];
     downloadText("vognary-recurring-audit.csv", rows.map((row) => row.map(csvEscape).join(",")).join("\n"), "text/csv");
+    setNotice("Spreadsheet report exported.");
   }
 
   function exportPdfReport() {
@@ -451,6 +453,7 @@ export default function VognaryMvpClient() {
     }
 
     doc.save("vognary-recurring-audit.pdf");
+    setNotice("PDF report exported.");
   }
 
   function importReceiptCandidate(candidate: ReceiptCandidate) {
@@ -524,6 +527,7 @@ export default function VognaryMvpClient() {
 
   return (
     <main id="ledger-main" className="relative px-4 pb-12 pt-4 text-foreground sm:px-6 lg:px-8">
+      <GlobalNotice notice={notice} onDismiss={() => setNotice(null)} />
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         {/* Instrument bar — live money tape */}
         <div className="sticky top-3 z-30 rise">
@@ -729,6 +733,24 @@ export default function VognaryMvpClient() {
         </footer>
       </div>
     </main>
+  );
+}
+
+function GlobalNotice({ notice, onDismiss }: { notice: string | null; onDismiss: () => void }) {
+  if (!notice) return null;
+
+  return (
+    <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-3xl rounded-xl border border-line-strong bg-[#14161b]/95 p-3 shadow-2xl backdrop-blur" role="status" aria-live="polite">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="eyebrow" style={{ fontSize: "0.56rem" }}>Action result</p>
+          <p className="mt-1 text-sm leading-6 text-(--ink)">{notice}</p>
+        </div>
+        <button type="button" onClick={onDismiss} className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-(--muted) transition hover:border-ember hover:text-ember">
+          Dismiss
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -955,13 +977,16 @@ function DataSourcesPanel({
             <button
               key={template.label}
               type="button"
-              onClick={() => onManualDraft({
-                ...manualDraft,
-                merchant: template.merchant,
-                amount: template.amount,
-                category: template.category,
-                sourceName: template.sourceName,
-              })}
+              onClick={() => {
+                onManualDraft({
+                  ...manualDraft,
+                  merchant: template.merchant,
+                  amount: template.amount,
+                  category: template.category,
+                  sourceName: template.sourceName,
+                });
+                onNotice(`${template.label} template loaded. Verify the amount and date, then add it.`);
+              }}
               className="rounded-full border border-line bg-card px-3 py-1 text-xs font-semibold text-(--muted) transition hover:border-ember hover:text-ember"
             >
               {template.label}

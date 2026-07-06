@@ -12,6 +12,7 @@ await assertOk("/sources");
 await assertOk("/integrations");
 await assertOk("/privacy");
 await assertOk("/security");
+await assertOk("/private-audit");
 
 const health = await (await assertOk("/api/health")).json();
 if (health.status !== "ok") throw new Error("Health endpoint did not return ok");
@@ -90,5 +91,25 @@ const auditResponse = await fetch(`${baseUrl}/api/audit`, {
 if (!auditResponse.ok) throw new Error(`Audit endpoint returned ${auditResponse.status}`);
 const audit = await auditResponse.json();
 if (!audit.audit?.summary) throw new Error("Audit endpoint did not return a summary");
+
+const auditIntakeResponse = await fetch(`${baseUrl}/api/audit-intake`, {
+  method: "POST",
+  headers: { "content-type": "application/json", "x-forwarded-for": `smoke-${Date.now()}` },
+  body: JSON.stringify({
+    name: "Smoke Founder",
+    email: "smoke@example.com",
+    contact: "LinkedIn",
+    persona: "Founder",
+    spendGuess: "50000",
+    paymentTypes: ["AI tools", "SaaS tools"],
+    sourceTypes: ["Redacted bank/card statement"],
+    biggestConcern: "Privacy",
+    canContact: true,
+    message: "Smoke audit intake validation",
+  }),
+});
+if (!auditIntakeResponse.ok) throw new Error(`Audit intake endpoint returned ${auditIntakeResponse.status}`);
+const auditIntake = await auditIntakeResponse.json();
+if (!auditIntake.status) throw new Error("Audit intake endpoint did not return a status");
 
 console.log(JSON.stringify({ status: "ok", baseUrl, routes: "verified" }, null, 2));

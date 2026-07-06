@@ -35,6 +35,7 @@ Open http://localhost:3000.
 Copy `.env.example` to `.env.local` when enabling waitlist persistence, payment links, Gmail OAuth, or future connected-account storage.
 
 Launch page: http://localhost:3000/launch
+Private audit intake: http://localhost:3000/private-audit
 Source guide: http://localhost:3000/sources
 Integration hub: http://localhost:3000/integrations
 
@@ -120,6 +121,8 @@ See:
 - [docs/product-architecture.md](docs/product-architecture.md)
 - [docs/validation-playbook.md](docs/validation-playbook.md)
 - [docs/market-entry-research.md](docs/market-entry-research.md)
+- [docs/private-audit-outreach-kit.md](docs/private-audit-outreach-kit.md)
+- [docs/private-audit-pipeline-template.csv](docs/private-audit-pipeline-template.csv)
 - [docs/deployment-plan.md](docs/deployment-plan.md)
 - [docs/phase-roadmap.md](docs/phase-roadmap.md)
 - [docs/integration-checklist.md](docs/integration-checklist.md)
