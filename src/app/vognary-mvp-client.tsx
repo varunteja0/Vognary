@@ -807,7 +807,7 @@ function QuickStartPanel() {
   ];
 
   return (
-    <section className="panel p-5 sm:p-6">
+    <section className="panel p-5 sm:p-6" data-reveal>
       <span className="folio" data-folio="§ 01">Procedure</span>
       <div className="mt-5 grid gap-5 md:grid-cols-4">
         {steps.map(([number, title, body], index) => (
@@ -837,7 +837,7 @@ function UserControlPanel({
   onDisableLocalSave: () => void;
 }) {
   return (
-    <section className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr]">
+    <section className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
       <div className="panel p-5 sm:p-6">
         <p className="eyebrow">Audit completeness</p>
         <div className="mt-3 flex items-end gap-3">
@@ -1035,7 +1035,7 @@ function PriorityActionPanel({
 
 function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; action: RecommendationType; onAction: (action: RecommendationType) => void }) {
   return (
-    <section className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr]">
+    <section className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
       <div className="dossier p-6">
         <span className="folio" data-folio="§ 10" style={{ color: "var(--dossier-muted)" }}>Exhibit</span>
         <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight text-(--dossier-ink)">{item.merchant}</h2>
@@ -1128,7 +1128,7 @@ function TeamReviewPanel({
   const actionedCount = audit.recurringItems.filter((item) => ["cancel", "downgrade", "investigate", "watch"].includes(item.recommendationType)).length;
 
   return (
-    <section className="panel p-5 sm:p-6">
+    <section className="panel p-5 sm:p-6" data-reveal>
       <SectionHead
         folio="§ 11"
         kicker="Review"
@@ -1197,7 +1197,7 @@ function TeamReviewPanel({
 
 function ReadinessPanel({ statementCount, manualCount }: { statementCount: number; manualCount: number }) {
   return (
-    <section className="panel p-5 sm:p-6">
+    <section className="panel p-5 sm:p-6" data-reveal>
       <SectionHead
         folio="§ 12"
         kicker="Readiness"
@@ -1208,6 +1208,72 @@ function ReadinessPanel({ statementCount, manualCount }: { statementCount: numbe
       <div className="mt-4 grid gap-2 md:grid-cols-2">
         {getReadinessItems(statementCount, manualCount).map((item) => <StatusRow key={item.label} {...item} />)}
       </div>
+    </section>
+  );
+}
+
+function verdictColor(action: RecommendationType): string {
+  return {
+    keep: "var(--verdict)",
+    watch: "var(--ochre)",
+    downgrade: "var(--indigo)",
+    cancel: "var(--ember)",
+    investigate: "var(--ink-soft)",
+  }[action];
+}
+
+function SpendSpectrum({ audit, userActions, onSelect }: { audit: AuditResult; userActions: Record<string, RecommendationType>; onSelect: (id: string) => void }) {
+  const items = [...audit.recurringItems].sort((left, right) => right.monthlyCost - left.monthlyCost);
+  const total = items.reduce((sum, item) => sum + item.monthlyCost, 0);
+
+  return (
+    <section className="panel p-5 sm:p-6" data-reveal>
+      <SectionHead
+        folio="§ 06"
+        kicker="Spectrum"
+        title="Spend spectrum"
+        desc="Every recurring rupee, split by merchant and lit by its verdict. The hottest bands are where money leaves fastest."
+        right={<span className="font-data text-xs text-(--muted)">{formatCurrency(audit.summary.monthlyRecurringSpend)}/mo</span>}
+      />
+      {items.length ? (
+        <>
+          <div className="spectrum-track mt-5" role="img" aria-label="Recurring spend by merchant">
+            {items.map((item) => {
+              const action = userActions[item.id] ?? item.recommendationType;
+              const pct = total > 0 ? (item.monthlyCost / total) * 100 : 0;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onSelect(item.id)}
+                  className={`spectrum-seg seg-${action}`}
+                  style={{ flexGrow: Math.max(item.monthlyCost, 1), flexBasis: 0 }}
+                  title={`${item.merchant} · ${formatCurrency(item.monthlyCost)}/mo · ${Math.round(pct)}%`}
+                  aria-label={`${item.merchant}, ${formatCurrency(item.monthlyCost)} per month`}
+                />
+              );
+            })}
+          </div>
+          <div className="mt-4 grid gap-1 sm:grid-cols-2">
+            {items.slice(0, 6).map((item) => {
+              const action = userActions[item.id] ?? item.recommendationType;
+              const pct = total > 0 ? (item.monthlyCost / total) * 100 : 0;
+              const color = verdictColor(action);
+              return (
+                <button key={item.id} type="button" onClick={() => onSelect(item.id)} className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left transition hover:bg-white/[0.04]">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="size-2 shrink-0 rounded-full" style={{ background: color, boxShadow: `0 0 8px 0 ${color}` }} />
+                    <span className="truncate text-sm text-(--ink)">{item.merchant}</span>
+                  </span>
+                  <span className="font-data shrink-0 text-xs tnum text-(--muted)">{formatCurrency(item.monthlyCost)} · {Math.round(pct)}%</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <p className="inset mt-5 px-3 py-6 text-center text-sm text-(--muted)">Add sources to light up your spend spectrum.</p>
+      )}
     </section>
   );
 }
@@ -1245,7 +1311,7 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: "i
   }[tone];
 
   return (
-    <div className="panel-flat relative overflow-hidden px-4 py-4">
+    <div className="panel-flat lift relative overflow-hidden px-4 py-4">
       <div className="flex items-center justify-between">
         <p className="eyebrow" style={{ fontSize: "0.58rem" }}>{label}</p>
         <span className="size-1.5 rounded-full" style={{ background: color, boxShadow: `0 0 10px 0 ${color}` }} />
