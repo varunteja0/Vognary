@@ -2,17 +2,17 @@ import Link from "next/link";
 import { VognaryMark } from "./brand";
 
 const checks = [
-  "AI tools: Claude, OpenAI, Cursor, Kling",
-  "Cloud and SaaS: Render, Vercel, GitHub, AWS",
-  "UPI AutoPay and card mandates",
-  "Apple, Google Play, domains, insurance, EMIs, SIPs",
+  "Gmail receipts: invoices, renewal notices, trials, payment-success emails",
+  "AI and SaaS: Claude, OpenAI, Cursor, Kling, X, Notion, Figma",
+  "Cloud and developer bills: Render, Vercel, GitHub, AWS, Cloudflare",
+  "Mandates and commitments: UPI AutoPay, cards, domains, insurance, EMIs, SIPs",
 ];
 
 const steps = [
-  ["1", "Sign in", "Use Google or private beta access so your workspace is yours."],
-  ["2", "Add evidence", "Use manual entries, statements, receipts, or source checks."],
-  ["3", "Review one list", "See recurring spend, next debits, proof, and actions."],
-  ["4", "Save safely", "Save an encrypted snapshot or delete your data from Profile."],
+  ["1", "Sign in", "Use Google so Vognary can create your private workspace."],
+  ["2", "Connect Gmail receipts", "Start with the first real connector: renewal and invoice history from Gmail."],
+  ["3", "Review one ledger", "See merchant, amount, renewal date, confidence, source, and next action in one list."],
+  ["4", "Save and repeat", "Save an encrypted snapshot, come back monthly, and add more official sources as they go live."],
 ];
 
 export default function Home() {
@@ -37,10 +37,10 @@ export default function Home() {
               See what is renewing<br />before money leaves.
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-7 muted-on-dark sm:text-lg">
-              Vognary helps you build one recurring-payment list from real evidence: tools, cloud bills, mandates, app stores, domains, insurance, EMIs, SIPs, and receipts.
+              Connect Gmail first, then Vognary scans receipt history and builds one recurring-payment ledger for renewals, invoices, trials, tools, cloud bills, mandates, domains, insurance, EMIs, SIPs, and subscriptions.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/login" className="btn btn-primary">Start with login</Link>
+              <Link href="/login" className="btn btn-primary">Start with Google</Link>
               <Link href="/private-audit" className="btn btn-ondark">Ask for private audit help</Link>
             </div>
           </div>
@@ -76,10 +76,10 @@ export default function Home() {
             <div>
               <span className="folio" data-folio="Honest">Current beta boundary</span>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">
-                Live now: login, manual/file/receipt evidence, recurring-payment graph, exports, encrypted snapshots, profile, and delete-data controls. Not live yet: direct UPI/card mandate sync, Account Aggregator, Apple/Google universal subscription APIs, PayPal/Razorpay/Cashfree live sync, and cancellation automation.
+                Live now: Google login, Gmail receipt connection, recurring-payment ledger, exports, encrypted snapshots, profile, and delete-data controls. Not live yet: direct UPI/card mandate sync, Account Aggregator, Apple/Google universal subscription APIs, PayPal/Razorpay/Cashfree live sync, and cancellation automation.
               </p>
             </div>
-            <Link href="/login" className="btn btn-primary">Go to login</Link>
+            <Link href="/login" className="btn btn-primary">Connect Gmail</Link>
           </div>
         </section>
       </div>

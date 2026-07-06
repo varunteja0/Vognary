@@ -6,37 +6,13 @@ import { connectors, type Connector, type ConnectorStatus } from "@/lib/connecto
 import {
   analyzeStatements,
   type AuditResult,
-  type Frequency,
   type ManualRecurringInput,
   type RecommendationType,
   type RecurringItem,
   type StatementSource,
 } from "@/lib/recurring-audit";
-import { extractReceiptCandidates, type ReceiptCandidate } from "@/lib/receipt-parser";
+import type { ReceiptCandidate } from "@/lib/receipt-parser";
 import { VognaryMark } from "./brand";
-
-const categoryOptions = [
-  "AI tools",
-  "Cloud hosting",
-  "Developer tools",
-  "Domains",
-  "Design tools",
-  "Creative tools",
-  "Productivity",
-  "Social tools",
-  "Streaming",
-  "App store",
-  "UPI AutoPay",
-  "Card mandate",
-  "Payments",
-  "Debt",
-  "Investments",
-  "Insurance",
-  "Utilities",
-  "Other",
-];
-
-const frequencyOptions: Frequency[] = ["weekly", "biweekly", "monthly", "bimonthly", "quarterly", "yearly", "irregular"];
 
 const statusStyles: Record<RecommendationType, string> = {
   keep: "stamp stamp-keep",
@@ -44,15 +20,6 @@ const statusStyles: Record<RecommendationType, string> = {
   downgrade: "stamp stamp-downgrade",
   cancel: "stamp stamp-cancel",
   investigate: "stamp stamp-investigate",
-};
-
-type ManualDraft = {
-  merchant: string;
-  amount: string;
-  frequency: Frequency;
-  nextExpectedDate: string;
-  category: string;
-  sourceName: string;
 };
 
 type StatementFile = StatementSource & {
@@ -124,29 +91,6 @@ function getInitialWorkspace(): WorkspaceBackup | null {
   }
 }
 
-const emptyManualDraft: ManualDraft = {
-  merchant: "",
-  amount: "",
-  frequency: "monthly",
-  nextExpectedDate: new Date().toISOString().slice(0, 10),
-  category: "Other",
-  sourceName: "manual entry",
-};
-
-const manualTemplates = [
-  { label: "Claude", merchant: "Claude", amount: "1700", category: "AI tools", sourceName: "AI subscription check" },
-  { label: "Kling", merchant: "Kling", amount: "800", category: "AI tools", sourceName: "AI subscription check" },
-  { label: "Vercel", merchant: "Vercel", amount: "1700", category: "Cloud hosting", sourceName: "cloud dashboard" },
-  { label: "Render", merchant: "Render", amount: "600", category: "Cloud hosting", sourceName: "cloud dashboard" },
-  { label: "X", merchant: "X Premium", amount: "900", category: "Social tools", sourceName: "app subscription check" },
-  { label: "Apple", merchant: "Apple / iCloud", amount: "749", category: "App store", sourceName: "Apple subscriptions" },
-  { label: "Google Play", merchant: "Google Play subscription", amount: "499", category: "App store", sourceName: "Google Play" },
-  { label: "UPI AutoPay", merchant: "UPI AutoPay mandate", amount: "999", category: "UPI AutoPay", sourceName: "UPI app mandate" },
-  { label: "Card Mandate", merchant: "Card merchant mandate", amount: "1999", category: "Card mandate", sourceName: "card recurring payments" },
-  { label: "Domain", merchant: "Domain renewal", amount: "1200", category: "Domains", sourceName: "registrar dashboard" },
-  { label: "Insurance", merchant: "Insurance premium", amount: "3000", category: "Insurance", sourceName: "policy dashboard" },
-];
-
 const integrationConnectorIds = [
   "gmail-readonly",
   "claude-subscription",
@@ -206,10 +150,6 @@ export default function VognaryMvpClient() {
   const [initialWorkspace] = useState<WorkspaceBackup | null>(() => getInitialWorkspace());
   const [statementSources, setStatementSources] = useState<StatementFile[]>(initialWorkspace?.statementSources ?? []);
   const [manualItems, setManualItems] = useState<ManualRecurringInput[]>(initialWorkspace?.manualItems ?? []);
-  const [manualDraft, setManualDraft] = useState<ManualDraft>(emptyManualDraft);
-  const [bulkEntryText, setBulkEntryText] = useState("");
-  const [pastedCsv, setPastedCsv] = useState("");
-  const [pastedName, setPastedName] = useState("pasted-statement");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [userActions, setUserActions] = useState<Record<string, RecommendationType>>(initialWorkspace?.userActions ?? {});
   const [itemOwners, setItemOwners] = useState<Record<string, string>>(initialWorkspace?.itemOwners ?? {});
@@ -220,7 +160,6 @@ export default function VognaryMvpClient() {
   const [reviewCompletedAt, setReviewCompletedAt] = useState<string | null>(null);
   const [localSaveEnabled, setLocalSaveEnabled] = useState(Boolean(initialWorkspace));
   const [notice, setNotice] = useState<string | null>(null);
-  const [statementFallbackOpen, setStatementFallbackOpen] = useState(false);
   const [serverSession, setServerSession] = useState<ServerSessionPayload | null>(null);
   const [serverSaveStatus, setServerSaveStatus] = useState<string | null>(null);
   const [connectorStartResults, setConnectorStartResults] = useState<Record<string, ConnectorStartPayload>>({});
@@ -230,7 +169,6 @@ export default function VognaryMvpClient() {
     () => analyzeStatements(statementSources.map(({ name, text }) => ({ name, text })), manualItems),
     [statementSources, manualItems],
   );
-  const receiptCandidates = useMemo(() => extractReceiptCandidates(splitReceiptText(receiptText)), [receiptText]);
   const selectedItem = audit.recurringItems.find((item) => item.id === selectedItemId) ?? audit.recurringItems[0] ?? null;
   const hasRealData = statementSources.length > 0 || manualItems.length > 0 || receiptText.trim().length > 0;
   const coverageSignals = useMemo(() => getCoverageSignals(statementSources, manualItems, receiptText), [statementSources, manualItems, receiptText]);
@@ -308,122 +246,6 @@ export default function VognaryMvpClient() {
     }
   }, []);
 
-  async function handleFiles(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
-    if (!files.length) return;
-
-    const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
-
-    const response = await fetch("/api/ingest", {
-      method: "POST",
-      body: formData,
-    });
-
-    const payload = await response.json();
-    if (!response.ok) {
-      setNotice(payload.error ?? "File ingestion failed.");
-      return;
-    }
-
-    const nextSources = (payload.sources ?? []).map((source: Omit<StatementFile, "id">) => ({
-      ...source,
-      id: `${source.name}-${Date.now()}-${crypto.randomUUID()}`,
-    }));
-
-    setStatementSources((current) => [...current, ...nextSources]);
-    const warningCount = nextSources.reduce((count: number, source: StatementFile) => count + (source.warnings?.length ?? 0), 0);
-    setNotice(`${nextSources.length} source(s) ingested${warningCount ? ` with ${warningCount} warning(s)` : ""}.`);
-    event.target.value = "";
-  }
-
-  async function startGmailConnection() {
-    const response = await fetch("/api/integrations/gmail/start?mode=json");
-    const payload = await response.json().catch(() => null) as { status?: string; authUrl?: string; requiredEnv?: string[] } | null;
-
-    if (response.ok && payload?.authUrl) {
-      window.location.href = payload.authUrl;
-      return;
-    }
-
-    setNotice(payload?.requiredEnv?.length
-      ? `Gmail connection needs setup first: ${payload.requiredEnv.join(", ")}. Receipt paste works now.`
-      : "Gmail connection is not ready yet. Paste receipt evidence for now.");
-  }
-
-  function addPastedStatement() {
-    if (!pastedCsv.trim()) {
-      setNotice("Paste statement export rows before adding them as a source.");
-      return;
-    }
-
-    setStatementSources((current) => [
-      ...current,
-      {
-        id: `${pastedName}-${Date.now()}`,
-        name: pastedName || "pasted-statement",
-        text: pastedCsv,
-        rowCount: countRows(pastedCsv),
-        kind: "csv",
-        warnings: [],
-      },
-    ]);
-    setPastedCsv("");
-    setNotice("Pasted statement added to the audit workspace.");
-  }
-
-  function addManualItem() {
-    const amount = Number.parseFloat(manualDraft.amount);
-    if (!manualDraft.merchant.trim() || !Number.isFinite(amount) || amount <= 0) {
-      setNotice("Add a merchant name and a positive amount for the manual commitment.");
-      return;
-    }
-
-    setManualItems((current) => [
-      ...current,
-      {
-        id: `manual-${Date.now()}`,
-        merchant: manualDraft.merchant.trim(),
-        amount,
-        frequency: manualDraft.frequency,
-        nextExpectedDate: manualDraft.nextExpectedDate,
-        category: manualDraft.category,
-        sourceName: manualDraft.sourceName,
-      },
-    ]);
-    setManualDraft(emptyManualDraft);
-    setNotice("Manual recurring commitment added.");
-  }
-
-  function addBulkSubscriptions() {
-    const parsed = parseBulkSubscriptionLines(bulkEntryText);
-    if (!parsed.items.length) {
-      setNotice("Paste at least one line with merchant and INR amount, for example: Claude, 1700, monthly.");
-      return;
-    }
-
-    const createdAt = Date.now();
-    setManualItems((current) => [
-      ...current,
-      ...parsed.items.map((item, index) => ({ ...item, id: `bulk-${createdAt}-${index}` })),
-    ]);
-    setBulkEntryText("");
-    const skippedText = parsed.skipped.length ? ` ${parsed.skipped.length} line(s) skipped because amount or merchant was missing.` : "";
-    setNotice(`${parsed.items.length} auto-debit item(s) added to the single list.${skippedText}`);
-  }
-
-  function loadFounderStackTemplate() {
-    setBulkEntryText([
-      "Claude, 1700, monthly",
-      "Kling, 800, monthly",
-      "Vercel, 1700, monthly",
-      "Render, 600, monthly",
-      "X Premium, 900, monthly",
-      "Cursor, 1700, monthly",
-    ].join("\n"));
-    setNotice("Starter stack loaded. Replace amounts with your real debits, then import.");
-  }
-
   function selectAndReviewItem(itemId?: string) {
     if (itemId) setSelectedItemId(itemId);
     document.getElementById("recurring-ledger")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -438,14 +260,6 @@ export default function VognaryMvpClient() {
     setSelectedItemId(null);
     setReceiptText("");
     setNotice("Workspace cleared. This browser has no audit data now.");
-  }
-
-  function removeSource(id: string) {
-    setStatementSources((current) => current.filter((source) => source.id !== id));
-  }
-
-  function removeManualItem(id: string) {
-    setManualItems((current) => current.filter((item) => item.id !== id));
   }
 
   function exportReport() {
@@ -658,27 +472,6 @@ export default function VognaryMvpClient() {
     setNotice("PDF report exported.");
   }
 
-  function importReceiptCandidate(candidate: ReceiptCandidate) {
-    setManualItems((current) => [
-      ...current,
-      {
-        id: `${candidate.id}-${Date.now()}`,
-        merchant: candidate.merchant,
-        amount: candidate.amount,
-        frequency: candidate.frequency,
-        nextExpectedDate: candidate.nextExpectedDate,
-        category: candidate.category,
-        sourceName: candidate.sourceName,
-      },
-    ]);
-    setNotice(`${candidate.merchant} imported from receipt evidence.`);
-  }
-
-  function importAllReceiptCandidates() {
-    receiptCandidates.forEach(importReceiptCandidate);
-    if (!receiptCandidates.length) setNotice("No receipt candidates found. Paste invoice or renewal snippets with merchant and amount.");
-  }
-
   function addTeamMember() {
     if (!memberDraft.name.trim()) {
       setNotice("Add a team member name before adding them to the review workflow.");
@@ -777,16 +570,6 @@ export default function VognaryMvpClient() {
           </div>
         </div>
 
-        <AutoDebitCommandPanel
-          audit={audit}
-          bulkEntryText={bulkEntryText}
-          onBulkEntryText={setBulkEntryText}
-          onImportBulk={addBulkSubscriptions}
-          onLoadFounderStack={loadFounderStackTemplate}
-          onReviewItem={selectAndReviewItem}
-          onJumpToLedger={() => selectAndReviewItem()}
-        />
-
         <IntegrationCommandCenter
           audit={audit}
           connectorStartResults={connectorStartResults}
@@ -865,38 +648,10 @@ export default function VognaryMvpClient() {
 
         <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]" data-reveal>
           <div className="flex flex-col gap-5">
-            <DataSourcesPanel
-              sources={statementSources}
-              manualItems={manualItems}
-              pastedCsv={pastedCsv}
-              pastedName={pastedName}
-              manualDraft={manualDraft}
-              notice={notice}
-              warnings={audit.warnings}
-              onFiles={handleFiles}
-              onRemoveSource={removeSource}
-              onPastedCsv={setPastedCsv}
-              onPastedName={setPastedName}
-              onAddPastedStatement={addPastedStatement}
-              statementFallbackOpen={statementFallbackOpen}
-              onStatementFallbackOpen={setStatementFallbackOpen}
-              onManualDraft={setManualDraft}
-              onAddManualItem={addManualItem}
-              onRemoveManualItem={removeManualItem}
-              onNotice={setNotice}
-              onConnectGmail={startGmailConnection}
-            />
             <ConnectedSourcePanel
               connectorStartResults={connectorStartResults}
               onStartConnector={startConnector}
               connectingConnectorId={connectingConnectorId}
-            />
-            <ReceiptIntelligencePanel
-              receiptText={receiptText}
-              candidates={receiptCandidates}
-              onReceiptText={setReceiptText}
-              onImportCandidate={importReceiptCandidate}
-              onImportAll={importAllReceiptCandidates}
             />
             <CoveragePanel />
           </div>
@@ -978,96 +733,6 @@ export default function VognaryMvpClient() {
   );
 }
 
-function AutoDebitCommandPanel({
-  audit,
-  bulkEntryText,
-  onBulkEntryText,
-  onImportBulk,
-  onLoadFounderStack,
-  onReviewItem,
-  onJumpToLedger,
-}: {
-  audit: AuditResult;
-  bulkEntryText: string;
-  onBulkEntryText: (value: string) => void;
-  onImportBulk: () => void;
-  onLoadFounderStack: () => void;
-  onReviewItem: (itemId: string) => void;
-  onJumpToLedger: () => void;
-}) {
-  const items = audit.recurringItems.slice(0, 8);
-
-  return (
-    <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]" data-reveal>
-      <div className="panel p-5 sm:p-6">
-        <SectionHead
-          folio="02"
-          kicker="One list"
-          title="Build your auto-debit list"
-          desc="Paste the subscriptions you already know, then add statements or receipts to fill the gaps. Every item appears in one recurring ledger."
-          right={<span className="pill pill-ready">Works now</span>}
-        />
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <MiniStat label="Items found" value={`${audit.summary.recurringCount}`} />
-          <MiniStat label="Monthly" value={formatCurrency(audit.summary.monthlyRecurringSpend)} />
-          <MiniStat label="Yearly" value={formatCurrency(audit.summary.annualRecurringSpend)} />
-        </div>
-        <textarea
-          value={bulkEntryText}
-          onChange={(event) => onBulkEntryText(event.target.value)}
-          className="field field-mono mt-4 min-h-32"
-          placeholder={[
-            "Claude, 1700, monthly",
-            "Kling, 800, monthly",
-            "Vercel, 1700, monthly",
-            "Render, 600, monthly",
-            "X Premium, 900, monthly",
-          ].join("\n")}
-        />
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={onImportBulk} className="btn btn-primary">Import to single list</button>
-          <button type="button" onClick={onLoadFounderStack} className="btn btn-ghost">Load startup stack</button>
-          <button type="button" onClick={onJumpToLedger} className="btn btn-ghost">Open full ledger</button>
-        </div>
-        <p className="mt-3 text-xs leading-5 text-(--muted)">Use INR amounts for now. Direct bank, phone-number, UPI, and card mandate sync still needs provider access; this list is the working beta path for verified manual, receipt, and statement evidence.</p>
-      </div>
-
-      <div className="panel overflow-hidden p-5 sm:p-6">
-        <SectionHead
-          folio="02A"
-          kicker="Current ledger"
-          title="Everything in one place"
-          desc="This is the same list used by the report, snapshot, and review workflow."
-          right={<span className="font-data text-xs text-(--muted)">{formatCurrency(audit.summary.monthlyRecurringSpend)}/mo</span>}
-        />
-        <div className="mt-4 grid gap-2">
-          {items.length ? items.map((item) => (
-            <button key={item.id} type="button" onClick={() => onReviewItem(item.id)} className="inset w-full p-3 text-left transition hover:border-ember">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-(--ink)">{item.merchant}</p>
-                  <p className="mt-0.5 font-data text-xs leading-5 text-(--muted)">{item.category} · {item.frequency} · next {item.nextExpectedDate}</p>
-                  <p className="mt-0.5 truncate text-xs text-(--muted)">{item.sourceNames.join(", ")}</p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="font-data text-sm font-semibold tnum text-(--ink)">{formatCurrency(item.monthlyCost)}</p>
-                  <span className={statusStyles[item.recommendationType]}>{item.recommendationType}</span>
-                </div>
-              </div>
-            </button>
-          )) : (
-            <div className="inset px-4 py-8 text-center">
-              <p className="font-data text-xs text-(--muted)">No auto-debits added yet</p>
-              <h3 className="mt-2 font-display text-xl font-semibold text-(--ink)">Paste your known subscriptions to start</h3>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-(--muted)">Start with Claude, Kling, Vercel, Render, X, domains, insurance, UPI AutoPay, or any card mandate you can verify.</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function IntegrationCommandCenter({
   audit,
   connectorStartResults,
@@ -1082,15 +747,16 @@ function IntegrationCommandCenter({
   onJumpToLedger: () => void;
 }) {
   const integrationConnectors = getIntegrationConnectors();
+  const gmailConnector = integrationConnectors.find((connector) => connector.id === "gmail-readonly");
   const liveCount = integrationConnectors.filter((connector) => connector.status === "live" || connector.status === "ready-with-env").length;
   const partnerCount = integrationConnectors.filter((connector) => connector.status === "partner-required").length;
 
   return (
     <section className="grid gap-5 xl:grid-cols-[0.78fr_1.22fr]" data-reveal>
       <div className="dossier p-6 sm:p-7">
-        <span className="folio" data-folio="Start" style={{ color: "var(--dossier-muted)" }}>Your recurring list</span>
-        <h1 className="mt-4 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-5xl">Add what you know, then review one ledger.</h1>
-        <p className="mt-4 text-sm leading-7 muted-on-dark">Start with manual entries for Claude, Render, Kling, X, UPI AutoPay, card mandates, domains, insurance, EMIs, or SIPs. Use provider connections only when they are truly available.</p>
+        <span className="folio" data-folio="Start" style={{ color: "var(--dossier-muted)" }}>First useful result</span>
+        <h1 className="mt-4 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-5xl">Connect Gmail, then review one recurring ledger.</h1>
+        <p className="mt-4 text-sm leading-7 muted-on-dark">A first-time user should not paste CSVs or remember every subscription. Start with official Gmail consent. Vognary scans receipt-like messages, imports recurring candidates, and keeps the review in one workspace.</p>
         <div className="mt-6 grid gap-2 sm:grid-cols-3">
           <DossierStat label="Integration targets" value={`${integrationConnectors.length}`} />
           <DossierStat label="Live/setup-ready" value={`${liveCount}`} />
@@ -1100,7 +766,10 @@ function IntegrationCommandCenter({
           <p className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Current result</p>
           <p className="mt-2 font-display text-2xl font-semibold text-(--dossier-ink)">{audit.summary.recurringCount} recurring item{audit.summary.recurringCount === 1 ? "" : "s"}</p>
           <p className="mt-1 text-sm leading-6 muted-on-dark">{formatCurrency(audit.summary.monthlyRecurringSpend)} per month · {formatCurrency(audit.summary.annualRecurringSpend)} per year</p>
-          <button type="button" onClick={onJumpToLedger} className="btn btn-primary mt-3">Open recurring ledger</button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {gmailConnector ? <button type="button" onClick={() => onStartConnector(gmailConnector)} className="btn btn-primary">Connect Gmail receipts</button> : null}
+            <button type="button" onClick={onJumpToLedger} className="btn btn-ondark">Open recurring ledger</button>
+          </div>
         </div>
       </div>
 
@@ -1108,9 +777,9 @@ function IntegrationCommandCenter({
         <SectionHead
           folio="01"
           kicker="Sources"
-          title="Official connections, when available"
-          desc="These buttons open the provider path or explain what access is still required. They are optional; the manual source panel below is the fastest way to start today."
-          right={<span className="pill pill-partial">Optional</span>}
+          title="Connect official sources"
+          desc="Gmail is the first real no-paste connector. Other cards show the official path or the API/partner access still needed before automatic sync can be honest."
+          right={<span className="pill pill-ready">Gmail ready</span>}
         />
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           {integrationConnectors.slice(0, 12).map((connector) => (
@@ -1261,207 +930,12 @@ function trackSpotlightPointer(event: React.MouseEvent<HTMLElement>) {
   event.currentTarget.style.setProperty("--my", `${((event.clientY - rect.top) / rect.height) * 100}%`);
 }
 
-function DataSourcesPanel({
-  sources,
-  manualItems,
-  pastedCsv,
-  pastedName,
-  manualDraft,
-  notice,
-  warnings,
-  onFiles,
-  onRemoveSource,
-  onPastedCsv,
-  onPastedName,
-  onAddPastedStatement,
-  statementFallbackOpen,
-  onStatementFallbackOpen,
-  onManualDraft,
-  onAddManualItem,
-  onRemoveManualItem,
-  onNotice,
-  onConnectGmail,
-}: {
-  sources: StatementFile[];
-  manualItems: ManualRecurringInput[];
-  pastedCsv: string;
-  pastedName: string;
-  manualDraft: ManualDraft;
-  notice: string | null;
-  warnings: string[];
-  onFiles: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onRemoveSource: (id: string) => void;
-  onPastedCsv: (value: string) => void;
-  onPastedName: (value: string) => void;
-  onAddPastedStatement: () => void;
-  statementFallbackOpen: boolean;
-  onStatementFallbackOpen: (open: boolean) => void;
-  onManualDraft: (draft: ManualDraft) => void;
-  onAddManualItem: () => void;
-  onRemoveManualItem: (id: string) => void;
-  onNotice: (notice: string) => void;
-  onConnectGmail: () => void;
-}) {
-  const liveSources = [
-    {
-      name: "Gmail receipts",
-      state: "Needs setup",
-      body: "Connect Gmail after OAuth is configured, or paste receipt text below now.",
-      action: "Connect Gmail",
-      onAction: onConnectGmail,
-    },
-    {
-      name: "Bank accounts",
-      state: "Needs partner",
-      body: "Direct bank sync needs an approved Account Aggregator partner. Vognary never asks for bank passwords.",
-      action: "View requirement",
-      notice: "Bank sync requires Account Aggregator partner approval. Use manual source checks until that is approved.",
-    },
-    {
-      name: "UPI and card mandates",
-      state: "Needs provider",
-      body: "Direct mandate visibility needs issuer, UPI, or payment-provider APIs. Add visible mandates manually for now.",
-      action: "View requirement",
-      notice: "Direct UPI/card mandate sync requires provider APIs. Add visible mandates manually for now.",
-    },
-    {
-      name: "Cloud and SaaS usage",
-      state: "Needs tokens",
-      body: "Read-only tokens are needed for live checks from OpenAI, Anthropic, GitHub, Vercel, Render, AWS, and domain tools.",
-      action: "View requirement",
-      notice: "Cloud/SaaS usage connectors require provider tokens and encrypted storage before live sync.",
-    },
-  ];
-
-  return (
-    <section id="source-inputs" className="panel scroll-mt-24 p-5 sm:p-6">
-      <SectionHead
-        folio="03"
-        kicker="Sources"
-        title="Add payment sources"
-        desc="Add one source first. Use statement import when a direct connection is not available."
-        right={<span className="pill pill-ready">Ready to use</span>}
-      />
-
-      <div className="mt-5 grid gap-3">
-        {liveSources.map((source) => (
-          <div key={source.name} className="inset p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="font-display text-base font-semibold text-(--ink)">{source.name}</p>
-                <p className="mt-1 max-w-xl text-sm leading-6 text-(--muted)">{source.body}</p>
-              </div>
-              <span className="pill pill-partial w-fit shrink-0">{source.state}</span>
-            </div>
-            <button type="button" onClick={source.onAction ?? (() => onNotice(source.notice ?? "Connector requires setup."))} className="btn btn-ghost mt-3 h-9 px-3 text-xs">{source.action}</button>
-          </div>
-        ))}
-      </div>
-
-      <details id="statement-fallback" className="mt-5 scroll-mt-24 inset p-4" open={statementFallbackOpen} onToggle={(event) => onStatementFallbackOpen(event.currentTarget.open)}>
-        <summary className="cursor-pointer font-display text-base font-semibold text-(--ink)">Import statement exports</summary>
-        <p className="mt-2 text-xs leading-5 text-(--muted)">Use this when a bank, card, or provider cannot connect directly yet. Vognary will look for repeated charges and show confidence.</p>
-        <label className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[11px] border border-dashed border-(--line-strong) bg-(--card-2) px-4 py-8 text-center transition hover:border-ember hover:bg-(--ember-tint)">
-          <span className="font-display text-base font-semibold text-(--ink)">Choose CSV or PDF statement files</span>
-          <span className="max-w-sm text-xs leading-5 text-(--muted)">Readable exports are converted into recurring payment items you can verify.</span>
-          <input type="file" multiple accept=".csv,text/csv,.pdf,application/pdf" onChange={onFiles} className="sr-only" />
-        </label>
-      </details>
-
-      <div className="mt-4 grid gap-2">
-        {sources.length ? sources.map((source) => (
-          <div key={source.id} className="inset flex items-center justify-between gap-3 px-3 py-2.5">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-(--ink)">{source.name}</p>
-              <p className="font-data text-[11px] text-(--muted)">{source.rowCount} rows · {source.kind === "pdf" ? "PDF" : "structured export"}</p>
-              {source.warnings?.length ? <p className="mt-1 text-xs text-ochre">{source.warnings[0]}</p> : null}
-            </div>
-            <button type="button" onClick={() => onRemoveSource(source.id)} className="rounded-md border border-line px-3 py-1 text-xs font-semibold text-(--muted) transition hover:border-ember hover:text-ember">
-              Remove
-            </button>
-          </div>
-        )) : <p className="inset px-3 py-3 text-sm text-(--muted)">No statements added yet.</p>}
-      </div>
-
-      <div className="mt-5 inset p-4">
-        <p className="eyebrow">Paste statement rows</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-[0.55fr_1.45fr]">
-          <input value={pastedName} onChange={(event) => onPastedName(event.target.value)} className="field" placeholder="source-name" />
-          <button type="button" onClick={onAddPastedStatement} className="btn btn-primary">Add pasted export</button>
-        </div>
-        <textarea value={pastedCsv} onChange={(event) => onPastedCsv(event.target.value)} className="field field-mono mt-3 min-h-28" placeholder="Paste exported statement rows here when a live source is unavailable." />
-      </div>
-
-      <div className="mt-4 inset p-4">
-        <p className="eyebrow">Add one payment manually</p>
-        <p className="mt-1 text-xs leading-5 text-(--muted)">Use this for Apple, Google Play, UPI AutoPay, insurance, domains, or cloud bills that are not visible in a source.</p>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {manualTemplates.map((template) => (
-            <button
-              key={template.label}
-              type="button"
-              onClick={() => {
-                onManualDraft({
-                  ...manualDraft,
-                  merchant: template.merchant,
-                  amount: template.amount,
-                  category: template.category,
-                  sourceName: template.sourceName,
-                });
-                onNotice(`${template.label} template loaded. Verify the amount and date, then add it.`);
-              }}
-              className="rounded-full border border-line bg-card px-3 py-1 text-xs font-semibold text-(--muted) transition hover:border-ember hover:text-ember"
-            >
-              {template.label}
-            </button>
-          ))}
-        </div>
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
-          <input value={manualDraft.merchant} onChange={(event) => onManualDraft({ ...manualDraft, merchant: event.target.value })} className="field" placeholder="Merchant, e.g. Apple iCloud" />
-          <input value={manualDraft.amount} onChange={(event) => onManualDraft({ ...manualDraft, amount: event.target.value })} className="field" placeholder="Amount in INR" inputMode="decimal" />
-          <select value={manualDraft.frequency} onChange={(event) => onManualDraft({ ...manualDraft, frequency: event.target.value as Frequency })} className="field capitalize">
-            {frequencyOptions.map((frequency) => <option key={frequency} value={frequency}>{frequency}</option>)}
-          </select>
-          <input value={manualDraft.nextExpectedDate} onChange={(event) => onManualDraft({ ...manualDraft, nextExpectedDate: event.target.value })} type="date" className="field" />
-          <select value={manualDraft.category} onChange={(event) => onManualDraft({ ...manualDraft, category: event.target.value })} className="field">
-            {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
-          </select>
-          <input value={manualDraft.sourceName} onChange={(event) => onManualDraft({ ...manualDraft, sourceName: event.target.value })} className="field" placeholder="Source, e.g. phone check" />
-        </div>
-        <button type="button" onClick={onAddManualItem} className="btn btn-ember mt-3 w-full">Add payment</button>
-        {manualItems.length ? (
-          <div className="mt-3 grid gap-2">
-            {manualItems.map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-3 rounded-md border border-line bg-card px-3 py-2">
-                <div>
-                  <p className="text-sm font-semibold text-(--ink)">{item.merchant}</p>
-                  <p className="font-data text-xs text-(--muted)">{formatCurrency(item.amount)} · {item.frequency} · {item.category}</p>
-                </div>
-                <button type="button" onClick={() => onRemoveManualItem(item.id)} className="rounded-md border border-line px-3 py-1 text-xs font-semibold text-(--muted) transition hover:border-ember hover:text-ember">
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      {notice ? <p className="mt-4 rounded-md border border-indigo bg-(--indigo-tint) px-3 py-2 text-sm text-indigo">{notice}</p> : null}
-      {warnings.length ? (
-        <div className="mt-3 rounded-md border border-ochre bg-(--ochre-tint) px-3 py-2 text-xs leading-5 text-ochre">
-          {warnings.slice(0, 4).map((warning) => <p key={warning}>{warning}</p>)}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
 function QuickStartPanel() {
   const steps = [
-    ["1", "Add 3 payments", "Use the manual templates for Claude, Render, Kling, X, UPI, cards, insurance, EMIs, or SIPs."],
-    ["2", "Add evidence", "Paste receipt text or import a statement only when you have it."],
-    ["3", "Review the ledger", "See one recurring-payment list with renewal dates, source, and confidence."],
-    ["4", "Save or delete", "Save an encrypted snapshot from the account panel, or delete your data from Profile."],
+    ["1", "Connect Gmail", "Use the official Google consent screen to scan receipt-like renewal emails."],
+    ["2", "Review candidates", "Vognary imports likely recurring payments into one ledger with source and confidence."],
+    ["3", "Connect more sources", "Use provider cards for OpenAI, Vercel, Render, GitHub, wallets, banks, UPI, and cards as they become available."],
+    ["4", "Save or delete", "Save an encrypted snapshot, export a report, or delete your data from Profile."],
   ];
 
   return (
@@ -1536,7 +1010,7 @@ function UserControlPanel({
               Save on this device
             </button>
           )}
-          <a href="/sources" className="btn btn-ghost">Open source guide</a>
+          <a href="/integrations" className="btn btn-ghost">Open integrations</a>
         </div>
         <div className="mt-4 rounded-[11px] border border-line bg-(--card-2) p-3">
           <p className="font-data text-[0.68rem] text-(--muted)">Beta account</p>
@@ -1562,58 +1036,10 @@ function UserControlPanel({
   );
 }
 
-function ReceiptIntelligencePanel({
-  receiptText,
-  candidates,
-  onReceiptText,
-  onImportCandidate,
-  onImportAll,
-}: {
-  receiptText: string;
-  candidates: ReceiptCandidate[];
-  onReceiptText: (value: string) => void;
-  onImportCandidate: (candidate: ReceiptCandidate) => void;
-  onImportAll: () => void;
-}) {
-  return (
-    <section id="receipt-intelligence" className="panel scroll-mt-24 p-5 sm:p-6">
-      <SectionHead
-        folio="04"
-        kicker="Receipts"
-        title="Paste receipts"
-        desc="Paste invoice or renewal snippets. Vognary will pull out likely recurring payments."
-        right={<button type="button" onClick={onImportAll} className="btn btn-primary">Import all found</button>}
-      />
-      <textarea
-        value={receiptText}
-        onChange={(event) => onReceiptText(event.target.value)}
-        className="field mt-4 min-h-28 leading-6"
-        placeholder="Paste email snippets: Your Claude subscription renewed for ₹1,700. Next billing 2026-08-08."
-      />
-      <div className="mt-3 grid gap-2">
-        {candidates.length ? candidates.map((candidate) => (
-          <div key={candidate.id} className="inset p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-(--ink)">{candidate.merchant}</p>
-                <p className="font-data text-xs text-(--muted)">{formatCurrency(candidate.amount)} · {candidate.frequency} · {candidate.category} · {candidate.confidenceScore}%</p>
-              </div>
-              <button type="button" onClick={() => onImportCandidate(candidate)} className="btn btn-ember" style={{ height: "2.1rem", padding: "0 0.85rem" }}>
-                Add
-              </button>
-            </div>
-            <p className="mt-2 line-clamp-2 text-xs leading-5 text-(--muted)">{candidate.evidenceText}</p>
-          </div>
-        )) : <p className="inset px-3 py-3 text-sm text-(--muted)">No receipt candidates yet.</p>}
-      </div>
-    </section>
-  );
-}
-
 function CoveragePanel() {
   return (
     <section className="panel p-5 sm:p-6">
-      <SectionHead folio="05" kicker="Sources" title="What has been checked" desc="Shows what you added and what still needs a manual check." />
+      <SectionHead folio="05" kicker="Sources" title="What has been checked" desc="Shows which official source categories are connected, setup-ready, planned, or partner-gated." />
       <div className="mt-4 grid gap-2">
         {getCoverageItems().map((item) => <StatusRow key={item.label} {...item} />)}
       </div>
@@ -1679,9 +1105,9 @@ function RecurringGraph({
       ) : (
         <div className="px-5 py-14 text-center">
           <p className="font-data text-xs text-(--muted)">{hasRealData ? "No pattern yet" : "No source added yet"}</p>
-          <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">{hasRealData ? "No repeated payments found yet" : "Add one source to start"}</h3>
+          <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">{hasRealData ? "No repeated payments found yet" : "Connect Gmail to start"}</h3>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">
-            {hasRealData ? "Add more history or add app-store, UPI, insurance, cloud, or domain payments manually." : "Connect a source, paste a receipt, or add one payment manually."}
+            {hasRealData ? "Connect more official sources or wait for provider/partner access to deepen coverage." : "Start with Gmail receipts, then add provider connections as they become available."}
           </p>
         </div>
       )}
@@ -2109,108 +1535,6 @@ function recurringIdentity(item: Pick<ManualRecurringInput, "merchant" | "amount
   return `${item.merchant.trim().toLowerCase()}::${Math.round(item.amount * 100)}::${item.frequency}`;
 }
 
-function parseBulkSubscriptionLines(text: string): { items: Omit<ManualRecurringInput, "id">[]; skipped: string[] } {
-  const items: Omit<ManualRecurringInput, "id">[] = [];
-  const skipped: string[] = [];
-
-  text.split(/\r?\n/).forEach((rawLine) => {
-    const line = rawLine.trim();
-    if (!line) return;
-
-    const parsed = parseBulkSubscriptionLine(line);
-    if (!parsed) {
-      skipped.push(line);
-      return;
-    }
-
-    items.push(parsed);
-  });
-
-  return { items, skipped };
-}
-
-function parseBulkSubscriptionLine(line: string): Omit<ManualRecurringInput, "id"> | null {
-  const cells = line.split(/,|\t/).map((cell) => cell.trim()).filter(Boolean);
-  const amountFromSecondCell = cells.length >= 2 ? parseMoneyAmount(cells[1]) : null;
-  const amountMatch = line.match(/(?:₹|rs\.?|inr)?\s*\d[\d,]*(?:\.\d+)?/i);
-
-  const merchant = amountFromSecondCell
-    ? cells[0]
-    : amountMatch
-      ? line.slice(0, amountMatch.index).replace(/[–—:-]+$/g, "").trim()
-      : "";
-  const amount = amountFromSecondCell ?? (amountMatch ? parseMoneyAmount(amountMatch[0]) : null);
-
-  if (!merchant || !amount || amount <= 0) return null;
-
-  const detailText = cells.length >= 3 ? cells.slice(2).join(" ") : line;
-  const frequency = inferBulkFrequency(detailText);
-  const category = inferBulkCategory(`${merchant} ${line}`);
-
-  return {
-    merchant,
-    amount,
-    frequency,
-    nextExpectedDate: inferBulkDate(detailText, frequency),
-    category,
-    sourceName: "bulk auto-debit list",
-  };
-}
-
-function parseMoneyAmount(value: string): number | null {
-  const normalized = value.replace(/(?:₹|rs\.?|inr)/gi, "").replace(/,/g, "").trim();
-  const amount = Number.parseFloat(normalized);
-  return Number.isFinite(amount) ? amount : null;
-}
-
-function inferBulkFrequency(text: string): Frequency {
-  if (/yearly|annual|annually|per year|\/yr/i.test(text)) return "yearly";
-  if (/quarter|qtr|3 months/i.test(text)) return "quarterly";
-  if (/biweekly|fortnight/i.test(text)) return "biweekly";
-  if (/weekly|per week/i.test(text)) return "weekly";
-  if (/bimonthly|two months|2 months/i.test(text)) return "bimonthly";
-  if (/irregular|variable|usage/i.test(text)) return "irregular";
-  return "monthly";
-}
-
-function inferBulkDate(text: string, frequency: Frequency): string {
-  const isoMatch = text.match(/\b\d{4}-\d{2}-\d{2}\b/);
-  if (isoMatch) return isoMatch[0];
-
-  const slashMatch = text.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
-  if (slashMatch) {
-    const [, day, month, year] = slashMatch;
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-  }
-
-  const days = {
-    weekly: 7,
-    biweekly: 14,
-    monthly: 30,
-    bimonthly: 61,
-    quarterly: 91,
-    yearly: 365,
-    irregular: 30,
-  }[frequency];
-  const nextDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-  return nextDate.toISOString().slice(0, 10);
-}
-
-function inferBulkCategory(text: string): string {
-  if (/claude|anthropic|openai|chatgpt|kling|cursor|perplexity|runway|midjourney|elevenlabs/i.test(text)) return "AI tools";
-  if (/vercel|render|aws|gcp|google cloud|digitalocean|cloudflare|hosting/i.test(text)) return "Cloud hosting";
-  if (/domain|namecheap|godaddy|registrar/i.test(text)) return "Domains";
-  if (/github|gitlab|bitbucket/i.test(text)) return "Developer tools";
-  if (/apple|icloud|app store|google play|play store/i.test(text)) return "App store";
-  if (/upi|autopay/i.test(text)) return "UPI AutoPay";
-  if (/card|mandate/i.test(text)) return "Card mandate";
-  if (/x\.com|twitter|x premium/i.test(text)) return "Social tools";
-  if (/insurance|policy/i.test(text)) return "Insurance";
-  if (/emi|loan/i.test(text)) return "Debt";
-  if (/sip|mutual fund|investment/i.test(text)) return "Investments";
-  return "Other";
-}
-
 function buildWorkspaceBackup({
   statementSources,
   manualItems,
@@ -2239,17 +1563,6 @@ function buildWorkspaceBackup({
     teamMembers,
     receiptText,
   };
-}
-
-function countRows(text: string): number {
-  return Math.max(0, text.split(/\r?\n/).filter((row) => row.trim()).length - 1);
-}
-
-function splitReceiptText(text: string): string[] {
-  return text
-    .split(/\n\s*\n|---+|={3,}/)
-    .map((part) => part.trim())
-    .filter(Boolean);
 }
 
 function getOwnerName(ownerId: string | undefined, teamMembers: TeamMember[]): string {
