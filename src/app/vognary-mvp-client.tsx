@@ -18,13 +18,16 @@ const categoryOptions = [
   "AI tools",
   "Cloud hosting",
   "Developer tools",
+  "Domains",
   "Design tools",
   "Creative tools",
   "Productivity",
+  "Social tools",
   "Streaming",
   "App store",
   "UPI AutoPay",
   "Card mandate",
+  "Payments",
   "Debt",
   "Investments",
   "Insurance",
@@ -191,6 +194,11 @@ const emptyManualDraft: ManualDraft = {
 };
 
 const manualTemplates = [
+  { label: "Claude", merchant: "Claude", amount: "1700", category: "AI tools", sourceName: "AI subscription check" },
+  { label: "Kling", merchant: "Kling", amount: "800", category: "AI tools", sourceName: "AI subscription check" },
+  { label: "Vercel", merchant: "Vercel", amount: "1700", category: "Cloud hosting", sourceName: "cloud dashboard" },
+  { label: "Render", merchant: "Render", amount: "600", category: "Cloud hosting", sourceName: "cloud dashboard" },
+  { label: "X", merchant: "X Premium", amount: "900", category: "Social tools", sourceName: "app subscription check" },
   { label: "Apple", merchant: "Apple / iCloud", amount: "749", category: "App store", sourceName: "Apple subscriptions" },
   { label: "Google Play", merchant: "Google Play subscription", amount: "499", category: "App store", sourceName: "Google Play" },
   { label: "UPI AutoPay", merchant: "UPI AutoPay mandate", amount: "999", category: "UPI AutoPay", sourceName: "UPI app mandate" },
@@ -204,6 +212,7 @@ export default function VognaryMvpClient() {
   const [statementSources, setStatementSources] = useState<StatementFile[]>(initialWorkspace?.statementSources ?? []);
   const [manualItems, setManualItems] = useState<ManualRecurringInput[]>(initialWorkspace?.manualItems ?? []);
   const [manualDraft, setManualDraft] = useState<ManualDraft>(emptyManualDraft);
+  const [bulkEntryText, setBulkEntryText] = useState("");
   const [pastedCsv, setPastedCsv] = useState("");
   const [pastedName, setPastedName] = useState("pasted-statement");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -344,6 +353,40 @@ export default function VognaryMvpClient() {
     ]);
     setManualDraft(emptyManualDraft);
     setNotice("Manual recurring commitment added.");
+  }
+
+  function addBulkSubscriptions() {
+    const parsed = parseBulkSubscriptionLines(bulkEntryText);
+    if (!parsed.items.length) {
+      setNotice("Paste at least one line with merchant and INR amount, for example: Claude, 1700, monthly.");
+      return;
+    }
+
+    const createdAt = Date.now();
+    setManualItems((current) => [
+      ...current,
+      ...parsed.items.map((item, index) => ({ ...item, id: `bulk-${createdAt}-${index}` })),
+    ]);
+    setBulkEntryText("");
+    const skippedText = parsed.skipped.length ? ` ${parsed.skipped.length} line(s) skipped because amount or merchant was missing.` : "";
+    setNotice(`${parsed.items.length} auto-debit item(s) added to the single list.${skippedText}`);
+  }
+
+  function loadFounderStackTemplate() {
+    setBulkEntryText([
+      "Claude, 1700, monthly",
+      "Kling, 800, monthly",
+      "Vercel, 1700, monthly",
+      "Render, 600, monthly",
+      "X Premium, 900, monthly",
+      "Cursor, 1700, monthly",
+    ].join("\n"));
+    setNotice("Starter stack loaded. Replace amounts with your real debits, then import.");
+  }
+
+  function selectAndReviewItem(itemId?: string) {
+    if (itemId) setSelectedItemId(itemId);
+    document.getElementById("recurring-ledger")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function clearWorkspace() {
@@ -683,6 +726,16 @@ export default function VognaryMvpClient() {
           onAction={focusAuditAction}
         />
 
+        <AutoDebitCommandPanel
+          audit={audit}
+          bulkEntryText={bulkEntryText}
+          onBulkEntryText={setBulkEntryText}
+          onImportBulk={addBulkSubscriptions}
+          onLoadFounderStack={loadFounderStackTemplate}
+          onReviewItem={selectAndReviewItem}
+          onJumpToLedger={() => selectAndReviewItem()}
+        />
+
         {/* Masthead */}
         <header
           className="dossier spotlight scan overflow-hidden rise"
@@ -858,6 +911,96 @@ export default function VognaryMvpClient() {
         </footer>
       </div>
     </main>
+  );
+}
+
+function AutoDebitCommandPanel({
+  audit,
+  bulkEntryText,
+  onBulkEntryText,
+  onImportBulk,
+  onLoadFounderStack,
+  onReviewItem,
+  onJumpToLedger,
+}: {
+  audit: AuditResult;
+  bulkEntryText: string;
+  onBulkEntryText: (value: string) => void;
+  onImportBulk: () => void;
+  onLoadFounderStack: () => void;
+  onReviewItem: (itemId: string) => void;
+  onJumpToLedger: () => void;
+}) {
+  const items = audit.recurringItems.slice(0, 8);
+
+  return (
+    <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]" data-reveal>
+      <div className="panel p-5 sm:p-6">
+        <SectionHead
+          folio="02"
+          kicker="One list"
+          title="Build your auto-debit list"
+          desc="Paste the subscriptions you already know, then add statements or receipts to fill the gaps. Every item appears in one recurring ledger."
+          right={<span className="pill pill-ready">Works now</span>}
+        />
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <MiniStat label="Items found" value={`${audit.summary.recurringCount}`} />
+          <MiniStat label="Monthly" value={formatCurrency(audit.summary.monthlyRecurringSpend)} />
+          <MiniStat label="Yearly" value={formatCurrency(audit.summary.annualRecurringSpend)} />
+        </div>
+        <textarea
+          value={bulkEntryText}
+          onChange={(event) => onBulkEntryText(event.target.value)}
+          className="field field-mono mt-4 min-h-32"
+          placeholder={[
+            "Claude, 1700, monthly",
+            "Kling, 800, monthly",
+            "Vercel, 1700, monthly",
+            "Render, 600, monthly",
+            "X Premium, 900, monthly",
+          ].join("\n")}
+        />
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={onImportBulk} className="btn btn-primary">Import to single list</button>
+          <button type="button" onClick={onLoadFounderStack} className="btn btn-ghost">Load startup stack</button>
+          <button type="button" onClick={onJumpToLedger} className="btn btn-ghost">Open full ledger</button>
+        </div>
+        <p className="mt-3 text-xs leading-5 text-(--muted)">Use INR amounts for now. Direct bank, phone-number, UPI, and card mandate sync still needs provider access; this list is the working beta path for verified manual, receipt, and statement evidence.</p>
+      </div>
+
+      <div className="panel overflow-hidden p-5 sm:p-6">
+        <SectionHead
+          folio="02A"
+          kicker="Current ledger"
+          title="Everything in one place"
+          desc="This is the same list used by the report, snapshot, and review workflow."
+          right={<span className="font-data text-xs text-(--muted)">{formatCurrency(audit.summary.monthlyRecurringSpend)}/mo</span>}
+        />
+        <div className="mt-4 grid gap-2">
+          {items.length ? items.map((item) => (
+            <button key={item.id} type="button" onClick={() => onReviewItem(item.id)} className="inset w-full p-3 text-left transition hover:border-ember">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-(--ink)">{item.merchant}</p>
+                  <p className="mt-0.5 font-data text-xs leading-5 text-(--muted)">{item.category} · {item.frequency} · next {item.nextExpectedDate}</p>
+                  <p className="mt-0.5 truncate text-xs text-(--muted)">{item.sourceNames.join(", ")}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-data text-sm font-semibold tnum text-(--ink)">{formatCurrency(item.monthlyCost)}</p>
+                  <span className={statusStyles[item.recommendationType]}>{item.recommendationType}</span>
+                </div>
+              </div>
+            </button>
+          )) : (
+            <div className="inset px-4 py-8 text-center">
+              <p className="font-data text-xs text-(--muted)">No auto-debits added yet</p>
+              <h3 className="mt-2 font-display text-xl font-semibold text-(--ink)">Paste your known subscriptions to start</h3>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-(--muted)">Start with Claude, Kling, Vercel, Render, X, domains, insurance, UPI AutoPay, or any card mandate you can verify.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1883,6 +2026,108 @@ function buildEvidenceText(statementSources: StatementFile[], manualItems: Manua
   const statementText = statementSources.map((source) => `${source.name} ${source.text.slice(0, 3000)}`).join(" ");
   const manualText = manualItems.map((item) => `${item.merchant} ${item.category} ${item.sourceName ?? ""}`).join(" ");
   return `${statementText} ${manualText} ${receiptText}`;
+}
+
+function parseBulkSubscriptionLines(text: string): { items: Omit<ManualRecurringInput, "id">[]; skipped: string[] } {
+  const items: Omit<ManualRecurringInput, "id">[] = [];
+  const skipped: string[] = [];
+
+  text.split(/\r?\n/).forEach((rawLine) => {
+    const line = rawLine.trim();
+    if (!line) return;
+
+    const parsed = parseBulkSubscriptionLine(line);
+    if (!parsed) {
+      skipped.push(line);
+      return;
+    }
+
+    items.push(parsed);
+  });
+
+  return { items, skipped };
+}
+
+function parseBulkSubscriptionLine(line: string): Omit<ManualRecurringInput, "id"> | null {
+  const cells = line.split(/,|\t/).map((cell) => cell.trim()).filter(Boolean);
+  const amountFromSecondCell = cells.length >= 2 ? parseMoneyAmount(cells[1]) : null;
+  const amountMatch = line.match(/(?:₹|rs\.?|inr)?\s*\d[\d,]*(?:\.\d+)?/i);
+
+  const merchant = amountFromSecondCell
+    ? cells[0]
+    : amountMatch
+      ? line.slice(0, amountMatch.index).replace(/[–—:-]+$/g, "").trim()
+      : "";
+  const amount = amountFromSecondCell ?? (amountMatch ? parseMoneyAmount(amountMatch[0]) : null);
+
+  if (!merchant || !amount || amount <= 0) return null;
+
+  const detailText = cells.length >= 3 ? cells.slice(2).join(" ") : line;
+  const frequency = inferBulkFrequency(detailText);
+  const category = inferBulkCategory(`${merchant} ${line}`);
+
+  return {
+    merchant,
+    amount,
+    frequency,
+    nextExpectedDate: inferBulkDate(detailText, frequency),
+    category,
+    sourceName: "bulk auto-debit list",
+  };
+}
+
+function parseMoneyAmount(value: string): number | null {
+  const normalized = value.replace(/(?:₹|rs\.?|inr)/gi, "").replace(/,/g, "").trim();
+  const amount = Number.parseFloat(normalized);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function inferBulkFrequency(text: string): Frequency {
+  if (/yearly|annual|annually|per year|\/yr/i.test(text)) return "yearly";
+  if (/quarter|qtr|3 months/i.test(text)) return "quarterly";
+  if (/biweekly|fortnight/i.test(text)) return "biweekly";
+  if (/weekly|per week/i.test(text)) return "weekly";
+  if (/bimonthly|two months|2 months/i.test(text)) return "bimonthly";
+  if (/irregular|variable|usage/i.test(text)) return "irregular";
+  return "monthly";
+}
+
+function inferBulkDate(text: string, frequency: Frequency): string {
+  const isoMatch = text.match(/\b\d{4}-\d{2}-\d{2}\b/);
+  if (isoMatch) return isoMatch[0];
+
+  const slashMatch = text.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  const days = {
+    weekly: 7,
+    biweekly: 14,
+    monthly: 30,
+    bimonthly: 61,
+    quarterly: 91,
+    yearly: 365,
+    irregular: 30,
+  }[frequency];
+  const nextDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  return nextDate.toISOString().slice(0, 10);
+}
+
+function inferBulkCategory(text: string): string {
+  if (/claude|anthropic|openai|chatgpt|kling|cursor|perplexity|runway|midjourney|elevenlabs/i.test(text)) return "AI tools";
+  if (/vercel|render|aws|gcp|google cloud|digitalocean|cloudflare|hosting/i.test(text)) return "Cloud hosting";
+  if (/domain|namecheap|godaddy|registrar/i.test(text)) return "Domains";
+  if (/github|gitlab|bitbucket/i.test(text)) return "Developer tools";
+  if (/apple|icloud|app store|google play|play store/i.test(text)) return "App store";
+  if (/upi|autopay/i.test(text)) return "UPI AutoPay";
+  if (/card|mandate/i.test(text)) return "Card mandate";
+  if (/x\.com|twitter|x premium/i.test(text)) return "Social tools";
+  if (/insurance|policy/i.test(text)) return "Insurance";
+  if (/emi|loan/i.test(text)) return "Debt";
+  if (/sip|mutual fund|investment/i.test(text)) return "Investments";
+  return "Other";
 }
 
 function getActionNotice(action: AuditActionId, mode: AuditModeId) {

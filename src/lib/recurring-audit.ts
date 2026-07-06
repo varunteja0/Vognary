@@ -102,6 +102,9 @@ const dayInMs = 24 * 60 * 60 * 1000;
 const merchantRules: MerchantRule[] = [
   { pattern: /OPEN\s?AI|CHATGPT|CHAT\s?GPT/i, merchant: "OpenAI", category: "AI tools" },
   { pattern: /ANTHROPIC|CLAUDE/i, merchant: "Anthropic", category: "AI tools" },
+  { pattern: /KLING|KWAI/i, merchant: "Kling", category: "AI tools" },
+  { pattern: /PERPLEXITY/i, merchant: "Perplexity", category: "AI tools" },
+  { pattern: /RUNWAY|MIDJOURNEY|ELEVENLABS/i, merchant: "AI creative tool", category: "AI tools" },
   { pattern: /CURSOR|ANYSPHERE/i, merchant: "Cursor", category: "AI tools" },
   { pattern: /GITHUB|GIT\s?HUB/i, merchant: "GitHub", category: "Developer tools" },
   { pattern: /VERCEL/i, merchant: "Vercel", category: "Cloud hosting" },
@@ -120,6 +123,7 @@ const merchantRules: MerchantRule[] = [
   { pattern: /NOTION/i, merchant: "Notion", category: "Productivity" },
   { pattern: /SLACK/i, merchant: "Slack", category: "Productivity" },
   { pattern: /ZOOM/i, merchant: "Zoom", category: "Productivity" },
+  { pattern: /X\.COM|TWITTER|X PREMIUM/i, merchant: "X", category: "Social tools" },
   { pattern: /RAZORPAY/i, merchant: "Razorpay", category: "Payments" },
   { pattern: /CASHFREE/i, merchant: "Cashfree", category: "Payments" },
   { pattern: /HOSTINGER|GODADDY|NAMECHEAP|CLOUDFLARE/i, merchant: "Domain or hosting provider", category: "Domains" },
