@@ -566,11 +566,7 @@ export default function VognaryMvpClient() {
         {/* Masthead — the blacklight chamber */}
         <header
           className="dossier spotlight scan overflow-hidden rise"
-          onMouseMove={(event) => {
-            const rect = event.currentTarget.getBoundingClientRect();
-            event.currentTarget.style.setProperty("--mx", `${((event.clientX - rect.left) / rect.width) * 100}%`);
-            event.currentTarget.style.setProperty("--my", `${((event.clientY - rect.top) / rect.height) * 100}%`);
-          }}
+          onMouseMove={trackSpotlightPointer}
         >
           <div className="grid gap-0 lg:grid-cols-[1.4fr_1fr]">
             <div className="p-7 sm:p-10">
@@ -740,7 +736,7 @@ function GlobalNotice({ notice, onDismiss }: { notice: string | null; onDismiss:
   if (!notice) return null;
 
   return (
-    <div className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-3xl rounded-xl border border-line-strong bg-[#14161b]/95 p-3 shadow-2xl backdrop-blur" role="status" aria-live="polite">
+    <div className="fixed bottom-4 left-4 right-4 z-50 rounded-xl border border-line-strong bg-[#14161b]/95 p-3 shadow-2xl backdrop-blur sm:left-auto sm:w-[min(30rem,calc(100vw-2rem))]" role="status" aria-live="polite">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="eyebrow" style={{ fontSize: "0.56rem" }}>Action result</p>
@@ -752,6 +748,12 @@ function GlobalNotice({ notice, onDismiss }: { notice: string | null; onDismiss:
       </div>
     </div>
   );
+}
+
+function trackSpotlightPointer(event: React.MouseEvent<HTMLElement>) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  event.currentTarget.style.setProperty("--mx", `${((event.clientX - rect.left) / rect.width) * 100}%`);
+  event.currentTarget.style.setProperty("--my", `${((event.clientY - rect.top) / rect.height) * 100}%`);
 }
 
 function GuidedAuditLauncher({
@@ -920,15 +922,15 @@ function DataSourcesPanel({
         right={<span className="pill pill-ready">Self-serve ready</span>}
       />
 
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
+      <div className="mt-5 grid gap-3">
         {liveSources.map((source) => (
           <div key={source.name} className="inset p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
                 <p className="font-display text-base font-semibold text-(--ink)">{source.name}</p>
-                <p className="mt-1 text-xs leading-5 text-(--muted)">{source.body}</p>
+                <p className="mt-1 max-w-xl text-sm leading-6 text-(--muted)">{source.body}</p>
               </div>
-              <span className="pill pill-partial shrink-0">{source.state}</span>
+              <span className="pill pill-partial w-fit shrink-0">{source.state}</span>
             </div>
             <button type="button" onClick={source.onAction ?? (() => onNotice(source.notice ?? "Connector requires setup."))} className="btn btn-ghost mt-3 h-9 px-3 text-xs">{source.action}</button>
           </div>

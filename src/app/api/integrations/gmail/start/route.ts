@@ -12,13 +12,17 @@ export function GET(request: Request) {
   const redirectUri = process.env.GOOGLE_REDIRECT_URI;
 
   if (!clientId || !redirectUri) {
+    const payload = {
+      status: "not-configured",
+      integration: "gmail-readonly",
+      requiredEnv: ["GOOGLE_CLIENT_ID", "GOOGLE_REDIRECT_URI"],
+      scope: gmailReadonlyScope,
+    };
+
+    if (wantsJson) return NextResponse.json(payload);
+
     return NextResponse.json(
-      {
-        status: "not-configured",
-        integration: "gmail-readonly",
-        requiredEnv: ["GOOGLE_CLIENT_ID", "GOOGLE_REDIRECT_URI"],
-        scope: gmailReadonlyScope,
-      },
+      payload,
       { status: 501 },
     );
   }

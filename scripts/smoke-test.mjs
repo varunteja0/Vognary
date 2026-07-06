@@ -38,6 +38,9 @@ if (!connectors.adapters?.includes("openai-costs")) throw new Error("OpenAI cost
 const gmailStart = await (await assertOk("/api/connectors/gmail-readonly/start")).json();
 if (!["ready-to-connect", "needs-configuration"].includes(gmailStart.state)) throw new Error("Gmail connector start state is invalid");
 
+const gmailProductStart = await (await assertOk("/api/integrations/gmail/start?mode=json")).json();
+if (!["ready", "not-configured"].includes(gmailProductStart.status)) throw new Error("Gmail product start endpoint returned an invalid state");
+
 const plannedStart = await (await assertOk("/api/connectors/anthropic-usage/start")).json();
 if (plannedStart.state === "ready-to-connect") throw new Error("Planned connector must not claim ready-to-connect");
 
