@@ -132,8 +132,11 @@ See [docs/deployment-plan.md](docs/deployment-plan.md). The current app is deplo
 
 Vognary should not become a generic budget app. The wedge is recurring financial commitments: subscriptions, card e-mandates, UPI AutoPay, EMIs, SIPs, insurance, SaaS, cloud bills, domains, app-store subscriptions, and utilities.
 
+The integration strategy is documented in [docs/universal-integration-operating-model.md](docs/universal-integration-operating-model.md). It defines how Vognary moves each source from launchpad target to real connector using OAuth, API keys, IAM roles, webhooks, or regulated partner APIs.
+
 See:
 
+- [docs/universal-integration-operating-model.md](docs/universal-integration-operating-model.md)
 - [docs/product-architecture.md](docs/product-architecture.md)
 - [docs/production-activation-runbook.md](docs/production-activation-runbook.md)
 - [docs/validation-playbook.md](docs/validation-playbook.md)

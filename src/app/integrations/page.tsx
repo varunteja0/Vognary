@@ -35,6 +35,12 @@ export default function IntegrationsPage() {
           <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">Available connections and setup status</h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">See what works now, what needs setup, and what still needs an approved partner.</p>
 
+          <div className="mt-5 rounded-[12px] border border-line bg-(--card-2) p-4">
+            <p className="eyebrow" style={{ fontSize: "0.62rem" }}>How Vognary integrates</p>
+            <p className="mt-2 text-sm leading-6 text-(--muted)">Every source moves through the same path: official consent or scoped credential, encrypted token reference, initial sync, scheduled resync, ledger normalization, disconnect/delete controls. Banks, UPI, and card mandates require regulated partner access before automatic sync.</p>
+            <Link href="/integration-model" className="btn btn-ghost mt-3 h-9 px-3 text-xs">Read integration model</Link>
+          </div>
+
           <div className="mt-6 grid gap-3 sm:grid-cols-4">
             {Object.entries(summary).map(([status, count]) => (
               <div key={status} className="inset px-4 py-3">
