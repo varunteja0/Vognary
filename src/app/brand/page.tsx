@@ -5,7 +5,7 @@ import { VognaryMark } from "../brand";
 export const metadata: Metadata = {
   title: "Brand",
   description:
-    "The Vognary identity — the mark, colours, and type behind a premium recurring-money instrument.",
+    "The Vognary brand basics: mark, colors, type, and downloadable assets.",
 };
 
 const grays: Array<[string, string]> = [
@@ -31,7 +31,7 @@ export default function BrandPage() {
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/" className="btn btn-ghost">Back to ledger</Link>
+          <Link href="/" className="btn btn-ghost">Back to app</Link>
         </div>
 
         <article className="panel overflow-hidden rise">
@@ -40,27 +40,24 @@ export default function BrandPage() {
               <VognaryMark size={140} className="text-(--ink)" animated title="Vognary mark" />
             </div>
             <div className="p-7 sm:p-9">
-              <span className="folio" data-folio="§ ID">Identity</span>
-              <h1 className="mt-4 font-display text-4xl font-semibold tracking-[-0.03em] text-(--ink) sm:text-5xl">
-                The Convergence
+              <span className="folio" data-folio="Brand">Identity</span>
+              <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">
+                Vognary brand basics
               </h1>
               <p className="mt-4 text-sm leading-7 text-(--muted)">
-                Two platinum strokes funnel downward and resolve into a single{" "}
-                <span className="glow-num font-semibold">faceted gold diamond</span> — every scattered recurring charge,
-                brought to one decision. Platinum is the instrument; champagne gold is money and the verdict.
+                The mark turns scattered recurring payments into one clear decision. Graphite carries the product UI; champagne gold highlights money and primary actions.
               </p>
               <p className="mt-3 text-sm leading-7 text-(--muted)">
-                The diamond makes the mark unmistakably ours — it holds its shape and meaning even in a single ink, from a
-                16px favicon to a billboard. A funnel of debits, narrowing to resolved value.
+                Use this page for the mark, colors, type, spacing rules, and downloadable assets.
               </p>
             </div>
           </div>
         </article>
 
         <section className="panel mt-6 p-5 sm:p-6" data-reveal>
-          <span className="folio" data-folio="§ USE">The mark in use</span>
-          <h2 className="mt-2 font-display text-[1.35rem] font-semibold tracking-[-0.02em] text-(--ink)">One shape, every surface</h2>
-          <p className="mt-1 text-sm leading-6 text-(--muted)">The diamond keeps the mark unmistakable on graphite, on a gold plate, on paper, or knocked back to a single ink — no gradients, no dependencies.</p>
+          <span className="folio" data-folio="Use">The mark in use</span>
+          <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">One mark for every surface</h2>
+          <p className="mt-1 text-sm leading-6 text-(--muted)">The mark works on dark, gold, light, and single-color surfaces without extra effects.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <MarkTile label="On graphite" bg="var(--card-2)" markClass="text-(--ink)" />
             <MarkTile label="On gold" bg="var(--gold)" markClass="text-[#14161b]" mono />
@@ -70,9 +67,9 @@ export default function BrandPage() {
         </section>
 
         <section className="panel mt-6 p-5 sm:p-6" data-reveal>
-          <span className="folio" data-folio="§ 01">Palette</span>
-          <h2 className="mt-2 font-display text-[1.35rem] font-semibold tracking-[-0.02em] text-(--ink)">Graphite &amp; gold</h2>
-          <p className="mt-1 text-sm leading-6 text-(--muted)">One accent, held with restraint. Gold is reserved for money, primary action, and focus. Verdicts are desaturated signals.</p>
+          <span className="folio" data-folio="01">Palette</span>
+          <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Graphite and gold</h2>
+          <p className="mt-1 text-sm leading-6 text-(--muted)">Gold is for money, primary actions, and focus states. The other colors label review actions.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Swatch name="Champagne gold" hex="#d8b87a" ring />
             {grays.map(([name, hex]) => (
@@ -87,11 +84,11 @@ export default function BrandPage() {
         </section>
 
         <section className="panel mt-6 p-5 sm:p-6" data-reveal>
-          <span className="folio" data-folio="§ 02">Typography</span>
+          <span className="folio" data-folio="02">Typography</span>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="inset p-5">
               <p className="eyebrow">Display / UI &middot; Geist</p>
-              <p className="mt-3 font-display text-3xl font-semibold tracking-[-0.03em] text-(--ink)">Recurring money, audited</p>
+              <p className="mt-3 font-display text-3xl font-semibold text-(--ink)">Recurring payments, reviewed</p>
               <p className="mt-2 text-sm text-(--muted)">Aa Bb Cc &middot; The quick brown fox</p>
             </div>
             <div className="inset p-5">
@@ -105,15 +102,15 @@ export default function BrandPage() {
         </section>
 
         <section className="panel mt-6 p-5 sm:p-6" data-reveal>
-          <span className="folio" data-folio="§ 03">Assets &amp; usage</span>
+          <span className="folio" data-folio="03">Assets &amp; usage</span>
           <div className="mt-4 grid gap-5 md:grid-cols-2">
             <div>
               <h3 className="font-display text-base font-semibold text-(--ink)">Clear space &amp; size</h3>
               <ul className="mt-2 grid gap-1.5 text-sm leading-6 text-(--muted)">
-                <li>&mdash; Keep clear space of at least the node&rsquo;s diameter on every side.</li>
-                <li>&mdash; Minimum size 20&nbsp;px for the mark, so the node stays legible.</li>
-                <li>&mdash; The V may take any single colour; the node stays champagne gold.</li>
-                <li>&mdash; Never recolour the node, rotate the mark, stretch it, or add effects.</li>
+                <li>- Keep clear space of at least the node&rsquo;s diameter on every side.</li>
+                <li>- Minimum size 20&nbsp;px for the mark, so the node stays legible.</li>
+                <li>- The V may take any single color; the node stays champagne gold.</li>
+                <li>- Never recolor the node, rotate the mark, stretch it, or add effects.</li>
               </ul>
             </div>
             <div>

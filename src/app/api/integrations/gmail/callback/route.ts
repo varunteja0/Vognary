@@ -14,7 +14,7 @@ type GmailMessage = {
 };
 
 export async function GET(request: NextRequest) {
-  const limit = rateLimit(request, { namespace: "gmail-callback", limit: 20, windowMs: 10 * 60_000 });
+  const limit = await rateLimit(request, { namespace: "gmail-callback", limit: 20, windowMs: 10 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   const code = request.nextUrl.searchParams.get("code");

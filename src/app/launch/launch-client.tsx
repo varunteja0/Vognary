@@ -30,7 +30,7 @@ export default function LaunchClient() {
             <VognaryMark size={22} />
             Vognary
           </span>
-          <Link href="/" className="btn btn-ghost">Open the ledger</Link>
+          <Link href="/" className="btn btn-ghost">Open app</Link>
         </div>
         <section className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
           <div
@@ -42,22 +42,22 @@ export default function LaunchClient() {
             }}
           >
             <VognaryMark size={54} className="mb-6 text-(--dossier-ink)" animated title="Vognary" />
-            <span className="folio" data-folio="§ 00" style={{ color: "var(--dossier-muted)" }}>Recurring intelligence</span>
-            <h1 className="mt-5 font-display text-4xl font-bold leading-none tracking-[-0.03em] text-(--dossier-ink) sm:text-6xl">Find the money<br /><span className="glow-num">leaking in silence.</span></h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 muted-on-dark">Vognary audits statements, receipts, and manual mandates to show every recurring commitment, upcoming debit, confidence score, and cancel or downgrade action.</p>
+            <span className="folio" data-folio="Start" style={{ color: "var(--dossier-muted)" }}>Recurring payments</span>
+            <h1 className="mt-5 font-display text-3xl font-bold leading-tight text-(--dossier-ink) sm:text-5xl">Find recurring payments{" "}<br /><span className="glow-num">before they renew.</span></h1>
+            <p className="mt-5 max-w-2xl text-base leading-7 muted-on-dark">Vognary reviews statements, receipts, and manual entries to show what renews, what it costs, and what to review first.</p>
             <div className="mt-8 grid gap-2.5 sm:grid-cols-3">
-              <Proof label="Self-serve audit" value="Live" />
-              <Proof label="Audit API" value="Live" />
-              <Proof label="Storage" value="Stateless" />
+              <Proof label="Self-serve review" value="Live" />
+              <Proof label="CSV/PDF import" value="Live" />
+              <Proof label="Default storage" value="Browser" />
             </div>
             <div className="mt-8 rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
-              <h2 className="font-display text-lg font-semibold text-(--dossier-ink)">First-customer promise</h2>
-              <p className="mt-2 text-sm leading-6 muted-on-dark">Upload statements and add missing app-store, UPI, and card mandates. Vognary returns recurring spend, annual burn, reviewable waste, next debits, and evidence you can verify.</p>
+              <h2 className="font-display text-lg font-semibold text-(--dossier-ink)">What you get</h2>
+              <p className="mt-2 text-sm leading-6 muted-on-dark">Add statements and missing app-store, UPI, or card mandates. Vognary returns monthly totals, yearly totals, next debits, and proof you can verify.</p>
             </div>
           </div>
 
           <form onSubmit={submit} className="panel p-6 sm:p-8 rise">
-            <span className="folio" data-folio="§ 01">Request access</span>
+            <span className="folio" data-folio="01">Request access</span>
             <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Request a recurring audit</h2>
             <p className="mt-2 text-sm leading-6 text-(--muted)">Use this to request help auditing cards, bank exports, app-store subscriptions, UPI mandates, cloud bills, and SaaS renewals.</p>
             <div className="mt-5 grid gap-2.5">
@@ -70,7 +70,7 @@ export default function LaunchClient() {
               <button type="submit" className="btn btn-ember">Request audit</button>
             </div>
             {status ? <p className="mt-4 rounded-md border border-indigo bg-(--indigo-tint) px-3 py-2 text-sm text-indigo">{status}</p> : null}
-            <Link href="/" className="mt-4 inline-flex text-sm font-semibold text-ember">Open Vognary →</Link>
+            <Link href="/" className="mt-4 inline-flex text-sm font-semibold text-ember">Open Vognary</Link>
           </form>
         </section>
       </div>

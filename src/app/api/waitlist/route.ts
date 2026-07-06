@@ -11,7 +11,7 @@ type WaitlistRequest = {
 };
 
 export async function POST(request: NextRequest) {
-  const limit = rateLimit(request, { namespace: "waitlist", limit: 12, windowMs: 60 * 60_000 });
+  const limit = await rateLimit(request, { namespace: "waitlist", limit: 12, windowMs: 60 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   let body: WaitlistRequest;

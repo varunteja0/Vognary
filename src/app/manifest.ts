@@ -6,10 +6,10 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Vognary — Recurring money, audited",
+    name: "Vognary - Review recurring payments",
     short_name: "Vognary",
     description:
-      "Find every silent subscription, mandate, and recurring charge, read the evidence, and cut it before the next debit.",
+      "Find subscriptions, mandates, and recurring charges, review the proof, and decide what to keep, change, or cancel.",
     id: "/",
     start_url: "/",
     display: "standalone",

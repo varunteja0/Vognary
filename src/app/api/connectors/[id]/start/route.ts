@@ -16,7 +16,7 @@ export async function GET(_request: Request, context: ConnectorRouteContext) {
 }
 
 export async function POST(request: Request, context: ConnectorRouteContext) {
-  const limit = rateLimit(request, { namespace: "connector-start", limit: 60, windowMs: 60_000 });
+  const limit = await rateLimit(request, { namespace: "connector-start", limit: 60, windowMs: 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   const { id } = await context.params;

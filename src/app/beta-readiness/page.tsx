@@ -10,19 +10,19 @@ export default function BetaReadinessPage() {
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/" className="btn btn-ghost">Back to ledger</Link>
+          <Link href="/" className="btn btn-ghost">Back to app</Link>
         </div>
         <article className="panel p-6 sm:p-8 rise">
-          <span className="folio" data-folio="§ OP">Operating plan</span>
-          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-(--ink) sm:text-5xl">Beta readiness</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">The product is ready for self-serve stateless audits. The table below is the honest path to connected-account production.</p>
+          <span className="folio" data-folio="Status">Beta status</span>
+          <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">What works now and what is next</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">The self-serve review works now. This table shows what is ready and what still needs setup before connected-account production.</p>
           <div className="mt-8 overflow-x-auto rounded-[11px] border border-line">
             <table className="w-full min-w-160 border-separate border-spacing-0 text-left text-sm">
               <thead>
                 <tr>
-                  <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Capability</th>
-                  <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Status</th>
-                  <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Next gate</th>
+                  <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.68rem] font-semibold text-(--muted)">Capability</th>
+                  <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.68rem] font-semibold text-(--muted)">Status</th>
+                  <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.68rem] font-semibold text-(--muted)">Next step</th>
                 </tr>
               </thead>
               <tbody>

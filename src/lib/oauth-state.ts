@@ -1,4 +1,5 @@
 export const gmailOAuthStateCookie = "vognary_gmail_oauth_state";
+export const googleAuthStateCookie = "vognary_google_auth_state";
 
 export function oauthStateCookieOptions() {
   return {

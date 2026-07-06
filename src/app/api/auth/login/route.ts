@@ -16,7 +16,7 @@ type LoginRequest = {
 };
 
 export async function POST(request: NextRequest) {
-  const limit = rateLimit(request, { namespace: "auth-login", limit: 8, windowMs: 60 * 60_000 });
+  const limit = await rateLimit(request, { namespace: "auth-login", limit: 8, windowMs: 60 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   const missingEnv = getMissingLoginEnv();

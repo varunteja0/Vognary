@@ -125,44 +125,44 @@ const auditModes: AuditMode[] = [
   {
     id: "founder",
     label: "Founder stack",
-    title: "Audit my founder stack",
-    promise: "Find SaaS, AI tools, cloud, domains, app-store, card, and UPI commitments before the next billing cycle.",
-    bestFor: "Solo founders, small teams, and builders with tool sprawl.",
+    title: "Check my work tools",
+    promise: "Find paid tools, cloud bills, domains, app-store charges, cards, and UPI AutoPay before they renew.",
+    bestFor: "Founders and small teams with many tools.",
   },
   {
     id: "personal",
     label: "Personal subscriptions",
-    title: "Check my personal subscriptions",
-    promise: "Build a recurring map from receipts, app-store checks, card statements, and manual source confirmations.",
-    bestFor: "One person trying to find forgotten monthly charges.",
+    title: "Check my subscriptions",
+    promise: "Use receipts, app stores, card statements, and manual entries to find what keeps renewing.",
+    bestFor: "One person looking for forgotten charges.",
   },
   {
     id: "household",
     label: "Household auto-debits",
-    title: "Review household auto-debits",
-    promise: "Track utilities, insurance, telecom, EMI, SIP, app-store, and mandate commitments in one review.",
-    bestFor: "Families and shared household budgets.",
+    title: "Check household auto-debits",
+    promise: "Track utilities, insurance, telecom, EMIs, SIPs, app stores, and mandates in one place.",
+    bestFor: "Families and shared budgets.",
   },
   {
     id: "cloud",
     label: "Cloud/SaaS spend",
-    title: "Audit cloud and SaaS spend",
-    promise: "Prioritize AI, cloud, developer tools, domains, hosting, and seat-based recurring spend.",
+    title: "Check cloud and SaaS spend",
+    promise: "Review AI tools, cloud, developer tools, domains, hosting, and paid seats.",
     bestFor: "Engineering, AI, and product teams.",
   },
   {
     id: "mandates",
     label: "UPI/card mandates",
     title: "Check UPI and card mandates",
-    promise: "Use source checks and fallback evidence for mandates that banks and PSPs do not expose directly yet.",
-    bestFor: "People worried about invisible AutoPay and e-mandates.",
+    promise: "Add visible mandates manually when banks or payment apps do not expose them yet.",
+    bestFor: "People worried about AutoPay or card mandates.",
   },
   {
     id: "appStores",
     label: "App stores",
     title: "Review app-store renewals",
-    promise: "Capture Apple, Google Play, iCloud, and app receipt evidence without pretending universal app-store APIs exist.",
-    bestFor: "Mobile subscriptions, creator tools, and family app purchases.",
+    promise: "Check Apple, Google Play, iCloud, and app receipts without needing a direct app-store connection.",
+    bestFor: "Mobile subscriptions and family app purchases.",
   },
 ];
 
@@ -354,7 +354,7 @@ export default function VognaryMvpClient() {
     setReviewNotes({});
     setSelectedItemId(null);
     setReceiptText("");
-    setNotice("Workspace cleared. No user data is stored by this MVP.");
+    setNotice("Workspace cleared. This browser has no audit data now.");
   }
 
   function removeSource(id: string) {
@@ -393,7 +393,7 @@ export default function VognaryMvpClient() {
     link.download = "vognary-private-beta-audit.json";
     link.click();
     URL.revokeObjectURL(url);
-    setNotice("Audit pack exported as JSON. Keep it private; it contains your source evidence.");
+    setNotice("Audit pack downloaded as JSON. Keep it private because it includes your source text.");
   }
 
   function exportWorkspaceBackup() {
@@ -549,9 +549,9 @@ export default function VognaryMvpClient() {
     doc.text(`Generated: ${new Date().toLocaleString("en-IN")}`, margin, y);
     y += 24;
     doc.setFontSize(12);
-    doc.text(`Monthly recurring: ${formatCurrency(audit.summary.monthlyRecurringSpend)} | Annual run-rate: ${formatCurrency(audit.summary.annualRecurringSpend)}`, margin, y);
+    doc.text(`Monthly total: ${formatCurrency(audit.summary.monthlyRecurringSpend)} | Yearly total: ${formatCurrency(audit.summary.annualRecurringSpend)}`, margin, y);
     y += 18;
-    doc.text(`Reviewable burn: ${formatCurrency(audit.summary.reviewableMonthlySpend)} | Items: ${audit.summary.recurringCount}`, margin, y);
+    doc.text(`Needs review: ${formatCurrency(audit.summary.reviewableMonthlySpend)} | Items: ${audit.summary.recurringCount}`, margin, y);
     y += 28;
 
     doc.setFont("helvetica", "bold");
@@ -655,19 +655,19 @@ export default function VognaryMvpClient() {
               <VognaryMark size={32} className="text-(--dossier-ink)" animated />
               <div className="leading-tight">
                 <p className="font-display text-lg font-semibold tracking-[-0.02em] text-(--dossier-ink)">Vognary</p>
-                <p className="eyebrow muted-on-dark" style={{ fontSize: "0.54rem", letterSpacing: "0.18em" }}>Recurring money, audited</p>
+                <p className="eyebrow muted-on-dark" style={{ fontSize: "0.58rem" }}>Recurring payments, reviewed</p>
               </div>
             </div>
             <div className="hidden h-8 w-px bg-(--dossier-line) lg:block" />
             <div className="flex flex-1 flex-wrap items-center gap-x-6 gap-y-2">
-              <TickerStat label="Monthly burn" value={formatCurrency(audit.summary.monthlyRecurringSpend)} tone="ember" />
-              <TickerStat label="Annual run-rate" value={formatCurrency(audit.summary.annualRecurringSpend)} tone="paper" />
-              <TickerStat label="Reviewable" value={formatCurrency(audit.summary.reviewableMonthlySpend)} tone="ochre" />
-              <TickerStat label="Renewals ≤10d" value={`${audit.summary.renewalsNextTenDays}`} tone="paper" />
+              <TickerStat label="Monthly total" value={formatCurrency(audit.summary.monthlyRecurringSpend)} tone="ember" />
+              <TickerStat label="Yearly total" value={formatCurrency(audit.summary.annualRecurringSpend)} tone="paper" />
+              <TickerStat label="Needs review" value={formatCurrency(audit.summary.reviewableMonthlySpend)} tone="ochre" />
+              <TickerStat label="Renewals in 10d" value={`${audit.summary.renewalsNextTenDays}`} tone="paper" />
             </div>
             <div className="flex items-center gap-2">
               <span className="live-dot" aria-hidden />
-              <span className="eyebrow muted-on-dark" style={{ fontSize: "0.54rem" }}>Local · Live</span>
+              <span className="eyebrow muted-on-dark" style={{ fontSize: "0.58rem" }}>On this device</span>
             </div>
           </div>
         </div>
@@ -682,37 +682,37 @@ export default function VognaryMvpClient() {
           onAction={focusAuditAction}
         />
 
-        {/* Masthead — the blacklight chamber */}
+        {/* Masthead */}
         <header
           className="dossier spotlight scan overflow-hidden rise"
           onMouseMove={trackSpotlightPointer}
         >
           <div className="grid gap-0 lg:grid-cols-[1.4fr_1fr]">
             <div className="p-7 sm:p-10">
-              <span className="folio" data-folio="§ 00" style={{ color: "var(--dossier-muted)" }}>Blacklight · recurring money</span>
+              <span className="folio" data-folio="Start" style={{ color: "var(--dossier-muted)" }}>Overview</span>
               <h2 className="hero-title mt-6 font-display font-bold text-(--dossier-ink)">
-                The charges
+                Find recurring{" "}
                 <br />
-                you never <span className="glow-num">see</span>
+                payments before{" "}
                 <br />
-                leaving.
+                they <span className="glow-num">renew.</span>
               </h2>
               <p className="mt-6 max-w-xl text-sm leading-7 muted-on-dark sm:text-base">
-                Ordinary in daylight, they slip out every month unnoticed. Vognary is the blacklight — it makes every silent recurring charge glow, shows the evidence, and helps you cut it before the next debit.
+                Add statements, receipts, or manual entries. Vognary lists repeated charges, shows where each one came from, and helps you decide what to keep, change, or cancel.
               </p>
               <div className="mt-7 flex flex-wrap gap-2.5">
-                <button type="button" onClick={exportReport} className="btn btn-primary">Export audit pack</button>
-                <button type="button" onClick={clearWorkspace} className="btn btn-ondark">Clear workspace</button>
+                <button type="button" onClick={exportReport} className="btn btn-primary">Download report</button>
+                <button type="button" onClick={clearWorkspace} className="btn btn-ondark">Clear data</button>
               </div>
               <div className="spectral mt-8 h-px w-full opacity-70" />
               <p className="mt-4 font-data text-[0.68rem] uppercase tracking-[0.16em] muted-on-dark">
-                <span className="text-(--dossier-ink)">{audit.summary.recurringCount}</span> signatures detected
+                <span className="text-(--dossier-ink)">{audit.summary.recurringCount}</span> items found
                 <span className="mx-2 text-(--dossier-line)">·</span>
                 <span className="text-(--dossier-ink)">{Math.round(audit.summary.averageConfidence)}%</span> avg confidence
               </p>
             </div>
             <div className="border-t p-7 sm:p-10 lg:border-l lg:border-t-0" style={{ borderColor: "var(--dossier-line)" }}>
-              <p className="eyebrow muted-on-dark">Exports &amp; workspace</p>
+              <p className="eyebrow muted-on-dark">Reports &amp; saved work</p>
               <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 <button type="button" onClick={exportPdfReport} className="btn btn-ondark w-full">PDF report</button>
                 <button type="button" onClick={exportCsvReport} className="btn btn-ondark w-full">Spreadsheet report</button>
@@ -723,7 +723,7 @@ export default function VognaryMvpClient() {
                 </label>
               </div>
               <div className="mt-5 rounded-xl border border-dashed p-4" style={{ borderColor: "var(--dossier-line)" }}>
-                <p className="eyebrow muted-on-dark" style={{ fontSize: "0.6rem" }}>Verdict spectrum</p>
+                <p className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Action labels</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span className="stamp stamp-keep">Keep</span>
                   <span className="stamp stamp-watch">Watch</span>
@@ -786,9 +786,9 @@ export default function VognaryMvpClient() {
           <div className="flex flex-col gap-5">
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <Metric label="Monthly recurring" value={formatCurrency(audit.summary.monthlyRecurringSpend)} tone="ink" />
-              <Metric label="Annual run-rate" value={formatCurrency(audit.summary.annualRecurringSpend)} tone="blue" />
-              <Metric label="Reviewable burn" value={formatCurrency(audit.summary.reviewableMonthlySpend)} tone="caution" />
-              <Metric label="Renewals in 10 days" value={`${audit.summary.renewalsNextTenDays}`} tone="accent" />
+              <Metric label="Yearly total" value={formatCurrency(audit.summary.annualRecurringSpend)} tone="blue" />
+              <Metric label="Needs review" value={formatCurrency(audit.summary.reviewableMonthlySpend)} tone="caution" />
+              <Metric label="Renewing in 10 days" value={`${audit.summary.renewalsNextTenDays}`} tone="accent" />
             </section>
 
             <SpendSpectrum audit={audit} userActions={userActions} onSelect={setSelectedItemId} />
@@ -831,22 +831,22 @@ export default function VognaryMvpClient() {
         <footer className="panel flex flex-col items-center gap-3 px-5 py-5 text-center" data-reveal>
           <div className="flex items-center gap-2.5">
             <VognaryMark size={22} className="text-(--ink)" />
-            <span className="font-display text-base font-semibold text-(--ink)">Vognary <span className="font-normal text-(--muted)">· Recurring money, audited</span></span>
+            <span className="font-display text-base font-semibold text-(--ink)">Vognary <span className="font-normal text-(--muted)">· Recurring payments, reviewed</span></span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-data text-[0.66rem] uppercase tracking-[0.16em] text-(--muted)">
             <a className="transition hover:text-(--ink)" href="/privacy">Privacy</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/security">Security</a>
             <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-(--ink)" href="/sources">Source guide</a>
+            <a className="transition hover:text-(--ink)" href="/sources">How to add sources</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/integrations">Integrations</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/terms">Terms</a>
             <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-(--ink)" href="/beta-readiness">Beta readiness</a>
+            <a className="transition hover:text-(--ink)" href="/beta-readiness">Beta status</a>
             <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-(--ink)" href="/login">Login</a>
+            <a className="transition hover:text-(--ink)" href="/login">Sign in</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/launch">Launch</a>
             <span className="text-(--line-strong)">·</span>
@@ -907,9 +907,9 @@ function GuidedAuditLauncher({
     <section className="panel overflow-hidden p-5 sm:p-6" data-reveal>
       <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
         <div>
-          <span className="folio" data-folio="§ START">Guided audit</span>
-          <h1 className="mt-3 font-display text-3xl font-semibold tracking-[-0.03em] text-(--ink) sm:text-5xl">Run a recurring-money audit</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-(--muted)">Pick the audit path that matches your pain. Vognary turns each real source you add into a recurring money graph, evidence trail, and next action.</p>
+          <span className="folio" data-folio="Start">Guided review</span>
+          <h1 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-4xl">Start a recurring payment review</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-(--muted)">Choose what you want to check. Add one real source, then Vognary will show repeated payments, proof, and the next action.</p>
 
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
             {auditModes.map((mode) => {
@@ -943,7 +943,7 @@ function GuidedAuditLauncher({
 
           <div className="mt-5 rounded-[11px] border p-3" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
             <div className="flex items-center justify-between gap-3">
-              <p className="eyebrow muted-on-dark" style={{ fontSize: "0.58rem" }}>First useful result</p>
+              <p className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Next step</p>
               <span className="font-data text-xs tnum" style={{ color: "var(--dossier-ink)" }}>{progressPercent}%</span>
             </div>
             <h3 className="mt-2 font-display text-lg font-semibold text-(--dossier-ink)">{activationState.headline}</h3>
@@ -1010,29 +1010,29 @@ function DataSourcesPanel({
   const liveSources = [
     {
       name: "Gmail receipts",
-      state: "Ready with OAuth",
-      body: "Read-only receipt discovery is wired. Configure Google OAuth to make this live for users.",
+      state: "Needs setup",
+      body: "Connect Gmail after OAuth is configured, or paste receipt text below now.",
       action: "Connect Gmail",
       onAction: onConnectGmail,
     },
     {
       name: "Bank accounts",
-      state: "Partner required",
-      body: "Account Aggregator needs an FIU/TSP or regulated partner. No password scraping.",
+      state: "Needs partner",
+      body: "Direct bank sync needs an approved Account Aggregator partner. Vognary never asks for bank passwords.",
       action: "View requirement",
       notice: "Bank sync requires Account Aggregator partner approval. Use manual source checks until that is approved.",
     },
     {
       name: "UPI and card mandates",
-      state: "Provider required",
-      body: "Direct mandate visibility needs issuer, UPI, or payment-provider APIs.",
+      state: "Needs provider",
+      body: "Direct mandate visibility needs issuer, UPI, or payment-provider APIs. Add visible mandates manually for now.",
       action: "View requirement",
       notice: "Direct UPI/card mandate sync requires provider APIs. Add visible mandates manually for now.",
     },
     {
       name: "Cloud and SaaS usage",
-      state: "Scoped API required",
-      body: "Usage intelligence needs read-only tokens for OpenAI, Anthropic, GitHub, Vercel, Render, AWS, and domains.",
+      state: "Needs tokens",
+      body: "Read-only tokens are needed for live checks from OpenAI, Anthropic, GitHub, Vercel, Render, AWS, and domain tools.",
       action: "View requirement",
       notice: "Cloud/SaaS usage connectors require provider tokens and encrypted storage before live sync.",
     },
@@ -1041,11 +1041,11 @@ function DataSourcesPanel({
   return (
     <section id="source-inputs" className="panel scroll-mt-24 p-5 sm:p-6">
       <SectionHead
-        folio="§ 03"
-        kicker="Live sources"
-        title="Connect recurring money sources"
-        desc="Start with live-capable sources and mandate checks. Use statement import only as a fallback when providers do not expose APIs yet."
-        right={<span className="pill pill-ready">Self-serve ready</span>}
+        folio="03"
+        kicker="Sources"
+        title="Add payment sources"
+        desc="Add one source first. Use statement import when a direct connection is not available."
+        right={<span className="pill pill-ready">Ready to use</span>}
       />
 
       <div className="mt-5 grid gap-3">
@@ -1064,11 +1064,11 @@ function DataSourcesPanel({
       </div>
 
       <details id="statement-fallback" className="mt-5 scroll-mt-24 inset p-4" open={statementFallbackOpen} onToggle={(event) => onStatementFallbackOpen(event.currentTarget.open)}>
-        <summary className="cursor-pointer font-display text-base font-semibold text-(--ink)">Fallback: import statement exports</summary>
-        <p className="mt-2 text-xs leading-5 text-(--muted)">Use this only when a bank, card, or provider cannot connect directly yet. Vognary will parse the export and still show evidence/confidence.</p>
+        <summary className="cursor-pointer font-display text-base font-semibold text-(--ink)">Import statement exports</summary>
+        <p className="mt-2 text-xs leading-5 text-(--muted)">Use this when a bank, card, or provider cannot connect directly yet. Vognary will look for repeated charges and show confidence.</p>
         <label className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[11px] border border-dashed border-(--line-strong) bg-(--card-2) px-4 py-8 text-center transition hover:border-ember hover:bg-(--ember-tint)">
-          <span className="font-display text-base font-semibold text-(--ink)">Drop statement export files</span>
-          <span className="max-w-sm text-xs leading-5 text-(--muted)">Readable statement exports are converted into evidence-backed recurring items.</span>
+          <span className="font-display text-base font-semibold text-(--ink)">Choose CSV or PDF statement files</span>
+          <span className="max-w-sm text-xs leading-5 text-(--muted)">Readable exports are converted into recurring payment items you can verify.</span>
           <input type="file" multiple accept=".csv,text/csv,.pdf,application/pdf" onChange={onFiles} className="sr-only" />
         </label>
       </details>
@@ -1085,11 +1085,11 @@ function DataSourcesPanel({
               Remove
             </button>
           </div>
-        )) : <p className="inset px-3 py-3 text-sm text-(--muted)">No real statement sources added yet.</p>}
+        )) : <p className="inset px-3 py-3 text-sm text-(--muted)">No statements added yet.</p>}
       </div>
 
       <div className="mt-5 inset p-4">
-        <p className="eyebrow">Paste a statement export</p>
+        <p className="eyebrow">Paste statement rows</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-[0.55fr_1.45fr]">
           <input value={pastedName} onChange={(event) => onPastedName(event.target.value)} className="field" placeholder="source-name" />
           <button type="button" onClick={onAddPastedStatement} className="btn btn-primary">Add pasted export</button>
@@ -1098,8 +1098,8 @@ function DataSourcesPanel({
       </div>
 
       <div className="mt-4 inset p-4">
-        <p className="eyebrow">Manual commitment</p>
-        <p className="mt-1 text-xs leading-5 text-(--muted)">For Apple, Google Play, UPI AutoPay, insurance, domains, or cloud not visible in a connected source.</p>
+        <p className="eyebrow">Add one payment manually</p>
+        <p className="mt-1 text-xs leading-5 text-(--muted)">Use this for Apple, Google Play, UPI AutoPay, insurance, domains, or cloud bills that are not visible in a source.</p>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {manualTemplates.map((template) => (
             <button
@@ -1133,7 +1133,7 @@ function DataSourcesPanel({
           </select>
           <input value={manualDraft.sourceName} onChange={(event) => onManualDraft({ ...manualDraft, sourceName: event.target.value })} className="field" placeholder="Source, e.g. phone check" />
         </div>
-        <button type="button" onClick={onAddManualItem} className="btn btn-ember mt-3 w-full">Add manual commitment</button>
+        <button type="button" onClick={onAddManualItem} className="btn btn-ember mt-3 w-full">Add payment</button>
         {manualItems.length ? (
           <div className="mt-3 grid gap-2">
             {manualItems.map((item) => (
@@ -1163,15 +1163,15 @@ function DataSourcesPanel({
 
 function QuickStartPanel() {
   const steps = [
-    ["1", "Connect sources", "Start with Gmail receipts, provider dashboards, app-store checks, and mandate sources."],
-    ["2", "Add missing mandates", "Use templates for Apple, Google Play, UPI AutoPay, card mandates, domains, insurance, and cloud."],
-    ["3", "Review evidence", "Open each recurring item, verify the proof, then mark keep, watch, downgrade, cancel, or investigate."],
-    ["4", "Export actions", "Download PDF, spreadsheet, or a private workspace backup for later review."],
+    ["1", "Add one source", "Use a statement, receipt text, or a manual payment you can verify."],
+    ["2", "Add missing payments", "Use templates for app stores, UPI, cards, domains, insurance, and cloud."],
+    ["3", "Check each item", "Open a payment, confirm the proof, then choose keep, watch, change, cancel, or investigate."],
+    ["4", "Download a report", "Export a PDF, spreadsheet, or backup file for later review."],
   ];
 
   return (
     <section className="panel p-5 sm:p-6" data-reveal>
-      <span className="folio" data-folio="§ 01">Procedure</span>
+      <span className="folio" data-folio="01">Start here</span>
       <div className="mt-5 grid gap-5 md:grid-cols-4">
         {steps.map(([number, title, body], index) => (
           <div key={title} className="relative">
@@ -1214,10 +1214,10 @@ function UserControlPanel({
   return (
     <section className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
       <div className="panel p-5 sm:p-6">
-        <p className="eyebrow">Audit completeness</p>
+        <p className="eyebrow">Source check</p>
         <div className="mt-3 flex items-end gap-3">
           <p className="font-display text-6xl font-semibold leading-none text-ember">{coverageScore}<span className="text-3xl">%</span></p>
-          <p className="pb-2 text-sm text-(--muted)">source coverage</p>
+          <p className="pb-2 text-sm text-(--muted)">checked</p>
         </div>
         <div className="mt-4 grid gap-2">
           {coverageSignals.map((signal) => (
@@ -1230,7 +1230,7 @@ function UserControlPanel({
       </div>
 
       <div className="panel p-5 sm:p-6">
-        <SectionHead folio="§ 02" kicker="Chain of custody" title="Use it safely" desc="By default Vognary stores nothing on a backend. Signed-in beta users can save an encrypted server snapshot, or keep everything local to this browser." />
+        <SectionHead folio="02" kicker="Your data" title="Control where your data is saved" desc="By default Vognary keeps this review in your browser. Signed-in beta users can also save an encrypted snapshot." />
         <div className="mt-4 flex flex-wrap gap-2">
           {localSaveEnabled ? (
             <button type="button" onClick={onDisableLocalSave} className="btn btn-ghost" style={{ borderColor: "var(--ember)", color: "var(--ember)" }}>
@@ -1244,7 +1244,7 @@ function UserControlPanel({
           <a href="/sources" className="btn btn-ghost">Open source guide</a>
         </div>
         <div className="mt-4 rounded-[11px] border border-line bg-(--card-2) p-3">
-          <p className="font-data text-[0.62rem] uppercase tracking-[0.16em] text-(--muted)">Beta account</p>
+          <p className="font-data text-[0.68rem] text-(--muted)">Beta account</p>
           <p className="mt-2 text-sm leading-6 text-(--muted)">
             {signedInEmail ? <>Signed in as <strong className="text-(--ink)">{signedInEmail}</strong>.</> : <>Not signed in. Use login to save encrypted snapshots across devices.</>}
           </p>
@@ -1256,7 +1256,7 @@ function UserControlPanel({
                 <button type="button" onClick={onDeleteServerWorkspace} className="btn btn-ghost" style={{ borderColor: "var(--ember)", color: "var(--ember)" }}>Delete server copies</button>
               </>
             ) : (
-              <a href="/login" className="btn btn-primary">Login</a>
+              <a href="/login" className="btn btn-primary">Sign in</a>
             )}
           </div>
           {serverSaveStatus ? <p className="mt-3 text-xs leading-5 text-(--muted)">{serverSaveStatus}</p> : null}
@@ -1283,11 +1283,11 @@ function ReceiptIntelligencePanel({
   return (
     <section id="receipt-intelligence" className="panel scroll-mt-24 p-5 sm:p-6">
       <SectionHead
-        folio="§ 04"
+        folio="04"
         kicker="Receipts"
-        title="Receipt intelligence"
-        desc="Paste invoice or renewal snippets. Gmail OAuth can feed this parser after verification."
-        right={<button type="button" onClick={onImportAll} className="btn btn-primary">Import all</button>}
+        title="Paste receipts"
+        desc="Paste invoice or renewal snippets. Vognary will pull out likely recurring payments."
+        right={<button type="button" onClick={onImportAll} className="btn btn-primary">Import all found</button>}
       />
       <textarea
         value={receiptText}
@@ -1318,7 +1318,7 @@ function ReceiptIntelligencePanel({
 function CoveragePanel({ statementCount, manualCount }: { statementCount: number; manualCount: number }) {
   return (
     <section className="panel p-5 sm:p-6">
-      <SectionHead folio="§ 05" kicker="Sources" title="Connected sources" desc="What is connected and what still needs a manual check, so the audit stays honest." />
+      <SectionHead folio="05" kicker="Sources" title="What has been checked" desc="Shows what you added and what still needs a manual check." />
       <div className="mt-4 grid gap-2">
         {getCoverageItems(statementCount, manualCount).map((item) => <StatusRow key={item.label} {...item} />)}
       </div>
@@ -1343,8 +1343,8 @@ function RecurringGraph({
     <section id="recurring-ledger" className="panel scroll-mt-24 overflow-hidden">
       <div className="flex flex-col gap-2 border-b border-line px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <span className="folio" data-folio="§ 07">The ledger</span>
-          <h2 className="mt-2 font-display text-xl font-semibold tracking-tight text-(--ink)">Recurring money graph</h2>
+          <span className="folio" data-folio="07">Results</span>
+          <h2 className="mt-2 font-display text-xl font-semibold text-(--ink)">Recurring payments found</h2>
           <p className="mt-1 text-sm text-(--muted)">{audit.summary.recurringCount} recurring items from {audit.summary.transactionCount} debit transactions.</p>
         </div>
         <p className="font-data text-xs text-(--muted)">Avg confidence {Math.round(audit.summary.averageConfidence)}%</p>
@@ -1356,10 +1356,10 @@ function RecurringGraph({
             <thead>
               <tr>
                 <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Merchant</th>
-                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Cadence</th>
+                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.68rem] font-semibold text-(--muted)">How often</th>
                 <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Monthly</th>
                 <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Next debit</th>
-                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Verdict</th>
+                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.68rem] font-semibold text-(--muted)">Suggested action</th>
               </tr>
             </thead>
             <tbody>
@@ -1383,10 +1383,10 @@ function RecurringGraph({
         </div>
       ) : (
         <div className="px-5 py-14 text-center">
-          <p className="font-data text-xs uppercase tracking-[0.2em] text-(--muted)">{hasRealData ? "No pattern yet" : "Awaiting evidence"}</p>
-          <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">{hasRealData ? "No recurring pattern found yet" : "Start with real sources"}</h3>
+          <p className="font-data text-xs text-(--muted)">{hasRealData ? "No pattern yet" : "No source added yet"}</p>
+          <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">{hasRealData ? "No repeated payments found yet" : "Add one source to start"}</h3>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">
-            {hasRealData ? "Add more source history or use manual entries for app-store, UPI, insurance, cloud, or domain commitments that do not appear in connected evidence." : "Connect a live source, paste receipt evidence, or add manual commitments to start your audit."}
+            {hasRealData ? "Add more history or add app-store, UPI, insurance, cloud, or domain payments manually." : "Connect a source, paste a receipt, or add one payment manually."}
           </p>
         </div>
       )}
@@ -1405,7 +1405,7 @@ function PriorityActionPanel({
 }) {
   return (
     <section className="panel p-5 sm:p-6">
-      <SectionHead folio="§ 08" kicker="Priority" title="Priority action plan" desc="Start with these before the next billing cycle." />
+      <SectionHead folio="08" kicker="Priority" title="What to review first" desc="Start with these before the next billing cycle." />
       <div className="mt-4 grid gap-2">
         {priorityItems.length ? priorityItems.map((item) => {
           const action = userActions[item.id] ?? item.recommendationType;
@@ -1430,17 +1430,17 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
   return (
     <section className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
       <div className="dossier p-6">
-        <span className="folio" data-folio="§ 10" style={{ color: "var(--dossier-muted)" }}>Exhibit</span>
-        <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight text-(--dossier-ink)">{item.merchant}</h2>
+        <span className="folio" data-folio="10" style={{ color: "var(--dossier-muted)" }}>Selected item</span>
+        <h2 className="mt-4 font-display text-2xl font-semibold text-(--dossier-ink)">{item.merchant}</h2>
         <p className="mt-2 text-sm leading-6 muted-on-dark">{item.recommendationReason}</p>
         <div className="mt-5 grid grid-cols-2 gap-2.5">
           <DossierStat label="Average debit" value={formatCurrency(item.averageAmount)} />
           <DossierStat label="Annual cost" value={formatCurrency(item.annualCost)} />
           <DossierStat label="Amount range" value={`${formatCurrency(item.amountMin)} – ${formatCurrency(item.amountMax)}`} />
-          <DossierStat label="Evidence rows" value={`${item.evidence.length}`} />
+          <DossierStat label="Proof rows" value={`${item.evidence.length}`} />
         </div>
         <div className="mt-5">
-          <label className="font-data text-[0.62rem] uppercase tracking-[0.18em]" style={{ color: "var(--dossier-muted)" }} htmlFor="action-select">Issue verdict</label>
+          <label className="font-data text-[0.68rem]" style={{ color: "var(--dossier-muted)" }} htmlFor="action-select">Choose action</label>
           <select id="action-select" value={action} onChange={(event) => onAction(event.target.value as RecommendationType)} className="mt-2 h-11 w-full rounded-[9px] border px-3 text-sm outline-none" style={{ background: "rgba(243,234,214,0.06)", borderColor: "var(--dossier-line)", color: "var(--dossier-ink)" }}>
             <option value="keep">Keep</option>
             <option value="watch">Watch</option>
@@ -1455,7 +1455,7 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
       </div>
 
       <div className="panel p-5 sm:p-6">
-        <SectionHead folio="§ 10" kicker="Proof" title="Evidence trail" desc="Every verdict traces back to transaction-level proof." right={<span className="pill pill-partial">{item.sourceNames.join(", ")}</span>} />
+        <SectionHead folio="10" kicker="Proof" title="Where this came from" desc="Each suggestion links back to transaction or receipt text." right={<span className="pill pill-partial">{item.sourceNames.join(", ")}</span>} />
         <div className="mt-4 overflow-hidden rounded-[11px] border border-line">
           <table className="w-full border-separate border-spacing-0 text-left text-sm">
             <thead>
@@ -1523,10 +1523,10 @@ function TeamReviewPanel({
   return (
     <section className="panel p-5 sm:p-6" data-reveal>
       <SectionHead
-        folio="§ 11"
+        folio="11"
         kicker="Review"
-        title="Team monthly review"
-        desc="Assign recurring spend to owners, record notes, and close the monthly review."
+        title="Monthly review"
+        desc="Assign payments to owners, record notes, and close the monthly review."
         right={<button type="button" onClick={onCompleteReview} className="btn btn-primary">Mark review complete</button>}
       />
       <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
@@ -1537,7 +1537,7 @@ function TeamReviewPanel({
       {reviewCompletedAt ? <p className="mt-3 rounded-md border border-verdict bg-(--verdict-tint) px-3 py-2 text-sm text-verdict">Review completed at {new Date(reviewCompletedAt).toLocaleString("en-IN")}.</p> : null}
 
       <div className="mt-4 inset p-4">
-        <p className="eyebrow">Review team</p>
+        <p className="eyebrow">People reviewing</p>
         <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
           <input value={memberDraft.name} onChange={(event) => onMemberDraft({ ...memberDraft, name: event.target.value })} className="field" placeholder="Name" />
           <input value={memberDraft.role} onChange={(event) => onMemberDraft({ ...memberDraft, role: event.target.value })} className="field" placeholder="Role" />
@@ -1592,11 +1592,11 @@ function ReadinessPanel({ statementCount, manualCount }: { statementCount: numbe
   return (
     <section className="panel p-5 sm:p-6" data-reveal>
       <SectionHead
-        folio="§ 12"
+        folio="12"
         kicker="Readiness"
-        title="User readiness"
-        desc="What works in this self-serve audit and which connected features still need setup or partners."
-        right={<span className="pill pill-ready">Self-serve ready</span>}
+        title="What works now"
+        desc="What works today and which connected features still need setup or partners."
+        right={<span className="pill pill-ready">Ready to use</span>}
       />
       <div className="mt-4 grid gap-2 md:grid-cols-2">
         {getReadinessItems(statementCount, manualCount).map((item) => <StatusRow key={item.label} {...item} />)}
@@ -1622,10 +1622,10 @@ function SpendSpectrum({ audit, userActions, onSelect }: { audit: AuditResult; u
   return (
     <section className="panel p-5 sm:p-6">
       <SectionHead
-        folio="§ 06"
-        kicker="Spectrum"
-        title="Spend spectrum"
-        desc="Every recurring rupee, split by merchant and lit by its verdict. The hottest bands are where money leaves fastest."
+        folio="06"
+        kicker="Spend"
+        title="Spend by merchant"
+        desc="Shows which recurring payments cost the most each month."
         right={<span className="font-data text-xs text-(--muted)">{formatCurrency(audit.summary.monthlyRecurringSpend)}/mo</span>}
       />
       {items.length ? (
@@ -1665,7 +1665,7 @@ function SpendSpectrum({ audit, userActions, onSelect }: { audit: AuditResult; u
           </div>
         </>
       ) : (
-        <p className="inset mt-5 px-3 py-6 text-center text-sm text-(--muted)">Add sources to light up your spend spectrum.</p>
+        <p className="inset mt-5 px-3 py-6 text-center text-sm text-(--muted)">Add sources to see spend by merchant.</p>
       )}
     </section>
   );
@@ -1675,7 +1675,7 @@ function TickerStat({ label, value, tone }: { label: string; value: string; tone
   const color = tone === "ember" ? "var(--ember)" : tone === "ochre" ? "var(--ochre)" : "var(--dossier-ink)";
   return (
     <div className="flex items-baseline gap-2">
-      <span className="eyebrow muted-on-dark" style={{ fontSize: "0.54rem", letterSpacing: "0.14em" }}>{label}</span>
+      <span className="eyebrow muted-on-dark" style={{ fontSize: "0.58rem" }}>{label}</span>
       <span className="font-data text-sm font-medium tnum" style={{ color }}>{value}</span>
     </div>
   );
@@ -1686,7 +1686,7 @@ function SectionHead({ folio, kicker, title, desc, right }: { folio: string; kic
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <span className="folio" data-folio={folio}>{kicker}</span>
-        <h2 className="mt-2 font-display text-[1.35rem] font-semibold tracking-[-0.02em] text-(--ink)">{title}</h2>
+        <h2 className="mt-2 font-display text-[1.22rem] font-semibold text-(--ink)">{title}</h2>
         {desc ? <p className="mt-1 max-w-xl text-sm leading-6 text-(--muted)">{desc}</p> : null}
       </div>
       {right ? <div className="shrink-0">{right}</div> : null}
@@ -1705,7 +1705,7 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: "i
   return (
     <div className="panel-flat lift relative overflow-hidden px-4 py-4">
       <div className="flex items-center justify-between">
-        <p className="eyebrow" style={{ fontSize: "0.58rem" }}>{label}</p>
+        <p className="eyebrow" style={{ fontSize: "0.62rem" }}>{label}</p>
         <span className="size-1.5 rounded-full" style={{ background: color }} />
       </div>
       <p className="font-data mt-3 text-[1.7rem] font-medium leading-none tnum" style={{ color }}>{value}</p>
@@ -1717,7 +1717,7 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: "i
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="inset px-3 py-2.5">
-      <p className="eyebrow" style={{ fontSize: "0.54rem" }}>{label}</p>
+      <p className="eyebrow" style={{ fontSize: "0.62rem" }}>{label}</p>
       <p className="font-data mt-1.5 text-sm font-semibold tnum text-(--ink)">{value}</p>
     </div>
   );
@@ -1755,12 +1755,12 @@ function getCoverageItems(statementCount: number, manualCount: number) {
 
 function getReadinessItems(statementCount: number, manualCount: number) {
   return [
-    { label: "Audit engine", value: "Deterministic recurring detection, confidence, next debit, evidence", state: "ready" as const },
-    { label: "Real-user workflow", value: statementCount || manualCount ? "Real sources can be audited now" : "Add sources to run a real audit", state: statementCount || manualCount ? "ready" as const : "partial" as const },
+    { label: "Payment detection", value: "Finds repeated charges, confidence, next debit, and proof", state: "ready" as const },
+    { label: "User workflow", value: statementCount || manualCount ? "Your sources can be reviewed now" : "Add sources to run a real review", state: statementCount || manualCount ? "ready" as const : "partial" as const },
     { label: "Data handling", value: "Session-local by default; backup file is user-controlled", state: "ready" as const },
     { label: "Exports", value: "PDF, spreadsheet, JSON audit pack, and private workspace backup", state: "ready" as const },
-    { label: "Accounts", value: "Session and workspace primitives exist; public login still needs an identity provider", state: "partial" as const },
-    { label: "Direct integrations", value: "OpenAI preview exists; Gmail, AA, and mandate APIs need credentials/partners", state: "partial" as const },
+    { label: "Accounts", value: "Private beta sign-in exists; public login still needs an identity provider", state: "partial" as const },
+    { label: "Direct integrations", value: "Gmail, bank, and mandate sync need credentials or partners", state: "partial" as const },
   ];
 }
 
@@ -1833,13 +1833,13 @@ function getAuditModeSignals(mode: AuditModeId, statementSources: StatementFile[
       { label: "UPI AutoPay check", done: /upi|autopay/i.test(evidenceText), action: "manual" },
       { label: "Card mandate check", done: /card|mandate/i.test(evidenceText), action: "manual" },
       { label: "Bank or card statement fallback", done: hasStatement, action: "statement" },
-      { label: "Mandate item in ledger", done: audit.recurringItems.some((item) => /upi|card|mandate/i.test(item.category + item.merchant)), action: hasRecurringItem ? "review" : "manual" },
+      { label: "Mandate payment found", done: audit.recurringItems.some((item) => /upi|card|mandate/i.test(item.category + item.merchant)), action: hasRecurringItem ? "review" : "manual" },
     ],
     appStores: [
       { label: "Apple subscription check", done: /apple|icloud/i.test(evidenceText), action: "manual" },
       { label: "Google Play check", done: /google play|play store|playstore/i.test(evidenceText), action: "manual" },
       { label: "Receipt evidence", done: hasReceipt, action: "receipt" },
-      { label: "App-store item in ledger", done: audit.recurringItems.some((item) => /app store|apple|google play/i.test(item.category + item.merchant)), action: hasRecurringItem ? "review" : "manual" },
+      { label: "App-store payment found", done: audit.recurringItems.some((item) => /app store|apple|google play/i.test(item.category + item.merchant)), action: hasRecurringItem ? "review" : "manual" },
     ],
   };
 
@@ -1853,15 +1853,15 @@ function getActivationState(mode: AuditModeId, signals: AuditModeSignal[], audit
   if (audit.recurringItems.length > 0) {
     return {
       headline: `${audit.recurringItems.length} recurring commitment${audit.recurringItems.length === 1 ? "" : "s"} found`,
-      detail: `Monthly recurring spend is ${formatCurrency(audit.summary.monthlyRecurringSpend)}. Review the top item and mark keep, watch, downgrade, cancel, or investigate.`,
-      primaryAction: { id: "review", label: "Review recurring graph" },
+      detail: `Monthly recurring total is ${formatCurrency(audit.summary.monthlyRecurringSpend)}. Review the top item and choose keep, watch, change, cancel, or investigate.`,
+      primaryAction: { id: "review", label: "Review payments" },
       secondaryMetric: `${audit.summary.renewalsNextTenDays} renewal${audit.summary.renewalsNextTenDays === 1 ? "" : "s"} in the next 10 days`,
     };
   }
 
   if (statementSources.length || manualItems.length || receiptText.trim()) {
     return {
-      headline: "Evidence captured, pattern not complete yet",
+      headline: "Source added, no recurring pattern yet",
       detail: firstMissing ? `Next best action for ${selectedMode.label}: ${firstMissing.label}.` : "Add more history or one manual commitment to make the recurring pattern visible.",
       primaryAction: { id: firstMissing?.action ?? "manual", label: firstMissing ? `Complete: ${firstMissing.label}` : "Add one commitment" },
       secondaryMetric: `${statementSources.length} source${statementSources.length === 1 ? "" : "s"} · ${manualItems.length} manual commitment${manualItems.length === 1 ? "" : "s"}`,
@@ -1870,9 +1870,9 @@ function getActivationState(mode: AuditModeId, signals: AuditModeSignal[], audit
 
   return {
     headline: "Get the first useful result in under 5 minutes",
-    detail: firstMissing ? `Start with ${firstMissing.label.toLowerCase()}. Vognary will update this checklist as soon as evidence is added.` : "Start by adding one real source.",
+    detail: firstMissing ? `Start with ${firstMissing.label.toLowerCase()}. Vognary will update this checklist as soon as a source is added.` : "Start by adding one real source.",
     primaryAction: { id: firstMissing?.action ?? "manual", label: firstMissing ? `Start: ${firstMissing.label}` : "Start audit" },
-    secondaryMetric: "Threshold: add 1 source, find 1 item, export 1 action report",
+    secondaryMetric: "Goal: add 1 source, find 1 item, download 1 report",
   };
 }
 
@@ -1889,7 +1889,7 @@ function getActionNotice(action: AuditActionId, mode: AuditModeId) {
     receipt: `Paste one real renewal or invoice snippet for the ${selectedMode} audit.`,
     statement: `Use statement import only when the provider cannot connect directly yet.`,
     gmail: `Gmail needs OAuth configuration before public receipt sync. Receipt paste works now.`,
-    review: `Review the recurring graph and mark a verdict before the next billing cycle.`,
+    review: `Review the recurring payments and choose an action before the next billing cycle.`,
   };
   return notices[action];
 }

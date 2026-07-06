@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Vognary — see the money leaving in the dark";
+export const alt = "Vognary recurring payment review";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -38,19 +38,19 @@ export default function OpengraphImage() {
         <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
           <img src={markSrc} width={88} height={88} alt="" />
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: -1 }}>Vognary</div>
-            <div style={{ fontSize: 17, color: "#8a8e98", letterSpacing: 4 }}>RECURRING MONEY, AUDITED</div>
+            <div style={{ fontSize: 40, fontWeight: 700, letterSpacing: 0 }}>Vognary</div>
+            <div style={{ fontSize: 17, color: "#8a8e98", letterSpacing: 0 }}>Recurring payments, reviewed</div>
           </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ fontSize: 78, fontWeight: 700, lineHeight: 1.02, letterSpacing: -3 }}>See the money</div>
-          <div style={{ display: "flex", fontSize: 78, fontWeight: 700, lineHeight: 1.06, letterSpacing: -3 }}>
-            <span>leaving in the</span>
-            <span style={{ color: "#d8b87a", marginLeft: 20 }}>dark.</span>
+          <div style={{ fontSize: 72, fontWeight: 700, lineHeight: 1.08, letterSpacing: 0 }}>Find recurring payments</div>
+          <div style={{ display: "flex", fontSize: 72, fontWeight: 700, lineHeight: 1.1, letterSpacing: 0 }}>
+            <span>before they</span>
+            <span style={{ color: "#d8b87a", marginLeft: 20 }}>renew.</span>
           </div>
           <div style={{ fontSize: 26, color: "#a6aab4", marginTop: 26, maxWidth: 780, lineHeight: 1.4 }}>
-            Find every silent subscription and mandate, read the evidence, and cut it before the next debit.
+            Review subscriptions, mandates, and recurring charges with proof you can verify.
           </div>
         </div>
 
@@ -61,7 +61,7 @@ export default function OpengraphImage() {
             ))}
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 18, color: "#8a8e98", letterSpacing: 3 }}>VOGNARY.COM</div>
+            <div style={{ fontSize: 18, color: "#8a8e98", letterSpacing: 0 }}>vognary.com</div>
             <div style={{ fontSize: 18, color: "#8a8e98" }}>Private beta</div>
           </div>
         </div>

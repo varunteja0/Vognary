@@ -277,29 +277,41 @@ Stop condition:
 
 ## 6. Identity Provider Or Magic Link
 
-The code currently verifies signed sessions and workspace membership. It does not yet mint public sessions. Choose one identity path before public accounts.
+The app can now mint real sessions through Resend magic links. Magic links create a short-lived one-time challenge in PostgreSQL, send the user an email, verify the token, create the user/workspace envelope, and set the existing signed session cookie.
 
-Recommended fastest path: Clerk for hosted auth, or Resend magic links for custom auth.
+Recommended fastest path: Resend magic links.
 
-Clerk click-by-click:
+Resend click-by-click:
 
-1. Open `https://dashboard.clerk.com/`.
-2. Click `Create application`.
-3. Name it `Vognary`.
-4. Enable Email login.
-5. Disable social login initially unless needed.
-6. Copy `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`.
-7. Copy `CLERK_SECRET_KEY`.
-8. Add both to Vercel env variables.
-9. Ask engineering to wire Clerk middleware/session issuance to Vognary's workspace store.
+1. Open `https://resend.com/`.
+2. Click `Add domain`.
+3. Add `vognary.com` or a sending subdomain such as `mail.vognary.com`.
+4. Copy the DNS records Resend shows.
+5. Open your DNS host.
+6. Add the SPF/DKIM/verification records exactly as shown.
+7. Return to Resend and wait until the domain shows verified.
+8. Click `API Keys`.
+9. Click `Create API Key`.
+10. Name it `Vognary production magic links`.
+11. Copy the key once.
+12. Open Vercel Dashboard > Vognary > Settings > Environment Variables.
+13. Add `RESEND_API_KEY` with the copied key.
+14. Add `RESEND_FROM_EMAIL` with a verified sender, for example `Vognary <login@vognary.com>`.
+15. Confirm `DATABASE_URL` and `SESSION_SECRET` are already configured.
+16. Redeploy production.
+17. Visit `https://www.vognary.com/login`.
+18. Enter your email in `Email sign-in link`.
+19. Click `Send sign-in link`.
+20. Open the email and click the link.
+21. Confirm `/api/auth/session` returns `authenticated: true`.
 
 Stop condition:
 
-- Do not market saved workspaces until a real login issuer exists and `/api/workspaces` returns workspaces for signed-in users.
+- Do not market saved workspaces until `npm run production:check -- https://www.vognary.com --strict` reports `Identity provider / magic link` as `READY` and `/api/workspaces` returns workspaces for a signed-in user.
 
 ## 7. Redis / Trusted Proxy Rate Limiting
 
-Current rate limiting is in-memory. It is enough for single-instance protection, not billion-dollar-grade public traffic.
+Current rate limiting falls back to in-memory when Upstash is absent. When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are configured, API routes use shared Upstash Redis REST counters.
 
 Fast path using Upstash:
 
@@ -311,11 +323,12 @@ Fast path using Upstash:
 6. Copy `UPSTASH_REDIS_REST_URL`.
 7. Copy `UPSTASH_REDIS_REST_TOKEN`.
 8. Add both to Vercel.
-9. Ask engineering to swap `src/lib/rate-limit.ts` from memory store to Upstash.
+9. Redeploy production.
+10. Verify `npm run production:check -- https://www.vognary.com` reports `Redis / trusted proxy rate limiting` as `READY`.
 
 Stop condition:
 
-- Do not run high-traffic campaigns until shared rate limiting is wired.
+- Do not run high-traffic campaigns until `/api/readiness` reports `hardening.redisRateLimiting` as `configured`.
 
 ## 8. Monitoring, Alerts, Backups
 
@@ -333,7 +346,17 @@ Sentry click-by-click:
 3. Platform: Next.js.
 4. Copy `SENTRY_DSN`.
 5. Add `SENTRY_DSN` to Vercel.
-6. Install/wire Sentry SDK in code before marking monitoring ready.
+6. Redeploy production.
+7. Verify `npm run production:check -- https://www.vognary.com` reports `Monitoring and incident alerts` as `READY`.
+
+Better Stack alternative:
+
+1. Open `https://betterstack.com/`.
+2. Create a logs source for `Vognary web`.
+3. Copy `BETTER_STACK_SOURCE_TOKEN`.
+4. Add `BETTER_STACK_SOURCE_TOKEN` to Vercel.
+5. Redeploy production.
+6. Verify `/api/readiness` reports `hardening.monitoring` as `configured-better-stack-server-errors`.
 
 Backups:
 
@@ -341,7 +364,11 @@ Backups:
 2. Go to `Branches` or `Backups`.
 3. Confirm Point-in-Time Restore is enabled.
 4. Set retention according to plan.
-5. Run a restore drill before storing user financial data.
+5. Create or choose encrypted backup/object storage and set one of `BACKUP_STORAGE_BUCKET`, `S3_BUCKET`, or `R2_BUCKET` in Vercel.
+6. Run a restore drill before storing user financial data.
+7. Add `BACKUP_RESTORE_DRILL_STATUS=passed` in Vercel only after the restore drill succeeds.
+8. Redeploy production.
+9. Verify `/api/readiness` reports `hardening.backups` as `configured`.
 
 Stop condition:
 

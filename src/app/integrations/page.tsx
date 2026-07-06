@@ -4,8 +4,8 @@ import { connectors, getConnectorSummary, getConnectorSyncSummary, type Connecto
 
 const statusLabels: Record<ConnectorStatus, string> = {
   live: "Live",
-  "ready-with-env": "Ready With Env",
-  "partner-required": "Partner Required",
+  "ready-with-env": "Needs setup",
+  "partner-required": "Needs partner",
   planned: "Planned",
 };
 
@@ -28,12 +28,12 @@ export default function IntegrationsPage() {
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/" className="btn btn-ghost">Back to ledger</Link>
+          <Link href="/" className="btn btn-ghost">Back to app</Link>
         </div>
         <article className="panel p-6 sm:p-8 rise">
-          <span className="folio" data-folio="§ IH">Integration hub</span>
-          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-(--ink) sm:text-5xl">Connector readiness across every phase</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">The honest map of what works now, what needs environment configuration, and what needs external regulated partners.</p>
+          <span className="folio" data-folio="Guide">Integrations</span>
+          <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">Available connections and setup status</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">See what works now, what needs setup, and what still needs an approved partner.</p>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-4">
             {Object.entries(summary).map(([status, count]) => (
@@ -46,16 +46,16 @@ export default function IntegrationsPage() {
 
           <div className="mt-3 grid gap-3 md:grid-cols-3">
             <div className="inset px-4 py-3">
-              <p className="eyebrow" style={{ fontSize: "0.56rem" }}>Connector targets</p>
+              <p className="eyebrow" style={{ fontSize: "0.62rem" }}>Connections listed</p>
               <p className="font-data mt-2 text-2xl font-semibold tnum text-(--ink)">{syncSummary.total}</p>
               <p className="mt-1 text-xs leading-5 text-(--muted)">{syncSummary.realtimeCapable} can become realtime after credentials, webhooks, or partner access.</p>
             </div>
             <div className="inset px-4 py-3">
-              <p className="eyebrow" style={{ fontSize: "0.56rem" }}>Auth surface</p>
+              <p className="eyebrow" style={{ fontSize: "0.62rem" }}>Sign-in method</p>
               <p className="mt-2 text-sm leading-6 text-(--muted)">{Object.entries(syncSummary.byAuthType).map(([type, count]) => `${type}: ${count}`).join(" · ")}</p>
             </div>
             <div className="inset px-4 py-3">
-              <p className="eyebrow" style={{ fontSize: "0.56rem" }}>Trust classes</p>
+              <p className="eyebrow" style={{ fontSize: "0.62rem" }}>Data access type</p>
               <p className="mt-2 text-sm leading-6 text-(--muted)">{Object.entries(syncSummary.byTrustClass).map(([type, count]) => `${type}: ${count}`).join(" · ")}</p>
             </div>
           </div>
@@ -72,10 +72,10 @@ export default function IntegrationsPage() {
                   <span className={`${statusClass[connector.status]} shrink-0`}>{statusLabels[connector.status]}</span>
                 </div>
                 <div className="mt-3 grid gap-2 text-xs leading-5 text-(--muted) md:grid-cols-4">
-                  <p><strong className="text-(--ink)">Auth:</strong> {connector.authType}</p>
-                  <p><strong className="text-(--ink)">Sync:</strong> {connector.syncMode}</p>
-                  <p><strong className="text-(--ink)">Trust:</strong> {connector.trustClass}</p>
-                  <p><strong className="text-(--ink)">Realtime:</strong> {connector.realtimeCapable ? "Capable" : "Scheduled/manual"}</p>
+                  <p><strong className="text-(--ink)">Sign-in:</strong> {connector.authType}</p>
+                  <p><strong className="text-(--ink)">Update:</strong> {connector.syncMode}</p>
+                  <p><strong className="text-(--ink)">Access:</strong> {connector.trustClass}</p>
+                  <p><strong className="text-(--ink)">Live updates:</strong> {connector.realtimeCapable ? "Possible" : "Scheduled/manual"}</p>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-(--muted)"><strong className="text-(--ink)">Evidence:</strong> {connector.evidence}</p>
                 {connector.limitation ? <p className="mt-2 text-sm leading-6 text-(--muted)"><strong className="text-(--ink)">Boundary:</strong> {connector.limitation}</p> : null}

@@ -65,7 +65,7 @@ const allowedConcerns = new Set([
 ]);
 
 export async function POST(request: NextRequest) {
-  const limit = rateLimit(request, { namespace: "audit-intake", limit: 10, windowMs: 60 * 60_000 });
+  const limit = await rateLimit(request, { namespace: "audit-intake", limit: 10, windowMs: 60 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   let body: AuditIntakeRequest;

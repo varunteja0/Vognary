@@ -13,7 +13,7 @@ type AuditRequestBody = {
 };
 
 export async function POST(request: NextRequest) {
-  const limit = rateLimit(request, { namespace: "audit", limit: 30, windowMs: 60_000 });
+  const limit = await rateLimit(request, { namespace: "audit", limit: 30, windowMs: 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   let body: AuditRequestBody;

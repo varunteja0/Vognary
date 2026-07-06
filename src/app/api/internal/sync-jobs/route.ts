@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const limit = rateLimit(request, { namespace: "internal-sync-jobs", limit: 60, windowMs: 60_000 });
+  const limit = await rateLimit(request, { namespace: "internal-sync-jobs", limit: 60, windowMs: 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   const auth = requireInternalSecret(request);

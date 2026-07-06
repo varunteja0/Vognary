@@ -13,7 +13,7 @@ type ConnectorWebhookRouteContext = {
 const maxWebhookBodyBytes = 1_000_000;
 
 export async function POST(request: Request, context: ConnectorWebhookRouteContext) {
-  const limit = rateLimit(request, { namespace: "connector-webhook", limit: 120, windowMs: 60_000 });
+  const limit = await rateLimit(request, { namespace: "connector-webhook", limit: 120, windowMs: 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   const { id } = await context.params;

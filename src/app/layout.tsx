@@ -19,11 +19,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.vognary.com"),
   applicationName: "Vognary",
   title: {
-    default: "Vognary — Recurring money, audited",
-    template: "%s — Vognary",
+    default: "Vognary - Review recurring payments",
+    template: "%s - Vognary",
   },
   description:
-    "Vognary finds every silent subscription, mandate, and recurring charge, shows the evidence, and helps you cut it before the next debit.",
+    "Vognary helps you find subscriptions, mandates, and recurring charges, review the proof, and decide what to keep, change, or cancel.",
   keywords: [
     "recurring payments",
     "subscription audit",
@@ -40,15 +40,15 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "Vognary",
     url: "/",
-    title: "Vognary — Recurring money, audited",
+    title: "Vognary - Review recurring payments",
     description:
-      "Find every silent subscription and mandate, read the evidence, and cut it before the next debit.",
+      "Find subscriptions and mandates, review the proof, and decide what to keep, change, or cancel.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vognary — Recurring money, audited",
+    title: "Vognary - Review recurring payments",
     description:
-      "Find every silent subscription and mandate, read the evidence, and cut it before the next debit.",
+      "Find subscriptions and mandates, review the proof, and decide what to keep, change, or cancel.",
   },
 };
 

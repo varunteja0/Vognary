@@ -14,7 +14,7 @@ type SnapshotRequest = {
 };
 
 export async function GET(request: Request) {
-  const limit = rateLimit(request, { namespace: "audit-snapshot-read", limit: 60, windowMs: 60_000 });
+  const limit = await rateLimit(request, { namespace: "audit-snapshot-read", limit: 60, windowMs: 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   const ready = getSnapshotReadiness(request);
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const limit = rateLimit(request, { namespace: "audit-snapshot-save", limit: 20, windowMs: 60 * 60_000 });
+  const limit = await rateLimit(request, { namespace: "audit-snapshot-save", limit: 20, windowMs: 60 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   const ready = getSnapshotReadiness(request);
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const limit = rateLimit(request, { namespace: "audit-snapshot-delete", limit: 8, windowMs: 60 * 60_000 });
+  const limit = await rateLimit(request, { namespace: "audit-snapshot-delete", limit: 8, windowMs: 60 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   const ready = getSnapshotReadiness(request);

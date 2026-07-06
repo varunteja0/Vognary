@@ -12,11 +12,11 @@ const sourceGroups = [
   },
   {
     title: "Apple And Google Play",
-    steps: ["Apple: Settings -> Apple ID -> Subscriptions.", "Google Play: Profile -> Payments and subscriptions -> Subscriptions.", "Add each active app-store subscription manually or paste receipt snippets into Receipt Intelligence."],
+    steps: ["Apple: Settings -> Apple ID -> Subscriptions.", "Google Play: Profile -> Payments and subscriptions -> Subscriptions.", "Add each active app-store subscription manually or paste receipt snippets into the receipts box."],
   },
   {
     title: "Email Receipts",
-    steps: ["Search Gmail or Outlook for invoice, receipt, subscription, renewal, payment successful, trial, monthly, annual.", "Paste useful snippets into Receipt Intelligence.", "When Gmail OAuth is configured, Vognary can read snippets through read-only consent."],
+    steps: ["Search Gmail or Outlook for invoice, receipt, subscription, renewal, payment successful, trial, monthly, annual.", "Paste useful snippets into the receipts box.", "When Gmail OAuth is configured, Vognary can read snippets through read-only consent."],
   },
   {
     title: "Cloud And SaaS",
@@ -37,12 +37,12 @@ export default function SourcesPage() {
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/" className="btn btn-ghost">Back to ledger</Link>
+          <Link href="/" className="btn btn-ghost">Back to app</Link>
         </div>
         <article className="panel p-6 sm:p-8 rise">
-          <span className="folio" data-folio="§ SG">Field kit</span>
-          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-(--ink) sm:text-5xl">Connect every recurring-payment source</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">No app can truthfully see every subscription without source access. Use this checklist to connect live sources first, then add fallback evidence only where providers are still closed.</p>
+          <span className="folio" data-folio="Guide">Source guide</span>
+          <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">How to add recurring-payment sources</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">Start with the sources you can verify. If a provider cannot connect directly yet, add a statement, receipt, or manual entry.</p>
           <div className="mt-8 grid gap-3 md:grid-cols-2">
             {sourceGroups.map((group, index) => (
               <section key={group.title} className="inset p-4" data-reveal style={{ ["--reveal-delay"]: `${index * 60}ms` } as React.CSSProperties}>

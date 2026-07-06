@@ -10,12 +10,12 @@ export default function SecurityPage() {
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/" className="btn btn-ghost">Back to ledger</Link>
+          <Link href="/" className="btn btn-ghost">Back to app</Link>
         </div>
         <article className="panel p-6 sm:p-8 rise">
-          <span className="folio" data-folio="§ T1">Trust</span>
-          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-(--ink) sm:text-5xl">Security model</h1>
-          <p className="mt-3 text-sm leading-7 text-(--muted)">Vognary runs self-serve stateless audits today, then graduates to encrypted persistence only when connected-account sync is enabled.</p>
+          <span className="folio" data-folio="Trust">Security</span>
+          <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">How Vognary handles data</h1>
+          <p className="mt-3 text-sm leading-7 text-(--muted)">Today, the review runs without backend file storage by default. Encrypted account storage is only for signed-in beta users.</p>
           <div className="mt-8 grid gap-3">
             {items.map((item) => (
               <div key={item.title} className="inset p-4">
@@ -31,9 +31,9 @@ export default function SecurityPage() {
 }
 
 const items = [
-  { title: "No credential collection", body: "The product must never collect bank passwords, card PINs, UPI PINs, or netbanking credentials." },
-  { title: "Stateless beta APIs", body: "The current audit, ingestion, and Gmail-preview APIs process request data and return results without database persistence." },
-  { title: "Evidence-first recommendations", body: "Every recommendation must link back to transaction or receipt evidence so users can verify before acting." },
-  { title: "Future encrypted storage", body: "When accounts ship, financial files must be encrypted at rest, access logged, and deletable by users." },
-  { title: "Integration approvals", body: "Gmail, Account Aggregator, UPI, and card-mandate integrations require approved scopes, partner paths, and legal review." },
+  { title: "No passwords or PINs", body: "Vognary never asks for bank passwords, card PINs, UPI PINs, or netbanking credentials." },
+  { title: "No backend file storage by default", body: "The current audit and file-import APIs process request data and return results without storing uploaded financial files." },
+  { title: "Proof before action", body: "Each suggestion links back to transaction or receipt text so users can verify before acting." },
+  { title: "Encrypted account storage", body: "Signed-in beta storage must be encrypted, access logged, and deletable by the user." },
+  { title: "Approved integrations only", body: "Gmail, Account Aggregator, UPI, and card-mandate integrations require approved scopes, partners, and legal review." },
 ];

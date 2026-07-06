@@ -20,7 +20,7 @@ const planEnvVars: Record<PaymentPlan, string> = {
 };
 
 export async function POST(request: NextRequest) {
-  const limit = rateLimit(request, { namespace: "checkout", limit: 30, windowMs: 60_000 });
+  const limit = await rateLimit(request, { namespace: "checkout", limit: 30, windowMs: 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   const body = await request.json().catch(() => null) as { plan?: string; email?: string } | null;

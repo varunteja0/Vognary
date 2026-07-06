@@ -124,25 +124,25 @@ export default function PrivateAuditClient() {
 
         <section className="grid gap-5 lg:grid-cols-[0.92fr_1.08fr]">
           <aside className="dossier spotlight scan p-7 sm:p-9 rise">
-            <span className="folio" data-folio="§ GTM" style={{ color: "var(--dossier-muted)" }}>Private beta</span>
-            <h1 className="mt-5 font-display text-4xl font-bold leading-none tracking-[-0.03em] text-(--dossier-ink) sm:text-6xl">
-              Find the burn<br /><span className="glow-num">renewing quietly.</span>
+            <span className="folio" data-folio="Beta" style={{ color: "var(--dossier-muted)" }}>Private audit</span>
+            <h1 className="mt-5 font-display text-3xl font-bold leading-tight text-(--dossier-ink) sm:text-5xl">
+              Get help reviewing{" "}<br /><span className="glow-num">recurring payments.</span>
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 muted-on-dark">
-              Apply for a private recurring-money audit across SaaS, AI tools, cloud, domains, app stores, UPI AutoPay, card mandates, insurance, EMIs, SIPs, utilities, and receipt emails.
+              Apply for a private review across SaaS, AI tools, cloud, domains, app stores, UPI AutoPay, card mandates, insurance, EMIs, SIPs, utilities, and receipt emails.
             </p>
             <div className="mt-8 grid gap-2.5 sm:grid-cols-3">
-              <Proof label="Beta slots" value="10" />
-              <Proof label="Individual" value="INR 999" />
+              <Proof label="Beta spots" value="10" />
+              <Proof label="Personal" value="INR 999" />
               <Proof label="Founder/team" value="INR 4,999" />
             </div>
             <div className="mt-8 rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
               <h2 className="font-display text-lg font-semibold text-(--dossier-ink)">What you get</h2>
               <ul className="mt-3 space-y-2 text-sm leading-6 muted-on-dark">
-                <li>Monthly recurring burn and annual run-rate.</li>
+                <li>Monthly total and yearly total.</li>
                 <li>Upcoming debits before they hit.</li>
-                <li>Avoidable, watch, cancel, downgrade, and investigate labels.</li>
-                <li>Source coverage score and missing source checklist.</li>
+                <li>Keep, watch, cancel, downgrade, and investigate labels.</li>
+                <li>List of missing sources to check.</li>
                 <li>PDF/CSV report with proof for every recommendation.</li>
               </ul>
             </div>
@@ -153,7 +153,7 @@ export default function PrivateAuditClient() {
           </aside>
 
           <form onSubmit={submit} className="panel p-6 sm:p-8 rise">
-            <span className="folio" data-folio="§ 01">Audit intake</span>
+            <span className="folio" data-folio="01">Audit request</span>
             <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Request a private audit</h2>
             <p className="mt-2 text-sm leading-6 text-(--muted)">Fill this first. I will reply with the safest minimum source to share. You do not need to upload financial documents on this page.</p>
 

@@ -63,6 +63,19 @@ create table users (
   deleted_at timestamptz
 );
 
+create table auth_magic_links (
+  id uuid primary key default gen_random_uuid(),
+  token_hash text unique not null,
+  email text not null,
+  display_name text,
+  workspace_name text,
+  redirect_path text not null default '/',
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
+create index auth_magic_links_expires_idx on auth_magic_links(expires_at);
+
 create table workspaces (
   id uuid primary key default gen_random_uuid(),
   owner_user_id uuid not null references users(id),

@@ -2,15 +2,15 @@ import Link from "next/link";
 import { VognaryMark } from "../brand";
 
 export default function PrivacyPage() {
-  return <TrustPage title="Privacy" intro="Vognary is built for self-serve recurring-payment audits with a data-minimization posture from day one." sections={sections} />;
+  return <TrustPage title="Privacy" intro="Vognary is designed to use the least data needed to review recurring payments." sections={sections} />;
 }
 
 const sections = [
-  ["Current Product", "Statement/PDF ingestion and audit calculations are stateless. The browser workflow and stateless APIs do not persist uploaded financial documents, Gmail tokens, or report outputs."],
-  ["Data Sources", "Users may connect available sources, upload fallback statement exports, paste receipt text, or manually enter recurring commitments. Gmail is only available when read-only OAuth credentials are configured."],
-  ["No Credential Collection", "Vognary does not ask for bank passwords, card numbers, UPI PINs, or netbanking credentials."],
-  ["Future Storage", "When accounts and storage are added, uploaded files must be encrypted at rest, deletable by the user, and access-audited."],
-  ["Connected Account Boundary", "The self-serve audit works without accounts. Connected-account sync requires auth, encryption, reviewed legal terms, and approved integrations before storing financial documents."],
+  ["What happens today", "Statement/PDF import and audit calculations do not store uploaded financial documents, Gmail tokens, or report outputs on a backend by default."],
+  ["Data sources", "You can connect available sources, upload statement exports, paste receipt text, or manually enter recurring payments."],
+  ["No credentials", "Vognary does not ask for bank passwords, card numbers, UPI PINs, or netbanking credentials."],
+  ["Account storage", "When account storage is used, uploaded files must be encrypted, deletable by the user, and access-audited."],
+  ["Connected accounts", "The self-serve review works without an account. Connected-account sync needs auth, encryption, reviewed legal terms, and approved integrations."],
 ];
 
 function TrustPage({ title, intro, sections }: { title: string; intro: string; sections: string[][] }) {
@@ -22,11 +22,11 @@ function TrustPage({ title, intro, sections }: { title: string; intro: string; s
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/" className="btn btn-ghost">Back to ledger</Link>
+          <Link href="/" className="btn btn-ghost">Back to app</Link>
         </div>
         <article className="panel p-6 sm:p-8 rise">
-          <span className="folio" data-folio="§ T2">Trust</span>
-          <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-(--ink) sm:text-5xl">{title}</h1>
+          <span className="folio" data-folio="Trust">Privacy</span>
+          <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">{title}</h1>
           <p className="mt-3 text-sm leading-7 text-(--muted)">{intro}</p>
           <div className="mt-8 grid gap-5">
             {sections.map(([heading, body]) => (

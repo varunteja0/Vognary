@@ -11,7 +11,9 @@ Copy `.env.example` to `.env.local` for local configuration. The app stays funct
 - `WAITLIST_WEBHOOK_URL` for persisted launch/audit requests.
 - `PAYMENT_LINK_*` for paid checkout links.
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` for Gmail read-only receipt discovery.
-- `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, and `SESSION_SECRET` for the future persistent connected-account backend.
+- `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `SESSION_SECRET`, and either Google auth or `PRIVATE_BETA_ACCESS_CODE` for private beta login and encrypted workspace snapshots.
+- `GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`, and `GOOGLE_AUTH_REDIRECT_URI` for Google sign-in. This uses basic identity scopes and is separate from Gmail receipt access.
+- `INTERNAL_SYNC_SECRET` for internal sync job APIs.
 
 ### Health Check
 
@@ -134,6 +136,28 @@ curl http://localhost:3000/api/workspaces
 
 The server has signed session-cookie primitives and workspace membership checks. `SESSION_SECRET` enables session verification, and `DATABASE_URL` enables workspace lookup. This is not a complete login product by itself; production still needs an identity provider, SSO, or magic-link email delivery to mint signed session cookies.
 
+### Private Beta Login And Encrypted Snapshots
+
+```bash
+curl -X POST http://localhost:3000/api/auth/login \
+	-H 'Content-Type: application/json' \
+	-d '{"email":"founder@example.com","accessCode":"<PRIVATE_BETA_ACCESS_CODE>"}'
+
+curl http://localhost:3000/api/workspaces/current/audit-snapshot
+```
+
+The `/login` page can mint signed private-beta sessions when `SESSION_SECRET`, `DATABASE_URL`, and `PRIVATE_BETA_ACCESS_CODE` are configured. Signed-in beta users can save/load/delete encrypted workspace snapshots when `TOKEN_ENCRYPTION_KEY` is configured and the PostgreSQL schema is applied.
+
+Google sign-in is also supported through `/api/auth/google/start` and `/api/auth/google/callback` when `GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`, and `GOOGLE_AUTH_REDIRECT_URI` are configured.
+
+Use the private beta activation check after deployment:
+
+```bash
+npm run production:check -- https://www.vognary.com --beta
+```
+
+`--strict` is intentionally broader and should fail until payments, Gmail OAuth, identity provider, Redis rate limiting, monitoring, backups, and partner rails are actually configured.
+
 ## Hosted Deployment
 
 Recommended first hosted options:
@@ -141,6 +165,8 @@ Recommended first hosted options:
 - Vercel for fastest web deployment.
 - Render/Fly/Railway if using the Dockerfile.
 - AWS/Azure/GCP only after backend storage and compliance requirements are clear.
+
+See [production-beta-setup.md](production-beta-setup.md) for click-by-click private beta setup.
 
 ## Production Boundary
 
