@@ -1,11 +1,11 @@
 import type { CSSProperties } from "react";
 
 /**
- * Vognary identity — "The Resolve".
- * A geometric V whose strokes converge into a single gold node: every
- * recurring charge, brought to one clear verdict. Gold = money / decision.
- * The V uses `currentColor` so it inherits the surrounding text colour;
- * the node is the brand's constant champagne gold.
+ * Vognary identity — "The Convergence".
+ * Two platinum strokes funnel down and resolve into a single faceted gold
+ * diamond — every recurring charge brought to one decision. Gold = money and
+ * the verdict; the diamond = value resolved. The strokes use `currentColor` so
+ * the mark inherits the surrounding text colour; the node stays gold.
  */
 
 const GOLD = "#d8b87a";
@@ -17,12 +17,14 @@ export function VognaryMark({
   className,
   style,
   animated = false,
+  mono = false,
 }: {
   size?: number;
   title?: string;
   className?: string;
   style?: CSSProperties;
   animated?: boolean;
+  mono?: boolean;
 }) {
   return (
     <svg
@@ -37,15 +39,21 @@ export function VognaryMark({
       aria-hidden={title ? undefined : true}
     >
       <path
-        d="M13 14 24 34 35 14"
+        d="M11.5 13.5 21.7 29.6"
         pathLength={1}
         stroke="currentColor"
-        strokeWidth={5.6}
+        strokeWidth={5}
         strokeLinecap="round"
-        strokeLinejoin="round"
       />
-      <circle cx="24" cy="34" r="4" fill={GOLD} />
-      <circle cx="22.6" cy="32.7" r="1.15" fill={GOLD_HIGHLIGHT} />
+      <path
+        d="M36.5 13.5 26.3 29.6"
+        pathLength={1}
+        stroke="currentColor"
+        strokeWidth={5}
+        strokeLinecap="round"
+      />
+      <path d="M24 26 29.4 31.8 24 37.6 18.6 31.8Z" fill={mono ? "currentColor" : GOLD} />
+      <path d="M24 26 29.4 31.8 18.6 31.8Z" fill={mono ? "currentColor" : GOLD_HIGHLIGHT} />
     </svg>
   );
 }

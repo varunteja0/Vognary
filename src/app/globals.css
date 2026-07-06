@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
-  VOGNARY — "PRIVATE LEDGER"  (graphite & gold, v1.1)
+  VOGNARY — "PRIVATE LEDGER"  (graphite & gold, v1.2 — Convergence mark)
   A premium financial instrument: cool graphite, hairline structure, and a
   single champagne-gold accent for money and action. Desaturated verdict
   colours, exact edges, quiet motion. Legacy token names are re-pointed so
@@ -660,11 +660,12 @@ textarea.field {
 .seg-investigate { background: color-mix(in srgb, var(--ink-soft) 30%, #0c111a); box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.08); }
 
 /* Logo draw-in — the V resolves into its gold node */
-.mark-draw path {
+.mark-draw path[stroke] {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
   animation: mark-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.15s forwards;
 }
+.mark-draw path:not([stroke]),
 .mark-draw circle {
   opacity: 0;
   transform-box: fill-box;
