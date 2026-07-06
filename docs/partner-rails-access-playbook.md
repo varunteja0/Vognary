@@ -2,6 +2,8 @@
 
 Use this to pursue Account Aggregator, UPI AutoPay, and card e-mandate access without overclaiming live coverage.
 
+For exact emails, LinkedIn notes, follow-ups, objections, and call scripts, use [docs/partner-rails-founder-comms.md](partner-rails-founder-comms.md).
+
 ## Current Truth
 
 Vognary already supports manual/fallback evidence for mandates and recurring payments. Direct AA/UPI/card mandate sync is not self-serve. It needs written partner approval, sandbox credentials, legal/compliance review, and production credentials before any public claim.
