@@ -380,24 +380,34 @@ These cannot be completed in code alone. They need business and regulatory acces
 
 Account Aggregator path:
 
-1. Shortlist FIU/TSP providers in India.
-2. Ask for sandbox access for account statement data.
-3. Confirm permitted use case: recurring payment audit / personal finance insight.
-4. Sign DPA and compliance paperwork.
-5. Get sandbox credentials.
-6. Build sandbox adapter.
-7. Submit security review.
-8. Move to production credentials.
+1. Open [docs/partner-rails-access-playbook.md](partner-rails-access-playbook.md).
+2. Fill [docs/partner-rails-outreach-tracker.csv](partner-rails-outreach-tracker.csv) with real contact URLs or emails.
+3. Shortlist FIU/TSP providers in India.
+4. Ask for sandbox access for account statement data.
+5. Confirm permitted use case: recurring payment audit / personal finance insight.
+6. Sign DPA and compliance paperwork.
+7. Get sandbox credentials.
+8. Build sandbox adapter.
+9. Submit security review.
+10. Move to production credentials.
 
 UPI/card mandate path:
 
-1. Shortlist PSPs/payment aggregators/issuers.
-2. Ask for mandate visibility APIs, not only merchant collection APIs.
-3. Confirm if they expose active mandate, next debit, amount, merchant, and cancel/modify status.
-4. Sign partner agreement.
-5. Get sandbox credentials.
-6. Build mandate adapter.
-7. Run legal review for cancellation/modify flows.
+1. Open [docs/partner-rails-access-playbook.md](partner-rails-access-playbook.md).
+2. Shortlist PSPs/payment aggregators/issuers.
+3. Ask for mandate visibility APIs, not only merchant collection APIs.
+4. Confirm if they expose active mandate, next debit, amount, merchant, and cancel/modify status.
+5. Sign partner agreement.
+6. Get sandbox credentials.
+7. Build mandate adapter.
+8. Run legal review for cancellation/modify flows.
+
+Status env rule:
+
+- `outreach-started` means email/contact form sent.
+- `sandbox-requested` means partner acknowledged and requested onboarding material.
+- `sandbox-approved` means sandbox credentials or invitation exists.
+- `production-live` means signed production access, approved consent, production credentials, and at least one production consent test. Strict production only passes when Account Aggregator, UPI, and card mandate statuses are all `production-live`.
 
 Stop condition:
 

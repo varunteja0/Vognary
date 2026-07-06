@@ -94,9 +94,9 @@ const groups = [
   {
     id: "partner-rails",
     label: "AA / UPI / card mandate partner rails",
-    requiredAny: ["ACCOUNT_AGGREGATOR_PARTNER_STATUS", "UPI_MANDATE_PARTNER_STATUS", "CARD_MANDATE_PARTNER_STATUS"],
+    required: ["ACCOUNT_AGGREGATOR_PARTNER_STATUS", "UPI_MANDATE_PARTNER_STATUS", "CARD_MANDATE_PARTNER_STATUS"],
     probe: isPartnerRailsReady,
-    why: "Required for regulated real-time mandate and bank data access.",
+    why: "Required for regulated real-time mandate and bank data access. Strict readiness requires all three statuses to be production-live.",
   },
 ];
 
@@ -385,7 +385,7 @@ function isBackupStorageReady({ endpointPayloads }) {
 
 function isPartnerRailsReady({ endpointPayloads }) {
   const status = endpointPayloads.readiness?.hardening?.partnerRails;
-  return typeof status === "string" ? status === "partner-status-recorded" : undefined;
+  return typeof status === "string" ? status === "production-live" : undefined;
 }
 
 function getEndpoint(context, id) {

@@ -50,7 +50,8 @@ export async function GET() {
       monitoring: getMonitoringStatus(monitoringBackend),
       backups: getBackupStatus(),
       identityProvider: getIdentityProviderStatus(magicLink, googleAuth),
-      partnerRails: process.env.ACCOUNT_AGGREGATOR_PARTNER_STATUS || process.env.UPI_MANDATE_PARTNER_STATUS || process.env.CARD_MANDATE_PARTNER_STATUS ? "partner-status-recorded" : "not-configured",
+      partnerRails: getPartnerRailsStatus(),
+      partnerRailStatuses: getPartnerRailStatuses(),
       sessionCookies: session.status,
       workspaceAuthorization: database.status === "ready" && session.status === "ready" ? "primitives-ready-no-login" : "not-ready",
       persistentTokenVault: tokenVault.status,
@@ -100,4 +101,26 @@ function getLeadPersistenceStatus() {
   if (isLeadDatabaseConfigured()) return "configured-database";
   if (process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL) return "configured-webhook";
   return "not-configured";
+}
+
+function getPartnerRailsStatus() {
+  const statuses = Object.values(getPartnerRailStatuses()).filter(Boolean);
+  if (!statuses.length) return "not-configured";
+  if (statuses.every((status) => status === "production-live")) return "production-live";
+  if (statuses.every((status) => status === "sandbox-approved" || status === "production-live")) return "sandbox-approved";
+  if (statuses.some((status) => status === "sandbox-requested" || status === "sandbox-approved" || status === "production-live")) return "in-progress";
+  return "outreach-started";
+}
+
+function getPartnerRailStatuses() {
+  return {
+    accountAggregator: normalizePartnerRailStatus(process.env.ACCOUNT_AGGREGATOR_PARTNER_STATUS),
+    upiMandates: normalizePartnerRailStatus(process.env.UPI_MANDATE_PARTNER_STATUS),
+    cardMandates: normalizePartnerRailStatus(process.env.CARD_MANDATE_PARTNER_STATUS),
+  };
+}
+
+function normalizePartnerRailStatus(value: string | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  return normalized || null;
 }

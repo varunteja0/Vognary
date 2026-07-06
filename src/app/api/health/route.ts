@@ -63,8 +63,9 @@ export function GET() {
       persistentStorage: "not-configured",
       gmailReceipts: process.env.GOOGLE_CLIENT_ID ? "configured" : "not-configured",
       cloudSaasConnectors: "planned-with-contracts",
-      accountAggregator: "not-configured",
-      upiMandates: "not-configured",
+      accountAggregator: normalizePartnerRailStatus(process.env.ACCOUNT_AGGREGATOR_PARTNER_STATUS) ?? "not-configured",
+      upiMandates: normalizePartnerRailStatus(process.env.UPI_MANDATE_PARTNER_STATUS) ?? "not-configured",
+      cardMandates: normalizePartnerRailStatus(process.env.CARD_MANDATE_PARTNER_STATUS) ?? "not-configured",
     },
     connectorSyncSummary,
     productionBoundary: "Ready for stateless audits and connector readiness planning. Persistent connected-account sync requires auth, encrypted token storage, privacy/legal review, and approved provider integrations.",
@@ -108,4 +109,9 @@ function getLeadPersistenceStatus() {
   if (isLeadDatabaseConfigured()) return "configured-database";
   if (process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL) return "configured-webhook";
   return "not-configured";
+}
+
+function normalizePartnerRailStatus(value: string | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  return normalized || null;
 }

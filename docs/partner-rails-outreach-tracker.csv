@@ -1,0 +1,13 @@
+rail,provider,provider_type,contact_url_or_email,status,next_action,owner,notes
+account_aggregator,Setu / Pine Labs,TSP / open-finance,to-be-filled,outreach-started,Send sandbox access email,Varun,Verify current AA/TSP offering and FIU partner route
+account_aggregator,FinBox,TSP / open-finance,to-be-filled,outreach-started,Send sandbox access email,Varun,Ask for consented statement data for recurring audit
+account_aggregator,Decentro,TSP / open-finance,to-be-filled,outreach-started,Send sandbox access email,Varun,Ask for AA/FIU enablement or partner route
+account_aggregator,Perfios,TSP / open-finance,to-be-filled,outreach-started,Send sandbox access email,Varun,Ask for sandbox and compliance requirements
+upi_mandates,Razorpay,Payment aggregator,to-be-filled,outreach-started,Ask mandate visibility question,Varun,Clarify merchant-side vs user-wide mandate visibility
+upi_mandates,Cashfree,Payment aggregator,to-be-filled,outreach-started,Ask mandate visibility question,Varun,Clarify UPI AutoPay read APIs and merchant scope
+upi_mandates,Juspay,Payments infrastructure,to-be-filled,outreach-started,Ask PSP/mandate data route,Varun,Ask for bank/PSP partner route
+upi_mandates,PhonePe,UPI / PSP,to-be-filled,outreach-started,Ask partner access route,Varun,Ask if user-authorized mandate visibility exists
+card_mandates,Razorpay,Payment aggregator,to-be-filled,outreach-started,Ask card e-mandate visibility question,Varun,Clarify merchant-only versus issuer/network visibility
+card_mandates,Cashfree,Payment aggregator,to-be-filled,outreach-started,Ask card mandate visibility question,Varun,Ask for recurring/card mandate data fields
+card_mandates,PayU,Payment aggregator,to-be-filled,outreach-started,Ask card mandate visibility question,Varun,Ask sandbox and recurring payments metadata
+card_mandates,Juspay,Payments infrastructure,to-be-filled,outreach-started,Ask issuer/processor route,Varun,Ask for card e-mandate evidence access
