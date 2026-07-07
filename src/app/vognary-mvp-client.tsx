@@ -792,128 +792,142 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
     <main id="ledger-main" className="relative px-4 pb-12 pt-4 text-foreground sm:px-6 lg:px-8">
       <GlobalNotice notice={notice} onDismiss={() => setNotice(null)} />
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        {/* Instrument bar — live money tape */}
-        <div className="sticky top-3 z-30 rise">
+        {/* Command header — live money tape + sticky section index */}
+        <div className="sticky top-3 z-30 flex flex-col gap-2 rise">
           <div className="dossier glass tape flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3 sm:px-5">
-            <div className="flex items-center gap-2.5">
+            <a href="#ledger-main" className="flex items-center gap-2.5 rounded-lg transition hover:opacity-90" aria-label="Vognary — back to top">
               <VognaryMark size={32} className="text-(--dossier-ink)" animated />
               <div className="leading-tight">
                 <p className="font-display text-lg font-semibold tracking-[-0.02em] text-(--dossier-ink)">Vognary</p>
                 <p className="eyebrow muted-on-dark" style={{ fontSize: "0.58rem" }}>Recurring payments, reviewed</p>
               </div>
-            </div>
+            </a>
             <div className="hidden h-8 w-px bg-(--dossier-line) lg:block" />
-            <div className="flex flex-1 flex-wrap items-center gap-x-6 gap-y-2">
+            <div className="hidden flex-1 flex-wrap items-center gap-x-6 gap-y-2 lg:flex">
               <TickerStat label="Monthly total" value={formatCurrency(audit.summary.monthlyRecurringSpend)} tone="ember" />
               <TickerStat label="Yearly total" value={formatCurrency(audit.summary.annualRecurringSpend)} tone="paper" />
               <TickerStat label="Needs review" value={formatCurrency(audit.summary.reviewableMonthlySpend)} tone="ochre" />
               <TickerStat label="Renewals in 10d" value={`${audit.summary.renewalsNextTenDays}`} tone="paper" />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-auto">
               <span className="live-dot" aria-hidden />
               <span className="eyebrow muted-on-dark" style={{ fontSize: "0.58rem" }}>On this device</span>
               <a href="/profile" className="btn btn-ondark h-9 px-3 text-xs">Profile</a>
             </div>
           </div>
+          <WorkspaceNav activeId={activeSection} />
         </div>
 
-        <IntegrationCommandCenter
-          audit={audit}
-          connectorStartResults={connectorStartResults}
-          connectingConnectorId={connectingConnectorId}
-          syncingConnectorId={syncingConnectorId}
-          connectedConnectorIds={connectedConnectorIds}
-          selectedConnectorId={selectedConnectorId}
-          serverSession={serverSession}
-          serverConnectors={serverConnectors}
-          apiKeyDraft={connectorApiKeyDraft}
-          accountDraft={connectorAccountDraft}
-          onSelectedConnector={setSelectedConnectorId}
-          onApiKeyDraftChange={setConnectorApiKeyDraft}
-          onAccountDraftChange={setConnectorAccountDraft}
-          onStartConnector={startConnector}
-          onDisconnectConnector={disconnectConnector}
-          onRunConnectorSync={runConnectorSyncNow}
-          onImportConnectorEvidence={importConnectorEvidence}
-          onRefreshWorkspaceConnectors={refreshWorkspaceConnectors}
-          onJumpToLedger={() => selectAndReviewItem()}
-          onExportReport={exportReport}
-          onClearWorkspace={clearWorkspace}
-        />
-
-        <FirstSuccessPanel
-          audit={audit}
-          coverageScore={coverageScore}
-          experienceMode={experienceMode}
-          hasRealData={hasRealData}
-          localSaveEnabled={localSaveEnabled}
-          receiptText={receiptText}
-          signedIn={Boolean(serverSession?.authenticated)}
-          onExportReport={exportReport}
-          onImportFiles={importStatementFiles}
-          onJumpToLedger={() => selectAndReviewItem()}
-          onLoadDemoWorkspace={loadDemoWorkspace}
-          onReceiptTextChange={setReceiptText}
-          onSaveLocal={enableLocalSave}
-        />
-
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-reveal>
-          <Metric label="Monthly recurring" value={formatCurrency(audit.summary.monthlyRecurringSpend)} tone="ink" />
-          <Metric label="Yearly total" value={formatCurrency(audit.summary.annualRecurringSpend)} tone="blue" />
-          <Metric label="Needs review" value={formatCurrency(audit.summary.reviewableMonthlySpend)} tone="caution" />
-          <Metric label="Renewing in 10 days" value={`${audit.summary.renewalsNextTenDays}`} tone="accent" />
-        </section>
-
-        <section className="grid gap-5 xl:grid-cols-[1.12fr_0.88fr]" data-reveal>
-          <RecurringGraph
+        {/* 01 · Connect evidence */}
+        <section id="connect" className="flex scroll-mt-36 flex-col gap-5">
+          <StageHeader folio="01" title="Connect evidence" note="Bring receipts, statements, and provider sources into one workspace." />
+          <IntegrationCommandCenter
             audit={audit}
-            hasRealData={hasRealData}
-            selectedItem={selectedItem}
-            userActions={userActions}
-            onSelect={setSelectedItemId}
+            connectorStartResults={connectorStartResults}
+            connectingConnectorId={connectingConnectorId}
+            syncingConnectorId={syncingConnectorId}
+            connectedConnectorIds={connectedConnectorIds}
+            selectedConnectorId={selectedConnectorId}
+            serverSession={serverSession}
+            serverConnectors={serverConnectors}
+            apiKeyDraft={connectorApiKeyDraft}
+            accountDraft={connectorAccountDraft}
+            onSelectedConnector={setSelectedConnectorId}
+            onApiKeyDraftChange={setConnectorApiKeyDraft}
+            onAccountDraftChange={setConnectorAccountDraft}
+            onStartConnector={startConnector}
+            onDisconnectConnector={disconnectConnector}
+            onRunConnectorSync={runConnectorSyncNow}
+            onImportConnectorEvidence={importConnectorEvidence}
+            onRefreshWorkspaceConnectors={refreshWorkspaceConnectors}
+            onJumpToLedger={() => selectAndReviewItem()}
+            onExportReport={exportReport}
+            onClearWorkspace={clearWorkspace}
           />
-          <div className="flex flex-col gap-5">
-            <SpendSpectrum audit={audit} userActions={userActions} onSelect={setSelectedItemId} />
-            <PriorityActionPanel priorityItems={priorityItems} userActions={userActions} onSelect={setSelectedItemId} />
-          </div>
+          <FirstSuccessPanel
+            audit={audit}
+            coverageScore={coverageScore}
+            experienceMode={experienceMode}
+            hasRealData={hasRealData}
+            localSaveEnabled={localSaveEnabled}
+            receiptText={receiptText}
+            signedIn={Boolean(serverSession?.authenticated)}
+            onExportReport={exportReport}
+            onImportFiles={importStatementFiles}
+            onJumpToLedger={() => selectAndReviewItem()}
+            onLoadDemoWorkspace={loadDemoWorkspace}
+            onReceiptTextChange={setReceiptText}
+            onSaveLocal={enableLocalSave}
+          />
         </section>
 
-        {selectedItem ? (
-          <SelectedItemPanel
-            item={selectedItem}
-            action={userActions[selectedItem.id] ?? selectedItem.recommendationType}
-            onAction={(action) => setUserActions((current) => ({ ...current, [selectedItem.id]: action }))}
+        {/* 02 · Recurring ledger */}
+        <section id="ledger" className="flex scroll-mt-36 flex-col gap-5">
+          <StageHeader folio="02" title="Recurring ledger" note="Every detected item with proof, cadence, and a decision." />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-reveal>
+            <Metric label="Monthly recurring" value={formatCurrency(audit.summary.monthlyRecurringSpend)} tone="ink" />
+            <Metric label="Yearly total" value={formatCurrency(audit.summary.annualRecurringSpend)} tone="blue" />
+            <Metric label="Needs review" value={formatCurrency(audit.summary.reviewableMonthlySpend)} tone="caution" />
+            <Metric label="Renewing in 10 days" value={`${audit.summary.renewalsNextTenDays}`} tone="accent" />
+          </div>
+          <div className="grid gap-5 xl:grid-cols-[1.12fr_0.88fr]" data-reveal>
+            <RecurringGraph
+              audit={audit}
+              hasRealData={hasRealData}
+              selectedItem={selectedItem}
+              userActions={userActions}
+              onSelect={setSelectedItemId}
+            />
+            <div className="flex flex-col gap-5">
+              <SpendSpectrum audit={audit} userActions={userActions} onSelect={setSelectedItemId} />
+              <PriorityActionPanel priorityItems={priorityItems} userActions={userActions} onSelect={setSelectedItemId} />
+            </div>
+          </div>
+          {selectedItem ? (
+            <SelectedItemPanel
+              item={selectedItem}
+              action={userActions[selectedItem.id] ?? selectedItem.recommendationType}
+              onAction={(action) => setUserActions((current) => ({ ...current, [selectedItem.id]: action }))}
+            />
+          ) : null}
+        </section>
+
+        {/* 03 · Monthly review */}
+        <section id="review" className="flex scroll-mt-36 flex-col gap-5">
+          <StageHeader folio="03" title="Monthly review" note="Assign owners, capture notes, and close the review." />
+          <TeamReviewPanel
+            audit={audit}
+            teamMembers={teamMembers}
+            memberDraft={memberDraft}
+            itemOwners={itemOwners}
+            reviewNotes={reviewNotes}
+            reviewCompletedAt={reviewCompletedAt}
+            onMemberDraft={setMemberDraft}
+            onAddTeamMember={addTeamMember}
+            onRemoveTeamMember={removeTeamMember}
+            onItemOwner={(itemId, ownerId) => setItemOwners((current) => ({ ...current, [itemId]: ownerId }))}
+            onReviewNote={(itemId, note) => setReviewNotes((current) => ({ ...current, [itemId]: note }))}
+            onCompleteReview={markMonthlyReviewComplete}
           />
-        ) : null}
+        </section>
 
-        <TeamReviewPanel
-          audit={audit}
-          teamMembers={teamMembers}
-          memberDraft={memberDraft}
-          itemOwners={itemOwners}
-          reviewNotes={reviewNotes}
-          reviewCompletedAt={reviewCompletedAt}
-          onMemberDraft={setMemberDraft}
-          onAddTeamMember={addTeamMember}
-          onRemoveTeamMember={removeTeamMember}
-          onItemOwner={(itemId, ownerId) => setItemOwners((current) => ({ ...current, [itemId]: ownerId }))}
-          onReviewNote={(itemId, note) => setReviewNotes((current) => ({ ...current, [itemId]: note }))}
-          onCompleteReview={markMonthlyReviewComplete}
-        />
-
-        <ReadinessPanel />
-        <UserControlPanel
-          coverageScore={coverageScore}
-          coverageSignals={coverageSignals}
-          localSaveEnabled={localSaveEnabled}
-          serverSession={serverSession}
-          serverSaveStatus={serverSaveStatus}
-          onEnableLocalSave={enableLocalSave}
-          onDisableLocalSave={disableLocalSave}
-          onSaveServerWorkspace={saveServerWorkspace}
-          onLoadServerWorkspace={loadServerWorkspace}
-          onDeleteServerWorkspace={deleteServerWorkspace}
-        />
+        {/* 04 · Data & readiness */}
+        <section id="data" className="flex scroll-mt-36 flex-col gap-5">
+          <StageHeader folio="04" title="Data & readiness" note="Control where data lives and what is already live." />
+          <ReadinessPanel />
+          <UserControlPanel
+            coverageScore={coverageScore}
+            coverageSignals={coverageSignals}
+            localSaveEnabled={localSaveEnabled}
+            serverSession={serverSession}
+            serverSaveStatus={serverSaveStatus}
+            onEnableLocalSave={enableLocalSave}
+            onDisableLocalSave={disableLocalSave}
+            onSaveServerWorkspace={saveServerWorkspace}
+            onLoadServerWorkspace={loadServerWorkspace}
+            onDeleteServerWorkspace={deleteServerWorkspace}
+          />
+        </section>
         <footer className="panel flex flex-col items-center gap-3 px-5 py-5 text-center" data-reveal>
           <div className="flex items-center gap-2.5">
             <VognaryMark size={22} className="text-(--ink)" />
@@ -1002,7 +1016,7 @@ function StageHeader({ folio, title, note }: { folio: string; title: string; not
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4" data-reveal>
       <span className="folio shrink-0" data-folio={folio}>{title}</span>
-      <span className="hidden h-px flex-1 bg-(--line) sm:block" aria-hidden />
+      <span className="hidden h-px flex-1 bg-line sm:block" aria-hidden />
       {note ? <p className="text-xs leading-5 text-(--muted) sm:max-w-sm sm:text-right">{note}</p> : null}
     </div>
   );
@@ -1072,7 +1086,7 @@ function IntegrationCommandCenter({
     <section className="dossier spotlight scan p-5 sm:p-6" data-reveal onMouseMove={trackSpotlightPointer}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <span className="folio" data-folio="Hub" style={{ color: "var(--dossier-muted)" }}>Connections</span>
+          <span className="folio" data-folio="1.1" style={{ color: "var(--dossier-muted)" }}>Connections</span>
           <h1 className="mt-3 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-4xl">Connect proof. Reveal renewals.</h1>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1201,7 +1215,7 @@ function FirstSuccessPanel({
     <section id="first-success" className="panel p-5 sm:p-6" data-reveal>
       <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
         <div>
-          <span className="folio" data-folio="Start">First successful audit</span>
+          <span className="folio" data-folio="1.2">First successful audit</span>
           <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Reach the useful ledger before login friction.</h2>
           <p className="mt-2 text-sm leading-6 text-(--muted)">{modeCopy}</p>
           <div className="mt-5 grid gap-2 sm:grid-cols-4">
@@ -1407,7 +1421,7 @@ function UserControlPanel({
       </div>
 
       <div className="panel p-5 sm:p-6">
-        <SectionHead folio="02" kicker="Your data" title="Control where your data is saved" desc="By default Vognary keeps this review in your browser. Signed-in beta users can also save an encrypted snapshot." />
+        <SectionHead folio="4.2" kicker="Your data" title="Control where your data is saved" desc="By default Vognary keeps this review in your browser. Signed-in beta users can also save an encrypted snapshot." />
         <div className="mt-4 flex flex-wrap gap-2">
           {localSaveEnabled ? (
             <button type="button" onClick={onDisableLocalSave} className="btn btn-ghost" style={{ borderColor: "var(--ember)", color: "var(--ember)" }}>
@@ -1458,10 +1472,10 @@ function RecurringGraph({
   onSelect: (id: string) => void;
 }) {
   return (
-    <section id="recurring-ledger" className="panel scroll-mt-24 overflow-hidden">
+    <section id="recurring-ledger" className="panel scroll-mt-36 overflow-hidden">
       <div className="flex flex-col gap-2 border-b border-line px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <span className="folio" data-folio="07">Results</span>
+          <span className="folio" data-folio="2.1">Results</span>
           <h2 className="mt-2 font-display text-xl font-semibold text-(--ink)">Recurring payments found</h2>
           <p className="mt-1 text-sm text-(--muted)">{audit.summary.recurringCount} recurring items from {audit.summary.transactionCount} debit transactions.</p>
         </div>
@@ -1523,7 +1537,7 @@ function PriorityActionPanel({
 }) {
   return (
     <section className="panel p-5 sm:p-6">
-      <SectionHead folio="08" kicker="Priority" title="What to review first" desc="Start with these before the next billing cycle." />
+      <SectionHead folio="2.3" kicker="Priority" title="What to review first" desc="Start with these before the next billing cycle." />
       <div className="mt-4 grid gap-2">
         {priorityItems.length ? priorityItems.map((item) => {
           const action = userActions[item.id] ?? item.recommendationType;
@@ -1550,7 +1564,7 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
   return (
     <section className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
       <div className="dossier p-6">
-        <span className="folio" data-folio="10" style={{ color: "var(--dossier-muted)" }}>Selected item</span>
+        <span className="folio" data-folio="2.4" style={{ color: "var(--dossier-muted)" }}>Selected item</span>
         <h2 className="mt-4 font-display text-2xl font-semibold text-(--dossier-ink)">{item.merchant}</h2>
         <p className="mt-2 text-sm leading-6 muted-on-dark">{item.recommendationReason}</p>
         <div className="mt-5 grid grid-cols-2 gap-2.5">
@@ -1583,7 +1597,7 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
       </div>
 
       <div className="panel p-5 sm:p-6">
-        <SectionHead folio="10" kicker="Proof" title="Where this came from" desc="Each suggestion links back to transaction or receipt text." right={<span className="pill pill-partial">{item.sourceNames.join(", ")}</span>} />
+        <SectionHead folio="2.4" kicker="Proof" title="Where this came from" desc="Each suggestion links back to transaction or receipt text." right={<span className="pill pill-partial">{item.sourceNames.join(", ")}</span>} />
         <div className="mt-4 overflow-hidden rounded-[11px] border border-line">
           <table className="w-full border-separate border-spacing-0 text-left text-sm">
             <thead>
@@ -1651,7 +1665,7 @@ function TeamReviewPanel({
   return (
     <section className="panel p-5 sm:p-6" data-reveal>
       <SectionHead
-        folio="11"
+        folio="3.1"
         kicker="Review"
         title="Monthly review"
         desc="Assign payments to owners, record notes, and close the monthly review."
@@ -1720,7 +1734,7 @@ function ReadinessPanel() {
   return (
     <section className="panel p-5 sm:p-6" data-reveal>
       <SectionHead
-        folio="12"
+        folio="4.1"
         kicker="Readiness"
         title="What works now"
         desc="What works today and which connected features still need setup or partners."
@@ -1750,7 +1764,7 @@ function SpendSpectrum({ audit, userActions, onSelect }: { audit: AuditResult; u
   return (
     <section className="panel p-5 sm:p-6">
       <SectionHead
-        folio="06"
+        folio="2.2"
         kicker="Spend"
         title="Spend by merchant"
         desc="Shows which recurring payments cost the most each month."
