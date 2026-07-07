@@ -26,15 +26,15 @@ const openAiCostsUrl = "https://api.openai.com/v1/organization/costs";
 export const openAiCostsAdapter: ConnectorAdapter = {
   id: "openai-costs",
   async connect(connection) {
-    getOpenAiAdminKey();
+    getOpenAiAdminKey(connection);
     return {
       ...connection,
-      accessRef: "env:OPENAI_ADMIN_API_KEY",
+      accessRef: connection.accessRef ?? (connection.apiKey ? "vault:api_key" : "env:OPENAI_ADMIN_API_KEY"),
       scopes: connection.scopes.length ? connection.scopes : ["organization:costs:read"],
     };
   },
   async sync(connection) {
-    const apiKey = getOpenAiAdminKey();
+    const apiKey = getOpenAiAdminKey(connection);
     const url = new URL(openAiCostsUrl);
     const endTime = Math.floor(Date.now() / 1000);
     const startTime = endTime - 30 * 24 * 60 * 60;
@@ -90,8 +90,8 @@ function normalizeOpenAiCostEvidence(payload: OpenAICostsResponse, connection: C
   return evidence;
 }
 
-function getOpenAiAdminKey() {
-  const apiKey = process.env.OPENAI_ADMIN_API_KEY?.trim();
+function getOpenAiAdminKey(connection?: ConnectorConnection) {
+  const apiKey = connection?.apiKey?.trim() || process.env.OPENAI_ADMIN_API_KEY?.trim();
   if (!apiKey) throw new Error("OPENAI_ADMIN_API_KEY is not configured.");
   return apiKey;
 }

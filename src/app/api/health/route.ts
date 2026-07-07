@@ -56,6 +56,7 @@ export function GET() {
       realtimeCapableTargets: connectorSyncSummary.realtimeCapable,
       tokenVault: tokenVault.status,
       syncScheduler: process.env.INTERNAL_SYNC_SECRET ? "internal-api-configured" : "ready-needs-internal-secret",
+      syncWorkers: getSyncWorkerStatus(),
       internalSyncJobApi: process.env.INTERNAL_SYNC_SECRET ? "configured" : "ready-needs-secret",
       webhookIngestion: process.env.CONNECTOR_WEBHOOK_SECRET ? "configured" : "ready-needs-secret",
       connectorTokenStore: isDatabaseConfigured() && tokenVault.status === "ready" ? "configured" : "not-configured",
@@ -109,6 +110,11 @@ function getLeadPersistenceStatus() {
   if (isLeadDatabaseConfigured()) return "configured-database";
   if (process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL) return "configured-webhook";
   return "not-configured";
+}
+
+function getSyncWorkerStatus() {
+  if (process.env.CRON_SECRET) return "vercel-cron-configured";
+  return "cron-route-ready-needs-secret";
 }
 
 function normalizePartnerRailStatus(value: string | undefined) {

@@ -16,6 +16,28 @@ const statusClass: Record<ConnectorStatus, string> = {
   planned: "pill pill-planned",
 };
 
+const statusMeaning: Record<ConnectorStatus, string> = {
+  live: "Usable now through live product paths, manual evidence, or fallback import.",
+  "ready-with-env": "Code path exists, but production credentials, verification, or workspace token capture is still required.",
+  "partner-required": "Needs a provider, issuer, PSP, network, bank, or regulated partner before direct sync can be claimed.",
+  planned: "Modeled as a target contract. It stays planned until an adapter and first authorized sync are proven.",
+};
+
+const launchWaves = [
+  { title: "Prove now", body: "Private audit, statement import, receipt snippets, manual mandates, saved beta snapshots, and source coverage review." },
+  { title: "Connect next", body: "Gmail receipt sync and OpenAI organization costs, because both have concrete code paths and official access patterns." },
+  { title: "Scale after proof", body: "AWS, GitHub/Copilot, Cloudflare, Vercel, Render, domains, and team SaaS after sandbox credentials prove first sync." },
+  { title: "Partner rails", body: "Account Aggregator, UPI AutoPay, card e-mandates, and bank/issuer pilots only after legal and partner approval." },
+];
+
+const realConnectorChecks = [
+  "Official consent, API key, IAM role, webhook, or partner API starts from Vognary.",
+  "Token references are encrypted per workspace and never exposed client-side.",
+  "Initial sync writes normalized evidence into the recurring ledger.",
+  "Resync works without repeating setup and errors are visible to the user.",
+  "Disconnect, delete, export, and audit-log paths exist before public rollout.",
+];
+
 export default function IntegrationsPage() {
   const summary = getConnectorSummary();
   const syncSummary = getConnectorSyncSummary();
@@ -35,10 +57,20 @@ export default function IntegrationsPage() {
           <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">Available connections and setup status</h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">See what works now, what needs setup, and what still needs an approved partner.</p>
 
-          <div className="mt-5 rounded-[12px] border border-line bg-(--card-2) p-4">
+          <div className="mt-5 rounded-xl border border-line bg-(--card-2) p-4">
             <p className="eyebrow" style={{ fontSize: "0.62rem" }}>How Vognary integrates</p>
             <p className="mt-2 text-sm leading-6 text-(--muted)">Every source moves through the same path: official consent or scoped credential, encrypted token reference, initial sync, scheduled resync, ledger normalization, disconnect/delete controls. Banks, UPI, and card mandates require regulated partner access before automatic sync.</p>
             <Link href="/integration-model" className="btn btn-ghost mt-3 h-9 px-3 text-xs">Read integration model</Link>
+          </div>
+
+          <div className="mt-5 grid gap-3 lg:grid-cols-4">
+            {launchWaves.map((wave, index) => (
+              <section key={wave.title} className="inset p-4">
+                <span className="font-display text-2xl font-semibold text-ember">{String(index + 1).padStart(2, "0")}</span>
+                <h2 className="mt-3 font-display text-base font-semibold text-(--ink)">{wave.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-(--muted)">{wave.body}</p>
+              </section>
+            ))}
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-4">
@@ -46,6 +78,7 @@ export default function IntegrationsPage() {
               <div key={status} className="inset px-4 py-3">
                 <p className="eyebrow" style={{ fontSize: "0.56rem" }}>{statusLabels[status as ConnectorStatus]}</p>
                 <p className="font-data mt-2 text-2xl font-semibold tnum text-(--ink)">{count}</p>
+                <p className="mt-2 text-xs leading-5 text-(--muted)">{statusMeaning[status as ConnectorStatus]}</p>
               </div>
             ))}
           </div>
@@ -65,6 +98,13 @@ export default function IntegrationsPage() {
               <p className="mt-2 text-sm leading-6 text-(--muted)">{Object.entries(syncSummary.byTrustClass).map(([type, count]) => `${type}: ${count}`).join(" · ")}</p>
             </div>
           </div>
+
+          <section className="mt-6 rounded-xl border border-line bg-(--card-2) p-4">
+            <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Definition of a real connector</p>
+            <ul className="mt-3 grid gap-2 text-sm leading-6 text-(--muted) md:grid-cols-2">
+              {realConnectorChecks.map((check) => <li key={check}>- {check}</li>)}
+            </ul>
+          </section>
 
           <div className="mt-8 grid gap-3">
             {connectors.map((connector) => (

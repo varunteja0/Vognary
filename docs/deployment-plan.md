@@ -14,6 +14,7 @@ Copy `.env.example` to `.env.local` for local configuration. The app stays funct
 - `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `SESSION_SECRET`, and either Google auth or `PRIVATE_BETA_ACCESS_CODE` for private beta login and encrypted workspace snapshots.
 - `GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`, and `GOOGLE_AUTH_REDIRECT_URI` for Google sign-in. This uses basic identity scopes and is separate from Gmail receipt access.
 - `INTERNAL_SYNC_SECRET` for internal sync job APIs.
+- `CRON_SECRET` for Vercel Cron to securely run due connector sync jobs.
 
 ### Health Check
 
@@ -50,9 +51,35 @@ curl http://localhost:3000/api/connectors/gmail-readonly/start
 curl http://localhost:3000/api/connectors/openai-costs/sync
 ```
 
-These endpoints return readiness, blockers, and implementation steps. Most connectors do not execute provider sync jobs until token storage and workers are implemented.
+These endpoints return readiness, blockers, and implementation steps. Registered adapters can execute provider sync jobs through the internal job runner when database, token vault, and scheduler secrets are configured.
 
-The first direct adapter is `openai-costs`: when `OPENAI_ADMIN_API_KEY` is configured, `POST /api/connectors/openai-costs/sync` performs a read-only 30-day cost sync preview and returns normalized evidence without storing it. In production this must move from env credentials to per-workspace encrypted token storage.
+Registered direct adapters now include `openai-costs`, `gmail-readonly`, `github-copilot`, `vercel-platform`, `render-platform`, and `cloudflare-billing`. When `OPENAI_ADMIN_API_KEY` is configured, `POST /api/connectors/openai-costs/sync` performs a read-only 30-day cost sync preview and returns normalized evidence without storing it. Queued production jobs can also use per-workspace API keys from the encrypted connector token store once a connected account has been created.
+
+Signed-in workspace admins can store API-key connector credentials through the connector start route:
+
+```bash
+curl -X POST http://localhost:3000/api/connectors/openai-costs/start \
+	-H 'Content-Type: application/json' \
+	-H 'Cookie: vognary_session=<signed-session-cookie>' \
+	-d '{"workspaceId":"<workspace-uuid>","apiKey":"<provider-api-key>","displayName":"OpenAI org costs"}'
+```
+
+The response never returns the secret. It stores the key through the AES-256-GCM token vault and queues an `initial_sync` job for the connected account. For GitHub Copilot, include `providerAccountId` with the GitHub organization slug. For Vercel and Render, `providerAccountId` can scope the team/owner when needed.
+
+Signed-in users can inspect connected accounts and persisted connector evidence from the workspace endpoint:
+
+```bash
+curl http://localhost:3000/api/workspaces/current/connectors \
+	-H 'Cookie: vognary_session=<signed-session-cookie>'
+
+curl -X POST http://localhost:3000/api/workspaces/current/connectors/<connected-account-id>/sync \
+	-H 'Cookie: vognary_session=<signed-session-cookie>'
+
+curl -X DELETE http://localhost:3000/api/workspaces/current/connectors/<connected-account-id> \
+	-H 'Cookie: vognary_session=<signed-session-cookie>'
+```
+
+The app connection hub uses these routes to show connected-account status, run sync now, revoke a connection, and import persisted connector evidence into the recurring ledger.
 
 ### Signed Connector Webhooks
 
@@ -75,9 +102,14 @@ curl -X POST http://localhost:3000/api/internal/sync-jobs \
 
 curl -X POST http://localhost:3000/api/internal/sync-jobs/<job-id>/run \
 	-H 'Authorization: Bearer <INTERNAL_SYNC_SECRET>'
+
+curl -X POST http://localhost:3000/api/internal/sync-jobs/due/run \
+	-H 'Authorization: Bearer <INTERNAL_SYNC_SECRET>'
 ```
 
 These routes are not user-facing. They require `INTERNAL_SYNC_SECRET` and `DATABASE_URL`. They create `connector_sync_jobs`, create `connector_sync_runs`, execute registered adapters, and persist normalized evidence into `connector_evidence`.
+
+Vercel Cron is configured in `vercel.json` to call `GET /api/internal/sync-jobs/due/run` once per day at `02:30 UTC` (`08:00 IST`). Set `CRON_SECRET` in Vercel; Vercel sends it as `Authorization: Bearer <CRON_SECRET>` for the cron request.
 
 ### Gmail Read-Only OAuth
 
@@ -85,7 +117,7 @@ These routes are not user-facing. They require `INTERNAL_SYNC_SECRET` and `DATAB
 curl http://localhost:3000/api/integrations/gmail/start
 ```
 
-Without Google OAuth env vars, this returns a `not-configured` response. With `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`, it starts the Gmail read-only consent flow, validates OAuth state on callback, and returns receipt candidates from recent invoice/subscription emails without storing tokens.
+Without Google OAuth env vars, this returns a `not-configured` response. With `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI`, it starts the Gmail read-only consent flow, validates OAuth state on callback, and returns receipt candidates from recent invoice/subscription emails. Signed-in users with `DATABASE_URL` and `TOKEN_ENCRYPTION_KEY` configured also get encrypted Gmail token persistence and an initial queued sync job. The registered Gmail adapter can refresh tokens and persist normalized receipt evidence through the internal sync runner.
 
 ## Local Production Run
 
@@ -113,7 +145,9 @@ DATABASE_URL=postgres://vognary:vognary@localhost:5432/vognary npm run db:apply-
 curl http://localhost:3000/api/readiness
 ```
 
-This applies the schema once. Production deployments should replace this with migrations before multiple schema revisions exist.
+This command now keeps a `schema_migrations` ledger. On a fresh database it applies `infra/postgres/schema.sql` as `0001_initial_schema`; on an existing database that already has the initial tables it records a baseline; then it applies forward-only SQL files from `infra/postgres/migrations` in sorted order.
+
+Add future production schema changes as `infra/postgres/migrations/0002_short_description.sql`, `0003_short_description.sql`, and so on. Do not edit already-applied migration files.
 
 ## Optional Token Vault Key
 
@@ -156,7 +190,7 @@ Use the private beta activation check after deployment:
 npm run production:check -- https://www.vognary.com --beta
 ```
 
-`--strict` is intentionally broader and should fail until payments, Gmail OAuth, identity provider, Redis rate limiting, monitoring, backups, and partner rails are actually configured.
+`--strict` is intentionally broader and should fail until payments, Gmail OAuth, identity provider, Redis rate limiting, scheduled sync worker, monitoring, backups, and partner rails are actually configured.
 
 ## Hosted Deployment
 
@@ -186,10 +220,10 @@ This product can be sold as a self-serve stateless audit tool. It should not be 
 ## Backend Roadmap
 
 1. Add production identity provider or magic-link delivery to mint signed sessions.
-2. Expose authenticated connected-account flows that store provider tokens in the encrypted token store.
-3. Promote OpenAI sync from env preview to per-workspace token-backed sync jobs.
-4. Add a worker daemon or managed scheduler that calls the internal sync-job routes.
-5. Convert Gmail preview into persistent receipt sync.
-6. Add AWS, GitHub/Copilot, Cloudflare, Render, Vercel, and domain adapters.
+2. Expand provider-specific billing depth for the live adapters where official endpoints expose costs/invoices.
+3. Expand scheduled sync coverage and stuck-job recovery.
+4. Complete public Gmail verification/security assessment before non-test Gmail users.
+5. Normalize synced connector evidence into recurring-item history and recommendations.
+6. Add AWS, Azure, GCP, GitHub billing, Stripe, PayPal, and domain registrar adapters where official user/admin APIs permit it.
 7. Add object storage for encrypted uploaded files.
 8. Add Account Aggregator integration through a compliant partner/TSP route.

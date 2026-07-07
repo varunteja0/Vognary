@@ -58,7 +58,7 @@ export async function GET() {
       connectorTokenStore: database.status === "ready" && tokenVault.status === "ready" ? "ready" : "not-ready",
       directAdapterRegistry: connectorAdapters.length > 0 ? "ready" : "not-configured",
       internalSyncJobApi: process.env.INTERNAL_SYNC_SECRET ? "configured" : "ready-needs-secret",
-      syncWorkers: "internal-runner-ready-no-daemon",
+      syncWorkers: getSyncWorkerStatus(),
       webhookIngestion: process.env.CONNECTOR_WEBHOOK_SECRET ? "configured" : "ready-needs-secret",
     },
   });
@@ -118,6 +118,11 @@ function getPartnerRailStatuses() {
     upiMandates: normalizePartnerRailStatus(process.env.UPI_MANDATE_PARTNER_STATUS),
     cardMandates: normalizePartnerRailStatus(process.env.CARD_MANDATE_PARTNER_STATUS),
   };
+}
+
+function getSyncWorkerStatus() {
+  if (process.env.CRON_SECRET) return "vercel-cron-configured";
+  return "cron-route-ready-needs-secret";
 }
 
 function normalizePartnerRailStatus(value: string | undefined) {

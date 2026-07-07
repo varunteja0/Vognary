@@ -42,6 +42,13 @@ const groups = [
     why: "Enables encrypted connected accounts, token storage, sync jobs, and workspace sessions.",
   },
   {
+    id: "sync-scheduler",
+    label: "Scheduled sync worker",
+    required: ["CRON_SECRET"],
+    probe: isSyncSchedulerReady,
+    why: "Lets Vercel Cron securely run due connector sync jobs instead of leaving queued work idle.",
+  },
+  {
     id: "private-beta-login",
     label: "Private beta login",
     required: ["DATABASE_URL", "SESSION_SECRET", "PRIVATE_BETA_ACCESS_CODE"],
@@ -149,6 +156,13 @@ const endpointChecks = [
     init: { method: "POST" },
   },
   { id: "audit-snapshot-auth-guard", path: "/api/workspaces/current/audit-snapshot", expected: [401] },
+  { id: "workspace-connectors-auth-guard", path: "/api/workspaces/current/connectors", expected: [401] },
+  {
+    id: "workspace-connector-sync-auth-guard",
+    path: "/api/workspaces/current/connectors/00000000-0000-4000-8000-000000000000/sync",
+    expected: [401],
+    init: { method: "POST" },
+  },
   {
     id: "audit-api",
     path: "/api/audit",
@@ -183,6 +197,7 @@ const endpointChecks = [
   },
   { id: "gmail-product-start", path: "/api/integrations/gmail/start?mode=json", expected: [200], captureJson: true },
   { id: "gmail-callback-config", path: "/api/integrations/gmail/callback", expected: [400, 501], captureJson: true },
+  { id: "sync-due-run-cron-guard", path: "/api/internal/sync-jobs/due/run", expected: [401, 501], captureJson: true },
   {
     id: "openai-cost-sync",
     path: "/api/connectors/openai-costs/sync",
@@ -303,6 +318,7 @@ function summarizeProbePayload(id, payload) {
         monitoring: payload.components?.monitoring,
         backups: payload.components?.backups,
         identityProvider: payload.components?.identityProvider,
+        syncWorkers: payload.components?.syncWorkers,
       },
     };
   }
@@ -340,6 +356,11 @@ function isPersistentBackendReady({ endpointPayloads }) {
     && readiness.tokenVault?.status === "ready"
     && readiness.auth?.session?.status === "ready"
     && readiness.hardening?.internalSyncJobApi === "configured";
+}
+
+function isSyncSchedulerReady({ endpointPayloads }) {
+  const status = endpointPayloads.readiness?.hardening?.syncWorkers;
+  return typeof status === "string" ? status === "vercel-cron-configured" : undefined;
 }
 
 function isPrivateBetaLoginReady(context) {

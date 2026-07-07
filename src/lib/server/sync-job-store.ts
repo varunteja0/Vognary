@@ -81,6 +81,23 @@ export async function getConnectorSyncJob(jobId: string) {
   return row ? mapSyncJob(row) : null;
 }
 
+export async function listDueConnectorSyncJobs(limit = 5) {
+  assertDatabaseReadyForSyncJobs();
+
+  const result = await getDatabasePool().query<ConnectorSyncJobRow>(
+    `select id, workspace_id, connected_account_id, connector_id, job_type, status, cursor_state
+     from connector_sync_jobs
+     where status in ('queued', 'failed')
+       and locked_at is null
+       and (next_run_at is null or next_run_at <= now())
+     order by priority asc, next_run_at asc nulls first, updated_at asc
+     limit $1`,
+    [Math.max(1, Math.min(limit, 20))],
+  );
+
+  return result.rows.map(mapSyncJob);
+}
+
 export async function beginConnectorSyncRun(job: ConnectorSyncJobRecord) {
   assertDatabaseReadyForSyncJobs();
 

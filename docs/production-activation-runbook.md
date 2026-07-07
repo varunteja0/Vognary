@@ -218,14 +218,23 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
 16. Add `INTERNAL_SYNC_SECRET` in Vercel.
-17. Redeploy production.
-18. Apply schema from a trusted terminal with production `DATABASE_URL` set:
+17. Generate cron secret:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+18. Add `CRON_SECRET` in Vercel. Vercel Cron sends this as the `Authorization` header to `/api/internal/sync-jobs/due/run`.
+19. Redeploy production.
+20. Apply schema from a trusted terminal with production `DATABASE_URL` set:
 
 ```bash
 DATABASE_URL='<production-neon-url>' POSTGRES_SSL=true npm run db:apply-schema
 ```
 
-19. Verify:
+This creates or updates the `schema_migrations` ledger. On a database where the initial schema already exists, the script records `0001_initial_schema` as a baseline before applying later files from `infra/postgres/migrations`.
+
+21. Verify:
 
 ```bash
 curl https://www.vognary.com/api/readiness
@@ -236,6 +245,7 @@ Expected:
 - `database.status` is `ready`.
 - `tokenVault.status` is `ready`.
 - `hardening.connectorTokenStore` is `ready` or `configured`.
+- `hardening.syncWorkers` is `vercel-cron-configured`.
 
 Stop condition:
 
@@ -269,11 +279,65 @@ curl -X POST https://www.vognary.com/api/connectors/openai-costs/sync \
 Expected:
 
 - `status` is `sync-preview-complete`, or a provider-specific error if the key lacks admin cost permissions.
-- `storage` is `none` until per-workspace token storage is exposed.
+- `storage` is `none` for the env-preview endpoint. Per-workspace production jobs use encrypted token refs after a connected account and `api_key` token are stored.
+
+Token-backed workspace connection test after login:
+
+```bash
+curl -X POST https://www.vognary.com/api/connectors/openai-costs/start \
+  -H 'Content-Type: application/json' \
+  -H 'Cookie: vognary_session=<signed-session-cookie>' \
+  -d '{"workspaceId":"<workspace-uuid>","apiKey":"<OPENAI_ADMIN_API_KEY>","displayName":"OpenAI org costs"}'
+```
+
+Expected: `status: "connected"`, a `connectedAccount.id`, a token `keyFingerprint`, and an `initial_sync` job id. The API key must not appear in the response.
+
+After a connected account exists, verify the user-facing account and evidence surface:
+
+```bash
+curl https://www.vognary.com/api/workspaces/current/connectors \
+  -H 'Cookie: vognary_session=<signed-session-cookie>'
+
+curl -X POST https://www.vognary.com/api/workspaces/current/connectors/<connected-account-id>/sync \
+  -H 'Cookie: vognary_session=<signed-session-cookie>'
+```
+
+Expected: the first response lists the connected account, latest run status, and evidence count. The second response creates a `manual_refresh` job and returns a sync result. The app connection hub should then show `Run now`, `Import evidence`, `Refresh`, and `Disconnect` controls.
 
 Stop condition:
 
 - If OpenAI returns 401/403, rotate the key or use an organization admin key with costs access.
+
+## 5A. Scheduled Connector Sync Worker
+
+Goal: queued connector sync jobs should not sit idle after Gmail or API-key connections are stored.
+
+The repo includes `vercel.json` with a daily Vercel Cron job at `02:30 UTC` (`08:00 IST`) for `/api/internal/sync-jobs/due/run`.
+
+Activation steps:
+
+1. Confirm `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `INTERNAL_SYNC_SECRET`, and `CRON_SECRET` are set in Vercel.
+2. Redeploy production after adding `CRON_SECRET`.
+3. Run:
+
+```bash
+curl https://www.vognary.com/api/internal/sync-jobs/due/run
+```
+
+Expected without the Vercel cron header: `401` if `CRON_SECRET` is configured, or `501` if it is missing.
+
+4. Manually run due jobs from a trusted terminal when needed:
+
+```bash
+curl -X POST https://www.vognary.com/api/internal/sync-jobs/due/run \
+  -H 'Authorization: Bearer <INTERNAL_SYNC_SECRET>'
+```
+
+Expected with no due jobs: `status: "completed"` and `selectedJobs: 0`.
+
+Stop condition:
+
+- Do not claim automatic connected monitoring until at least one stored Gmail or provider account queues a job, the due-job endpoint runs it, and `connector_evidence` receives rows.
 
 ## 6. Identity Provider Or Magic Link
 
@@ -415,13 +479,22 @@ Stop condition:
 
 ## 10. More Provider Adapters
 
-Build order after OpenAI:
+Live token-backed adapters now exist for:
+
+- OpenAI organization costs.
+- Gmail read-only receipt evidence.
+- GitHub Copilot organization metrics reports.
+- Vercel domain renewals.
+- Render services.
+- Cloudflare accounts.
+
+Build order after these:
 
 1. AWS Cost Explorer.
-2. GitHub billing and Copilot usage.
-3. Cloudflare billing/subscriptions.
-4. Render services/metrics.
-5. Vercel usage/billing surfaces.
+2. GitHub billing and Advanced Security billing.
+3. Cloudflare subscriptions/billing where official account endpoints expose it.
+4. Render metrics and cost mapping.
+5. Vercel usage/billing surfaces beyond domains.
 6. Domain registrar renewals.
 
 Activation rule for each provider:

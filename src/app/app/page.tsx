@@ -5,11 +5,17 @@ import VognaryMvpClient from "../vognary-mvp-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function AppPage() {
-  const session = await readRequestSession();
-  if (!session) redirect("/login");
+type AppPageProps = {
+  searchParams?: Promise<{ demo?: string; guest?: string }>;
+};
 
-  return <VognaryMvpClient />;
+export default async function AppPage({ searchParams }: AppPageProps) {
+  const params = await searchParams;
+  const experienceMode = params?.demo === "1" ? "demo" : params?.guest === "1" ? "guest" : "signed-in";
+  const session = await readRequestSession();
+  if (!session && experienceMode === "signed-in") redirect("/login?next=/app");
+
+  return <VognaryMvpClient experienceMode={session ? "signed-in" : experienceMode} />;
 }
 
 async function readRequestSession() {

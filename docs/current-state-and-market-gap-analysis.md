@@ -44,8 +44,9 @@ Overall current score: 6.6/10 for the full vision, but 8/10 for the private audi
 | Encrypted server workspace snapshots | Done | Signed-in beta users can save/load/delete encrypted snapshots through `/api/workspaces/current/audit-snapshot`. |
 | PostgreSQL schema | Done | Users, workspaces, sources, transactions, recurring items, connectors, token refs, audit logs. |
 | Connector registry | Done | Models 39 targets with honest status. |
-| OpenAI cost preview | Partial | Env-gated preview, not per-user persistent sync. |
-| Gmail OAuth preview | Partial | OAuth/state scaffold, no token persistence. |
+| OpenAI cost sync | Partial | Env-gated preview plus authenticated API-key storage and queued token-backed jobs. |
+| Gmail OAuth sync | Partial | OAuth/state scaffold, encrypted token persistence for signed-in users, queued initial sync, and registered receipt-evidence adapter. Public Google verification and production worker activation remain. |
+| Platform API adapters | Partial | Registered adapters now cover GitHub Copilot report links, Vercel domain renewals, Render services, and Cloudflare account evidence through encrypted user tokens. Exact billing/cost depth still depends on each provider's exposed endpoints and account permissions. |
 
 ## What Is Not Done Yet
 

@@ -5,6 +5,7 @@ import { connectors, type Connector, type ConnectorStatus } from "@/lib/connecto
 import {
   analyzeStatements,
   type AuditResult,
+  type Frequency,
   type ManualRecurringInput,
   type RecommendationType,
   type RecurringItem,
@@ -65,6 +66,7 @@ type CoverageSignal = {
 type ConnectorStartPayload = {
   status?: string;
   state?: string;
+  error?: string;
   missingEnv?: string[];
   nextSteps?: string[];
   requiredEnv?: string[];
@@ -73,8 +75,123 @@ type ConnectorStartPayload = {
   redirectUri?: string;
 };
 
+type ServerConnectedAccount = {
+  id: string;
+  connectorId: string;
+  providerAccountId: string | null;
+  displayName: string;
+  status: string;
+  latestRunStatus: string | null;
+  latestRunAt: string | null;
+  evidenceCount: number;
+};
+
+type ServerConnectorEvidence = {
+  id: string;
+  connectorId: string;
+  connectedAccountId: string | null;
+  provider: string;
+  evidenceType: string;
+  observedAt: string;
+  merchantRaw: string | null;
+  amount: number | null;
+  currency: string | null;
+  cadenceHint: string | null;
+  nextDebitHint: string | null;
+  confidenceScore: number;
+};
+
+type WorkspaceConnectorStatusPayload = {
+  status?: string;
+  accounts?: ServerConnectedAccount[];
+  evidence?: ServerConnectorEvidence[];
+  error?: string;
+  message?: string;
+};
+
+type ExperienceMode = "signed-in" | "guest" | "demo";
+
+type IngestSourcePayload = {
+  name: string;
+  text: string;
+  kind?: "csv" | "pdf";
+  rowCount?: number;
+  warnings?: string[];
+};
+
+type IngestResponsePayload = {
+  sources?: IngestSourcePayload[];
+  error?: string;
+  message?: string;
+};
+
 const workspaceStorageKey = "vognary.workspace.v1";
 const gmailReceiptStorageKey = "vognary.gmail.receipts.v1";
+
+const demoReceiptText = [
+  "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly. Usage source not connected yet.",
+  "GitHub Copilot Business invoice INR 1,520 paid on 2026-07-02. Review inactive seats before next billing cycle.",
+  "Cloudflare domain renewal notice INR 1,200 annual renewal due 2026-09-10. Auto-renew enabled.",
+].join("\n\n");
+
+const demoStatementCsv = `Date,Description,Debit,Credit
+2026-04-02,GITHUB COPILOT BUSINESS,1520,
+2026-05-02,GITHUB COPILOT BUSINESS,1520,
+2026-06-02,GITHUB COPILOT BUSINESS,1520,
+2026-07-02,GITHUB COPILOT BUSINESS,1520,
+2026-04-06,OPENAI CHATGPT PLUS,1999,
+2026-05-06,OPENAI CHATGPT PLUS,1999,
+2026-06-06,OPENAI CHATGPT PLUS,1999,
+2026-07-06,OPENAI CHATGPT PLUS,1999,
+2026-04-18,VERCEL PRO TEAM,1600,
+2026-05-18,VERCEL PRO TEAM,1600,
+2026-06-18,VERCEL PRO TEAM,1600,
+2026-01-10,CLOUDFLARE DOMAIN RENEWAL,1200,
+2026-04-10,INSURANCE POLICY PREMIUM,4200,
+2026-05-15,SIP MUTUAL FUND AUTOPAY,5000,
+2026-06-15,SIP MUTUAL FUND AUTOPAY,5000,`;
+
+function buildDemoWorkspace(): WorkspaceBackup {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    statementSources: [
+      {
+        id: "demo-founder-stack-statement",
+        name: "demo-founder-stack.csv",
+        text: demoStatementCsv,
+        rowCount: 15,
+        kind: "csv",
+        warnings: [],
+      },
+    ],
+    manualItems: [
+      {
+        id: "demo-upi-mandate",
+        merchant: "UPI AutoPay mandate - AI video tool",
+        amount: 999,
+        frequency: "monthly",
+        nextExpectedDate: "2026-08-03",
+        category: "AI tools",
+        sourceName: "User-confirmed UPI mandate screen",
+      },
+      {
+        id: "demo-google-play",
+        merchant: "Google Play subscription",
+        amount: 299,
+        frequency: "monthly",
+        nextExpectedDate: "2026-08-12",
+        category: "App store",
+        sourceName: "Google Play subscription screen",
+      },
+    ],
+    userActions: {},
+    itemOwners: {},
+    reviewNotes: {},
+    teamMembers: [{ id: "founder", name: "Founder", role: "Owner" }],
+    receiptText: demoReceiptText,
+  };
+}
 
 function getInitialWorkspace(): WorkspaceBackup | null {
   if (typeof window === "undefined") return null;
@@ -146,8 +263,19 @@ const connectorStatusClass: Record<ConnectorStatus, string> = {
   planned: "pill pill-planned",
 };
 
-export default function VognaryMvpClient() {
-  const [initialWorkspace] = useState<WorkspaceBackup | null>(() => getInitialWorkspace());
+// Workspace information architecture — the ordered chapters of the review.
+// Drives the sticky section index (table of contents) and the scroll-spy state.
+const workspaceSections = [
+  { id: "connect", folio: "01", label: "Connect", title: "Connect evidence", note: "Bring receipts, statements, and provider sources into one workspace." },
+  { id: "ledger", folio: "02", label: "Ledger", title: "Recurring ledger", note: "Every detected item with proof, cadence, and a decision." },
+  { id: "review", folio: "03", label: "Review", title: "Monthly review", note: "Assign owners, capture notes, and close the review." },
+  { id: "data", folio: "04", label: "Data", title: "Data & readiness", note: "Control where data lives and what is already live." },
+] as const;
+
+const workspaceSectionIds = workspaceSections.map((section) => section.id);
+
+export default function VognaryMvpClient({ experienceMode = "signed-in" }: { experienceMode?: ExperienceMode }) {
+  const [initialWorkspace] = useState<WorkspaceBackup | null>(() => experienceMode === "demo" ? buildDemoWorkspace() : getInitialWorkspace());
   const [statementSources, setStatementSources] = useState<StatementFile[]>(initialWorkspace?.statementSources ?? []);
   const [manualItems, setManualItems] = useState<ManualRecurringInput[]>(initialWorkspace?.manualItems ?? []);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -158,13 +286,17 @@ export default function VognaryMvpClient() {
   const [memberDraft, setMemberDraft] = useState({ name: "", role: "Finance / Ops" });
   const [receiptText, setReceiptText] = useState(initialWorkspace?.receiptText ?? "");
   const [reviewCompletedAt, setReviewCompletedAt] = useState<string | null>(null);
-  const [localSaveEnabled, setLocalSaveEnabled] = useState(Boolean(initialWorkspace));
+  const [localSaveEnabled, setLocalSaveEnabled] = useState(experienceMode !== "demo" && Boolean(initialWorkspace));
   const [notice, setNotice] = useState<string | null>(null);
   const [serverSession, setServerSession] = useState<ServerSessionPayload | null>(null);
   const [serverSaveStatus, setServerSaveStatus] = useState<string | null>(null);
   const [connectorStartResults, setConnectorStartResults] = useState<Record<string, ConnectorStartPayload>>({});
   const [connectingConnectorId, setConnectingConnectorId] = useState<string | null>(null);
+  const [syncingConnectorId, setSyncingConnectorId] = useState<string | null>(null);
   const [selectedConnectorId, setSelectedConnectorId] = useState("gmail-readonly");
+  const [connectorApiKeyDraft, setConnectorApiKeyDraft] = useState("");
+  const [connectorAccountDraft, setConnectorAccountDraft] = useState("");
+  const [serverConnectors, setServerConnectors] = useState<WorkspaceConnectorStatusPayload | null>(null);
   const [disconnectedConnectorIds, setDisconnectedConnectorIds] = useState<string[]>([]);
 
   const audit = useMemo<AuditResult>(
@@ -182,9 +314,12 @@ export default function VognaryMvpClient() {
     for (const [id, result] of Object.entries(connectorStartResults)) {
       if (result.status?.startsWith("connected")) connected.add(id);
     }
+    for (const account of serverConnectors?.accounts ?? []) {
+      if (account.status === "active") connected.add(account.connectorId);
+    }
     for (const id of disconnectedConnectorIds) connected.delete(id);
     return connected;
-  }, [connectorStartResults, disconnectedConnectorIds, receiptText]);
+  }, [connectorStartResults, disconnectedConnectorIds, receiptText, serverConnectors]);
   useEffect(() => {
     if (!localSaveEnabled || typeof window === "undefined") return;
     const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText });
@@ -209,6 +344,25 @@ export default function VognaryMvpClient() {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadWorkspaceConnectors() {
+      if (!serverSession?.authenticated) {
+        setServerConnectors(null);
+        return;
+      }
+
+      const payload = await fetchWorkspaceConnectors();
+      if (!ignore) setServerConnectors(payload);
+    }
+
+    loadWorkspaceConnectors();
+    return () => {
+      ignore = true;
+    };
+  }, [serverSession?.authenticated, serverSession?.session?.workspaceId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -261,6 +415,8 @@ export default function VognaryMvpClient() {
     }
   }, []);
 
+  const activeSection = useActiveSection(workspaceSectionIds);
+
   function selectAndReviewItem(itemId?: string) {
     if (itemId) setSelectedItemId(itemId);
     document.getElementById("recurring-ledger")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -275,6 +431,53 @@ export default function VognaryMvpClient() {
     setSelectedItemId(null);
     setReceiptText("");
     setNotice("Workspace cleared. This browser has no audit data now.");
+  }
+
+  function loadDemoWorkspace() {
+    const demo = buildDemoWorkspace();
+    setStatementSources(demo.statementSources);
+    setManualItems(demo.manualItems);
+    setUserActions({});
+    setItemOwners({});
+    setReviewNotes({});
+    setTeamMembers(demo.teamMembers);
+    setReceiptText(demo.receiptText ?? "");
+    setSelectedItemId(null);
+    setDisconnectedConnectorIds([]);
+    setNotice("Sample workspace loaded. You can review the ledger, change actions, export it, or replace it with your own evidence.");
+    window.setTimeout(() => selectAndReviewItem(), 80);
+  }
+
+  async function importStatementFiles(files: File[]) {
+    if (!files.length) return;
+    setNotice(`Importing ${files.length} source file(s)...`);
+
+    try {
+      const formData = new FormData();
+      for (const file of files) formData.append("files", file);
+      const response = await fetch("/api/ingest", { method: "POST", body: formData });
+      const payload = await response.json().catch(() => ({})) as IngestResponsePayload;
+
+      if (!response.ok || !payload.sources?.length) {
+        setNotice(payload.message ?? payload.error ?? "Could not import those files. Use CSV/TXT/PDF statement exports under 8 MB.");
+        return;
+      }
+
+      const importedAt = Date.now();
+      const importedSources: StatementFile[] = payload.sources.map((source, index) => ({
+        id: `source-${importedAt}-${index}`,
+        name: source.name,
+        text: source.text,
+        rowCount: source.rowCount ?? Math.max(0, source.text.split(/\r?\n/).filter((row) => row.trim()).length - 1),
+        kind: source.kind ?? "csv",
+        warnings: source.warnings ?? [],
+      }));
+      setStatementSources((current) => [...current, ...importedSources]);
+      setNotice(`Imported ${importedSources.length} source file(s). Vognary updated the ledger and source checklist.`);
+      window.setTimeout(() => selectAndReviewItem(), 80);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not import those files.");
+    }
   }
 
   function exportReport() {
@@ -433,6 +636,43 @@ export default function VognaryMvpClient() {
     setDisconnectedConnectorIds((current) => current.filter((id) => id !== connector.id));
 
     try {
+      if (connector.authType === "api-key" && connectorApiKeyDraft.trim()) {
+        const workspaceId = serverSession?.session?.workspaceId;
+        if (!serverSession?.authenticated || !workspaceId) {
+          setNotice("Sign in before storing an encrypted provider API key.");
+          return;
+        }
+
+        if (connector.id === "github-copilot" && !connectorAccountDraft.trim()) {
+          setNotice("Add the GitHub organization slug before storing a Copilot metrics token.");
+          return;
+        }
+
+        const response = await fetch(`/api/connectors/${connector.id}/start`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            workspaceId,
+            apiKey: connectorApiKeyDraft.trim(),
+            providerAccountId: connectorAccountDraft.trim() || undefined,
+            displayName: `${connector.name} sync`,
+          }),
+        });
+        const payload = await response.json().catch(() => ({})) as ConnectorStartPayload;
+        setConnectorStartResults((current) => ({ ...current, [connector.id]: payload }));
+
+        if (!response.ok) {
+          setNotice(payload.message ?? payload.error ?? `Could not connect ${connector.name}.`);
+          return;
+        }
+
+        setConnectorApiKeyDraft("");
+    setConnectorAccountDraft("");
+    await refreshWorkspaceConnectors();
+        setNotice(`${connector.name} key stored in the encrypted vault. Initial sync job queued.`);
+        return;
+      }
+
       if (connector.id === "gmail-readonly") {
         const response = await fetch("/api/integrations/gmail/start?mode=json", { cache: "no-store" });
         const payload = await response.json().catch(() => ({})) as ConnectorStartPayload;
@@ -465,7 +705,26 @@ export default function VognaryMvpClient() {
     }
   }
 
-  function disconnectConnector(connector: Connector) {
+  async function disconnectConnector(connector: Connector) {
+    const account = getActiveServerAccount(serverConnectors, connector.id);
+    if (account) {
+      setConnectingConnectorId(connector.id);
+      try {
+        const response = await fetch(`/api/workspaces/current/connectors/${account.id}`, { method: "DELETE" });
+        const payload = await response.json().catch(() => ({})) as { status?: string; error?: string; message?: string };
+        if (!response.ok) {
+          setNotice(payload.message ?? payload.error ?? `Could not disconnect ${connector.name}.`);
+          return;
+        }
+        await refreshWorkspaceConnectors();
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : `Could not disconnect ${connector.name}.`);
+        return;
+      } finally {
+        setConnectingConnectorId(null);
+      }
+    }
+
     setConnectorStartResults((current) => {
       const next = { ...current };
       delete next[connector.id];
@@ -480,6 +739,53 @@ export default function VognaryMvpClient() {
     }
 
     setNotice(`${connector.name} disconnected in this workspace.`);
+  }
+
+  async function refreshWorkspaceConnectors() {
+    if (!serverSession?.authenticated) return;
+    setServerConnectors(await fetchWorkspaceConnectors());
+  }
+
+  async function runConnectorSyncNow(connector: Connector) {
+    const account = getActiveServerAccount(serverConnectors, connector.id);
+    if (!account) {
+      setNotice(`Connect ${connector.name} before running sync.`);
+      return;
+    }
+
+    setSyncingConnectorId(connector.id);
+    try {
+      const response = await fetch(`/api/workspaces/current/connectors/${account.id}/sync`, { method: "POST" });
+      const payload = await response.json().catch(() => ({})) as { status?: string; error?: string; message?: string; result?: { evidenceWritten?: number; error?: string } };
+      await refreshWorkspaceConnectors();
+      if (!response.ok) {
+        setNotice(payload.result?.error ?? payload.message ?? payload.error ?? `${connector.name} sync failed.`);
+        return;
+      }
+      setNotice(`${connector.name} sync finished. Evidence written: ${payload.result?.evidenceWritten ?? 0}.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : `${connector.name} sync failed.`);
+    } finally {
+      setSyncingConnectorId(null);
+    }
+  }
+
+  function importConnectorEvidence(connectorId: string) {
+    const evidence = (serverConnectors?.evidence ?? []).filter((item) => item.connectorId === connectorId);
+    const nextItems = evidence.map(evidenceToManualItem).filter((item): item is ManualRecurringInput => Boolean(item));
+
+    if (!nextItems.length) {
+      setNotice("No importable connector evidence yet. Run sync after connecting a provider.");
+      return;
+    }
+
+    setManualItems((current) => {
+      const existing = new Set(current.map((item) => recurringIdentity(item)));
+      const uniqueItems = nextItems.filter((item) => !existing.has(recurringIdentity(item)));
+      if (!uniqueItems.length) return current;
+      return [...current, ...uniqueItems];
+    });
+    setNotice(`Imported ${nextItems.length} connector evidence item(s) into the ledger.`);
   }
 
   return (
@@ -515,14 +821,40 @@ export default function VognaryMvpClient() {
           audit={audit}
           connectorStartResults={connectorStartResults}
           connectingConnectorId={connectingConnectorId}
+          syncingConnectorId={syncingConnectorId}
           connectedConnectorIds={connectedConnectorIds}
           selectedConnectorId={selectedConnectorId}
+          serverSession={serverSession}
+          serverConnectors={serverConnectors}
+          apiKeyDraft={connectorApiKeyDraft}
+          accountDraft={connectorAccountDraft}
           onSelectedConnector={setSelectedConnectorId}
+          onApiKeyDraftChange={setConnectorApiKeyDraft}
+          onAccountDraftChange={setConnectorAccountDraft}
           onStartConnector={startConnector}
           onDisconnectConnector={disconnectConnector}
+          onRunConnectorSync={runConnectorSyncNow}
+          onImportConnectorEvidence={importConnectorEvidence}
+          onRefreshWorkspaceConnectors={refreshWorkspaceConnectors}
           onJumpToLedger={() => selectAndReviewItem()}
           onExportReport={exportReport}
           onClearWorkspace={clearWorkspace}
+        />
+
+        <FirstSuccessPanel
+          audit={audit}
+          coverageScore={coverageScore}
+          experienceMode={experienceMode}
+          hasRealData={hasRealData}
+          localSaveEnabled={localSaveEnabled}
+          receiptText={receiptText}
+          signedIn={Boolean(serverSession?.authenticated)}
+          onExportReport={exportReport}
+          onImportFiles={importStatementFiles}
+          onJumpToLedger={() => selectAndReviewItem()}
+          onLoadDemoWorkspace={loadDemoWorkspace}
+          onReceiptTextChange={setReceiptText}
+          onSaveLocal={enableLocalSave}
         />
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-reveal>
@@ -614,15 +946,87 @@ export default function VognaryMvpClient() {
   );
 }
 
+// Scroll-spy: reports which workspace chapter is currently in the reading band.
+function useActiveSection(ids: readonly string[]): string {
+  const [active, setActive] = useState(ids[0] ?? "");
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) return;
+    const elements = ids
+      .map((id) => document.getElementById(id))
+      .filter((element): element is HTMLElement => Boolean(element));
+    if (!elements.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) setActive(visible[0].target.id);
+      },
+      { rootMargin: "-45% 0px -50% 0px", threshold: 0 },
+    );
+
+    elements.forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [ids]);
+
+  return active;
+}
+
+// Sticky section index — the workspace table of contents with active-chapter state.
+function WorkspaceNav({ activeId }: { activeId: string }) {
+  return (
+    <nav aria-label="Workspace sections" className="glass flex items-center gap-1 overflow-x-auto rounded-2xl border border-line px-1.5 py-1.5">
+      {workspaceSections.map((section) => {
+        const active = activeId === section.id;
+        return (
+          <a
+            key={section.id}
+            href={`#${section.id}`}
+            aria-current={active ? "true" : undefined}
+            className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition ${active ? "bg-(--gold) text-[#17130a]" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"}`}
+          >
+            <span className={`font-data text-[0.6rem] tnum ${active ? "opacity-70" : "text-(--muted)"}`}>{section.folio}</span>
+            <span>{section.label}</span>
+          </a>
+        );
+      })}
+      <a href="#ledger-main" className="ml-auto hidden shrink-0 items-center rounded-xl px-3 py-1.5 font-data text-[0.6rem] uppercase tracking-[0.14em] text-(--muted) transition hover:text-(--ink) sm:inline-flex" aria-label="Back to top of workspace">Top</a>
+    </nav>
+  );
+}
+
+// Chapter divider — the folio marker + intent that opens each workspace section.
+function StageHeader({ folio, title, note }: { folio: string; title: string; note?: string }) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4" data-reveal>
+      <span className="folio shrink-0" data-folio={folio}>{title}</span>
+      <span className="hidden h-px flex-1 bg-(--line) sm:block" aria-hidden />
+      {note ? <p className="text-xs leading-5 text-(--muted) sm:max-w-sm sm:text-right">{note}</p> : null}
+    </div>
+  );
+}
+
 function IntegrationCommandCenter({
   audit,
   connectorStartResults,
   connectingConnectorId,
+  syncingConnectorId,
   connectedConnectorIds,
   selectedConnectorId,
+  serverSession,
+  serverConnectors,
+  apiKeyDraft,
+  accountDraft,
   onSelectedConnector,
+  onApiKeyDraftChange,
+  onAccountDraftChange,
   onStartConnector,
   onDisconnectConnector,
+  onRunConnectorSync,
+  onImportConnectorEvidence,
+  onRefreshWorkspaceConnectors,
   onJumpToLedger,
   onExportReport,
   onClearWorkspace,
@@ -630,11 +1034,21 @@ function IntegrationCommandCenter({
   audit: AuditResult;
   connectorStartResults: Record<string, ConnectorStartPayload>;
   connectingConnectorId: string | null;
+  syncingConnectorId: string | null;
   connectedConnectorIds: Set<string>;
   selectedConnectorId: string;
+  serverSession: ServerSessionPayload | null;
+  serverConnectors: WorkspaceConnectorStatusPayload | null;
+  apiKeyDraft: string;
+  accountDraft: string;
   onSelectedConnector: (connectorId: string) => void;
+  onApiKeyDraftChange: (value: string) => void;
+  onAccountDraftChange: (value: string) => void;
   onStartConnector: (connector: Connector) => void;
   onDisconnectConnector: (connector: Connector) => void;
+  onRunConnectorSync: (connector: Connector) => void;
+  onImportConnectorEvidence: (connectorId: string) => void;
+  onRefreshWorkspaceConnectors: () => void;
   onJumpToLedger: () => void;
   onExportReport: () => void;
   onClearWorkspace: () => void;
@@ -647,6 +1061,12 @@ function IntegrationCommandCenter({
   const missing = result?.missingEnv ?? result?.requiredEnv ?? [];
   const statusLabel = connected ? "Connected" : connectorStatusLabels[selectedConnector.status];
   const statusClass = connected ? "pill pill-ready" : connectorStatusClass[selectedConnector.status];
+  const signedIn = Boolean(serverSession?.authenticated && serverSession.session?.workspaceId);
+  const hasApiKeyDraft = Boolean(apiKeyDraft.trim());
+  const showApiKeyControl = selectedConnector.authType === "api-key";
+  const serverAccount = getActiveServerAccount(serverConnectors, selectedConnector.id);
+  const selectedEvidence = (serverConnectors?.evidence ?? []).filter((item) => item.connectorId === selectedConnector.id);
+  const syncing = syncingConnectorId === selectedConnector.id;
 
   return (
     <section className="dossier spotlight scan p-5 sm:p-6" data-reveal onMouseMove={trackSpotlightPointer}>
@@ -666,14 +1086,46 @@ function IntegrationCommandCenter({
       <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
         <label className="block">
           <span className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Platform</span>
-          <select value={selectedConnector.id} onChange={(event) => onSelectedConnector(event.target.value)} className="mt-2 h-13 w-full rounded-[10px] border px-4 text-base font-semibold outline-none" style={{ background: "rgba(243,234,214,0.06)", borderColor: "var(--dossier-line)", color: "var(--dossier-ink)" }}>
+          <select value={selectedConnector.id} onChange={(event) => { onSelectedConnector(event.target.value); onApiKeyDraftChange(""); onAccountDraftChange(""); }} className="mt-2 h-13 w-full rounded-[10px] border px-4 text-base font-semibold outline-none" style={{ background: "rgba(243,234,214,0.06)", borderColor: "var(--dossier-line)", color: "var(--dossier-ink)" }}>
             {integrationConnectors.map((connector) => <option key={connector.id} value={connector.id}>{connector.name}</option>)}
           </select>
         </label>
         <button type="button" disabled={busy} onClick={() => connected ? onDisconnectConnector(selectedConnector) : onStartConnector(selectedConnector)} className={`${connected ? "btn btn-ondark" : "btn btn-primary"} h-13 self-end px-6 disabled:cursor-not-allowed disabled:opacity-60`}>
-          {busy ? "Connecting..." : connected ? "Disconnect" : "Connect"}
+          {busy ? "Connecting..." : connected ? "Disconnect" : showApiKeyControl && hasApiKeyDraft ? "Store & sync" : "Connect"}
         </button>
       </div>
+
+      {showApiKeyControl ? (
+        <div className="mt-3 rounded-[11px] border p-3" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
+          <label className="block">
+            <span className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>{getConnectorAccountLabel(selectedConnector.id)}</span>
+            <input
+              value={accountDraft}
+              onChange={(event) => onAccountDraftChange(event.target.value)}
+              type="text"
+              disabled={!signedIn || busy}
+              placeholder={getConnectorAccountPlaceholder(selectedConnector.id)}
+              className="mt-2 h-11 w-full rounded-[10px] border px-3 font-data text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ background: "rgba(10,12,16,0.28)", borderColor: "var(--dossier-line)", color: "var(--dossier-ink)" }}
+            />
+          </label>
+          <label className="block">
+            <span className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Encrypted API key</span>
+            <input
+              value={apiKeyDraft}
+              onChange={(event) => onApiKeyDraftChange(event.target.value)}
+              type="password"
+              disabled={!signedIn || busy}
+              placeholder={signedIn ? "Paste read/admin key" : "Sign in to store a key"}
+              className="mt-2 h-11 w-full rounded-[10px] border px-3 font-data text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ background: "rgba(10,12,16,0.28)", borderColor: "var(--dossier-line)", color: "var(--dossier-ink)" }}
+            />
+          </label>
+          <p className="mt-2 text-xs leading-5 muted-on-dark">
+            {signedIn ? "Stored through the token vault, then queued for scheduled sync." : "API-key connectors require a signed-in beta workspace."}
+          </p>
+        </div>
+      ) : null}
 
       <div className="mt-4 flex flex-col gap-3 rounded-[11px] border p-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
         <div className="min-w-0">
@@ -683,11 +1135,125 @@ function IntegrationCommandCenter({
           </div>
           {missing.length ? <p className="mt-2 text-xs leading-5 text-ochre">Needs setup: {missing.join(", ")}</p> : null}
           {result?.redirectUri ? <p className="mt-2 break-all font-data text-[0.68rem] muted-on-dark">Redirect URI: {result.redirectUri}</p> : null}
+          {serverAccount ? (
+            <p className="mt-2 text-xs leading-5 muted-on-dark">
+              Server account: <span className="text-(--dossier-ink)">{serverAccount.displayName}</span> · Evidence {serverAccount.evidenceCount} · Last run {serverAccount.latestRunStatus ?? "not run"}
+            </p>
+          ) : null}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
+          <button type="button" disabled={!serverAccount || syncing} onClick={() => onRunConnectorSync(selectedConnector)} className="btn btn-ondark h-9 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60">{syncing ? "Syncing" : "Run now"}</button>
+          <button type="button" disabled={!selectedEvidence.length} onClick={() => onImportConnectorEvidence(selectedConnector.id)} className="btn btn-ondark h-9 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60">Import evidence</button>
+          <button type="button" onClick={onRefreshWorkspaceConnectors} className="btn btn-ondark h-9 px-3 text-xs">Refresh</button>
           <button type="button" onClick={onJumpToLedger} className="btn btn-ondark h-9 px-3 text-xs">Open ledger</button>
           <button type="button" onClick={onExportReport} className="btn btn-ondark h-9 px-3 text-xs">Download report</button>
           <button type="button" onClick={onClearWorkspace} className="btn btn-ondark h-9 px-3 text-xs">Clear</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FirstSuccessPanel({
+  audit,
+  coverageScore,
+  experienceMode,
+  hasRealData,
+  localSaveEnabled,
+  receiptText,
+  signedIn,
+  onExportReport,
+  onImportFiles,
+  onJumpToLedger,
+  onLoadDemoWorkspace,
+  onReceiptTextChange,
+  onSaveLocal,
+}: {
+  audit: AuditResult;
+  coverageScore: number;
+  experienceMode: ExperienceMode;
+  hasRealData: boolean;
+  localSaveEnabled: boolean;
+  receiptText: string;
+  signedIn: boolean;
+  onExportReport: () => void;
+  onImportFiles: (files: File[]) => void;
+  onJumpToLedger: () => void;
+  onLoadDemoWorkspace: () => void;
+  onReceiptTextChange: (value: string) => void;
+  onSaveLocal: () => void;
+}) {
+  const hasLedger = audit.summary.recurringCount > 0;
+  const saved = localSaveEnabled || signedIn;
+  const steps = [
+    { label: "Add evidence", done: hasRealData, detail: "Sample, receipt snippets, CSV/PDF statement, or manual source." },
+    { label: "Review ledger", done: hasLedger, detail: "Check amount, cadence, next debit, confidence, and proof." },
+    { label: "Fill gaps", done: coverageScore >= 70, detail: "Add missing Gmail, UPI, card, app-store, SaaS, cloud, EMI, SIP, insurance, or utility sources." },
+    { label: "Keep control", done: saved, detail: "Export, browser-save, or sign in for encrypted snapshots." },
+  ];
+  const modeCopy = experienceMode === "demo"
+    ? "You are viewing a complete sample workspace. Replace it with your own evidence whenever ready."
+    : experienceMode === "guest"
+      ? "Browser-only mode is active. Nothing is stored on the server unless you sign in and save an encrypted snapshot."
+      : "Signed-in workspace. Use this guide to complete the first review and improve coverage.";
+
+  return (
+    <section id="first-success" className="panel p-5 sm:p-6" data-reveal>
+      <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+        <div>
+          <span className="folio" data-folio="Start">First successful audit</span>
+          <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Reach the useful ledger before login friction.</h2>
+          <p className="mt-2 text-sm leading-6 text-(--muted)">{modeCopy}</p>
+          <div className="mt-5 grid gap-2 sm:grid-cols-4">
+            {steps.map((step, index) => (
+              <div key={step.label} className="inset p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-display text-xl font-semibold text-ember">{index + 1}</span>
+                  <span className={step.done ? "pill pill-ready" : "pill pill-planned"}>{step.done ? "Done" : "Next"}</span>
+                </div>
+                <p className="mt-2 text-sm font-semibold text-(--ink)">{step.label}</p>
+                <p className="mt-1 text-xs leading-5 text-(--muted)">{step.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-line bg-(--card-2) p-4">
+          <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Start in one click</p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <button type="button" onClick={onLoadDemoWorkspace} className="btn btn-primary">Load sample workspace</button>
+            <label className="btn btn-ghost cursor-pointer text-center">
+              Import CSV/PDF
+              <input
+                type="file"
+                accept=".csv,.txt,.pdf,text/csv,text/plain,application/pdf"
+                multiple
+                className="sr-only"
+                onChange={(event) => {
+                  const files = Array.from(event.currentTarget.files ?? []);
+                  event.currentTarget.value = "";
+                  onImportFiles(files);
+                }}
+              />
+            </label>
+            <button type="button" onClick={onJumpToLedger} className="btn btn-ghost" disabled={!hasLedger}>Open ledger</button>
+            <button type="button" onClick={onExportReport} className="btn btn-ghost" disabled={!hasRealData}>Download report</button>
+            <button type="button" onClick={onSaveLocal} className="btn btn-ghost" disabled={!hasRealData || localSaveEnabled}>{localSaveEnabled ? "Saved on device" : "Save on this device"}</button>
+            <a href="/login" className="btn btn-ghost">Sign in to sync</a>
+          </div>
+          <details className="mt-4 rounded-[11px] border border-line bg-card p-3" open={!hasRealData}>
+            <summary className="cursor-pointer select-none font-display text-sm font-semibold text-(--ink)">Paste receipt snippets</summary>
+            <label className="mt-3 block">
+              <span className="field-label">Receipt, invoice, renewal, or payment-success text</span>
+              <textarea
+                value={receiptText}
+                onChange={(event) => onReceiptTextChange(event.target.value)}
+                className="field min-h-28"
+                placeholder="Paste one or more receipt snippets. Keep merchant, amount, date, and renewal text visible; remove account numbers and private identifiers."
+              />
+            </label>
+            <p className="mt-2 text-xs leading-5 text-(--muted)">Pasted receipts improve source coverage immediately. Gmail OAuth can automate this later when configured.</p>
+          </details>
         </div>
       </div>
     </section>
@@ -703,6 +1269,63 @@ function openOfficialConnectorTarget(connectorId: string) {
   const target = connectorLaunchTargets[connectorId];
   if (!target) return;
   window.open(target.url, "_blank", "noopener,noreferrer");
+}
+
+async function fetchWorkspaceConnectors(): Promise<WorkspaceConnectorStatusPayload> {
+  try {
+    const response = await fetch("/api/workspaces/current/connectors", { cache: "no-store" });
+    return await response.json() as WorkspaceConnectorStatusPayload;
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "Could not load workspace connectors." };
+  }
+}
+
+function getActiveServerAccount(payload: WorkspaceConnectorStatusPayload | null, connectorId: string) {
+  return payload?.accounts?.find((account) => account.connectorId === connectorId && account.status === "active") ?? null;
+}
+
+function getConnectorAccountLabel(connectorId: string) {
+  if (connectorId === "github-copilot") return "GitHub organization slug";
+  if (connectorId === "vercel-platform") return "Vercel team slug";
+  if (connectorId === "render-platform") return "Render owner ID";
+  return "Account identifier";
+}
+
+function getConnectorAccountPlaceholder(connectorId: string) {
+  if (connectorId === "github-copilot") return "Required, for example your-org";
+  if (connectorId === "vercel-platform") return "Optional team slug";
+  if (connectorId === "render-platform") return "Optional owner/workspace ID";
+  if (connectorId === "cloudflare-billing") return "Optional label";
+  return "Optional account id";
+}
+
+function evidenceToManualItem(evidence: ServerConnectorEvidence): ManualRecurringInput | null {
+  if (!evidence.merchantRaw || typeof evidence.amount !== "number" || !Number.isFinite(evidence.amount) || evidence.amount <= 0) return null;
+  const connector = connectors.find((item) => item.id === evidence.connectorId);
+
+  return {
+    id: `connector-${evidence.id}`,
+    merchant: evidence.merchantRaw,
+    amount: evidence.amount,
+    frequency: normalizeEvidenceFrequency(evidence.cadenceHint),
+    nextExpectedDate: evidence.nextDebitHint ?? evidence.observedAt.slice(0, 10),
+    category: inferEvidenceCategory(evidence, connector),
+    sourceName: connector ? `${connector.name} evidence` : `${evidence.provider} evidence`,
+  };
+}
+
+function normalizeEvidenceFrequency(value: string | null): Frequency {
+  if (value === "weekly" || value === "biweekly" || value === "monthly" || value === "bimonthly" || value === "quarterly" || value === "yearly" || value === "irregular") return value;
+  if (value === "usage-window") return "monthly";
+  return "monthly";
+}
+
+function inferEvidenceCategory(evidence: ServerConnectorEvidence, connector: Connector | undefined) {
+  if (connector?.category.includes("AI")) return "AI tools";
+  if (connector?.category.includes("Cloud")) return "Cloud hosting";
+  if (connector?.category.includes("Developer")) return "Developer tools";
+  if (evidence.evidenceType === "receipt" || evidence.evidenceType === "invoice") return "Receipts";
+  return "Other";
 }
 
 function GlobalNotice({ notice, onDismiss }: { notice: string | null; onDismiss: () => void }) {
@@ -753,6 +1376,7 @@ function UserControlPanel({
   onDeleteServerWorkspace: () => void;
 }) {
   const signedInEmail = serverSession?.authenticated ? serverSession.session?.email : null;
+  const missingSignals = coverageSignals.filter((signal) => !signal.done).slice(0, 4);
 
   return (
     <section className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
@@ -769,6 +1393,16 @@ function UserControlPanel({
               <span className={signal.done ? "pill pill-ready" : "pill pill-planned"}>{signal.done ? "Added" : "Check"}</span>
             </div>
           ))}
+        </div>
+        <div className="mt-4 rounded-[11px] border border-line bg-(--card-2) p-3">
+          <p className="font-data text-[0.68rem] text-(--muted)">Next best sources</p>
+          {missingSignals.length ? (
+            <ul className="mt-2 grid gap-2 text-xs leading-5 text-(--muted)">
+              {missingSignals.map((signal) => <li key={signal.label}>- {getCoverageAction(signal.label)}</li>)}
+            </ul>
+          ) : (
+            <p className="mt-2 text-xs leading-5 text-verdict">Core evidence rails are represented. Use direct connectors next to refresh this automatically.</p>
+          )}
         </div>
       </div>
 
@@ -867,10 +1501,10 @@ function RecurringGraph({
         </div>
       ) : (
         <div className="px-5 py-14 text-center">
-          <p className="font-data text-xs text-(--muted)">{hasRealData ? "No pattern yet" : "No source added yet"}</p>
-          <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">{hasRealData ? "No repeated payments found yet" : "Connect Gmail to start"}</h3>
+          <p className="font-data text-xs text-(--muted)">{hasRealData ? "No pattern yet" : "No proof connected yet"}</p>
+          <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">{hasRealData ? "No repeated payments found yet" : "Connect a source to reveal renewals"}</h3>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">
-            {hasRealData ? "Connect more official sources or wait for provider/partner access to deepen coverage." : "Start with Gmail receipts, then add provider connections as they become available."}
+            {hasRealData ? "Connect more official sources or wait for provider/partner access to deepen coverage." : "Start with Gmail receipts. If UPI, card, app-store, bank, SaaS, or cloud evidence is missing, Vognary keeps that gap visible instead of guessing."}
           </p>
         </div>
       )}
@@ -904,13 +1538,15 @@ function PriorityActionPanel({
               </div>
             </button>
           );
-        }) : <p className="inset px-3 py-3 text-sm text-(--muted)">Add sources to generate an action plan.</p>}
+        }) : <p className="inset px-3 py-3 text-sm text-(--muted)">Connect a proof source to generate an action plan.</p>}
       </div>
     </section>
   );
 }
 
 function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; action: RecommendationType; onAction: (action: RecommendationType) => void }) {
+  const confidence = getConfidenceStory(item);
+
   return (
     <section className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
       <div className="dossier p-6">
@@ -935,6 +1571,14 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           {item.riskTags.length ? item.riskTags.map((tag) => <span key={tag} className="rounded-full border px-3 py-1 font-data text-[0.6rem] uppercase tracking-[0.12em]" style={{ borderColor: "var(--dossier-line)", color: "var(--dossier-muted)" }}>{tag}</span>) : <span className="text-sm muted-on-dark">No risk tags yet.</span>}
+        </div>
+        <div className="mt-5 rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-display text-base font-semibold text-(--dossier-ink)">{confidence.label}</p>
+            <span className="pill pill-partial">{item.confidenceScore}%</span>
+          </div>
+          <p className="mt-2 text-sm leading-6 muted-on-dark">{confidence.detail}</p>
+          <p className="mt-2 text-xs leading-5 muted-on-dark">{confidence.nextStep}</p>
         </div>
       </div>
 
@@ -1228,7 +1872,7 @@ function StatusRow({ label, value, state }: { label: string; value: string; stat
 
 function getCoverageItems() {
   return [
-    { label: "Google identity", value: "Ready for private beta login and workspace sessions", state: "ready" as const },
+    { label: "Google identity", value: "OAuth route exists; workspace sessions require configured Google auth, database, and session secret", state: "partial" as const },
     { label: "Gmail receipts", value: "OAuth path exists; production Gmail receipt sync needs Google app verification", state: "partial" as const },
     { label: "Cloud and AI tools", value: "OpenAI adapter exists; Claude, Kling, Vercel, Render, GitHub, and X are connector targets", state: "partial" as const },
     { label: "App-store subscriptions", value: "Apple and Google Play need official source access or provider-supported evidence", state: "planned" as const },
@@ -1239,10 +1883,10 @@ function getCoverageItems() {
 
 function getReadinessItems() {
   return [
-    { label: "Integration launchpad", value: "Users start from official provider connection cards, not upload-first flows", state: "ready" as const },
+    { label: "Integration launchpad", value: "Users start from one platform selector and one connect/disconnect action", state: "ready" as const },
     { label: "Recurring ledger", value: "Connected evidence lands in one review table with next debit and action labels", state: "ready" as const },
-    { label: "Data handling", value: "Private beta login, database, token vault, and encrypted snapshots are configured", state: "ready" as const },
-    { label: "Exports", value: "PDF, spreadsheet, JSON audit pack, and private workspace backup remain available", state: "ready" as const },
+    { label: "Data handling", value: "Browser-local review works; encrypted server snapshots require configured database, session secret, and token key", state: "partial" as const },
+    { label: "Exports", value: "JSON audit pack export remains available from the review workspace", state: "ready" as const },
     { label: "Provider APIs", value: "Each real auto-sync needs OAuth, API keys, or provider partnership per source", state: "partial" as const },
     { label: "Regulated rails", value: "Bank, UPI, and card mandate discovery cannot be universal without approved partners", state: "blocked" as const },
   ];
@@ -1261,6 +1905,36 @@ function getCoverageSignals(statementSources: StatementFile[], manualItems: Manu
     { label: "Cloud/SaaS tools", done: /openai|anthropic|claude|cursor|github|vercel|render|aws|cloud|domain/.test(manualText + sourceNames) },
     { label: "EMI/SIP/insurance/utilities", done: /emi|sip|insurance|utility|utilities|telecom|debt|investment/.test(manualText + sourceNames) },
   ];
+}
+
+function getCoverageAction(label: string) {
+  const actions: Record<string, string> = {
+    "Bank/card statements": "Add one redacted bank or card CSV so Vognary can detect repeated debits.",
+    "Statement source coverage": "Prefer CSV over PDF for the next statement because it gives cleaner transaction rows.",
+    "UPI/card mandates": "Open your UPI or card app, list active mandates, and add them manually until partner APIs are live.",
+    "Apple/Google app stores": "Check Apple ID and Google Play subscriptions, then paste receipts or add each active plan manually.",
+    "Email receipts": "Paste Gmail or Outlook receipt snippets, or connect Gmail when OAuth is configured.",
+    "Cloud/SaaS tools": "Add invoices or usage exports for OpenAI, GitHub, Vercel, Render, AWS, Cloudflare, and domains.",
+    "EMI/SIP/insurance/utilities": "Add policy, EMI, SIP, broadband, telecom, and utility renewals so annual commitments are visible.",
+  };
+
+  return actions[label] ?? `Add evidence for ${label.toLowerCase()}.`;
+}
+
+function getConfidenceStory(item: RecurringItem) {
+  const sourceCount = new Set(item.sourceNames).size;
+  const evidenceCount = item.evidence.length;
+  const amountStable = Math.abs(item.amountMax - item.amountMin) <= Math.max(25, item.averageAmount * 0.05);
+  const label = item.confidenceScore >= 85 ? "Strong evidence" : item.confidenceScore >= 70 ? "Useful evidence" : "Needs confirmation";
+  const stability = amountStable ? "amount is stable" : "amount changes across evidence rows";
+
+  return {
+    label,
+    detail: `Seen in ${evidenceCount} proof row(s) across ${sourceCount} source(s); ${stability}; cadence is ${item.frequency}.`,
+    nextStep: item.confidenceScore >= 85
+      ? "Use this to decide ownership and action before the next debit."
+      : "Add one more source, receipt, or dashboard check before treating this as final.",
+  };
 }
 
 function getPriorityItems(items: RecurringItem[], userActions: Record<string, RecommendationType>): RecurringItem[] {

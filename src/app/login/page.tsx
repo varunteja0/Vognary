@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import LoginClient from "./login-client";
 
 export const metadata: Metadata = {
-  title: "Private Beta Login",
-  description: "Sign in to a Vognary private beta workspace to save encrypted review snapshots.",
+  title: "Start Recurring Audit",
+  description: "Start a Vognary proof-backed recurring-money audit workspace.",
 };
 
 export default function LoginPage() {

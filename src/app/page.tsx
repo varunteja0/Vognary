@@ -39,6 +39,20 @@ const userLanguage = [
   "Enterprise spend tools are overkill before we have finance or procurement.",
 ];
 
+const proofRows = [
+  { source: "Gmail receipts", proves: "Invoices, renewals, trial reminders, payment-success emails", status: "First connector" },
+  { source: "SaaS and cloud dashboards", proves: "AI/API usage, paid plans, domains, seats, cloud commitments", status: "Provider path" },
+  { source: "Statements and mandates", proves: "Bank debits, card repeats, UPI AutoPay, EMIs, SIPs, utilities", status: "Audit evidence" },
+  { source: "Partner rails", proves: "Direct UPI/card mandate state and regulated account data", status: "Needs approval" },
+];
+
+const sampleAuditRows = [
+  { merchant: "OpenAI / ChatGPT", monthly: "INR 1,999", renews: "Aug 6", source: "Gmail receipt", proof: "Paid invoice found; usage source still missing", action: "downgrade", actionClass: "stamp stamp-downgrade" },
+  { merchant: "Vercel Pro", monthly: "INR 1,600", renews: "Jul 18", source: "Dashboard path", proof: "Team plan renewal; project usage should be checked", action: "watch", actionClass: "stamp stamp-watch" },
+  { merchant: "Domain renewal", monthly: "INR 100", renews: "Sep 10", source: "Registrar email", proof: "Annual renewal normalized into monthly burn", action: "keep", actionClass: "stamp stamp-keep" },
+  { merchant: "UPI AutoPay mandate", monthly: "INR 999", renews: "Unknown", source: "Missing proof", proof: "Needs UPI app, bank, PSP, or partner source before decision", action: "investigate", actionClass: "stamp stamp-investigate" },
+];
+
 export default function Home() {
   return (
     <main id="ledger-main" className="relative px-4 pb-16 pt-4 text-foreground sm:px-6 lg:px-8">
@@ -51,6 +65,7 @@ export default function Home() {
           </Link>
           <div className="hidden items-center gap-1 md:flex">
             <a href="#solves" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">What it solves</a>
+            <a href="#sample-audit" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Sample audit</a>
             <a href="#how" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">How it works</a>
             <Link href="/integrations" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Integrations</Link>
             <Link href="/security" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Security</Link>
@@ -73,7 +88,9 @@ export default function Home() {
                 Vognary turns receipts, statements, mandates, invoices, SaaS bills, cloud spend, EMIs, SIPs, insurance, and utilities into one proof-backed monthly action review.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link href="/login" className="btn btn-primary btn-lg">Find hidden renewals</Link>
+                <Link href="/app?demo=1" className="btn btn-primary btn-lg">Try sample workspace</Link>
+                <Link href="/app?guest=1" className="btn btn-ondark btn-lg">Start with my data</Link>
+                <a href="#sample-audit" className="btn btn-ondark btn-lg">See sample audit</a>
                 <Link href="/private-audit" className="btn btn-ondark btn-lg">Ask for a private audit</Link>
               </div>
               <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -94,7 +111,7 @@ export default function Home() {
                   </blockquote>
                 ))}
               </div>
-              <Link href="/login" className="btn btn-primary btn-block mt-6">Start the audit</Link>
+              <Link href="/app?demo=1" className="btn btn-primary btn-block mt-6">Open a working sample</Link>
             </div>
           </div>
         </section>
@@ -116,6 +133,96 @@ export default function Home() {
                 <p className="mt-2 text-sm leading-6 text-(--muted)">{item.body}</p>
               </article>
             ))}
+          </div>
+        </section>
+
+        {/* Sample audit result */}
+        <section id="sample-audit" className="panel scroll-mt-24 overflow-hidden">
+          <div className="flex flex-col gap-4 border-b border-line px-5 py-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <span className="folio" data-folio="Demo">Sample audit result</span>
+              <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">What a useful review should show in five minutes.</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">A ledger row is useful only when it carries amount, renewal timing, proof, missing source, and a decision label.</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="inset px-3 py-2">
+                <p className="eyebrow" style={{ fontSize: "0.58rem" }}>Monthly</p>
+                <p className="font-data mt-1 text-sm font-semibold tnum text-(--ink)">INR 4,698</p>
+              </div>
+              <div className="inset px-3 py-2">
+                <p className="eyebrow" style={{ fontSize: "0.58rem" }}>Review</p>
+                <p className="font-data mt-1 text-sm font-semibold tnum text-(--ink)">INR 4,598</p>
+              </div>
+              <div className="inset px-3 py-2">
+                <p className="eyebrow" style={{ fontSize: "0.58rem" }}>Missing</p>
+                <p className="font-data mt-1 text-sm font-semibold tnum text-(--ink)">1 source</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-220 border-separate border-spacing-0 text-left text-sm">
+              <thead>
+                <tr>
+                  <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Merchant</th>
+                  <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Monthly</th>
+                  <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Renews</th>
+                  <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Source</th>
+                  <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Proof / gap</th>
+                  <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sampleAuditRows.map((row) => (
+                  <tr key={row.merchant}>
+                    <td className="border-b border-line px-5 py-3.5 font-semibold text-(--ink)">{row.merchant}</td>
+                    <td className="border-b border-line px-5 py-3.5 font-data tnum text-(--ink-soft)">{row.monthly}</td>
+                    <td className="border-b border-line px-5 py-3.5 font-data text-xs text-(--muted)">{row.renews}</td>
+                    <td className="border-b border-line px-5 py-3.5 text-(--ink-soft)">{row.source}</td>
+                    <td className="border-b border-line px-5 py-3.5 text-(--muted)">{row.proof}</td>
+                    <td className="border-b border-line px-5 py-3.5"><span className={row.actionClass}>{row.action}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm leading-6 text-(--muted)">This is the product promise: not a list of subscriptions, but a reviewable evidence table with gaps called out honestly.</p>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/app?demo=1" className="btn btn-primary">Open sample workspace</Link>
+              <Link href="/private-audit" className="btn btn-ghost">Request this audit</Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Proof map */}
+        <section className="panel p-6 sm:p-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <span className="folio" data-folio="Proof">What gets proven</span>
+              <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">One ledger only matters if every row has a source.</h2>
+            </div>
+            <p className="max-w-sm text-sm leading-6 text-(--muted)">The product job is not to pretend every rail is connected. It is to prove what can be proven now and name the missing source clearly.</p>
+          </div>
+          <div className="mt-6 overflow-x-auto rounded-[11px] border border-line">
+            <table className="w-full min-w-180 border-separate border-spacing-0 text-left text-sm">
+              <thead>
+                <tr>
+                  <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Source</th>
+                  <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">What it proves</th>
+                  <th className="border-b border-line bg-(--card-2) px-4 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Current path</th>
+                </tr>
+              </thead>
+              <tbody>
+                {proofRows.map((row) => (
+                  <tr key={row.source}>
+                    <td className="border-b border-line px-4 py-3 font-semibold text-(--ink)">{row.source}</td>
+                    <td className="border-b border-line px-4 py-3 text-(--ink-soft)">{row.proves}</td>
+                    <td className="border-b border-line px-4 py-3"><span className="pill pill-partial">{row.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
 

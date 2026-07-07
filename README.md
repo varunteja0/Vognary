@@ -13,15 +13,18 @@ Vognary is a connector-first recurring-money intelligence product for founders, 
 - JSON export for audit reports.
 - PDF report export, CSV export, and private workspace backup/import.
 - Source guide, completeness score, receipt snippet parsing, and priority actions.
-- Connector registry and readiness APIs for 39 provider targets.
+- Connector registry and readiness APIs for 42 provider targets.
 - Connector start/sync planning APIs with honest states for live, planned, and partner-required sources.
-- First direct provider adapter: OpenAI organization costs, env-gated by `OPENAI_ADMIN_API_KEY` and returned as stateless evidence preview.
+- Direct provider adapters for OpenAI costs, Gmail receipt evidence, GitHub Copilot metrics reports, Vercel domains, Render services, and Cloudflare accounts.
+- Authenticated API-key connector storage for OpenAI, GitHub, Vercel, Render, and Cloudflare sync, with encrypted token refs and queued initial sync jobs.
+- Registered Gmail read-only sync adapter that can refresh stored OAuth tokens and persist receipt evidence from queued sync jobs.
 - API rate limiting on public/heavy endpoints.
 - Signed connector webhook endpoint with HMAC verification and optional PostgreSQL event persistence.
 - Internal-secret-gated sync job API that can queue and run registered adapters into PostgreSQL evidence tables once `DATABASE_URL` and `INTERNAL_SYNC_SECRET` are configured.
+- Vercel Cron-compatible due-job runner guarded by `CRON_SECRET` for scheduled connected-account sync.
 - Signed session-cookie and workspace authorization primitives, exposed through closed-by-default auth/workspace APIs.
 - Resend magic-link login route with one-time PostgreSQL challenges for public session issuance once email credentials are configured.
-- Gmail OAuth preview with state validation and no token persistence.
+- Gmail OAuth receipt connector with state validation, browser import fallback, and encrypted token persistence for signed-in users when the database and token vault are configured.
 - PostgreSQL schema for the future persistent connected-account backend.
 
 ## Quick Start
@@ -95,6 +98,18 @@ curl -X POST http://localhost:3000/api/internal/sync-jobs \
 	-H 'Content-Type: application/json' \
 	-H 'Authorization: Bearer <INTERNAL_SYNC_SECRET>' \
 	-d '{"connectorId":"openai-costs","workspaceId":"<workspace-uuid>"}'
+curl -X POST http://localhost:3000/api/internal/sync-jobs/due/run \
+	-H 'Authorization: Bearer <INTERNAL_SYNC_SECRET>'
+curl -X POST http://localhost:3000/api/connectors/openai-costs/start \
+	-H 'Content-Type: application/json' \
+	-H 'Cookie: vognary_session=<signed-session-cookie>' \
+	-d '{"workspaceId":"<workspace-uuid>","apiKey":"<OPENAI_ADMIN_API_KEY>","displayName":"OpenAI org costs"}'
+curl http://localhost:3000/api/workspaces/current/connectors \
+	-H 'Cookie: vognary_session=<signed-session-cookie>'
+curl -X POST http://localhost:3000/api/workspaces/current/connectors/<connected-account-id>/sync \
+	-H 'Cookie: vognary_session=<signed-session-cookie>'
+curl -X DELETE http://localhost:3000/api/workspaces/current/connectors/<connected-account-id> \
+	-H 'Cookie: vognary_session=<signed-session-cookie>'
 ```
 
 Auth/workspace route shape:
@@ -124,9 +139,17 @@ Generate a future token-vault key with:
 npm run secrets:generate-token-key
 ```
 
+Apply or advance the PostgreSQL schema with:
+
+```bash
+DATABASE_URL='<postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
+```
+
+The command maintains `schema_migrations`, baselines the initial schema when needed, and applies forward-only SQL files from `infra/postgres/migrations`.
+
 ## Deployment
 
-See [docs/deployment-plan.md](docs/deployment-plan.md). The current app is deployable for self-serve stateless audits and connector readiness planning. It intentionally does not store financial documents or connected-account tokens server-side yet.
+See [docs/deployment-plan.md](docs/deployment-plan.md). The current app is deployable for self-serve stateless audits and connector readiness planning. Persistent workspace snapshots, connected-account token references, scheduled sync evidence, and cron execution require `DATABASE_URL`, `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY`, `INTERNAL_SYNC_SECRET`, `CRON_SECRET`, and provider credentials. Raw financial document storage should stay disabled until encrypted object storage, backups, and a restore drill are configured.
 
 ## Product Direction
 
@@ -134,9 +157,12 @@ Vognary should not become a generic budget app. The wedge is recurring financial
 
 The integration strategy is documented in [docs/universal-integration-operating-model.md](docs/universal-integration-operating-model.md). It defines how Vognary moves each source from launchpad target to real connector using OAuth, API keys, IAM roles, webhooks, or regulated partner APIs.
 
+The current legal integration execution report is documented in [docs/legal-platform-integration-action-report.md](docs/legal-platform-integration-action-report.md). It separates what is complete in production from what requires external credentials, payment setup, monitoring, storage, or regulated partner approval.
+
 See:
 
 - [docs/universal-integration-operating-model.md](docs/universal-integration-operating-model.md)
+- [docs/legal-platform-integration-action-report.md](docs/legal-platform-integration-action-report.md)
 - [docs/product-architecture.md](docs/product-architecture.md)
 - [docs/production-activation-runbook.md](docs/production-activation-runbook.md)
 - [docs/validation-playbook.md](docs/validation-playbook.md)

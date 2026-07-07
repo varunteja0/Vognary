@@ -6,9 +6,13 @@ export type ConnectorSyncState = "ready" | "blocked" | "manual" | "not-found";
 export type ConnectorConnection = {
   connectorId: string;
   workspaceId: string;
+  connectedAccountId?: string;
   providerAccountId?: string;
   accessRef?: string;
   refreshRef?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  apiKey?: string;
   expiresAt?: string;
   scopes: string[];
 };

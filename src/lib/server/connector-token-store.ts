@@ -1,6 +1,7 @@
 import { getDatabasePool } from "@/lib/server/database";
 import { decryptSecret, encryptSecret, type EncryptedSecret } from "@/lib/server/token-vault";
 import type { ConnectorAuthType } from "@/lib/connectors";
+import type { ConnectorConnection } from "@/lib/connector-runtime";
 
 export type TokenKind = "access" | "refresh" | "api_key" | "iam_role" | "partner_secret";
 
@@ -34,6 +35,13 @@ export type StoreConnectorSecretInput = {
   scopes?: string[];
   expiresAt?: string | null;
   metadata?: Record<string, unknown>;
+};
+
+export type ConnectorSecretRecord = {
+  secret: string;
+  scopes: string[];
+  expiresAt: string | null;
+  metadata: Record<string, unknown>;
 };
 
 export async function upsertConnectedAccount(input: UpsertConnectedAccountInput): Promise<ConnectedAccountRecord> {
@@ -119,9 +127,76 @@ export async function storeConnectorSecret(input: StoreConnectorSecretInput) {
   };
 }
 
+export async function buildStoredConnectorConnection(input: {
+  connectorId: string;
+  workspaceId: string;
+  connectedAccountId: string;
+}): Promise<ConnectorConnection | null> {
+  const account = await getConnectedAccount(input);
+  if (!account) return null;
+
+  const [access, refresh, apiKey] = await Promise.all([
+    loadConnectorSecretRecord(account.id, "access"),
+    loadConnectorSecretRecord(account.id, "refresh"),
+    loadConnectorSecretRecord(account.id, "api_key"),
+  ]);
+  const scopes = uniqueStrings([
+    ...account.scopes,
+    ...(access?.scopes ?? []),
+    ...(refresh?.scopes ?? []),
+    ...(apiKey?.scopes ?? []),
+  ]);
+
+  return {
+    connectorId: account.connectorId,
+    workspaceId: account.workspaceId,
+    connectedAccountId: account.id,
+    providerAccountId: account.providerAccountId ?? undefined,
+    accessRef: access ? `vault:${account.id}:access` : undefined,
+    refreshRef: refresh ? `vault:${account.id}:refresh` : undefined,
+    accessToken: access?.secret,
+    refreshToken: refresh?.secret,
+    apiKey: apiKey?.secret,
+    expiresAt: access?.expiresAt ?? apiKey?.expiresAt ?? undefined,
+    scopes,
+  };
+}
+
+export async function getConnectedAccount(input: {
+  connectorId: string;
+  workspaceId: string;
+  connectedAccountId: string;
+}): Promise<ConnectedAccountRecord | null> {
+  const result = await getDatabasePool().query<ConnectedAccountRow>(
+    `select id, workspace_id, source_id, connector_id, auth_type, provider_account_id, display_name, scopes, status
+     from connected_accounts
+     where id = $1
+       and workspace_id = $2
+       and connector_id = $3
+       and status = 'active'`,
+    [input.connectedAccountId, input.workspaceId, input.connectorId],
+  );
+
+  const row = result.rows[0];
+  return row ? mapConnectedAccount(row) : null;
+}
+
 export async function loadConnectorSecret(connectedAccountId: string, tokenKind: TokenKind) {
-  const result = await getDatabasePool().query<{ encrypted_payload: EncryptedSecret | null }>(
+  const record = await loadConnectorSecretRecord(connectedAccountId, tokenKind);
+  return record?.secret ?? null;
+}
+
+export async function loadConnectorSecretRecord(connectedAccountId: string, tokenKind: TokenKind): Promise<ConnectorSecretRecord | null> {
+  const result = await getDatabasePool().query<{
+    encrypted_payload: EncryptedSecret | null;
+    scopes: string[];
+    expires_at: Date | null;
+    metadata: Record<string, unknown>;
+  }>(
     `select encrypted_payload
+            , scopes
+            , expires_at
+            , metadata
      from connector_token_refs
      where connected_account_id = $1
        and token_kind = $2
@@ -132,7 +207,17 @@ export async function loadConnectorSecret(connectedAccountId: string, tokenKind:
   const encrypted = result.rows[0]?.encrypted_payload;
   if (!encrypted) return null;
 
-  return decryptSecret(encrypted, associatedData(connectedAccountId, tokenKind));
+  const row = result.rows[0];
+  return {
+    secret: decryptSecret(encrypted, associatedData(connectedAccountId, tokenKind)),
+    scopes: row.scopes ?? [],
+    expiresAt: row.expires_at?.toISOString() ?? null,
+    metadata: row.metadata ?? {},
+  };
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 function associatedData(connectedAccountId: string, tokenKind: TokenKind) {
