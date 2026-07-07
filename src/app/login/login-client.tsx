@@ -148,7 +148,7 @@ export default function LoginClient() {
             <p className="mt-2 text-sm leading-6 text-(--muted)">Use this only if you were invited to the beta. The access code will be replaced with email verification before public launch.</p>
 
             {session?.authenticated ? (
-              <div className="mt-6 rounded-[12px] border border-line bg-(--card-2) p-4">
+              <div className="mt-6 rounded-xl border border-line bg-(--card-2) p-4">
                 <p className="font-data text-xs uppercase tracking-[0.16em] text-(--muted)">Current session</p>
                 <p className="mt-2 font-semibold text-(--ink)">{session.session?.email}</p>
                 <p className="mt-1 text-sm text-(--muted)">Workspace: {session.session?.workspaceId ?? "not selected"}</p>
@@ -161,38 +161,50 @@ export default function LoginClient() {
               </div>
             ) : (
               <div className="mt-5 grid gap-5">
-                <div className="rounded-[12px] border border-line bg-(--card-2) p-4">
-                  <h3 className="font-display text-lg font-semibold text-(--ink)">Google sign-in</h3>
-                  <p className="mt-1 text-sm leading-6 text-(--muted)">Fastest path for beta users. Vognary reads your verified Google identity only; Gmail receipt access is a separate connector.</p>
-                  <button disabled={googleSubmitting} type="button" onClick={startGoogleSignIn} className="btn btn-primary mt-3 w-full disabled:cursor-not-allowed disabled:opacity-60">
+                <div className="rounded-xl border p-5" style={{ borderColor: "color-mix(in srgb, var(--gold) 40%, var(--line))", background: "color-mix(in srgb, var(--gold) 6%, var(--card-2))" }}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="pill pill-ready">Recommended</span>
+                    <h3 className="font-display text-lg font-semibold text-(--ink)">Continue with Google</h3>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-(--muted)">Fastest path for beta users. Vognary reads your verified Google identity only — Gmail receipt access is a separate, explicit connector.</p>
+                  <button disabled={googleSubmitting} type="button" onClick={startGoogleSignIn} className="btn btn-primary btn-lg btn-block mt-4">
                     {googleSubmitting ? "Opening Google..." : "Continue with Google"}
                   </button>
                   {googleStatus ? <p className="mt-3 rounded-md border border-indigo bg-(--indigo-tint) px-3 py-2 text-sm text-indigo">{googleStatus}</p> : null}
                 </div>
 
-                <form onSubmit={requestMagicLink} className="grid gap-3 rounded-[12px] border border-line bg-(--card-2) p-4">
-                  <h3 className="font-display text-lg font-semibold text-(--ink)">Email sign-in link</h3>
-                  <p className="text-sm leading-6 text-(--muted)">Optional fallback when Resend is configured.</p>
-                  <input value={magicForm.name} onChange={(event) => setMagicForm({ ...magicForm, name: event.target.value })} className="field" placeholder="Name" />
-                  <input required type="email" value={magicForm.email} onChange={(event) => setMagicForm({ ...magicForm, email: event.target.value })} className="field" placeholder="Email" />
-                  <input value={magicForm.workspaceName} onChange={(event) => setMagicForm({ ...magicForm, workspaceName: event.target.value })} className="field" placeholder="Workspace name" />
-                  <button disabled={magicSubmitting} type="submit" className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-60">{magicSubmitting ? "Sending..." : "Send sign-in link"}</button>
-                  {magicStatus ? <p className="rounded-md border border-indigo bg-(--indigo-tint) px-3 py-2 text-sm text-indigo">{magicStatus}</p> : null}
-                </form>
+                <div className="flex items-center gap-3">
+                  <span className="hairline flex-1" />
+                  <span className="eyebrow shrink-0">Other ways to sign in</span>
+                  <span className="hairline flex-1" />
+                </div>
 
-                <form onSubmit={submit} className="grid gap-3 rounded-[12px] border border-line bg-(--card-2) p-4">
-                  <h3 className="font-display text-lg font-semibold text-(--ink)">Private beta code</h3>
-                  <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="field" placeholder="Name" />
-                  <input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="field" placeholder="Email" />
-                  <input value={form.workspaceName} onChange={(event) => setForm({ ...form, workspaceName: event.target.value })} className="field" placeholder="Workspace name" />
-                  <input required type="password" value={form.accessCode} onChange={(event) => setForm({ ...form, accessCode: event.target.value })} className="field" placeholder="Private beta access code" />
-                  <button disabled={submitting} type="submit" className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-60">{submitting ? "Signing in..." : "Sign in with code"}</button>
-                </form>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <form onSubmit={requestMagicLink} className="flex flex-col gap-3 rounded-xl border border-line bg-(--card-2) p-4">
+                    <h3 className="font-display text-base font-semibold text-(--ink)">Email sign-in link</h3>
+                    <p className="text-xs leading-5 text-(--muted)">Optional fallback when Resend is configured.</p>
+                    <input value={magicForm.name} onChange={(event) => setMagicForm({ ...magicForm, name: event.target.value })} className="field" placeholder="Name" />
+                    <input required type="email" value={magicForm.email} onChange={(event) => setMagicForm({ ...magicForm, email: event.target.value })} className="field" placeholder="Email" />
+                    <input value={magicForm.workspaceName} onChange={(event) => setMagicForm({ ...magicForm, workspaceName: event.target.value })} className="field" placeholder="Workspace name" />
+                    <button disabled={magicSubmitting} type="submit" className="btn btn-ghost btn-block mt-auto disabled:cursor-not-allowed disabled:opacity-60">{magicSubmitting ? "Sending..." : "Send sign-in link"}</button>
+                    {magicStatus ? <p className="rounded-md border border-indigo bg-(--indigo-tint) px-3 py-2 text-sm text-indigo">{magicStatus}</p> : null}
+                  </form>
+
+                  <form onSubmit={submit} className="flex flex-col gap-3 rounded-xl border border-line bg-(--card-2) p-4">
+                    <h3 className="font-display text-base font-semibold text-(--ink)">Private beta code</h3>
+                    <p className="text-xs leading-5 text-(--muted)">For invited beta users. Replaced by email verification at launch.</p>
+                    <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="field" placeholder="Name" />
+                    <input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="field" placeholder="Email" />
+                    <input value={form.workspaceName} onChange={(event) => setForm({ ...form, workspaceName: event.target.value })} className="field" placeholder="Workspace name" />
+                    <input required type="password" value={form.accessCode} onChange={(event) => setForm({ ...form, accessCode: event.target.value })} className="field" placeholder="Private beta access code" />
+                    <button disabled={submitting} type="submit" className="btn btn-ghost btn-block mt-auto disabled:cursor-not-allowed disabled:opacity-60">{submitting ? "Signing in..." : "Sign in with code"}</button>
+                  </form>
+                </div>
               </div>
             )}
 
             {status ? <p className="mt-4 rounded-md border border-indigo bg-(--indigo-tint) px-3 py-2 text-sm text-indigo">{status}</p> : null}
-            <div className="mt-5 rounded-[12px] border border-line bg-(--card-2) p-4 text-sm leading-6 text-(--muted)">
+            <div className="mt-5 rounded-xl border border-line bg-(--card-2) p-4 text-sm leading-6 text-(--muted)">
               <p><strong className="text-(--ink)">Configuration:</strong> session secret is {session?.configuration.status ?? "checking"}.</p>
               <p className="mt-1">Google login env: <span className="font-data">GOOGLE_AUTH_CLIENT_ID</span>, <span className="font-data">GOOGLE_AUTH_CLIENT_SECRET</span>, <span className="font-data">GOOGLE_AUTH_REDIRECT_URI</span>. Code fallback env: <span className="font-data">PRIVATE_BETA_ACCESS_CODE</span>.</p>
             </div>

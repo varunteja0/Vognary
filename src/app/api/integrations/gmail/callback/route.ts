@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { gmailOAuthStateCookie, oauthStateCookieOptions } from "@/lib/oauth-state";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { extractReceiptCandidates } from "@/lib/receipt-parser";
+import { isDatabaseConfigured } from "@/lib/server/database";
+import { readSession } from "@/lib/server/session";
+import { checkTokenVaultConfiguration } from "@/lib/server/token-vault";
+import { upsertConnectedAccount, storeConnectorSecret } from "@/lib/server/connector-token-store";
+import { createConnectorSyncJob } from "@/lib/server/sync-job-store";
+import { getOrCreateDefaultWorkspaceForUser } from "@/lib/server/workspace-store";
 
 export const dynamic = "force-dynamic";
+
+const gmailReadonlyScope = "https://www.googleapis.com/auth/gmail.readonly";
 
 type GmailMessageList = {
   messages?: Array<{ id: string }>;
@@ -11,6 +19,21 @@ type GmailMessageList = {
 
 type GmailMessage = {
   snippet?: string;
+};
+
+type GoogleTokenPayload = {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  scope?: string;
+  token_type?: string;
+};
+
+type GmailProfile = {
+  emailAddress?: string;
+  messagesTotal?: number;
+  threadsTotal?: number;
+  historyId?: string;
 };
 
 export async function GET(request: NextRequest) {
@@ -63,10 +86,12 @@ export async function GET(request: NextRequest) {
     return clearOAuthState(NextResponse.json({ error: "Google token exchange failed." }, { status: 502 }));
   }
 
-  const tokenPayload = await tokenResponse.json() as { access_token?: string };
+  const tokenPayload = await tokenResponse.json() as GoogleTokenPayload;
   if (!tokenPayload.access_token) {
     return clearOAuthState(NextResponse.json({ error: "Google token response did not include an access token." }, { status: 502 }));
   }
+
+  const profile = await fetchGmailProfile(tokenPayload.access_token);
 
   const query = encodeURIComponent('(invoice OR receipt OR subscription OR renewal OR "payment successful") newer_than:365d');
   const listResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=20`, {
@@ -87,9 +112,12 @@ export async function GET(request: NextRequest) {
     return payload.snippet ?? "";
   }));
 
+  const persistence = await persistSignedInGmailConnection(request, tokenPayload, profile);
+
   return clearOAuthState(buildGmailImportResponse({
     candidates: extractReceiptCandidates(snippets),
     messageCount: snippets.filter(Boolean).length,
+    persistence,
   }));
 }
 
@@ -107,14 +135,91 @@ function getGmailClientSecret() {
 }
 
 function getGmailRedirectUri(origin: string) {
-  const appOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || origin.replace(/\/$/, "");
-  return process.env.GOOGLE_REDIRECT_URI?.trim() || `${appOrigin}/api/integrations/gmail/callback`;
+  return process.env.GOOGLE_REDIRECT_URI?.trim() || `${origin.replace(/\/$/, "")}/api/integrations/gmail/callback`;
 }
 
-function buildGmailImportResponse(payload: { candidates: ReturnType<typeof extractReceiptCandidates>; messageCount: number }) {
+async function fetchGmailProfile(accessToken: string): Promise<GmailProfile | null> {
+  const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) return null;
+  return await response.json() as GmailProfile;
+}
+
+async function persistSignedInGmailConnection(request: NextRequest, tokenPayload: GoogleTokenPayload, profile: GmailProfile | null) {
+  const session = readSession(request);
+  if (!session) return { status: "not-signed-in" as const };
+  if (!isDatabaseConfigured()) return { status: "database-not-configured" as const };
+  if (checkTokenVaultConfiguration().status !== "ready") return { status: "token-vault-not-ready" as const };
+
+  try {
+    const workspaceId = session.workspaceId ?? (await getOrCreateDefaultWorkspaceForUser({ userId: session.userId })).workspaceId;
+    const scopes = tokenPayload.scope?.split(/\s+/).filter(Boolean) ?? [gmailReadonlyScope];
+    const email = profile?.emailAddress ?? session.email;
+    const connectedAccount = await upsertConnectedAccount({
+      workspaceId,
+      connectorId: "gmail-readonly",
+      authType: "oauth",
+      providerAccountId: email,
+      displayName: `Gmail receipts (${email})`,
+      scopes,
+      metadata: {
+        provider: "google",
+        emailAddress: email,
+        messagesTotal: profile?.messagesTotal ?? null,
+        threadsTotal: profile?.threadsTotal ?? null,
+        historyId: profile?.historyId ?? null,
+        connectedAt: new Date().toISOString(),
+      },
+    });
+
+    await storeConnectorSecret({
+      connectedAccountId: connectedAccount.id,
+      tokenKind: "access",
+      secret: tokenPayload.access_token ?? "",
+      scopes,
+      expiresAt: tokenPayload.expires_in ? new Date(Date.now() + tokenPayload.expires_in * 1000).toISOString() : null,
+      metadata: { provider: "google", tokenType: tokenPayload.token_type ?? "Bearer" },
+    });
+
+    if (tokenPayload.refresh_token) {
+      await storeConnectorSecret({
+        connectedAccountId: connectedAccount.id,
+        tokenKind: "refresh",
+        secret: tokenPayload.refresh_token,
+        scopes,
+        metadata: { provider: "google" },
+      });
+    }
+
+    const syncJob = await createConnectorSyncJob({
+      workspaceId,
+      connectedAccountId: connectedAccount.id,
+      connectorId: "gmail-readonly",
+      jobType: "initial_sync",
+      priority: 40,
+      cursorState: { historyId: profile?.historyId ?? null, source: "gmail-oauth-callback" },
+    });
+
+    return {
+      status: "stored" as const,
+      workspaceId,
+      connectedAccountId: connectedAccount.id,
+      syncJobId: syncJob.id,
+      refreshTokenStored: Boolean(tokenPayload.refresh_token),
+    };
+  } catch (error) {
+    return {
+      status: "storage-failed" as const,
+      message: error instanceof Error ? error.message : "Could not persist Gmail connection.",
+    };
+  }
+}
+
+function buildGmailImportResponse(payload: { candidates: ReturnType<typeof extractReceiptCandidates>; messageCount: number; persistence: Awaited<ReturnType<typeof persistSignedInGmailConnection>> }) {
   const serialized = JSON.stringify({
     status: "connected-preview",
-    storage: "browser-import",
+    storage: payload.persistence.status === "stored" ? "browser-import-and-token-vault" : "browser-import",
     importedAt: new Date().toISOString(),
     ...payload,
   }).replace(/</g, "\\u003c");

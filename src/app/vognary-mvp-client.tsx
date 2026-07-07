@@ -6,6 +6,7 @@ import { connectors, type Connector, type ConnectorStatus } from "@/lib/connecto
 import {
   analyzeStatements,
   type AuditResult,
+  type Frequency,
   type ManualRecurringInput,
   type RecommendationType,
   type RecurringItem,
@@ -63,6 +64,14 @@ type CoverageSignal = {
   done: boolean;
 };
 
+type QuickRecurringDraft = {
+  merchant: string;
+  amount: string;
+  frequency: Frequency;
+  category: string;
+  sourceName: string;
+};
+
 type ConnectorStartPayload = {
   status?: string;
   state?: string;
@@ -75,6 +84,48 @@ type ConnectorStartPayload = {
 
 const workspaceStorageKey = "vognary.workspace.v1";
 const gmailReceiptStorageKey = "vognary.gmail.receipts.v1";
+
+const quickCategories = [
+  "AI tools",
+  "Cloud hosting",
+  "Developer tools",
+  "Productivity",
+  "App store",
+  "UPI AutoPay",
+  "Card mandate",
+  "Domains",
+  "Insurance",
+  "Debt",
+  "Investments",
+  "Utilities",
+  "Streaming",
+  "Other",
+];
+
+const quickFrequencies: Frequency[] = ["weekly", "monthly", "quarterly", "yearly", "irregular"];
+
+const emptyQuickDraft: QuickRecurringDraft = {
+  merchant: "",
+  amount: "",
+  frequency: "monthly",
+  category: "AI tools",
+  sourceName: "known recurring payment",
+};
+
+const quickTemplates: QuickRecurringDraft[] = [
+  { merchant: "Claude", amount: "1999", frequency: "monthly", category: "AI tools", sourceName: "Claude billing" },
+  { merchant: "OpenAI / ChatGPT", amount: "1999", frequency: "monthly", category: "AI tools", sourceName: "OpenAI billing" },
+  { merchant: "Kling", amount: "999", frequency: "monthly", category: "AI tools", sourceName: "Kling account" },
+  { merchant: "Render", amount: "700", frequency: "monthly", category: "Cloud hosting", sourceName: "Render dashboard" },
+  { merchant: "Vercel", amount: "1600", frequency: "monthly", category: "Cloud hosting", sourceName: "Vercel dashboard" },
+  { merchant: "GitHub Copilot", amount: "850", frequency: "monthly", category: "Developer tools", sourceName: "GitHub billing" },
+  { merchant: "Domain renewal", amount: "1200", frequency: "yearly", category: "Domains", sourceName: "registrar dashboard" },
+  { merchant: "UPI AutoPay mandate", amount: "999", frequency: "monthly", category: "UPI AutoPay", sourceName: "UPI app mandate" },
+  { merchant: "Card merchant mandate", amount: "1999", frequency: "monthly", category: "Card mandate", sourceName: "card recurring payments" },
+  { merchant: "Insurance premium", amount: "3000", frequency: "monthly", category: "Insurance", sourceName: "policy dashboard" },
+  { merchant: "Loan EMI", amount: "15000", frequency: "monthly", category: "Debt", sourceName: "loan account" },
+  { merchant: "Investment SIP", amount: "5000", frequency: "monthly", category: "Investments", sourceName: "investment app" },
+];
 
 function getInitialWorkspace(): WorkspaceBackup | null {
   if (typeof window === "undefined") return null;
@@ -150,6 +201,8 @@ export default function VognaryMvpClient() {
   const [initialWorkspace] = useState<WorkspaceBackup | null>(() => getInitialWorkspace());
   const [statementSources, setStatementSources] = useState<StatementFile[]>(initialWorkspace?.statementSources ?? []);
   const [manualItems, setManualItems] = useState<ManualRecurringInput[]>(initialWorkspace?.manualItems ?? []);
+  const [quickDraft, setQuickDraft] = useState<QuickRecurringDraft>(emptyQuickDraft);
+  const [knownDebitsText, setKnownDebitsText] = useState("Claude 1999\nRender 700\nKling 999");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [userActions, setUserActions] = useState<Record<string, RecommendationType>>(initialWorkspace?.userActions ?? {});
   const [itemOwners, setItemOwners] = useState<Record<string, string>>(initialWorkspace?.itemOwners ?? {});
@@ -260,6 +313,42 @@ export default function VognaryMvpClient() {
     setSelectedItemId(null);
     setReceiptText("");
     setNotice("Workspace cleared. This browser has no audit data now.");
+  }
+
+  function addQuickRecurringItem(draft: QuickRecurringDraft = quickDraft) {
+    const amount = Number.parseFloat(draft.amount.replace(/,/g, ""));
+    if (!draft.merchant.trim() || !Number.isFinite(amount) || amount <= 0) {
+      setNotice("Add a merchant name and a positive amount first.");
+      return;
+    }
+
+    const item = buildQuickManualItem(draft, amount);
+    setManualItems((current) => recurringExists(current, item) ? current : [...current, item]);
+    setQuickDraft(emptyQuickDraft);
+    setSelectedItemId(item.id);
+    setNotice(`${item.merchant} added to your recurring ledger.`);
+  }
+
+  function importKnownDebits() {
+    const parsed = knownDebitsText
+      .split(/\r?\n/)
+      .map((line) => parseKnownDebitLine(line))
+      .filter((item): item is ManualRecurringInput => Boolean(item));
+
+    if (!parsed.length) {
+      setNotice("Paste one recurring payment per line, for example: Claude 1999");
+      return;
+    }
+
+    setManualItems((current) => {
+      const next = [...current];
+      for (const item of parsed) {
+        if (!recurringExists(next, item)) next.push(item);
+      }
+      return next;
+    });
+    setSelectedItemId(parsed[0].id);
+    setNotice(`${parsed.length} known recurring payment(s) imported.`);
   }
 
   function exportReport() {
@@ -578,6 +667,18 @@ export default function VognaryMvpClient() {
           onJumpToLedger={() => selectAndReviewItem()}
         />
 
+        <QuickRecurringPanel
+          draft={quickDraft}
+          knownDebitsText={knownDebitsText}
+          audit={audit}
+          onDraft={setQuickDraft}
+          onKnownDebitsText={setKnownDebitsText}
+          onAddDraft={() => addQuickRecurringItem()}
+          onAddTemplate={addQuickRecurringItem}
+          onImportKnownDebits={importKnownDebits}
+          onReview={() => selectAndReviewItem()}
+        />
+
         {/* Masthead */}
         <header
           className="dossier spotlight scan overflow-hidden rise"
@@ -823,6 +924,79 @@ function ConnectedSourcePanel({
       <div className="mt-5 grid gap-4">
         <ConnectorGroup title="Cloud, SaaS, and AI tools" connectors={cloudConnectors} connectorStartResults={connectorStartResults} connectingConnectorId={connectingConnectorId} onStartConnector={onStartConnector} />
         <ConnectorGroup title="Banks, UPI, cards, wallets" connectors={mandateConnectors} connectorStartResults={connectorStartResults} connectingConnectorId={connectingConnectorId} onStartConnector={onStartConnector} />
+      </div>
+    </section>
+  );
+}
+
+function QuickRecurringPanel({
+  draft,
+  knownDebitsText,
+  audit,
+  onDraft,
+  onKnownDebitsText,
+  onAddDraft,
+  onAddTemplate,
+  onImportKnownDebits,
+  onReview,
+}: {
+  draft: QuickRecurringDraft;
+  knownDebitsText: string;
+  audit: AuditResult;
+  onDraft: (draft: QuickRecurringDraft) => void;
+  onKnownDebitsText: (value: string) => void;
+  onAddDraft: () => void;
+  onAddTemplate: (draft: QuickRecurringDraft) => void;
+  onImportKnownDebits: () => void;
+  onReview: () => void;
+}) {
+  return (
+    <section className="grid gap-5 xl:grid-cols-[0.88fr_1.12fr]" data-reveal>
+      <div className="panel p-5 sm:p-6">
+        <SectionHead
+          folio="02"
+          kicker="Fallback"
+          title="Add known debits only if Gmail misses them"
+          desc="Gmail is the primary path. This fallback is for obvious payments you already know, so the first review still has value while provider APIs are being added."
+          right={<span className="pill pill-partial">Fallback</span>}
+        />
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <input value={draft.merchant} onChange={(event) => onDraft({ ...draft, merchant: event.target.value })} className="field" placeholder="Merchant, e.g. Claude" />
+          <input value={draft.amount} onChange={(event) => onDraft({ ...draft, amount: event.target.value })} className="field" placeholder="Amount in INR" inputMode="decimal" />
+          <select value={draft.frequency} onChange={(event) => onDraft({ ...draft, frequency: event.target.value as Frequency })} className="field capitalize">
+            {quickFrequencies.map((frequency) => <option key={frequency} value={frequency}>{frequency}</option>)}
+          </select>
+          <select value={draft.category} onChange={(event) => onDraft({ ...draft, category: event.target.value })} className="field">
+            {quickCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+          <input value={draft.sourceName} onChange={(event) => onDraft({ ...draft, sourceName: event.target.value })} className="field sm:col-span-2" placeholder="Source, e.g. Claude billing page" />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={onAddDraft} className="btn btn-primary">Add known debit</button>
+          <button type="button" onClick={onReview} className="btn btn-ghost">Review ledger</button>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          {quickTemplates.slice(0, 8).map((template) => (
+            <button key={`${template.merchant}-${template.category}`} type="button" onClick={() => onAddTemplate(template)} className="rounded-full border border-line bg-card px-3 py-1 text-xs font-semibold text-(--muted) transition hover:border-ember hover:text-ember">
+              {template.merchant}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel p-5 sm:p-6">
+        <SectionHead
+          folio="02A"
+          kicker="Fast import"
+          title="Paste names only when you already know them"
+          desc="One per line, such as Claude 1999 or Render 700. This is a fallback, not the intended long-term integration model."
+          right={<span className="font-data text-xs text-(--muted)">{audit.summary.recurringCount} found</span>}
+        />
+        <textarea value={knownDebitsText} onChange={(event) => onKnownDebitsText(event.target.value)} className="field field-mono mt-4 min-h-28" />
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={onImportKnownDebits} className="btn btn-primary">Import known debits</button>
+          <button type="button" onClick={onReview} className="btn btn-ghost">Open recurring ledger</button>
+        </div>
       </div>
     </section>
   );
@@ -1533,6 +1707,79 @@ function isReceiptCandidate(value: unknown): value is ReceiptCandidate {
 
 function recurringIdentity(item: Pick<ManualRecurringInput, "merchant" | "amount" | "frequency">) {
   return `${item.merchant.trim().toLowerCase()}::${Math.round(item.amount * 100)}::${item.frequency}`;
+}
+
+function buildQuickManualItem(draft: QuickRecurringDraft, amount: number): ManualRecurringInput {
+  const merchant = draft.merchant.trim();
+  return {
+    id: `quick-${Date.now()}-${slugify(merchant)}`,
+    merchant,
+    amount,
+    frequency: draft.frequency,
+    nextExpectedDate: inferNextExpectedDate(draft.frequency),
+    category: draft.category,
+    sourceName: draft.sourceName.trim() || "known recurring payment",
+  };
+}
+
+function recurringExists(items: ManualRecurringInput[], candidate: Pick<ManualRecurringInput, "merchant" | "amount" | "frequency">) {
+  const identity = recurringIdentity(candidate);
+  return items.some((item) => recurringIdentity(item) === identity);
+}
+
+function parseKnownDebitLine(line: string): ManualRecurringInput | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+
+  const amountMatch = trimmed.match(/(?:₹|rs\.?|inr)?\s*\d[\d,]*(?:\.\d+)?/i);
+  if (!amountMatch) return null;
+
+  const amount = Number.parseFloat(amountMatch[0].replace(/(?:₹|rs\.?|inr)/gi, "").replace(/,/g, "").trim());
+  const merchant = trimmed.slice(0, amountMatch.index).replace(/[–—:-]+$/g, "").trim();
+  if (!merchant || !Number.isFinite(amount) || amount <= 0) return null;
+
+  const frequency = /year|annual/i.test(trimmed) ? "yearly" : /week/i.test(trimmed) ? "weekly" : /quarter/i.test(trimmed) ? "quarterly" : "monthly";
+  return {
+    id: `known-${Date.now()}-${slugify(merchant)}`,
+    merchant,
+    amount,
+    frequency,
+    nextExpectedDate: inferNextExpectedDate(frequency),
+    category: inferQuickCategory(merchant),
+    sourceName: "known recurring payment",
+  };
+}
+
+function inferQuickCategory(merchant: string) {
+  if (/claude|openai|chatgpt|kling|cursor|perplexity/i.test(merchant)) return "AI tools";
+  if (/render|vercel|aws|cloudflare|digitalocean|gcp|cloud/i.test(merchant)) return "Cloud hosting";
+  if (/github|copilot|gitlab/i.test(merchant)) return "Developer tools";
+  if (/apple|icloud|google play|play store/i.test(merchant)) return "App store";
+  if (/upi|autopay/i.test(merchant)) return "UPI AutoPay";
+  if (/card|mandate/i.test(merchant)) return "Card mandate";
+  if (/domain|namecheap|godaddy/i.test(merchant)) return "Domains";
+  if (/insurance|policy/i.test(merchant)) return "Insurance";
+  if (/emi|loan/i.test(merchant)) return "Debt";
+  if (/sip|mutual|investment/i.test(merchant)) return "Investments";
+  return "Other";
+}
+
+function inferNextExpectedDate(frequency: Frequency) {
+  const days = {
+    weekly: 7,
+    biweekly: 14,
+    monthly: 30,
+    bimonthly: 61,
+    quarterly: 91,
+    yearly: 365,
+    irregular: 30,
+  }[frequency];
+  const date = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  return date.toISOString().slice(0, 10);
+}
+
+function slugify(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
 function buildWorkspaceBackup({

@@ -21,6 +21,7 @@ export function GET(request: Request) {
       status: "not-configured",
       integration: "gmail-readonly",
       requiredEnv: missingEnv,
+      redirectUri,
       scope: gmailReadonlyScope,
     };
 
@@ -47,6 +48,7 @@ export function GET(request: Request) {
       status: "ready",
       integration: "gmail-readonly",
       authUrl: authUrl.toString(),
+      redirectUri,
       scope: gmailReadonlyScope,
     });
     response.cookies.set(gmailOAuthStateCookie, state, oauthStateCookieOptions());
@@ -67,6 +69,5 @@ function getGmailClientSecret() {
 }
 
 function getGmailRedirectUri(origin: string) {
-  const appOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || origin.replace(/\/$/, "");
-  return process.env.GOOGLE_REDIRECT_URI?.trim() || `${appOrigin}/api/integrations/gmail/callback`;
+  return process.env.GOOGLE_REDIRECT_URI?.trim() || `${origin.replace(/\/$/, "")}/api/integrations/gmail/callback`;
 }

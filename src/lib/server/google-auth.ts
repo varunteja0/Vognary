@@ -39,7 +39,7 @@ export function getGoogleAuthRedirectUri(origin: string) {
 }
 
 export function getGoogleAuthOrigin(requestOrigin: string) {
-  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || requestOrigin;
+  return requestOrigin.replace(/\/$/, "");
 }
 
 export function isGoogleEmailAllowed(email: string) {

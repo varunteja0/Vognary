@@ -18,6 +18,7 @@ export function GET(request: NextRequest) {
       status: "not-configured",
       provider: "google-auth",
       requiredEnv: ["GOOGLE_AUTH_CLIENT_ID or GOOGLE_CLIENT_ID"],
+      redirectUri,
       message: "Google login needs a Google OAuth client ID.",
     };
     return NextResponse.json(payload, { status: wantsJson ? 200 : 501 });
