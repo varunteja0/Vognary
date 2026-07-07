@@ -34,8 +34,8 @@ function isValidEmail(value: string) {
 }
 
 function safeNextPath(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/app";
-  if (raw === "/login" || raw.startsWith("/login?") || raw.startsWith("/login/")) return "/app";
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/connect";
+  if (raw === "/login" || raw.startsWith("/login?") || raw.startsWith("/login/")) return "/connect";
   return raw;
 }
 
