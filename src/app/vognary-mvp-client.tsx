@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { jsPDF } from "jspdf";
 import { connectors, type Connector, type ConnectorStatus } from "@/lib/connectors";
 import {
   analyzeStatements,
   type AuditResult,
-  type Frequency,
   type ManualRecurringInput,
   type RecommendationType,
   type RecurringItem,
@@ -64,14 +62,6 @@ type CoverageSignal = {
   done: boolean;
 };
 
-type QuickRecurringDraft = {
-  merchant: string;
-  amount: string;
-  frequency: Frequency;
-  category: string;
-  sourceName: string;
-};
-
 type ConnectorStartPayload = {
   status?: string;
   state?: string;
@@ -80,52 +70,11 @@ type ConnectorStartPayload = {
   requiredEnv?: string[];
   message?: string;
   authUrl?: string;
+  redirectUri?: string;
 };
 
 const workspaceStorageKey = "vognary.workspace.v1";
 const gmailReceiptStorageKey = "vognary.gmail.receipts.v1";
-
-const quickCategories = [
-  "AI tools",
-  "Cloud hosting",
-  "Developer tools",
-  "Productivity",
-  "App store",
-  "UPI AutoPay",
-  "Card mandate",
-  "Domains",
-  "Insurance",
-  "Debt",
-  "Investments",
-  "Utilities",
-  "Streaming",
-  "Other",
-];
-
-const quickFrequencies: Frequency[] = ["weekly", "monthly", "quarterly", "yearly", "irregular"];
-
-const emptyQuickDraft: QuickRecurringDraft = {
-  merchant: "",
-  amount: "",
-  frequency: "monthly",
-  category: "AI tools",
-  sourceName: "known recurring payment",
-};
-
-const quickTemplates: QuickRecurringDraft[] = [
-  { merchant: "Claude", amount: "1999", frequency: "monthly", category: "AI tools", sourceName: "Claude billing" },
-  { merchant: "OpenAI / ChatGPT", amount: "1999", frequency: "monthly", category: "AI tools", sourceName: "OpenAI billing" },
-  { merchant: "Kling", amount: "999", frequency: "monthly", category: "AI tools", sourceName: "Kling account" },
-  { merchant: "Render", amount: "700", frequency: "monthly", category: "Cloud hosting", sourceName: "Render dashboard" },
-  { merchant: "Vercel", amount: "1600", frequency: "monthly", category: "Cloud hosting", sourceName: "Vercel dashboard" },
-  { merchant: "GitHub Copilot", amount: "850", frequency: "monthly", category: "Developer tools", sourceName: "GitHub billing" },
-  { merchant: "Domain renewal", amount: "1200", frequency: "yearly", category: "Domains", sourceName: "registrar dashboard" },
-  { merchant: "UPI AutoPay mandate", amount: "999", frequency: "monthly", category: "UPI AutoPay", sourceName: "UPI app mandate" },
-  { merchant: "Card merchant mandate", amount: "1999", frequency: "monthly", category: "Card mandate", sourceName: "card recurring payments" },
-  { merchant: "Insurance premium", amount: "3000", frequency: "monthly", category: "Insurance", sourceName: "policy dashboard" },
-  { merchant: "Loan EMI", amount: "15000", frequency: "monthly", category: "Debt", sourceName: "loan account" },
-  { merchant: "Investment SIP", amount: "5000", frequency: "monthly", category: "Investments", sourceName: "investment app" },
-];
 
 function getInitialWorkspace(): WorkspaceBackup | null {
   if (typeof window === "undefined") return null;
@@ -201,8 +150,6 @@ export default function VognaryMvpClient() {
   const [initialWorkspace] = useState<WorkspaceBackup | null>(() => getInitialWorkspace());
   const [statementSources, setStatementSources] = useState<StatementFile[]>(initialWorkspace?.statementSources ?? []);
   const [manualItems, setManualItems] = useState<ManualRecurringInput[]>(initialWorkspace?.manualItems ?? []);
-  const [quickDraft, setQuickDraft] = useState<QuickRecurringDraft>(emptyQuickDraft);
-  const [knownDebitsText, setKnownDebitsText] = useState("Claude 1999\nRender 700\nKling 999");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [userActions, setUserActions] = useState<Record<string, RecommendationType>>(initialWorkspace?.userActions ?? {});
   const [itemOwners, setItemOwners] = useState<Record<string, string>>(initialWorkspace?.itemOwners ?? {});
@@ -217,6 +164,8 @@ export default function VognaryMvpClient() {
   const [serverSaveStatus, setServerSaveStatus] = useState<string | null>(null);
   const [connectorStartResults, setConnectorStartResults] = useState<Record<string, ConnectorStartPayload>>({});
   const [connectingConnectorId, setConnectingConnectorId] = useState<string | null>(null);
+  const [selectedConnectorId, setSelectedConnectorId] = useState("gmail-readonly");
+  const [disconnectedConnectorIds, setDisconnectedConnectorIds] = useState<string[]>([]);
 
   const audit = useMemo<AuditResult>(
     () => analyzeStatements(statementSources.map(({ name, text }) => ({ name, text })), manualItems),
@@ -227,6 +176,15 @@ export default function VognaryMvpClient() {
   const coverageSignals = useMemo(() => getCoverageSignals(statementSources, manualItems, receiptText), [statementSources, manualItems, receiptText]);
   const coverageScore = Math.round((coverageSignals.filter((signal) => signal.done).length / coverageSignals.length) * 100);
   const priorityItems = useMemo(() => getPriorityItems(audit.recurringItems, userActions), [audit.recurringItems, userActions]);
+  const connectedConnectorIds = useMemo(() => {
+    const connected = new Set<string>();
+    if (receiptText.trim()) connected.add("gmail-readonly");
+    for (const [id, result] of Object.entries(connectorStartResults)) {
+      if (result.status?.startsWith("connected")) connected.add(id);
+    }
+    for (const id of disconnectedConnectorIds) connected.delete(id);
+    return connected;
+  }, [connectorStartResults, disconnectedConnectorIds, receiptText]);
   useEffect(() => {
     if (!localSaveEnabled || typeof window === "undefined") return;
     const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText });
@@ -264,6 +222,8 @@ export default function VognaryMvpClient() {
 
       if (!candidates.length) {
         queueMicrotask(() => {
+          setConnectorStartResults((current) => ({ ...current, "gmail-readonly": { status: "connected-preview", message: "Gmail connected; no recurring candidates found yet." } }));
+          setDisconnectedConnectorIds((current) => current.filter((id) => id !== "gmail-readonly"));
           setNotice(`Gmail connected. Scanned ${payload.messageCount ?? 0} receipt-like message(s), but no recurring candidates were found yet.`);
         });
         return;
@@ -287,6 +247,8 @@ export default function VognaryMvpClient() {
           return [...current, ...nextItems];
         });
         setReceiptText((current) => current || candidates.map((candidate) => candidate.evidenceText).join("\n\n"));
+        setConnectorStartResults((current) => ({ ...current, "gmail-readonly": { status: "connected-preview", message: `Imported ${candidates.length} recurring candidate(s) from Gmail.` } }));
+        setDisconnectedConnectorIds((current) => current.filter((id) => id !== "gmail-readonly"));
         setNotice(`Gmail connected. Imported ${candidates.length} recurring candidate(s) from receipt history.`);
       });
     } catch {
@@ -313,42 +275,6 @@ export default function VognaryMvpClient() {
     setSelectedItemId(null);
     setReceiptText("");
     setNotice("Workspace cleared. This browser has no audit data now.");
-  }
-
-  function addQuickRecurringItem(draft: QuickRecurringDraft = quickDraft) {
-    const amount = Number.parseFloat(draft.amount.replace(/,/g, ""));
-    if (!draft.merchant.trim() || !Number.isFinite(amount) || amount <= 0) {
-      setNotice("Add a merchant name and a positive amount first.");
-      return;
-    }
-
-    const item = buildQuickManualItem(draft, amount);
-    setManualItems((current) => recurringExists(current, item) ? current : [...current, item]);
-    setQuickDraft(emptyQuickDraft);
-    setSelectedItemId(item.id);
-    setNotice(`${item.merchant} added to your recurring ledger.`);
-  }
-
-  function importKnownDebits() {
-    const parsed = knownDebitsText
-      .split(/\r?\n/)
-      .map((line) => parseKnownDebitLine(line))
-      .filter((item): item is ManualRecurringInput => Boolean(item));
-
-    if (!parsed.length) {
-      setNotice("Paste one recurring payment per line, for example: Claude 1999");
-      return;
-    }
-
-    setManualItems((current) => {
-      const next = [...current];
-      for (const item of parsed) {
-        if (!recurringExists(next, item)) next.push(item);
-      }
-      return next;
-    });
-    setSelectedItemId(parsed[0].id);
-    setNotice(`${parsed.length} known recurring payment(s) imported.`);
   }
 
   function exportReport() {
@@ -380,12 +306,6 @@ export default function VognaryMvpClient() {
     link.click();
     URL.revokeObjectURL(url);
     setNotice("Audit pack downloaded as JSON. Keep it private because it includes your source text.");
-  }
-
-  function exportWorkspaceBackup() {
-    const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText });
-    downloadText("vognary-workspace-backup.json", JSON.stringify(backup, null, 2), "application/json");
-    setNotice("Workspace backup downloaded. It includes your source text, so keep it private.");
   }
 
   async function saveServerWorkspace() {
@@ -475,92 +395,6 @@ export default function VognaryMvpClient() {
     setNotice(message);
   }
 
-  async function importWorkspaceBackup(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const backup = JSON.parse(await file.text()) as Partial<WorkspaceBackup>;
-      if (backup.version !== 1 || !Array.isArray(backup.statementSources) || !Array.isArray(backup.manualItems)) {
-        setNotice("This is not a valid Vognary workspace backup.");
-        return;
-      }
-
-      setStatementSources(backup.statementSources);
-      setManualItems(backup.manualItems);
-      setUserActions(backup.userActions ?? {});
-      setItemOwners(backup.itemOwners ?? {});
-      setReviewNotes(backup.reviewNotes ?? {});
-      setTeamMembers(backup.teamMembers?.length ? backup.teamMembers : [{ id: "founder", name: "Founder", role: "Owner" }]);
-      setReceiptText(backup.receiptText ?? "");
-      setNotice("Workspace backup imported on this device.");
-    } catch {
-      setNotice("Could not import this workspace backup.");
-    } finally {
-      event.target.value = "";
-    }
-  }
-
-  function exportCsvReport() {
-    const rows = [
-      ["Merchant", "Category", "Frequency", "Monthly Cost", "Annual Cost", "Next Debit", "Confidence", "Action", "Owner", "Review Note"],
-      ...audit.recurringItems.map((item) => [
-        item.merchant,
-        item.category,
-        item.frequency,
-        Math.round(item.monthlyCost).toString(),
-        Math.round(item.annualCost).toString(),
-        item.nextExpectedDate,
-        `${item.confidenceScore}%`,
-        userActions[item.id] ?? item.recommendationType,
-        getOwnerName(itemOwners[item.id], teamMembers),
-        reviewNotes[item.id] ?? "",
-      ]),
-    ];
-    downloadText("vognary-recurring-audit.csv", rows.map((row) => row.map(csvEscape).join(",")).join("\n"), "text/csv");
-    setNotice("Spreadsheet report exported.");
-  }
-
-  function exportPdfReport() {
-    const doc = new jsPDF({ unit: "pt", format: "a4" });
-    const margin = 42;
-    let y = 48;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(20);
-    doc.text("Vognary Recurring Audit", margin, y);
-    y += 28;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleString("en-IN")}`, margin, y);
-    y += 24;
-    doc.setFontSize(12);
-    doc.text(`Monthly total: ${formatCurrency(audit.summary.monthlyRecurringSpend)} | Yearly total: ${formatCurrency(audit.summary.annualRecurringSpend)}`, margin, y);
-    y += 18;
-    doc.text(`Needs review: ${formatCurrency(audit.summary.reviewableMonthlySpend)} | Items: ${audit.summary.recurringCount}`, margin, y);
-    y += 28;
-
-    doc.setFont("helvetica", "bold");
-    doc.text("Recurring commitments", margin, y);
-    y += 18;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-
-    for (const item of audit.recurringItems.slice(0, 18)) {
-      const line = `${item.merchant} | ${formatCurrency(item.monthlyCost)}/mo | ${item.frequency} | next ${item.nextExpectedDate} | ${userActions[item.id] ?? item.recommendationType} | ${getOwnerName(itemOwners[item.id], teamMembers)}`;
-      const wrapped = doc.splitTextToSize(line, 510) as string[];
-      if (y + wrapped.length * 12 > 760) {
-        doc.addPage();
-        y = 48;
-      }
-      doc.text(wrapped, margin, y);
-      y += wrapped.length * 12 + 8;
-    }
-
-    doc.save("vognary-recurring-audit.pdf");
-    setNotice("PDF report exported.");
-  }
-
   function addTeamMember() {
     if (!memberDraft.name.trim()) {
       setNotice("Add a team member name before adding them to the review workflow.");
@@ -596,6 +430,7 @@ export default function VognaryMvpClient() {
 
   async function startConnector(connector: Connector) {
     setConnectingConnectorId(connector.id);
+    setDisconnectedConnectorIds((current) => current.filter((id) => id !== connector.id));
 
     try {
       if (connector.id === "gmail-readonly") {
@@ -610,7 +445,7 @@ export default function VognaryMvpClient() {
 
         openOfficialConnectorTarget(connector.id);
         setNotice(payload.requiredEnv?.length
-          ? `Gmail needs production OAuth setup first: ${payload.requiredEnv.join(", ")}. Opening the official setup page.`
+          ? `Gmail needs production OAuth setup first: ${payload.requiredEnv.join(", ")}. Required redirect URI: ${payload.redirectUri ?? "not available"}.`
           : "Opening the official Gmail setup path.");
         return;
       }
@@ -628,6 +463,23 @@ export default function VognaryMvpClient() {
     } finally {
       setConnectingConnectorId(null);
     }
+  }
+
+  function disconnectConnector(connector: Connector) {
+    setConnectorStartResults((current) => {
+      const next = { ...current };
+      delete next[connector.id];
+      return next;
+    });
+    setDisconnectedConnectorIds((current) => current.includes(connector.id) ? current : [...current, connector.id]);
+
+    if (connector.id === "gmail-readonly") {
+      window.localStorage.removeItem(gmailReceiptStorageKey);
+      setReceiptText("");
+      setManualItems((current) => current.filter((item) => item.sourceName !== "Gmail receipt sync"));
+    }
+
+    setNotice(`${connector.name} disconnected in this workspace.`);
   }
 
   return (
@@ -663,117 +515,33 @@ export default function VognaryMvpClient() {
           audit={audit}
           connectorStartResults={connectorStartResults}
           connectingConnectorId={connectingConnectorId}
+          connectedConnectorIds={connectedConnectorIds}
+          selectedConnectorId={selectedConnectorId}
+          onSelectedConnector={setSelectedConnectorId}
           onStartConnector={startConnector}
+          onDisconnectConnector={disconnectConnector}
           onJumpToLedger={() => selectAndReviewItem()}
+          onExportReport={exportReport}
+          onClearWorkspace={clearWorkspace}
         />
 
-        <QuickRecurringPanel
-          draft={quickDraft}
-          knownDebitsText={knownDebitsText}
-          audit={audit}
-          onDraft={setQuickDraft}
-          onKnownDebitsText={setKnownDebitsText}
-          onAddDraft={() => addQuickRecurringItem()}
-          onAddTemplate={addQuickRecurringItem}
-          onImportKnownDebits={importKnownDebits}
-          onReview={() => selectAndReviewItem()}
-        />
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-reveal>
+          <Metric label="Monthly recurring" value={formatCurrency(audit.summary.monthlyRecurringSpend)} tone="ink" />
+          <Metric label="Yearly total" value={formatCurrency(audit.summary.annualRecurringSpend)} tone="blue" />
+          <Metric label="Needs review" value={formatCurrency(audit.summary.reviewableMonthlySpend)} tone="caution" />
+          <Metric label="Renewing in 10 days" value={`${audit.summary.renewalsNextTenDays}`} tone="accent" />
+        </section>
 
-        {/* Masthead */}
-        <header
-          className="dossier spotlight scan overflow-hidden rise"
-          onMouseMove={trackSpotlightPointer}
-        >
-          <div className="grid gap-0 lg:grid-cols-[1.4fr_1fr]">
-            <div className="p-7 sm:p-10">
-              <span className="folio" data-folio="Start" style={{ color: "var(--dossier-muted)" }}>Overview</span>
-              <h2 className="hero-title mt-6 font-display font-bold text-(--dossier-ink)">
-                Find recurring{" "}
-                <br />
-                payments before{" "}
-                <br />
-                they <span className="glow-num">renew.</span>
-              </h2>
-              <p className="mt-6 max-w-xl text-sm leading-7 muted-on-dark sm:text-base">
-                Connect official sources first. Vognary turns provider evidence into one recurring-payment ledger, then shows renewals, proof, owners, and actions.
-              </p>
-              <div className="mt-7 flex flex-wrap gap-2.5">
-                <button type="button" onClick={exportReport} className="btn btn-primary">Download report</button>
-                <button type="button" onClick={clearWorkspace} className="btn btn-ondark">Clear data</button>
-              </div>
-              <div className="spectral mt-8 h-px w-full opacity-70" />
-              <p className="mt-4 font-data text-[0.68rem] uppercase tracking-[0.16em] muted-on-dark">
-                <span className="text-(--dossier-ink)">{audit.summary.recurringCount}</span> items found
-                <span className="mx-2 text-(--dossier-line)">·</span>
-                <span className="text-(--dossier-ink)">{Math.round(audit.summary.averageConfidence)}%</span> avg confidence
-              </p>
-            </div>
-            <div className="border-t p-7 sm:p-10 lg:border-l lg:border-t-0" style={{ borderColor: "var(--dossier-line)" }}>
-              <p className="eyebrow muted-on-dark">Reports &amp; saved work</p>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <button type="button" onClick={exportPdfReport} className="btn btn-ondark w-full">PDF report</button>
-                <button type="button" onClick={exportCsvReport} className="btn btn-ondark w-full">Spreadsheet report</button>
-                <button type="button" onClick={exportWorkspaceBackup} className="btn btn-ondark w-full">Backup file</button>
-                <label className="btn btn-ondark w-full cursor-pointer">
-                  Import backup
-                  <input type="file" accept="application/json,.json" onChange={importWorkspaceBackup} className="sr-only" />
-                </label>
-              </div>
-              <div className="mt-5 rounded-xl border border-dashed p-4" style={{ borderColor: "var(--dossier-line)" }}>
-                <p className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Action labels</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="stamp stamp-keep">Keep</span>
-                  <span className="stamp stamp-watch">Watch</span>
-                  <span className="stamp stamp-downgrade">Downgrade</span>
-                  <span className="stamp stamp-cancel">Cancel</span>
-                  <span className="stamp stamp-investigate">Investigate</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <QuickStartPanel />
-        <UserControlPanel
-          coverageScore={coverageScore}
-          coverageSignals={coverageSignals}
-          localSaveEnabled={localSaveEnabled}
-          serverSession={serverSession}
-          serverSaveStatus={serverSaveStatus}
-          onEnableLocalSave={enableLocalSave}
-          onDisableLocalSave={disableLocalSave}
-          onSaveServerWorkspace={saveServerWorkspace}
-          onLoadServerWorkspace={loadServerWorkspace}
-          onDeleteServerWorkspace={deleteServerWorkspace}
-        />
-
-        <section className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]" data-reveal>
+        <section className="grid gap-5 xl:grid-cols-[1.12fr_0.88fr]" data-reveal>
+          <RecurringGraph
+            audit={audit}
+            hasRealData={hasRealData}
+            selectedItem={selectedItem}
+            userActions={userActions}
+            onSelect={setSelectedItemId}
+          />
           <div className="flex flex-col gap-5">
-            <ConnectedSourcePanel
-              connectorStartResults={connectorStartResults}
-              onStartConnector={startConnector}
-              connectingConnectorId={connectingConnectorId}
-            />
-            <CoveragePanel />
-          </div>
-
-          <div className="flex flex-col gap-5">
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Metric label="Monthly recurring" value={formatCurrency(audit.summary.monthlyRecurringSpend)} tone="ink" />
-              <Metric label="Yearly total" value={formatCurrency(audit.summary.annualRecurringSpend)} tone="blue" />
-              <Metric label="Needs review" value={formatCurrency(audit.summary.reviewableMonthlySpend)} tone="caution" />
-              <Metric label="Renewing in 10 days" value={`${audit.summary.renewalsNextTenDays}`} tone="accent" />
-            </section>
-
             <SpendSpectrum audit={audit} userActions={userActions} onSelect={setSelectedItemId} />
-
-            <RecurringGraph
-              audit={audit}
-              hasRealData={hasRealData}
-              selectedItem={selectedItem}
-              userActions={userActions}
-              onSelect={setSelectedItemId}
-            />
             <PriorityActionPanel priorityItems={priorityItems} userActions={userActions} onSelect={setSelectedItemId} />
           </div>
         </section>
@@ -802,6 +570,18 @@ export default function VognaryMvpClient() {
         />
 
         <ReadinessPanel />
+        <UserControlPanel
+          coverageScore={coverageScore}
+          coverageSignals={coverageSignals}
+          localSaveEnabled={localSaveEnabled}
+          serverSession={serverSession}
+          serverSaveStatus={serverSaveStatus}
+          onEnableLocalSave={enableLocalSave}
+          onDisableLocalSave={disableLocalSave}
+          onSaveServerWorkspace={saveServerWorkspace}
+          onLoadServerWorkspace={loadServerWorkspace}
+          onDeleteServerWorkspace={deleteServerWorkspace}
+        />
         <footer className="panel flex flex-col items-center gap-3 px-5 py-5 text-center" data-reveal>
           <div className="flex items-center gap-2.5">
             <VognaryMark size={22} className="text-(--ink)" />
@@ -838,240 +618,85 @@ function IntegrationCommandCenter({
   audit,
   connectorStartResults,
   connectingConnectorId,
+  connectedConnectorIds,
+  selectedConnectorId,
+  onSelectedConnector,
   onStartConnector,
+  onDisconnectConnector,
   onJumpToLedger,
+  onExportReport,
+  onClearWorkspace,
 }: {
   audit: AuditResult;
   connectorStartResults: Record<string, ConnectorStartPayload>;
   connectingConnectorId: string | null;
+  connectedConnectorIds: Set<string>;
+  selectedConnectorId: string;
+  onSelectedConnector: (connectorId: string) => void;
   onStartConnector: (connector: Connector) => void;
+  onDisconnectConnector: (connector: Connector) => void;
   onJumpToLedger: () => void;
+  onExportReport: () => void;
+  onClearWorkspace: () => void;
 }) {
   const integrationConnectors = getIntegrationConnectors();
-  const gmailConnector = integrationConnectors.find((connector) => connector.id === "gmail-readonly");
-  const liveCount = integrationConnectors.filter((connector) => connector.status === "live" || connector.status === "ready-with-env").length;
-  const partnerCount = integrationConnectors.filter((connector) => connector.status === "partner-required").length;
-
-  return (
-    <section className="grid gap-5 xl:grid-cols-[0.78fr_1.22fr]" data-reveal>
-      <div className="dossier p-6 sm:p-7">
-        <span className="folio" data-folio="Start" style={{ color: "var(--dossier-muted)" }}>First useful result</span>
-        <h1 className="mt-4 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-5xl">Connect Gmail, then review one recurring ledger.</h1>
-        <p className="mt-4 text-sm leading-7 muted-on-dark">A first-time user should not paste CSVs or remember every subscription. Start with official Gmail consent. Vognary scans receipt-like messages, imports recurring candidates, and keeps the review in one workspace.</p>
-        <div className="mt-6 grid gap-2 sm:grid-cols-3">
-          <DossierStat label="Integration targets" value={`${integrationConnectors.length}`} />
-          <DossierStat label="Live/setup-ready" value={`${liveCount}`} />
-          <DossierStat label="Partner-gated" value={`${partnerCount}`} />
-        </div>
-        <div className="mt-5 rounded-[11px] border p-3" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
-          <p className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Current result</p>
-          <p className="mt-2 font-display text-2xl font-semibold text-(--dossier-ink)">{audit.summary.recurringCount} recurring item{audit.summary.recurringCount === 1 ? "" : "s"}</p>
-          <p className="mt-1 text-sm leading-6 muted-on-dark">{formatCurrency(audit.summary.monthlyRecurringSpend)} per month · {formatCurrency(audit.summary.annualRecurringSpend)} per year</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {gmailConnector ? <button type="button" onClick={() => onStartConnector(gmailConnector)} className="btn btn-primary">Connect Gmail receipts</button> : null}
-            <button type="button" onClick={onJumpToLedger} className="btn btn-ondark">Open recurring ledger</button>
-          </div>
-        </div>
-      </div>
-
-      <div className="panel p-5 sm:p-6">
-        <SectionHead
-          folio="01"
-          kicker="Sources"
-          title="Connect official sources"
-          desc="Gmail is the first real no-paste connector. Other cards show the official path or the API/partner access still needed before automatic sync can be honest."
-          right={<span className="pill pill-ready">Gmail ready</span>}
-        />
-        <div className="mt-5 grid gap-3 md:grid-cols-2">
-          {integrationConnectors.slice(0, 12).map((connector) => (
-            <ConnectorCard
-              key={connector.id}
-              connector={connector}
-              result={connectorStartResults[connector.id]}
-              busy={connectingConnectorId === connector.id}
-              onStart={() => onStartConnector(connector)}
-            />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ConnectedSourcePanel({
-  connectorStartResults,
-  connectingConnectorId,
-  onStartConnector,
-}: {
-  connectorStartResults: Record<string, ConnectorStartPayload>;
-  connectingConnectorId: string | null;
-  onStartConnector: (connector: Connector) => void;
-}) {
-  const integrationConnectors = getIntegrationConnectors();
-  const mandateConnectors = integrationConnectors.filter((connector) => ["account-aggregator", "upi-autopay-mandates", "card-emandates", "paypal-automatic-payments"].includes(connector.id));
-  const cloudConnectors = integrationConnectors.filter((connector) => /Cloud|AI|Developer|Consumer SaaS/.test(connector.category)).slice(0, 8);
-
-  return (
-    <section id="source-inputs" className="panel scroll-mt-24 p-5 sm:p-6">
-      <SectionHead
-        folio="03"
-        kicker="Integrations"
-        title="Connection queue"
-        desc="Optional provider handoffs. Items become true auto-sync only after the official provider grants API, OAuth, or partner access."
-        right={<a href="/integrations" className="btn btn-ghost">All integrations</a>}
-      />
-
-      <div className="mt-5 grid gap-4">
-        <ConnectorGroup title="Cloud, SaaS, and AI tools" connectors={cloudConnectors} connectorStartResults={connectorStartResults} connectingConnectorId={connectingConnectorId} onStartConnector={onStartConnector} />
-        <ConnectorGroup title="Banks, UPI, cards, wallets" connectors={mandateConnectors} connectorStartResults={connectorStartResults} connectingConnectorId={connectingConnectorId} onStartConnector={onStartConnector} />
-      </div>
-    </section>
-  );
-}
-
-function QuickRecurringPanel({
-  draft,
-  knownDebitsText,
-  audit,
-  onDraft,
-  onKnownDebitsText,
-  onAddDraft,
-  onAddTemplate,
-  onImportKnownDebits,
-  onReview,
-}: {
-  draft: QuickRecurringDraft;
-  knownDebitsText: string;
-  audit: AuditResult;
-  onDraft: (draft: QuickRecurringDraft) => void;
-  onKnownDebitsText: (value: string) => void;
-  onAddDraft: () => void;
-  onAddTemplate: (draft: QuickRecurringDraft) => void;
-  onImportKnownDebits: () => void;
-  onReview: () => void;
-}) {
-  return (
-    <section className="grid gap-5 xl:grid-cols-[0.88fr_1.12fr]" data-reveal>
-      <div className="panel p-5 sm:p-6">
-        <SectionHead
-          folio="02"
-          kicker="Fallback"
-          title="Add known debits only if Gmail misses them"
-          desc="Gmail is the primary path. This fallback is for obvious payments you already know, so the first review still has value while provider APIs are being added."
-          right={<span className="pill pill-partial">Fallback</span>}
-        />
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <input value={draft.merchant} onChange={(event) => onDraft({ ...draft, merchant: event.target.value })} className="field" placeholder="Merchant, e.g. Claude" />
-          <input value={draft.amount} onChange={(event) => onDraft({ ...draft, amount: event.target.value })} className="field" placeholder="Amount in INR" inputMode="decimal" />
-          <select value={draft.frequency} onChange={(event) => onDraft({ ...draft, frequency: event.target.value as Frequency })} className="field capitalize">
-            {quickFrequencies.map((frequency) => <option key={frequency} value={frequency}>{frequency}</option>)}
-          </select>
-          <select value={draft.category} onChange={(event) => onDraft({ ...draft, category: event.target.value })} className="field">
-            {quickCategories.map((category) => <option key={category} value={category}>{category}</option>)}
-          </select>
-          <input value={draft.sourceName} onChange={(event) => onDraft({ ...draft, sourceName: event.target.value })} className="field sm:col-span-2" placeholder="Source, e.g. Claude billing page" />
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={onAddDraft} className="btn btn-primary">Add known debit</button>
-          <button type="button" onClick={onReview} className="btn btn-ghost">Review ledger</button>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {quickTemplates.slice(0, 8).map((template) => (
-            <button key={`${template.merchant}-${template.category}`} type="button" onClick={() => onAddTemplate(template)} className="rounded-full border border-line bg-card px-3 py-1 text-xs font-semibold text-(--muted) transition hover:border-ember hover:text-ember">
-              {template.merchant}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="panel p-5 sm:p-6">
-        <SectionHead
-          folio="02A"
-          kicker="Fast import"
-          title="Paste names only when you already know them"
-          desc="One per line, such as Claude 1999 or Render 700. This is a fallback, not the intended long-term integration model."
-          right={<span className="font-data text-xs text-(--muted)">{audit.summary.recurringCount} found</span>}
-        />
-        <textarea value={knownDebitsText} onChange={(event) => onKnownDebitsText(event.target.value)} className="field field-mono mt-4 min-h-28" />
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={onImportKnownDebits} className="btn btn-primary">Import known debits</button>
-          <button type="button" onClick={onReview} className="btn btn-ghost">Open recurring ledger</button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ConnectorGroup({
-  title,
-  connectors: connectorItems,
-  connectorStartResults,
-  connectingConnectorId,
-  onStartConnector,
-}: {
-  title: string;
-  connectors: Connector[];
-  connectorStartResults: Record<string, ConnectorStartPayload>;
-  connectingConnectorId: string | null;
-  onStartConnector: (connector: Connector) => void;
-}) {
-  return (
-    <div className="inset p-4">
-      <h3 className="font-display text-base font-semibold text-(--ink)">{title}</h3>
-      <div className="mt-3 grid gap-2">
-        {connectorItems.map((connector) => (
-          <ConnectorCard
-            key={connector.id}
-            connector={connector}
-            result={connectorStartResults[connector.id]}
-            busy={connectingConnectorId === connector.id}
-            compact
-            onStart={() => onStartConnector(connector)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ConnectorCard({ connector, result, busy, compact, onStart }: { connector: Connector; result?: ConnectorStartPayload; busy?: boolean; compact?: boolean; onStart: () => void }) {
-  const launchTarget = connectorLaunchTargets[connector.id];
-  const state = result?.state;
+  const selectedConnector = integrationConnectors.find((connector) => connector.id === selectedConnectorId) ?? integrationConnectors[0];
+  const result = connectorStartResults[selectedConnector.id];
+  const connected = connectedConnectorIds.has(selectedConnector.id);
+  const busy = connectingConnectorId === selectedConnector.id;
   const missing = result?.missingEnv ?? result?.requiredEnv ?? [];
+  const statusLabel = connected ? "Connected" : connectorStatusLabels[selectedConnector.status];
+  const statusClass = connected ? "pill pill-ready" : connectorStatusClass[selectedConnector.status];
 
   return (
-    <div className={`inset ${compact ? "p-3" : "p-4"}`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="eyebrow" style={{ fontSize: "0.56rem" }}>{connector.category} · {connector.authType}</p>
-          <h3 className="mt-1 font-display text-base font-semibold text-(--ink)">{connector.name}</h3>
-          {!compact ? <p className="mt-1 text-xs leading-5 text-(--muted)">{connector.userValue}</p> : null}
-          {state ? <p className="mt-2 font-data text-[0.68rem] text-(--muted)">State: {state}</p> : null}
-          {missing.length ? <p className="mt-1 text-xs leading-5 text-ochre">Needs setup: {missing.join(", ")}</p> : null}
+    <section className="dossier spotlight scan p-5 sm:p-6" data-reveal onMouseMove={trackSpotlightPointer}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <span className="folio" data-folio="Hub" style={{ color: "var(--dossier-muted)" }}>Connections</span>
+          <h1 className="mt-3 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-4xl">Connect proof. Reveal renewals.</h1>
         </div>
-        <span className={`${connectorStatusClass[connector.status]} w-fit shrink-0`}>{connectorStatusLabels[connector.status]}</span>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <DossierStat label="Items" value={`${audit.summary.recurringCount}`} />
+          <DossierStat label="Monthly" value={formatCurrency(audit.summary.monthlyRecurringSpend)} />
+          <DossierStat label="Yearly" value={formatCurrency(audit.summary.annualRecurringSpend)} />
+          <DossierStat label="Review" value={formatCurrency(audit.summary.reviewableMonthlySpend)} />
+        </div>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={onStart} disabled={busy} className="btn btn-primary h-9 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60">
-          {busy ? "Starting..." : getConnectorActionLabel(connector)}
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+        <label className="block">
+          <span className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Platform</span>
+          <select value={selectedConnector.id} onChange={(event) => onSelectedConnector(event.target.value)} className="mt-2 h-13 w-full rounded-[10px] border px-4 text-base font-semibold outline-none" style={{ background: "rgba(243,234,214,0.06)", borderColor: "var(--dossier-line)", color: "var(--dossier-ink)" }}>
+            {integrationConnectors.map((connector) => <option key={connector.id} value={connector.id}>{connector.name}</option>)}
+          </select>
+        </label>
+        <button type="button" disabled={busy} onClick={() => connected ? onDisconnectConnector(selectedConnector) : onStartConnector(selectedConnector)} className={`${connected ? "btn btn-ondark" : "btn btn-primary"} h-13 self-end px-6 disabled:cursor-not-allowed disabled:opacity-60`}>
+          {busy ? "Connecting..." : connected ? "Disconnect" : "Connect"}
         </button>
-        {launchTarget ? <a href={launchTarget.url} target="_blank" rel="noreferrer" className="btn btn-ghost h-9 px-3 text-xs">Open {launchTarget.label}</a> : null}
       </div>
-      {connector.limitation && !compact ? <p className="mt-3 text-xs leading-5 text-(--muted)">Boundary: {connector.limitation}</p> : null}
-    </div>
+
+      <div className="mt-4 flex flex-col gap-3 rounded-[11px] border p-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={statusClass}>{statusLabel}</span>
+            <span className="font-data text-xs muted-on-dark">{selectedConnector.category} · {selectedConnector.authType}</span>
+          </div>
+          {missing.length ? <p className="mt-2 text-xs leading-5 text-ochre">Needs setup: {missing.join(", ")}</p> : null}
+          {result?.redirectUri ? <p className="mt-2 break-all font-data text-[0.68rem] muted-on-dark">Redirect URI: {result.redirectUri}</p> : null}
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <button type="button" onClick={onJumpToLedger} className="btn btn-ondark h-9 px-3 text-xs">Open ledger</button>
+          <button type="button" onClick={onExportReport} className="btn btn-ondark h-9 px-3 text-xs">Download report</button>
+          <button type="button" onClick={onClearWorkspace} className="btn btn-ondark h-9 px-3 text-xs">Clear</button>
+        </div>
+      </div>
+    </section>
   );
 }
 
 function getIntegrationConnectors() {
   const selected = new Set(integrationConnectorIds);
   return connectors.filter((connector) => selected.has(connector.id));
-}
-
-function getConnectorActionLabel(connector: Connector) {
-  if (connector.status === "partner-required") return "Request partner path";
-  if (connector.status === "planned") return "Open official source";
-  if (connector.status === "ready-with-env") return "Start setup";
-  return "Connect";
 }
 
 function openOfficialConnectorTarget(connectorId: string) {
@@ -1102,31 +727,6 @@ function trackSpotlightPointer(event: React.MouseEvent<HTMLElement>) {
   const rect = event.currentTarget.getBoundingClientRect();
   event.currentTarget.style.setProperty("--mx", `${((event.clientX - rect.left) / rect.width) * 100}%`);
   event.currentTarget.style.setProperty("--my", `${((event.clientY - rect.top) / rect.height) * 100}%`);
-}
-
-function QuickStartPanel() {
-  const steps = [
-    ["1", "Connect Gmail", "Use the official Google consent screen to scan receipt-like renewal emails."],
-    ["2", "Review candidates", "Vognary imports likely recurring payments into one ledger with source and confidence."],
-    ["3", "Connect more sources", "Use provider cards for OpenAI, Vercel, Render, GitHub, wallets, banks, UPI, and cards as they become available."],
-    ["4", "Save or delete", "Save an encrypted snapshot, export a report, or delete your data from Profile."],
-  ];
-
-  return (
-    <section className="panel p-5 sm:p-6" data-reveal>
-      <span className="folio" data-folio="01">Start here</span>
-      <div className="mt-5 grid gap-5 md:grid-cols-4">
-        {steps.map(([number, title, body], index) => (
-          <div key={title} className="relative">
-            {index < steps.length - 1 ? <span className="absolute -right-4 top-4 hidden h-px w-7 bg-(--line-strong) md:block" aria-hidden /> : null}
-            <span className="font-display text-4xl font-semibold leading-none text-ember">{number}</span>
-            <h2 className="mt-3 font-display text-base font-semibold text-(--ink)">{title}</h2>
-            <p className="mt-1.5 text-xs leading-5 text-(--muted)">{body}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
 }
 
 function UserControlPanel({
@@ -1205,17 +805,6 @@ function UserControlPanel({
           {serverSaveStatus ? <p className="mt-3 text-xs leading-5 text-(--muted)">{serverSaveStatus}</p> : null}
         </div>
         <p className="mt-3 text-xs leading-5 text-(--muted)">Do not enable browser save on shared machines. Local backups contain source text. Server snapshots require configured login, database, and TOKEN_ENCRYPTION_KEY.</p>
-      </div>
-    </section>
-  );
-}
-
-function CoveragePanel() {
-  return (
-    <section className="panel p-5 sm:p-6">
-      <SectionHead folio="05" kicker="Sources" title="What has been checked" desc="Shows which official source categories are connected, setup-ready, planned, or partner-gated." />
-      <div className="mt-4 grid gap-2">
-        {getCoverageItems().map((item) => <StatusRow key={item.label} {...item} />)}
       </div>
     </section>
   );
@@ -1709,79 +1298,6 @@ function recurringIdentity(item: Pick<ManualRecurringInput, "merchant" | "amount
   return `${item.merchant.trim().toLowerCase()}::${Math.round(item.amount * 100)}::${item.frequency}`;
 }
 
-function buildQuickManualItem(draft: QuickRecurringDraft, amount: number): ManualRecurringInput {
-  const merchant = draft.merchant.trim();
-  return {
-    id: `quick-${Date.now()}-${slugify(merchant)}`,
-    merchant,
-    amount,
-    frequency: draft.frequency,
-    nextExpectedDate: inferNextExpectedDate(draft.frequency),
-    category: draft.category,
-    sourceName: draft.sourceName.trim() || "known recurring payment",
-  };
-}
-
-function recurringExists(items: ManualRecurringInput[], candidate: Pick<ManualRecurringInput, "merchant" | "amount" | "frequency">) {
-  const identity = recurringIdentity(candidate);
-  return items.some((item) => recurringIdentity(item) === identity);
-}
-
-function parseKnownDebitLine(line: string): ManualRecurringInput | null {
-  const trimmed = line.trim();
-  if (!trimmed) return null;
-
-  const amountMatch = trimmed.match(/(?:₹|rs\.?|inr)?\s*\d[\d,]*(?:\.\d+)?/i);
-  if (!amountMatch) return null;
-
-  const amount = Number.parseFloat(amountMatch[0].replace(/(?:₹|rs\.?|inr)/gi, "").replace(/,/g, "").trim());
-  const merchant = trimmed.slice(0, amountMatch.index).replace(/[–—:-]+$/g, "").trim();
-  if (!merchant || !Number.isFinite(amount) || amount <= 0) return null;
-
-  const frequency = /year|annual/i.test(trimmed) ? "yearly" : /week/i.test(trimmed) ? "weekly" : /quarter/i.test(trimmed) ? "quarterly" : "monthly";
-  return {
-    id: `known-${Date.now()}-${slugify(merchant)}`,
-    merchant,
-    amount,
-    frequency,
-    nextExpectedDate: inferNextExpectedDate(frequency),
-    category: inferQuickCategory(merchant),
-    sourceName: "known recurring payment",
-  };
-}
-
-function inferQuickCategory(merchant: string) {
-  if (/claude|openai|chatgpt|kling|cursor|perplexity/i.test(merchant)) return "AI tools";
-  if (/render|vercel|aws|cloudflare|digitalocean|gcp|cloud/i.test(merchant)) return "Cloud hosting";
-  if (/github|copilot|gitlab/i.test(merchant)) return "Developer tools";
-  if (/apple|icloud|google play|play store/i.test(merchant)) return "App store";
-  if (/upi|autopay/i.test(merchant)) return "UPI AutoPay";
-  if (/card|mandate/i.test(merchant)) return "Card mandate";
-  if (/domain|namecheap|godaddy/i.test(merchant)) return "Domains";
-  if (/insurance|policy/i.test(merchant)) return "Insurance";
-  if (/emi|loan/i.test(merchant)) return "Debt";
-  if (/sip|mutual|investment/i.test(merchant)) return "Investments";
-  return "Other";
-}
-
-function inferNextExpectedDate(frequency: Frequency) {
-  const days = {
-    weekly: 7,
-    biweekly: 14,
-    monthly: 30,
-    bimonthly: 61,
-    quarterly: 91,
-    yearly: 365,
-    irregular: 30,
-  }[frequency];
-  const date = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-  return date.toISOString().slice(0, 10);
-}
-
-function slugify(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
-
 function buildWorkspaceBackup({
   statementSources,
   manualItems,
@@ -1815,21 +1331,6 @@ function buildWorkspaceBackup({
 function getOwnerName(ownerId: string | undefined, teamMembers: TeamMember[]): string {
   if (!ownerId) return "Unassigned";
   return teamMembers.find((member) => member.id === ownerId)?.name ?? "Unassigned";
-}
-
-function csvEscape(value: string): string {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
-}
-
-function downloadText(fileName: string, content: string, type: string) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
 }
 
 function formatCurrency(value: number): string {

@@ -3,35 +3,41 @@ import { VognaryMark } from "./brand";
 
 const checks = [
   {
-    tag: "Receipts",
-    title: "Gmail receipt history",
-    body: "Invoices, renewal notices, free-trial reminders, and payment-success emails — turned into candidates.",
+    tag: "Scattered",
+    title: "The renewal is never in one place",
+    body: "One charge is in Gmail, one in a UPI mandate, one on a card, one inside a SaaS dashboard, and one inside a cloud bill.",
   },
   {
-    tag: "SaaS & AI",
-    title: "Tools you already pay for",
-    body: "Claude, OpenAI, Cursor, Kling, X, Notion, and Figma — your whole stack in one list.",
+    tag: "Unproven",
+    title: "A charge without proof is not a decision",
+    body: "Vognary keeps the source beside every candidate: receipt, statement row, dashboard, mandate, invoice, or missing evidence.",
   },
   {
-    tag: "Cloud",
-    title: "Developer and cloud bills",
-    body: "Render, Vercel, GitHub, AWS, and Cloudflare charges tracked beside everything else.",
+    tag: "Founder burn",
+    title: "Small tools become invisible monthly burn",
+    body: "AI, API, cloud, domains, design tools, app stores, insurance, SIPs, EMIs, and utilities all renew on different rails.",
   },
   {
-    tag: "Mandates",
-    title: "Auto-debits and commitments",
-    body: "UPI AutoPay, card mandates, domains, insurance, EMIs, and SIPs — money that leaves on a schedule.",
+    tag: "No owner",
+    title: "Nobody owns the monthly review",
+    body: "A useful audit should say what renews next, what can be cancelled, what needs a human check, and what source is still missing.",
   },
 ];
 
 const steps = [
-  { n: "1", title: "Sign in", body: "Use Google to create your private workspace. No bank passwords, ever." },
-  { n: "2", title: "Connect Gmail", body: "Approve the official Google consent screen so Vognary can read receipt-like messages." },
-  { n: "3", title: "Review one ledger", body: "See merchant, amount, renewal date, confidence, source, and the next action in a single list." },
-  { n: "4", title: "Save and repeat", body: "Save an encrypted snapshot, return monthly, and add more official sources as they go live." },
+  { n: "1", title: "Connect evidence", body: "Start with Google receipts, then add official sources as they become available. No bank passwords." },
+  { n: "2", title: "Prove the commitment", body: "Every recurring candidate carries source, confidence, amount, cadence, and next expected debit." },
+  { n: "3", title: "Name what is missing", body: "If UPI, cards, app stores, bank debits, or SaaS dashboards are not connected, the gap is visible." },
+  { n: "4", title: "Run the review", body: "Keep, watch, downgrade, cancel, or investigate before the next renewal silently hits." },
 ];
 
-const trust = ["No bank passwords", "Encrypted snapshots", "Delete anytime", "Runs in your workspace"];
+const trust = ["Proof over guesses", "No bank passwords", "Missing sources named", "Delete anytime"];
+
+const userLanguage = [
+  "I forgot what I am actually paying for.",
+  "Subscriptions pile up across Stripe, GPay, bank debits, cards, and SaaS tools.",
+  "Enterprise spend tools are overkill before we have finance or procurement.",
+];
 
 export default function Home() {
   return (
@@ -59,15 +65,15 @@ export default function Home() {
         <section className="dossier spotlight scan overflow-hidden">
           <div className="grid gap-0 lg:grid-cols-[1.35fr_1fr]">
             <div className="p-7 sm:p-10 lg:p-12">
-              <span className="folio" data-folio="Start" style={{ color: "var(--dossier-muted)" }}>Recurring payments, reviewed</span>
+              <span className="folio" data-folio="Start" style={{ color: "var(--dossier-muted)" }}>Evidence-first recurring money</span>
               <h1 className="mt-6 font-display text-4xl font-bold leading-[0.98] tracking-[-0.035em] text-(--dossier-ink) sm:text-6xl">
-                See what is renewing<br />before money leaves.
+                Every renewal hides<br />in a different place.
               </h1>
               <p className="mt-6 max-w-xl text-base leading-7 muted-on-dark sm:text-lg">
-                Connect Gmail once. Vognary scans your receipt history and builds a single recurring-payment ledger — renewals, invoices, trials, cloud bills, mandates, insurance, EMIs, and SIPs.
+                Vognary turns receipts, statements, mandates, invoices, SaaS bills, cloud spend, EMIs, SIPs, insurance, and utilities into one proof-backed monthly action review.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link href="/login" className="btn btn-primary btn-lg">Start with Google</Link>
+                <Link href="/login" className="btn btn-primary btn-lg">Find hidden renewals</Link>
                 <Link href="/private-audit" className="btn btn-ondark btn-lg">Ask for a private audit</Link>
               </div>
               <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -80,19 +86,15 @@ export default function Home() {
               </div>
             </div>
             <div className="border-t border-(--dossier-line) p-7 sm:p-10 lg:border-l lg:border-t-0">
-              <p className="eyebrow muted-on-dark">The guided path</p>
-              <ol className="mt-4 flex flex-col gap-4">
-                {steps.map((step) => (
-                  <li key={step.n} className="flex items-start gap-3">
-                    <span className="step-num shrink-0">{step.n}</span>
-                    <div className="min-w-0">
-                      <p className="font-display text-sm font-semibold text-(--dossier-ink)">{step.title}</p>
-                      <p className="mt-0.5 text-xs leading-5 muted-on-dark">{step.body}</p>
-                    </div>
-                  </li>
+              <p className="eyebrow muted-on-dark">The pain users say out loud</p>
+              <div className="mt-4 flex flex-col gap-3">
+                {userLanguage.map((quote) => (
+                  <blockquote key={quote} className="rounded-[10px] border p-3 text-sm leading-6 muted-on-dark" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
+                    {quote}
+                  </blockquote>
                 ))}
-              </ol>
-              <Link href="/login" className="btn btn-primary btn-block mt-6">Connect Gmail</Link>
+              </div>
+              <Link href="/login" className="btn btn-primary btn-block mt-6">Start the audit</Link>
             </div>
           </div>
         </section>
@@ -102,9 +104,9 @@ export default function Home() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <span className="folio" data-folio="Solves">What this solves</span>
-              <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">One place for every recurring commitment</h2>
+              <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">The problem is not subscriptions. It is proof.</h2>
             </div>
-            <p className="max-w-sm text-sm leading-6 text-(--muted)">Stop hunting through inboxes, dashboards, and statements. Everything that renews lands in a single reviewable ledger.</p>
+            <p className="max-w-sm text-sm leading-6 text-(--muted)">Generic trackers make lists. Vognary shows what source proved each commitment, what renews next, and what source still has to be connected.</p>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {checks.map((item) => (
@@ -122,7 +124,7 @@ export default function Home() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <span className="folio" data-folio="Flow">How it works</span>
-              <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">Four steps, about two minutes</h2>
+              <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">From scattered evidence to one review</h2>
             </div>
             <Link href="/sources" className="btn btn-ghost">How to add sources</Link>
           </div>
@@ -147,16 +149,16 @@ export default function Home() {
               <span className="folio" data-folio="Honest">Current beta boundary</span>
               <div className="mt-5 grid gap-5 sm:grid-cols-2">
                 <div className="inset p-4">
-                  <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Live now</p>
-                  <p className="mt-2 text-sm leading-6 text-(--ink-soft)">Google login, Gmail receipt connection, the recurring-payment ledger, exports, encrypted snapshots, profile, and delete-data controls.</p>
+                  <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">The wedge</p>
+                  <p className="mt-2 text-sm leading-6 text-(--ink-soft)">Start as a proof-backed recurring-money audit: Gmail receipts first, one ledger, evidence, confidence, next debit, action labels, and saved review snapshots when beta infrastructure is configured.</p>
                 </div>
                 <div className="inset p-4">
-                  <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-ochre">Not live yet</p>
-                  <p className="mt-2 text-sm leading-6 text-(--muted)">Direct UPI/card mandate sync, Account Aggregator, Apple/Google subscription APIs, PayPal/Razorpay/Cashfree live sync, and cancellation automation.</p>
+                  <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-ochre">The honest gap</p>
+                  <p className="mt-2 text-sm leading-6 text-(--muted)">Direct UPI/card mandate sync, Account Aggregator, user-wide app-store APIs, PayPal/Razorpay/Cashfree live sync, and cancellation automation need provider or partner access before they can be claimed.</p>
                 </div>
               </div>
             </div>
-            <Link href="/login" className="btn btn-primary btn-lg">Connect Gmail</Link>
+            <Link href="/login" className="btn btn-primary btn-lg">Start the review</Link>
           </div>
         </section>
 
