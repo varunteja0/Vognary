@@ -76,7 +76,7 @@ Set `enabled` to `false` to withdraw the linked consent and cancel unsent work. 
 
 ## Worker activation
 
-`vercel.json` invokes `GET /api/internal/renewal-alerts/due/run` every 15 minutes. Vercel supplies `Authorization: Bearer <CRON_SECRET>`.
+`vercel.json` invokes `GET /api/internal/renewal-alerts/due/run` daily at 09:00 IST (`03:30 UTC`) so the deployment remains compatible with the Vercel Hobby plan. Vercel supplies `Authorization: Bearer <CRON_SECRET>`. Due reminders for other configured time zones can wait until this daily invocation.
 
 Manual trusted run:
 

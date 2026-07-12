@@ -83,13 +83,24 @@ test("renewal scheduling and delivery source enforce opt-in, idempotency, bounde
   assert.doesNotMatch(worker.slice(worker.indexOf("const sent =")), /delivery\.(email|merchant)/);
 });
 
-test("Vercel keeps connector sync, renewal delivery, and 03:00 IST retention schedules", () => {
+test("Vercel keeps Hobby-compatible daily worker schedules", () => {
   const config = JSON.parse(source("vercel.json")) as { crons: Array<{ path: string; schedule: string }> };
   const paths = config.crons.map((cron) => cron.path);
   assert.ok(paths.includes("/api/internal/sync-jobs/due/run"));
   assert.ok(paths.includes("/api/internal/renewal-alerts/due/run"));
   assert.ok(paths.includes("/api/internal/privacy/retention/run"));
+  assert.equal(config.crons.find((cron) => cron.path === "/api/internal/sync-jobs/due/run")?.schedule, "0 0 * * *");
+  assert.equal(config.crons.find((cron) => cron.path === "/api/internal/renewal-alerts/due/run")?.schedule, "30 3 * * *");
   assert.equal(config.crons.find((cron) => cron.path === "/api/internal/privacy/retention/run")?.schedule, "30 21 * * *");
+  for (const cron of config.crons) {
+    // Hobby rejects any schedule that can fire more than once per day: the
+    // minute and hour fields must each be one fixed integer, or Vercel
+    // refuses to even create the deployment (no Error record, only a failed
+    // GitHub commit status).
+    const [minute, hour] = cron.schedule.split(" ");
+    assert.match(minute, /^(?:[0-9]|[1-5][0-9])$/, `${cron.path} minute field must be a single fixed value for Hobby`);
+    assert.match(hour, /^(?:[0-9]|1[0-9]|2[0-3])$/, `${cron.path} hour field must be a single fixed value for Hobby`);
+  }
 });
 
 function source(relativePath: string) {

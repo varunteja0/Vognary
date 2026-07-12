@@ -117,8 +117,8 @@ curl -X POST http://localhost:3000/api/internal/sync-jobs/due/run \
 
 These routes are not user-facing. They require `INTERNAL_SYNC_SECRET` and `DATABASE_URL`. They create `connector_sync_jobs`, create `connector_sync_runs`, execute registered adapters, and persist normalized evidence into `connector_evidence`.
 
-Vercel Cron is configured in `vercel.json` to call `GET /api/internal/sync-jobs/due/run` and
-`GET /api/internal/renewal-alerts/due/run` every 15 minutes, plus the fixed-policy retention worker daily at 03:00 IST (`21:30 UTC`). Set `CRON_SECRET` in Vercel; Vercel sends it as
+Vercel Cron is configured in `vercel.json` to call `GET /api/internal/sync-jobs/due/run` daily at 05:30 IST (`00:00 UTC`),
+`GET /api/internal/renewal-alerts/due/run` daily at 09:00 IST (`03:30 UTC`), and the fixed-policy retention worker daily at 03:00 IST (`21:30 UTC`). These once-daily schedules are compatible with the Vercel Hobby plan; due sync work and reminders can wait until the next daily invocation. Set `CRON_SECRET` in Vercel; Vercel sends it as
 `Authorization: Bearer <CRON_SECRET>`. The secret proves authentication configuration, not that the deployed schedules are firing; use
 the activation-runbook evidence gates before setting either production status flag.
 

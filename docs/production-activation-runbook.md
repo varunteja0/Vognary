@@ -324,7 +324,7 @@ Stop condition:
 
 Goal: queued connector sync jobs should not sit idle after Gmail or API-key connections are stored.
 
-The repo includes `vercel.json` with a Vercel Cron job every 15 minutes for `/api/internal/sync-jobs/due/run`.
+The repo includes `vercel.json` with a Hobby-compatible daily Vercel Cron job at 05:30 IST (`00:00 UTC`) for `/api/internal/sync-jobs/due/run`. Due jobs can wait until the next daily invocation on this plan.
 
 Activation steps:
 
@@ -364,7 +364,7 @@ Goal: users who explicitly opt in receive deduplicated email reminders before ca
 
 1. Apply PostgreSQL migration `0006_renewal_alerts.sql` with `npm run db:apply-schema`.
 2. Confirm `DATABASE_URL`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`, and `INTERNAL_SYNC_SECRET` are configured.
-3. Keep the `/api/internal/sync-jobs/due/run` cron. The additional `/api/internal/renewal-alerts/due/run` cron runs every 15 minutes; the two workers serve different queues.
+3. Keep the `/api/internal/sync-jobs/due/run` cron. The additional `/api/internal/renewal-alerts/due/run` cron runs daily at 09:00 IST (`03:30 UTC`); the two workers serve different queues. On the Hobby plan, delivery can lag a user's configured local send time until this daily invocation.
 4. Explicitly opt a test user in through `PUT /api/renewal-alerts/preferences`. Deployment alone must leave every user disabled.
 5. Sync a source whose canonical `next_expected_date` is more than seven days ahead.
 6. Confirm exactly one `7_day` and one `1_day` delivery row exists for each selected window, then rerun sync and confirm the count does not increase.
