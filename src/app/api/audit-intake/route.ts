@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { isLeadDatabaseConfigured, persistAuditLead } from "@/lib/server/lead-store";
+import { recordProductEvent } from "@/lib/server/product-event-store";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 
@@ -144,6 +145,7 @@ export async function POST(request: NextRequest) {
   if (isLeadDatabaseConfigured()) {
     try {
       const leadId = await persistAuditLead(payload);
+      await recordProductEvent({ eventName: "private_audit.requested", source: "workspace-api", status: "succeeded" }).catch(() => undefined);
       await mirrorToWebhook(process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL, payload);
       return NextResponse.json({ status: "accepted", persisted: true, storage: "database", leadId, score: payload.score });
     } catch {

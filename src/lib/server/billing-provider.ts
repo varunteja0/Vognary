@@ -65,7 +65,7 @@ export async function createRazorpayPaymentLink(input: {
       customer: { email: input.email },
       notify: { email: true, sms: false },
       reminder_enable: true,
-      callback_url: `${appUrl}/app?billing=returned`,
+      callback_url: `${appUrl}/billing/return?checkout=${input.checkoutId}`,
       callback_method: "get",
       notes: { vognary_plan: input.plan },
     }),

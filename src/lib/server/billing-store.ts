@@ -3,11 +3,13 @@ import "server-only";
 import type { BillingEntitlementKey, BillingPlan, RazorpayBillingEvent } from "@/lib/billing";
 import { billingEntitlementForPlan } from "@/lib/billing";
 import { getDatabasePool } from "@/lib/server/database";
+import { recordProductEvent } from "@/lib/server/product-event-store";
 
 type BillingCheckoutRecord = {
   id: string;
   workspaceId: string | null;
   userId: string | null;
+  leadId: string | null;
   customerEmail: string;
   plan: BillingPlan;
   provider: "razorpay" | "payment-link";
@@ -22,6 +24,7 @@ type CheckoutRow = {
   id: string;
   workspace_id: string | null;
   user_id: string | null;
+  lead_id: string | null;
   customer_email: string;
   plan: BillingPlan;
   provider: "razorpay" | "payment-link";
@@ -35,6 +38,7 @@ type CheckoutRow = {
 export async function createBillingCheckout(input: {
   workspaceId: string | null;
   userId: string | null;
+  leadId: string | null;
   customerEmail: string;
   plan: BillingPlan;
   provider: "razorpay";
@@ -44,18 +48,27 @@ export async function createBillingCheckout(input: {
 }) {
   const result = await getDatabasePool().query<CheckoutRow>(
     `insert into billing_checkout_sessions (
-       workspace_id, user_id, customer_email, plan, provider, currency,
+       workspace_id, user_id, lead_id, customer_email, plan, provider, currency,
        amount_minor, idempotency_key
-     ) values ($1, $2, $3, $4, $5, $6, $7, $8)
+     ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      on conflict (idempotency_key) do nothing
-     returning id, workspace_id, user_id, customer_email, plan, provider, status,
+     returning id, workspace_id, user_id, lead_id, customer_email, plan, provider, status,
                currency, amount_minor::text, provider_checkout_id, provider_checkout_url`,
-    [input.workspaceId, input.userId, input.customerEmail, input.plan, input.provider, input.currency, input.amountMinor, input.idempotencyKey],
+    [input.workspaceId, input.userId, input.leadId, input.customerEmail, input.plan, input.provider, input.currency, input.amountMinor, input.idempotencyKey],
   );
-  if (result.rows[0]) return { created: true, checkout: mapCheckout(result.rows[0]) };
+  if (result.rows[0]) {
+    await recordProductEvent({
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      eventName: "billing.checkout_started",
+      source: "workspace-api",
+      status: "started",
+    }).catch(() => undefined);
+    return { created: true, checkout: mapCheckout(result.rows[0]) };
+  }
 
   const existing = await getDatabasePool().query<CheckoutRow>(
-    `select id, workspace_id, user_id, customer_email, plan, provider, status,
+    `select id, workspace_id, user_id, lead_id, customer_email, plan, provider, status,
             currency, amount_minor::text, provider_checkout_id, provider_checkout_url
      from billing_checkout_sessions where idempotency_key = $1`,
     [input.idempotencyKey],
@@ -64,11 +77,52 @@ export async function createBillingCheckout(input: {
   if (!checkout
     || checkout.workspaceId !== input.workspaceId
     || checkout.userId !== input.userId
+    || checkout.leadId !== input.leadId
     || checkout.customerEmail.toLowerCase() !== input.customerEmail.toLowerCase()
     || checkout.plan !== input.plan) {
     throw new Error("Checkout idempotency key is already bound to another request.");
   }
   return { created: false, checkout };
+}
+
+const publicCheckoutStatuses = ["created", "pending", "paid", "failed", "cancelled", "expired", "refunded"] as const;
+export type PublicCheckoutStatus = {
+  id: string;
+  status: (typeof publicCheckoutStatuses)[number];
+  plan: BillingPlan;
+  currency: string;
+  amountMinor: number;
+  paidAt: string | null;
+  refundedAt: string | null;
+};
+
+// Deliberately excludes customer_email, lead_id, and provider identifiers:
+// the checkout UUID acts as an unguessable capability for status viewing only.
+export async function getPublicCheckoutStatus(checkoutId: string): Promise<PublicCheckoutStatus | null> {
+  const result = await getDatabasePool().query<{
+    id: string;
+    status: PublicCheckoutStatus["status"];
+    plan: BillingPlan;
+    currency: string;
+    amount_minor: string;
+    paid_at: Date | null;
+    refunded_at: Date | null;
+  }>(
+    `select id, status, plan, currency, amount_minor::text, paid_at, refunded_at
+     from billing_checkout_sessions where id = $1`,
+    [checkoutId],
+  );
+  const row = result.rows[0];
+  if (!row || !publicCheckoutStatuses.includes(row.status)) return null;
+  return {
+    id: row.id,
+    status: row.status,
+    plan: row.plan,
+    currency: row.currency,
+    amountMinor: Number(row.amount_minor),
+    paidAt: row.paid_at ? row.paid_at.toISOString() : null,
+    refundedAt: row.refunded_at ? row.refunded_at.toISOString() : null,
+  };
 }
 
 export async function attachBillingProviderCheckout(input: { checkoutId: string; providerCheckoutId: string; paymentUrl: string }) {
@@ -80,7 +134,7 @@ export async function attachBillingProviderCheckout(input: { checkoutId: string;
        failed_at = null,
          updated_at = now()
      where id = $1 and provider = 'razorpay' and status in ('created', 'failed')
-     returning id, workspace_id, user_id, customer_email, plan, provider, status,
+     returning id, workspace_id, user_id, lead_id, customer_email, plan, provider, status,
                currency, amount_minor::text, provider_checkout_id, provider_checkout_url`,
     [input.checkoutId, input.providerCheckoutId, input.paymentUrl],
   );
@@ -140,6 +194,13 @@ export async function applyRazorpayBillingEvent(event: RazorpayBillingEvent, pay
          where id = $1 and status in ('created', 'pending', 'failed', 'paid')`,
         [checkout.id, event.providerPaymentId],
       );
+      await recordProductEvent({
+        workspaceId: checkout.workspace_id,
+        userId: checkout.user_id,
+        eventName: "billing.payment_settled",
+        source: "workspace-api",
+        status: "succeeded",
+      }, client);
       if (checkout.workspace_id) await activateEntitlement(client, checkout.workspace_id, checkout.id, checkout.plan);
     } else if (event.kind === "cancelled" || event.kind === "expired") {
       const result = await client.query<typeof checkout & object>(
@@ -183,6 +244,13 @@ export async function applyRazorpayBillingEvent(event: RazorpayBillingEvent, pay
           [checkout.workspace_id, checkout.id],
         );
       }
+      await recordProductEvent({
+        workspaceId: checkout.workspace_id,
+        userId: checkout.user_id,
+        eventName: "billing.payment_refunded",
+        source: "workspace-api",
+        status: fullyRefunded ? "succeeded" : "partial",
+      }, client);
     } else {
       throw new Error("Unsupported billing event state.");
     }
@@ -271,6 +339,7 @@ function mapCheckout(row: CheckoutRow): BillingCheckoutRecord {
     id: row.id,
     workspaceId: row.workspace_id,
     userId: row.user_id,
+    leadId: row.lead_id,
     customerEmail: row.customer_email,
     plan: row.plan,
     provider: row.provider,

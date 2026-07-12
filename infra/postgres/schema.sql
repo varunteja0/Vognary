@@ -162,6 +162,7 @@ create table billing_checkout_sessions (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid references workspaces(id) on delete cascade,
   user_id uuid references users(id) on delete set null,
+  lead_id uuid references private_audit_leads(id) on delete set null,
   customer_email text not null check (length(btrim(customer_email)) between 3 and 320),
   plan text not null check (plan in ('personal', 'founder', 'team', 'annual')),
   provider text not null check (provider in ('razorpay', 'payment-link')),
@@ -185,6 +186,7 @@ create table billing_checkout_sessions (
 create unique index billing_checkout_provider_id_idx on billing_checkout_sessions(provider, provider_checkout_id) where provider_checkout_id is not null;
 create index billing_checkout_workspace_created_idx on billing_checkout_sessions(workspace_id, created_at desc);
 create index billing_checkout_payment_idx on billing_checkout_sessions(provider, provider_payment_id) where provider_payment_id is not null;
+create index billing_checkout_lead_idx on billing_checkout_sessions(lead_id) where lead_id is not null;
 
 create table billing_webhook_events (
   id uuid primary key default gen_random_uuid(),
@@ -562,7 +564,11 @@ create table product_events (
     'ledger.viewed',
     'review.action_recorded',
     'review.completed',
-    'export.created'
+    'export.created',
+    'private_audit.requested',
+    'billing.checkout_started',
+    'billing.payment_settled',
+    'billing.payment_refunded'
   )),
   occurred_at timestamptz not null default now(),
   source text not null check (source in ('sync-runner', 'living-ledger', 'workspace-api', 'product-ui')),

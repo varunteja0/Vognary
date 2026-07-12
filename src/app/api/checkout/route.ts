@@ -4,6 +4,7 @@ import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { createBillingCheckout, attachBillingProviderCheckout, markBillingCheckoutFailed } from "@/lib/server/billing-store";
 import { createRazorpayPaymentLink, getBillingCheckoutConfiguration } from "@/lib/server/billing-provider";
 import { isDatabaseConfigured } from "@/lib/server/database";
+import { getAuditLeadEmail } from "@/lib/server/lead-store";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 import { readCurrentSession } from "@/lib/server/session";
@@ -20,6 +21,8 @@ export async function GET(request: NextRequest) {
     plan,
     provider: configuration.provider,
     settlementTracking: configuration.status === "ready",
+    amountMinor: configuration.status === "ready" ? configuration.amountMinor : null,
+    currency: configuration.status === "ready" ? configuration.currency : null,
     requiredEnv: configuration.missing,
   }, { status: configuration.status === "not-configured" ? 501 : 200 });
 }
@@ -31,9 +34,9 @@ export async function POST(request: NextRequest) {
   const limit = await rateLimit(request, { namespace: "checkout", limit: 30, windowMs: 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
-  let body: { plan?: string; email?: string };
+  let body: { plan?: string; email?: string; leadId?: string };
   try {
-    body = await readLimitedJson<{ plan?: string; email?: string }>(request, 4 * 1024);
+    body = await readLimitedJson<{ plan?: string; email?: string; leadId?: string }>(request, 4 * 1024);
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) return NextResponse.json({ error: "Checkout request is too large." }, { status: 413 });
     if (error instanceof UnsupportedContentTypeError) return NextResponse.json({ error: "Content-Type must be application/json." }, { status: 415 });
@@ -79,9 +82,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A 16–128 character Idempotency-Key header is required." }, { status: 400 });
   }
 
+  let leadId: string | null = null;
+  if (body.leadId !== undefined) {
+    if (typeof body.leadId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.leadId)) {
+      return NextResponse.json({ error: "leadId must be the UUID returned by the audit intake." }, { status: 400 });
+    }
+    const leadEmail = await getAuditLeadEmail(body.leadId.toLowerCase());
+    if (!leadEmail || leadEmail.toLowerCase() !== email.toLowerCase()) {
+      return NextResponse.json({ error: "This checkout email does not match the audit request on file." }, { status: 409 });
+    }
+    leadId = body.leadId.toLowerCase();
+  }
+
   const intent = await createBillingCheckout({
     workspaceId: session?.workspaceId ?? null,
     userId: session?.userId ?? null,
+    leadId,
     customerEmail: email,
     plan,
     provider: "razorpay",

@@ -79,6 +79,14 @@ export async function persistWaitlistLead(input: WaitlistLeadInput) {
   }
 }
 
+export async function getAuditLeadEmail(leadId: string) {
+  const result = await getDatabasePool().query<{ email: string }>(
+    `select email from private_audit_leads where id = $1`,
+    [leadId],
+  );
+  return result.rows[0]?.email ?? null;
+}
+
 async function insertLeadConsent(
   client: import("pg").PoolClient,
   input: Pick<WaitlistLeadInput, "email" | "source" | "consentPurpose" | "consentNoticeVersion" | "consentGrantedAt">,

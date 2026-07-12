@@ -201,6 +201,8 @@ const endpointChecks = [
     },
   },
   { id: "audit-intake-status", path: "/api/audit-intake", expected: [200, 501], captureJson: true },
+  { id: "billing-return-page", path: "/billing/return", expected: [200] },
+  { id: "checkout-status-guard", path: "/api/checkout/00000000-0000-4000-8000-000000000000", expected: [404, 501, 503], captureJson: true },
   { id: "gmail-product-start", path: "/api/integrations/gmail/start?mode=json", expected: [200, 401, 501], captureJson: true },
   { id: "gmail-callback-config", path: "/api/integrations/gmail/callback", expected: [400, 501], captureJson: true },
   { id: "sync-due-run-cron-guard", path: "/api/internal/sync-jobs/due/run", expected: [401, 501], captureJson: true },

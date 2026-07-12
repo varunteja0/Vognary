@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { VognaryMark } from "../brand";
 
 const personas = [
@@ -102,12 +102,14 @@ export default function PrivateAuditClient() {
   const [form, setForm] = useState<IntakeForm>(initialForm);
   const [status, setStatus] = useState<string | null>(null);
   const [brief, setBrief] = useState<string | null>(null);
+  const [lead, setLead] = useState<{ id: string; email: string } | null>(null);
   const selectedSummary = useMemo(() => [...form.paymentTypes, ...form.sourceTypes].slice(0, 5).join(" / "), [form.paymentTypes, form.sourceTypes]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatus("Submitting audit request...");
     setBrief(null);
+    setLead(null);
 
     const response = await fetch("/api/audit-intake", {
       method: "POST",
@@ -123,6 +125,9 @@ export default function PrivateAuditClient() {
 
     const generatedBrief = buildBrief(form);
     setBrief(generatedBrief);
+    if (typeof payload.leadId === "string" && payload.leadId) {
+      setLead({ id: payload.leadId, email: form.email.trim().toLowerCase() });
+    }
     setStatus(payload.persisted
       ? "Audit request received. I will reply with the safest minimum source to share."
       : "Request prepared. This deployment still needs AUDIT_INTAKE_WEBHOOK_URL to persist leads; copy the brief below as backup.");
@@ -255,6 +260,7 @@ export default function PrivateAuditClient() {
               <span className="font-data text-xs text-(--muted)">{selectedSummary || "Select at least one source"}</span>
             </div>
             {status ? <p className="mt-4 rounded-md border border-indigo bg-(--indigo-tint) px-3 py-2 text-sm text-indigo">{status}</p> : null}
+            {lead ? <AuditPaymentStep lead={lead} /> : null}
             {brief ? <textarea readOnly value={brief} className="field field-mono mt-4 min-h-44" aria-label="Generated audit request backup" /> : null}
           </form>
         </section>
@@ -284,6 +290,102 @@ function ChoiceGroup({ legend, values, selected, onChange }: { legend: string; v
         })}
       </div>
     </fieldset>
+  );
+}
+
+type AuditCheckoutOffer =
+  | { state: "loading" }
+  | { state: "ready"; amountMinor: number; currency: string }
+  | { state: "link-only"; paymentUrl: string }
+  | { state: "not-configured" }
+  | { state: "unavailable" };
+
+function AuditPaymentStep({ lead }: { lead: { id: string; email: string } }) {
+  const [offer, setOffer] = useState<AuditCheckoutOffer>({ state: "loading" });
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/checkout?plan=annual")
+      .then(async (response) => {
+        const payload = await response.json();
+        if (cancelled) return;
+        if (payload.status === "ready" && typeof payload.amountMinor === "number") {
+          setOffer({ state: "ready", amountMinor: payload.amountMinor, currency: payload.currency ?? "INR" });
+        } else if (payload.status === "link-only" && typeof payload.paymentUrl === "string") {
+          setOffer({ state: "link-only", paymentUrl: payload.paymentUrl });
+        } else {
+          setOffer({ state: "not-configured" });
+        }
+      })
+      .catch(() => { if (!cancelled) setOffer({ state: "unavailable" }); });
+    return () => { cancelled = true; };
+  }, [lead.id]);
+
+  async function pay() {
+    if (offer.state !== "ready" || paying) return;
+    setPaying(true);
+    setPayError(null);
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `private-audit:${lead.id}`,
+        },
+        body: JSON.stringify({ plan: "annual", email: lead.email, leadId: lead.id }),
+      });
+      const payload = await response.json();
+      if (response.ok && typeof payload.paymentUrl === "string") {
+        window.location.href = payload.paymentUrl;
+        return;
+      }
+      setPayError(payload.error ?? "The checkout could not be started. Retry in a moment; the same request is safe to repeat.");
+    } catch {
+      setPayError("The checkout could not be started. Retry in a moment; the same request is safe to repeat.");
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  if (offer.state === "loading") return null;
+
+  return (
+    <div className="mt-4 rounded-[11px] border border-line bg-(--card-2) p-4">
+      <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Optional — reserve your audit now</p>
+      {offer.state === "ready" ? (
+        <>
+          <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
+            One-time private audit — <span className="font-data font-semibold">INR {(offer.amountMinor / 100).toLocaleString("en-IN")}</span>.
+            Payment runs on Razorpay and is confirmed by its signed webhook; you get a public status page and a receipt email.
+            Paying now reserves your slot, or simply wait for our reply first.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={pay} disabled={paying} className="btn btn-primary">
+              {paying ? "Opening Razorpay..." : "Pay for the audit"}
+            </button>
+            <span className="font-data text-xs text-(--muted)">Server-verified amount. No card details touch Vognary.</span>
+          </div>
+          {payError ? <p className="mt-3 rounded-md border border-line px-3 py-2 text-sm text-(--muted)">{payError}</p> : null}
+        </>
+      ) : offer.state === "link-only" ? (
+        <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
+          Tracked checkout is not active yet. You can pay through this fallback payment link;
+          it does not grant an automatic entitlement, so we reconcile it manually against your audit request:
+          {" "}<a href={offer.paymentUrl} className="underline" rel="noreferrer">open payment link</a>.
+        </p>
+      ) : offer.state === "not-configured" ? (
+        <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
+          Online payment is not activated yet. No action needed — we reply to your request with next steps,
+          and payment happens only after you see the audit plan.
+        </p>
+      ) : (
+        <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
+          Payment status could not be checked right now. Your audit request is saved; we reply by email with next steps.
+        </p>
+      )}
+    </div>
   );
 }
 

@@ -4,7 +4,7 @@ Vognary supports tracked Razorpay Payment Links. A configured static payment URL
 
 ## Required configuration
 
-- `DATABASE_URL` with migration `0013_billing_entitlements` applied.
+- `DATABASE_URL` with migrations `0013_billing_entitlements` and `0015_paid_audit_flow` applied.
 - `NEXT_PUBLIC_APP_URL` using the deployed HTTPS origin.
 - `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` from the intended Razorpay mode.
 - `RAZORPAY_WEBHOOK_SECRET` configured independently in the Razorpay dashboard.
@@ -17,6 +17,28 @@ https://<production-origin>/api/billing/webhooks/razorpay
 ```
 
 Subscribe to `payment_link.paid`, `payment_link.cancelled`, `payment_link.expired`, and `refund.processed`. Vognary validates `X-Razorpay-Signature` against the untouched raw body and deduplicates `x-razorpay-event-id`. It stores only bounded settlement identifiers and a SHA-256 payload hash, never the raw webhook body.
+
+## Paid private audits (guest checkout)
+
+The `annual` plan is the guest-payable one-time private audit. The flow is:
+
+1. A visitor submits `/private-audit`; `POST /api/audit-intake` persists the lead and returns `leadId`.
+2. The page offers the server-owned price from `GET /api/checkout?plan=annual` (`amountMinor` appears only when tracked checkout is fully configured).
+3. `POST /api/checkout` with `{ plan: "annual", email, leadId }` and header `Idempotency-Key: private-audit:<leadId>` creates or replays one checkout bound to that lead. The server verifies the lead exists and its email matches before binding; a mismatch returns `409`.
+4. Razorpay redirects the payer back to the public status page `/billing/return?checkout=<checkoutId>`. That page never requires login and reads only `GET /api/checkout/<checkoutId>` (status, plan, amount, timestamps — no email, no provider identifiers).
+5. Settlement remains webhook-only. A paid `annual` checkout grants the `annual-audit` entitlement when a workspace exists and grants nothing for guests — it never becomes a monitoring entitlement.
+
+Operator identification of a paid audit (no payment credentials involved):
+
+```sql
+select c.id as checkout_id, c.status, c.paid_at, c.amount_minor, l.name, l.email, l.persona
+from billing_checkout_sessions c
+join private_audit_leads l on l.id = c.lead_id
+where c.plan = 'annual' and c.status = 'paid'
+order by c.paid_at desc;
+```
+
+Funnel telemetry (privacy-safe counts only, no identifiers): `private_audit.requested`, `billing.checkout_started`, `billing.payment_settled`, and `billing.payment_refunded` in `product_events`.
 
 ## Test-mode proof
 

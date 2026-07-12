@@ -8,6 +8,10 @@ export const productEventNames = [
   "review.action_recorded",
   "review.completed",
   "export.created",
+  "private_audit.requested",
+  "billing.checkout_started",
+  "billing.payment_settled",
+  "billing.payment_refunded",
 ] as const;
 
 export const productEventSources = ["sync-runner", "living-ledger", "workspace-api", "product-ui"] as const;
