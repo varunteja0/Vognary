@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { VognaryMark } from "../brand";
 
 type SessionPayload = {
@@ -29,6 +29,11 @@ type Banner = { tone: Tone; text: string } | null;
 const trustPoints = ["No bank passwords", "Read-only identity", "Encrypted workspace state", "Delete anytime"];
 const isDevEnv = process.env.NODE_ENV !== "production";
 
+type LoginClientProps = {
+  initialGoogleReason?: string;
+  initialNextPath?: string;
+};
+
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
@@ -47,28 +52,22 @@ function safeNextPath(raw: string | null): string {
   return raw;
 }
 
-export default function LoginClient() {
+export default function LoginClient({ initialGoogleReason, initialNextPath }: LoginClientProps) {
   const [form, setForm] = useState({ name: "", email: "", workspaceName: "", accessCode: "" });
   const [magicForm, setMagicForm] = useState({ name: "", email: "", workspaceName: "" });
   const [session, setSession] = useState<SessionPayload | null>(null);
   const [status, setStatus] = useState<Banner>(null);
   const [magicStatus, setMagicStatus] = useState<Banner>(null);
-  const [googleStatus, setGoogleStatus] = useState<Banner>(() => {
-    if (typeof window === "undefined") return null;
-    const reason = new URLSearchParams(window.location.search).get("google");
-    return reason ? { tone: "error", text: getGoogleFailureMessage(reason) } : null;
-  });
+  const [googleStatus, setGoogleStatus] = useState<Banner>(() => initialGoogleReason
+    ? { tone: "error", text: getGoogleFailureMessage(initialGoogleReason) }
+    : null);
   const [submitting, setSubmitting] = useState(false);
   const [magicSubmitting, setMagicSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
   const [resendIn, setResendIn] = useState(0);
-
-  const nextPath = useMemo(() => {
-    if (typeof window === "undefined") return "/app";
-    return safeNextPath(new URLSearchParams(window.location.search).get("next"));
-  }, []);
+  const nextPath = safeNextPath(initialNextPath ?? null);
 
   useEffect(() => {
     let cancelled = false;

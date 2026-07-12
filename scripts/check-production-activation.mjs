@@ -24,10 +24,20 @@ const groups = [
   },
   {
     id: "payments",
-    label: "Payment links",
-    required: ["PAYMENT_LINK_PERSONAL_PRO", "PAYMENT_LINK_FOUNDER_PRO", "PAYMENT_LINK_TEAM", "PAYMENT_LINK_ANNUAL_AUDIT"],
+    label: "Tracked Razorpay billing",
+    required: [
+      "DATABASE_URL",
+      "NEXT_PUBLIC_APP_URL",
+      "RAZORPAY_KEY_ID",
+      "RAZORPAY_KEY_SECRET",
+      "RAZORPAY_WEBHOOK_SECRET",
+      "PAYMENT_AMOUNT_PERSONAL_INR",
+      "PAYMENT_AMOUNT_FOUNDER_INR",
+      "PAYMENT_AMOUNT_TEAM_INR",
+      "PAYMENT_AMOUNT_ANNUAL_AUDIT_INR",
+    ],
     probe: isPaymentReady,
-    why: "Enables paid plan checkout buttons and private audit collection.",
+    why: "Requires tracked checkout creation, signed settlement webhooks, and at least one observed paid entitlement. Static payment links are an untracked fallback only.",
   },
   {
     id: "gmail-oauth",
@@ -168,7 +178,7 @@ const endpointChecks = [
   { id: "privacy-retention-policy-auth-guard", path: "/api/privacy/retention-policy", expected: [401] },
   { id: "privacy-requests-auth-guard", path: "/api/privacy/requests", expected: [401] },
   { id: "platform-token-admin-auth-guard", path: "/api/platform/tokens", expected: [401] },
-    { id: "billing-entitlements-auth-guard", path: "/api/billing/entitlements", expected: [401] },
+  { id: "billing-entitlements-auth-guard", path: "/api/billing/entitlements", expected: [401] },
   { id: "platform-ledger-token-guard", path: "/api/v1/ledger", expected: [401, 503], captureJson: true },
   { id: "platform-sources-token-guard", path: "/api/v1/sources", expected: [401, 503], captureJson: true },
   {

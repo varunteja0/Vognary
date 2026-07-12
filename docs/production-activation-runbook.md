@@ -61,52 +61,36 @@ Rollback:
 - Remove `AUDIT_INTAKE_WEBHOOK_URL` from Vercel if the webhook is leaking or failing.
 - The site will fall back to preview mode and still produce a backup brief.
 
-## 2. Payment Links
+## 2. Tracked Razorpay Billing
 
-Goal: paid CTAs can send users to a real payment page.
+Goal: a signed-in workspace can create a tracked Razorpay checkout, and access changes only after a signed settlement webhook.
 
-Recommended India-first path: Razorpay Payment Links. Stripe can be added later for international cards.
+Static `PAYMENT_LINK_*` URLs are an explicitly untracked fallback. They return `status: "link-only"`, do not grant an entitlement, and cannot satisfy production readiness.
 
-Click-by-click using Razorpay:
+1. Complete Razorpay business/KYC activation and create keys for the intended mode. Follow Razorpay's current official key instructions: `https://razorpay.com/docs/payments/dashboard/settings/api-keys/`.
+2. Apply migration `0013_billing_entitlements` to the production database.
+3. In Vercel production environment variables, configure `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, and all four `PAYMENT_AMOUNT_*_INR` values listed in `docs/billing-activation-runbook.md`.
+4. In Razorpay, configure `https://www.vognary.com/api/billing/webhooks/razorpay` as the webhook URL using the same independently generated webhook secret. Follow the current official webhook instructions: `https://razorpay.com/docs/webhooks/setup-edit-payments/`.
+5. Subscribe the webhook to `payment_link.paid`, `payment_link.cancelled`, `payment_link.expired`, and `refund.processed`.
+6. Redeploy production.
+7. Sign in to a disposable test workspace and start checkout from the workspace UI. The tracked `personal`, `founder`, and `team` plans intentionally require an authenticated workspace.
+8. Confirm checkout creation returns `status: "ready"` and a Razorpay URL. The request must include the signed session cookie and a unique 16–128 character `Idempotency-Key` header.
+9. Complete the test payment, verify the signed webhook changed the checkout to `paid`, and verify an active `workspace_entitlements` row exists.
+10. Replay the event id, test a full refund, and run `npm run billing:reconcile -- --report-only`; require zero mismatches.
+11. Follow the complete proof and rollback conditions in `docs/billing-activation-runbook.md`.
 
-1. Open `https://dashboard.razorpay.com/`.
-2. Log in to your Razorpay account.
-3. Complete business/KYC activation if prompted.
-4. In the left navigation, click `Payment Links`.
-5. Click `Create Payment Link`.
-6. Create `Vognary Personal Pro` for INR 999.
-7. Copy the payment link URL.
-8. Create `Vognary Founder Pro` for INR 4,999.
-9. Copy the payment link URL.
-10. Create `Vognary Team` for your team price.
-11. Copy the payment link URL.
-12. Create `Vognary Annual Audit` for the annual audit price.
-13. Copy the payment link URL.
-14. Open Vercel Dashboard.
-15. Select `Vognary` project.
-16. Click `Settings` > `Environment Variables`.
-17. Add:
-    - `PAYMENT_LINK_PERSONAL_PRO`
-    - `PAYMENT_LINK_FOUNDER_PRO`
-    - `PAYMENT_LINK_TEAM`
-    - `PAYMENT_LINK_ANNUAL_AUDIT`
-18. Paste each Razorpay link as its value.
-19. Select `Production` for each.
-20. Click `Save`.
-21. Redeploy production.
-22. Test:
+Success check:
 
 ```bash
-curl -X POST https://www.vognary.com/api/checkout \
-  -H 'Content-Type: application/json' \
-  -d '{"plan":"founder"}'
+npm run production:check -- https://www.vognary.com --strict
 ```
 
-Expected: JSON returns `status: "ready"` and a `paymentUrl`.
+Expected: `Tracked Razorpay billing` becomes `READY` only after the readiness API reports `settlement-observed` and every tracked plan probe reports `ready`.
 
-Stop condition:
+Stop conditions:
 
-- Do not announce paid checkout until Razorpay test payment succeeds and settlement/KYC is active.
+- Do not announce paid access from a browser redirect or a static payment URL.
+- Stop on webhook signature failures, reconciliation mismatches, duplicate entitlement periods, or a refund that does not revoke access.
 
 ## 3. Gmail OAuth For User-Owned Gmail Receipt Sync
 

@@ -1,5 +1,7 @@
 # Day-90 Completion Report
 
+> Historical milestone snapshot. Several items listed below as future work were subsequently implemented. Use `README.md`, `docs/current-state-and-market-gap-analysis.md`, and `docs/production-activation-runbook.md` for current repository and activation status.
+
 ## Completed In Code
 
 - Public launch page at `/launch`.

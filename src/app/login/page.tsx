@@ -6,6 +6,23 @@ export const metadata: Metadata = {
   description: "Start a Vognary proof-backed recurring-money audit workspace.",
 };
 
-export default function LoginPage() {
-  return <LoginClient />;
+type LoginPageProps = {
+  searchParams: Promise<{
+    google?: string | string[];
+    next?: string | string[];
+  }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+  return (
+    <LoginClient
+      initialGoogleReason={firstQueryValue(params.google)}
+      initialNextPath={firstQueryValue(params.next)}
+    />
+  );
+}
+
+function firstQueryValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }

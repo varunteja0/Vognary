@@ -1,6 +1,3 @@
-| PostgreSQL schema + forward migrations | Code complete | Users/workspaces/sessions, connector control plane, canonical ledger, revisioned workspace state, privacy lifecycle, alerts, decisions, API tokens, consent-bound connector accounts, and tracked billing entitlements are modeled through `0002`–`0013`. CI applies the real schema to PostgreSQL 16 and runs database integration tests. Production databases must still apply them. |
-| Database-backed product modules | Migrations `0002`–`0013` exist | Apply migrations in staging/production, verify `schema_migrations`, backup first, and run route/worker/database smoke tests |
-1. Apply migrations `0002`–`0013` to staging/production and repeat the PostgreSQL integration suite plus route/worker smoke tests (the disposable PostgreSQL 16 proof is now automated in CI).
 # Vognary Current State And Market Gap Analysis
 
 Date: 2026-07-11

@@ -22,7 +22,10 @@ export function getDatabasePool() {
   if (!globalStore.__vognaryPostgresPool) {
     globalStore.__vognaryPostgresPool = new Pool({
       connectionString,
-      max: Number.parseInt(process.env.POSTGRES_POOL_MAX ?? "5", 10),
+      max: readPositiveInteger("POSTGRES_POOL_MAX", 5),
+      connectionTimeoutMillis: readPositiveInteger("POSTGRES_CONNECTION_TIMEOUT_MS", 5_000),
+      idleTimeoutMillis: readPositiveInteger("POSTGRES_IDLE_TIMEOUT_MS", 30_000),
+      statement_timeout: readPositiveInteger("POSTGRES_STATEMENT_TIMEOUT_MS", 30_000),
       ssl: getPostgresSsl(),
     });
   }
@@ -37,6 +40,11 @@ function getPostgresSsl() {
     ca: process.env.POSTGRES_CA_CERT || undefined,
     rejectUnauthorized: process.env.POSTGRES_SSL_REJECT_UNAUTHORIZED !== "false",
   };
+}
+
+function readPositiveInteger(name: string, fallback: number) {
+  const value = Number.parseInt(process.env[name] ?? "", 10);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
 export async function checkDatabaseConnection(): Promise<DatabaseStatus> {

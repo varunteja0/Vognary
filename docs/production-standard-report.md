@@ -1,5 +1,7 @@
 # Production Standard Report
 
+> Historical snapshot. Do not use this report as the current activation source of truth. The persistence, authenticated connector, billing, and privacy layers described below were subsequently implemented. Use `README.md`, `docs/current-state-and-market-gap-analysis.md`, and `docs/production-activation-runbook.md` for current status.
+
 ## Current Sell-Ready Product Boundary
 
 Vognary is sell-ready only as a self-serve, stateless recurring-payment audit and connector-readiness product. It is not yet the stateful enterprise sync platform. A user can:
