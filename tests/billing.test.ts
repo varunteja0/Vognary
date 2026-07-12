@@ -116,3 +116,11 @@ test("audit intake emits the private_audit.requested funnel event after durable 
   const eventIndex = route.indexOf('eventName: "private_audit.requested"');
   assert.ok(persistIndex > -1 && eventIndex > persistIndex);
 });
+
+test("outreach attribution tags are server-validated and bounded", () => {
+  const route = source("src/app/api/audit-intake/route.ts");
+  assert.match(route, /\/\^\[a-z0-9\]\[a-z0-9-\]\{0,31\}\$\//);
+  assert.match(route, /vognary-private-audit-intake:\$\{sourceTag\}/);
+  const client = source("src/app/private-audit/private-audit-client.tsx");
+  assert.match(client, /URLSearchParams\(window\.location\.search\)\.get\("src"\)/);
+});

@@ -18,6 +18,7 @@ type AuditIntakeRequest = {
   biggestConcern?: string;
   canContact?: boolean;
   message?: string;
+  sourceTag?: string;
 };
 
 const allowedPersonas = new Set([
@@ -123,9 +124,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Select at least one source you can share." }, { status: 400 });
   }
 
+  // Outreach attribution: the page forwards ?src=<tag> from tracked links.
+  // Server-validated so the stored source stays a bounded, predictable value.
+  const sourceTag = typeof body.sourceTag === "string" && /^[a-z0-9][a-z0-9-]{0,31}$/.test(body.sourceTag.trim().toLowerCase())
+    ? body.sourceTag.trim().toLowerCase()
+    : null;
+
   const createdAt = new Date().toISOString();
   const payload = {
-    source: "vognary-private-audit-intake",
+    source: sourceTag ? `vognary-private-audit-intake:${sourceTag}` : "vognary-private-audit-intake",
     createdAt,
     name,
     email,

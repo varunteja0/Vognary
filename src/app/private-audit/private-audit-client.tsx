@@ -111,10 +111,11 @@ export default function PrivateAuditClient() {
     setBrief(null);
     setLead(null);
 
+    const sourceTag = new URLSearchParams(window.location.search).get("src") ?? undefined;
     const response = await fetch("/api/audit-intake", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, sourceTag }),
     });
     const payload = await response.json();
 

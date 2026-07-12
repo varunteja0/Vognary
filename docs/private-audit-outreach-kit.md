@@ -60,8 +60,13 @@ I am taking 10 private beta audits this week.
 If the report is useful, paid beta is INR 999 for individuals or INR 4,999 for founder/team audits.
 If I find nothing useful, do not pay.
 
-Comment "audit" or DM me and I will send the intake link.
+Intake link (no login needed): https://www.vognary.com/private-audit?src=li-post
 ```
+
+Note (2026-07-12): the earlier "Comment \"audit\" or DM me" close was removed. LinkedIn's 2026
+authenticity update suppresses comment-gating engagement bait, so the link now goes directly in
+the post (or first comment). 1:1 DMs from `docs/first-five-audits-operator-sheet.md` are the
+primary route; this post is air cover.
 
 Reply to comments:
 
