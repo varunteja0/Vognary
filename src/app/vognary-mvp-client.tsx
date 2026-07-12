@@ -2473,7 +2473,10 @@ function OverviewPanel({
             {checkoutBusy ? "Opening checkout…" : "Monitor this workspace"}
           </button>
         ) : (
-          <a href="/login?next=%2Fapp%23overview" className="btn btn-primary h-9 px-3 text-xs">Sign in to monitor</a>
+          <>
+            <a href="/private-audit" className="btn btn-primary h-9 px-3 text-xs">Get a private audit</a>
+            <a href="/login?next=%2Fapp%23overview" className="btn btn-ghost h-9 px-3 text-xs">Sign in to monitor</a>
+          </>
         )}
         <p className="font-data text-[0.64rem] text-(--muted)">Every JSON export has an offline tamper checksum; /verify separately reports whether a trusted Vognary issuer signature is present.</p>
       </div>
