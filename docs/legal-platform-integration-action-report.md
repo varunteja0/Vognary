@@ -36,7 +36,7 @@ Ready in production:
 Missing before full production activation:
 
 - Payment links: `PAYMENT_LINK_PERSONAL_PRO`, `PAYMENT_LINK_FOUNDER_PRO`, `PAYMENT_LINK_TEAM`, `PAYMENT_LINK_ANNUAL_AUDIT`.
-- OpenAI direct sync key: `OPENAI_ADMIN_API_KEY`.
+- OpenAI direct sync key: a per-workspace key stored through the encrypted connector flow. `OPENAI_ADMIN_API_KEY` is local-preview-only.
 - Redis-backed public rate limiting: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
 - Monitoring and incident alerts: `SENTRY_DSN` or `BETTER_STACK_SOURCE_TOKEN`.
 - Backup/object storage and restore drill: `BACKUP_STORAGE_BUCKET`, `S3_BUCKET`, or `R2_BUCKET`, plus `BACKUP_RESTORE_DRILL_STATUS=passed`.
@@ -78,7 +78,7 @@ These can be used now without pretending direct provider sync exists:
 These have code paths or adapter foundations but require production credentials and external verification:
 
 - Gmail Read-Only: OAuth receipt discovery with state validation. For signed-in users, the callback can persist encrypted token references when database and token vault are configured, then queue an initial sync job. Public launch still requires Google OAuth verification for the restricted `gmail.readonly` scope.
-- OpenAI Usage and Costs: adapter exists for `GET /organization/costs`, but production sync is blocked until `OPENAI_ADMIN_API_KEY` is configured or workspace-level key capture is implemented.
+- OpenAI Usage and Costs: adapter exists for `GET /organization/costs`; production sync requires the workspace-level encrypted key capture flow and never falls back to a deployment-wide key.
 
 ### Backend Foundations
 
@@ -164,7 +164,7 @@ Goal: prove a direct provider cost connector end to end.
 
 Complete next:
 
-1. Configure `OPENAI_ADMIN_API_KEY` for controlled admin preview, or build workspace-level admin-key capture.
+1. Validate workspace-level OpenAI admin-key capture and rotation with a design partner; keep any environment-key preview local-only.
 2. Run the adapter against a real authorized organization.
 3. Persist evidence through sync jobs instead of stateless preview only.
 4. Normalize cost windows into recurring ledger evidence.

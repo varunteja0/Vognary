@@ -136,9 +136,33 @@ function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function normalizeRedirectPath(path: string | null | undefined) {
-  if (!path || !path.startsWith("/") || path.startsWith("//")) return "/";
-  return path.slice(0, 256);
+export function normalizeRedirectPath(path: string | null | undefined) {
+  if (!path || path.length > 256 || path !== path.trim()) return "/";
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) return "/";
+
+  // Reject encoded and double-encoded separators/control characters too. URL
+  // parsers disagree about backslashes, so validating only startsWith("//") is
+  // insufficient for a security boundary.
+  let decoded = path;
+  for (let pass = 0; pass < 3; pass += 1) {
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next.startsWith("//") || next.includes("\\") || /[\u0000-\u001f\u007f]/.test(next)) return "/";
+      if (next === decoded) break;
+      decoded = next;
+    } catch {
+      return "/";
+    }
+  }
+
+  try {
+    const base = new URL("https://vognary.invalid/");
+    const parsed = new URL(path, base);
+    if (parsed.origin !== base.origin || parsed.username || parsed.password) return "/";
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return "/";
+  }
 }
 
 function escapeHtml(value: string) {

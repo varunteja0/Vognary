@@ -1,18 +1,30 @@
 import { getConnectorSummary, getConnectorSyncSummary } from "@/lib/connectors";
+import { billingPlans } from "@/lib/billing";
 import { getRateLimitBackendStatus } from "@/lib/rate-limit";
 import { listConnectorAdapters } from "@/lib/connectors/adapter-registry";
+import { getPartnerRailsMissingProductionRails, getPartnerRailsStatus, getPartnerRailStatuses } from "@/lib/partner-rails";
+import { checkBackupConfiguration } from "@/lib/server/backup-readiness";
+import { getBillingCheckoutConfiguration } from "@/lib/server/billing-provider";
 import { checkDatabaseConnection } from "@/lib/server/database";
+import { checkFeatureReadiness, getUnconfiguredFeatureReadiness } from "@/lib/server/feature-readiness";
 import { checkGoogleAuthConfiguration } from "@/lib/server/google-auth";
 import { isLeadDatabaseConfigured } from "@/lib/server/lead-store";
 import { checkMagicLinkConfiguration } from "@/lib/server/magic-link-auth";
 import { getMonitoringBackendStatus } from "@/lib/server/monitoring";
+import { checkRenewalAlertEmailConfiguration } from "@/lib/server/renewal-alert-mailer";
 import { checkSessionConfiguration } from "@/lib/server/session";
 import { checkTokenVaultConfiguration } from "@/lib/server/token-vault";
+import { requireInternalSecret } from "@/lib/server/internal-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (process.env.NODE_ENV === "production") {
+    const unauthorized = requireInternalSecret(request);
+    if (unauthorized) return unauthorized;
+  }
+
   const database = await checkDatabaseConnection();
   const tokenVault = checkTokenVaultConfiguration();
   const session = checkSessionConfiguration();
@@ -23,11 +35,15 @@ export async function GET() {
   const monitoringBackend = getMonitoringBackendStatus();
   const magicLink = checkMagicLinkConfiguration();
   const googleAuth = checkGoogleAuthConfiguration();
+  const backups = checkBackupConfiguration();
+  const features = database.status === "ready" ? await checkFeatureReadiness() : getUnconfiguredFeatureReadiness();
+  const renewalAlertEmail = checkRenewalAlertEmailConfiguration();
+  const schemaDegraded = database.status === "ready" && features.schema.status !== "ready";
 
   return Response.json({
     service: "vognary-web",
-    status: database.status === "error" ? "degraded" : "ok",
-    stage: "stateless-audit-plus-connector-control-plane",
+    status: database.status === "error" || schemaDegraded ? "degraded" : "ok",
+    stage: "recurring-ledger-with-opt-in-automation-and-read-only-platform-api",
     timestamp: new Date().toISOString(),
     database,
     tokenVault,
@@ -40,34 +56,44 @@ export async function GET() {
       syncSummary: connectorSyncSummary,
       adapters: connectorAdapters,
     },
+    capabilities: features,
     hardening: {
-      apiRateLimiting: rateLimitBackend === "upstash-rest" ? "shared-upstash" : "in-memory",
+      apiRateLimiting: rateLimitBackend === "upstash-rest" ? "shared-upstash" : rateLimitBackend === "shared-required-not-configured" ? "blocked-shared-backend-required" : "in-memory",
       redisRateLimiting: getRedisRateLimitStatus(rateLimitBackend),
       oauthStateValidation: "ready",
       securityHeaders: "configured",
       leadPersistence: getLeadPersistenceStatus(),
-      payments: process.env.PAYMENT_LINK_FOUNDER_PRO ? "configured" : "not-configured",
+      payments: getPaymentStatus(features.billing),
       monitoring: getMonitoringStatus(monitoringBackend),
-      backups: getBackupStatus(),
+      backups: backups.status,
+      backupReadiness: backups,
       identityProvider: getIdentityProviderStatus(magicLink, googleAuth),
       partnerRails: getPartnerRailsStatus(),
       partnerRailStatuses: getPartnerRailStatuses(),
+      partnerRailsMissingProduction: getPartnerRailsMissingProductionRails(),
       sessionCookies: session.status,
       workspaceAuthorization: database.status === "ready" && session.status === "ready" ? "primitives-ready-no-login" : "not-ready",
       persistentTokenVault: tokenVault.status,
       connectorTokenStore: database.status === "ready" && tokenVault.status === "ready" ? "ready" : "not-ready",
       directAdapterRegistry: connectorAdapters.length > 0 ? "ready" : "not-configured",
       internalSyncJobApi: process.env.INTERNAL_SYNC_SECRET ? "configured" : "ready-needs-secret",
-      syncWorkers: getSyncWorkerStatus(),
+      syncWorkers: getSyncWorkerStatus(features.syncWorkers),
+      privacyLifecycle: getPrivacyLifecycleStatus(features.privacyLifecycle),
+      retentionScheduler: getRetentionSchedulerStatus(features.privacyLifecycle),
+      renewalAlerts: getRenewalAlertStatus(features.renewalAlerts, renewalAlertEmail),
+      renewalAlertEmail: renewalAlertEmail.status === "ready" ? "configured" : `missing-${renewalAlertEmail.missing.join("-")}`,
+      commitmentDecisions: features.commitmentDecisions.status,
+      platformApi: getPlatformApiStatus(features.platformApi, rateLimitBackend),
       webhookIngestion: process.env.CONNECTOR_WEBHOOK_SECRET ? "configured" : "ready-needs-secret",
     },
-  });
+  }, { headers: { "cache-control": "no-store" } });
 }
 
 function getRedisRateLimitStatus(rateLimitBackend: ReturnType<typeof getRateLimitBackendStatus>) {
   if (rateLimitBackend === "upstash-rest") return "configured";
   if (rateLimitBackend === "upstash-missing-token") return "missing-upstash-token";
   if (rateLimitBackend === "redis-url-configured-not-wired") return "redis-url-configured-not-wired";
+  if (rateLimitBackend === "shared-required-not-configured") return "required-not-configured";
   return "not-configured";
 }
 
@@ -88,44 +114,63 @@ function getIdentityProviderStatus(magicLink: ReturnType<typeof checkMagicLinkCo
   return "not-configured";
 }
 
-function getBackupStatus() {
-  const hasStorage = Boolean(process.env.BACKUP_STORAGE_BUCKET || process.env.S3_BUCKET || process.env.R2_BUCKET);
-  const restoreDrillPassed = process.env.BACKUP_RESTORE_DRILL_STATUS?.trim().toLowerCase() === "passed";
-  if (hasStorage && restoreDrillPassed) return "configured";
-  if (hasStorage) return "storage-configured-restore-drill-required";
-  if (restoreDrillPassed) return "restore-drill-recorded-needs-storage";
-  return "not-configured";
-}
-
 function getLeadPersistenceStatus() {
   if (isLeadDatabaseConfigured()) return "configured-database";
   if (process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL) return "configured-webhook";
   return "not-configured";
 }
 
-function getPartnerRailsStatus() {
-  const statuses = Object.values(getPartnerRailStatuses()).filter(Boolean);
-  if (!statuses.length) return "not-configured";
-  if (statuses.every((status) => status === "production-live")) return "production-live";
-  if (statuses.every((status) => status === "sandbox-approved" || status === "production-live")) return "sandbox-approved";
-  if (statuses.some((status) => status === "sandbox-requested" || status === "sandbox-approved" || status === "production-live")) return "in-progress";
-  return "outreach-started";
+function getPaymentStatus(feature: { status: string; activeEntitlements: number | null; lastPaidAt: string | null }) {
+  if (feature.status === "migration-pending" || feature.status === "migration-ledger-unavailable" || feature.status === "schema-query-failed") return feature.status;
+  const configurations = billingPlans.map(getBillingCheckoutConfiguration);
+  if (configurations.some((configuration) => configuration.status === "link-only")) return "link-only-untracked";
+  if (configurations.some((configuration) => configuration.status !== "ready")) return "not-configured";
+  if (feature.activeEntitlements && feature.activeEntitlements > 0 && feature.lastPaidAt) return "settlement-observed";
+  if (feature.lastPaidAt) return "payment-observed-no-active-entitlement";
+  return "tracked-checkout-ready-settlement-unproven";
 }
 
-function getPartnerRailStatuses() {
-  return {
-    accountAggregator: normalizePartnerRailStatus(process.env.ACCOUNT_AGGREGATOR_PARTNER_STATUS),
-    upiMandates: normalizePartnerRailStatus(process.env.UPI_MANDATE_PARTNER_STATUS),
-    cardMandates: normalizePartnerRailStatus(process.env.CARD_MANDATE_PARTNER_STATUS),
-  };
-}
-
-function getSyncWorkerStatus() {
-  if (process.env.CRON_SECRET) return "vercel-cron-configured";
+function getSyncWorkerStatus(feature: { status: string; lastCronEvidenceAt: string | null }) {
+  if (feature.status === "migration-pending" || feature.status === "migration-ledger-unavailable" || feature.status === "schema-query-failed") return feature.status;
+  if (process.env.SYNC_SCHEDULER_STATUS === "production-live" && process.env.CRON_SECRET && feature.lastCronEvidenceAt) return "operator-attested-production-live";
+  if (process.env.SYNC_SCHEDULER_STATUS === "production-live" && !feature.lastCronEvidenceAt) return "invalid-attestation-no-cron-evidence";
+  if (process.env.SYNC_SCHEDULER_STATUS === "production-live") return "invalid-attestation-missing-cron-secret";
+  if (feature.lastCronEvidenceAt) return "cron-evidence-observed-deployment-schedule-unverified";
+  if (process.env.CRON_SECRET) return "cron-secret-configured-deployment-schedule-unverified";
   return "cron-route-ready-needs-secret";
 }
 
-function normalizePartnerRailStatus(value: string | undefined) {
-  const normalized = value?.trim().toLowerCase();
-  return normalized || null;
+function getPrivacyLifecycleStatus(feature: { status: string }) {
+  return feature.status;
+}
+
+function getRetentionSchedulerStatus(feature: { status: string; lastEnforcedAt: string | null }) {
+  if (feature.status === "migration-pending" || feature.status === "migration-ledger-unavailable" || feature.status === "schema-query-failed") return feature.status;
+  if (process.env.RETENTION_SCHEDULER_STATUS === "production-live" && feature.lastEnforcedAt) return "operator-attested-production-live";
+  if (process.env.RETENTION_SCHEDULER_STATUS === "production-live") return "invalid-attestation-no-enforced-run-observed";
+  if (feature.lastEnforcedAt) return "last-run-observed-deployment-schedule-unverified";
+  if (process.env.CRON_SECRET) return "cron-secret-configured-deployment-schedule-unverified";
+  return "cron-route-ready-needs-secret";
+}
+
+function getRenewalAlertStatus(
+  feature: { status: string; lastSentAt: string | null },
+  email: ReturnType<typeof checkRenewalAlertEmailConfiguration>,
+) {
+  if (feature.status === "migration-pending" || feature.status === "migration-ledger-unavailable" || feature.status === "schema-query-failed") return feature.status;
+  if (email.status !== "ready") return "schema-ready-email-not-configured";
+  if (!process.env.CRON_SECRET) return "email-ready-cron-secret-missing";
+  if (process.env.RENEWAL_ALERT_DELIVERY_STATUS === "production-live" && feature.lastSentAt) return "operator-attested-production-live";
+  if (process.env.RENEWAL_ALERT_DELIVERY_STATUS === "production-live") return "invalid-attestation-no-delivery-observed";
+  if (feature.lastSentAt) return "delivery-observed-deployment-schedule-unverified";
+  return "worker-configured-delivery-unproven";
+}
+
+function getPlatformApiStatus(
+  feature: { status: string },
+  rateLimitBackend: ReturnType<typeof getRateLimitBackendStatus>,
+) {
+  if (feature.status === "migration-pending" || feature.status === "migration-ledger-unavailable" || feature.status === "schema-query-failed") return feature.status;
+  if (rateLimitBackend !== "upstash-rest") return "schema-ready-shared-rate-limit-required";
+  return feature.status;
 }

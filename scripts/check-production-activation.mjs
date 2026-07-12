@@ -10,7 +10,9 @@ const urlArg = args.find((arg) => arg.startsWith("http://") || arg.startsWith("h
 const baseUrl = (urlArg || process.env.NEXT_PUBLIC_APP_URL || "https://www.vognary.com").replace(/\/$/, "");
 
 const betaRequiredGroupIds = new Set(["lead-persistence", "encrypted-snapshots"]);
-const betaSignInGroupIds = new Set(["identity-provider", "private-beta-login"]);
+const betaSignInGroupIds = new Set(["identity-provider"]);
+const targetUrl = new URL(baseUrl);
+const targetIsLocal = targetUrl.hostname === "localhost" || targetUrl.hostname === "127.0.0.1" || targetUrl.hostname === "::1";
 
 const groups = [
   {
@@ -42,32 +44,42 @@ const groups = [
     why: "Enables encrypted connected accounts, token storage, sync jobs, and workspace sessions.",
   },
   {
+    id: "feature-migrations",
+    label: "Feature migrations 0002 through 0014",
+    required: ["DATABASE_URL"],
+    probe: isFeatureMigrationsReady,
+    why: "Confirms the target database recorded every forward migration and can query persistent capability schema.",
+  },
+  {
     id: "sync-scheduler",
     label: "Scheduled sync worker",
     required: ["CRON_SECRET"],
+    requiredValues: { SYNC_SCHEDULER_STATUS: "production-live" },
     probe: isSyncSchedulerReady,
-    why: "Lets Vercel Cron securely run due connector sync jobs instead of leaving queued work idle.",
+    why: "Requires an operator attestation after deployed Vercel Cron logs and connector-run evidence prove the schedule, not merely a configured secret.",
   },
   {
-    id: "private-beta-login",
-    label: "Private beta login",
-    required: ["DATABASE_URL", "SESSION_SECRET", "PRIVATE_BETA_ACCESS_CODE"],
-    probe: isPrivateBetaLoginReady,
-    why: "Enables invited beta users to sign in and create a workspace envelope.",
+    id: "privacy-lifecycle",
+    label: "Privacy lifecycle enforcement",
+    required: ["DATABASE_URL", "INTERNAL_SYNC_SECRET"],
+    requiredValues: { RETENTION_SCHEDULER_STATUS: "production-live" },
+    probe: isPrivacyLifecycleReady,
+    why: "Requires migration 0004, at least one audited destructive enforcement run, and an operator-verified deployed fixed-policy retention cron.",
+  },
+  {
+    id: "renewal-alerts",
+    label: "Consent-gated renewal email delivery",
+    required: ["DATABASE_URL", "RESEND_API_KEY", "RESEND_FROM_EMAIL", "NEXT_PUBLIC_APP_URL", "CRON_SECRET"],
+    requiredValues: { RENEWAL_ALERT_DELIVERY_STATUS: "production-live" },
+    probe: isRenewalAlertsReady,
+    why: "Requires migration 0006, complete email configuration, a delivered opt-in test reminder, and an operator-verified deployed cron.",
   },
   {
     id: "encrypted-snapshots",
-    label: "Encrypted server snapshots",
-    required: ["DATABASE_URL", "TOKEN_ENCRYPTION_KEY", "SESSION_SECRET", "PRIVATE_BETA_ACCESS_CODE"],
+    label: "Encrypted synchronized workspace state",
+    required: ["DATABASE_URL", "TOKEN_ENCRYPTION_KEY", "SESSION_SECRET"],
     probe: isEncryptedSnapshotsReady,
-    why: "Enables signed-in beta users to save encrypted audit snapshots server-side.",
-  },
-  {
-    id: "openai-costs",
-    label: "OpenAI cost sync",
-    required: ["OPENAI_ADMIN_API_KEY"],
-    probe: isOpenAiCostSyncReady,
-    why: "Enables the first direct provider cost adapter.",
+    why: "Enables signed-in beta users to auto-sync revisioned encrypted workspace state and normalized upload/manual ledger rows.",
   },
   {
     id: "identity-provider",
@@ -82,6 +94,13 @@ const groups = [
     required: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
     probe: isRedisRateLimitReady,
     why: "Required before multi-instance public traffic; uses Upstash Redis REST when configured.",
+  },
+  {
+    id: "platform-api",
+    label: "Read-only platform API surface",
+    required: ["DATABASE_URL", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
+    probe: isPlatformApiReady,
+    why: "Confirms migration 0008, shared rate limiting, and unauthenticated denial on the read-only ledger/source routes. It does not claim partner adoption.",
   },
   {
     id: "monitoring",
@@ -112,7 +131,15 @@ const endpointChecks = [
   { id: "private-audit", path: "/private-audit", expected: [200] },
   { id: "login", path: "/login", expected: [200] },
   { id: "health", path: "/api/health", expected: [200], captureJson: true },
-  { id: "readiness", path: "/api/readiness", expected: [200], captureJson: true },
+  {
+    id: "readiness",
+    path: "/api/readiness",
+    expected: [200],
+    captureJson: true,
+    init: {
+      headers: { authorization: `Bearer ${process.env.INTERNAL_SYNC_SECRET ?? ""}` },
+    },
+  },
   { id: "connectors", path: "/api/connectors", expected: [200] },
   { id: "auth-session", path: "/api/auth/session", expected: [200] },
   { id: "auth-google-start", path: "/api/auth/google/start?mode=json", expected: [200, 501], captureJson: true },
@@ -127,36 +154,23 @@ const endpointChecks = [
       body: JSON.stringify({}),
     },
   },
-  {
-    id: "auth-login-guard",
-    path: "/api/auth/login",
-    expected: [401, 501],
-    captureJson: true,
-    init: {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": `activation-login-${Date.now()}` },
-      body: JSON.stringify({ email: "activation@example.com", accessCode: "wrong" }),
-    },
-  },
+  { id: "auth-login-status", path: "/api/auth/login", expected: [200, 501], captureJson: true },
   ...["personal", "founder", "team", "annual"].map((plan) => ({
     id: `checkout-${plan}`,
-    path: "/api/checkout",
+    path: `/api/checkout?plan=${plan}`,
     expected: [200, 501],
     captureJson: true,
-    init: {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": `activation-checkout-${plan}-${Date.now()}` },
-      body: JSON.stringify({ plan }),
-    },
   })),
-  {
-    id: "auth-logout",
-    path: "/api/auth/logout",
-    expected: [200],
-    init: { method: "POST" },
-  },
   { id: "audit-snapshot-auth-guard", path: "/api/workspaces/current/audit-snapshot", expected: [401] },
   { id: "workspace-connectors-auth-guard", path: "/api/workspaces/current/connectors", expected: [401] },
+  { id: "workspace-decisions-auth-guard", path: "/api/workspaces/current/decisions", expected: [401] },
+  { id: "renewal-alert-preferences-auth-guard", path: "/api/renewal-alerts/preferences", expected: [401] },
+  { id: "privacy-retention-policy-auth-guard", path: "/api/privacy/retention-policy", expected: [401] },
+  { id: "privacy-requests-auth-guard", path: "/api/privacy/requests", expected: [401] },
+  { id: "platform-token-admin-auth-guard", path: "/api/platform/tokens", expected: [401] },
+    { id: "billing-entitlements-auth-guard", path: "/api/billing/entitlements", expected: [401] },
+  { id: "platform-ledger-token-guard", path: "/api/v1/ledger", expected: [401, 503], captureJson: true },
+  { id: "platform-sources-token-guard", path: "/api/v1/sources", expected: [401, 503], captureJson: true },
   {
     id: "workspace-connector-sync-auth-guard",
     path: "/api/workspaces/current/connectors/00000000-0000-4000-8000-000000000000/sync",
@@ -176,32 +190,22 @@ const endpointChecks = [
       }),
     },
   },
-  {
-    id: "audit-intake",
-    path: "/api/audit-intake",
-    expected: [200],
-    captureJson: true,
-    init: {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": `activation-${Date.now()}` },
-      body: JSON.stringify({
-        name: "Activation Check",
-        email: "activation@example.com",
-        persona: "Founder",
-        paymentTypes: ["AI tools"],
-        sourceTypes: ["Redacted bank/card statement"],
-        biggestConcern: "Privacy",
-        canContact: true,
-      }),
-    },
-  },
-  { id: "gmail-product-start", path: "/api/integrations/gmail/start?mode=json", expected: [200], captureJson: true },
+  { id: "audit-intake-status", path: "/api/audit-intake", expected: [200, 501], captureJson: true },
+  { id: "gmail-product-start", path: "/api/integrations/gmail/start?mode=json", expected: [200, 401, 501], captureJson: true },
   { id: "gmail-callback-config", path: "/api/integrations/gmail/callback", expected: [400, 501], captureJson: true },
   { id: "sync-due-run-cron-guard", path: "/api/internal/sync-jobs/due/run", expected: [401, 501], captureJson: true },
+  { id: "renewal-alert-due-run-cron-guard", path: "/api/internal/renewal-alerts/due/run", expected: [401, 501], captureJson: true },
   {
-    id: "openai-cost-sync",
+    id: "privacy-retention-worker-secret-guard",
+    path: "/api/internal/privacy/retention/run",
+    expected: [401, 501],
+    captureJson: true,
+    init: { method: "POST" },
+  },
+  {
+    id: "openai-cost-sync-auth-guard",
     path: "/api/connectors/openai-costs/sync",
-    expected: [200, 409, 502],
+    expected: [401],
     captureJson: true,
     init: {
       method: "POST",
@@ -215,7 +219,10 @@ const endpointReport = [];
 const endpointPayloads = {};
 for (const check of endpointChecks) {
   try {
-    const response = await fetch(`${baseUrl}${check.path}`, check.init);
+    const response = await fetch(`${baseUrl}${check.path}`, {
+      ...check.init,
+      signal: AbortSignal.timeout(8_000),
+    });
     const payload = check.captureJson ? await readResponseJson(response) : undefined;
     if (payload) endpointPayloads[check.id] = payload;
     endpointReport.push({
@@ -245,7 +252,8 @@ const summary = {
   beta,
   endpointsReady: endpointReport.every((item) => item.ok),
   activationReady: envReport.every((item) => item.ready),
-  betaReady: envReport.filter((item) => betaRequiredGroupIds.has(item.id)).every((item) => item.ready)
+  betaReady: endpointReport.every((item) => item.ok)
+    && envReport.filter((item) => betaRequiredGroupIds.has(item.id)).every((item) => item.ready)
     && envReport.some((item) => betaSignInGroupIds.has(item.id) && item.ready),
   env: envReport,
   endpoints: endpointReport,
@@ -265,22 +273,32 @@ function hasEnv(name) {
 function buildActivationReport(group, context) {
   const required = group.required ?? [];
   const requiredAny = group.requiredAny ?? [];
-  const present = [...required, ...requiredAny].filter(hasEnv);
+  const requiredValues = group.requiredValues ?? {};
+  const present = [...new Set([...required, ...requiredAny, ...Object.keys(requiredValues)])].filter(hasEnv);
   const missing = required.filter((name) => !hasEnv(name));
   const anySatisfied = requiredAny.length === 0 || requiredAny.some(hasEnv);
-  const localReady = missing.length === 0 && anySatisfied;
+  const invalidValues = Object.entries(requiredValues)
+    .filter(([name, expected]) => process.env[name]?.trim() !== expected)
+    .map(([name, expected]) => `${name}=${expected}`);
+  const localReady = missing.length === 0 && anySatisfied && invalidValues.length === 0;
   const targetReady = typeof group.probe === "function" ? group.probe(context) : undefined;
-  const ready = typeof targetReady === "boolean" ? targetReady : localReady;
+  const hasTargetEvidence = typeof targetReady === "boolean";
+  const ready = hasTargetEvidence ? targetReady : targetIsLocal && localReady;
+  const targetEvidenceMissing = !targetIsLocal && (!hasTargetEvidence || !targetReady)
+    ? ["target activation evidence"]
+    : [];
 
   return {
     id: group.id,
     label: group.label,
     ready,
-    source: typeof targetReady === "boolean" ? "target-probe" : "local-env",
+    source: hasTargetEvidence ? "target-probe" : targetIsLocal ? "local-env" : "target-evidence-unavailable",
     present,
     missing: ready ? [] : [
       ...missing,
       ...(anySatisfied ? [] : [`one of: ${requiredAny.join(" | ")}`]),
+      ...invalidValues,
+      ...targetEvidenceMissing,
     ],
     why: group.why,
   };
@@ -307,6 +325,7 @@ function summarizeProbePayload(id, payload) {
       tokenVault: payload.tokenVault?.status,
       session: payload.auth?.session?.status,
       hardening: payload.hardening,
+      capabilities: payload.capabilities,
     };
   }
 
@@ -331,7 +350,7 @@ function summarizeProbePayload(id, payload) {
 }
 
 function isLeadPersistenceReady({ endpointPayloads }) {
-  const intake = endpointPayloads["audit-intake"];
+  const intake = endpointPayloads["audit-intake-status"];
   if (typeof intake?.persisted === "boolean") return intake.persisted;
   const readiness = endpointPayloads.readiness;
   const status = readiness?.hardening?.leadPersistence;
@@ -339,7 +358,8 @@ function isLeadPersistenceReady({ endpointPayloads }) {
 }
 
 function isPaymentReady({ endpointPayloads }) {
-  return ["personal", "founder", "team", "annual"].every((plan) => endpointPayloads[`checkout-${plan}`]?.status === "ready");
+  return ["personal", "founder", "team", "annual"].every((plan) => endpointPayloads[`checkout-${plan}`]?.status === "ready")
+    && endpointPayloads.readiness?.hardening?.payments === "settlement-observed";
 }
 
 function isGmailOAuthReady(context) {
@@ -355,32 +375,60 @@ function isPersistentBackendReady({ endpointPayloads }) {
   return readiness.database?.status === "ready"
     && readiness.tokenVault?.status === "ready"
     && readiness.auth?.session?.status === "ready"
-    && readiness.hardening?.internalSyncJobApi === "configured";
+    && readiness.hardening?.internalSyncJobApi === "configured"
+    && readiness.capabilities?.schema?.status === "ready";
 }
 
 function isSyncSchedulerReady({ endpointPayloads }) {
   const status = endpointPayloads.readiness?.hardening?.syncWorkers;
-  return typeof status === "string" ? status === "vercel-cron-configured" : undefined;
+  return typeof status === "string" ? status === "operator-attested-production-live" : undefined;
 }
 
-function isPrivateBetaLoginReady(context) {
-  const login = getEndpoint(context, "auth-login-guard");
-  return login ? login.status === 401 : undefined;
+function isFeatureMigrationsReady({ endpointPayloads }) {
+  const capabilities = endpointPayloads.readiness?.capabilities;
+  if (!capabilities) return undefined;
+  return capabilities.schema?.status === "ready"
+    && capabilities.privacyLifecycle?.status !== "schema-query-failed"
+    && capabilities.renewalAlerts?.status !== "schema-query-failed"
+    && capabilities.commitmentDecisions?.status !== "schema-query-failed"
+    && capabilities.platformApi?.status !== "schema-query-failed"
+    && capabilities.billing?.status !== "schema-query-failed";
+}
+
+function isPrivacyLifecycleReady({ endpointPayloads }) {
+  const readiness = endpointPayloads.readiness;
+  if (!readiness) return undefined;
+  return readiness.hardening?.retentionScheduler === "operator-attested-production-live"
+    && typeof readiness.capabilities?.privacyLifecycle?.lastEnforcedAt === "string";
+}
+
+function isRenewalAlertsReady({ endpointPayloads }) {
+  const readiness = endpointPayloads.readiness;
+  if (!readiness) return undefined;
+  return readiness.hardening?.renewalAlerts === "operator-attested-production-live"
+    && typeof readiness.capabilities?.renewalAlerts?.lastSentAt === "string";
+}
+
+function isPlatformApiReady(context) {
+  const readiness = context.endpointPayloads.readiness;
+  const ledger = getEndpoint(context, "platform-ledger-token-guard");
+  const sources = getEndpoint(context, "platform-sources-token-guard");
+  if (!readiness || !ledger || !sources) return undefined;
+  return readiness.capabilities?.schema?.status === "ready"
+    && readiness.capabilities?.platformApi?.status !== "migration-pending"
+    && readiness.capabilities?.platformApi?.status !== "schema-query-failed"
+    && readiness.hardening?.platformApi !== "schema-ready-shared-rate-limit-required"
+    && ledger.status === 401
+    && sources.status === 401;
 }
 
 function isEncryptedSnapshotsReady(context) {
   const readiness = context.endpointPayloads.readiness;
   if (!readiness) return undefined;
-  const signInReady = isPrivateBetaLoginReady(context) === true || isIdentityProviderReady(context) === true;
-  return signInReady
+  return isIdentityProviderReady(context) === true
     && readiness.database?.status === "ready"
     && readiness.tokenVault?.status === "ready"
     && readiness.auth?.session?.status === "ready";
-}
-
-function isOpenAiCostSyncReady({ endpointPayloads }) {
-  const payload = endpointPayloads["openai-cost-sync"];
-  return payload ? payload.status === "sync-preview-complete" : undefined;
 }
 
 function isIdentityProviderReady({ endpointPayloads }) {

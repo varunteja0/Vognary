@@ -7,9 +7,24 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --conditions=react-server --import=tsx --test tests/*.test.ts",
+    "test:postgres": "node --conditions=react-server --import=tsx --test tests/postgres/*.test.ts",
+    "test:e2e": "playwright test",
+    "corpus": "node --conditions=react-server --import=tsx scripts/check-statement-corpus.ts",
+    "corpus:strict": "node --conditions=react-server --import=tsx scripts/check-statement-corpus.ts --strict",
+    "claims:check": "node scripts/check-public-claims.mjs",
     "smoke": "node scripts/smoke-test.mjs",
+    "ci": "npm run lint && npm run claims:check && npm run test && npm run build",
+    "ci:database": "npm run db:apply-schema && npm run test:postgres",
+    "ops:preflight": "node scripts/check-ops-preflight.mjs",
     "production:check": "node scripts/check-production-activation.mjs",
+    "partner-rails:check": "node scripts/check-partner-rails.mjs",
+    "monitoring:test": "node scripts/check-monitoring-delivery.mjs",
+    "billing:reconcile": "node --import=tsx scripts/reconcile-billing.ts",
+    "backup:postgres": "node scripts/backup-postgres.mjs",
+    "backup:restore-drill": "node scripts/restore-postgres-drill.mjs",
     "db:apply-schema": "node scripts/apply-postgres-schema.mjs",
+    "secrets:generate-backup-key": "node scripts/generate-backup-encryption-key.mjs",
     "secrets:generate-token-key": "node scripts/generate-token-encryption-key.mjs"
   },
   "dependencies": {
@@ -19,9 +34,13 @@
     "pg": "^8.22.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "tailwindcss": "^4.3.2"
+    "server-only": "^0.0.1",
+    "tailwindcss": "^4.3.2",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
@@ -29,7 +48,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
-    "typescript": "^5"
+    "tsx": "^4.23.0",
+    "typescript": "^5",
+    "yaml": "^2.9.0"
   },
   "overrides": {
     "postcss": "^8.5.10"

@@ -11,11 +11,11 @@ type InternalSyncJobRunContext = {
 };
 
 export async function POST(request: Request, context: InternalSyncJobRunContext) {
-  const limit = await rateLimit(request, { namespace: "internal-sync-job-run", limit: 60, windowMs: 60_000 });
-  if (!limit.allowed) return rateLimitExceeded(limit);
-
   const auth = requireInternalSecret(request);
   if (auth) return auth;
+
+  const limit = await rateLimit(request, { namespace: "internal-sync-job-run", limit: 60, windowMs: 60_000, requireShared: true });
+  if (!limit.allowed) return rateLimitExceeded(limit);
 
   const { id } = await context.params;
   if (!isUuid(id)) return Response.json({ error: "Sync job id must be a UUID." }, { status: 400 });
@@ -28,7 +28,7 @@ export async function POST(request: Request, context: InternalSyncJobRunContext)
   }
 
   try {
-    const result = await runConnectorSyncJob(id);
+    const result = await runConnectorSyncJob(id, "internal-api");
     const status = result.status === "not-found" ? 404 : result.status === "failed" ? 502 : 200;
     return Response.json(result, { status });
   } catch (error) {

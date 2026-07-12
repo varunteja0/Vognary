@@ -12,6 +12,14 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
+/corpus/statement-fixtures
+/.playwright-cli
+/output
+
+# local tooling artifacts
+/graphify-out
 
 # next.js
 /.next/
@@ -19,6 +27,7 @@
 
 # production
 /build
+/backups
 
 # misc
 .DS_Store

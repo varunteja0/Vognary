@@ -2,7 +2,10 @@
 
 ## Current Deployable Unit
 
-The current app is a Next.js connector-first stateless audit product. It can be deployed as a server-rendered web app and used for recurring audits and connector readiness planning without server-side financial-data storage.
+The current app is a Next.js modular product with a stateless guest audit path and a PostgreSQL living ledger for signed-in workspaces. When migrations and
+runtime dependencies are active, it supports revisioned encrypted workspace sync, normalized upload/manual materialization, revocable sessions, consent-bound connected sources, privacy lifecycle execution,
+consent-gated renewal email alerts, durable commitment decisions, and cursor-paginated read-only platform APIs. Those persistent capabilities must
+not be described as active merely because their routes exist.
 
 ## Environment Contract
 
@@ -11,10 +14,14 @@ Copy `.env.example` to `.env.local` for local configuration. The app stays funct
 - `WAITLIST_WEBHOOK_URL` for persisted launch/audit requests.
 - `PAYMENT_LINK_*` for paid checkout links.
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` for Gmail read-only receipt discovery.
-- `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `SESSION_SECRET`, and either Google auth or `PRIVATE_BETA_ACCESS_CODE` for private beta login and encrypted workspace snapshots.
+- `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, and `SESSION_SECRET`, plus verified Google identity or Resend magic links, for revocable sessions and automatic encrypted workspace state.
 - `GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`, and `GOOGLE_AUTH_REDIRECT_URI` for Google sign-in. This uses basic identity scopes and is separate from Gmail receipt access.
 - `INTERNAL_SYNC_SECRET` for internal sync job APIs.
-- `CRON_SECRET` for Vercel Cron to securely run due connector sync jobs.
+- `CRON_SECRET` for Vercel Cron to authenticate connector-sync, renewal-alert, and retention workers.
+- `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `NEXT_PUBLIC_APP_URL` for opted-in renewal email delivery.
+- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` for production multi-instance and platform-API rate limiting.
+- `SYNC_SCHEDULER_STATUS`, `RENEWAL_ALERT_DELIVERY_STATUS`, and `RETENTION_SCHEDULER_STATUS` only after the production runbook evidence
+  gates are complete. Leave them blank during setup.
 
 ### Health Check
 
@@ -22,7 +29,8 @@ Copy `.env.example` to `.env.local` for local configuration. The app stays funct
 curl http://localhost:3000/api/health
 ```
 
-The health endpoint reports which components are ready and which are intentionally not configured yet.
+The public health endpoint reports liveness only and intentionally exposes no deployment configuration. Detailed capability readiness is
+available from `/api/readiness`; production requests to that route require `Authorization: Bearer <INTERNAL_SYNC_SECRET>`.
 
 ### Stateless Audit API
 
@@ -53,7 +61,7 @@ curl http://localhost:3000/api/connectors/openai-costs/sync
 
 These endpoints return readiness, blockers, and implementation steps. Registered adapters can execute provider sync jobs through the internal job runner when database, token vault, and scheduler secrets are configured.
 
-Registered direct adapters now include `openai-costs`, `gmail-readonly`, `github-copilot`, `vercel-platform`, `render-platform`, and `cloudflare-billing`. When `OPENAI_ADMIN_API_KEY` is configured, `POST /api/connectors/openai-costs/sync` performs a read-only 30-day cost sync preview and returns normalized evidence without storing it. Queued production jobs can also use per-workspace API keys from the encrypted connector token store once a connected account has been created.
+Registered direct adapters now include `openai-costs`, `gmail-readonly`, `github-copilot`, `vercel-platform`, `render-platform`, and `cloudflare-billing`. Public `GET` routes expose only readiness plans. Production execution requires an authenticated workspace account and its encrypted provider credential; environment-backed previews are disabled in production.
 
 Signed-in workspace admins can store API-key connector credentials through the connector start route:
 
@@ -79,7 +87,7 @@ curl -X DELETE http://localhost:3000/api/workspaces/current/connectors/<connecte
 	-H 'Cookie: vognary_session=<signed-session-cookie>'
 ```
 
-The app connection hub uses these routes to show connected-account status, run sync now, revoke a connection, and import persisted connector evidence into the recurring ledger.
+The app connection hub uses these routes to show connected-account status, retry failed sync, revoke a connection, and consume persisted connector evidence automatically in the recurring ledger.
 
 ### Signed Connector Webhooks
 
@@ -109,7 +117,10 @@ curl -X POST http://localhost:3000/api/internal/sync-jobs/due/run \
 
 These routes are not user-facing. They require `INTERNAL_SYNC_SECRET` and `DATABASE_URL`. They create `connector_sync_jobs`, create `connector_sync_runs`, execute registered adapters, and persist normalized evidence into `connector_evidence`.
 
-Vercel Cron is configured in `vercel.json` to call `GET /api/internal/sync-jobs/due/run` once per day at `02:30 UTC` (`08:00 IST`). Set `CRON_SECRET` in Vercel; Vercel sends it as `Authorization: Bearer <CRON_SECRET>` for the cron request.
+Vercel Cron is configured in `vercel.json` to call `GET /api/internal/sync-jobs/due/run` and
+`GET /api/internal/renewal-alerts/due/run` every 15 minutes, plus the fixed-policy retention worker daily at 03:00 IST (`21:30 UTC`). Set `CRON_SECRET` in Vercel; Vercel sends it as
+`Authorization: Bearer <CRON_SECRET>`. The secret proves authentication configuration, not that the deployed schedules are firing; use
+the activation-runbook evidence gates before setting either production status flag.
 
 ### Gmail Read-Only OAuth
 
@@ -135,17 +146,18 @@ docker compose up --build web
 
 Then open http://localhost:3000.
 
-## Optional PostgreSQL Schema Apply
+## PostgreSQL Schema Apply For Persistent Features
 
 For a fresh development database:
 
 ```bash
-docker compose --profile future-backend up -d postgres
-DATABASE_URL=postgres://vognary:vognary@localhost:5432/vognary npm run db:apply-schema
+docker compose up --build web
 curl http://localhost:3000/api/readiness
 ```
 
-This command now keeps a `schema_migrations` ledger. On a fresh database it applies `infra/postgres/schema.sql` as `0001_initial_schema`; on an existing database that already has the initial tables it records a baseline; then it applies forward-only SQL files from `infra/postgres/migrations` in sorted order.
+Compose waits for PostgreSQL 16, runs the schema migration service to completion, and then starts the web service. The migration command keeps a `schema_migrations` ledger. On a fresh database it applies `infra/postgres/schema.sql` as `0001_initial_schema`; on an existing database that already has the initial tables it records a baseline; then it applies forward-only SQL files from `infra/postgres/migrations` in sorted order.
+
+Readiness requires every forward migration from `0002_revocable_sessions` through `0014_sync_run_invocation`, then runs bounded aggregate queries against capability tables. `capabilities.schema.status=ready` means the migration ledger and those queries succeeded; it does not prove a deployed schedule, delivered renewal email, paid entitlement, or platform adoption. Sync-worker production status additionally requires a successful cron-invoked run that wrote evidence. CI applies the schema to PostgreSQL 16 and runs `npm run test:postgres`.
 
 Add future production schema changes as `infra/postgres/migrations/0002_short_description.sql`, `0003_short_description.sql`, and so on. Do not edit already-applied migration files.
 
@@ -170,17 +182,17 @@ curl http://localhost:3000/api/workspaces
 
 The server has signed session-cookie primitives and workspace membership checks. `SESSION_SECRET` enables session verification, and `DATABASE_URL` enables workspace lookup. This is not a complete login product by itself; production still needs an identity provider, SSO, or magic-link email delivery to mint signed session cookies.
 
-### Private Beta Login And Encrypted Snapshots
+### Verified Login And Encrypted Workspace State
 
 ```bash
-curl -X POST http://localhost:3000/api/auth/login \
+curl -X POST http://localhost:3000/api/auth/magic-link/request \
 	-H 'Content-Type: application/json' \
-	-d '{"email":"founder@example.com","accessCode":"<PRIVATE_BETA_ACCESS_CODE>"}'
+	-d '{"email":"founder@example.com","redirectPath":"/app"}'
 
 curl http://localhost:3000/api/workspaces/current/audit-snapshot
 ```
 
-The `/login` page can mint signed private-beta sessions when `SESSION_SECRET`, `DATABASE_URL`, and `PRIVATE_BETA_ACCESS_CODE` are configured. Signed-in beta users can save/load/delete encrypted workspace snapshots when `TOKEN_ENCRYPTION_KEY` is configured and the PostgreSQL schema is applied.
+The `/login` page mints opaque, database-backed sessions only after verified Google identity or a one-time email link. Code login is hard-disabled in production. Signed-in beta users automatically hydrate and debounce-save one encrypted revisioned workspace state record when `TOKEN_ENCRYPTION_KEY` is configured. Stale revisions receive `409` rather than overwriting another device, and upload/manual evidence materializes transactionally into normalized ledger rows.
 
 Google sign-in is also supported through `/api/auth/google/start` and `/api/auth/google/callback` when `GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`, and `GOOGLE_AUTH_REDIRECT_URI` are configured.
 
@@ -190,7 +202,9 @@ Use the private beta activation check after deployment:
 npm run production:check -- https://www.vognary.com --beta
 ```
 
-`--strict` is intentionally broader and should fail until payments, Gmail OAuth, identity provider, Redis rate limiting, scheduled sync worker, monitoring, backups, and partner rails are actually configured.
+`--strict` is intentionally broader and should fail until payments, Gmail OAuth, identity provider, feature migrations, Redis rate
+limiting, the attested scheduled-sync worker, privacy enforcement, a proven renewal delivery, the platform API guard, monitoring,
+backups, and partner rails are actually configured or evidenced as specified in the activation runbook.
 
 ## Hosted Deployment
 
@@ -204,15 +218,16 @@ See [production-beta-setup.md](production-beta-setup.md) for click-by-click priv
 
 ## Production Boundary
 
-This product can be sold as a self-serve stateless audit tool. It should not be marketed as a regulated connected-account financial-data system until the following are complete:
+The stateless audit path remains available without PostgreSQL. Persistent, automatic, platform, or regulated claims require their
+separate readiness evidence. In particular, do not market Vognary as a regulated connected-account financial-data system until the
+following external and operational gates are complete:
 
-- Authentication and account deletion.
-- Encrypted database and object storage.
-- Token vault and refresh-token rotation.
-- Queue/scheduler for connector sync jobs.
-- Webhook receiver and signature verification.
-- Legal privacy policy and terms.
-- Security review for financial documents.
+- Production identity and account-deletion exercises.
+- Encrypted database, tested backups, and any required object storage.
+- Token-vault rotation exercises and provider revocation verification.
+- Observed production scheduler runs for connector sync and consent-gated renewal delivery.
+- A deployed authenticated Vercel retention cron plus audited enforcement runs.
+- Security and legal review for financial evidence and external API access.
 - Gmail OAuth verification before receipt ingestion.
 - Account Aggregator or regulated partner path before pulling bank data directly.
 - Operational monitoring, backups, and incident response.

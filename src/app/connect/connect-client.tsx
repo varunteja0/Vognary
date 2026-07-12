@@ -8,12 +8,12 @@ type Tone = "info" | "error" | "success";
 type Banner = { tone: Tone; text: string } | null;
 
 const steps = [
-  { n: "1", title: "Click Connect", body: "Pick your inbox or your bank. That's the only decision you make." },
-  { n: "2", title: "Approve on their screen", body: "You log in and approve on the provider's own official page — never on ours." },
-  { n: "3", title: "We do the rest", body: "Vognary reads only what you allowed and builds one live recurring-money ledger." },
+  { n: "1", title: "Choose a supported source", body: "Start with the source that can prove the most commitments. Gmail is the first automatic discovery source in beta." },
+  { n: "2", title: "Approve on the provider screen", body: "Sign in and approve the exact scope on the provider's official page. Vognary never receives that provider password." },
+  { n: "3", title: "Track coverage and freshness", body: "Vognary backfills available evidence, shows the last successful sync, and names every source that is still missing." },
 ];
 
-const trust = ["Read-only access", "No passwords, ever", "Bank-grade encryption", "Delete anytime"];
+const trust = ["Read-only where available", "No bank passwords or PINs", "Stored tokens encrypted", "Disconnect anytime"];
 
 const alsoCovered = [
   "Netflix, Spotify, Prime",
@@ -27,7 +27,10 @@ const alsoCovered = [
 export default function ConnectClient() {
   const [connectingInbox, setConnectingInbox] = useState(false);
   const [inboxBanner, setInboxBanner] = useState<Banner>(null);
-  const [bankOpen, setBankOpen] = useState(false);
+  const [bankEmail, setBankEmail] = useState("");
+  const [bankConsent, setBankConsent] = useState(false);
+  const [bankSubmitting, setBankSubmitting] = useState(false);
+  const [bankBanner, setBankBanner] = useState<Banner>(null);
 
   async function connectInbox() {
     setConnectingInbox(true);
@@ -46,12 +49,55 @@ export default function ConnectClient() {
       }
       setInboxBanner({
         tone: "error",
-        text: payload?.message ?? "Inbox connection isn't available in this environment yet. It's live on vognary.com.",
+        text: payload?.message ?? "Inbox connection is not configured in this environment yet.",
       });
       setConnectingInbox(false);
     } catch {
       setInboxBanner({ tone: "error", text: "Could not reach the connection service. Please try again." });
       setConnectingInbox(false);
+    }
+  }
+
+  async function requestBankAccess(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const email = bankEmail.trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setBankBanner({ tone: "error", text: "Enter a valid email address to join the regulated-rail pilot." });
+      return;
+    }
+    if (!bankConsent) {
+      setBankBanner({ tone: "error", text: "Confirm that Vognary may store your email and contact you about this pilot." });
+      return;
+    }
+
+    setBankSubmitting(true);
+    setBankBanner({ tone: "info", text: "Saving your pilot request…" });
+    try {
+      const response = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email,
+          segment: "regulated-bank-rail-pilot",
+          message: "Requested Account Aggregator / regulated bank-rail early access from /connect.",
+          consentNoticeVersion: "privacy-2026-07-11",
+          consentPurpose: "regulated-rail-pilot-contact",
+          canContact: true,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.persisted !== true) {
+        setBankBanner({
+          tone: "error",
+          text: payload?.error ?? "The pilot request could not be stored yet. Please use the private-audit form instead.",
+        });
+        return;
+      }
+      setBankBanner({ tone: "success", text: "Request saved. We will contact you only when a compliant pilot slot is available." });
+    } catch {
+      setBankBanner({ tone: "error", text: "Could not reach the pilot service. Please try again." });
+    } finally {
+      setBankSubmitting(false);
     }
   }
 
@@ -72,12 +118,12 @@ export default function ConnectClient() {
 
         {/* Hero */}
         <section className="dossier spotlight scan overflow-hidden p-7 sm:p-10 lg:p-12">
-          <span className="folio" data-folio="Connect" style={{ color: "var(--dossier-muted)" }}>One click. Everything.</span>
+          <span className="folio" data-folio="Connect" style={{ color: "var(--dossier-muted)" }}>Connect once. Know the coverage.</span>
           <h1 className="mt-6 max-w-3xl font-display text-4xl font-bold leading-[0.98] tracking-[-0.035em] text-(--dossier-ink) sm:text-6xl">
-            Connect once.<br />See every rupee that renews.
+            Connect supported sources.<br />Keep renewals current.
           </h1>
           <p className="mt-6 max-w-2xl text-base leading-7 muted-on-dark sm:text-lg">
-            You never paste an API key or a password. You click <span className="text-(--dossier-ink)">Connect</span>, approve on the provider&apos;s own screen, and Vognary builds one live ledger of every subscription, EMI, loan, mandate, and auto-debit.
+            Approve a source on its official consent screen and Vognary continuously organizes the evidence that source can provide. Coverage, freshness, and unsupported rails stay visible instead of being presented as universal sync.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2">
             {trust.map((item) => (
@@ -91,15 +137,15 @@ export default function ConnectClient() {
 
         {/* The two aggregator lanes */}
         <section className="grid gap-5 lg:grid-cols-2">
-          {/* Inbox — LIVE */}
+          {/* Inbox — beta connector */}
           <article className="panel lift flex flex-col p-6 sm:p-7">
             <div className="flex items-center justify-between gap-3">
               <span className="pill pill-ready">Start here</span>
-              <span className="font-data text-[0.62rem] uppercase tracking-[0.16em] text-verdict">Live</span>
+              <span className="font-data text-[0.62rem] uppercase tracking-[0.16em] text-verdict">Beta connector</span>
             </div>
             <h2 className="mt-4 font-display text-2xl font-semibold text-(--ink)">Connect your Inbox</h2>
             <p className="mt-2 text-sm leading-6 text-(--muted)">
-              One consent to Gmail finds subscriptions from your receipts automatically — hundreds of merchants, no per-app setup. Read-only; Vognary never sees your Google password.
+              Gmail can discover supported receipt, invoice, renewal, trial, and pre-debit messages without per-merchant setup. The beta uses read-only Gmail access and shows the evidence it found; complete mailbox coverage is not implied.
             </p>
             <div className="mt-4 flex flex-wrap gap-1.5">
               {alsoCovered.map((item) => (
@@ -123,25 +169,37 @@ export default function ConnectClient() {
             </div>
             <h2 className="mt-4 font-display text-2xl font-semibold text-(--ink)">Connect your Bank</h2>
             <p className="mt-2 text-sm leading-6 text-(--muted)">
-              One secure consent shows <span className="text-(--ink-soft)">every</span> EMI, loan, UPI AutoPay, card mandate, SIP, and auto-debit — because it all flows through your account. Exactly like the consent you approve in PhonePe or Google Pay.
+              Automatic Indian bank coverage requires an approved regulated Account Aggregator, FIU/TSP, issuer, or PSP path. Vognary is recruiting pilot users while that partner rail is being established.
             </p>
             <div className="mt-4 inset p-4">
               <p className="eyebrow" style={{ fontSize: "0.6rem" }}>How it stays safe</p>
               <p className="mt-2 text-sm leading-6 text-(--muted)">
-                Bank data connects through India&apos;s <span className="text-(--ink-soft)">RBI-regulated Account Aggregator</span> network. You approve a read-only consent with your bank — no account numbers or passwords are ever shared with Vognary.
+                When the rail becomes available, consent will happen through the regulated provider and will be limited by purpose, accounts, data range, and expiry. Vognary will not ask for a netbanking password, UPI PIN, or card PIN.
               </p>
             </div>
             <div className="mt-auto pt-6">
-              <button type="button" onClick={() => setBankOpen((v) => !v)} aria-expanded={bankOpen} className="btn btn-primary btn-lg btn-block">
-                {bankOpen ? "Got it — keep me posted" : "Request early access"}
-              </button>
-              {bankOpen ? (
-                <div className="mt-3 rounded-md border border-verdict bg-(--verdict-tint) px-3 py-2 text-sm text-verdict" role="status" aria-live="polite">
-                  You&apos;re on the early-access list for bank connections. Want a hands-on review meanwhile? <Link href="/private-audit" className="underline underline-offset-2">Ask for a private audit →</Link>
-                </div>
-              ) : (
-                <p className="mt-3 font-data text-[0.66rem] leading-5 text-(--muted)">Onboarding as an Account Aggregator partner — join the first cohort.</p>
-              )}
+              <form onSubmit={requestBankAccess} className="grid gap-3">
+                <label htmlFor="bank-pilot-email" className="field-label">Email for the regulated-rail pilot</label>
+                <input
+                  id="bank-pilot-email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={bankEmail}
+                  onChange={(event) => setBankEmail(event.target.value)}
+                  className="field"
+                  placeholder="you@company.com"
+                />
+                <label className="flex items-start gap-2 text-xs leading-5 text-(--muted)">
+                  <input type="checkbox" checked={bankConsent} onChange={(event) => setBankConsent(event.target.checked)} className="mt-1" />
+                  <span>I agree that Vognary may store this email and contact me about the regulated-rail pilot under the <Link href="/privacy" className="underline underline-offset-2">Privacy Notice</Link>.</span>
+                </label>
+                <button type="submit" disabled={bankSubmitting} className="btn btn-primary btn-lg btn-block disabled:cursor-not-allowed disabled:opacity-60">
+                  {bankSubmitting ? "Saving request…" : "Request early access"}
+                </button>
+              </form>
+              <Notice banner={bankBanner} />
+              <p className="mt-3 font-data text-[0.66rem] leading-5 text-(--muted)">This records a pilot request; it does not claim that a bank connection is already available.</p>
             </div>
           </article>
         </section>
@@ -149,7 +207,7 @@ export default function ConnectClient() {
         {/* How it works */}
         <section className="panel p-6 sm:p-8">
           <span className="folio" data-folio="Flow">How connecting works</span>
-          <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">No API. No pasting. No technical work.</h2>
+          <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">Automatic where supported. Explicit everywhere else.</h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             {steps.map((step) => (
               <div key={step.n} className="inset p-5">
@@ -160,7 +218,7 @@ export default function ConnectClient() {
             ))}
           </div>
           <p className="mt-6 text-sm leading-6 text-(--muted)">
-            You will never be asked for an API key, a token, a card number, or a bank password — anywhere in Vognary. If a provider can&apos;t be connected safely, we simply read its receipt from your inbox instead.
+            OAuth sources use provider consent. Some direct workspace integrations may require an administrator to store a scoped API key in Vognary&apos;s encrypted token vault. Vognary does not ask for bank passwords, card numbers, UPI PINs, or card PINs. Unsupported sources remain visible as coverage gaps or optional recovery imports.
           </p>
         </section>
 
@@ -168,7 +226,7 @@ export default function ConnectClient() {
         <footer className="panel flex flex-col items-center gap-3 px-5 py-6 text-center">
           <div className="flex items-center gap-2.5">
             <VognaryMark size={22} className="text-(--ink)" />
-            <span className="font-display text-base font-semibold text-(--ink)">Vognary <span className="font-normal text-(--muted)">· Connect once, see everything</span></span>
+            <span className="font-display text-base font-semibold text-(--ink)">Vognary <span className="font-normal text-(--muted)">· Connect evidence, see coverage</span></span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-data text-[0.66rem] uppercase tracking-[0.16em] text-(--muted)">
             <Link className="transition hover:text-(--ink)" href="/security">Security</Link>

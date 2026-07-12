@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { isLeadDatabaseConfigured, persistAuditLead } from "@/lib/server/lead-store";
+import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
+import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 
 export const dynamic = "force-dynamic";
 
@@ -65,15 +67,34 @@ const allowedConcerns = new Set([
   "Other",
 ]);
 
+export async function GET() {
+  if (isLeadDatabaseConfigured()) {
+    return NextResponse.json({ status: "ready", persisted: true, storage: "database" });
+  }
+  if (process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL) {
+    return NextResponse.json({ status: "ready", persisted: true, storage: "webhook" });
+  }
+  return NextResponse.json({
+    status: "not-configured",
+    persisted: false,
+    requiredEnv: ["DATABASE_URL or AUDIT_INTAKE_WEBHOOK_URL or WAITLIST_WEBHOOK_URL"],
+  }, { status: 501 });
+}
+
 export async function POST(request: NextRequest) {
+  const crossSite = rejectCrossSiteMutation(request);
+  if (crossSite) return crossSite;
+
   const limit = await rateLimit(request, { namespace: "audit-intake", limit: 10, windowMs: 60 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
   let body: AuditIntakeRequest;
 
   try {
-    body = await request.json();
-  } catch {
+    body = await readLimitedJson<AuditIntakeRequest>(request, 16 * 1024);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) return NextResponse.json({ error: "Request is too large." }, { status: 413 });
+    if (error instanceof UnsupportedContentTypeError) return NextResponse.json({ error: "Content-Type must be application/json." }, { status: 415 });
     return NextResponse.json({ error: "Request body must be JSON." }, { status: 400 });
   }
 
@@ -101,9 +122,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Select at least one source you can share." }, { status: 400 });
   }
 
+  const createdAt = new Date().toISOString();
   const payload = {
     source: "vognary-private-audit-intake",
-    createdAt: new Date().toISOString(),
+    createdAt,
     name,
     email,
     contact,
@@ -114,6 +136,9 @@ export async function POST(request: NextRequest) {
     biggestConcern,
     message,
     score: scoreLead({ persona, paymentTypes, sourceTypes }),
+    consentPurpose: "private-audit-contact",
+    consentNoticeVersion: "privacy-2026-07-11",
+    consentGrantedAt: createdAt,
   };
 
   if (isLeadDatabaseConfigured()) {
@@ -121,8 +146,8 @@ export async function POST(request: NextRequest) {
       const leadId = await persistAuditLead(payload);
       await mirrorToWebhook(process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL, payload);
       return NextResponse.json({ status: "accepted", persisted: true, storage: "database", leadId, score: payload.score });
-    } catch (error) {
-      return NextResponse.json({ error: error instanceof Error ? error.message : "Audit lead database persistence failed." }, { status: 502 });
+    } catch {
+      return NextResponse.json({ error: "The audit request could not be stored right now. Please try again later." }, { status: 502 });
     }
   }
 

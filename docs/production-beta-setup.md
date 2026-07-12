@@ -1,14 +1,14 @@
 # Vognary Private Beta Production Setup
 
-Use this guide to make `https://www.vognary.com` usable for private beta users with login, encrypted workspace snapshots, and lead capture.
+Use this guide to make `https://www.vognary.com` usable for private beta users with verified login, automatic encrypted workspace synchronization, normalized ledger persistence, and lead capture.
 
 ## What You Are Setting Up Now
 
 Private beta readiness means these work in production:
 
 - `/private-audit` captures audit requests.
-- `/login` lets invited users sign in with a beta access code.
-- Signed-in users can save/load/delete encrypted workspace snapshots.
+- `/login` lets invited users sign in with verified Google identity or a one-time email link.
+- Signed-in users automatically hydrate and revision-sync encrypted workspace state; upload/manual evidence materializes into normalized PostgreSQL rows.
 - `/api/workspaces` stays locked without a valid signed session.
 
 This does not mean Vognary has live UPI/card mandate, Account Aggregator, Apple, Google Play, PayPal, Razorpay, or Cashfree sync yet.
@@ -30,7 +30,7 @@ GOOGLE_AUTH_CLIENT_SECRET
 GOOGLE_AUTH_REDIRECT_URI
 ```
 
-Keep `PRIVATE_BETA_ACCESS_CODE` as a fallback if you still want code-based beta access.
+Code login is deliberately unavailable in production. Use verified Google identity or Resend magic links for every production user.
 
 Lead capture is free with the same Postgres database. `AUDIT_INTAKE_WEBHOOK_URL` or `WAITLIST_WEBHOOK_URL` is optional if you also want to mirror leads into a spreadsheet or automation tool.
 
@@ -41,7 +41,7 @@ These can be activated without monthly software spend, though some still require
 | Need | Free path | Can be completed in code? | What still blocks it |
 | --- | --- | --- | --- |
 | Database and lead persistence | Neon Postgres free tier | Yes, code now stores leads in Postgres | You must create the Neon DB, set `DATABASE_URL`, and apply schema. |
-| Private beta login | Google OAuth basic identity, or beta access code | Yes | You must create Google OAuth credentials or set `PRIVATE_BETA_ACCESS_CODE`. |
+| Private beta login | Google OAuth basic identity or Resend email link | Yes | You must configure Google OAuth or verify a Resend sender/domain. |
 | Magic-link login | Resend free tier | Yes | You must verify a sender/domain and set `RESEND_API_KEY`, `RESEND_FROM_EMAIL`. |
 | Gmail receipt sync | Google OAuth + Gmail API | Yes for preview sync | You must create OAuth credentials and complete Google verification before public users. |
 | Shared rate limiting | Upstash Redis free tier | Yes | You must create Upstash Redis and set REST URL/token. |
@@ -68,11 +68,7 @@ Use the outputs like this:
 - `SESSION_SECRET`: use the first `openssl rand -base64 32` output.
 - `INTERNAL_SYNC_SECRET`: use the second `openssl rand -base64 32` output when you enable internal sync jobs.
 
-For `PRIVATE_BETA_ACCESS_CODE`, choose a memorable invite code and rotate it if it leaks. Example format:
-
-```text
-vognary-beta-2026-<private-word>
-```
+For local-only development, an email-bound fallback can be enabled with `ENABLE_DEVELOPMENT_LOGIN=true`, `DEVELOPMENT_LOGIN_EMAIL`, and `DEVELOPMENT_LOGIN_ACCESS_CODE`. The API ignores this mechanism in production even if those variables are accidentally set.
 
 ## Create Google Login Credentials
 
@@ -197,10 +193,12 @@ GOOGLE_AUTH_CLIENT_SECRET=<Google OAuth Client Secret>
 GOOGLE_AUTH_REDIRECT_URI=https://www.vognary.com/api/auth/google/callback
 ```
 
-Optional beta code fallback:
+Optional local/test-only development identity (never set on production):
 
 ```text
-PRIVATE_BETA_ACCESS_CODE=<your invite code>
+ENABLE_DEVELOPMENT_LOGIN=true
+DEVELOPMENT_LOGIN_EMAIL=<one developer email>
+DEVELOPMENT_LOGIN_ACCESS_CODE=<local-only random secret>
 ```
 
 Optional but useful now:
@@ -259,15 +257,15 @@ After `--beta` passes:
 3. Choose your Google account.
 4. Complete Google sign-in.
 5. Open `https://www.vognary.com/`.
-6. Add 2 manual commitments, for example `Claude` and `Render`.
-7. Click `Save encrypted snapshot`.
-8. Refresh the page.
-9. Click `Load latest`.
+6. Add 2 manual commitments from sources you can verify.
+7. Wait for `Encrypted workspace synchronized at revision ...` in **Data & readiness**.
+8. Refresh the page without clicking **Sync now**.
+9. Confirm both commitments and review fields restore automatically at the same revision.
 
 Expected success message:
 
 ```text
-Encrypted server snapshot loaded into this browser.
+Encrypted workspace synchronized at revision <number>.
 ```
 
 Then verify profile and data controls:
@@ -279,7 +277,7 @@ Then verify profile and data controls:
 5. Confirm pending integrations are listed.
 6. Do not click delete unless you intentionally want to remove the beta account.
 
-If login, save/load snapshot, and profile all work, Vognary is private-beta usable.
+If verified login, automatic revision sync/reload, normalized profile counts, and lead persistence all work, Vognary is private-beta usable for the sources explicitly supported by that deployment.
 
 ## What To Share With Users
 
@@ -308,10 +306,10 @@ After that I will tell you the safest minimum source to share. You can redact se
 | --- | --- | --- |
 | Google sign-in says not configured | Missing Google OAuth envs | Set `GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`, `GOOGLE_AUTH_REDIRECT_URI`. |
 | Google says redirect URI mismatch | Google Console URI does not match | Add `https://www.vognary.com/api/auth/google/callback` exactly in Google OAuth client. |
-| `/login` shows not configured | Missing envs | Set `DATABASE_URL`, `SESSION_SECRET`, `PRIVATE_BETA_ACCESS_CODE`. |
+| `/login` shows not configured | Missing identity envs | Set `DATABASE_URL`, `SESSION_SECRET`, and either Google OAuth or Resend magic-link credentials. |
 | `/` opens login instead of app | You are signed out | Sign in with Google first; anonymous users cannot access the audit workspace. |
 | `/profile` opens login instead of profile | You are signed out | Sign in with Google first. |
-| Save encrypted snapshot fails | Missing token key or DB | Set `TOKEN_ENCRYPTION_KEY`, verify `DATABASE_URL`, apply schema. |
+| Automatic workspace sync fails | Missing token key, DB, or migration | Set `TOKEN_ENCRYPTION_KEY`, verify `DATABASE_URL`, apply all migrations, and inspect the revision-conflict message. |
 | Intake says preview/local only | Missing webhook | Set `AUDIT_INTAKE_WEBHOOK_URL` or `WAITLIST_WEBHOOK_URL`. |
 | `--strict` fails | Expected today | Use `--beta`; strict is for full production maturity. |
 | Schema apply fails | DB connection/SSL issue | Check `DATABASE_URL`, `POSTGRES_SSL`, and provider SSL docs. |
@@ -321,7 +319,7 @@ After that I will tell you the safest minimum source to share. You can redact se
 Stop and fix before inviting users if:
 
 - `npm run production:check -- https://www.vognary.com --beta` fails.
-- You cannot log in with the beta access code.
-- You cannot save and load an encrypted snapshot.
+- You cannot log in with verified Google identity or a one-time email link.
+- Encrypted workspace state does not auto-sync and restore after refresh, or a stale tab overwrites a newer revision instead of receiving `409`.
 - You cannot open `/profile` after login.
 - Lead intake does not persist anywhere you can read.

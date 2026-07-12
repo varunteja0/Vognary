@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
 
   const user = await getOrCreateUserByEmail({ email: tokenInfo.email.toLowerCase(), displayName: tokenInfo.name });
   const workspace = await getOrCreateDefaultWorkspaceForUser({ userId: user.id, workspaceName: getGoogleWorkspaceName(tokenInfo) });
-  const cookie = createSessionCookie({ userId: user.id, email: user.email, workspaceId: workspace.workspaceId });
+  const cookie = await createSessionCookie({ userId: user.id, workspaceId: workspace.workspaceId });
 
   const response = clearGoogleState(NextResponse.redirect(new URL("/", request.nextUrl.origin)));
   response.cookies.set(cookie.name, cookie.value, sessionCookieOptions(cookie.maxAgeSeconds));

@@ -1,6 +1,9 @@
+| PostgreSQL schema + forward migrations | Code complete | Users/workspaces/sessions, connector control plane, canonical ledger, revisioned workspace state, privacy lifecycle, alerts, decisions, API tokens, consent-bound connector accounts, and tracked billing entitlements are modeled through `0002`–`0013`. CI applies the real schema to PostgreSQL 16 and runs database integration tests. Production databases must still apply them. |
+| Database-backed product modules | Migrations `0002`–`0013` exist | Apply migrations in staging/production, verify `schema_migrations`, backup first, and run route/worker/database smoke tests |
+1. Apply migrations `0002`–`0013` to staging/production and repeat the PostgreSQL integration suite plus route/worker smoke tests (the disposable PostgreSQL 16 proof is now automated in CI).
 # Vognary Current State And Market Gap Analysis
 
-Date: 2026-07-06
+Date: 2026-07-11
 
 ## Verdict
 
@@ -17,17 +20,20 @@ Do not claim a universal dashboard yet. Claim an honest recurring-money audit th
 | Area | Rating | Reason |
 | --- | ---: | --- |
 | Pain clarity | 8/10 | The homepage clearly explains silent recurring charges, evidence, next debits, and actions. |
-| Immediate usefulness | 7/10 | Users can upload/paste statements, add manual commitments, parse receipts, and export reports. |
-| Trust posture | 7/10 | Privacy/security pages, stateless processing, no fake bank integrations, and source coverage help. Login was missing and is now added as private beta. |
-| Persistent personal account | 5/10 | Signed-session, workspace primitives, and encrypted beta workspace snapshots exist. Normalized durable audit history is not wired yet. |
+| Immediate usefulness | 8/10 | Stateless users can upload/paste evidence, add commitments, parse receipts, and export reports; a configured workspace can additionally sync supported providers, review canonical items, and persist decisions. |
+| Trust posture | 8/10 | Revocable sessions, workspace authorization, consent controls, privacy-safe telemetry, scoped exports, bounded retention code, honest connector states, and deletion/disconnect controls exist. Production enforcement still depends on migrations and operations. |
+| Persistent personal account | 8/10 | Signed-in workspace state auto-syncs as one encrypted revisioned record, while connector and upload/manual evidence materialize transactionally into normalized sources, transactions, recurring items, and evidence links. Actions bind to canonical UUIDs; owners, notes, review completion, and merge decisions persist inside encrypted workspace state rather than first-class workflow tables. |
 | Universal auto-debit coverage | 4/10 | Manual/fallback evidence covers many sources, but direct sync for UPI/card mandates/app stores/banks is not live. |
 | India-specific moat | 6/10 | The roadmap understands UPI, e-mandates, AA/TSP, SIPs, EMIs, insurance, and statement fallback. Needs real partnerships and beta proof. |
-| Competitive differentiation | 7/10 | Better than generic subscription trackers if Vognary stays evidence-first and India/founder focused. |
-| Production readiness | 5.5/10 | Stateless audit is usable and encrypted beta snapshots now exist; public auth, normalized persistence, consent lifecycle, monitoring, backups, and incident response remain. |
+| Competitive differentiation | 8/10 | The evidence-first graph now combines canonical source health, persisted actions, consent-gated reminders, read-only API access, and fail-closed aggregate benchmarks. Regulated-rail coverage remains the larger moat and the larger gap. |
+| Production readiness | 6.5/10 | The application modules and forward migrations are production-shaped, but Google verification, production migration execution, schedulers, verified email delivery, provider credentials/contracts, backup proof, and regulated approvals remain gates. |
 
-Overall current score: 6.6/10 for the full vision, but 8/10 for the private audit wedge.
+Overall current score: approximately 7/10 for the full vision and 8/10 for the private-audit wedge. These are directional product scores, not claims of production activation.
 
 ## What Is Done Now
+
+The status below describes repository capability. "Code complete" still requires the activation gate in the final column before it can be
+described as operating in production.
 
 | Capability | Status | Notes |
 | --- | --- | --- |
@@ -36,24 +42,29 @@ Overall current score: 6.6/10 for the full vision, but 8/10 for the private audi
 | Evidence trail and confidence | Done | User can see why an item was detected. |
 | Next debit prediction | Done | Works from transaction cadence. |
 | PDF/CSV/JSON exports | Done | Useful for private audits and accountant handoff. |
-| Local browser workspace save/backup | Done | Browser-local only; not multi-device. |
+| Local browser workspace save/backup | Done | Optional device-local fallback for guest mode; signed-in mode is server-authoritative. |
 | Private audit intake page | Done | `/private-audit` now exists. |
-| Private beta login page | Done | `/login` now exists with signed-session beta access-code flow. |
+| Login and revocable session flow | Code complete | `/login` supports Resend magic links and Google identity when configured; sessions are database-backed and revocable. Email-bound code login is outside-production development only. |
 | Session status API | Done | `/api/auth/session`. |
 | Workspace auth gate | Done | Workspace APIs require signed session. |
-| Encrypted server workspace snapshots | Done | Signed-in beta users can save/load/delete encrypted snapshots through `/api/workspaces/current/audit-snapshot`. |
-| PostgreSQL schema | Done | Users, workspaces, sources, transactions, recurring items, connectors, token refs, audit logs. |
-| Connector registry | Done | Models 39 targets with honest status. |
-| OpenAI cost sync | Partial | Env-gated preview plus authenticated API-key storage and queued token-backed jobs. |
-| Gmail OAuth sync | Partial | OAuth/state scaffold, encrypted token persistence for signed-in users, queued initial sync, and registered receipt-evidence adapter. Public Google verification and production worker activation remain. |
-| Platform API adapters | Partial | Registered adapters now cover GitHub Copilot report links, Vercel domain renewals, Render services, and Cloudflare account evidence through encrypted user tokens. Exact billing/cost depth still depends on each provider's exposed endpoints and account permissions. |
+| Encrypted synchronized workspace state | Done | Signed-in workspaces load automatically, save after a short debounce, reject stale revisions with `409`, and can pause/delete/resume synchronization through `/api/workspaces/current/audit-snapshot`. |
+| PostgreSQL schema + forward migrations | Code complete | Users/workspaces/sessions, connector control plane, canonical ledger, revisioned workspace state, privacy lifecycle, alerts, decisions, API tokens, billing entitlements, consent-bound connector accounts, and sync invocation evidence are modeled through `0002`–`0014`. CI applies the real schema to PostgreSQL 16 and runs database integration tests. Production databases must still apply them. |
+| Canonical living ledger | Code complete | Connector batches and revisioned upload/manual workspace state idempotently materialize normalized sources, evidence, transactions, recurring items, evidence links, coverage, and usage observations. |
+| Persisted commitment decisions | Code complete | Workspace members can save safety-checked actions on canonical recurring items; reads/writes are scoped and audited, and the UI hydrates them from PostgreSQL. Requires migration `0007`. |
+| Consent-gated renewal alerts | Code complete | Authenticated opt-in preferences, 7-day/1-day deduplicated scheduling, privacy-minimized delivery rows, bounded retries, safe templates, and cron worker exist. Requires `0006`, verified email delivery, secrets, and a proven cron run. |
+| Privacy lifecycle | Code complete | Bounded retention policy, complete requester access export, raw connector/error minimization, product-event deletion, stale-webhook dead-lettering, run audit trail, and authenticated daily retention cron exist. Requires production migrations, Upstash, backup proof, and observed enforcement runs. |
+| Read-only platform API | Code complete | Admin-issued hashed/expiring/revocable tokens expose cursor-paginated canonical ledger/decision and source-health endpoints with request IDs and an OpenAPI contract. Requires a production consumer proof. |
+| Thresholded aggregate insights | Code complete, cohort gated | Only opted-in canonical items contribute; statistics aggregate at workspace level, cap contribution, publish daily coarsened output, and fail closed below 25 distinct workspaces. |
+| Connector registry | Done | Models 42 targets with explicit live/setup/verification/partner/evidence/planned states. Registry presence is not provider activation. |
+| OpenAI cost sync | Partial activation | Authenticated workspace API-key storage, encrypted tokens, queued jobs, normalization, and living-ledger writes exist. A real organization key and production worker proof are still required. |
+| Gmail OAuth sync | Partial activation | OAuth/state validation, encrypted token persistence, refresh, queued sync, receipt parsing, and living-ledger writes exist. Public Google verification and production worker activation remain. |
+| Platform provider adapters | Partial activation | GitHub Copilot, Vercel, Render, and Cloudflare adapters currently provide source-health/inventory evidence only because their implemented responses have no amount. OpenAI provides numeric usage/cost observations but does not invent a subscription. Billing depth still depends on validated provider endpoints and permissions. |
 
-## What Is Not Done Yet
+## Product Gaps Still Not Implemented
 
 | Capability | Status | Required Before Claiming It |
 | --- | --- | --- |
-| Public user login | Not done | Magic link, OAuth, or identity provider with email verification. |
-| Normalized per-user audit history | Not done | Persist parsed transactions, recurring items, evidence, reports, and review workflow as relational records by workspace. |
+| First-class relational team workflow | Not done | Owners, notes, review completion, team labels, and duplicate-merge decisions are durable and multi-device inside encrypted revisioned workspace state; move them to typed relational workflow tables only when multi-user querying/approvals require it. Canonical commitment actions are already relational. |
 | Encrypted file storage | Not done | Object storage, retention controls, deletion workflow, and file-level audit log. Snapshot JSON is encrypted; raw object storage is not implemented. |
 | Real bank connection | Not done | Account Aggregator/TSP path or regulated data partner. |
 | UPI AutoPay direct dashboard | Not done | PSP/bank/NPCI-connected partner or mandate data provider. |
@@ -64,6 +75,21 @@ Overall current score: 6.6/10 for the full vision, but 8/10 for the private audi
 | Razorpay/Cashfree consumer-wide mandates | Not done | Merchant APIs help merchants; consumer-wide view needs different access. |
 | Usage-aware AI tool optimization | Not done | Provider usage APIs, per-user tokens, safe recommendations. |
 | Cancellation automation | Not done | Legal, provider-specific workflows, user authorization, failure handling. |
+
+## Code-Complete Capabilities Awaiting External Production Activation
+
+| Capability | Repository status | External proof required before a production claim |
+| --- | --- | --- |
+| Public magic-link identity | Implemented | Production `SESSION_SECRET`/PostgreSQL, verified Resend sender, delivery test, shared rate limiting, and abuse monitoring |
+| Google identity + Gmail receipt sync | Implemented for approved/test users | Google restricted-scope verification, production OAuth credentials/redirects, token-vault key, and a real queued sync proof |
+| Database-backed product modules | Migrations `0002`–`0014` exist | Apply migrations in staging/production, verify `schema_migrations`, backup first, and run route/worker/database smoke tests |
+| Connector synchronization | Scheduler/runner and registered adapters exist | Configure cron/internal secrets, Upstash, provider-owned credentials, permissions, and successful retry/disconnect/delete tests |
+| Renewal-alert delivery | Preference, schedule, worker, retry, and template code exists | Apply `0006`, verify email domain/sender, deploy cron, then prove opt-in → send → disable/cancel without payload leakage |
+| Privacy retention enforcement | Policy/export/executor and authenticated daily GET cron exist | Verify backup/restore, configure `CRON_SECRET` and Upstash, review a dry run, then observe and monitor enforced runs |
+| Read-only platform API | Token lifecycle and cursor-paginated `/api/v1` endpoints exist | Configure database/Upstash, issue and revoke a test token, validate a real consumer against `docs/api/openapi.yaml` |
+| Aggregate benchmarks | Consent, contribution-cap, daily coarsening, and threshold code exist | At least 25 distinct opted-in workspaces with prior-day canonical items; smaller cohorts intentionally return nothing |
+| Direct SaaS/cloud connectors | Adapter code exists by provider | Real credentials/account permissions, endpoint validation, provider terms, and where required commercial contracts |
+| AA, bank, UPI, and card-mandate rails | Partner-readiness model/manual evidence only | Regulatory role, FIU/TSP/PSP/bank/issuer approval, contracts, DPA/security review, sandbox proof, then production credentials |
 
 ## Competitive Landscape
 
@@ -159,8 +185,11 @@ Pause if:
 
 ## Next Build Priority
 
-1. Configure production beta login envs: `SESSION_SECRET`, `DATABASE_URL`, `PRIVATE_BETA_ACCESS_CODE`, `TOKEN_ENCRYPTION_KEY`.
-2. Configure audit lead persistence: `AUDIT_INTAKE_WEBHOOK_URL` or `WAITLIST_WEBHOOK_URL`.
-3. Convert encrypted snapshots into normalized durable per-workspace audit history after 5 paid/serious beta users.
-4. Promote Gmail receipt intelligence only after token vault and deletion controls are ready.
-5. Prioritize connectors from real audit evidence, not guesses.
+1. Apply migrations `0002`–`0014` to staging/production and repeat the PostgreSQL integration suite plus route/worker smoke tests (the disposable PostgreSQL 16 proof is automated in CI).
+2. Activate production infrastructure: Upstash, monitoring delivery, encrypted backups plus restore drill, connector/renewal/retention cron secrets, and a verified Resend sender.
+3. Complete Google restricted-scope verification and prove Gmail connect → refresh → queued sync → canonical ledger → disconnect with approved test accounts before public rollout.
+4. Configure durable audit/waitlist lead persistence and run five real paid/serious audits; measure surprise findings, willingness to pay, and demand for monitoring.
+5. Validate multi-device revision conflicts and normalized upload/manual materialization with real beta workspaces; introduce typed owner/note/approval tables only when multi-user workflow evidence justifies them.
+6. Prove one production consumer of the read-only platform API and keep it read-only until a separately reviewed mutation contract exists.
+7. Build the 25-workspace explicit-consent cohort before presenting aggregate benchmarks; never weaken the threshold or contribution controls to create demo data.
+8. Prioritize new connectors from real audit evidence and advance regulated AA/mandate work only through approved providers and contracts.

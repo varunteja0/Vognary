@@ -19,6 +19,13 @@ export type MonitoringBackendStatus =
   | "axiom-token-configured-needs-dataset"
   | "not-configured";
 
+export type MonitoringDeliveryResult = {
+  status: "delivered" | "not-configured" | "failed";
+  backend: MonitoringBackendStatus;
+  eventId?: string;
+  message?: string;
+};
+
 export function getMonitoringBackendStatus(): MonitoringBackendStatus {
   if (process.env.SENTRY_DSN?.trim()) return "sentry";
   if (process.env.BETTER_STACK_SOURCE_TOKEN?.trim()) return "better-stack";
@@ -27,27 +34,76 @@ export function getMonitoringBackendStatus(): MonitoringBackendStatus {
 }
 
 export async function reportServerError(error: unknown, request: MonitoringErrorRequest, context: MonitoringErrorContext) {
+  await deliverServerError(error, request, context);
+}
+
+export async function sendMonitoringTestEvent(source: string): Promise<MonitoringDeliveryResult> {
+  const eventId = createEventId();
+  return deliverServerError(
+    new Error(`Vognary monitoring delivery test ${eventId}`),
+    {
+      path: `/internal/monitoring/test/${source}`,
+      method: "POST",
+      headers: {},
+    },
+    {
+      source,
+      synthetic: true,
+      eventId,
+      timestamp: new Date().toISOString(),
+    },
+    eventId,
+  );
+}
+
+async function deliverServerError(
+  error: unknown,
+  request: MonitoringErrorRequest,
+  context: MonitoringErrorContext,
+  suppliedEventId?: string,
+): Promise<MonitoringDeliveryResult> {
   const normalized = normalizeError(error);
+  const safeRequest = sanitizeRequest(request);
+  const safeContext = sanitizeMonitoringValue(context) as MonitoringErrorContext;
   const backend = getMonitoringBackendStatus();
+
+  if (backend === "not-configured" || backend === "axiom-token-configured-needs-dataset") {
+    return {
+      status: "not-configured",
+      backend,
+      message: backend === "axiom-token-configured-needs-dataset"
+        ? "AXIOM_TOKEN is set but AXIOM_DATASET is not wired for delivery. Configure SENTRY_DSN or BETTER_STACK_SOURCE_TOKEN for server-error delivery."
+        : "Configure SENTRY_DSN or BETTER_STACK_SOURCE_TOKEN for server-error delivery.",
+    };
+  }
 
   try {
     if (backend === "sentry") {
-      await sendSentryEvent(normalized, request, context);
-      return;
+      const eventId = await sendSentryEvent(normalized, safeRequest, safeContext, suppliedEventId);
+      return { status: "delivered", backend, eventId };
     }
     if (backend === "better-stack") {
-      await sendBetterStackLog(normalized, request, context);
+      await sendBetterStackLog(normalized, safeRequest, safeContext);
+      return { status: "delivered", backend, eventId: suppliedEventId };
     }
-  } catch {
+  } catch (error) {
     // Monitoring must never make the user-facing failure path worse.
+    return {
+      status: "failed",
+      backend,
+      eventId: suppliedEventId,
+      message: error instanceof Error ? error.message : "Monitoring delivery failed.",
+    };
   }
+
+  return { status: "not-configured", backend };
 }
 
-async function sendSentryEvent(error: NormalizedError, request: MonitoringErrorRequest, context: MonitoringErrorContext) {
+async function sendSentryEvent(error: NormalizedError, request: MonitoringErrorRequest, context: MonitoringErrorContext, suppliedEventId?: string) {
   const endpoint = getSentryEnvelopeEndpoint();
-  if (!endpoint) return;
+  if (!endpoint) throw new Error("SENTRY_DSN is invalid or missing a project id.");
 
-  const eventId = createEventId();
+  const eventId = suppliedEventId ?? createEventId();
   const sentAt = new Date().toISOString();
   const event = {
     event_id: eventId,
@@ -80,7 +136,7 @@ async function sendSentryEvent(error: NormalizedError, request: MonitoringErrorR
     },
   };
 
-  await fetch(endpoint, {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "content-type": "application/x-sentry-envelope" },
     body: [
@@ -90,13 +146,16 @@ async function sendSentryEvent(error: NormalizedError, request: MonitoringErrorR
     ].join("\n"),
     signal: getMonitoringTimeoutSignal(),
   });
+
+  if (!response.ok) throw new Error(`Sentry delivery failed with HTTP ${response.status}.`);
+  return eventId;
 }
 
 async function sendBetterStackLog(error: NormalizedError, request: MonitoringErrorRequest, context: MonitoringErrorContext) {
   const token = process.env.BETTER_STACK_SOURCE_TOKEN?.trim();
   if (!token) return;
 
-  await fetch("https://in.logs.betterstack.com/", {
+  const response = await fetch("https://in.logs.betterstack.com/", {
     method: "POST",
     headers: {
       authorization: `Bearer ${token}`,
@@ -119,6 +178,8 @@ async function sendBetterStackLog(error: NormalizedError, request: MonitoringErr
     }),
     signal: getMonitoringTimeoutSignal(),
   });
+
+  if (!response.ok) throw new Error(`Better Stack delivery failed with HTTP ${response.status}.`);
 }
 
 function getSentryEnvelopeEndpoint() {
@@ -147,15 +208,15 @@ function normalizeError(error: unknown): NormalizedError {
   if (error instanceof Error) {
     return {
       name: error.name || "Error",
-      message: error.message || "Unhandled server error",
-      stack: error.stack,
+      message: redactMonitoringText(error.message || "Unhandled server error"),
+      stack: error.stack ? redactMonitoringText(error.stack) : undefined,
       digest: readDigest(error),
     };
   }
 
   return {
     name: "UnknownError",
-    message: typeof error === "string" ? error : "Unhandled server error",
+    message: typeof error === "string" ? redactMonitoringText(error) : "Unhandled server error",
     digest: readDigest(error),
   };
 }
@@ -165,12 +226,59 @@ function readDigest(value: unknown) {
 }
 
 function sanitizeHeaders(headers: Record<string, string | string[] | undefined>) {
-  const allowed = new Set(["host", "referer", "user-agent", "x-forwarded-for", "x-real-ip", "x-vercel-id"]);
+  const allowed = new Set(["host", "referer", "user-agent", "x-vercel-id"]);
   return Object.fromEntries(
     Object.entries(headers)
       .filter(([key, value]) => value !== undefined && allowed.has(key.toLowerCase()))
-      .map(([key, value]) => [key, Array.isArray(value) ? value.join(", ") : value]),
+      .map(([key, value]) => {
+        const normalized = Array.isArray(value) ? value.join(", ") : value ?? "";
+        return [key, key.toLowerCase() === "referer" ? sanitizeMonitoringPath(normalized) : redactMonitoringText(normalized)];
+      }),
   );
+}
+
+function sanitizeRequest(request: MonitoringErrorRequest): MonitoringErrorRequest {
+  return {
+    path: sanitizeMonitoringPath(request.path),
+    method: request.method.slice(0, 16).toUpperCase(),
+    headers: sanitizeHeaders(request.headers),
+  };
+}
+
+export function sanitizeMonitoringPath(rawPath: string) {
+  if (!rawPath) return "/";
+  try {
+    const parsed = new URL(rawPath, "https://monitoring.invalid");
+    return redactMonitoringText(parsed.pathname || "/");
+  } catch {
+    return redactMonitoringText(rawPath.split(/[?#]/, 1)[0] || "/");
+  }
+}
+
+export function sanitizeMonitoringValue(value: unknown, depth = 0): unknown {
+  if (depth > 4) return "[TRUNCATED]";
+  if (typeof value === "string") return redactMonitoringText(value).slice(0, 2_000);
+  if (typeof value === "number" || typeof value === "boolean" || value == null) return value;
+  if (Array.isArray(value)) return value.slice(0, 25).map((entry) => sanitizeMonitoringValue(entry, depth + 1));
+  if (typeof value !== "object") return String(value);
+
+  const blockedKeys = /(?:authorization|cookie|token|secret|password|passcode|code|state|email|phone|account|card|payload|body|query|search)/i;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !blockedKeys.test(key))
+      .slice(0, 50)
+      .map(([key, entry]) => [key, sanitizeMonitoringValue(entry, depth + 1)]),
+  );
+}
+
+export function redactMonitoringText(value: string) {
+  return value
+    .replace(/\b(?:postgres(?:ql)?|redis|https?):\/\/[^\s]+/gi, "[REDACTED_URL]")
+    .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, "Bearer [REDACTED]")
+    .replace(/\b(?:sk|rk|pk|sess|token)[-_][A-Za-z0-9_-]{12,}\b/gi, "[REDACTED_SECRET]")
+    .replace(/\b[A-Fa-f0-9]{40,}\b/g, "[REDACTED_SECRET]")
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[REDACTED_EMAIL]")
+    .replace(/([?&](?:token|code|state|key|secret|email)=)[^&#\s]*/gi, "$1[REDACTED]");
 }
 
 function createEventId() {

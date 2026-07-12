@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectors, getConnectorSummary, getConnectorSyncSummary } from "@/lib/connectors";
 import { listConnectorAdapters } from "@/lib/connectors/adapter-registry";
-import { buildConnectorReadiness } from "@/lib/connector-runtime";
+import { buildConnectorHonestyMap, buildConnectorReadiness } from "@/lib/connector-runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,7 @@ export function GET() {
     summary: getConnectorSummary(),
     syncSummary: getConnectorSyncSummary(),
     readiness: buildConnectorReadiness(),
+    honesty: buildConnectorHonestyMap(),
     adapters: listConnectorAdapters(),
     connectors,
   });

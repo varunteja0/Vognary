@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { checkMagicLinkConfiguration, createMagicLinkChallenge, maskEmail, sendMagicLinkEmail } from "@/lib/server/magic-link-auth";
+import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
+import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,6 +15,9 @@ type MagicLinkRequest = {
 };
 
 export async function POST(request: NextRequest) {
+  const crossSite = rejectCrossSiteMutation(request);
+  if (crossSite) return crossSite;
+
   const limit = await rateLimit(request, { namespace: "magic-link-request", limit: 5, windowMs: 60 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
@@ -25,7 +30,8 @@ export async function POST(request: NextRequest) {
     }, { status: 501 });
   }
 
-  const body = await readJson(request);
+  const body = await readMagicLinkJson(request);
+  if (body instanceof Response) return body;
   const email = body.email?.trim().toLowerCase() ?? "";
   if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
     return NextResponse.json({ error: "Valid email is required." }, { status: 400 });
@@ -49,11 +55,13 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ status: "sent", email: maskEmail(email), expiresAt: challenge.expiresAt });
 }
 
-async function readJson(request: Request): Promise<MagicLinkRequest> {
+async function readMagicLinkJson(request: Request): Promise<MagicLinkRequest | Response> {
   try {
-    return await request.json() as MagicLinkRequest;
-  } catch {
-    return {};
+    return await readLimitedJson<MagicLinkRequest>(request, 8 * 1024);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) return NextResponse.json({ error: "Magic-link request is too large." }, { status: 413 });
+    if (error instanceof UnsupportedContentTypeError) return NextResponse.json({ error: "Content-Type must be application/json." }, { status: 415 });
+    return NextResponse.json({ error: "Magic-link request must be valid JSON." }, { status: 400 });
   }
 }
 

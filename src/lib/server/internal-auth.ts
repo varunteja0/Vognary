@@ -18,10 +18,33 @@ export function requireInternalSecret(request: Request) {
   return null;
 }
 
+export function requireCronSecret(request: Request) {
+  const configured = process.env.CRON_SECRET?.trim();
+  if (!configured) {
+    return Response.json({
+      status: "not-configured",
+      requiredEnv: ["CRON_SECRET"],
+      message: "Configure CRON_SECRET before enabling scheduled worker execution.",
+    }, { status: 501 });
+  }
+
+  const supplied = readBearerToken(request);
+  if (!supplied || !safeEqual(configured, supplied)) {
+    return Response.json({ error: "Unauthorized cron invocation." }, { status: 401 });
+  }
+
+  return null;
+}
+
 function readInternalSecret(request: Request) {
-  const authorization = request.headers.get("authorization") ?? "";
-  if (authorization.toLowerCase().startsWith("bearer ")) return authorization.slice("bearer ".length).trim();
+  const bearer = readBearerToken(request);
+  if (bearer) return bearer;
   return request.headers.get("x-vognary-internal-secret")?.trim() ?? null;
+}
+
+function readBearerToken(request: Request) {
+  const authorization = request.headers.get("authorization") ?? "";
+  return authorization.toLowerCase().startsWith("bearer ") ? authorization.slice("bearer ".length).trim() : null;
 }
 
 function safeEqual(expected: string, supplied: string) {

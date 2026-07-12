@@ -1,19 +1,26 @@
 import { NextResponse } from "next/server";
 import { gmailOAuthStateCookie, oauthStateCookieOptions } from "@/lib/oauth-state";
+import { readCurrentSession } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 
 const gmailReadonlyScope = "https://www.googleapis.com/auth/gmail.readonly";
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const url = new URL(request.url);
   const wantsJson = url.searchParams.get("mode") === "json";
+  const session = await readCurrentSession(request);
+  if (!session) {
+    if (wantsJson) return NextResponse.json({ status: "unauthenticated", message: "Sign in before connecting Gmail." }, { status: 401 });
+    return NextResponse.redirect(new URL("/login?next=/connect", url.origin));
+  }
   const clientId = getGmailClientId();
   const clientSecret = getGmailClientSecret();
   const redirectUri = getGmailRedirectUri(url.origin);
   const missingEnv = [
     clientId ? null : "GOOGLE_CLIENT_ID or GOOGLE_AUTH_CLIENT_ID",
     clientSecret ? null : "GOOGLE_CLIENT_SECRET or GOOGLE_AUTH_CLIENT_SECRET",
+    redirectUri ? null : "GOOGLE_REDIRECT_URI",
   ].filter((value): value is string => Boolean(value));
 
   if (missingEnv.length) {
@@ -40,6 +47,7 @@ export function GET(request: Request) {
   authUrl.searchParams.set("scope", gmailReadonlyScope);
   authUrl.searchParams.set("access_type", "offline");
   authUrl.searchParams.set("prompt", "consent");
+  authUrl.searchParams.set("include_granted_scopes", "true");
   const state = crypto.randomUUID();
   authUrl.searchParams.set("state", state);
 
@@ -69,5 +77,7 @@ function getGmailClientSecret() {
 }
 
 function getGmailRedirectUri(origin: string) {
-  return process.env.GOOGLE_REDIRECT_URI?.trim() || `${origin.replace(/\/$/, "")}/api/integrations/gmail/callback`;
+  const configured = process.env.GOOGLE_REDIRECT_URI?.trim();
+  if (configured) return configured;
+  return process.env.NODE_ENV === "production" ? "" : `${origin.replace(/\/$/, "")}/api/integrations/gmail/callback`;
 }

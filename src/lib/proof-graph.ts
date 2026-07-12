@@ -1,0 +1,160 @@
+import { primaryCurrency, type RecurringItem } from "./recurring-audit";
+import { parseCalendarDate } from "./date-only";
+
+export type ProofSourceStat = {
+  source: string;
+  itemCount: number;
+  monthlySpend: number;
+};
+
+export type NextBestSource = {
+  suggestion: string;
+  reason: string;
+  monthlyAtStake: number;
+  merchants: string[];
+};
+
+export type ProofGraphSummary = {
+  totalMonthly: number;
+  itemCount: number;
+  /** Spend proven by exactly one source — the trust-weakest rupees. */
+  singleSourceMonthly: number;
+  singleSourceShare: number;
+  multiSourceMonthly: number;
+  /** Spend whose evidence trail has gone quiet (2+ unproven cycles). */
+  staleMonthly: number;
+  averageProofRows: number;
+  newestEvidenceDate: string | null;
+  sources: ProofSourceStat[];
+  nextBestSources: NextBestSource[];
+};
+
+export type ProofGraphOptions = {
+  today?: Date;
+};
+
+// The Proof Graph reads the evidence structure behind the ledger and answers:
+// which rupees rest on one source, which have gone stale, and which single
+// connection would strengthen the most spend. Confidence becomes explainable
+// instead of a bare number.
+export function buildProofGraphSummary(items: RecurringItem[], options: ProofGraphOptions = {}): ProofGraphSummary {
+  const today = options.today ?? new Date();
+  // Money totals are deliberately primary-currency only. Counts and freshness
+  // still cover every commitment, but unlike currencies are never added.
+  const totalMonthly = sumMonthly(items);
+
+  let singleSourceMonthly = 0;
+  let multiSourceMonthly = 0;
+  let staleMonthly = 0;
+  let proofRows = 0;
+  let newestEvidence: string | null = null;
+
+  const sourceStats = new Map<string, ProofSourceStat>();
+  const statementOnly: RecurringItem[] = [];
+  const manualOnly: RecurringItem[] = [];
+  const mandateShaped: RecurringItem[] = [];
+
+  for (const item of items) {
+    const isPrimaryCurrency = item.currency === primaryCurrency;
+    proofRows += item.evidence.length;
+    const sourceCount = new Set(item.sourceNames.map((name) => name.toLowerCase())).size;
+    if (isPrimaryCurrency && sourceCount <= 1) singleSourceMonthly += item.monthlyCost;
+    else if (isPrimaryCurrency) multiSourceMonthly += item.monthlyCost;
+    if (isPrimaryCurrency && item.missedCycles >= 2) staleMonthly += item.monthlyCost;
+
+    for (const link of item.evidence) {
+      // Future-dated rows (a manual item's expected renewal) are forward-looking
+      // markers, not observations — they must not inflate evidence freshness.
+      const linkDate = parseCalendarDate(link.date);
+      if (!linkDate || linkDate > today) continue;
+      if (!newestEvidence || link.date > newestEvidence) newestEvidence = link.date;
+    }
+
+    for (const source of item.sourceNames) {
+      const existing = sourceStats.get(source) ?? { source, itemCount: 0, monthlySpend: 0 };
+      existing.itemCount += 1;
+      if (isPrimaryCurrency) existing.monthlySpend += item.monthlyCost;
+      sourceStats.set(source, existing);
+    }
+
+    const sourceText = item.sourceNames.join(" ").toLowerCase();
+    const isStatementBacked = /statement|\.csv|\.pdf|converted/.test(sourceText);
+    const isReceiptBacked = /receipt|gmail|invoice/.test(sourceText);
+    const isMandateCategory = ["Mandates", "App store", "Debt", "Investments", "Insurance"].includes(item.category)
+      || /mandate|autopay/i.test(`${item.merchant} ${sourceText}`);
+
+    if (isPrimaryCurrency && sourceCount <= 1) {
+      if (isMandateCategory && !isStatementBacked) mandateShaped.push(item);
+      else if (isStatementBacked && !isReceiptBacked) statementOnly.push(item);
+      else if (!isStatementBacked) manualOnly.push(item);
+    }
+  }
+
+  const nextBestSources = rankNextBestSources(statementOnly, manualOnly, mandateShaped);
+
+  return {
+    totalMonthly,
+    itemCount: items.length,
+    singleSourceMonthly,
+    singleSourceShare: totalMonthly > 0 ? singleSourceMonthly / totalMonthly : 0,
+    multiSourceMonthly,
+    staleMonthly,
+    averageProofRows: items.length ? proofRows / items.length : 0,
+    newestEvidenceDate: newestEvidence,
+    sources: [...sourceStats.values()].sort((left, right) => right.monthlySpend - left.monthlySpend),
+    nextBestSources,
+  };
+}
+
+function rankNextBestSources(
+  statementOnly: RecurringItem[],
+  manualOnly: RecurringItem[],
+  mandateShaped: RecurringItem[],
+): NextBestSource[] {
+  const suggestions: NextBestSource[] = [];
+
+  const statementSpend = sumMonthly(statementOnly);
+  if (statementOnly.length) {
+    suggestions.push({
+      suggestion: "Connect Gmail receipts",
+      reason: "These commitments are proven only by statement rows. A matching receipt raises confidence and catches plan changes early.",
+      monthlyAtStake: statementSpend,
+      merchants: topMerchants(statementOnly),
+    });
+  }
+
+  const manualSpend = sumMonthly(manualOnly);
+  if (manualOnly.length) {
+    suggestions.push({
+      suggestion: "Import a bank/card statement",
+      reason: "These commitments rest on manual or receipt evidence alone. One statement export proves the actual debits.",
+      monthlyAtStake: manualSpend,
+      merchants: topMerchants(manualOnly),
+    });
+  }
+
+  const mandateSpend = sumMonthly(mandateShaped);
+  if (mandateShaped.length) {
+    suggestions.push({
+      suggestion: "Run guided mandate capture",
+      reason: "Mandate-shaped commitments need the source screen (UPI app, bank e-mandate list, app store) confirmed to trust amount and next debit.",
+      monthlyAtStake: mandateSpend,
+      merchants: topMerchants(mandateShaped),
+    });
+  }
+
+  return suggestions.sort((left, right) => right.monthlyAtStake - left.monthlyAtStake).slice(0, 3);
+}
+
+function sumMonthly(items: RecurringItem[]): number {
+  return items
+    .filter((item) => item.currency === primaryCurrency)
+    .reduce((total, item) => total + item.monthlyCost, 0);
+}
+
+function topMerchants(items: RecurringItem[]): string[] {
+  return [...items]
+    .sort((left, right) => right.monthlyCost - left.monthlyCost)
+    .slice(0, 2)
+    .map((item) => item.merchant);
+}

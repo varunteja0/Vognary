@@ -1,4 +1,4 @@
-import { readSession, type AuthSession } from "@/lib/server/session";
+import { readCurrentSession, type AuthSession } from "@/lib/server/session";
 import { getWorkspaceMembership, type WorkspaceMembership } from "@/lib/server/workspace-store";
 
 export type WorkspaceRole = WorkspaceMembership["role"];
@@ -10,14 +10,14 @@ const roleRank: Record<WorkspaceRole, number> = {
   owner: 4,
 };
 
-export function requireSession(request: Request): AuthSession | Response {
-  const session = readSession(request);
+export async function requireSession(request: Request): Promise<AuthSession | Response> {
+  const session = await readCurrentSession(request);
   if (!session) return Response.json({ error: "Authentication required." }, { status: 401 });
   return session;
 }
 
 export async function requireWorkspaceRole(request: Request, workspaceId: string, minimumRole: WorkspaceRole) {
-  const session = requireSession(request);
+  const session = await requireSession(request);
   if (session instanceof Response) return session;
 
   const membership = await getWorkspaceMembership(session.userId, workspaceId);

@@ -35,10 +35,20 @@ export async function persistConnectorWebhookEvent(input: ConnectorWebhookEventI
       event_type = excluded.event_type,
       signature_valid = excluded.signature_valid,
       payload_hash = excluded.payload_hash,
-      payload = excluded.payload,
-      status = 'verified',
-      received_at = now(),
-      error_message = null
+      payload = case
+        when connector_webhook_events.payload_minimized_at is null then excluded.payload
+        else connector_webhook_events.payload
+      end,
+      status = case
+        when connector_webhook_events.payload_minimized_at is null then 'verified'::webhook_event_status
+        else 'ignored'::webhook_event_status
+      end,
+      received_at = case
+        when connector_webhook_events.payload_minimized_at is null then now()
+        else connector_webhook_events.received_at
+      end,
+      error_message = null,
+      error_at = null
     returning id`,
     [
       input.connectorId,

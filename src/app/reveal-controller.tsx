@@ -28,6 +28,10 @@ export default function RevealController() {
     const register = (el: Element) => {
       if (seen.has(el)) return;
       seen.add(el);
+      if (document.visibilityState !== "visible") {
+        el.classList.add("is-visible");
+        return;
+      }
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight || document.documentElement.clientHeight;
       if (rect.top < vh * 0.92) {
@@ -40,6 +44,15 @@ export default function RevealController() {
 
     document.querySelectorAll("[data-reveal]").forEach(register);
     root.classList.add("reveal-ready");
+
+    const revealAll = () => {
+      document.querySelectorAll("[data-reveal]").forEach((element) => element.classList.add("is-visible"));
+    };
+    const visibilityChanged = () => {
+      if (document.visibilityState !== "visible") revealAll();
+    };
+    document.addEventListener("visibilitychange", visibilityChanged);
+    const fallback = window.setTimeout(revealAll, 2_000);
 
     // Catch elements added by client-side navigation.
     const mutation = new MutationObserver((mutations) => {
@@ -57,6 +70,8 @@ export default function RevealController() {
     return () => {
       observer.disconnect();
       mutation.disconnect();
+      document.removeEventListener("visibilitychange", visibilityChanged);
+      window.clearTimeout(fallback);
     };
   }, []);
 

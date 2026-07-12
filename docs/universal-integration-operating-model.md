@@ -38,7 +38,7 @@ Most serious integrations use one of these patterns:
 | Token vault | Ready | Encrypted token storage primitives exist. |
 | Connector token store | Ready | Connected-account and encrypted-token tables exist. |
 | Internal sync API | Configured | Internal sync routes exist; worker daemon is still not a standalone scheduler. |
-| OpenAI costs | Adapter exists, blocked by env | Needs `OPENAI_ADMIN_API_KEY` or workspace token capture. |
+| OpenAI costs | Adapter and encrypted workspace token capture exist | Requires each workspace admin to provide its own scoped key; deployment-wide keys are local-preview-only. |
 | Claude, Kling, X Premium | Planned targets | Need official API/partner access before real personal billing sync. |
 | Vercel, Render, GitHub, Cloudflare, AWS | Planned targets | Need provider adapters and user/workspace credential capture. |
 | Apple/Google Play consumer subscriptions | Evidence only today | Universal consumer subscription APIs are not generally available to third-party apps. |

@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:vognary_ci@127.0.0.1:5432/vognary_ci
+      POSTGRES_SSL: "false"
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: vognary_ci
+          POSTGRES_DB: vognary_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vognary_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run ci:database
+      - run: npm run lint
+      - run: npm run claims:check
+      - run: npm test
+      - run: npm run corpus
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Start production server
+        run: |
+          ALLOW_IN_MEMORY_RATE_LIMITS=true INTERNAL_SYNC_SECRET=ci-internal-sync-secret PORT=3000 npm run start > /tmp/vognary.log 2>&1 &
+          echo $! > /tmp/vognary.pid
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:3000/api/health && exit 0
+            sleep 1
+          done
+          cat /tmp/vognary.log
+          exit 1
+      - run: npm run smoke
+        env:
+          SMOKE_BASE_URL: http://127.0.0.1:3000
+          SMOKE_INTERNAL_SECRET: ci-internal-sync-secret
+      - name: Stop production server
+        if: always()
+        run: |
+          if [ -f /tmp/vognary.pid ]; then kill "$(cat /tmp/vognary.pid)" || true; fi

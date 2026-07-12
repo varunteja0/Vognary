@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ConnectorAdapter, ConnectorConnection, ConnectorEvidence } from "@/lib/connector-runtime";
+import { isEnvironmentConnectorPreviewEnabled } from "@/lib/server/connector-preview-policy";
 
 type OpenAICostsResponse = {
   data?: OpenAICostBucket[];
@@ -33,11 +34,14 @@ export const openAiCostsAdapter: ConnectorAdapter = {
       scopes: connection.scopes.length ? connection.scopes : ["organization:costs:read"],
     };
   },
-  async sync(connection) {
+  async sync(connection, context) {
     const apiKey = getOpenAiAdminKey(connection);
     const url = new URL(openAiCostsUrl);
     const endTime = Math.floor(Date.now() / 1000);
-    const startTime = endTime - 30 * 24 * 60 * 60;
+    const previousEnd = asUnixSeconds(context?.cursorState.windowEndUnix);
+    const startTime = previousEnd
+      ? Math.max(endTime - 30 * 24 * 60 * 60, previousEnd - 24 * 60 * 60)
+      : endTime - 30 * 24 * 60 * 60;
     url.searchParams.set("start_time", String(startTime));
     url.searchParams.set("limit", "31");
 
@@ -54,7 +58,16 @@ export const openAiCostsAdapter: ConnectorAdapter = {
     }
 
     const payload = await response.json() as OpenAICostsResponse;
-    return normalizeOpenAiCostEvidence(payload, connection);
+    return {
+      evidence: normalizeOpenAiCostEvidence(payload, connection),
+      nextCursorState: { windowEndUnix: endTime },
+      nextSyncAt: new Date((endTime + 24 * 60 * 60) * 1_000).toISOString(),
+      coverage: {
+        startAt: new Date(startTime * 1_000).toISOString(),
+        endAt: new Date(endTime * 1_000).toISOString(),
+        completeness: "partial",
+      },
+    };
   },
 };
 
@@ -71,15 +84,25 @@ function normalizeOpenAiCostEvidence(payload: OpenAICostsResponse, connection: C
       const currency = (result.amount?.currency ?? "USD").toUpperCase();
       const merchantRaw = result.line_item ? `OpenAI ${result.line_item}` : "OpenAI usage";
       const payloadHash = hashPayload({ bucket, result, workspaceId: connection.workspaceId });
+      const externalId = hashPayload({
+        startTime: bucket.start_time,
+        endTime: bucket.end_time,
+        lineItem: result.line_item ?? null,
+        projectId: result.project_id ?? null,
+        organizationId: result.organization_id ?? null,
+        currency,
+      });
 
       evidence.push({
         connectorId: openAiCostsAdapter.id,
+        externalId: `openai-cost:${externalId}`,
         provider: "openai",
         observedAt,
         evidenceType: "cost",
         merchantRaw,
         amount,
         currency,
+        category: "AI usage",
         cadenceHint: "usage-window",
         sourcePayloadHash: payloadHash,
         confidence: 96,
@@ -91,14 +114,28 @@ function normalizeOpenAiCostEvidence(payload: OpenAICostsResponse, connection: C
 }
 
 function getOpenAiAdminKey(connection?: ConnectorConnection) {
-  const apiKey = connection?.apiKey?.trim() || process.env.OPENAI_ADMIN_API_KEY?.trim();
-  if (!apiKey) throw new Error("OPENAI_ADMIN_API_KEY is not configured.");
+  const workspaceApiKey = connection?.apiKey?.trim();
+  if (workspaceApiKey) return workspaceApiKey;
+
+  const apiKey = !connection?.connectedAccountId && isEnvironmentConnectorPreviewEnabled()
+    ? process.env.OPENAI_ADMIN_API_KEY?.trim()
+    : undefined;
+  if (!apiKey) {
+    throw new Error(connection?.connectedAccountId
+      ? "OpenAI Admin API key is not configured for this connected account."
+      : "Non-production OpenAI environment preview is not configured.");
+  }
   return apiKey;
 }
 
 function toIsoDate(value: number | undefined) {
   if (!value) return new Date().toISOString();
   return new Date(value * 1000).toISOString();
+}
+
+function asUnixSeconds(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
+  return Math.floor(value);
 }
 
 function hashPayload(value: unknown) {

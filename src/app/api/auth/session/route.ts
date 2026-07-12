@@ -1,11 +1,11 @@
-import { checkSessionConfiguration, readSession } from "@/lib/server/session";
+import { checkSessionConfiguration, readCurrentSession } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const configuration = checkSessionConfiguration();
-  const session = readSession(request);
+  const session = await readCurrentSession(request);
 
   return Response.json({
     authenticated: Boolean(session),

@@ -1,0 +1,12 @@
+version: 1
+fixtures:
+  - file: fixtures/example-redacted.csv
+    institution: Example Bank
+    provenance: consented-redacted-real
+    consentReference: consent-audit-000001
+    expected:
+      recurring:
+        - merchant: OpenAI
+          currency: INR
+          frequency: monthly
+          averageAmount: 1999

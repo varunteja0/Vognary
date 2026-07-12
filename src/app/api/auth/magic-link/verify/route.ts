@@ -24,11 +24,22 @@ export async function GET(request: NextRequest) {
 
   const user = await getOrCreateUserByEmail({ email: challenge.email, displayName: challenge.displayName ?? undefined });
   const workspace = await getOrCreateDefaultWorkspaceForUser({ userId: user.id, workspaceName: challenge.workspaceName ?? undefined });
-  const cookie = createSessionCookie({ userId: user.id, email: user.email, workspaceId: workspace.workspaceId });
+  const cookie = await createSessionCookie({ userId: user.id, workspaceId: workspace.workspaceId });
 
-  const response = NextResponse.redirect(new URL(challenge.redirectPath, request.nextUrl.origin));
+  const response = NextResponse.redirect(new URL(challenge.redirectPath, getCanonicalAppOrigin(request)));
   response.cookies.set(cookie.name, cookie.value, sessionCookieOptions(cookie.maxAgeSeconds));
   return response;
+}
+
+function getCanonicalAppOrigin(request: NextRequest) {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (!configured) return request.nextUrl.origin;
+
+  try {
+    return new URL(configured).origin;
+  } catch {
+    return request.nextUrl.origin;
+  }
 }
 
 function redirectToLogin(request: NextRequest, reason: string) {

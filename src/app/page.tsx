@@ -257,7 +257,7 @@ export default function Home() {
               <div className="mt-5 grid gap-5 sm:grid-cols-2">
                 <div className="inset p-4">
                   <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">The wedge</p>
-                  <p className="mt-2 text-sm leading-6 text-(--ink-soft)">Start as a proof-backed recurring-money audit: Gmail receipts first, one ledger, evidence, confidence, next debit, action labels, and saved review snapshots when beta infrastructure is configured.</p>
+                  <p className="mt-2 text-sm leading-6 text-(--ink-soft)">Start as a proof-backed recurring-money audit: Gmail receipts first, one ledger, evidence, confidence, next debit, action labels, and automatic encrypted workspace sync when beta infrastructure is configured.</p>
                 </div>
                 <div className="inset p-4">
                   <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-ochre">The honest gap</p>

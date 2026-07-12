@@ -1,5 +1,6 @@
 import { getDatabasePool } from "@/lib/server/database";
 import { decryptSecret, encryptSecret, type EncryptedSecret } from "@/lib/server/token-vault";
+import { materializeWorkspaceState } from "@/lib/server/workspace-state-materializer";
 
 export type AuditSnapshotSummary = {
   recurringCount: number;
@@ -15,20 +16,21 @@ export type AuditSnapshotRecord = {
   title: string;
   summary: AuditSnapshotSummary;
   snapshot: unknown;
+  revision: number;
   createdAt: string;
-  exportedAt: string | null;
+  updatedAt: string;
 };
 
-type AuditReportRow = {
-  id: string;
-  title: string;
+type WorkspaceStateRow = {
+  workspace_id: string;
   summary: AuditSnapshotSummary;
-  report_json: {
+  encrypted_snapshot: {
     encrypted?: boolean;
     payload?: EncryptedSecret;
   };
+  revision: string;
   created_at: Date;
-  exported_at: Date | null;
+  updated_at: Date;
 };
 
 export async function saveAuditSnapshot(input: {
@@ -37,6 +39,7 @@ export async function saveAuditSnapshot(input: {
   title: string;
   summary: AuditSnapshotSummary;
   snapshot: unknown;
+  expectedRevision?: number | null;
 }) {
   const associatedData = getSnapshotAssociatedData(input.workspaceId);
   const encrypted = encryptSecret(JSON.stringify(input.snapshot), associatedData);
@@ -44,28 +47,57 @@ export async function saveAuditSnapshot(input: {
 
   try {
     await client.query("begin");
-    const result = await client.query<Pick<AuditReportRow, "id" | "created_at">>(
-      `insert into audit_reports (workspace_id, title, summary, report_json, exported_at)
-       values ($1, $2, $3::jsonb, $4::jsonb, now())
-       returning id, created_at`,
-      [
-        input.workspaceId,
-        input.title,
-        JSON.stringify(input.summary),
-        JSON.stringify({ encrypted: true, payload: encrypted }),
-      ],
+    await client.query(
+      `select pg_advisory_xact_lock(hashtextextended($1, 0))`,
+      [`workspace-state:${input.workspaceId}`],
     );
-    const id = result.rows[0]?.id;
-    if (!id) throw new Error("Audit snapshot insert did not return an id.");
+    const current = await client.query<{ revision: string }>(
+      `select revision::text
+       from workspace_states
+       where workspace_id = $1
+       for update`,
+      [input.workspaceId],
+    );
+    const currentRevision = current.rows[0] ? Number(current.rows[0].revision) : null;
+    const expectedRevision = input.expectedRevision ?? null;
+    if (currentRevision !== expectedRevision) {
+      await client.query("rollback");
+      return { status: "conflict" as const, currentRevision };
+    }
+
+    const nextRevision = (currentRevision ?? 0) + 1;
+    const result = await client.query<{ revision: string; created_at: Date; updated_at: Date }>(
+      `insert into workspace_states (
+         workspace_id, encrypted_snapshot, summary, revision, updated_by_user_id
+       ) values ($1, $2::jsonb, $3::jsonb, $4, $5)
+       on conflict (workspace_id)
+       do update set encrypted_snapshot = excluded.encrypted_snapshot,
+                     summary = excluded.summary,
+                     revision = excluded.revision,
+                     updated_by_user_id = excluded.updated_by_user_id,
+                     updated_at = now()
+       returning revision::text, created_at, updated_at`,
+      [input.workspaceId, JSON.stringify({ encrypted: true, payload: encrypted }), JSON.stringify(input.summary), nextRevision, input.userId],
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error("Workspace state upsert did not return a row.");
+    const materialized = await materializeWorkspaceState(client, input.workspaceId, input.snapshot);
 
     await client.query(
       `insert into audit_log (workspace_id, user_id, action, entity_type, entity_id, metadata)
-       values ($1, $2, 'audit_snapshot.saved', 'audit_report', $3, $4::jsonb)`,
-      [input.workspaceId, input.userId, id, JSON.stringify({ title: input.title, summary: input.summary })],
+       values ($1, $2, 'workspace_state.saved', 'workspace_state', $1, $3::jsonb)`,
+      [input.workspaceId, input.userId, JSON.stringify({ title: input.title, summary: input.summary, revision: nextRevision, materialized })],
     );
     await client.query("commit");
 
-    return { id, createdAt: result.rows[0]?.created_at?.toISOString() ?? new Date().toISOString() };
+    return {
+      status: "saved" as const,
+      id: input.workspaceId,
+      revision: Number(row.revision),
+      createdAt: row.created_at.toISOString(),
+      updatedAt: row.updated_at.toISOString(),
+      materialized,
+    };
   } catch (error) {
     await client.query("rollback");
     throw error;
@@ -75,18 +107,16 @@ export async function saveAuditSnapshot(input: {
 }
 
 export async function getLatestAuditSnapshot(workspaceId: string): Promise<AuditSnapshotRecord | null> {
-  const result = await getDatabasePool().query<AuditReportRow>(
-    `select id, title, summary, report_json, created_at, exported_at
-     from audit_reports
-     where workspace_id = $1
-     order by created_at desc
-     limit 1`,
+  const result = await getDatabasePool().query<WorkspaceStateRow>(
+    `select workspace_id, summary, encrypted_snapshot, revision::text, created_at, updated_at
+     from workspace_states
+     where workspace_id = $1`,
     [workspaceId],
   );
   const row = result.rows[0];
   if (!row) return null;
 
-  return mapAuditSnapshotRow(workspaceId, row);
+  return mapWorkspaceStateRow(workspaceId, row);
 }
 
 export async function deleteAuditSnapshots(input: { workspaceId: string; userId: string }) {
@@ -94,16 +124,34 @@ export async function deleteAuditSnapshots(input: { workspaceId: string; userId:
 
   try {
     await client.query("begin");
-    const result = await client.query<{ id: string }>(
-      `delete from audit_reports
+    const result = await client.query<{ workspace_id: string }>(
+      `delete from workspace_states
        where workspace_id = $1
-       returning id`,
+       returning workspace_id`,
+      [input.workspaceId],
+    );
+    await client.query(
+      `delete from recurring_items
+       where workspace_id = $1
+         and external_reference like 'workspace-state:%'`,
+      [input.workspaceId],
+    );
+    await client.query(
+      `delete from transactions
+       where workspace_id = $1
+         and external_reference like 'workspace-state:%'`,
+      [input.workspaceId],
+    );
+    await client.query(
+      `delete from data_sources
+       where workspace_id = $1
+         and external_reference like 'workspace-state:%'`,
       [input.workspaceId],
     );
 
     await client.query(
       `insert into audit_log (workspace_id, user_id, action, entity_type, metadata)
-       values ($1, $2, 'audit_snapshot.deleted', 'audit_report', $3::jsonb)`,
+      values ($1, $2, 'workspace_state.deleted', 'workspace_state', $3::jsonb)`,
       [input.workspaceId, input.userId, JSON.stringify({ deletedCount: result.rowCount ?? 0 })],
     );
     await client.query("commit");
@@ -116,20 +164,21 @@ export async function deleteAuditSnapshots(input: { workspaceId: string; userId:
   }
 }
 
-function mapAuditSnapshotRow(workspaceId: string, row: AuditReportRow): AuditSnapshotRecord {
-  if (!row.report_json?.encrypted || !row.report_json.payload) {
-    throw new Error("Audit snapshot payload is not encrypted.");
+function mapWorkspaceStateRow(workspaceId: string, row: WorkspaceStateRow): AuditSnapshotRecord {
+  if (!row.encrypted_snapshot?.encrypted || !row.encrypted_snapshot.payload) {
+    throw new Error("Workspace state payload is not encrypted.");
   }
 
-  const plaintext = decryptSecret(row.report_json.payload, getSnapshotAssociatedData(workspaceId));
+  const plaintext = decryptSecret(row.encrypted_snapshot.payload, getSnapshotAssociatedData(workspaceId));
 
   return {
-    id: row.id,
-    title: row.title,
+    id: row.workspace_id,
+    title: "Vognary workspace state",
     summary: row.summary,
     snapshot: JSON.parse(plaintext),
+    revision: Number(row.revision),
     createdAt: row.created_at.toISOString(),
-    exportedAt: row.exported_at?.toISOString() ?? null,
+    updatedAt: row.updated_at.toISOString(),
   };
 }
 

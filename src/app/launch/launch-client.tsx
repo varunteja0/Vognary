@@ -7,7 +7,7 @@ import { VognaryMark } from "../brand";
 const segments = ["Founder / builder", "Freelancer", "Small team", "Household", "Investor", "Accountant / CFO"];
 
 export default function LaunchClient() {
-  const [form, setForm] = useState({ name: "", email: "", segment: segments[0], message: "" });
+  const [form, setForm] = useState({ name: "", email: "", segment: segments[0], message: "", canContact: false });
   const [status, setStatus] = useState<string | null>(null);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -16,7 +16,11 @@ export default function LaunchClient() {
     const response = await fetch("/api/waitlist", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        consentNoticeVersion: "privacy-2026-07-11",
+        consentPurpose: "launch-audit-contact",
+      }),
     });
     const payload = await response.json();
     setStatus(response.ok ? (payload.persisted ? "Your audit request is captured." : "Request accepted locally. Configure WAITLIST_WEBHOOK_URL before public launch.") : payload.error ?? "Signup failed.");
@@ -67,7 +71,11 @@ export default function LaunchClient() {
                 {segments.map((segment) => <option key={segment} value={segment}>{segment}</option>)}
               </select>
               <textarea value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="field min-h-28" placeholder="What recurring payments do you want Vognary to find?" />
-              <button type="submit" className="btn btn-ember">Request audit</button>
+              <label className="flex items-start gap-2 text-xs leading-5 text-(--muted)">
+                <input type="checkbox" checked={form.canContact} onChange={(event) => setForm({ ...form, canContact: event.target.checked })} className="mt-1" />
+                <span>I agree that Vognary may store this information and contact me about the requested audit under the <Link href="/privacy" className="underline underline-offset-2">Privacy Notice</Link>.</span>
+              </label>
+              <button type="submit" disabled={!form.canContact} className="btn btn-ember disabled:cursor-not-allowed disabled:opacity-60">Request audit</button>
             </div>
             {status ? <p className="mt-4 rounded-md border border-indigo bg-(--indigo-tint) px-3 py-2 text-sm text-indigo">{status}</p> : null}
             <Link href="/app" className="mt-4 inline-flex text-sm font-semibold text-ember">Open Vognary</Link>

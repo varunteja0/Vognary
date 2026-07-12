@@ -9,11 +9,11 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const limit = await rateLimit(request, { namespace: "internal-sync-jobs", limit: 60, windowMs: 60_000 });
-  if (!limit.allowed) return rateLimitExceeded(limit);
-
   const auth = requireInternalSecret(request);
   if (auth) return auth;
+
+  const limit = await rateLimit(request, { namespace: "internal-sync-jobs", limit: 60, windowMs: 60_000, requireShared: true });
+  if (!limit.allowed) return rateLimitExceeded(limit);
 
   const body = await readJson(request);
   const connectorId = readString(body.connectorId);

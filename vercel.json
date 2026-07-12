@@ -3,7 +3,15 @@
   "crons": [
     {
       "path": "/api/internal/sync-jobs/due/run",
-      "schedule": "30 2 * * *"
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/internal/renewal-alerts/due/run",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/internal/privacy/retention/run",
+      "schedule": "30 21 * * *"
     }
   ]
 }

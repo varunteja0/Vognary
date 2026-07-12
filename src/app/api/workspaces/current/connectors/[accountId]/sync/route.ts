@@ -1,7 +1,9 @@
+import { connectorReauthorizationRequiredCode } from "@/lib/connector-errors";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { runConnectorSyncJob } from "@/lib/server/connector-sync-runner";
 import { getWorkspaceConnectedAccount } from "@/lib/server/connected-account-store";
 import { isDatabaseConfigured } from "@/lib/server/database";
+import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 import { createConnectorSyncJob } from "@/lib/server/sync-job-store";
 import { requireSession, requireWorkspaceRole } from "@/lib/server/workspace-auth";
 
@@ -14,10 +16,13 @@ type ConnectorAccountSyncRouteContext = {
 };
 
 export async function POST(request: Request, context: ConnectorAccountSyncRouteContext) {
+  const crossSite = rejectCrossSiteMutation(request);
+  if (crossSite) return crossSite;
+
   const limit = await rateLimit(request, { namespace: "workspace-connectors-sync", limit: 20, windowMs: 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
-  const session = requireSession(request);
+  const session = await requireSession(request);
   if (session instanceof Response) return session;
   if (!session.workspaceId) return Response.json({ error: "Session has no workspace. Sign in again." }, { status: 400 });
 
@@ -30,7 +35,17 @@ export async function POST(request: Request, context: ConnectorAccountSyncRouteC
   if (!isUuid(accountId)) return Response.json({ error: "Connected account id must be a UUID." }, { status: 400 });
 
   const account = await getWorkspaceConnectedAccount(session.workspaceId, accountId);
-  if (!account || account.status !== "active") return Response.json({ error: "Connected account not found or inactive." }, { status: 404 });
+  if (!account) return Response.json({ error: "Connected account not found." }, { status: 404 });
+  if (account.status === "needs_reauth") {
+    return Response.json({
+      status: "needs_reauth",
+      code: connectorReauthorizationRequiredCode,
+      error: "The provider authorization has expired or was revoked. Reconnect this source to resume automatic sync.",
+    }, { status: 409 });
+  }
+  if (account.status !== "active") {
+    return Response.json({ error: "Connected account is inactive." }, { status: 409 });
+  }
 
   const job = await createConnectorSyncJob({
     workspaceId: session.workspaceId,
@@ -40,14 +55,15 @@ export async function POST(request: Request, context: ConnectorAccountSyncRouteC
     priority: 20,
     cursorState: { source: "workspace-run-now", requestedByUserId: session.userId },
   });
-  const result = await runConnectorSyncJob(job.id);
+  const result = await runConnectorSyncJob(job.id, "manual");
 
+  const responseStatus = result.status === "needs_reauth" ? 409 : result.status === "failed" ? 502 : 200;
   return Response.json({
     status: result.status === "succeeded" ? "synced" : result.status,
     account,
     job,
     result,
-  }, { status: result.status === "failed" ? 502 : 200 });
+  }, { status: responseStatus });
 }
 
 function isUuid(value: string) {

@@ -1,0 +1,73 @@
+name: Encrypted Backup Drill
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 2 * * *"
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install PostgreSQL client tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - run: npm ci
+      - name: Preflight report
+        run: npm run ops:preflight -- --report-only
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+          BACKUP_STORAGE_BUCKET: ${{ secrets.BACKUP_STORAGE_BUCKET }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          BACKUP_STORAGE_ENDPOINT: ${{ secrets.BACKUP_STORAGE_ENDPOINT }}
+          BACKUP_STORAGE_REGION: ${{ secrets.BACKUP_STORAGE_REGION }}
+          BACKUP_STORAGE_ACCESS_KEY_ID: ${{ secrets.BACKUP_STORAGE_ACCESS_KEY_ID }}
+          BACKUP_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_STORAGE_SECRET_ACCESS_KEY }}
+          BACKUP_RESTORE_DRILL_STATUS: ${{ vars.BACKUP_RESTORE_DRILL_STATUS }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          BETTER_STACK_SOURCE_TOKEN: ${{ secrets.BETTER_STACK_SOURCE_TOKEN }}
+          INTERNAL_SYNC_SECRET: ${{ secrets.INTERNAL_SYNC_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      - name: Create encrypted backup and upload to object storage
+        run: npm run backup:postgres
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          POSTGRES_SSL: "true"
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+          BACKUP_STORAGE_BUCKET: ${{ secrets.BACKUP_STORAGE_BUCKET }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          BACKUP_STORAGE_ENDPOINT: ${{ secrets.BACKUP_STORAGE_ENDPOINT }}
+          BACKUP_STORAGE_REGION: ${{ secrets.BACKUP_STORAGE_REGION }}
+          BACKUP_STORAGE_ACCESS_KEY_ID: ${{ secrets.BACKUP_STORAGE_ACCESS_KEY_ID }}
+          BACKUP_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_STORAGE_SECRET_ACCESS_KEY }}
+          BACKUP_STORAGE_PREFIX: ${{ vars.BACKUP_STORAGE_PREFIX }}
+      - name: Restore drill when disposable database is configured
+        run: |
+          if [ -z "$RESTORE_DATABASE_URL" ]; then
+            echo "RESTORE_DATABASE_URL is not configured; encrypted backup was created but restore drill was skipped."
+            exit 0
+          fi
+          manifest="$(ls -t backups/postgres/*.manifest.json | head -1)"
+          RESTORE_CONFIRM_DISPOSABLE=true npm run backup:restore-drill -- "$manifest"
+        env:
+          RESTORE_DATABASE_URL: ${{ secrets.RESTORE_DATABASE_URL }}
+          RESTORE_POSTGRES_SSL: "true"
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: encrypted-postgres-backup
+          path: backups/postgres/*
+          if-no-files-found: ignore
+          retention-days: 7

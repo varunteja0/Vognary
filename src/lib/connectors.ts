@@ -33,6 +33,7 @@ export type Connector = {
   envVars?: string[];
   scopes?: string[];
   limitation?: string;
+  materialization?: "financial" | "usage-only" | "source-health-only";
 };
 
 const connectorDefinitions: Connector[] = [
@@ -92,7 +93,7 @@ const connectorDefinitions: Connector[] = [
     name: "OpenAI Usage and Costs",
     phase: "Phase 2",
     category: "AI / Cloud Spend",
-    status: "ready-with-env",
+    status: "live",
     authType: "api-key",
     syncMode: "scheduled",
     trustClass: "admin-api",
@@ -100,9 +101,9 @@ const connectorDefinitions: Connector[] = [
     priority: 4,
     realtimeCapable: false,
     userValue: "Compare OpenAI spend against actual usage so teams can downgrade unused plans or cap runaway usage.",
-    evidence: "OpenAI exposes organization usage endpoints and GET /organization/costs for admin accounts. Vognary has an env-gated cost adapter for first sync validation.",
-    requirements: ["OPENAI_ADMIN_API_KEY", "Encrypted token storage for per-workspace production use", "Daily cost sync job"],
-    envVars: ["OPENAI_ADMIN_API_KEY"],
+    evidence: "OpenAI exposes GET /organization/costs for admin accounts. Production sync uses a per-workspace key from encrypted connector storage; a global key is limited to an explicit non-production preview.",
+    requirements: ["Workspace-scoped OpenAI Admin API key", "Encrypted token storage", "Daily cost sync job"],
+    materialization: "usage-only",
   },
   {
     id: "anthropic-usage",
@@ -217,9 +218,10 @@ const connectorDefinitions: Connector[] = [
     priority: 8,
     realtimeCapable: false,
     userValue: "Find paid Copilot seats with low activity before renewal.",
-    evidence: "Registered adapter calls GitHub's organization Copilot 28-day metrics report endpoint and stores report evidence when a workspace admin provides a GitHub token and org slug.",
+    evidence: "Registered adapter stores the availability and date range of GitHub's organization Copilot report. It does not yet download report rows or produce seat-cost observations.",
     requirements: ["GitHub organization slug", "Token with read:org or Copilot metrics permission", "Copilot Business or Enterprise"],
     scopes: ["read:org"],
+    materialization: "source-health-only",
   },
   {
     id: "cloudflare-billing",
@@ -230,12 +232,13 @@ const connectorDefinitions: Connector[] = [
     authType: "api-key",
     syncMode: "scheduled",
     trustClass: "direct-api",
-    dataTypes: ["subscription", "usage", "cost", "invoice"],
+    dataTypes: ["workspace", "evidence"],
     priority: 9,
     realtimeCapable: false,
-    userValue: "Track Cloudflare subscriptions, billing history, AI Gateway usage, and account-level costs.",
-    evidence: "Registered adapter calls Cloudflare's official account-list endpoint with a scoped API token and stores account/workspace evidence.",
+    userValue: "Confirm which Cloudflare accounts are connected and whether their inventory sync is healthy.",
+    evidence: "Registered adapter calls Cloudflare's official account-list endpoint and stores account inventory. The current endpoint returns no billing amount, so it does not populate spend or commitments.",
     requirements: ["Scoped Cloudflare API token", "Account read permission"],
+    materialization: "source-health-only",
   },
   {
     id: "render-platform",
@@ -249,10 +252,11 @@ const connectorDefinitions: Connector[] = [
     dataTypes: ["usage", "workspace", "cost"],
     priority: 10,
     realtimeCapable: true,
-    userValue: "Map Render services, instances, bandwidth, disk, and metrics to recurring infrastructure commitments.",
-    evidence: "Registered adapter calls Render's official list-services endpoint and stores service/workspace evidence.",
+    userValue: "Confirm which Render services are connected and whether their inventory sync is healthy.",
+    evidence: "Registered adapter calls Render's official list-services endpoint and stores service inventory. The current endpoint returns no billing amount, so it does not populate spend or commitments.",
     requirements: ["Render API key", "Workspace owner access"],
-    limitation: "Service presence sync is live; exact invoice/cost mapping still needs billing endpoint validation.",
+    limitation: "Service presence sync is implemented; exact invoice/cost mapping still needs a validated billing endpoint.",
+    materialization: "source-health-only",
   },
   {
     id: "vercel-platform",
@@ -266,9 +270,10 @@ const connectorDefinitions: Connector[] = [
     dataTypes: ["usage", "cost", "workspace", "subscription"],
     priority: 11,
     realtimeCapable: false,
-    userValue: "Track Vercel team usage, analytics, and billing-related surfaces where account API access allows it.",
-    evidence: "Registered adapter calls Vercel's official domain-list endpoint and stores domain renewal evidence when a workspace admin provides a Vercel token.",
+    userValue: "Track connected Vercel domain inventory and renewal dates as a coverage signal.",
+    evidence: "Registered adapter calls Vercel's official domain-list endpoint and stores domain renewal inventory. The response has no renewal amount, so it does not populate spend or commitments.",
     requirements: ["Vercel token", "Optional team slug", "Domain read access"],
+    materialization: "source-health-only",
   },
   {
     id: "azure-cost-management",
@@ -724,6 +729,79 @@ const connectorDefinitions: Connector[] = [
 ];
 
 export const connectors = [...connectorDefinitions].sort((left, right) => left.priority - right.priority);
+
+// The fine-grained truth vocabulary shown to users. Derived from status, auth
+// type, and runtime env state so a connector can never claim more readiness
+// than its weakest missing requirement.
+export type ConnectorHonestyState =
+  | "live"
+  | "usage-only"
+  | "source-health-only"
+  | "setup-ready"
+  | "token-required"
+  | "oauth-required"
+  | "verification-required"
+  | "partner-gated"
+  | "blocked"
+  | "evidence-only"
+  | "planned";
+
+export type ConnectorHonestyContext = {
+  envConfigured?: boolean;
+  verificationComplete?: boolean;
+};
+
+export function getConnectorHonestyState(connector: Connector, context: ConnectorHonestyContext = {}): ConnectorHonestyState {
+  if (connector.status === "partner-required") return "partner-gated";
+  if (connector.status === "planned") return "planned";
+
+  const evidenceOnly = connector.authType === "manual" || connector.authType === "file-fallback";
+  if (connector.status === "live") {
+    if (evidenceOnly) return "evidence-only";
+    if (connector.materialization === "source-health-only") return "source-health-only";
+    if (connector.materialization === "usage-only") return "usage-only";
+    return "live";
+  }
+
+  // status === "ready-with-env": the code path exists but activation is pending.
+  if (connector.authType === "api-key") return "token-required";
+  if (connector.authType === "oauth") {
+    if (!context.envConfigured) return "oauth-required";
+    return context.verificationComplete ? "setup-ready" : "verification-required";
+  }
+  if (connector.authType === "iam-role" || connector.authType === "partner-api") {
+    return context.envConfigured ? "setup-ready" : "blocked";
+  }
+  return "setup-ready";
+}
+
+export const connectorHonestyStateLabels: Record<ConnectorHonestyState, string> = {
+  live: "Live",
+  "usage-only": "Usage/cost only",
+  "source-health-only": "Source health only",
+  "setup-ready": "Setup ready",
+  "token-required": "Token required",
+  "oauth-required": "OAuth app required",
+  "verification-required": "Verification pending",
+  "partner-gated": "Partner gated",
+  blocked: "Blocked",
+  "evidence-only": "Evidence path",
+  planned: "Planned",
+};
+
+export const connectorHonestyStateMeanings: Record<ConnectorHonestyState, string> = {
+  live: "Users can connect through an official path and the current adapter writes financial ledger evidence.",
+  "usage-only": "The adapter writes numeric cost or usage observations, but does not infer a recurring subscription without billing evidence.",
+  "source-health-only": "The adapter verifies account or service inventory and sync health, but the current provider response has no amount and does not add spend.",
+  "setup-ready": "Credentials exist; final configuration or first proven sync is pending.",
+  "token-required": "A workspace admin must provide a scoped provider token before sync can run.",
+  "oauth-required": "The provider OAuth app has not been configured for this deployment yet.",
+  "verification-required": "OAuth is configured, but provider verification is pending before public users can consent.",
+  "partner-gated": "Direct sync needs a bank, issuer, PSP, network, or regulated partner agreement.",
+  blocked: "A required external dependency is missing; the connector cannot progress in this deployment.",
+  "evidence-only": "Covered today through receipts, statements, or user-confirmed manual evidence, not a direct API.",
+  planned: "Modeled as a target contract; no adapter has proven a first authorized sync yet.",
+};
 
 export function getConnectorSummary() {
   return connectors.reduce<Record<ConnectorStatus, number>>((summary, connector) => {

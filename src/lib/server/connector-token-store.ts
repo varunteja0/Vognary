@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import { getDatabasePool } from "@/lib/server/database";
 import { decryptSecret, encryptSecret, type EncryptedSecret } from "@/lib/server/token-vault";
 import type { ConnectorAuthType } from "@/lib/connectors";
@@ -9,6 +10,7 @@ export type ConnectedAccountRecord = {
   id: string;
   workspaceId: string;
   sourceId: string | null;
+  consentGrantId: string | null;
   connectorId: string;
   authType: ConnectorAuthType;
   providerAccountId: string | null;
@@ -20,6 +22,7 @@ export type ConnectedAccountRecord = {
 export type UpsertConnectedAccountInput = {
   workspaceId: string;
   sourceId?: string | null;
+  consentGrantId?: string | null;
   connectorId: string;
   authType: ConnectorAuthType;
   providerAccountId?: string | null;
@@ -44,31 +47,37 @@ export type ConnectorSecretRecord = {
   metadata: Record<string, unknown>;
 };
 
-export async function upsertConnectedAccount(input: UpsertConnectedAccountInput): Promise<ConnectedAccountRecord> {
-  const result = await getDatabasePool().query<ConnectedAccountRow>(
+export async function upsertConnectedAccount(input: UpsertConnectedAccountInput, client?: PoolClient): Promise<ConnectedAccountRecord> {
+  const queryable = client ?? getDatabasePool();
+  const result = await queryable.query<ConnectedAccountRow>(
     `insert into connected_accounts (
       workspace_id,
       source_id,
+      consent_grant_id,
       connector_id,
       auth_type,
       provider_account_id,
       display_name,
       scopes,
       metadata
-    ) values ($1, $2, $3, $4, $5, $6, $7, $8)
+    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     on conflict (workspace_id, connector_id, provider_account_id)
     do update set
       source_id = excluded.source_id,
+      consent_grant_id = excluded.consent_grant_id,
       auth_type = excluded.auth_type,
       display_name = excluded.display_name,
       scopes = excluded.scopes,
       metadata = connected_accounts.metadata || excluded.metadata,
       status = 'active',
+      last_error = null,
+      last_error_at = null,
       updated_at = now()
-    returning id, workspace_id, source_id, connector_id, auth_type, provider_account_id, display_name, scopes, status`,
+    returning id, workspace_id, source_id, consent_grant_id, connector_id, auth_type, provider_account_id, display_name, scopes, status`,
     [
       input.workspaceId,
       input.sourceId ?? null,
+      input.consentGrantId ?? null,
       input.connectorId,
       input.authType,
       input.providerAccountId ?? null,
@@ -83,10 +92,11 @@ export async function upsertConnectedAccount(input: UpsertConnectedAccountInput)
   return mapConnectedAccount(row);
 }
 
-export async function storeConnectorSecret(input: StoreConnectorSecretInput) {
+export async function storeConnectorSecret(input: StoreConnectorSecretInput, client?: PoolClient) {
   const encrypted = encryptSecret(input.secret, associatedData(input.connectedAccountId, input.tokenKind));
 
-  await getDatabasePool().query(
+  const queryable = client ?? getDatabasePool();
+  await queryable.query(
     `insert into connector_token_refs (
       connected_account_id,
       token_kind,
@@ -168,12 +178,19 @@ export async function getConnectedAccount(input: {
   connectedAccountId: string;
 }): Promise<ConnectedAccountRecord | null> {
   const result = await getDatabasePool().query<ConnectedAccountRow>(
-    `select id, workspace_id, source_id, connector_id, auth_type, provider_account_id, display_name, scopes, status
-     from connected_accounts
-     where id = $1
-       and workspace_id = $2
-       and connector_id = $3
-       and status = 'active'`,
+    `select account.id, account.workspace_id, account.source_id, account.consent_grant_id,
+            account.connector_id, account.auth_type, account.provider_account_id,
+            account.display_name, account.scopes, account.status
+     from connected_accounts account
+     join consent_grants consent
+       on consent.id = account.consent_grant_id
+      and consent.workspace_id = account.workspace_id
+      and consent.withdrawn_at is null
+      and (consent.expires_at is null or consent.expires_at > now())
+     where account.id = $1
+       and account.workspace_id = $2
+       and account.connector_id = $3
+       and account.status = 'active'`,
     [input.connectedAccountId, input.workspaceId, input.connectorId],
   );
 
@@ -228,6 +245,7 @@ type ConnectedAccountRow = {
   id: string;
   workspace_id: string;
   source_id: string | null;
+  consent_grant_id: string | null;
   connector_id: string;
   auth_type: ConnectorAuthType;
   provider_account_id: string | null;
@@ -241,6 +259,7 @@ function mapConnectedAccount(row: ConnectedAccountRow): ConnectedAccountRecord {
     id: row.id,
     workspaceId: row.workspace_id,
     sourceId: row.source_id,
+    consentGrantId: row.consent_grant_id,
     connectorId: row.connector_id,
     authType: row.auth_type,
     providerAccountId: row.provider_account_id,

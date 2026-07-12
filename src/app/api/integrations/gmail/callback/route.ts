@@ -1,25 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildConnectorConsentResourceKey } from "@/lib/consent";
 import { gmailOAuthStateCookie, oauthStateCookieOptions } from "@/lib/oauth-state";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
-import { extractReceiptCandidates } from "@/lib/receipt-parser";
-import { isDatabaseConfigured } from "@/lib/server/database";
-import { readSession } from "@/lib/server/session";
+import { getDatabasePool, isDatabaseConfigured } from "@/lib/server/database";
+import { readCurrentSession } from "@/lib/server/session";
 import { checkTokenVaultConfiguration } from "@/lib/server/token-vault";
 import { upsertConnectedAccount, storeConnectorSecret } from "@/lib/server/connector-token-store";
 import { createConnectorSyncJob } from "@/lib/server/sync-job-store";
 import { getOrCreateDefaultWorkspaceForUser } from "@/lib/server/workspace-store";
+import { recordConsentGrant } from "@/lib/server/consent-store";
+import { runConnectorSyncJob } from "@/lib/server/connector-sync-runner";
 
 export const dynamic = "force-dynamic";
 
 const gmailReadonlyScope = "https://www.googleapis.com/auth/gmail.readonly";
-
-type GmailMessageList = {
-  messages?: Array<{ id: string }>;
-};
-
-type GmailMessage = {
-  snippet?: string;
-};
 
 type GoogleTokenPayload = {
   access_token?: string;
@@ -49,6 +43,7 @@ export async function GET(request: NextRequest) {
   const missingEnv = [
     clientId ? null : "GOOGLE_CLIENT_ID or GOOGLE_AUTH_CLIENT_ID",
     clientSecret ? null : "GOOGLE_CLIENT_SECRET or GOOGLE_AUTH_CLIENT_SECRET",
+    redirectUri ? null : "GOOGLE_REDIRECT_URI",
   ].filter((value): value is string => Boolean(value));
 
   if (missingEnv.length) {
@@ -70,6 +65,11 @@ export async function GET(request: NextRequest) {
     return clearOAuthState(NextResponse.json({ error: "Invalid OAuth state." }, { status: 400 }));
   }
 
+  const currentSession = await readCurrentSession(request);
+  if (!currentSession) {
+    return clearOAuthState(NextResponse.redirect(new URL("/login?next=/connect", request.nextUrl.origin)));
+  }
+
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -80,6 +80,7 @@ export async function GET(request: NextRequest) {
       redirect_uri: redirectUri,
       grant_type: "authorization_code",
     }),
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!tokenResponse.ok) {
@@ -92,33 +93,16 @@ export async function GET(request: NextRequest) {
   }
 
   const profile = await fetchGmailProfile(tokenPayload.access_token);
-
-  const query = encodeURIComponent('(invoice OR receipt OR subscription OR renewal OR "payment successful") newer_than:365d');
-  const listResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${query}&maxResults=20`, {
-    headers: { authorization: `Bearer ${tokenPayload.access_token}` },
-  });
-
-  if (!listResponse.ok) {
-    return clearOAuthState(NextResponse.json({ error: "Gmail message search failed." }, { status: 502 }));
+  const persistence = await persistSignedInGmailConnection(request, tokenPayload, profile);
+  if (persistence.status !== "stored") {
+    return clearOAuthState(NextResponse.redirect(new URL(`/app?gmail=${encodeURIComponent(persistence.status)}`, request.nextUrl.origin)));
   }
 
-  const listPayload = await listResponse.json() as GmailMessageList;
-  const snippets = await Promise.all((listPayload.messages ?? []).slice(0, 20).map(async (message) => {
-    const messageResponse = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}?format=metadata`, {
-      headers: { authorization: `Bearer ${tokenPayload.access_token}` },
-    });
-    if (!messageResponse.ok) return "";
-    const payload = await messageResponse.json() as GmailMessage;
-    return payload.snippet ?? "";
-  }));
-
-  const persistence = await persistSignedInGmailConnection(request, tokenPayload, profile);
-
-  return clearOAuthState(buildGmailImportResponse({
-    candidates: extractReceiptCandidates(snippets),
-    messageCount: snippets.filter(Boolean).length,
-    persistence,
-  }));
+  // The first backfill runs before redirect so the workspace can show value
+  // immediately. Subsequent cursor-based syncs continue in the scheduler.
+  const syncResult = await runConnectorSyncJob(persistence.syncJobId, "initial-setup");
+  const outcome = syncResult.status === "succeeded" ? "connected" : "sync-pending";
+  return clearOAuthState(NextResponse.redirect(new URL(`/app?gmail=${outcome}`, request.nextUrl.origin)));
 }
 
 function clearOAuthState(response: NextResponse) {
@@ -135,19 +119,22 @@ function getGmailClientSecret() {
 }
 
 function getGmailRedirectUri(origin: string) {
-  return process.env.GOOGLE_REDIRECT_URI?.trim() || `${origin.replace(/\/$/, "")}/api/integrations/gmail/callback`;
+  const configured = process.env.GOOGLE_REDIRECT_URI?.trim();
+  if (configured) return configured;
+  return process.env.NODE_ENV === "production" ? "" : `${origin.replace(/\/$/, "")}/api/integrations/gmail/callback`;
 }
 
 async function fetchGmailProfile(accessToken: string): Promise<GmailProfile | null> {
   const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
     headers: { authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) return null;
   return await response.json() as GmailProfile;
 }
 
 async function persistSignedInGmailConnection(request: NextRequest, tokenPayload: GoogleTokenPayload, profile: GmailProfile | null) {
-  const session = readSession(request);
+  const session = await readCurrentSession(request);
   if (!session) return { status: "not-signed-in" as const };
   if (!isDatabaseConfigured()) return { status: "database-not-configured" as const };
   if (checkTokenVaultConfiguration().status !== "ready") return { status: "token-vault-not-ready" as const };
@@ -156,50 +143,71 @@ async function persistSignedInGmailConnection(request: NextRequest, tokenPayload
     const workspaceId = session.workspaceId ?? (await getOrCreateDefaultWorkspaceForUser({ userId: session.userId })).workspaceId;
     const scopes = tokenPayload.scope?.split(/\s+/).filter(Boolean) ?? [gmailReadonlyScope];
     const email = profile?.emailAddress ?? session.email;
-    const connectedAccount = await upsertConnectedAccount({
-      workspaceId,
-      connectorId: "gmail-readonly",
-      authType: "oauth",
-      providerAccountId: email,
-      displayName: `Gmail receipts (${email})`,
-      scopes,
-      metadata: {
-        provider: "google",
-        emailAddress: email,
-        messagesTotal: profile?.messagesTotal ?? null,
-        threadsTotal: profile?.threadsTotal ?? null,
-        historyId: profile?.historyId ?? null,
-        connectedAt: new Date().toISOString(),
-      },
-    });
-
-    await storeConnectorSecret({
-      connectedAccountId: connectedAccount.id,
-      tokenKind: "access",
-      secret: tokenPayload.access_token ?? "",
-      scopes,
-      expiresAt: tokenPayload.expires_in ? new Date(Date.now() + tokenPayload.expires_in * 1000).toISOString() : null,
-      metadata: { provider: "google", tokenType: tokenPayload.token_type ?? "Bearer" },
-    });
-
-    if (tokenPayload.refresh_token) {
+    const client = await getDatabasePool().connect();
+    let connectedAccount: Awaited<ReturnType<typeof upsertConnectedAccount>>;
+    let syncJob: Awaited<ReturnType<typeof createConnectorSyncJob>>;
+    try {
+      await client.query("begin");
+      const consent = await recordConsentGrant({
+        workspaceId,
+        userId: session.userId,
+        subjectEmail: session.email,
+        resourceKey: buildConnectorConsentResourceKey("gmail-readonly", email),
+        purpose: "gmail-readonly-sync",
+        noticeVersion: "privacy-2026-07-11",
+        source: "gmail-oauth-callback",
+        scopes,
+      }, client);
+      connectedAccount = await upsertConnectedAccount({
+        workspaceId,
+        consentGrantId: consent.id,
+        connectorId: "gmail-readonly",
+        authType: "oauth",
+        providerAccountId: email,
+        displayName: `Gmail receipts (${email})`,
+        scopes,
+        metadata: {
+          provider: "google",
+          emailAddress: email,
+          messagesTotal: profile?.messagesTotal ?? null,
+          threadsTotal: profile?.threadsTotal ?? null,
+          historyId: profile?.historyId ?? null,
+          connectedAt: new Date().toISOString(),
+        },
+      }, client);
       await storeConnectorSecret({
         connectedAccountId: connectedAccount.id,
-        tokenKind: "refresh",
-        secret: tokenPayload.refresh_token,
+        tokenKind: "access",
+        secret: tokenPayload.access_token ?? "",
         scopes,
-        metadata: { provider: "google" },
-      });
+        expiresAt: tokenPayload.expires_in ? new Date(Date.now() + tokenPayload.expires_in * 1000).toISOString() : null,
+        metadata: { provider: "google", tokenType: tokenPayload.token_type ?? "Bearer" },
+      }, client);
+      if (tokenPayload.refresh_token) {
+        await storeConnectorSecret({
+          connectedAccountId: connectedAccount.id,
+          tokenKind: "refresh",
+          secret: tokenPayload.refresh_token,
+          scopes,
+          metadata: { provider: "google" },
+        }, client);
+      }
+      syncJob = await createConnectorSyncJob({
+        workspaceId,
+        connectedAccountId: connectedAccount.id,
+        connectorId: "gmail-readonly",
+        jobType: "initial_sync",
+        priority: 40,
+        cursorState: { source: "gmail-oauth-callback" },
+      }, client);
+      await client.query("commit");
+    } catch (error) {
+      await client.query("rollback");
+      await revokeGoogleTokenBestEffort(tokenPayload.refresh_token ?? tokenPayload.access_token ?? "");
+      throw error;
+    } finally {
+      client.release();
     }
-
-    const syncJob = await createConnectorSyncJob({
-      workspaceId,
-      connectedAccountId: connectedAccount.id,
-      connectorId: "gmail-readonly",
-      jobType: "initial_sync",
-      priority: 40,
-      cursorState: { historyId: profile?.historyId ?? null, source: "gmail-oauth-callback" },
-    });
 
     return {
       status: "stored" as const,
@@ -216,37 +224,12 @@ async function persistSignedInGmailConnection(request: NextRequest, tokenPayload
   }
 }
 
-function buildGmailImportResponse(payload: { candidates: ReturnType<typeof extractReceiptCandidates>; messageCount: number; persistence: Awaited<ReturnType<typeof persistSignedInGmailConnection>> }) {
-  const serialized = JSON.stringify({
-    status: "connected-preview",
-    storage: payload.persistence.status === "stored" ? "browser-import-and-token-vault" : "browser-import",
-    importedAt: new Date().toISOString(),
-    ...payload,
-  }).replace(/</g, "\\u003c");
-
-  return new NextResponse(`<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gmail connected · Vognary</title>
-  <style>
-    body { background: #0b0c0f; color: #edeef1; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; display: grid; min-height: 100vh; place-items: center; margin: 0; }
-    main { max-width: 32rem; padding: 2rem; border: 1px solid rgba(255,255,255,.12); border-radius: 1rem; background: #131519; }
-    p { color: #a6aab4; line-height: 1.6; }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>Gmail receipt scan complete</h1>
-    <p>Found ${payload.candidates.length} recurring candidate(s) from ${payload.messageCount} receipt-like message(s). Returning to your Vognary workspace.</p>
-  </main>
-  <script>
-    localStorage.setItem("vognary.gmail.receipts.v1", ${JSON.stringify(serialized)});
-    window.location.replace("/app?gmail=connected");
-  </script>
-</body>
-</html>`, {
-    headers: { "content-type": "text/html; charset=utf-8" },
-  });
+async function revokeGoogleTokenBestEffort(token: string) {
+  if (!token) return;
+  await fetch("https://oauth2.googleapis.com/revoke", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ token }),
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => null);
 }

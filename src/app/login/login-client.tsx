@@ -26,7 +26,7 @@ type GoogleStartPayload = {
 type Tone = "info" | "error" | "success";
 type Banner = { tone: Tone; text: string } | null;
 
-const trustPoints = ["No bank passwords", "Read-only identity", "Encrypted snapshots", "Delete anytime"];
+const trustPoints = ["No bank passwords", "Read-only identity", "Encrypted workspace state", "Delete anytime"];
 const isDevEnv = process.env.NODE_ENV !== "production";
 
 function isValidEmail(value: string) {
@@ -34,8 +34,16 @@ function isValidEmail(value: string) {
 }
 
 function safeNextPath(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/connect";
-  if (raw === "/login" || raw.startsWith("/login?") || raw.startsWith("/login/")) return "/connect";
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return "/app#connect";
+  try {
+    const decoded = decodeURIComponent(raw);
+    if (decoded.startsWith("//") || decoded.includes("\\") || /[\u0000-\u001f\u007f]/.test(decoded)) return "/app#connect";
+    const base = new URL("https://vognary.invalid/");
+    if (new URL(raw, base).origin !== base.origin) return "/app#connect";
+  } catch {
+    return "/app#connect";
+  }
+  if (raw === "/login" || raw.startsWith("/login?") || raw.startsWith("/login/")) return "/app#connect";
   return raw;
 }
 
@@ -267,21 +275,23 @@ export default function LoginClient() {
                     )}
                   </div>
 
-                  <form onSubmit={submit} className="flex flex-col gap-3">
-                    <h2 className="font-display text-base font-semibold text-(--ink)">Beta code</h2>
-                    <div>
-                      <label htmlFor="code-email" className="field-label">Email</label>
-                      <input id="code-email" required type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="field" placeholder="you@example.com" />
-                    </div>
-                    <div>
-                      <label htmlFor="code-value" className="field-label">Private beta access code</label>
-                      <div className="flex gap-2">
-                        <input id="code-value" required type={showCode ? "text" : "password"} autoComplete="off" value={form.accessCode} onChange={(event) => setForm({ ...form, accessCode: event.target.value })} className="field" placeholder="Access code" />
-                        <button type="button" onClick={() => setShowCode((value) => !value)} aria-pressed={showCode} className="btn btn-ghost btn-sm shrink-0">{showCode ? "Hide" : "Show"}</button>
+                  {isDevEnv ? (
+                    <form onSubmit={submit} className="flex flex-col gap-3">
+                      <h2 className="font-display text-base font-semibold text-(--ink)">Development login</h2>
+                      <div>
+                        <label htmlFor="code-email" className="field-label">Configured developer email</label>
+                        <input id="code-email" required type="email" autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="field" placeholder="developer@example.com" />
                       </div>
-                    </div>
-                    <button disabled={submitting} type="submit" className="btn btn-ghost btn-block mt-auto disabled:cursor-not-allowed disabled:opacity-60">{submitting ? "Signing in…" : "Sign in with code"}</button>
-                  </form>
+                      <div>
+                        <label htmlFor="code-value" className="field-label">Development access code</label>
+                        <div className="flex gap-2">
+                          <input id="code-value" required type={showCode ? "text" : "password"} autoComplete="off" value={form.accessCode} onChange={(event) => setForm({ ...form, accessCode: event.target.value })} className="field" placeholder="Access code" />
+                          <button type="button" onClick={() => setShowCode((value) => !value)} aria-pressed={showCode} className="btn btn-ghost btn-sm shrink-0">{showCode ? "Hide" : "Show"}</button>
+                        </div>
+                      </div>
+                      <button disabled={submitting} type="submit" className="btn btn-ghost btn-block mt-auto disabled:cursor-not-allowed disabled:opacity-60">{submitting ? "Signing in…" : "Sign in as developer"}</button>
+                    </form>
+                  ) : null}
                 </div>
               </details>
 
@@ -309,7 +319,7 @@ export default function LoginClient() {
             <details className="mt-5 rounded-xl border border-dashed border-line bg-(--card-2) p-4 text-sm leading-6 text-(--muted)">
               <summary className="cursor-pointer font-data text-xs uppercase tracking-[0.14em] text-(--muted)">Developer configuration (dev only)</summary>
               <p className="mt-3"><strong className="text-(--ink)">Session secret:</strong> {session?.configuration.status ?? "checking"}.</p>
-              <p className="mt-1">Google env: <span className="font-data">GOOGLE_AUTH_CLIENT_ID</span>, <span className="font-data">GOOGLE_AUTH_CLIENT_SECRET</span>, <span className="font-data">GOOGLE_AUTH_REDIRECT_URI</span>. Code fallback: <span className="font-data">PRIVATE_BETA_ACCESS_CODE</span>.</p>
+              <p className="mt-1">Google env: <span className="font-data">GOOGLE_AUTH_CLIENT_ID</span>, <span className="font-data">GOOGLE_AUTH_CLIENT_SECRET</span>, <span className="font-data">GOOGLE_AUTH_REDIRECT_URI</span>. Local fallback: <span className="font-data">ENABLE_DEVELOPMENT_LOGIN</span>, <span className="font-data">DEVELOPMENT_LOGIN_EMAIL</span>, and <span className="font-data">DEVELOPMENT_LOGIN_ACCESS_CODE</span>.</p>
             </details>
           ) : null}
         </section>

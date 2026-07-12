@@ -224,7 +224,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-18. Add `CRON_SECRET` in Vercel. Vercel Cron sends this as the `Authorization` header to `/api/internal/sync-jobs/due/run`.
+18. Add `CRON_SECRET` in Vercel. Vercel Cron sends this as the `Authorization` header to the connector-sync and renewal-alert `GET` workers.
 19. Redeploy production.
 20. Apply schema from a trusted terminal with production `DATABASE_URL` set:
 
@@ -237,7 +237,8 @@ This creates or updates the `schema_migrations` ledger. On a database where the 
 21. Verify:
 
 ```bash
-curl https://www.vognary.com/api/readiness
+curl https://www.vognary.com/api/readiness \
+  -H "Authorization: Bearer $INTERNAL_SYNC_SECRET"
 ```
 
 Expected:
@@ -245,11 +246,44 @@ Expected:
 - `database.status` is `ready`.
 - `tokenVault.status` is `ready`.
 - `hardening.connectorTokenStore` is `ready` or `configured`.
-- `hardening.syncWorkers` is `vercel-cron-configured`.
+- `capabilities.schema.status` is `ready`, with every migration from `0002_revocable_sessions` through
+  `0014_sync_run_invocation` in `capabilities.schema.applied`.
+- Each capability status is queryable rather than `migration-pending`, `migration-ledger-unavailable`, or `schema-query-failed`.
+- `hardening.syncWorkers` is `cron-secret-configured-deployment-schedule-unverified` until a cron-invoked successful sync writes evidence. It becomes `operator-attested-production-live` only after that evidence exists and `SYNC_SCHEDULER_STATUS=production-live` is set.
 
 Stop condition:
 
-- If schema apply fails, do not store user credentials. Fix database/schema first.
+- If schema apply fails or readiness reports a pending/failed capability query, do not store user credentials or enable the affected
+  automation. Fix the database and rerun the migration command first.
+
+## 4A. Optional Audit-Pack Issuer Signing
+
+Goal: authenticated workspace exports carry a Vognary Ed25519 signature in addition to their offline self-checksum. The signing endpoint receives only checksum and issuance metadata, never the report's merchant, amount, evidence, or notes.
+
+1. Generate an Ed25519 PKCS#8 key in a trusted local environment:
+
+```bash
+openssl genpkey -algorithm ED25519 -out audit-pack-signing-private.pem
+```
+
+2. Add the complete private PEM as `AUDIT_PACK_SIGNING_PRIVATE_KEY` in the production secret store.
+3. Set a stable identifier such as `AUDIT_PACK_SIGNING_KEY_ID=vognary-2026-01`.
+4. Redeploy, then check public-key discovery:
+
+```bash
+curl https://www.vognary.com/api/audit-packs/sign
+```
+
+Expected: `signingAvailable: true` and one current Ed25519 public key. No private material is returned.
+
+5. Sign in, export an audit pack, and verify it at `/verify`. The page must show both `Self-checksum intact` and `Vognary signature valid`.
+6. Before rotating the private key, export the old public key as base64 SPKI and preserve it in `AUDIT_PACK_TRUSTED_PUBLIC_KEYS` as a JSON map from old key id to public key. Historical signatures become `unknown-key` if their public key is removed.
+
+Stop conditions:
+
+- Never place the private key in a `NEXT_PUBLIC_` variable, browser bundle, pack, or public-key response.
+- Do not describe an unsigned pack as Vognary-issued. Its checksum detects edits but can be recreated by anyone.
+- A valid signature proves the signing service issued that hash for an authenticated workspace; it does not certify the accuracy or completeness of the financial claims.
 
 ## 5. OpenAI Cost Sync
 
@@ -257,29 +291,23 @@ Goal: first direct provider adapter can sync organization costs.
 
 Click-by-click:
 
-1. Open `https://platform.openai.com/`.
-2. Log in as an organization admin.
-3. Open organization/admin settings.
-4. Find API keys or admin keys.
-5. Create a new admin/read key for Vognary cost usage.
-6. Name it `Vognary cost sync`.
-7. Copy the key once.
-8. Open Vercel Dashboard > Vognary > Settings > Environment Variables.
-9. Add `OPENAI_ADMIN_API_KEY`.
-10. Paste the key.
-11. Redeploy production.
-12. Test:
+1. Open `https://platform.openai.com/` as the workspace's organization admin.
+2. Create the least-privileged admin/read key that can read organization costs.
+3. Sign in to Vognary as that workspace's owner or admin.
+4. Connect OpenAI through the authenticated connector flow; Vognary stores the key encrypted and scoped to that workspace account.
+5. Test the persisted account:
 
 ```bash
-curl -X POST https://www.vognary.com/api/connectors/openai-costs/sync \
+curl -X POST https://www.vognary.com/api/connectors/openai-costs/start \
   -H 'Content-Type: application/json' \
-  -d '{"workspaceId":"env-preview"}'
+  -H 'Cookie: vognary_session=<current-session-cookie>' \
+  -d '{"workspaceId":"<workspace-uuid>","apiKey":"<workspace-openai-admin-key>","displayName":"OpenAI org costs"}'
 ```
 
 Expected:
 
-- `status` is `sync-preview-complete`, or a provider-specific error if the key lacks admin cost permissions.
-- `storage` is `none` for the env-preview endpoint. Per-workspace production jobs use encrypted token refs after a connected account and `api_key` token are stored.
+- `status` is `connected`, an encrypted token reference is created, and an initial sync job is queued.
+- Unauthenticated `POST /api/connectors/openai-costs/sync` returns `401`; the environment-preview execution path is unavailable in production.
 
 Token-backed workspace connection test after login:
 
@@ -287,7 +315,7 @@ Token-backed workspace connection test after login:
 curl -X POST https://www.vognary.com/api/connectors/openai-costs/start \
   -H 'Content-Type: application/json' \
   -H 'Cookie: vognary_session=<signed-session-cookie>' \
-  -d '{"workspaceId":"<workspace-uuid>","apiKey":"<OPENAI_ADMIN_API_KEY>","displayName":"OpenAI org costs"}'
+  -d '{"workspaceId":"<workspace-uuid>","apiKey":"<WORKSPACE_OPENAI_ADMIN_KEY>","displayName":"OpenAI org costs"}'
 ```
 
 Expected: `status: "connected"`, a `connectedAccount.id`, a token `keyFingerprint`, and an `initial_sync` job id. The API key must not appear in the response.
@@ -312,7 +340,7 @@ Stop condition:
 
 Goal: queued connector sync jobs should not sit idle after Gmail or API-key connections are stored.
 
-The repo includes `vercel.json` with a daily Vercel Cron job at `02:30 UTC` (`08:00 IST`) for `/api/internal/sync-jobs/due/run`.
+The repo includes `vercel.json` with a Vercel Cron job every 15 minutes for `/api/internal/sync-jobs/due/run`.
 
 Activation steps:
 
@@ -335,9 +363,43 @@ curl -X POST https://www.vognary.com/api/internal/sync-jobs/due/run \
 
 Expected with no due jobs: `status: "completed"` and `selectedJobs: 0`.
 
+5. Observe at least two scheduled invocations in the deployed Vercel Cron logs and confirm a due job advances to a terminal sync run
+   without a manual request.
+6. Only after that evidence exists, set `SYNC_SCHEDULER_STATUS=production-live`, redeploy, and confirm
+   `hardening.syncWorkers` becomes `operator-attested-production-live`.
+
+`CRON_SECRET` by itself proves only that the route can authenticate a scheduler. It does not prove the schedule is deployed or firing.
+
 Stop condition:
 
 - Do not claim automatic connected monitoring until at least one stored Gmail or provider account queues a job, the due-job endpoint runs it, and `connector_evidence` receives rows.
+
+## 5B. Consent-Gated Renewal Alert Worker
+
+Goal: users who explicitly opt in receive deduplicated email reminders before canonical renewal dates.
+
+1. Apply PostgreSQL migration `0006_renewal_alerts.sql` with `npm run db:apply-schema`.
+2. Confirm `DATABASE_URL`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`, and `INTERNAL_SYNC_SECRET` are configured.
+3. Keep the `/api/internal/sync-jobs/due/run` cron. The additional `/api/internal/renewal-alerts/due/run` cron runs every 15 minutes; the two workers serve different queues.
+4. Explicitly opt a test user in through `PUT /api/renewal-alerts/preferences`. Deployment alone must leave every user disabled.
+5. Sync a source whose canonical `next_expected_date` is more than seven days ahead.
+6. Confirm exactly one `7_day` and one `1_day` delivery row exists for each selected window, then rerun sync and confirm the count does not increase.
+7. Run the worker manually from a trusted terminal:
+
+```bash
+curl -X POST 'https://www.vognary.com/api/internal/renewal-alerts/due/run?limit=10' \
+  -H 'Authorization: Bearer <INTERNAL_SYNC_SECRET>'
+```
+
+The response must contain aggregate selected/sent/failed/cancelled counts only. It must not contain an email, merchant, amount, evidence text, or credential. See `docs/renewal-alerts-runbook.md` for the preference contract, retry behavior, safe operational queries, and rollback.
+
+8. After the opted-in test email arrives and deployed cron logs show scheduled invocation, set
+   `RENEWAL_ALERT_DELIVERY_STATUS=production-live`, redeploy, and confirm `hardening.renewalAlerts` becomes
+   `operator-attested-production-live`. Readiness rejects that attestation when no sent delivery is recorded.
+
+Stop condition:
+
+- Do not advertise renewal email alerts until one explicitly opted-in test user receives a reminder, repeat scheduling remains idempotent, opt-out cancels unsent rows, and cron failures are monitored.
 
 ## 6. Identity Provider Or Magic Link
 
@@ -375,7 +437,7 @@ Stop condition:
 
 ## 7. Redis / Trusted Proxy Rate Limiting
 
-Current rate limiting falls back to in-memory when Upstash is absent. When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are configured, API routes use shared Upstash Redis REST counters.
+Production rate limiting fails closed when Upstash is absent. When `NODE_ENV=production`, rate-limited endpoints require `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; otherwise they return `503` with the missing envs. `ALLOW_IN_MEMORY_RATE_LIMITS=true` is an emergency bypass only, not a launch state.
 
 Fast path using Upstash:
 
@@ -411,7 +473,9 @@ Sentry click-by-click:
 4. Copy `SENTRY_DSN`.
 5. Add `SENTRY_DSN` to Vercel.
 6. Redeploy production.
-7. Verify `npm run production:check -- https://www.vognary.com` reports `Monitoring and incident alerts` as `READY`.
+7. Run `INTERNAL_SYNC_SECRET='<production-secret>' npm run monitoring:test -- https://www.vognary.com`.
+8. Verify the script returns `status: "delivered"` and the synthetic event is visible in Sentry.
+9. Verify `npm run production:check -- https://www.vognary.com` reports `Monitoring and incident alerts` as `READY`.
 
 Better Stack alternative:
 
@@ -420,7 +484,9 @@ Better Stack alternative:
 3. Copy `BETTER_STACK_SOURCE_TOKEN`.
 4. Add `BETTER_STACK_SOURCE_TOKEN` to Vercel.
 5. Redeploy production.
-6. Verify `/api/readiness` reports `hardening.monitoring` as `configured-better-stack-server-errors`.
+6. Run `INTERNAL_SYNC_SECRET='<production-secret>' npm run monitoring:test -- https://www.vognary.com`.
+7. Verify the script returns `status: "delivered"` and the synthetic event is visible in Better Stack.
+8. Verify `/api/readiness` reports `hardening.monitoring` as `configured-better-stack-server-errors`.
 
 Backups:
 
@@ -428,15 +494,149 @@ Backups:
 2. Go to `Branches` or `Backups`.
 3. Confirm Point-in-Time Restore is enabled.
 4. Set retention according to plan.
-5. Create or choose encrypted backup/object storage and set one of `BACKUP_STORAGE_BUCKET`, `S3_BUCKET`, or `R2_BUCKET` in Vercel.
-6. Run a restore drill before storing user financial data.
-7. Add `BACKUP_RESTORE_DRILL_STATUS=passed` in Vercel only after the restore drill succeeds.
-8. Redeploy production.
-9. Verify `/api/readiness` reports `hardening.backups` as `configured`.
+
+5. Generate a separate backup key: `npm run secrets:generate-backup-key`.
+6. Store `BACKUP_ENCRYPTION_KEY` in the production secret manager.
+7. Create or choose encrypted S3/R2-compatible backup/object storage.
+8. Set the storage upload envs in the backup runner or secret manager:
+
+```bash
+BACKUP_STORAGE_BUCKET='<bucket>' # or S3_BUCKET / R2_BUCKET
+BACKUP_STORAGE_REGION='<region-or-auto>'
+BACKUP_STORAGE_ENDPOINT='<required-for-r2-or-s3-compatible-storage>'
+BACKUP_STORAGE_ACCESS_KEY_ID='<access-key-id>'
+BACKUP_STORAGE_SECRET_ACCESS_KEY='<secret-access-key>'
+BACKUP_STORAGE_PREFIX='vognary-postgres/'
+```
+
+9. Run a preflight without printing secrets:
+
+```bash
+npm run ops:preflight -- --report-only https://www.vognary.com
+```
+
+10. From a trusted operator terminal, create an encrypted dump and upload it automatically when storage envs are configured:
+
+```bash
+DATABASE_URL='<production-postgres-url>' \
+BACKUP_ENCRYPTION_KEY='<backup-key>' \
+POSTGRES_SSL=true \
+npm run backup:postgres
+```
+
+If `pg_dump` is not installed locally, the script uses Docker with the official `postgres:16` image when Docker is available.
+
+11. Restore the backup into a disposable Postgres database:
+
+```bash
+RESTORE_DATABASE_URL='<disposable-postgres-url>' \
+RESTORE_CONFIRM_DISPOSABLE=true \
+BACKUP_ENCRYPTION_KEY='<backup-key>' \
+POSTGRES_SSL=true \
+npm run backup:restore-drill -- backups/postgres/<backup>.manifest.json
+```
+
+If `pg_restore` is not installed locally, the restore script uses the same Docker fallback.
+
+12. Record the generated `keyFingerprint` as `BACKUP_KEY_FINGERPRINT` if the web runtime should not receive `BACKUP_ENCRYPTION_KEY`.
+13. Add `BACKUP_RESTORE_DRILL_STATUS=passed` in Vercel only after the restore drill succeeds and the encrypted storage upload is confirmed.
+14. Redeploy production.
+15. Verify `/api/readiness` reports `hardening.backups` as `configured` and includes `hardening.backupReadiness.restoreDrill: "passed"`.
+
+GitHub Actions automation:
+
+- `.github/workflows/ops-backup-drill.yml` installs PostgreSQL client tools, runs `backup:postgres`, uploads encrypted artifacts to configured S3/R2 storage, optionally runs `backup:restore-drill` when `RESTORE_DATABASE_URL` is configured, and keeps a short-retention encrypted artifact copy.
+- Required GitHub secrets: `DATABASE_URL`, `BACKUP_ENCRYPTION_KEY`, storage bucket/endpoint/region/access-key secrets, and optionally `RESTORE_DATABASE_URL` for restore drills.
 
 Stop condition:
 
 - Do not store user financial source files until backup restore has been tested.
+
+### Privacy lifecycle retention
+
+Migration `0004_privacy_lifecycle.sql` adds bounded workspace policies, data-subject request history, retention-run audit records, and
+minimization timestamps. Apply migrations through `npm run db:apply-schema` before enabling this executor. Do not run the executor against
+a production database until a restorable backup has been verified.
+
+The internal endpoint is `POST /api/internal/privacy/retention/run`. It accepts `Authorization: Bearer <INTERNAL_SYNC_SECRET>` or the
+configured `CRON_SECRET`, uses bounded JSON, and defaults to a non-mutating dry run. Start with:
+
+```bash
+curl -X POST https://www.vognary.com/api/internal/privacy/retention/run \
+  -H "Authorization: Bearer $INTERNAL_SYNC_SECRET" \
+  -H 'Content-Type: application/json' \
+  --data '{"dryRun":true}'
+```
+
+Review every numeric count and `hasMore` flag. To process one workspace during a controlled rollout, include its UUID as `workspaceId`.
+For more than five workspaces, pass the returned `nextWorkspaceCursor` back as `afterWorkspaceId` on the next dry run until the cursor is
+null. The cursor is accepted only for dry runs and cannot be combined with `workspaceId`. Only after the dry-run result is understood and
+a current backup is verified should an operator execute:
+
+```bash
+curl -X POST https://www.vognary.com/api/internal/privacy/retention/run \
+  -H "Authorization: Bearer $INTERNAL_SYNC_SECRET" \
+  -H 'Content-Type: application/json' \
+  --data '{"dryRun":false,"workspaceLimit":10,"batchSize":1000}'
+```
+
+Defaults are 30 days for raw connector payload JSON, 90 days for optional product events, and 30 days for operational error text.
+Workspace policy bounds are 7–90, 30–365, and 7–90 days respectively. Each call is capped at 10 workspaces and 2,000 rows per category
+per workspace; repeat controlled calls while `hasMore` is true. Request-history metadata uses a fixed 730-day window, and retention-run
+metadata uses 365 days.
+
+The executor minimizes raw JSON and error text or deletes optional product events. It preserves normalized recurring facts, normalized
+evidence columns, transactions, payload hashes, and audit events. It does not erase uploaded-file objects, immutable or provider-managed
+backups, provider-held data, or external monitoring and delivery records. Those systems need their own lifecycle controls.
+
+Webhook events currently enter storage as `verified`. If no processor moves an event to a terminal state before its raw-payload window,
+the executor marks the stale event `ignored`, records a processing timestamp, and minimizes its payload. Operational webhook error text
+uses the same bounded error window as connector synchronization errors. A concurrent executor that cannot acquire a workspace lock returns
+`completed-with-skips` and a `workspace_busy`/`orphaned_busy` result; retry it later rather than treating it as data-loss failure.
+
+`vercel.json` invokes authenticated `GET /api/internal/privacy/retention/run` daily at 03:00 IST (`21:30 UTC`). That GET accepts no
+caller-controlled mutation options: it enforces a fixed batch of at most 10 workspaces and 500 rows per category using `CRON_SECRET`.
+Keep body-driven `POST` for operator dry runs and constrained investigations. Production monitoring should alert on non-2xx responses,
+retain only the numeric response summary, and investigate any workspace result marked `failed`.
+
+Readiness does not independently observe Vercel schedule configuration. Treat retention windows as unenforced until the cron is deployed,
+one constrained destructive run is audited, and the operator has separately monitored subsequent runs.
+
+After those conditions are satisfied, set `RETENTION_SCHEDULER_STATUS=production-live`, redeploy, and confirm
+`hardening.retentionScheduler` becomes `operator-attested-production-live`. Readiness requires a recorded non-dry-run completion in
+addition to the operator flag; it still labels the flag as operator attestation rather than independent scheduler telemetry.
+
+Stop condition:
+
+- Do not enable destructive scheduled runs until the dry run, a constrained actual run, the resulting audit record, and a restore drill
+  have all been verified.
+
+### Commitment decisions and read-only platform API
+
+Migrations `0007_commitment_decisions.sql` and `0008_platform_api.sql` activate durable class-safe review decisions and scoped read-only
+API tokens. Applying the migrations proves schema availability only.
+
+Readiness reports:
+
+- `capabilities.commitmentDecisions.status`: `schema-ready-no-decisions` until a user saves a decision, then `decisions-observed`.
+- `capabilities.platformApi.status`: distinguishes no active token, token creation without consumer traffic, and observed token use.
+- `hardening.platformApi`: remains `schema-ready-shared-rate-limit-required` until Upstash REST rate limiting is active.
+
+The platform surface is:
+
+- Admin-only `GET|POST|DELETE /api/platform/tokens` for hashed, expiring, revocable tokens.
+- Cursor-paginated `GET /api/v1/ledger` with `ledger:read` (`limit` 1–200 and opaque `nextCursor`).
+- `GET /api/v1/sources` with `sources:read`.
+
+An unauthenticated platform request must return `401` after database and shared rate limiting are configured. A `503` indicates a
+prerequisite is still missing and is not proof of the token guard. `npm run production:check -- --strict` checks migration readiness,
+shared rate limiting, and both unauthenticated denials. It does not label the API as adopted by a partner; only
+`capabilities.platformApi.lastUsedAt` provides evidence that a token has actually been used.
+
+Stop condition:
+
+- Do not publish a partner/API availability claim until migration `0008` is ready, the unauthenticated checks return `401`, an authorized
+  test token returns only its allowed workspace data, revocation is verified, and rate limiting is active.
 
 ## 9. Account Aggregator / UPI / Card Mandate Partners
 
@@ -467,6 +667,12 @@ UPI/card mandate path:
 8. Run legal review for cancellation/modify flows.
 
 Status env rule:
+
+Run the exact-status validator before changing production envs:
+
+```bash
+npm run partner-rails:check
+```
 
 - `outreach-started` means email/contact form sent.
 - `sandbox-requested` means partner acknowledged and requested onboarding material.

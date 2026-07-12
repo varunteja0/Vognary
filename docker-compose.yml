@@ -1,20 +1,45 @@
 services:
+  migrate:
+    build:
+      context: .
+      target: builder
+    command: npm run db:apply-schema
+    environment: &database-environment
+      DATABASE_URL: postgres://vognary:vognary@postgres:5432/vognary
+      POSTGRES_SSL: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   web:
     build: .
     ports:
       - "3000:3000"
     environment:
+      <<: *database-environment
       NEXT_PUBLIC_APP_URL: http://localhost:3000
+      SESSION_SECRET: local-compose-session-secret-at-least-32-bytes
+      TOKEN_ENCRYPTION_KEY: 1111111111111111111111111111111111111111111111111111111111111111
+      INTERNAL_SYNC_SECRET: local-compose-internal-secret
+      CRON_SECRET: local-compose-cron-secret
+      ALLOW_IN_MEMORY_RATE_LIMITS: "true"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   postgres:
-    image: postgres:17-alpine
-    profiles: ["future-backend"]
+    image: postgres:16
     environment:
       POSTGRES_USER: vognary
       POSTGRES_PASSWORD: vognary
       POSTGRES_DB: vognary
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vognary -d vognary"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
       - postgres-data:/var/lib/postgresql/data
 

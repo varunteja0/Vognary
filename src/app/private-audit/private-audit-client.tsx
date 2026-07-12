@@ -94,7 +94,7 @@ const initialForm: IntakeForm = {
   paymentTypes: ["AI tools", "SaaS tools"],
   sourceTypes: ["Redacted bank/card statement"],
   biggestConcern: "Privacy",
-  canContact: true,
+  canContact: false,
   message: "",
 };
 

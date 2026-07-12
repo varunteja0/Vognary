@@ -1,0 +1,251 @@
+import "server-only";
+
+import { getDatabasePool } from "@/lib/server/database";
+
+export const productionFeatureMigrations = [
+  "0002_revocable_sessions",
+  "0003_living_ledger",
+  "0004_privacy_lifecycle",
+  "0005_product_experience_events",
+  "0006_renewal_alerts",
+  "0007_commitment_decisions",
+  "0008_platform_api",
+  "0009_consent_scope",
+  "0010_connector_consent",
+  "0011_workspace_state",
+  "0012_workspace_state_materialization",
+  "0013_billing_entitlements",
+  "0014_sync_run_invocation",
+] as const;
+
+type FeatureMigrationId = typeof productionFeatureMigrations[number];
+
+export function getUnconfiguredFeatureReadiness() {
+  return {
+    schema: {
+      status: "database-not-configured" as const,
+      required: [...productionFeatureMigrations],
+      applied: [] as FeatureMigrationId[],
+      missing: [...productionFeatureMigrations],
+    },
+    privacyLifecycle: { status: "database-not-configured" as const, migrationId: "0004_privacy_lifecycle" as const, lastEnforcedAt: null },
+    renewalAlerts: { status: "database-not-configured" as const, migrationId: "0006_renewal_alerts" as const, enabledPreferences: null, lastSentAt: null },
+    commitmentDecisions: { status: "database-not-configured" as const, migrationId: "0007_commitment_decisions" as const, savedDecisions: null },
+    platformApi: { status: "database-not-configured" as const, migrationId: "0008_platform_api" as const, activeTokens: null, lastUsedAt: null },
+    billing: { status: "database-not-configured" as const, migrationId: "0013_billing_entitlements" as const, paidCheckouts: null, activeEntitlements: null, lastPaidAt: null },
+    syncWorkers: { status: "database-not-configured" as const, migrationId: "0014_sync_run_invocation" as const, successfulCronRuns: null, lastCronEvidenceAt: null },
+  };
+}
+
+export async function checkFeatureReadiness() {
+  const unavailable = getUnconfiguredFeatureReadiness();
+  let applied: Set<string>;
+
+  try {
+    const result = await getDatabasePool().query<{ id: string }>(
+      `select id
+       from schema_migrations
+       where id = any($1::text[])
+       order by id`,
+      [[...productionFeatureMigrations]],
+    );
+    applied = new Set(result.rows.map((row) => row.id));
+  } catch {
+    return {
+      ...unavailable,
+      schema: {
+        status: "migration-ledger-unavailable" as const,
+        required: [...productionFeatureMigrations],
+        applied: [] as FeatureMigrationId[],
+        missing: [...productionFeatureMigrations],
+      },
+      privacyLifecycle: { ...unavailable.privacyLifecycle, status: "migration-ledger-unavailable" as const },
+      renewalAlerts: { ...unavailable.renewalAlerts, status: "migration-ledger-unavailable" as const },
+      commitmentDecisions: { ...unavailable.commitmentDecisions, status: "migration-ledger-unavailable" as const },
+      platformApi: { ...unavailable.platformApi, status: "migration-ledger-unavailable" as const },
+      billing: { ...unavailable.billing, status: "migration-ledger-unavailable" as const },
+      syncWorkers: { ...unavailable.syncWorkers, status: "migration-ledger-unavailable" as const },
+    };
+  }
+
+  const appliedMigrations = productionFeatureMigrations.filter((id) => applied.has(id));
+  const missingMigrations = productionFeatureMigrations.filter((id) => !applied.has(id));
+  const [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers] = await Promise.all([
+    checkPrivacyLifecycle(applied),
+    checkRenewalAlerts(applied),
+    checkCommitmentDecisions(applied),
+    checkPlatformApi(applied),
+    checkBilling(applied),
+    checkSyncWorkers(applied),
+  ]);
+  const capabilityQueryFailed = [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers]
+    .some((feature) => feature.status === "schema-query-failed");
+
+  return {
+    schema: {
+      status: missingMigrations.length
+        ? "migrations-pending" as const
+        : capabilityQueryFailed
+          ? "capability-query-failed" as const
+          : "ready" as const,
+      required: [...productionFeatureMigrations],
+      applied: appliedMigrations,
+      missing: missingMigrations,
+    },
+    privacyLifecycle,
+    renewalAlerts,
+    commitmentDecisions,
+    platformApi,
+    billing,
+    syncWorkers,
+  };
+}
+
+async function checkPrivacyLifecycle(applied: Set<string>) {
+  const migrationId = "0004_privacy_lifecycle" as const;
+  if (!applied.has(migrationId)) return { status: "migration-pending" as const, migrationId, lastEnforcedAt: null };
+
+  try {
+    const result = await getDatabasePool().query<{ last_enforced_at: Date | null }>(
+      `select max(finished_at) filter (where not dry_run and status = 'completed') as last_enforced_at
+       from retention_runs`,
+    );
+    const row = result.rows[0];
+    const lastEnforcedAt = row?.last_enforced_at?.toISOString() ?? null;
+    return {
+      status: lastEnforcedAt ? "last-run-observed-schedule-unverified" as const : "schema-ready-enforcement-unproven" as const,
+      migrationId,
+      lastEnforcedAt,
+    };
+  } catch {
+    return { status: "schema-query-failed" as const, migrationId, lastEnforcedAt: null };
+  }
+}
+
+async function checkRenewalAlerts(applied: Set<string>) {
+  const migrationId = "0006_renewal_alerts" as const;
+  if (!applied.has(migrationId)) return { status: "migration-pending" as const, migrationId, enabledPreferences: null, lastSentAt: null };
+
+  try {
+    const result = await getDatabasePool().query<{ enabled_preferences: number; last_sent_at: Date | null }>(
+      `select
+         (select count(*)::int from renewal_alert_preferences where enabled) as enabled_preferences,
+         (select max(sent_at) from renewal_alert_deliveries where status = 'sent') as last_sent_at`,
+    );
+    const row = result.rows[0];
+    const enabledPreferences = row?.enabled_preferences ?? 0;
+    const lastSentAt = row?.last_sent_at?.toISOString() ?? null;
+    return {
+      status: lastSentAt
+        ? "delivery-observed-schedule-unverified" as const
+        : enabledPreferences > 0
+          ? "opt-ins-observed-delivery-unproven" as const
+          : "schema-ready-default-off" as const,
+      migrationId,
+      enabledPreferences,
+      lastSentAt,
+    };
+  } catch {
+    return { status: "schema-query-failed" as const, migrationId, enabledPreferences: null, lastSentAt: null };
+  }
+}
+
+async function checkCommitmentDecisions(applied: Set<string>) {
+  const migrationId = "0007_commitment_decisions" as const;
+  if (!applied.has(migrationId)) return { status: "migration-pending" as const, migrationId, savedDecisions: null };
+
+  try {
+    const result = await getDatabasePool().query<{ saved_decisions: number }>(
+      `select count(*)::int as saved_decisions from commitment_decisions`,
+    );
+    const savedDecisions = result.rows[0]?.saved_decisions ?? 0;
+    return {
+      status: savedDecisions > 0 ? "decisions-observed" as const : "schema-ready-no-decisions" as const,
+      migrationId,
+      savedDecisions,
+    };
+  } catch {
+    return { status: "schema-query-failed" as const, migrationId, savedDecisions: null };
+  }
+}
+
+async function checkPlatformApi(applied: Set<string>) {
+  const migrationId = "0008_platform_api" as const;
+  if (!applied.has(migrationId)) return { status: "migration-pending" as const, migrationId, activeTokens: null, lastUsedAt: null };
+
+  try {
+    const result = await getDatabasePool().query<{ active_tokens: number; last_used_at: Date | null }>(
+      `select
+         count(*) filter (where revoked_at is null and expires_at > now())::int as active_tokens,
+         max(last_used_at) as last_used_at
+       from platform_api_tokens`,
+    );
+    const row = result.rows[0];
+    const activeTokens = row?.active_tokens ?? 0;
+    const lastUsedAt = row?.last_used_at?.toISOString() ?? null;
+    return {
+      status: lastUsedAt
+        ? "consumer-traffic-observed" as const
+        : activeTokens > 0
+          ? "tokens-created-consumer-traffic-unproven" as const
+          : "schema-ready-no-active-tokens" as const,
+      migrationId,
+      activeTokens,
+      lastUsedAt,
+    };
+  } catch {
+    return { status: "schema-query-failed" as const, migrationId, activeTokens: null, lastUsedAt: null };
+  }
+}
+
+async function checkBilling(applied: Set<string>) {
+  const migrationId = "0013_billing_entitlements" as const;
+  if (!applied.has(migrationId)) return { status: "migration-pending" as const, migrationId, paidCheckouts: null, activeEntitlements: null, lastPaidAt: null };
+
+  try {
+    const result = await getDatabasePool().query<{ paid_checkouts: number; active_entitlements: number; last_paid_at: Date | null }>(
+      `select
+         (select count(*)::int from billing_checkout_sessions where status in ('paid', 'refunded')) as paid_checkouts,
+         (select count(*)::int from workspace_entitlements where status = 'active' and expires_at > now()) as active_entitlements,
+         (select max(paid_at) from billing_checkout_sessions where paid_at is not null) as last_paid_at`,
+    );
+    const row = result.rows[0];
+    const paidCheckouts = row?.paid_checkouts ?? 0;
+    const activeEntitlements = row?.active_entitlements ?? 0;
+    const lastPaidAt = row?.last_paid_at?.toISOString() ?? null;
+    return {
+      status: activeEntitlements > 0 ? "active-entitlement-observed" as const : paidCheckouts > 0 ? "payment-observed-no-active-entitlement" as const : "schema-ready-no-settlements" as const,
+      migrationId,
+      paidCheckouts,
+      activeEntitlements,
+      lastPaidAt,
+    };
+  } catch {
+    return { status: "schema-query-failed" as const, migrationId, paidCheckouts: null, activeEntitlements: null, lastPaidAt: null };
+  }
+}
+
+async function checkSyncWorkers(applied: Set<string>) {
+  const migrationId = "0014_sync_run_invocation" as const;
+  if (!applied.has(migrationId)) return { status: "migration-pending" as const, migrationId, successfulCronRuns: null, lastCronEvidenceAt: null };
+
+  try {
+    const result = await getDatabasePool().query<{ successful_cron_runs: number; last_cron_evidence_at: Date | null }>(
+      `select
+         count(*) filter (where invocation = 'cron' and status = 'succeeded' and evidence_written > 0)::int as successful_cron_runs,
+         max(finished_at) filter (where invocation = 'cron' and status = 'succeeded' and evidence_written > 0) as last_cron_evidence_at
+       from connector_sync_runs`,
+    );
+    const row = result.rows[0];
+    const successfulCronRuns = row?.successful_cron_runs ?? 0;
+    const lastCronEvidenceAt = row?.last_cron_evidence_at?.toISOString() ?? null;
+    return {
+      status: lastCronEvidenceAt ? "cron-evidence-observed-schedule-unverified" as const : "schema-ready-cron-evidence-unproven" as const,
+      migrationId,
+      successfulCronRuns,
+      lastCronEvidenceAt,
+    };
+  } catch {
+    return { status: "schema-query-failed" as const, migrationId, successfulCronRuns: null, lastCronEvidenceAt: null };
+  }
+}
