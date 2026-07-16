@@ -1,5 +1,5 @@
 import { getConnectorSummary, getConnectorSyncSummary } from "@/lib/connectors";
-import { billingPlans } from "@/lib/billing";
+import { publicOffer } from "@/lib/billing";
 import { getRateLimitBackendStatus } from "@/lib/rate-limit";
 import { listConnectorAdapters } from "@/lib/connectors/adapter-registry";
 import { getPartnerRailsMissingProductionRails, getPartnerRailsStatus, getPartnerRailStatuses } from "@/lib/partner-rails";
@@ -120,13 +120,12 @@ function getLeadPersistenceStatus() {
   return "not-configured";
 }
 
-function getPaymentStatus(feature: { status: string; activeEntitlements: number | null; lastPaidAt: string | null }) {
+function getPaymentStatus(feature: { status: string; assistedAuditOrders: number | null; lastPaidAt: string | null }) {
   if (feature.status === "migration-pending" || feature.status === "migration-ledger-unavailable" || feature.status === "schema-query-failed") return feature.status;
-  const configurations = billingPlans.map(getBillingCheckoutConfiguration);
-  if (configurations.some((configuration) => configuration.status === "link-only")) return "link-only-untracked";
-  if (configurations.some((configuration) => configuration.status !== "ready")) return "not-configured";
-  if (feature.activeEntitlements && feature.activeEntitlements > 0 && feature.lastPaidAt) return "settlement-observed";
-  if (feature.lastPaidAt) return "payment-observed-no-active-entitlement";
+  const configuration = getBillingCheckoutConfiguration(publicOffer.plan);
+  if (configuration.status !== "ready") return "not-configured";
+  if (feature.assistedAuditOrders && feature.assistedAuditOrders > 0 && feature.lastPaidAt) return "settlement-observed";
+  if (feature.lastPaidAt) return "payment-observed-no-assisted-audit-order";
   return "tracked-checkout-ready-settlement-unproven";
 }
 

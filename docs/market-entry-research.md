@@ -195,8 +195,8 @@ Offer:
 Pricing tests:
 
 - Individual founder audit: Rs 999 to Rs 2,999 or USD 19 to USD 49.
-- Team/founder audit: Rs 4,999 to Rs 14,999 or USD 99 to USD 249.
-- Monthly monitoring beta: Rs 499 to Rs 1,999/month or USD 9 to USD 39/month.
+- Superseded research range (not a current offer): team/founder audit pricing previously explored above INR 999.
+- Superseded research range (not a current offer): monthly monitoring pricing requires separate product, provider, legal, tax, and regional-currency validation.
 
 Go/no-go:
 

@@ -22,6 +22,7 @@ test("extracts merchant, amount, and cadence from receipt snippets", () => {
   assert.ok(openai);
   assert.equal(openai?.amount, 1999);
   assert.equal(openai?.frequency, "monthly");
+  assert.equal(openai?.nextExpectedDate, "2026-08-06");
 
   const cloudflare = candidates.find((candidate) => /cloudflare/i.test(candidate.merchant));
   assert.ok(cloudflare);
@@ -65,4 +66,64 @@ test("pre-debit notices for known merchants keep their brand category", () => {
   assert.equal(candidates[0].merchant, "Netflix");
   assert.equal(candidates[0].category, "Streaming");
   assert.equal(candidates[0].nextExpectedDate, "2026-08-15");
+});
+
+test("does not silently guess an explicit ambiguous receipt date", () => {
+  const notice = "Netflix subscription of Rs. 649 will be debited on 08/09/2026.";
+
+  assert.deepEqual(extractReceiptCandidates([notice]), []);
+});
+
+test("rejects an impossible explicit receipt date instead of rolling it over", () => {
+  const notice = "Netflix subscription of Rs. 649 will be debited on 31/02/2026.";
+
+  assert.deepEqual(extractReceiptCandidates([notice]), []);
+});
+
+test("derives renewal from the explicit charge date with month-end clamping", () => {
+  const candidates = extractReceiptCandidates([
+    "Netflix subscription charged INR 649 on 2026-01-31. Renews monthly.",
+    "Cloudflare domain renewal paid INR 1,200 on 2024-02-29. Renews yearly.",
+  ]);
+
+  assert.equal(candidates[0]?.nextExpectedDate, "2026-02-28");
+  assert.equal(candidates[1]?.nextExpectedDate, "2025-02-28");
+});
+
+test("preserves explicit receipt cadence and future pre-debit dates", () => {
+  const candidates = extractReceiptCandidates([
+    "Acme Fitness membership charged INR 500 on 2026-07-06. Renews weekly.",
+    "Netflix subscription will be debited for INR 649 on 2026-08-15.",
+  ]);
+
+  assert.equal(candidates[0]?.frequency, "weekly");
+  assert.equal(candidates[0]?.nextExpectedDate, "2026-07-13");
+  assert.equal(candidates[1]?.nextExpectedDate, "2026-08-15");
+});
+
+test("does not fabricate an exact renewal date when no usable date is present", () => {
+  assert.deepEqual(extractReceiptCandidates(["Netflix subscription INR 649 renews monthly."]), []);
+});
+
+test("detects explicit foreign currencies case-insensitively and rejects ambiguous dollar symbols", () => {
+  const candidates = extractReceiptCandidates([
+    "Netflix subscription paid usd 10 on 2026-07-01. Renews monthly.",
+    "Adobe subscription paid EUR 12 on 2026-07-02. Renews monthly.",
+    "Canva subscription paid GBP 9 on 2026-07-03. Renews monthly.",
+    "Notion subscription paid CA$ 14 on 2026-07-04. Renews monthly.",
+  ]);
+  assert.deepEqual(candidates.map((candidate) => candidate.currency), ["USD", "EUR", "GBP", "CAD"]);
+  assert.deepEqual(extractReceiptCandidates(["Netflix subscription paid $10 on 2026-07-01. Renews monthly."]), []);
+});
+
+test("receipt identity is stable when snippets reorder and price or date changes", () => {
+  const before = extractReceiptCandidates([
+    "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly.",
+    "Notion invoice paid INR 830 on 2026-07-01. Notion Plus renews monthly.",
+  ]);
+  const after = extractReceiptCandidates([
+    "Notion invoice paid INR 830 on 2026-07-01. Notion Plus renews monthly.",
+    "OpenAI invoice paid INR 2,099 on 2026-08-06. ChatGPT Plus renews monthly.",
+  ]);
+  assert.equal(before.find((item) => item.merchant === "OpenAI")?.id, after.find((item) => item.merchant === "OpenAI")?.id);
 });

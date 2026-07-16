@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { normalizeProductEvent, type ProductEventInput } from "@/lib/product-events";
+import { normalizeProductEvent, productEventNames, type ProductEventInput } from "@/lib/product-events";
+import { POST as postProductEvent } from "../src/app/api/product-events/route";
 
 test("product events accept only bounded operational metrics", () => {
   const event = normalizeProductEvent({
@@ -60,4 +62,22 @@ test("product events reject raw payload fields, arbitrary metrics, PII-shaped ID
     source: "living-ledger",
     metrics: { recordsSeen: "12" },
   } as unknown as ProductEventInput), /bounded non-negative number/);
+});
+
+test("anonymous funnel ingestion is rejected until a separate legal basis and consent flow exist", async () => {
+  const response = await postProductEvent(new Request("http://localhost/api/product-events", {
+    method: "POST",
+    headers: { "content-type": "application/json", "sec-fetch-site": "same-origin" },
+    body: JSON.stringify({ eventName: "guest_audit.started", email: "person@example.com" }),
+  }));
+  assert.equal(response.status, 401);
+});
+
+test("guest clients do not automatically transmit first-session analytics", () => {
+  const guest = readFileSync(new URL("../src/app/guest-audit-client.tsx", import.meta.url), "utf8");
+  const privateAudit = readFileSync(new URL("../src/app/private-audit/private-audit-client.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(`${guest}\n${privateAudit}`, /trackAnonymousFunnelEvent|\/api\/product-events/);
+  for (const eventName of ["guest_audit.started", "guest_audit.evidence_added", "guest_audit.first_result_reached", "private_audit.opened"]) {
+    assert.equal((productEventNames as readonly string[]).includes(eventName), false);
+  }
 });

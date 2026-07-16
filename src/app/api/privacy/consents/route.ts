@@ -1,4 +1,5 @@
 import { normalizeConsentGrant, type ConsentPurpose } from "@/lib/consent";
+import { currentPrivacyNoticeVersion } from "@/lib/privacy-notice";
 import { isDatabaseConfigured } from "@/lib/server/database";
 import { listConsentGrants, recordConsentGrant, withdrawConsentGrant } from "@/lib/server/consent-store";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       userId: session.userId,
       subjectEmail: session.email,
       purpose: body.purpose as ConsentPurpose,
-      noticeVersion: "privacy-2026-07-11",
+      noticeVersion: currentPrivacyNoticeVersion,
       source: "profile-privacy-controls",
       scopes: Array.isArray(body.scopes) ? body.scopes : [],
     });

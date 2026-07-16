@@ -30,6 +30,13 @@ type ProfileDataCounts = {
   latestSummary: Record<string, unknown> | null;
 };
 
+class ProfileDeletionConflictError extends Error {
+  constructor(readonly code: "workspace-transfer-required" | "paid-order-resolution-required", readonly details: unknown[]) {
+    super(code);
+    this.name = "ProfileDeletionConflictError";
+  }
+}
+
 export async function GET(request: NextRequest) {
   const limit = await rateLimit(request, { namespace: "profile-read", limit: 60, windowMs: 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
@@ -97,6 +104,15 @@ export async function DELETE(request: NextRequest) {
     }, { status: 409 });
   }
 
+  const unresolvedOrders = await listUnresolvedAssistedAuditOrders(session.userId, session.email);
+  if (unresolvedOrders.length) {
+    return NextResponse.json({
+      error: "Resolve or deliver each paid assisted audit before deleting this account.",
+      code: "paid-order-resolution-required",
+      orders: unresolvedOrders,
+    }, { status: 409 });
+  }
+
   const ownedConnectors = await listOwnedConnectorAccounts(session.userId);
   const providerRevocations = await Promise.all(ownedConnectors.map(async (account) => {
     try {
@@ -117,7 +133,21 @@ export async function DELETE(request: NextRequest) {
       };
     }
   }));
-  const result = await deleteUserData(session.userId, session.email);
+  let result: Awaited<ReturnType<typeof deleteUserData>>;
+  try {
+    result = await deleteUserData(session.userId, session.email);
+  } catch (error) {
+    if (error instanceof ProfileDeletionConflictError) {
+      return NextResponse.json({
+        error: error.code === "workspace-transfer-required"
+          ? "Transfer or remove the other members of each owned workspace before deleting this account."
+          : "Resolve or deliver each paid assisted audit before deleting this account.",
+        code: error.code,
+        [error.code === "workspace-transfer-required" ? "workspaces" : "orders"]: error.details,
+      }, { status: 409 });
+    }
+    throw error;
+  }
   const response = NextResponse.json({
     status: "deleted",
     ...result,
@@ -227,7 +257,7 @@ function getEmptyDataCounts(): ProfileDataCounts {
 
 function getConnectedNow(data: ProfileDataCounts) {
   return [
-    "Google/private beta identity",
+    "Verified Google or email-link identity",
     data.auditReports > 0 ? "Encrypted synchronized workspace state" : null,
     data.connectedAccounts > 0 ? "Connected provider accounts" : null,
     data.dataSources > 0 ? "Server data sources" : null,
@@ -242,7 +272,7 @@ function getPendingIntegrations() {
     "UPI AutoPay mandate sync",
     "Card e-mandate sync",
     "Apple/Google Play user-wide APIs (not offered to third parties; receipt evidence remains the available path)",
-    "PayPal/Razorpay/Cashfree live connectors",
+    "PayPal/Cashfree financial connectors and Razorpay transaction discovery",
     "Provider-authorized cancellation automation",
   ];
 }
@@ -273,14 +303,76 @@ async function listOwnedConnectorAccounts(userId: string) {
   return result.rows.map((row) => ({ id: row.id, connectorId: row.connector_id }));
 }
 
+async function listUnresolvedAssistedAuditOrders(userId: string, email: string) {
+  const result = await getDatabasePool().query<{ checkout_session_id: string; status: string }>(
+    `select orders.checkout_session_id, orders.status
+     from assisted_audit_orders orders
+     join billing_checkout_sessions checkout on checkout.id = orders.checkout_session_id
+     where (orders.user_id = $1 or lower(checkout.customer_email) = lower($2))
+       and orders.status not in ('delivered', 'refunded')
+     order by orders.created_at asc`,
+    [userId, email],
+  );
+  return result.rows.map((row) => ({ checkoutId: row.checkout_session_id, status: row.status }));
+}
+
 async function deleteUserData(userId: string, email: string) {
   const client = await getDatabasePool().connect();
   try {
     await client.query("begin");
+    await client.query(`select id from users where id = $1 for update`, [userId]);
+    await client.query(`select id from workspaces where owner_user_id = $1 for update`, [userId]);
+    await client.query(
+      `select id from billing_checkout_sessions
+       where user_id = $1 or lower(customer_email) = lower($2)
+       for update`,
+      [userId, email],
+    );
+    const sharedWorkspaces = await client.query<{ id: string; name: string; member_count: number }>(
+      `select w.id, w.name, count(wm.user_id)::int as member_count
+       from workspaces w
+       join workspace_members wm on wm.workspace_id = w.id
+       where w.owner_user_id = $1
+       group by w.id, w.name
+       having count(wm.user_id) > 1`,
+      [userId],
+    );
+    if (sharedWorkspaces.rows.length) {
+      throw new ProfileDeletionConflictError("workspace-transfer-required", sharedWorkspaces.rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        memberCount: row.member_count,
+      })));
+    }
+    const unresolvedOrders = await client.query<{ checkout_session_id: string; status: string }>(
+      `select orders.checkout_session_id, orders.status
+       from assisted_audit_orders orders
+       join billing_checkout_sessions checkout on checkout.id = orders.checkout_session_id
+       where (orders.user_id = $1 or lower(checkout.customer_email) = lower($2))
+         and orders.status not in ('delivered', 'refunded')
+       for update of orders`,
+      [userId, email],
+    );
+    if (unresolvedOrders.rows.length) {
+      throw new ProfileDeletionConflictError("paid-order-resolution-required", unresolvedOrders.rows.map((row) => ({
+        checkoutId: row.checkout_session_id,
+        status: row.status,
+      })));
+    }
     const waitlistResult = await client.query(`delete from waitlist_leads where lower(email) = lower($1)`, [email]);
     const auditLeadResult = await client.query(`delete from private_audit_leads where lower(email) = lower($1)`, [email]);
     const magicLinkResult = await client.query(`delete from auth_magic_links where lower(email) = lower($1)`, [email]);
-    const billingResult = await client.query(`delete from billing_checkout_sessions where lower(customer_email) = lower($1)`, [email]);
+    const billingResult = await client.query(
+      `update billing_checkout_sessions
+       set customer_email = 'deleted+' || replace(id::text, '-', '') || '@redacted.invalid',
+           user_id = null,
+           workspace_id = null,
+           lead_id = null,
+           provider_checkout_url = null,
+           updated_at = now()
+       where lower(customer_email) = lower($1)`,
+      [email],
+    );
     const consentResult = await client.query(
       `update consent_grants
        set subject_email = null,
@@ -314,7 +406,7 @@ async function deleteUserData(userId: string, email: string) {
       deletedWaitlistLeads: waitlistResult.rowCount ?? 0,
       deletedAuditLeads: auditLeadResult.rowCount ?? 0,
       deletedMagicLinks: magicLinkResult.rowCount ?? 0,
-      deletedBillingCheckouts: billingResult.rowCount ?? 0,
+      pseudonymizedBillingCheckouts: billingResult.rowCount ?? 0,
       anonymizedConsentGrants: consentResult.rowCount ?? 0,
       backupNotice: "Live database rows were deleted. Backup tooling encrypts database dumps, but this codebase does not enforce automatic backup expiry or selective erasure. Operators must retire affected backups under the published policy and must not restore deleted data into the live service.",
     };

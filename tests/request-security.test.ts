@@ -70,6 +70,18 @@ test("allows a same-origin mutation", () => {
   assert.equal(rejectCrossSiteMutation(request), null);
 });
 
+test("allows a browser origin that matches Host when the framework normalizes Request.url", () => {
+  const request = new Request("http://localhost:3000/api/profile", {
+    method: "POST",
+    headers: {
+      host: "127.0.0.1:3000",
+      origin: "http://127.0.0.1:3000",
+      "sec-fetch-site": "same-origin",
+    },
+  });
+  assert.equal(rejectCrossSiteMutation(request), null);
+});
+
 test("rejects a cross-site mutation", async () => {
   const request = new Request("https://vognary.test/api/profile", {
     method: "DELETE",

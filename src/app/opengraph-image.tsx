@@ -62,7 +62,7 @@ export default function OpengraphImage() {
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontSize: 18, color: "#8a8e98", letterSpacing: 0 }}>vognary.com</div>
-            <div style={{ fontSize: 18, color: "#8a8e98" }}>Private beta</div>
+            <div style={{ fontSize: 18, color: "#8a8e98" }}>Evidence-first audit</div>
           </div>
         </div>
       </div>

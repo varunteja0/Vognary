@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { guestAuditTransferKey } from "@/lib/guest-audit-transfer";
 import { VognaryMark } from "../brand";
 
 type SessionPayload = {
@@ -31,6 +32,7 @@ const isDevEnv = process.env.NODE_ENV !== "production";
 
 type LoginClientProps = {
   initialGoogleReason?: string;
+  initialMagicReason?: string;
   initialNextPath?: string;
 };
 
@@ -52,7 +54,7 @@ function safeNextPath(raw: string | null): string {
   return raw;
 }
 
-export default function LoginClient({ initialGoogleReason, initialNextPath }: LoginClientProps) {
+export default function LoginClient({ initialGoogleReason, initialMagicReason, initialNextPath }: LoginClientProps) {
   const [form, setForm] = useState({ name: "", email: "", workspaceName: "", accessCode: "" });
   const [magicForm, setMagicForm] = useState({ name: "", email: "", workspaceName: "" });
   const [session, setSession] = useState<SessionPayload | null>(null);
@@ -66,12 +68,15 @@ export default function LoginClient({ initialGoogleReason, initialNextPath }: Lo
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
+  const [magicLinkHasGuestTransfer, setMagicLinkHasGuestTransfer] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const nextPath = safeNextPath(initialNextPath ?? null);
+  const returnToOriginalTab = initialMagicReason === "same-tab-transfer";
+  const [verificationTabHasTransfer, setVerificationTabHasTransfer] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    async function loadSession() {
       try {
         const response = await fetch("/api/auth/session", { cache: "no-store" });
         const payload = await response.json() as SessionPayload;
@@ -81,17 +86,30 @@ export default function LoginClient({ initialGoogleReason, initialNextPath }: Lo
         setSession({ authenticated: false, configuration: { status: "not-configured", cookieName: "vognary_session" }, session: null });
         setStatus({ tone: "error", text: "Could not reach the sign-in service. Check your connection and retry." });
       }
-    })();
+    }
+    const recheck = () => {
+      if (document.visibilityState === "visible") void loadSession();
+    };
+    void loadSession();
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", recheck);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", recheck);
     };
   }, []);
 
   useEffect(() => {
-    if (!session?.authenticated) return;
+    if (!session?.authenticated || (returnToOriginalTab && !verificationTabHasTransfer)) return;
     const timer = setTimeout(() => window.location.assign(nextPath), 500);
     return () => clearTimeout(timer);
-  }, [session, nextPath]);
+  }, [session, nextPath, returnToOriginalTab, verificationTabHasTransfer]);
+
+  useEffect(() => {
+    if (!returnToOriginalTab) return;
+    queueMicrotask(() => setVerificationTabHasTransfer(Boolean(window.sessionStorage.getItem(guestAuditTransferKey))));
+  }, [returnToOriginalTab]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -135,12 +153,19 @@ export default function LoginClient({ initialGoogleReason, initialNextPath }: Lo
     }
     setMagicSubmitting(true);
     setMagicStatus({ tone: "info", text: "Sending sign-in link…" });
+    const guestTransferPresent = Boolean(window.sessionStorage.getItem(guestAuditTransferKey));
+    setMagicLinkHasGuestTransfer(guestTransferPresent);
 
     try {
       const response = await fetch("/api/auth/magic-link/request", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...magicForm, redirectPath: nextPath }),
+        body: JSON.stringify({
+          ...magicForm,
+          redirectPath: guestTransferPresent
+            ? `/login?magic=same-tab-transfer&next=${encodeURIComponent(nextPath)}`
+            : nextPath,
+        }),
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -168,7 +193,7 @@ export default function LoginClient({ initialGoogleReason, initialNextPath }: Lo
     setGoogleStatus({ tone: "info", text: "Opening Google sign-in…" });
 
     try {
-      const response = await fetch("/api/auth/google/start?mode=json", { cache: "no-store" });
+      const response = await fetch(`/api/auth/google/start?mode=json&next=${encodeURIComponent(nextPath)}`, { cache: "no-store" });
       const payload = await response.json() as GoogleStartPayload;
       if (!response.ok || payload.status !== "ready" || !payload.authUrl) {
         const missing = payload.requiredEnv?.length ? ` Missing: ${payload.requiredEnv.join(", ")}.` : "";
@@ -219,9 +244,15 @@ export default function LoginClient({ initialGoogleReason, initialNextPath }: Lo
             <div className="mt-6 rounded-xl border border-line bg-(--card-2) p-4" role="status" aria-live="polite">
               <p className="font-data text-xs uppercase tracking-[0.16em] text-verdict">Signed in</p>
               <p className="mt-2 font-semibold text-(--ink)">{session.session?.email}</p>
-              <p className="mt-1 text-sm text-(--muted)">Taking you to your workspace…</p>
+              <p className="mt-1 text-sm leading-6 text-(--muted)">
+                {returnToOriginalTab && !verificationTabHasTransfer
+                  ? "Return to the original Vognary tab. It holds your guest evidence and will detect this sign-in, save the audit, and clear the transfer copy only after encrypted sync succeeds."
+                  : "Taking you to your workspace…"}
+              </p>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Link href={nextPath} className="btn btn-primary">Continue to app</Link>
+                {returnToOriginalTab && !verificationTabHasTransfer
+                  ? <button type="button" onClick={() => window.close()} className="btn btn-primary">Close this tab</button>
+                  : <Link href={nextPath} className="btn btn-primary">Continue to app</Link>}
                 <button type="button" onClick={signOut} className="btn btn-ghost">Sign out</button>
               </div>
             </div>
@@ -252,7 +283,11 @@ export default function LoginClient({ initialGoogleReason, initialNextPath }: Lo
                     <h2 className="font-display text-base font-semibold text-(--ink)">Email link</h2>
                     {magicSent ? (
                       <div className="rounded-lg border border-line bg-card p-3">
-                        <p className="text-sm leading-6 text-(--ink-soft)">Check your inbox and open the link to finish signing in. It expires shortly.</p>
+                        <p className="text-sm leading-6 text-(--ink-soft)">
+                          {magicLinkHasGuestTransfer
+                            ? "Check your inbox and open the link in this same browser. This tab holds your unsaved audit; if your mail app opens another browser or device, return here and open the link here instead."
+                            : "Check your inbox and open the link in this browser to finish signing in. It expires shortly."}
+                        </p>
                         <button type="button" disabled={resendIn > 0 || magicSubmitting} onClick={sendMagicLink} className="btn btn-ghost btn-sm mt-3 disabled:cursor-not-allowed disabled:opacity-60">
                           {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend link"}
                         </button>
@@ -372,7 +407,9 @@ function getGoogleFailureMessage(reason: string) {
     "audience-mismatch": "Google OAuth client mismatch. Check client ID and redirect URI.",
     "email-not-verified": "Google email is not verified.",
     "missing-email": "Google did not return an email address.",
-    "not-allowed": "This Google account is not allowed for the beta.",
+    "missing-subject": "Google did not return a stable account identity.",
+    "identity-conflict": "This email is already linked to a different Google account. Use the originally linked account or email sign-in.",
+    "not-allowed": "This Google account is not allowed for this deployment.",
   };
   return messages[reason] ?? "Google sign-in failed. Try again.";
 }

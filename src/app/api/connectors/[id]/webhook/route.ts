@@ -56,6 +56,15 @@ export async function POST(request: Request, context: ConnectorWebhookRouteConte
     payload,
   });
 
+  if (persistence.status === "not-persisted") {
+    return Response.json({
+      status: "not-configured",
+      connectorId: id,
+      requiredEnv: ["DATABASE_URL"],
+      message: "Durable webhook storage is not configured. The event was not accepted.",
+    }, { status: 501 });
+  }
+
   return Response.json({
     status: "accepted",
     connectorId: id,

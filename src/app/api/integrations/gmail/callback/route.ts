@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildConnectorConsentResourceKey } from "@/lib/consent";
-import { gmailOAuthStateCookie, oauthStateCookieOptions } from "@/lib/oauth-state";
+import { gmailOAuthBindingCookie, gmailOAuthStateCookie, oauthStateCookieOptions } from "@/lib/oauth-state";
+import { currentPrivacyNoticeVersion } from "@/lib/privacy-notice";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { getDatabasePool, isDatabaseConfigured } from "@/lib/server/database";
+import { verifyOAuthSessionBinding } from "@/lib/server/oauth-session-binding";
 import { readCurrentSession } from "@/lib/server/session";
 import { checkTokenVaultConfiguration } from "@/lib/server/token-vault";
 import { upsertConnectedAccount, storeConnectorSecret } from "@/lib/server/connector-token-store";
 import { createConnectorSyncJob } from "@/lib/server/sync-job-store";
-import { getOrCreateDefaultWorkspaceForUser } from "@/lib/server/workspace-store";
+import { requireWorkspaceRole } from "@/lib/server/workspace-auth";
 import { recordConsentGrant } from "@/lib/server/consent-store";
 import { runConnectorSyncJob } from "@/lib/server/connector-sync-runner";
 
@@ -67,7 +69,14 @@ export async function GET(request: NextRequest) {
 
   const currentSession = await readCurrentSession(request);
   if (!currentSession) {
-    return clearOAuthState(NextResponse.redirect(new URL("/login?next=/connect", request.nextUrl.origin)));
+    return clearOAuthState(NextResponse.redirect(new URL("/login?next=/sources", request.nextUrl.origin)));
+  }
+  if (!currentSession.workspaceId) return clearOAuthState(NextResponse.json({ error: "Session has no workspace. Sign in again." }, { status: 400 }));
+  const initialAuthorization = await requireWorkspaceRole(request, currentSession.workspaceId, "admin");
+  if (initialAuthorization instanceof Response) return clearOAuthState(initialAuthorization);
+  const binding = request.cookies.get(gmailOAuthBindingCookie)?.value;
+  if (!verifyOAuthSessionBinding(binding, currentSession, "gmail-readonly")) {
+    return clearOAuthState(NextResponse.json({ error: "OAuth session changed before the callback completed." }, { status: 400 }));
   }
 
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -92,22 +101,44 @@ export async function GET(request: NextRequest) {
     return clearOAuthState(NextResponse.json({ error: "Google token response did not include an access token." }, { status: 502 }));
   }
 
-  const profile = await fetchGmailProfile(tokenPayload.access_token);
-  const persistence = await persistSignedInGmailConnection(request, tokenPayload, profile);
-  if (persistence.status !== "stored") {
-    return clearOAuthState(NextResponse.redirect(new URL(`/app?gmail=${encodeURIComponent(persistence.status)}`, request.nextUrl.origin)));
-  }
+  try {
+    const profile = await fetchGmailProfile(tokenPayload.access_token);
+    const scopes = tokenPayload.scope?.split(/\s+/).filter(Boolean) ?? [];
+    if (!scopes.includes(gmailReadonlyScope)) throw new Error("Google did not grant the required Gmail scope.");
 
-  // The first backfill runs before redirect so the workspace can show value
-  // immediately. Subsequent cursor-based syncs continue in the scheduler.
-  const syncResult = await runConnectorSyncJob(persistence.syncJobId, "initial-setup");
-  const outcome = syncResult.status === "succeeded" ? "connected" : "sync-pending";
-  return clearOAuthState(NextResponse.redirect(new URL(`/app?gmail=${outcome}`, request.nextUrl.origin)));
+    const verifiedSession = await readCurrentSession(request);
+    if (!verifiedSession?.workspaceId || !verifyOAuthSessionBinding(binding, verifiedSession, "gmail-readonly")) {
+      await revokeGoogleTokenBestEffort(tokenPayload.refresh_token ?? tokenPayload.access_token);
+      return clearOAuthState(NextResponse.json({ error: "OAuth session expired before the connection could be stored." }, { status: 400 }));
+    }
+    const authorization = await requireWorkspaceRole(request, verifiedSession.workspaceId, "admin");
+    if (authorization instanceof Response) {
+      await revokeGoogleTokenBestEffort(tokenPayload.refresh_token ?? tokenPayload.access_token);
+      return clearOAuthState(authorization);
+    }
+
+    const persistence = await persistSignedInGmailConnection(verifiedSession, tokenPayload, profile);
+    if (persistence.status !== "stored") {
+      await revokeGoogleTokenBestEffort(tokenPayload.refresh_token ?? tokenPayload.access_token);
+      return clearOAuthState(NextResponse.redirect(new URL(`/sources?gmail=${encodeURIComponent(persistence.status)}`, request.nextUrl.origin)));
+    }
+
+    const syncResult = await runConnectorSyncJob(persistence.syncJobId, "initial-setup");
+    const outcome = syncResult.status === "succeeded" ? "connected" : "sync-pending";
+    return clearOAuthState(NextResponse.redirect(new URL(`/sources?gmail=${outcome}`, request.nextUrl.origin)));
+  } catch {
+    await revokeGoogleTokenBestEffort(tokenPayload.refresh_token ?? tokenPayload.access_token);
+    return clearOAuthState(NextResponse.json({ error: "Gmail identity or scope could not be verified. No connection was stored." }, { status: 502 }));
+  }
 }
 
-function clearOAuthState(response: NextResponse) {
-  response.cookies.set(gmailOAuthStateCookie, "", { ...oauthStateCookieOptions(), maxAge: 0 });
-  return response;
+function clearOAuthState(response: Response) {
+  const nextResponse = response instanceof NextResponse
+    ? response
+    : new NextResponse(response.body, { status: response.status, statusText: response.statusText, headers: response.headers });
+  nextResponse.cookies.set(gmailOAuthStateCookie, "", { ...oauthStateCookieOptions(), maxAge: 0 });
+  nextResponse.cookies.set(gmailOAuthBindingCookie, "", { ...oauthStateCookieOptions(), maxAge: 0 });
+  return nextResponse;
 }
 
 function getGmailClientId() {
@@ -120,29 +151,37 @@ function getGmailClientSecret() {
 
 function getGmailRedirectUri(origin: string) {
   const configured = process.env.GOOGLE_REDIRECT_URI?.trim();
-  if (configured) return configured;
+  if (configured) {
+    try {
+      const url = new URL(configured);
+      if (url.protocol === "https:" || (process.env.NODE_ENV !== "production" && url.protocol === "http:")) return url.toString();
+    } catch {
+      return "";
+    }
+  }
   return process.env.NODE_ENV === "production" ? "" : `${origin.replace(/\/$/, "")}/api/integrations/gmail/callback`;
 }
 
-async function fetchGmailProfile(accessToken: string): Promise<GmailProfile | null> {
+async function fetchGmailProfile(accessToken: string): Promise<GmailProfile> {
   const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
     headers: { authorization: `Bearer ${accessToken}` },
     signal: AbortSignal.timeout(15_000),
   });
-  if (!response.ok) return null;
-  return await response.json() as GmailProfile;
+  if (!response.ok) throw new Error("Gmail profile request failed.");
+  const profile = await response.json() as GmailProfile;
+  if (!profile.emailAddress || !/^\S+@\S+\.\S+$/.test(profile.emailAddress)) throw new Error("Gmail profile did not include a valid account email.");
+  return profile;
 }
 
-async function persistSignedInGmailConnection(request: NextRequest, tokenPayload: GoogleTokenPayload, profile: GmailProfile | null) {
-  const session = await readCurrentSession(request);
-  if (!session) return { status: "not-signed-in" as const };
+async function persistSignedInGmailConnection(session: NonNullable<Awaited<ReturnType<typeof readCurrentSession>>>, tokenPayload: GoogleTokenPayload, profile: GmailProfile) {
   if (!isDatabaseConfigured()) return { status: "database-not-configured" as const };
   if (checkTokenVaultConfiguration().status !== "ready") return { status: "token-vault-not-ready" as const };
 
   try {
-    const workspaceId = session.workspaceId ?? (await getOrCreateDefaultWorkspaceForUser({ userId: session.userId })).workspaceId;
-    const scopes = tokenPayload.scope?.split(/\s+/).filter(Boolean) ?? [gmailReadonlyScope];
-    const email = profile?.emailAddress ?? session.email;
+    if (!session.workspaceId) return { status: "workspace-not-configured" as const };
+    const workspaceId = session.workspaceId;
+    const scopes = tokenPayload.scope?.split(/\s+/).filter(Boolean) ?? [];
+    const email = profile.emailAddress!.toLowerCase();
     const client = await getDatabasePool().connect();
     let connectedAccount: Awaited<ReturnType<typeof upsertConnectedAccount>>;
     let syncJob: Awaited<ReturnType<typeof createConnectorSyncJob>>;
@@ -154,7 +193,7 @@ async function persistSignedInGmailConnection(request: NextRequest, tokenPayload
         subjectEmail: session.email,
         resourceKey: buildConnectorConsentResourceKey("gmail-readonly", email),
         purpose: "gmail-readonly-sync",
-        noticeVersion: "privacy-2026-07-11",
+        noticeVersion: currentPrivacyNoticeVersion,
         source: "gmail-oauth-callback",
         scopes,
       }, client);
@@ -169,9 +208,9 @@ async function persistSignedInGmailConnection(request: NextRequest, tokenPayload
         metadata: {
           provider: "google",
           emailAddress: email,
-          messagesTotal: profile?.messagesTotal ?? null,
-          threadsTotal: profile?.threadsTotal ?? null,
-          historyId: profile?.historyId ?? null,
+          messagesTotal: profile.messagesTotal ?? null,
+          threadsTotal: profile.threadsTotal ?? null,
+          historyId: profile.historyId ?? null,
           connectedAt: new Date().toISOString(),
         },
       }, client);

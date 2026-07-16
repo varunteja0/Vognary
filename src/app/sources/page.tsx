@@ -1,66 +1,36 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { connection } from "next/server";
 import { VognaryMark } from "../brand";
+import { getConnectorById } from "@/lib/connectors";
+import { getConnectorHonesty } from "@/lib/connector-runtime";
 import SourceHealthClient from "./source-health-client";
+import SourceSetupClient, { type SourceSetupOption } from "./source-setup-client";
 
 export const metadata: Metadata = {
-  title: "Connected Source Health",
-  description: "See connected recurring-payment sources, sync freshness, evidence coverage, and fallback options in Vognary.",
+  title: "Sources",
+  description: "Connect, refresh, and remove recurring-spend evidence sources without overstating their coverage.",
 };
 
-const sourceGroups = [
-  {
-    title: "Cards and bank statements",
-    steps: ["Use connected-bank access when an approved Account Aggregator or issuer path is available.", "If no direct source is offered, export a redacted CSV covering enough history to show the recurring pattern.", "Do not repeat an upload when the connected source already covers the same account and date window."],
-  },
-  {
-    title: "UPI AutoPay",
-    steps: ["Use direct mandate data only through an approved partner connection when available.", "Otherwise check AutoPay or Mandates in your UPI app and add only commitments missing from connected evidence.", "Keep account numbers, UPI IDs, and authorization references redacted."],
-  },
-  {
-    title: "Apple and Google Play",
-    steps: ["Use receipt sync when an authorized mailbox source contains app-store renewals.", "If a renewal is still missing, check Apple Subscriptions or Google Play Subscriptions once.", "Add only the missing subscription with its renewal date and amount."],
-  },
-  {
-    title: "Email receipts",
-    steps: ["Prefer the read-only Gmail connection where it is enabled and verified for your account.", "Outlook direct sync is not available yet; use a redacted receipt snippet only for evidence that cannot be connected.", "Never paste passwords, one-time codes, full card numbers, or unrelated email content."],
-  },
-  {
-    title: "Cloud and SaaS",
-    steps: ["Connect a scoped provider or admin credential only for integrations marked available in Vognary.", "Let scheduled sync maintain supported cost and usage evidence.", "Use an invoice or manual entry only when that provider has no working direct path."],
-  },
-  {
-    title: "EMIs, SIPs, insurance, utilities",
-    steps: ["Rely on connected transaction evidence where an approved bank source covers the account.", "Add a redacted policy, mandate, or bill only for a commitment absent from that coverage.", "Review high-impact financial commitments with the relevant provider before taking action."],
-  },
-];
-
-const evidencePacks = [
-  {
-    title: "Private fallback pack",
-    bestFor: "Personal, founder, freelancer, household",
-    sources: ["One redacted CSV only if no direct account source exists", "Only the receipt snippets missing from connected mail evidence", "Only mandates that connected evidence did not detect"],
-  },
-  {
-    title: "Founder stack pack",
-    bestFor: "AI builders, agencies, small teams",
-    sources: ["OpenAI/AI tool invoice or usage export", "GitHub, Vercel/Render, Cloudflare, domain invoices", "SaaS seat list or billing emails"],
-  },
-  {
-    title: "India recurring rails pack",
-    bestFor: "UPI AutoPay, card mandates, SIPs, EMIs, insurance",
-    sources: ["Mandate screenshots with account numbers hidden", "Statement rows showing repeat debits", "Policy, EMI, SIP, or utility renewal receipts"],
-  },
-];
+const managedConnectorIds = [
+  "gmail-readonly",
+  "openai-costs",
+  "github-copilot",
+  "cloudflare-billing",
+  "render-platform",
+  "vercel-platform",
+] as const;
 
 const redactionChecklist = [
-  "Hide account numbers except the last 2 to 4 characters if needed for matching.",
-  "Hide card numbers, CVV, OTPs, passwords, full addresses, and identity document numbers.",
-  "Keep merchant name, charge date, amount, currency, cadence, and renewal text visible.",
-  "Prefer CSV exports for statements because PDF extraction can be lower confidence.",
+  "Hide account and card numbers, CVV, OTPs, passwords, addresses, and identity-document numbers.",
+  "Keep the merchant, charge date, amount, currency, cadence, and renewal text needed to verify the commitment.",
+  "Use one redacted statement range only when a connected source cannot cover that account and period.",
 ];
 
-export default function SourcesPage() {
+export default async function SourcesPage() {
+  await connection();
+  const sourceOptions = buildSourceOptions();
+
   return (
     <main className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
@@ -69,64 +39,86 @@ export default function SourcesPage() {
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/app" className="btn btn-ghost">Back to app</Link>
+          <Link href="/app?guest=1" prefetch={false} className="btn btn-ghost">Back to audit</Link>
         </div>
+
         <article className="panel p-6 sm:p-8 rise">
-          <span className="folio" data-folio="Sources">Workspace source health</span>
-          <h1 className="mt-4 max-w-3xl font-display text-3xl font-semibold text-(--ink) sm:text-4xl">One view of what is connected, current, and covered</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">Vognary reads the source ledger for your signed-in workspace so you can see sync freshness, evidence coverage, and the next scheduled update without re-uploading the same history.</p>
+          <span className="folio" data-folio="Sources">Evidence sources</span>
+          <h1 className="mt-4 max-w-3xl font-display text-3xl font-semibold text-(--ink) sm:text-4xl">Keep the evidence behind your renewals current</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">See what is connected, refresh a source that needs attention, or remove access you no longer want. Freshness describes the evidence Vognary received; it never guarantees a provider has published every pending charge.</p>
           <SourceHealthClient />
         </article>
 
-        <article className="panel mt-5 p-6 sm:p-8">
-          <span className="folio" data-folio="Fallback">Manual evidence, only for source gaps</span>
-          <h2 className="mt-4 max-w-3xl font-display text-2xl font-semibold text-(--ink) sm:text-3xl">Use an upload only when a direct source cannot cover the commitment</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">Fallback evidence helps close a specific gap. It is not intended to become a recurring chore: avoid duplicate date ranges, redact sensitive identifiers, and stop uploading once a connected source covers the same account.</p>
+        <SourceSetupClient options={sourceOptions} />
 
-          <div className="mt-6 grid gap-3 lg:grid-cols-[1fr_0.8fr]">
-            <section className="inset p-4">
-              <p className="font-data text-[0.66rem] text-indigo">Fallback evidence packs</p>
-              <div className="mt-4 grid gap-3">
-                {evidencePacks.map((pack) => (
-                  <div key={pack.title} className="rounded-[10px] border border-line bg-(--card) p-3">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <h3 className="font-display text-base font-semibold text-(--ink)">{pack.title}</h3>
-                      <span className="pill pill-partial">{pack.bestFor}</span>
-                    </div>
-                    <ul className="mt-3 grid gap-1 text-sm leading-6 text-(--muted)">
-                      {pack.sources.map((source) => <li key={source}>- {source}</li>)}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </section>
-            <section className="inset p-4">
-              <p className="font-data text-[0.66rem] text-ochre">Redaction checklist</p>
-              <ul className="mt-4 grid gap-2 text-sm leading-6 text-(--muted)">
+        <details className="panel mt-5 p-5 sm:p-6">
+          <summary className="cursor-pointer font-display text-lg font-semibold text-(--ink)">Fill a source gap with redacted evidence</summary>
+          <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto] md:items-start">
+            <div>
+              <p className="text-sm leading-6 text-(--muted)">Receipt or invoice paste is the safest fallback for one missing commitment. Statement import is useful when several repeated debits are absent. Manual entry is available when no document is needed.</p>
+              <ul className="mt-3 grid gap-2 text-sm leading-6 text-(--muted)">
                 {redactionChecklist.map((item) => <li key={item}>- {item}</li>)}
               </ul>
-              <Link href="/private-audit" className="btn btn-ghost mt-4">Request source-gap review</Link>
-            </section>
-          </div>
-
-          <details className="inset mt-6 p-4 sm:p-5">
-            <summary className="cursor-pointer font-display text-base font-semibold text-(--ink)">Show fallback instructions by source type</summary>
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
-              {sourceGroups.map((group, index) => (
-                <section key={group.title} className="rounded-[10px] border border-line bg-(--card) p-4">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-display text-xl font-semibold text-indigo">{String(index + 1).padStart(2, "0")}</span>
-                    <h3 className="font-display text-base font-semibold text-(--ink)">{group.title}</h3>
-                  </div>
-                  <ol className="mt-3 grid gap-2 text-sm leading-6 text-(--muted)">
-                    {group.steps.map((step, stepIndex) => <li key={step} className="flex gap-2"><span className="font-data text-xs text-indigo">{stepIndex + 1}.</span><span>{step}</span></li>)}
-                  </ol>
-                </section>
-              ))}
             </div>
-          </details>
-        </article>
+            <Link href="/app?guest=1" prefetch={false} className="btn btn-ghost">Add fallback evidence</Link>
+          </div>
+        </details>
+
+        <details className="panel mt-5 p-5 sm:p-6">
+          <summary className="cursor-pointer font-display text-lg font-semibold text-(--ink)">Why bank, UPI, and card access is not offered here</summary>
+          <p className="mt-4 max-w-3xl text-sm leading-6 text-(--muted)">Direct Indian bank, UPI AutoPay, and card-mandate access requires an approved regulated partner path. Until that path is proven, Vognary accepts redacted evidence and does not ask for netbanking passwords, card numbers, UPI PINs, or card PINs.</p>
+        </details>
       </div>
     </main>
   );
+}
+
+function buildSourceOptions() {
+  return managedConnectorIds.flatMap((id): SourceSetupOption[] => {
+    const connector = getConnectorById(id);
+    if (!connector) return [];
+    const honesty = getConnectorHonesty(connector);
+    return [{
+      id: connector.id,
+      name: connector.name,
+      authType: connector.authType,
+      honestyLabel: honesty.label,
+      honestyMeaning: honesty.meaning,
+      evidenceBoundary: getPublicEvidenceBoundary(connector.id),
+      requirements: getPublicRequirements(connector.id),
+      accountLabel: getAccountLabel(connector.id),
+      accountRequired: connector.id === "github-copilot",
+    }];
+  });
+}
+
+function getAccountLabel(connectorId: string) {
+  if (connectorId === "github-copilot") return "GitHub organization slug";
+  if (connectorId === "vercel-platform") return "Vercel team slug (optional)";
+  if (connectorId === "render-platform") return "Render owner ID (optional)";
+  return "Provider account ID (optional)";
+}
+
+function getPublicEvidenceBoundary(connectorId: string) {
+  const boundaries: Record<string, string> = {
+    "gmail-readonly": "Looks for supported receipt, invoice, renewal, trial, and pre-debit messages through read-only Gmail access. Complete mailbox or merchant coverage is not implied.",
+    "openai-costs": "Reads organization usage and cost observations for an administered OpenAI account. It does not read a personal ChatGPT subscription or create recurring financial commitments from usage alone.",
+    "github-copilot": "Records whether an organization Copilot report is available and its date range. It does not yet import seat rows or calculate seat cost.",
+    "cloudflare-billing": "Records authorized Cloudflare account inventory and source health. The available response does not provide billing amounts.",
+    "render-platform": "Records authorized Render service inventory and source health. Exact invoice and cost mapping is not available from this source.",
+    "vercel-platform": "Records authorized Vercel domain inventory and renewal dates. It does not provide renewal amounts.",
+  };
+  return boundaries[connectorId] ?? "Coverage is limited to the evidence returned by the authorized provider account.";
+}
+
+function getPublicRequirements(connectorId: string) {
+  const requirements: Record<string, string[]> = {
+    "gmail-readonly": ["Google consent", "Read-only Gmail scope"],
+    "openai-costs": ["Workspace-scoped OpenAI Admin API key"],
+    "github-copilot": ["GitHub organization slug", "Token with organization or Copilot metrics read access", "Copilot Business or Enterprise"],
+    "cloudflare-billing": ["Scoped Cloudflare API token", "Account read permission"],
+    "render-platform": ["Render API key", "Workspace owner access"],
+    "vercel-platform": ["Vercel token", "Optional team slug", "Domain read access"],
+  };
+  return requirements[connectorId] ?? [];
 }

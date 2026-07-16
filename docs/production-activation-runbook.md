@@ -63,20 +63,20 @@ Rollback:
 
 ## 2. Tracked Razorpay Billing
 
-Goal: a signed-in workspace can create a tracked Razorpay checkout, and access changes only after a signed settlement webhook.
+Goal: a durably stored private-audit lead can create one tracked INR 999 assisted-audit checkout, and fulfillment exists only after a signed settlement webhook.
 
-Static `PAYMENT_LINK_*` URLs are an explicitly untracked fallback. They return `status: "link-only"`, do not grant an entitlement, and cannot satisfy production readiness.
+Static `PAYMENT_LINK_*` URLs and legacy monitoring plans are not exposed in Vognary 1.0.
 
 1. Complete Razorpay business/KYC activation and create keys for the intended mode. Follow Razorpay's current official key instructions: `https://razorpay.com/docs/payments/dashboard/settings/api-keys/`.
-2. Apply migration `0013_billing_entitlements` to the production database.
-3. In Vercel production environment variables, configure `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, and all four `PAYMENT_AMOUNT_*_INR` values listed in `docs/billing-activation-runbook.md`.
+2. Apply migrations through `0016_assisted_audit_orders` to the production database.
+3. Obtain qualified legal review of Terms and Privacy. Only after approval, configure `ASSISTED_AUDIT_LEGAL_TERMS_STATUS=approved` with `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, a live-mode `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET`. The INR 999 amount is server-owned.
 4. In Razorpay, configure `https://www.vognary.com/api/billing/webhooks/razorpay` as the webhook URL using the same independently generated webhook secret. Follow the current official webhook instructions: `https://razorpay.com/docs/webhooks/setup-edit-payments/`.
 5. Subscribe the webhook to `payment_link.paid`, `payment_link.cancelled`, `payment_link.expired`, and `refund.processed`.
 6. Redeploy production.
-7. Sign in to a disposable test workspace and start checkout from the workspace UI. The tracked `personal`, `founder`, and `team` plans intentionally require an authenticated workspace.
-8. Confirm checkout creation returns `status: "ready"` and a Razorpay URL. The request must include the signed session cookie and a unique 16–128 character `Idempotency-Key` header.
-9. Complete the test payment, verify the signed webhook changed the checkout to `paid`, and verify an active `workspace_entitlements` row exists.
-10. Replay the event id, test a full refund, and run `npm run billing:reconcile -- --report-only`; require zero mismatches.
+7. Submit a disposable private-audit lead and start the `assisted-audit` checkout from `/private-audit` after accepting current terms.
+8. Confirm checkout creation returns `status: "ready"`, the server-owned amount/offer/terms versions, settlement tracking, and a Razorpay URL.
+9. Complete the test payment, verify the signed webhook changed the checkout to `paid`, and verify exactly one `assisted_audit_orders` row and zero workspace entitlements for that checkout.
+10. Replay same/fresh event IDs, process duplicate/partial/full/out-of-order refunds, and run `npm run billing:reconcile -- --report-only`; require exit code 0 and zero findings. Attach the outputs, then set the five `RAZORPAY_*_STATUS` attestations listed in the billing runbook and redeploy.
 11. Follow the complete proof and rollback conditions in `docs/billing-activation-runbook.md`.
 
 Success check:
@@ -85,12 +85,12 @@ Success check:
 npm run production:check -- https://www.vognary.com --strict
 ```
 
-Expected: `Tracked Razorpay billing` becomes `READY` only after the readiness API reports `settlement-observed` and every tracked plan probe reports `ready`.
+Expected: `Tracked Razorpay billing` becomes `READY` only after the assisted-audit probe reports `ready` and the readiness API reports `settlement-observed` from a real order.
 
 Stop conditions:
 
 - Do not announce paid access from a browser redirect or a static payment URL.
-- Stop on webhook signature failures, reconciliation mismatches, duplicate entitlement periods, or a refund that does not revoke access.
+- Stop on missing legal approval, webhook signature failures, reconciliation mismatches, duplicate orders, duplicate payment/refund application, or a refund that does not update checkout/order state.
 
 ## 3. Gmail OAuth For User-Owned Gmail Receipt Sync
 

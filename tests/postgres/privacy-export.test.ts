@@ -133,6 +133,8 @@ test("privacy export includes held product data and excludes all credential mate
     assert.ok(document.renewalAlertDeliveries.length >= 1);
     assert.equal(document.apiTokens.length, 1);
     assert.equal(document.apiTokens[0].tokenPrefix, platformToken.summary.tokenPrefix);
+    assert.ok(Array.isArray(document.assistedAuditOrders));
+    assert.ok(Array.isArray(document.billingRefunds));
     assert.ok(document.auditHistory.length >= 4);
 
     for (const forbidden of [

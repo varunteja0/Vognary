@@ -27,7 +27,7 @@ export default function IntegrationModelPage() {
             Vognary
           </Link>
           <div className="flex flex-wrap gap-2">
-            <Link href="/integrations" className="btn btn-ghost">Integrations</Link>
+            <Link href="/sources" className="btn btn-ghost">Sources</Link>
             <Link href="/app" className="btn btn-primary">Open app</Link>
           </div>
         </div>

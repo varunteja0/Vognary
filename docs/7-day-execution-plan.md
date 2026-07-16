@@ -30,7 +30,7 @@ npm run ops:preflight -- --report-only https://www.vognary.com
 ## Day 3 — Private audit sales push (first 10 asks)
 
 - [ ] Send 10 personal private-audit offers from `docs/private-audit-outreach-kit.md` to founders/operators who complain about SaaS/AI/UPI renewals.
-- [ ] Create Razorpay payment links (`PAYMENT_LINK_*`) so a "yes" can pay the same day.
+- [ ] Complete qualified legal review and Razorpay test-mode proof for the tracked `assisted-audit` checkout. Do not use untracked static links.
 - [ ] Complete 2 audits manually using the product (sample → their evidence), export audit packs, deliver.
 
 **Gate G3:** ≥5 audit conversations started, ≥2 audits delivered. If nobody will share even redacted evidence, stop and fix the trust pitch before more outreach.
@@ -43,17 +43,17 @@ npm run ops:preflight -- --report-only https://www.vognary.com
 
 **Gate G4:** ≥3 test users connected Gmail and saw real recurring candidates. Do not invite non-test Gmail users until Google verification completes.
 
-## Day 5 — Monitoring loop proof
+## Day 5 — Scheduled source proof
 
 - [ ] Store one OpenAI admin key and one other provider token (GitHub/Vercel/Render/Cloudflare) through the product UI for a real workspace.
 - [ ] Confirm the cron runner executes due jobs and `connector_evidence` receives rows (`/api/internal/sync-jobs/due/run` with secret).
-- [ ] Deliver the first "monthly monitoring" pitch to audit customers: same ledger, refreshed automatically, renewal calendar included.
+- [ ] Show existing audit users the proven scheduled-source refresh and renewal-calendar capability without quoting or promising a monitoring SKU.
 
-**Gate G5:** At least one scheduled sync wrote evidence without manual help. Do not sell "connected monitoring" before G5.
+**Gate G5:** At least one scheduled sync wrote evidence without manual help. This proves source refresh only; it does not authorize a monitoring offer.
 
 ## Day 6 — Paid conversion
 
-- [ ] Follow up every delivered audit with the paid monitoring offer (₹999 personal / ₹4,999 founder as modeled in checkout).
+- [ ] Follow up every delivered audit with the one-time INR 999 assisted-audit offer only when tracked checkout is activated; do not pitch an unimplemented monitoring SKU.
 - [ ] Record objections verbatim in `docs/validation-playbook.md`.
 - [ ] Ask each payer for the one missing source they most want connected — this reorders the connector roadmap by evidence, not guesses.
 

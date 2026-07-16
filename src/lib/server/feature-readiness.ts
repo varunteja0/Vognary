@@ -1,5 +1,6 @@
 import "server-only";
 
+import { publicOffer } from "@/lib/public-offer";
 import { getDatabasePool } from "@/lib/server/database";
 
 export const productionFeatureMigrations = [
@@ -16,6 +17,8 @@ export const productionFeatureMigrations = [
   "0012_workspace_state_materialization",
   "0013_billing_entitlements",
   "0014_sync_run_invocation",
+  "0015_paid_audit_flow",
+  "0016_assisted_audit_orders",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];
@@ -32,7 +35,7 @@ export function getUnconfiguredFeatureReadiness() {
     renewalAlerts: { status: "database-not-configured" as const, migrationId: "0006_renewal_alerts" as const, enabledPreferences: null, lastSentAt: null },
     commitmentDecisions: { status: "database-not-configured" as const, migrationId: "0007_commitment_decisions" as const, savedDecisions: null },
     platformApi: { status: "database-not-configured" as const, migrationId: "0008_platform_api" as const, activeTokens: null, lastUsedAt: null },
-    billing: { status: "database-not-configured" as const, migrationId: "0013_billing_entitlements" as const, paidCheckouts: null, activeEntitlements: null, lastPaidAt: null },
+    billing: { status: "database-not-configured" as const, migrationId: "0016_assisted_audit_orders" as const, paidCheckouts: null, assistedAuditOrders: null, activeEntitlements: null, lastPaidAt: null },
     syncWorkers: { status: "database-not-configured" as const, migrationId: "0014_sync_run_invocation" as const, successfulCronRuns: null, lastCronEvidenceAt: null },
   };
 }
@@ -107,7 +110,7 @@ async function checkPrivacyLifecycle(applied: Set<string>) {
 
   try {
     const result = await getDatabasePool().query<{ last_enforced_at: Date | null }>(
-      `select max(finished_at) filter (where not dry_run and status = 'completed') as last_enforced_at
+      `select max(finished_at) filter (where invocation = 'cron' and not dry_run and status = 'completed') as last_enforced_at
        from retention_runs`,
     );
     const row = result.rows[0];
@@ -130,7 +133,7 @@ async function checkRenewalAlerts(applied: Set<string>) {
     const result = await getDatabasePool().query<{ enabled_preferences: number; last_sent_at: Date | null }>(
       `select
          (select count(*)::int from renewal_alert_preferences where enabled) as enabled_preferences,
-         (select max(sent_at) from renewal_alert_deliveries where status = 'sent') as last_sent_at`,
+         (select max(sent_at) from renewal_alert_deliveries where status = 'sent' and last_invocation = 'cron') as last_sent_at`,
     );
     const row = result.rows[0];
     const enabledPreferences = row?.enabled_preferences ?? 0;
@@ -199,29 +202,47 @@ async function checkPlatformApi(applied: Set<string>) {
 }
 
 async function checkBilling(applied: Set<string>) {
-  const migrationId = "0013_billing_entitlements" as const;
-  if (!applied.has(migrationId)) return { status: "migration-pending" as const, migrationId, paidCheckouts: null, activeEntitlements: null, lastPaidAt: null };
+  const migrationId = "0016_assisted_audit_orders" as const;
+  if (!applied.has("0013_billing_entitlements") || !applied.has("0015_paid_audit_flow") || !applied.has(migrationId)) {
+    return { status: "migration-pending" as const, migrationId, paidCheckouts: null, assistedAuditOrders: null, activeEntitlements: null, lastPaidAt: null };
+  }
 
   try {
-    const result = await getDatabasePool().query<{ paid_checkouts: number; active_entitlements: number; last_paid_at: Date | null }>(
+    const result = await getDatabasePool().query<{ paid_checkouts: number; assisted_audit_orders: number; active_entitlements: number; last_paid_at: Date | null }>(
       `select
-         (select count(*)::int from billing_checkout_sessions where status in ('paid', 'refunded')) as paid_checkouts,
+         (select count(*)::int
+          from billing_checkout_sessions
+          where plan = $1 and offer_id = $2 and offer_version = $3 and terms_version = $4
+            and status in ('paid', 'partially_refunded')) as paid_checkouts,
+         (select count(*)::int
+          from assisted_audit_orders orders
+          join billing_checkout_sessions checkout on checkout.id = orders.checkout_session_id
+          where checkout.plan = $1 and checkout.offer_id = $2
+            and checkout.offer_version = $3 and checkout.terms_version = $4
+            and checkout.status in ('paid', 'partially_refunded')
+            and orders.status in ('pending', 'in_progress', 'delivered')) as assisted_audit_orders,
          (select count(*)::int from workspace_entitlements where status = 'active' and expires_at > now()) as active_entitlements,
-         (select max(paid_at) from billing_checkout_sessions where paid_at is not null) as last_paid_at`,
+         (select max(paid_at)
+          from billing_checkout_sessions
+          where plan = $1 and offer_id = $2 and offer_version = $3 and terms_version = $4
+            and status in ('paid', 'partially_refunded')) as last_paid_at`,
+      [publicOffer.plan, publicOffer.id, publicOffer.version, publicOffer.termsVersion],
     );
     const row = result.rows[0];
     const paidCheckouts = row?.paid_checkouts ?? 0;
+    const assistedAuditOrders = row?.assisted_audit_orders ?? 0;
     const activeEntitlements = row?.active_entitlements ?? 0;
     const lastPaidAt = row?.last_paid_at?.toISOString() ?? null;
     return {
-      status: activeEntitlements > 0 ? "active-entitlement-observed" as const : paidCheckouts > 0 ? "payment-observed-no-active-entitlement" as const : "schema-ready-no-settlements" as const,
+      status: assistedAuditOrders > 0 ? "assisted-audit-order-observed" as const : activeEntitlements > 0 ? "legacy-active-entitlement-observed" as const : paidCheckouts > 0 ? "payment-observed-no-order" as const : "schema-ready-no-settlements" as const,
       migrationId,
       paidCheckouts,
+      assistedAuditOrders,
       activeEntitlements,
       lastPaidAt,
     };
   } catch {
-    return { status: "schema-query-failed" as const, migrationId, paidCheckouts: null, activeEntitlements: null, lastPaidAt: null };
+    return { status: "schema-query-failed" as const, migrationId, paidCheckouts: null, assistedAuditOrders: null, activeEntitlements: null, lastPaidAt: null };
   }
 }
 

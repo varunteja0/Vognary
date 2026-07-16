@@ -224,6 +224,29 @@ test("parses Debit/Credit split columns and skips credits", () => {
   assert.equal(audit.recurringItems.length, 1);
 });
 
+  test("honors explicit statement currencies and skips ambiguous dollar rows", () => {
+    const audit = analyzeStatements([{ name: "global.csv", text: [
+      "Date,Description,Debit,Credit,Currency",
+      "2026-05-01,NOTION PLAN,20,,usd",
+      "2026-06-01,NOTION PLAN,20,,USD",
+      "2026-07-01,NOTION PLAN,20,,USD",
+      "2026-05-02,CANVA PLAN,14,,CAD",
+      "2026-06-02,CANVA PLAN,14,,CAD",
+      "2026-07-02,CANVA PLAN,14,,CAD",
+    ].join("\n") }], [], { today });
+
+    assert.equal(audit.summary.monthlyRecurringSpend, 0);
+    assert.deepEqual(audit.summary.foreignMonthlyTotals, { USD: 20, CAD: 14 });
+
+    const ambiguous = analyzeStatements([{ name: "ambiguous.csv", text: [
+      "Date,Description,Debit,Credit",
+      "2026-05-01,NOTION PLAN $20,20,",
+      "2026-06-01,NOTION PLAN $20,20,",
+    ].join("\n") }], [], { today });
+    assert.equal(ambiguous.transactions.length, 0);
+    assert.ok(ambiguous.warnings.some((warning) => /invalid or ambiguous currency/i.test(warning)));
+  });
+
 test("merchant normalization keeps words intact when stripping payment noise", () => {
   const audit = analyzeStatements(
     [{
@@ -268,7 +291,56 @@ test("merges duplicate manual/receipt inputs for the same commitment", () => {
 
   assert.equal(audit.recurringItems.length, 1, "identical evidence from two capture paths is one commitment");
   assert.ok(Math.abs(audit.summary.monthlyRecurringSpend - 1999) < 1);
-  assert.deepEqual([...audit.recurringItems[0].sourceNames].sort(), ["Gmail receipt sync", "Pasted receipt snippet"]);
+  assert.deepEqual(audit.recurringItems[0].sourceNames, ["Gmail receipt sync"]);
+  assert.equal(audit.recurringItems[0].evidence.length, 1);
+  assert.equal(audit.recurringItems[0].confidenceScore, 72);
+});
+
+test("copied receipt evidence does not inflate confidence or independent-source claims", () => {
+  const inputs: ManualRecurringInput[] = [
+    { id: "receipt-netflix", merchant: "Netflix", amount: 649, frequency: "monthly", nextExpectedDate: "2026-08-15", category: "Streaming", sourceName: "Gmail receipt sync" },
+    { id: "receipt-netflix", merchant: "Netflix", amount: 649, frequency: "monthly", nextExpectedDate: "2026-08-15", category: "Streaming", sourceName: "Pasted receipt snippet" },
+  ];
+  const audit = analyzeStatements([], inputs, { today });
+  const item = audit.recurringItems[0];
+
+  assert.equal(audit.recurringItems.length, 1);
+  assert.equal(item.evidence.length, 1);
+  assert.equal(item.confidenceScore, 72);
+  assert.equal(item.riskTags.includes("multi-source verified"), false);
+  assert.doesNotMatch(item.recommendationReason, /independent sources/);
+});
+
+test("ambiguous cross-source matches stay in the ledger without inflating recurrence proof", () => {
+  const first = csv([
+    "2026-05-06,OPENAI CHATGPT PLUS,1999,",
+    "2026-06-06,OPENAI CHATGPT PLUS,1999,",
+  ]);
+  const second = csv([
+    "2026-06-06,OPENAI CHATGPT PLUS,1999,",
+    "2026-07-06,OPENAI CHATGPT PLUS,1999,",
+  ]);
+  const audit = analyzeStatements([{ name: "may-june.csv", text: first }, { name: "june-july.csv", text: second }], [], { today });
+
+  assert.equal(audit.transactions.length, 4);
+  assert.equal(audit.recurringItems[0]?.evidence.length, 3);
+  assert.ok(audit.warnings.some((warning) => /exact transaction match.*remain in the transaction ledger.*not treated as independent recurrence proof/i.test(warning)));
+});
+
+test("overlapping files with the same filename do not inflate recurrence proof", () => {
+  const first = csv([
+    "2026-05-06,OPENAI CHATGPT PLUS,1999,",
+    "2026-06-06,OPENAI CHATGPT PLUS,1999,",
+  ]);
+  const second = csv([
+    "2026-06-06,OPENAI CHATGPT PLUS,1999,",
+    "2026-07-06,OPENAI CHATGPT PLUS,1999,",
+  ]);
+  const audit = analyzeStatements([{ name: "statement.csv", text: first }, { name: "statement.csv", text: second }], [], { today });
+
+  assert.equal(audit.transactions.length, 4);
+  assert.equal(audit.recurringItems[0]?.evidence.length, 3);
+  assert.equal(audit.recurringItems[0]?.frequency, "monthly");
 });
 
 test("manual items with past renewal dates roll forward", () => {
@@ -361,6 +433,93 @@ test("applyMergeDecisionsToAudit combines confirmed pairs and recomputes totals"
   assert.deepEqual(applyMergeDecisionsToAudit(audit, {}), audit, "no decisions returns the audit unchanged");
 });
 
+test("applyMergeDecisionsToAudit never combines different currencies", () => {
+  const audit = analyzeStatements([], [
+    { id: "openai-inr", merchant: "OpenAI ChatGPT Plus", amount: 1_999, currency: "INR", frequency: "monthly", nextExpectedDate: "2026-08-06", category: "AI tools", sourceName: "INR receipt" },
+    { id: "openai-usd", merchant: "OpenAI API usage", amount: 25, currency: "USD", frequency: "monthly", nextExpectedDate: "2026-08-09", category: "AI tools", sourceName: "USD invoice" },
+  ], { today });
+  const inr = audit.recurringItems.find((item) => item.currency === "INR");
+  const usd = audit.recurringItems.find((item) => item.currency === "USD");
+  assert.ok(inr && usd);
+
+  const merged = applyMergeDecisionsToAudit(audit, { [makePairKey(inr.identityKey, usd.identityKey)]: "merge" }, { today });
+
+  assert.equal(merged.recurringItems.length, 2);
+  assert.equal(merged.summary.monthlyRecurringSpend, audit.summary.monthlyRecurringSpend);
+  assert.deepEqual(merged.summary.foreignMonthlyTotals, audit.summary.foreignMonthlyTotals);
+});
+
+test("same-merchant commitment identities do not swap when their relative costs cross", () => {
+  const build = (plusAmount: number, usageAmount: number, reverse = false) => analyzeStatements([], (reverse ? [
+    { id: "usage", merchant: "OpenAI API usage", amount: usageAmount, frequency: "monthly" as const, nextExpectedDate: "2026-09-09", category: "AI tools", sourceName: "Usage dashboard" },
+    { id: "plus", merchant: "OpenAI ChatGPT Plus", amount: plusAmount, frequency: "monthly" as const, nextExpectedDate: "2026-09-06", category: "AI tools", sourceName: "ChatGPT receipt" },
+  ] : [
+    { id: "plus", merchant: "OpenAI ChatGPT Plus", amount: plusAmount, frequency: "monthly" as const, nextExpectedDate: "2026-08-06", category: "AI tools", sourceName: "ChatGPT receipt" },
+    { id: "usage", merchant: "OpenAI API usage", amount: usageAmount, frequency: "monthly" as const, nextExpectedDate: "2026-08-09", category: "AI tools", sourceName: "Usage dashboard" },
+  ]), { today });
+
+  const before = build(1_000, 3_000);
+  const after = build(3_500, 2_000, true);
+  assert.equal(before.recurringItems.length, 2);
+  assert.equal(after.recurringItems.length, 2);
+  const keyBySource = (audit: ReturnType<typeof build>, source: string) => audit.recurringItems.find((item) => item.sourceNames.includes(source))?.identityKey;
+  assert.equal(keyBySource(before, "ChatGPT receipt"), keyBySource(after, "ChatGPT receipt"));
+  assert.equal(keyBySource(before, "Usage dashboard"), keyBySource(after, "Usage dashboard"));
+});
+
+test("a singleton keeps its identity when a same-merchant sibling is added", () => {
+  const singleton = analyzeStatements([], [{
+    id: "plus",
+    merchant: "OpenAI ChatGPT Plus",
+    amount: 1_999,
+    frequency: "monthly",
+    nextExpectedDate: "2026-08-06",
+    category: "AI tools",
+    sourceName: "ChatGPT receipt",
+  }], { today });
+  const collision = analyzeStatements([], [
+    {
+      id: "plus",
+      merchant: "OpenAI ChatGPT Plus",
+      amount: 2_099,
+      frequency: "monthly",
+      nextExpectedDate: "2026-09-06",
+      category: "AI tools",
+      sourceName: "ChatGPT receipt",
+    },
+    {
+      id: "usage",
+      merchant: "OpenAI API usage",
+      amount: 3_000,
+      frequency: "monthly",
+      nextExpectedDate: "2026-09-09",
+      category: "AI tools",
+      sourceName: "Usage dashboard",
+    },
+  ], { today });
+
+  const before = singleton.recurringItems[0]?.identityKey;
+  const after = collision.recurringItems.find((item) => item.sourceNames.includes("ChatGPT receipt"))?.identityKey;
+  assert.equal(after, before);
+});
+
+test("single commitment identity survives older-history backfill and price changes", () => {
+  const before = analyzeStatements([{ name: "recent.csv", text: csv([
+    "2026-05-06,OPENAI CHATGPT PLUS,1999,",
+    "2026-06-06,OPENAI CHATGPT PLUS,1999,",
+    "2026-07-06,OPENAI CHATGPT PLUS,1999,",
+  ]) }], [], { today });
+  const after = analyzeStatements([{ name: "expanded.csv", text: csv([
+    "2026-03-06,OPENAI CHATGPT PLUS,1799,",
+    "2026-04-06,OPENAI CHATGPT PLUS,1799,",
+    "2026-05-06,OPENAI CHATGPT PLUS,1999,",
+    "2026-06-06,OPENAI CHATGPT PLUS,1999,",
+    "2026-07-06,OPENAI CHATGPT PLUS,1999,",
+  ]) }], [], { today });
+
+  assert.equal(after.recurringItems[0]?.identityKey, before.recurringItems[0]?.identityKey);
+});
+
 test("advanceDateByFrequency clamps month-end anchors", () => {
   const jan31 = new Date(2026, 0, 31);
   const feb = advanceDateByFrequency(jan31, "monthly", 30.44, 31);
@@ -369,4 +528,27 @@ test("advanceDateByFrequency clamps month-end anchors", () => {
 
   const mar = advanceDateByFrequency(feb, "monthly", 30.44, 31);
   assert.equal(mar.getDate(), 31, "restores the anchor day when the month allows it");
+});
+
+test("civil recurrence arithmetic preserves semimonthly, end-of-month, and DST boundaries", () => {
+  assert.equal(advanceDateByFrequency(new Date(2026, 6, 1), "semimonthly").getDate(), 15);
+  assert.equal(advanceDateByFrequency(new Date(2026, 6, 15), "semimonthly").toDateString(), new Date(2026, 7, 1).toDateString());
+
+  const endOfMonth = analyzeStatements([{ name: "eom.csv", text: csv([
+    "2026-02-28,NETFLIX SUBSCRIPTION,649,",
+    "2026-03-31,NETFLIX SUBSCRIPTION,649,",
+    "2026-04-30,NETFLIX SUBSCRIPTION,649,",
+  ]) }], [], { today: new Date(2026, 3, 30) });
+  assert.equal(endOfMonth.recurringItems[0]?.nextExpectedDate, "2026-05-31");
+
+  const previous = process.env.TZ;
+  process.env.TZ = "America/Los_Angeles";
+  try {
+    const weekly = advanceDateByFrequency(new Date(2026, 9, 27), "weekly");
+    assert.equal(weekly.getFullYear(), 2026);
+    assert.equal(weekly.getMonth(), 10);
+    assert.equal(weekly.getDate(), 3);
+  } finally {
+    process.env.TZ = previous;
+  }
 });

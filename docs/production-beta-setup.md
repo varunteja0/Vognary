@@ -205,12 +205,10 @@ Optional but useful now:
 
 ```text
 AUDIT_INTAKE_WEBHOOK_URL=<optional lead webhook mirror>
-WAITLIST_WEBHOOK_URL=<same lead webhook if you want launch page leads persisted>
-PAYMENT_LINK_PERSONAL_PRO=<Razorpay/Stripe payment link>
-PAYMENT_LINK_FOUNDER_PRO=<Razorpay/Stripe payment link>
-PAYMENT_LINK_TEAM=<Razorpay/Stripe payment link>
-PAYMENT_LINK_ANNUAL_AUDIT=<Razorpay/Stripe payment link>
+WAITLIST_WEBHOOK_URL=<same lead webhook only for legacy contact intake>
 ```
+
+Tracked V1 payment uses the server-owned INR 999 `assisted-audit` offer. Follow `docs/billing-activation-runbook.md`; do not configure or expose static fallback payment links.
 
 Do not set fake values just to make a check green. Leave future integrations blank until they are real.
 

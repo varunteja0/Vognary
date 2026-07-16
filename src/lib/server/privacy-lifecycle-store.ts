@@ -29,6 +29,8 @@ const exportRowLimits = {
   renewalAlertDeliveries: 10_000,
   apiTokens: 500,
   billingCheckouts: 1_000,
+  assistedAuditOrders: 1_000,
+  billingRefunds: 2_000,
   entitlements: 100,
   auditHistory: 10_000,
 };
@@ -389,6 +391,8 @@ async function buildAccessExport(client: PoolClient, input: {
     renewalDeliveryResult,
     apiTokenResult,
     billingCheckoutResult,
+    assistedAuditOrderResult,
+    billingRefundResult,
     entitlementResult,
     auditResult,
   ] = await Promise.all([
@@ -645,6 +649,9 @@ async function buildAccessExport(client: PoolClient, input: {
       id: string;
       user_id: string | null;
       plan: string;
+      offer_id: string;
+      offer_version: number;
+      terms_version: string;
       provider: string;
       status: string;
       currency: string;
@@ -657,7 +664,8 @@ async function buildAccessExport(client: PoolClient, input: {
       created_at: Date;
       updated_at: Date;
     }>(
-      `select id, user_id, plan, provider, status, currency, amount_minor::text,
+            `select id, user_id, plan, offer_id, offer_version, terms_version,
+              provider, status, currency, amount_minor::text,
               refunded_amount_minor::text, provider_checkout_id, provider_payment_id,
               paid_at, refunded_at, created_at, updated_at
        from billing_checkout_sessions
@@ -665,6 +673,54 @@ async function buildAccessExport(client: PoolClient, input: {
        order by created_at asc
        limit $2`,
       [input.workspaceId, exportRowLimits.billingCheckouts + 1],
+    ),
+    query<{
+      id: string;
+      checkout_session_id: string;
+      user_id: string | null;
+      lead_id: string | null;
+      offer_id: string;
+      offer_version: number;
+      terms_version: string;
+      status: string;
+      created_at: Date;
+      started_at: Date | null;
+      delivered_at: Date | null;
+      refunded_at: Date | null;
+      updated_at: Date;
+    }>(
+      `select id, checkout_session_id, user_id, lead_id, offer_id, offer_version,
+              terms_version, status, created_at, started_at, delivered_at,
+              refunded_at, updated_at
+       from assisted_audit_orders
+       where workspace_id = $1
+       order by created_at asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.assistedAuditOrders + 1],
+    ),
+    query<{
+      id: string;
+      provider: string;
+      provider_refund_id: string;
+      provider_payment_id: string;
+      checkout_session_id: string | null;
+      amount_minor: string;
+      currency: string;
+      status: string;
+      rejection_code: string | null;
+      created_at: Date;
+      applied_at: Date | null;
+    }>(
+      `select refund.id, refund.provider, refund.provider_refund_id,
+              refund.provider_payment_id, refund.checkout_session_id,
+              refund.amount_minor::text, refund.currency, refund.status,
+              refund.rejection_code, refund.created_at, refund.applied_at
+       from billing_refunds refund
+       join billing_checkout_sessions checkout on checkout.id = refund.checkout_session_id
+       where checkout.workspace_id = $1
+       order by refund.created_at asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.billingRefunds + 1],
     ),
     query<{
       entitlement_key: string;
@@ -715,6 +771,8 @@ async function buildAccessExport(client: PoolClient, input: {
   assertWithinExportLimit("renewalAlertDeliveries", renewalDeliveryResult.rows.length);
   assertWithinExportLimit("apiTokens", apiTokenResult.rows.length);
   assertWithinExportLimit("billingCheckouts", billingCheckoutResult.rows.length);
+  assertWithinExportLimit("assistedAuditOrders", assistedAuditOrderResult.rows.length);
+  assertWithinExportLimit("billingRefunds", billingRefundResult.rows.length);
   assertWithinExportLimit("entitlements", entitlementResult.rows.length);
   assertWithinExportLimit("auditHistory", auditResult.rows.length);
 
@@ -874,6 +932,9 @@ async function buildAccessExport(client: PoolClient, input: {
       id: row.id,
       userId: row.user_id,
       plan: row.plan,
+      offerId: row.offer_id,
+      offerVersion: row.offer_version,
+      termsVersion: row.terms_version,
       provider: row.provider,
       status: row.status,
       currency: row.currency,
@@ -885,6 +946,34 @@ async function buildAccessExport(client: PoolClient, input: {
       refundedAt: toIso(row.refunded_at),
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
+    })),
+    assistedAuditOrders: assistedAuditOrderResult.rows.map((row) => ({
+      id: row.id,
+      checkoutSessionId: row.checkout_session_id,
+      userId: row.user_id,
+      leadId: row.lead_id,
+      offerId: row.offer_id,
+      offerVersion: row.offer_version,
+      termsVersion: row.terms_version,
+      status: row.status,
+      createdAt: row.created_at.toISOString(),
+      startedAt: toIso(row.started_at),
+      deliveredAt: toIso(row.delivered_at),
+      refundedAt: toIso(row.refunded_at),
+      updatedAt: row.updated_at.toISOString(),
+    })),
+    billingRefunds: billingRefundResult.rows.map((row) => ({
+      id: row.id,
+      provider: row.provider,
+      providerRefundId: row.provider_refund_id,
+      providerPaymentId: row.provider_payment_id,
+      checkoutSessionId: row.checkout_session_id,
+      amountMinor: Number(row.amount_minor),
+      currency: row.currency,
+      status: row.status,
+      rejectionCode: row.rejection_code,
+      createdAt: row.created_at.toISOString(),
+      appliedAt: toIso(row.applied_at),
     })),
     entitlements: entitlementResult.rows.map((row) => ({
       key: row.entitlement_key,

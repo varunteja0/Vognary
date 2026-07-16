@@ -33,10 +33,10 @@ const steps = [
 
 const trust = ["Proof over guesses", "No bank passwords", "Missing sources named", "Delete anytime"];
 
-const userLanguage = [
-  "I forgot what I am actually paying for.",
-  "Subscriptions pile up across Stripe, GPay, bank debits, cards, and SaaS tools.",
-  "Enterprise spend tools are overkill before we have finance or procurement.",
+const firstResult = [
+  "Your recurring monthly total",
+  "The next renewal date",
+  "One ranked action with its source proof",
 ];
 
 const proofRows = [
@@ -67,12 +67,10 @@ export default function Home() {
             <a href="#solves" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">What it solves</a>
             <a href="#sample-audit" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Sample audit</a>
             <a href="#how" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">How it works</a>
-            <Link href="/integrations" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Integrations</Link>
             <Link href="/security" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Security</Link>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/private-audit" className="btn btn-sm btn-ghost">Request audit</Link>
-            <Link href="/login" className="btn btn-sm btn-primary">Sign in</Link>
+            <Link href="/app?guest=1" prefetch={false} className="btn btn-sm btn-primary">Start audit</Link>
           </div>
         </nav>
 
@@ -82,16 +80,14 @@ export default function Home() {
             <div className="p-7 sm:p-10 lg:p-12">
               <span className="folio" data-folio="Start" style={{ color: "var(--dossier-muted)" }}>Evidence-first recurring money</span>
               <h1 className="mt-6 font-display text-4xl font-bold leading-[0.98] tracking-[-0.035em] text-(--dossier-ink) sm:text-6xl">
-                Every renewal hides<br />in a different place.
+                Find what renews next.<br />Act before it charges.
               </h1>
               <p className="mt-6 max-w-xl text-base leading-7 muted-on-dark sm:text-lg">
-                Vognary turns receipts, statements, mandates, invoices, SaaS bills, cloud spend, EMIs, SIPs, insurance, and utilities into one proof-backed monthly action review.
+                Paste receipts or invoices and get your monthly burn, next renewal, and one evidence-backed action—without creating an account.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link href="/app?demo=1" className="btn btn-primary btn-lg">Try sample workspace</Link>
-                <Link href="/app?guest=1" className="btn btn-ondark btn-lg">Start with my data</Link>
-                <a href="#sample-audit" className="btn btn-ondark btn-lg">See sample audit</a>
-                <Link href="/private-audit" className="btn btn-ondark btn-lg">Ask for a private audit</Link>
+                <Link href="/app?guest=1" prefetch={false} className="btn btn-primary btn-lg">Audit my recurring spend</Link>
+                <Link href="/app?demo=1" prefetch={false} className="btn btn-ondark btn-lg">See sample</Link>
               </div>
               <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2">
                 {trust.map((item) => (
@@ -103,15 +99,15 @@ export default function Home() {
               </div>
             </div>
             <div className="border-t border-(--dossier-line) p-7 sm:p-10 lg:border-l lg:border-t-0">
-              <p className="eyebrow muted-on-dark">The pain users say out loud</p>
+              <p className="eyebrow muted-on-dark">Your first result</p>
               <div className="mt-4 flex flex-col gap-3">
-                {userLanguage.map((quote) => (
-                  <blockquote key={quote} className="rounded-[10px] border p-3 text-sm leading-6 muted-on-dark" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
-                    {quote}
-                  </blockquote>
+                {firstResult.map((item) => (
+                  <div key={item} className="rounded-[10px] border p-3 text-sm leading-6 muted-on-dark" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
+                    {item}
+                  </div>
                 ))}
               </div>
-              <Link href="/app?demo=1" className="btn btn-primary btn-block mt-6">Open a working sample</Link>
+              <Link href="/app?guest=1" prefetch={false} className="btn btn-primary btn-block mt-6">Start with receipt paste</Link>
             </div>
           </div>
         </section>
@@ -160,7 +156,25 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="divide-y divide-line sm:hidden" aria-label="Sample recurring spend audit">
+            {sampleAuditRows.map((row) => (
+              <article key={row.merchant} className="grid gap-3 px-5 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-(--ink)">{row.merchant}</h3>
+                    <p className="font-data mt-1 text-xs text-(--muted)">{row.source}</p>
+                  </div>
+                  <span className={row.actionClass}>{row.action}</span>
+                </div>
+                <dl className="grid grid-cols-2 gap-3">
+                  <div><dt className="eyebrow">Monthly</dt><dd className="font-data mt-1 tnum text-(--ink-soft)">{row.monthly}</dd></div>
+                  <div><dt className="eyebrow">Renews</dt><dd className="font-data mt-1 text-(--ink-soft)">{row.renews}</dd></div>
+                </dl>
+                <p className="text-sm leading-6 text-(--muted)">{row.proof}</p>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto sm:block" role="region" aria-label="Sample recurring spend audit table" tabIndex={0}>
             <table className="w-full min-w-220 border-separate border-spacing-0 text-left text-sm">
               <thead>
                 <tr>
@@ -189,7 +203,7 @@ export default function Home() {
           <div className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm leading-6 text-(--muted)">This is the product promise: not a list of subscriptions, but a reviewable evidence table with gaps called out honestly.</p>
             <div className="flex flex-wrap gap-2">
-              <Link href="/app?demo=1" className="btn btn-primary">Open sample workspace</Link>
+              <Link href="/app?demo=1" prefetch={false} className="btn btn-primary">Open sample workspace</Link>
               <Link href="/private-audit" className="btn btn-ghost">Request this audit</Link>
             </div>
           </div>
@@ -204,7 +218,18 @@ export default function Home() {
             </div>
             <p className="max-w-sm text-sm leading-6 text-(--muted)">The product job is not to pretend every rail is connected. It is to prove what can be proven now and name the missing source clearly.</p>
           </div>
-          <div className="mt-6 overflow-x-auto rounded-[11px] border border-line">
+          <div className="mt-6 divide-y divide-line rounded-[11px] border border-line sm:hidden" aria-label="Evidence source coverage">
+            {proofRows.map((row) => (
+              <article key={row.source} className="grid gap-2 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-semibold text-(--ink)">{row.source}</h3>
+                  <span className="pill pill-partial">{row.status}</span>
+                </div>
+                <p className="text-sm leading-6 text-(--ink-soft)">{row.proves}</p>
+              </article>
+            ))}
+          </div>
+          <div className="mt-6 hidden overflow-x-auto rounded-[11px] border border-line sm:block" role="region" aria-label="Evidence source coverage table" tabIndex={0}>
             <table className="w-full min-w-180 border-separate border-spacing-0 text-left text-sm">
               <thead>
                 <tr>
@@ -249,15 +274,15 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Honest beta boundary */}
+        {/* Honest capability boundary */}
         <section className="panel p-6 sm:p-8">
           <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
-              <span className="folio" data-folio="Honest">Current beta boundary</span>
+              <span className="folio" data-folio="Honest">Current capability boundary</span>
               <div className="mt-5 grid gap-5 sm:grid-cols-2">
                 <div className="inset p-4">
                   <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">The wedge</p>
-                  <p className="mt-2 text-sm leading-6 text-(--ink-soft)">Start as a proof-backed recurring-money audit: Gmail receipts first, one ledger, evidence, confidence, next debit, action labels, and automatic encrypted workspace sync when beta infrastructure is configured.</p>
+                  <p className="mt-2 text-sm leading-6 text-(--ink-soft)">Start as a proof-backed recurring-money audit: receipt paste first, one ledger, evidence, confidence, next debit, action labels, and encrypted workspace sync when deployment infrastructure is configured.</p>
                 </div>
                 <div className="inset p-4">
                   <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-ochre">The honest gap</p>
@@ -265,7 +290,7 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <Link href="/login" className="btn btn-primary btn-lg">Start the review</Link>
+            <Link href="/app?guest=1" prefetch={false} className="btn btn-primary btn-lg">Start with receipts</Link>
           </div>
         </section>
 
@@ -282,7 +307,7 @@ export default function Home() {
             <span className="text-(--line-strong)">·</span>
             <Link className="transition hover:text-(--ink)" href="/sources">Sources</Link>
             <span className="text-(--line-strong)">·</span>
-            <Link className="transition hover:text-(--ink)" href="/integrations">Integrations</Link>
+            <Link className="transition hover:text-(--ink)" href="/sources">Sources</Link>
             <span className="text-(--line-strong)">·</span>
             <Link className="transition hover:text-(--ink)" href="/terms">Terms</Link>
             <span className="text-(--line-strong)">·</span>

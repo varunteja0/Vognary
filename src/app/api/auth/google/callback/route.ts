@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { googleAuthStateCookie, oauthStateCookieOptions } from "@/lib/oauth-state";
+import { googleAuthNextCookie, googleAuthStateCookie, oauthStateCookieOptions, sanitizeOAuthReturnPath } from "@/lib/oauth-state";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import {
   checkGoogleAuthConfiguration,
@@ -9,10 +9,14 @@ import {
   getGoogleAuthRedirectUri,
   getGoogleWorkspaceName,
   isGoogleEmailAllowed,
-  type GoogleTokenInfo,
+  verifyGoogleIdToken,
 } from "@/lib/server/google-auth";
 import { createSessionCookie, sessionCookieOptions } from "@/lib/server/session";
-import { getOrCreateDefaultWorkspaceForUser, getOrCreateUserByEmail } from "@/lib/server/workspace-store";
+import {
+  getOrCreateDefaultWorkspaceForUser,
+  getOrCreateUserByGoogleIdentity,
+  WorkspaceIdentityConflictError,
+} from "@/lib/server/workspace-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -53,20 +57,32 @@ export async function GET(request: NextRequest) {
   const tokenPayload = await tokenResponse.json() as { id_token?: string };
   if (!tokenPayload.id_token) return redirectToLogin(request, "missing-id-token");
 
-  const tokenInfoResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(tokenPayload.id_token)}`);
-  if (!tokenInfoResponse.ok) return redirectToLogin(request, "token-validation-failed");
-  const tokenInfo = await tokenInfoResponse.json() as GoogleTokenInfo;
+  const tokenInfo = await verifyGoogleIdToken(tokenPayload.id_token, clientId).catch(() => null);
+  if (!tokenInfo) return redirectToLogin(request, "token-validation-failed");
 
   if (tokenInfo.aud !== clientId) return redirectToLogin(request, "audience-mismatch");
   if (tokenInfo.email_verified !== true && tokenInfo.email_verified !== "true") return redirectToLogin(request, "email-not-verified");
   if (!tokenInfo.email) return redirectToLogin(request, "missing-email");
+  if (!tokenInfo.iss || !tokenInfo.sub) return redirectToLogin(request, "missing-subject");
   if (!isGoogleEmailAllowed(tokenInfo.email)) return redirectToLogin(request, "not-allowed");
 
-  const user = await getOrCreateUserByEmail({ email: tokenInfo.email.toLowerCase(), displayName: tokenInfo.name });
+  let user;
+  try {
+    user = await getOrCreateUserByGoogleIdentity({
+      issuer: tokenInfo.iss,
+      subject: tokenInfo.sub,
+      email: tokenInfo.email.toLowerCase(),
+      displayName: tokenInfo.name,
+    });
+  } catch (error) {
+    if (error instanceof WorkspaceIdentityConflictError) return redirectToLogin(request, "identity-conflict");
+    throw error;
+  }
   const workspace = await getOrCreateDefaultWorkspaceForUser({ userId: user.id, workspaceName: getGoogleWorkspaceName(tokenInfo) });
   const cookie = await createSessionCookie({ userId: user.id, workspaceId: workspace.workspaceId });
 
-  const response = clearGoogleState(NextResponse.redirect(new URL("/", request.nextUrl.origin)));
+  const nextPath = sanitizeOAuthReturnPath(request.cookies.get(googleAuthNextCookie)?.value);
+  const response = clearGoogleState(NextResponse.redirect(new URL(nextPath, request.nextUrl.origin)));
   response.cookies.set(cookie.name, cookie.value, sessionCookieOptions(cookie.maxAgeSeconds));
   return response;
 }
@@ -74,10 +90,13 @@ export async function GET(request: NextRequest) {
 function redirectToLogin(request: NextRequest, reason: string) {
   const url = new URL("/login", request.nextUrl.origin);
   url.searchParams.set("google", reason);
+  const nextPath = sanitizeOAuthReturnPath(request.cookies.get(googleAuthNextCookie)?.value);
+  if (nextPath !== "/app") url.searchParams.set("next", nextPath);
   return clearGoogleState(NextResponse.redirect(url));
 }
 
 function clearGoogleState(response: NextResponse) {
   response.cookies.set(googleAuthStateCookie, "", { ...oauthStateCookieOptions(), maxAge: 0 });
+  response.cookies.set(googleAuthNextCookie, "", { ...oauthStateCookieOptions(), maxAge: 0 });
   return response;
 }

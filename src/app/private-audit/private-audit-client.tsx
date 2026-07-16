@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { buildRedactionFirstSourcePlan, type RedactionFirstSourcePlan } from "@/lib/private-audit-plan";
+import { publicOffer } from "@/lib/public-offer";
 import { VognaryMark } from "../brand";
 
 const personas = [
@@ -85,6 +87,12 @@ type IntakeForm = {
   message: string;
 };
 
+type AuditLead = { id: string; email: string };
+type AuditCheckoutOffer =
+  | { state: "loading" }
+  | { state: "ready" }
+  | { state: "unavailable" };
+
 const initialForm: IntakeForm = {
   name: "",
   email: "",
@@ -102,36 +110,46 @@ export default function PrivateAuditClient() {
   const [form, setForm] = useState<IntakeForm>(initialForm);
   const [status, setStatus] = useState<string | null>(null);
   const [brief, setBrief] = useState<string | null>(null);
-  const [lead, setLead] = useState<{ id: string; email: string } | null>(null);
+  const [sourcePlan, setSourcePlan] = useState<RedactionFirstSourcePlan | null>(null);
+  const [lead, setLead] = useState<AuditLead | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const selectedSummary = useMemo(() => [...form.paymentTypes, ...form.sourceTypes].slice(0, 5).join(" / "), [form.paymentTypes, form.sourceTypes]);
-
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     setStatus("Submitting audit request...");
     setBrief(null);
+    setSourcePlan(null);
     setLead(null);
 
-    const sourceTag = new URLSearchParams(window.location.search).get("src") ?? undefined;
-    const response = await fetch("/api/audit-intake", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...form, sourceTag }),
-    });
-    const payload = await response.json();
+    try {
+      const sourceTag = new URLSearchParams(window.location.search).get("src") ?? undefined;
+      const response = await fetch("/api/audit-intake", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...form, sourceTag }),
+      });
+      const payload = await readJson(response) as { error?: string; persisted?: boolean; leadId?: string; sourcePlan?: RedactionFirstSourcePlan };
 
-    if (!response.ok) {
-      setStatus(payload.error ?? "Audit request failed.");
-      return;
-    }
+      if (!response.ok) {
+        setStatus(payload.error ?? "Audit request failed. Check your connection and retry.");
+        return;
+      }
 
-    const generatedBrief = buildBrief(form);
-    setBrief(generatedBrief);
-    if (typeof payload.leadId === "string" && payload.leadId) {
-      setLead({ id: payload.leadId, email: form.email.trim().toLowerCase() });
+      const generatedBrief = buildBrief(form);
+      setBrief(generatedBrief);
+      setSourcePlan(payload.sourcePlan ?? buildRedactionFirstSourcePlan(form));
+      const normalizedEmail = form.email.trim().toLowerCase();
+      if (payload.persisted && typeof payload.leadId === "string") setLead({ id: payload.leadId, email: normalizedEmail });
+      setStatus(payload.persisted
+        ? "Audit request received. Your safe source plan is ready below."
+        : "Request prepared. This deployment cannot persist leads yet, so keep the backup brief below.");
+    } catch {
+      setStatus("The audit request could not be submitted. Nothing was charged; check your connection and retry.");
+    } finally {
+      setSubmitting(false);
     }
-    setStatus(payload.persisted
-      ? "Audit request received. I will reply with the safest minimum source to share."
-      : "Request prepared. This deployment still needs AUDIT_INTAKE_WEBHOOK_URL to persist leads; copy the brief below as backup.");
   }
 
   return (
@@ -144,23 +162,21 @@ export default function PrivateAuditClient() {
           </Link>
           <div className="flex flex-wrap gap-2">
             <Link href="/sources" className="btn btn-ghost">Source guide</Link>
-            <Link href="/app?guest=1" className="btn btn-primary">Open audit app</Link>
+            <Link href="/app?guest=1" prefetch={false} className="btn btn-primary">Open audit app</Link>
           </div>
         </div>
 
         <section className="grid gap-5 lg:grid-cols-[0.92fr_1.08fr]">
-          <aside className="dossier spotlight scan p-7 sm:p-9 rise">
-            <span className="folio" data-folio="Beta" style={{ color: "var(--dossier-muted)" }}>Private audit</span>
+          <aside className="dossier min-w-0 p-7 sm:p-9 rise">
+            <span className="folio" data-folio="Service" style={{ color: "var(--dossier-muted)" }}>Private audit</span>
             <h1 className="mt-5 font-display text-3xl font-bold leading-tight text-(--dossier-ink) sm:text-5xl">
               Prove what renews{" "}<br /><span className="glow-num">before it charges.</span>
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 muted-on-dark">
               Apply for a redaction-first audit across SaaS, AI tools, cloud, domains, app stores, UPI AutoPay, card mandates, insurance, EMIs, SIPs, utilities, and receipt emails.
             </p>
-            <div className="mt-8 grid gap-2.5 sm:grid-cols-3">
-              <Proof label="Beta spots" value="10" />
-              <Proof label="Personal" value="INR 999" />
-              <Proof label="Founder/team" value="INR 4,999" />
+            <div className="mt-8 grid gap-2.5">
+              <Proof label="Assisted audit" value={`${publicOffer.currency} ${(publicOffer.amountMinor / 100).toLocaleString("en-IN")}`} />
             </div>
             <div className="mt-8 rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
               <h2 className="font-display text-lg font-semibold text-(--dossier-ink)">What you get</h2>
@@ -184,10 +200,10 @@ export default function PrivateAuditClient() {
             </div>
           </aside>
 
-          <form onSubmit={submit} className="panel p-6 sm:p-8 rise">
+          <form onSubmit={submit} className="panel min-w-0 p-6 sm:p-8 rise">
             <span className="folio" data-folio="01">Audit request</span>
             <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Request a proof-backed audit</h2>
-            <p className="mt-2 text-sm leading-6 text-(--muted)">Tell us which recurring rails you use. We reply with the safest minimum source to share first. You do not need to upload financial documents on this page.</p>
+            <p className="mt-2 text-sm leading-6 text-(--muted)">Tell us which recurring rails you use. You will get a safe minimum-source plan immediately. You do not need to upload financial documents on this page.</p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <label className="grid gap-2">
@@ -215,7 +231,7 @@ export default function PrivateAuditClient() {
             <div className="mt-5 rounded-[11px] border border-line bg-(--card-2) p-4">
               <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">What happens after you submit</p>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <MiniStep title="1. Minimum source" body="We reply with the safest first source to share, usually a redacted CSV or receipt set." />
+                <MiniStep title="1. Minimum source" body="Get the safest first source and exact redactions immediately." />
                 <MiniStep title="2. Proof pass" body="Vognary identifies recurring items, confidence, next debits, and missing rails." />
                 <MiniStep title="3. Action review" body="You get a keep/watch/downgrade/cancel/investigate review before sharing more." />
               </div>
@@ -252,17 +268,18 @@ export default function PrivateAuditClient() {
             </details>
 
             <label className="mt-5 flex items-start gap-3 rounded-[11px] border border-line bg-(--card-2) p-3 text-sm leading-6 text-(--ink-soft)">
-              <input type="checkbox" checked={form.canContact} onChange={(event) => setForm({ ...form, canContact: event.target.checked })} className="mt-1 accent-(--gold)" />
+              <input type="checkbox" required checked={form.canContact} onChange={(event) => setForm({ ...form, canContact: event.target.checked })} className="mt-1 accent-(--gold)" />
               You can contact me about this private audit. I understand I should redact sensitive details and never send passwords, OTPs, CVV, bank credentials, or identity documents.
             </label>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <button type="submit" className="btn btn-primary">Request private audit</button>
+              <button type="submit" disabled={submitting} className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-60">{submitting ? "Submitting request…" : "Request private audit"}</button>
               <span className="font-data text-xs text-(--muted)">{selectedSummary || "Select at least one source"}</span>
             </div>
-            {status ? <p className="mt-4 rounded-md border border-indigo bg-(--indigo-tint) px-3 py-2 text-sm text-indigo">{status}</p> : null}
+            {status ? <p role="status" aria-live="polite" className="mt-4 rounded-md border border-indigo bg-(--indigo-tint) px-3 py-2 text-sm text-indigo">{status}</p> : null}
+            {sourcePlan ? <SourcePlan plan={sourcePlan} /> : null}
             {lead ? <AuditPaymentStep lead={lead} /> : null}
-            {brief ? <textarea readOnly value={brief} className="field field-mono mt-4 min-h-44" aria-label="Generated audit request backup" /> : null}
+            {brief ? <details className="mt-4"><summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">Audit request backup</summary><textarea readOnly value={brief} className="field field-mono mt-3 min-h-44" aria-label="Generated audit request backup" /></details> : null}
           </form>
         </section>
       </div>
@@ -294,100 +311,105 @@ function ChoiceGroup({ legend, values, selected, onChange }: { legend: string; v
   );
 }
 
-type AuditCheckoutOffer =
-  | { state: "loading" }
-  | { state: "ready"; amountMinor: number; currency: string }
-  | { state: "link-only"; paymentUrl: string }
-  | { state: "not-configured" }
-  | { state: "unavailable" };
+function SourcePlan({ plan }: { plan: RedactionFirstSourcePlan }) {
+  return (
+    <section aria-label="Your redaction-first source plan" className="mt-4 rounded-[11px] border border-verdict bg-(--verdict-tint) p-4">
+      <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Your redaction-first source plan</p>
+      <h3 className="mt-2 font-display text-lg font-semibold text-(--ink)">{plan.title}</h3>
+      <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{plan.startWith}</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-(--muted)">Keep visible</p><ul className="mt-2 space-y-1 text-sm text-(--ink-soft)">{plan.keepVisible.map((item) => <li key={item}>{item}</li>)}</ul></div>
+        <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-(--muted)">Remove first</p><ul className="mt-2 space-y-1 text-sm text-(--ink-soft)">{plan.remove.map((item) => <li key={item}>{item}</li>)}</ul></div>
+      </div>
+      <p className="mt-3 text-xs leading-5 text-(--muted)">Never share passwords, OTPs, CVV, card numbers, or bank credentials.</p>
+      <Link href="/app?guest=1" prefetch={false} className="btn btn-primary mt-4">Continue my audit</Link>
+    </section>
+  );
+}
 
-function AuditPaymentStep({ lead }: { lead: { id: string; email: string } }) {
+function AuditPaymentStep({ lead }: { lead: AuditLead }) {
   const [offer, setOffer] = useState<AuditCheckoutOffer>({ state: "loading" });
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [paying, setPaying] = useState(false);
-  const [payError, setPayError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    fetch("/api/checkout?plan=annual")
+    const controller = new AbortController();
+    fetch(`/api/checkout?plan=${encodeURIComponent(publicOffer.plan)}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
-        const payload = await response.json();
-        if (cancelled) return;
-        if (payload.status === "ready" && typeof payload.amountMinor === "number") {
-          setOffer({ state: "ready", amountMinor: payload.amountMinor, currency: payload.currency ?? "INR" });
-        } else if (payload.status === "link-only" && typeof payload.paymentUrl === "string") {
-          setOffer({ state: "link-only", paymentUrl: payload.paymentUrl });
-        } else {
-          setOffer({ state: "not-configured" });
-        }
+        const payload = await readJson(response);
+        const matches = response.ok
+          && payload.status === "ready"
+          && payload.settlementTracking === true
+          && payload.offerId === publicOffer.id
+          && payload.offerVersion === publicOffer.version
+          && payload.termsVersion === publicOffer.termsVersion
+          && payload.amountMinor === publicOffer.amountMinor
+          && payload.currency === publicOffer.currency;
+        setOffer(matches ? { state: "ready" } : { state: "unavailable" });
       })
-      .catch(() => { if (!cancelled) setOffer({ state: "unavailable" }); });
-    return () => { cancelled = true; };
+      .catch((caught: unknown) => {
+        if (!(caught instanceof DOMException && caught.name === "AbortError")) setOffer({ state: "unavailable" });
+      });
+    return () => controller.abort();
   }, [lead.id]);
 
   async function pay() {
-    if (offer.state !== "ready" || paying) return;
+    if (offer.state !== "ready" || !termsAccepted || paying) return;
     setPaying(true);
-    setPayError(null);
+    setError(null);
     try {
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "idempotency-key": `private-audit:${lead.id}`,
+          "idempotency-key": `assisted-audit:${publicOffer.version}:${lead.id}`,
         },
-        body: JSON.stringify({ plan: "annual", email: lead.email, leadId: lead.id }),
+        body: JSON.stringify({
+          plan: publicOffer.plan,
+          email: lead.email,
+          leadId: lead.id,
+          termsVersion: publicOffer.termsVersion,
+        }),
       });
-      const payload = await response.json();
-      if (response.ok && typeof payload.paymentUrl === "string") {
-        window.location.href = payload.paymentUrl;
+      const payload = await readJson(response);
+      if (response.ok && payload.settlementTracking === true && typeof payload.paymentUrl === "string") {
+        window.location.assign(payload.paymentUrl);
         return;
       }
-      setPayError(payload.error ?? "The checkout could not be started. Retry in a moment; the same request is safe to repeat.");
+      setError(typeof payload.error === "string" ? payload.error : "Tracked checkout could not be opened. Nothing was charged.");
     } catch {
-      setPayError("The checkout could not be started. Retry in a moment; the same request is safe to repeat.");
+      setError("Tracked checkout could not be reached. Nothing was charged; retry with the same request when your connection is stable.");
     } finally {
       setPaying(false);
     }
   }
 
-  if (offer.state === "loading") return null;
-
+  if (offer.state !== "ready") return null;
   return (
-    <div className="mt-4 rounded-[11px] border border-line bg-(--card-2) p-4">
-      <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Optional — reserve your audit now</p>
-      {offer.state === "ready" ? (
-        <>
-          <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
-            One-time private audit — <span className="font-data font-semibold">INR {(offer.amountMinor / 100).toLocaleString("en-IN")}</span>.
-            Payment runs on Razorpay and is confirmed by its signed webhook; you get a public status page and a receipt email.
-            Paying now reserves your slot, or simply wait for our reply first.
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <button type="button" onClick={pay} disabled={paying} className="btn btn-primary">
-              {paying ? "Opening Razorpay..." : "Pay for the audit"}
-            </button>
-            <span className="font-data text-xs text-(--muted)">Server-verified amount. No card details touch Vognary.</span>
-          </div>
-          {payError ? <p className="mt-3 rounded-md border border-line px-3 py-2 text-sm text-(--muted)">{payError}</p> : null}
-        </>
-      ) : offer.state === "link-only" ? (
-        <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
-          Tracked checkout is not active yet. You can pay through this fallback payment link;
-          it does not grant an automatic entitlement, so we reconcile it manually against your audit request:
-          {" "}<a href={offer.paymentUrl} className="underline" rel="noreferrer">open payment link</a>.
-        </p>
-      ) : offer.state === "not-configured" ? (
-        <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
-          Online payment is not activated yet. No action needed — we reply to your request with next steps,
-          and payment happens only after you see the audit plan.
-        </p>
-      ) : (
-        <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
-          Payment status could not be checked right now. Your audit request is saved; we reply by email with next steps.
-        </p>
-      )}
-    </div>
+    <section aria-label="Assisted audit checkout" className="mt-4 rounded-[11px] border border-line bg-(--card-2) p-4">
+      <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Tracked one-time checkout</p>
+      <h3 className="mt-2 font-display text-lg font-semibold text-(--ink)">{publicOffer.title} · {publicOffer.currency} {(publicOffer.amountMinor / 100).toLocaleString("en-IN")}</h3>
+      <p className="mt-2 text-sm leading-6 text-(--ink-soft)">One assisted audit for this request. It does not auto-renew and does not activate monitoring. Razorpay handles payment details; Vognary marks settlement only after its signed webhook arrives.</p>
+      <p className="mt-2 text-xs leading-5 text-(--muted)">{publicOffer.refundSummary} No representation about tax treatment or international payment eligibility is made here.</p>
+      <label className="mt-3 flex items-start gap-2 text-sm leading-6 text-(--ink-soft)">
+        <input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} className="mt-1 accent-(--gold)" />
+        <span>I accept the current <Link href="/terms" className="underline underline-offset-2">assisted-audit terms</Link>, including the one-time scope and refund section.</span>
+      </label>
+      <button type="button" onClick={() => void pay()} disabled={!termsAccepted || paying} className="btn btn-primary mt-3 disabled:cursor-not-allowed disabled:opacity-60">
+        {paying ? "Opening tracked checkout…" : "Pay for this audit"}
+      </button>
+      {error ? <p role="alert" className="mt-3 rounded-md border border-ember/30 bg-(--ember-tint) px-3 py-2 text-sm text-ember">{error}</p> : null}
+    </section>
   );
+}
+
+async function readJson(response: Response): Promise<Record<string, unknown>> {
+  try {
+    return await response.json() as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }
 
 function Proof({ label, value }: { label: string; value: string }) {

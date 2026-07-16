@@ -19,9 +19,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ status: "not-configured", requiredEnv: ["DATABASE_URL"] }, { status: 501 });
   }
 
-  const checkout = await getPublicCheckoutStatus(checkoutId.toLowerCase()).catch(() => null);
+  let checkout;
+  try {
+    checkout = await getPublicCheckoutStatus(checkoutId.toLowerCase());
+  } catch {
+    return NextResponse.json(
+      { error: "Payment status is temporarily unavailable. No settlement conclusion can be drawn yet." },
+      { status: 503, headers: { "cache-control": "no-store" } },
+    );
+  }
   if (!checkout) {
-    return NextResponse.json({ error: "This checkout reference was not found." }, { status: 404 });
+    return NextResponse.json({ error: "This checkout reference was not found." }, { status: 404, headers: { "cache-control": "no-store" } });
   }
   return NextResponse.json(checkout, { headers: { "cache-control": "no-store" } });
 }

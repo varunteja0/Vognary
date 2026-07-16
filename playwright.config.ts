@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 30_000,
@@ -8,7 +10,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
@@ -22,9 +24,9 @@ export default defineConfig({
       use: { ...devices["Pixel 7"] },
     },
   ],
-  webServer: {
+  webServer: process.env.PLAYWRIGHT_EXTERNAL_SERVER ? undefined : {
     command: "npm run dev -- --hostname 127.0.0.1 --port 3000",
-    url: "http://127.0.0.1:3000/api/health",
+    url: `${baseURL}/api/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

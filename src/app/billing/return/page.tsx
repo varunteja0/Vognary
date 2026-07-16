@@ -6,6 +6,7 @@ import BillingReturnClient from "./billing-return-client";
 export const metadata: Metadata = {
   title: "Payment status · Vognary",
   description: "Check the settlement status of a Vognary checkout. Settlement is confirmed by Razorpay's signed webhook, not by this page loading.",
+  robots: { index: false, follow: false },
 };
 
 export default async function BillingReturnPage({ searchParams }: { searchParams: Promise<{ checkout?: string | string[] }> }) {
@@ -36,9 +37,9 @@ export default async function BillingReturnPage({ searchParams }: { searchParams
           <div className="mt-6 inset p-4">
             <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Good to know</p>
             <ul className="mt-2 grid gap-1.5 text-sm leading-6 text-(--muted)">
-              <li>— Razorpay also emails you a receipt for every successful payment. That email is independent proof.</li>
+              <li>— Keep the payment confirmation shown by Razorpay. Vognary does not claim settlement until the signed webhook is processed.</li>
               <li>— A paid private audit is delivered by reply to the email you used in the audit request.</li>
-              <li>— If this page cannot find your payment, reply to your Razorpay receipt or re-open the link from your audit request.</li>
+              <li>— If status remains unavailable, email support@vognary.com with the checkout reference shown in the return-page URL. Do not send card or bank credentials.</li>
             </ul>
           </div>
         </article>

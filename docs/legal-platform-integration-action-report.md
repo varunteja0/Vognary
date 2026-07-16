@@ -1,6 +1,6 @@
 # Vognary Legal Platform Integration Action Report
 
-Date: 2026-07-07 IST
+Updated: 2026-07-13 IST
 
 ## Executive Decision
 
@@ -8,34 +8,13 @@ Vognary must integrate platforms through permissioned, legal, auditable rails on
 
 The product direction is correct: become the evidence-first recurring-money graph. Every recommendation should show which source proved it, what source is missing, how fresh the evidence is, and whether the connector is live, ready-with-env, planned, or partner-gated.
 
-## Verified Current State
+## Current State Boundary
 
-Production check run:
-
-```bash
-npm run production:check -- https://www.vognary.com
-```
-
-Result summary:
-
-- Endpoint health: passing.
-- Beta readiness: passing.
-- Full activation readiness: incomplete because external accounts, secrets, storage, monitoring, and partner statuses are still missing.
-
-Ready in production:
-
-- Home, private audit, login, health, readiness, audit, connector, auth, and workspace guard endpoints.
-- Lead persistence.
-- Google identity.
-- Gmail OAuth start flow.
-- Persistent backend.
-- Private beta login.
-- Encrypted server audit snapshots.
-- Session cookies, token vault, connector token store, and internal sync job API.
+The repository contains the guest audit, encrypted signed-in persistence, source lifecycle, privacy controls, and one-time assisted-audit code paths. This report does not transfer those code claims to the deployed site. Re-run the production activation checker after deploying the same artifact and attach the output before describing any capability as production-active.
 
 Missing before full production activation:
 
-- Payment links: `PAYMENT_LINK_PERSONAL_PRO`, `PAYMENT_LINK_FOUNDER_PRO`, `PAYMENT_LINK_TEAM`, `PAYMENT_LINK_ANNUAL_AUDIT`.
+- Assisted-audit payment: qualified legal review, Razorpay KYC/keys/webhook, migration 0016, test payment, fresh-event replay, duplicate/out-of-order refund proof, and reconciliation. Static payment links are not a V1 path.
 - OpenAI direct sync key: a per-workspace key stored through the encrypted connector flow. `OPENAI_ADMIN_API_KEY` is local-preview-only.
 - Redis-backed public rate limiting: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
 - Monitoring and incident alerts: `SENTRY_DSN` or `BETTER_STACK_SOURCE_TOKEN`.

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { NextRequest } from "next/server";
 
 import { POST } from "../src/app/api/audit/route";
 
@@ -27,4 +28,24 @@ test("stateless audit accepts semimonthly commitments supported by the engine", 
   assert.equal(response.status, 200);
   const payload = await response.json();
   assert.equal(payload.audit.recurringItems[0]?.frequency, "semimonthly");
+});
+
+test("stateless audit rejects malformed supplied currency codes", async () => {
+    const response = await POST(new NextRequest("http://localhost/api/audit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        manualItems: [{
+          id: "manual-invalid-currency",
+          merchant: "Notion",
+          amount: 20,
+          currency: "USDX",
+          frequency: "monthly",
+          nextExpectedDate: "2026-08-01",
+          category: "SaaS",
+        }],
+      }),
+    }));
+
+    assert.equal(response.status, 400);
 });

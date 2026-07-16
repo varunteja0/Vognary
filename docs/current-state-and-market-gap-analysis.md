@@ -45,7 +45,7 @@ described as operating in production.
 | Session status API | Done | `/api/auth/session`. |
 | Workspace auth gate | Done | Workspace APIs require signed session. |
 | Encrypted synchronized workspace state | Done | Signed-in workspaces load automatically, save after a short debounce, reject stale revisions with `409`, and can pause/delete/resume synchronization through `/api/workspaces/current/audit-snapshot`. |
-| PostgreSQL schema + forward migrations | Code complete | Users/workspaces/sessions, connector control plane, canonical ledger, revisioned workspace state, privacy lifecycle, alerts, decisions, API tokens, billing entitlements, consent-bound connector accounts, and sync invocation evidence are modeled through `0002`–`0014`. CI applies the real schema to PostgreSQL 16 and runs database integration tests. Production databases must still apply them. |
+| PostgreSQL schema + forward migrations | Code complete | Users/workspaces/sessions, immutable Google identities, connector control plane, canonical ledger, revisioned workspace state, privacy lifecycle, alerts, decisions, API tokens, and assisted-audit settlement/fulfillment are modeled through `0016`. CI applies the real schema to PostgreSQL 16 and runs database integration tests. Production databases must still apply them. |
 | Canonical living ledger | Code complete | Connector batches and revisioned upload/manual workspace state idempotently materialize normalized sources, evidence, transactions, recurring items, evidence links, coverage, and usage observations. |
 | Persisted commitment decisions | Code complete | Workspace members can save safety-checked actions on canonical recurring items; reads/writes are scoped and audited, and the UI hydrates them from PostgreSQL. Requires migration `0007`. |
 | Consent-gated renewal alerts | Code complete | Authenticated opt-in preferences, 7-day/1-day deduplicated scheduling, privacy-minimized delivery rows, bounded retries, safe templates, and cron worker exist. Requires `0006`, verified email delivery, secrets, and a proven cron run. |
@@ -79,7 +79,7 @@ described as operating in production.
 | --- | --- | --- |
 | Public magic-link identity | Implemented | Production `SESSION_SECRET`/PostgreSQL, verified Resend sender, delivery test, shared rate limiting, and abuse monitoring |
 | Google identity + Gmail receipt sync | Implemented for approved/test users | Google restricted-scope verification, production OAuth credentials/redirects, token-vault key, and a real queued sync proof |
-| Database-backed product modules | Migrations `0002`–`0014` exist | Apply migrations in staging/production, verify `schema_migrations`, backup first, and run route/worker/database smoke tests |
+| Database-backed product modules | Migrations `0002`–`0016` exist | Apply migrations in staging/production, verify `schema_migrations`, backup first, and run route/worker/database smoke tests |
 | Connector synchronization | Scheduler/runner and registered adapters exist | Configure cron/internal secrets, Upstash, provider-owned credentials, permissions, and successful retry/disconnect/delete tests |
 | Renewal-alert delivery | Preference, schedule, worker, retry, and template code exists | Apply `0006`, verify email domain/sender, deploy cron, then prove opt-in → send → disable/cancel without payload leakage |
 | Privacy retention enforcement | Policy/export/executor and authenticated daily GET cron exist | Verify backup/restore, configure `CRON_SECRET` and Upstash, review a dry run, then observe and monitor enforced runs |
@@ -171,7 +171,7 @@ Proceed with Vognary if the next 7 days produce:
 - 3 users willing to pay after seeing the report,
 - 60% of audits with at least one avoidable/watch item,
 - repeated user language around "I did not know this was renewing",
-- at least 3 users asking for monthly monitoring.
+- repeated unsolicited requests for an ongoing refresh product (research only; not a current SKU).
 
 Pause if:
 
@@ -182,7 +182,7 @@ Pause if:
 
 ## Next Build Priority
 
-1. Apply migrations `0002`–`0014` to staging/production and repeat the PostgreSQL integration suite plus route/worker smoke tests (the disposable PostgreSQL 16 proof is automated in CI).
+1. Apply migrations through `0016` to staging/production and repeat the PostgreSQL integration suite plus route/worker smoke tests (the disposable PostgreSQL 16 proof is automated in CI).
 2. Activate production infrastructure: Upstash, monitoring delivery, encrypted backups plus restore drill, connector/renewal/retention cron secrets, and a verified Resend sender.
 3. Complete Google restricted-scope verification and prove Gmail connect → refresh → queued sync → canonical ledger → disconnect with approved test accounts before public rollout.
 4. Configure durable audit/waitlist lead persistence and run five real paid/serious audits; measure surprise findings, willingness to pay, and demand for monitoring.

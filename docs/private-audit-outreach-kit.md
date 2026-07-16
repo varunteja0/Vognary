@@ -56,9 +56,9 @@ Vognary turns this into an evidence-backed recurring burn report:
 
 You can redact sensitive details. No passwords, OTPs, CVV, or bank credentials.
 
-I am taking 10 private beta audits this week.
-If the report is useful, paid beta is INR 999 for individuals or INR 4,999 for founder/team audits.
-If I find nothing useful, do not pay.
+I am taking a small assisted-audit batch this week.
+The current one-time assisted audit is INR 999 for one request; it does not auto-renew or include monitoring.
+Online payment is offered only when tracked checkout is activated. If I find nothing useful, request a refund before evidence review closes.
 
 Intake link (no login needed): https://www.vognary.com/private-audit?src=li-post
 ```
@@ -171,7 +171,7 @@ I think this can help your clients before monthly bookkeeping/review because it 
 - unmanaged SaaS/cloud costs
 - source coverage gaps
 
-I am running 10 private beta audits this week.
+I am running a small assisted-audit batch this week.
 
 Would you be open to referring 1 client who has messy recurring spend?
 For the beta, I can give you the first audit report free so you can judge quality.
@@ -197,11 +197,11 @@ Has 10+ recurring payments
 Has UPI/card mandates
 Has insurance/EMIs/SIPs
 Will share at least one real source
-Can pay INR 999 or INR 4,999 after value
+Can evaluate the one-time INR 999 assisted audit after seeing the source plan
 ```
 
 Reject curiosity-only leads:
 
 ```text
-For this beta I am prioritizing people with real recurring payments and at least one source they can share. I will keep you posted when there is a self-serve version.
+I am prioritizing people with real recurring payments and at least one redacted source they can share. The self-audit is already available without login; assisted review slots are limited by operator capacity.
 ```

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { isLeadDatabaseConfigured, persistWaitlistLead } from "@/lib/server/lead-store";
+import { currentPrivacyNoticeVersion } from "@/lib/privacy-notice";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
     createdAt,
     source: "vognary-launch-page",
     consentPurpose: allowedConsentPurposes.has(requestedPurpose) ? requestedPurpose : "product-research-contact",
-    consentNoticeVersion: cleanText(body.consentNoticeVersion, 80) || "privacy-2026-07-11",
+    consentNoticeVersion: cleanText(body.consentNoticeVersion, 80) || currentPrivacyNoticeVersion,
     consentGrantedAt: createdAt,
   };
 

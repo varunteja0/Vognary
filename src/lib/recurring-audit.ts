@@ -1,4 +1,5 @@
 import { parseIsoDateOnly } from "./date-only";
+import { parseLooseCalendarDate, resolveNumericDateOrder, type NumericDateOrder } from "./loose-date";
 import { getCommitmentPolicy, type CommitmentPolicy } from "./commitment-policy";
 
 export type Frequency =
@@ -49,6 +50,8 @@ export type RecurringItem = {
   id: string;
   /** Canonical PostgreSQL id when this item includes server-synced evidence. */
   canonicalRecurringItemId?: string;
+  /** Stable non-financial discriminator used only when one merchant has multiple commitments. */
+  identityHint?: string;
   /**
    * Stable identity for user state (actions, notes, owners, merge decisions).
    * Derived from merchant + currency, NOT charge dates, so importing next
@@ -132,6 +135,7 @@ type FrequencyModel = {
 };
 
 const dayInMs = 24 * 60 * 60 * 1000;
+type DateAnchor = number | readonly [number, number];
 
 export const primaryCurrency = "INR";
 
@@ -219,7 +223,8 @@ export function analyzeStatements(
   const warnings: string[] = [];
   const uniqueSources = dedupeIdenticalSources(sources, warnings);
   const transactions = uniqueSources.flatMap((source) => parseCsvStatement(source.text, source.name, warnings));
-  const detectedItems = detectRecurringItems(transactions, today);
+  const recurrenceTransactions = selectRecurrenceTransactions(transactions, warnings);
+  const detectedItems = detectRecurringItems(recurrenceTransactions, today);
   const recurringItems = assignIdentityKeys(
     mergeManualEvidence(detectedItems, manualItems, today),
   ).sort((left, right) => right.monthlyCost - left.monthlyCost);
@@ -230,6 +235,38 @@ export function analyzeStatements(
     summary: summarizeAudit(transactions, recurringItems, today),
     warnings,
   };
+}
+
+function selectRecurrenceTransactions(transactions: ParsedTransaction[], warnings: string[]) {
+  const firstByFingerprint = new Map<string, ParsedTransaction>();
+  const selected: ParsedTransaction[] = [];
+  let ambiguousCopies = 0;
+
+  for (const transaction of transactions) {
+    const fingerprint = [
+      transaction.date,
+      transaction.normalizedMerchant.toLowerCase(),
+      transaction.amount.toFixed(2),
+      transaction.currency,
+      transaction.direction,
+      transaction.description.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim(),
+    ].join("|");
+    const existing = firstByFingerprint.get(fingerprint);
+    if (existing) {
+      ambiguousCopies += 1;
+      continue;
+    }
+    if (!existing) firstByFingerprint.set(fingerprint, transaction);
+    selected.push(transaction);
+  }
+
+  if (ambiguousCopies) {
+    warnings.push(
+      `Found ${ambiguousCopies} exact transaction match${ambiguousCopies === 1 ? "" : "es"} across the supplied evidence. `
+      + "All rows remain in the transaction ledger, but duplicate matches are not treated as independent recurrence proof because the source files do not identify an account.",
+    );
+  }
+  return selected;
 }
 
 // Importing the same file twice (same text, any filename) must never double
@@ -270,22 +307,25 @@ export function getFrequencyGapDays(frequency: Frequency): number {
   return frequencyModels.find((item) => item.frequency === frequency)?.expectedGapDays ?? 30.44;
 }
 
-export function advanceDateByFrequency(date: Date, frequency: Frequency, fallbackGapDays = 30.44, anchorDay?: number): Date {
+export function advanceDateByFrequency(date: Date, frequency: Frequency, fallbackGapDays = 30.44, anchorDay?: DateAnchor): Date {
   switch (frequency) {
     case "weekly":
       return addDays(date, 7);
     case "biweekly":
       return addDays(date, 14);
     case "semimonthly":
+      if (Array.isArray(anchorDay)) return advanceSemimonthly(date, anchorDay as readonly [number, number]);
+      if (date.getDate() === 1) return new Date(date.getFullYear(), date.getMonth(), 15);
+      if (date.getDate() === 15) return new Date(date.getFullYear(), date.getMonth() + 1, 1);
       return addDays(date, 15);
     case "monthly":
-      return addMonthsAnchored(date, 1, anchorDay);
+      return addMonthsAnchored(date, 1, typeof anchorDay === "number" ? anchorDay : undefined);
     case "bimonthly":
-      return addMonthsAnchored(date, 2, anchorDay);
+      return addMonthsAnchored(date, 2, typeof anchorDay === "number" ? anchorDay : undefined);
     case "quarterly":
-      return addMonthsAnchored(date, 3, anchorDay);
+      return addMonthsAnchored(date, 3, typeof anchorDay === "number" ? anchorDay : undefined);
     case "yearly":
-      return addMonthsAnchored(date, 12, anchorDay);
+      return addMonthsAnchored(date, 12, typeof anchorDay === "number" ? anchorDay : undefined);
     default:
       return addDays(date, Math.max(7, Math.round(fallbackGapDays || 30.44)));
   }
@@ -332,26 +372,60 @@ function summarizeAudit(transactions: ParsedTransaction[], recurringItems: Recur
   };
 }
 
-// Identity keys: merchant + currency, independent of charge dates. When one
-// merchant genuinely carries multiple commitments (plan + usage), later items
-// get a deterministic ::2/::3 suffix by cost rank.
+// Every commitment is qualified from first appearance. Waiting until a
+// collision exists would change the singleton's key when a sibling is added.
 function assignIdentityKeys(items: RecurringItem[]): RecurringItem[] {
   const byBase = new Map<string, RecurringItem[]>();
   for (const item of items) {
     const base = `${item.normalizedMerchant.trim().toLowerCase()}::${item.currency}`;
-    const group = byBase.get(base);
-    if (group) group.push(item);
-    else byBase.set(base, [item]);
+    byBase.set(base, [...(byBase.get(base) ?? []), item]);
   }
 
-  const keyed: RecurringItem[] = [];
-  for (const [base, group] of byBase) {
-    const ordered = [...group].sort((left, right) => right.monthlyCost - left.monthlyCost);
-    ordered.forEach((item, index) => {
-      keyed.push({ ...item, identityKey: index === 0 ? base : `${base}::${index + 1}` });
-    });
+  return items.map((item) => {
+    const base = `${item.normalizedMerchant.trim().toLowerCase()}::${item.currency}`;
+    const group = byBase.get(base) ?? [];
+    const hint = stableIdentityHint(item);
+    const sameHint = group.filter((candidate) => stableIdentityHint(candidate) === hint);
+    if (sameHint.length <= 1) return { ...item, identityKey: `${base}::${stableHash(hint)}` };
+
+    const ordered = [...sameHint].sort((left, right) => stableCollisionOrder(left).localeCompare(stableCollisionOrder(right)));
+    const index = ordered.findIndex((candidate) => candidate === item);
+    return { ...item, identityKey: `${base}::${stableHash(hint)}::${index + 1}` };
+  });
+}
+
+function stableIdentityHint(item: RecurringItem) {
+  if (item.canonicalRecurringItemId) return `canonical|${item.canonicalRecurringItemId}`;
+  if (item.identityHint) return item.identityHint;
+  return `descriptor|${normalizeIdentityDescriptor(item.merchant)}`;
+}
+
+function stableCollisionOrder(item: RecurringItem) {
+  return [
+    item.canonicalRecurringItemId ?? "",
+    item.identityHint ?? "",
+    normalizeIdentityDescriptor(item.merchant),
+    [...item.sourceNames].sort().join("|"),
+  ].join("|");
+}
+
+function normalizeIdentityDescriptor(value: string) {
+  return value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\b\d{1,4}[-/]\d{1,2}[-/]\d{1,4}\b/g, " ")
+    .replace(/(?:₹|rs\.?|inr|usd|eur|gbp|cad|aud|\$|€|£)?\s*\d[\d,.]*/g, " ")
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, " ")
+    .trim();
+}
+
+function stableHash(value: string) {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
   }
-  return keyed;
+  return (hash >>> 0).toString(36);
 }
 
 function buildManualRecurringItem(input: ManualRecurringInput, today: Date): RecurringItem {
@@ -360,7 +434,8 @@ function buildManualRecurringItem(input: ManualRecurringInput, today: Date): Rec
   const averageGapDays = getFrequencyGapDays(input.frequency);
   const monthlyCost = input.amount * multiplier;
   const sourceName = input.sourceName || "manual entry";
-  const currency = normalizeCurrency(input.currency);
+  const currency = normalizeCurrencyCode(input.currency);
+  if (!currency) throw new Error("Manual commitment currency must be a three-letter code.");
   const projected = projectNextExpectedDate(input.nextExpectedDate, today, input.frequency, averageGapDays);
   const category = input.category || normalized.category;
   const policy = getCommitmentPolicy(category);
@@ -372,6 +447,9 @@ function buildManualRecurringItem(input: ManualRecurringInput, today: Date): Rec
   return {
     id: input.id,
     canonicalRecurringItemId: input.canonicalRecurringItemId,
+    identityHint: input.canonicalRecurringItemId
+      ? `canonical|${input.canonicalRecurringItemId}`
+      : `manual|${input.id}`,
     identityKey: `${normalized.merchant.trim().toLowerCase()}::${currency}`,
     merchant: input.merchant.trim() || normalized.merchant,
     normalizedMerchant: normalized.merchant,
@@ -447,8 +525,10 @@ function canMergeEvidence(item: RecurringItem, manual: RecurringItem): boolean {
 }
 
 function mergeEvidence(target: RecurringItem, manual: RecurringItem, input: ManualRecurringInput, today: Date): RecurringItem {
-  const evidence = [...target.evidence, ...manual.evidence].sort((left, right) => compareDate(left.date, right.date));
-  const sourceNames = [...new Set([...target.sourceNames, ...manual.sourceNames])];
+  const evidence = dedupeEvidence([...target.evidence, ...manual.evidence])
+    .sort((left, right) => compareDate(left.date, right.date));
+  const uniqueEvidenceAdded = evidence.length > target.evidence.length;
+  const sourceNames = [...new Set(evidence.map((link) => link.source))];
   const amounts = evidence.map((link) => link.amount).filter((amount) => Number.isFinite(amount) && amount > 0);
   const averageAmount = average(amounts);
   const amountMin = amounts.length ? Math.min(...amounts) : target.amountMin;
@@ -456,7 +536,9 @@ function mergeEvidence(target: RecurringItem, manual: RecurringItem, input: Manu
   const amountVariance = averageAmount ? (amountMax - amountMin) / averageAmount : 0;
   const frequency = target.frequency === "irregular" ? manual.frequency : target.frequency;
   const monthlyCost = averageAmount * getFrequencyMonthlyMultiplier(frequency);
-  const confidenceScore = Math.min(98, Math.max(target.confidenceScore, manual.confidenceScore) + 6);
+  const confidenceScore = uniqueEvidenceAdded
+    ? Math.min(98, Math.max(target.confidenceScore, manual.confidenceScore) + 6)
+    : target.confidenceScore;
   const nextExpectedDate = pickNextExpectedDate(target.nextExpectedDate, manual.nextExpectedDate, today);
   const merchant = genericMerchantNames.has(target.merchant) && input.merchant.trim() ? input.merchant.trim() : target.merchant;
   const recommendation = recommendItem(target.category, monthlyCost, confidenceScore, nextExpectedDate, amountVariance, today);
@@ -466,12 +548,13 @@ function mergeEvidence(target: RecurringItem, manual: RecurringItem, input: Manu
     ...target.riskTags.filter((tag) => !singleSourceTags.has(tag)),
     ...manual.riskTags.filter((tag) => !singleSourceTags.has(tag)),
     ...recommendation.riskTags,
-    "multi-source verified",
+    ...(uniqueEvidenceAdded && sourceNames.length > 1 ? ["multi-source verified"] : []),
   ])];
 
   return {
     ...target,
     canonicalRecurringItemId: target.canonicalRecurringItemId ?? manual.canonicalRecurringItemId,
+    identityHint: target.identityHint ?? manual.identityHint,
     merchant,
     frequency,
     amountMin,
@@ -482,11 +565,28 @@ function mergeEvidence(target: RecurringItem, manual: RecurringItem, input: Manu
     nextExpectedDate,
     confidenceScore,
     recommendationType: recommendation.type,
-    recommendationReason: `${recommendation.reason} Confirmed by ${sourceNames.length} independent sources.`,
+    recommendationReason: uniqueEvidenceAdded && sourceNames.length > 1
+      ? `${recommendation.reason} Confirmed by ${sourceNames.length} independent sources.`
+      : recommendation.reason,
     riskTags,
     evidence,
     sourceNames,
   };
+}
+
+function dedupeEvidence(evidence: EvidenceLink[]) {
+  const seen = new Set<string>();
+  return evidence.filter((link) => {
+    const fingerprint = [
+      link.date,
+      link.amount.toFixed(2),
+      link.description.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim(),
+      link.kind ?? "observed-charge",
+    ].join("|");
+    if (seen.has(fingerprint)) return false;
+    seen.add(fingerprint);
+    return true;
+  });
 }
 
 export type MergeDecision = "merge" | "separate";
@@ -577,7 +677,7 @@ export function applyMergeDecisionsToAudit(
     const [leftKey, rightKey] = pairKey.split("||");
     const left = byKey.get(leftKey);
     const right = byKey.get(rightKey);
-    if (!left || !right || left === right) continue;
+    if (!left || !right || left === right || left.currency !== right.currency) continue;
 
     const combined = combineRecurringItems(left, right, today);
     byKey.delete(leftKey);
@@ -626,6 +726,7 @@ function combineRecurringItems(left: RecurringItem, right: RecurringItem, today:
   return {
     ...primary,
     canonicalRecurringItemId: primary.canonicalRecurringItemId ?? other.canonicalRecurringItemId,
+    identityHint: primary.identityHint ?? other.identityHint,
     merchant,
     frequency,
     amountMin,
@@ -671,6 +772,7 @@ function parseCsvStatement(input: string, source: string, warnings: string[]): P
   const amountIndex = findHeader(headers, ["amount", "transactionamount", "amt", "value"]);
   const debitIndex = findHeader(headers, ["debit", "withdrawal", "withdrawals", "paidout", "debitamount", "dr", "withdrawalamt", "withdrawalamountinr", "withdrawalamtinr", "withdrawaldr"]);
   const creditIndex = findHeader(headers, ["credit", "deposit", "deposits", "paidin", "creditamount", "cr", "depositamt", "depositamountinr", "depositamtinr", "depositcr"]);
+  const currencyIndex = findHeader(headers, ["currency", "currencycode", "ccy", "curr"]);
 
   if (dateIndex === -1) warnings.push("No date column was found. Add a Date or Transaction Date column.");
   if (descriptionIndex === -1) warnings.push("No merchant/description column was found. Add Description, Narration, or Particulars.");
@@ -679,15 +781,19 @@ function parseCsvStatement(input: string, source: string, warnings: string[]): P
 
   // Resolve dd/mm vs mm/dd once per source: any row with day>12 in one slot
   // disambiguates the whole file, instead of guessing row by row.
-  const preferMonthFirst = detectMonthFirstDates(rows.slice(1).map((cells) => cells[dateIndex] ?? ""));
+  const dateResolution = resolveNumericDateOrder(rows.slice(1).map((cells) => cells[dateIndex] ?? ""));
+  if (dateResolution.status === "ambiguous") warnings.push("Ambiguous numeric statement dates were skipped because the source did not establish day-first or month-first order.");
+  if (dateResolution.status === "conflicting") warnings.push("Conflicting numeric statement date orders were found; ambiguous rows were skipped.");
+  if (dateResolution.invalidCount) warnings.push(`${dateResolution.invalidCount} invalid calendar date row(s) were skipped.`);
 
   const transactions: ParsedTransaction[] = [];
+  let invalidCurrencyRows = 0;
 
   rows.slice(1).forEach((cells, index) => {
     const rowNumber = index + 2;
     const rawDate = cells[dateIndex] ?? "";
     const rawDescription = cells[descriptionIndex] ?? "";
-    const parsedDate = parseDate(rawDate, preferMonthFirst);
+    const parsedDate = parseStatementDate(rawDate, dateResolution.order);
     const description = rawDescription.trim();
     const amount = extractOutflowAmount(cells, amountIndex, debitIndex, creditIndex, description);
 
@@ -698,6 +804,11 @@ function parseCsvStatement(input: string, source: string, warnings: string[]): P
       amountIndex >= 0 ? cells[amountIndex] : "",
       debitIndex >= 0 ? cells[debitIndex] : "",
     ].join(" ");
+    const currency = resolveStatementCurrency(currencyIndex >= 0 ? cells[currencyIndex] : undefined, `${rawAmountText} ${description}`);
+    if (!currency) {
+      invalidCurrencyRows += 1;
+      return;
+    }
 
     transactions.push({
       id: `${source}-${rowNumber}`,
@@ -706,12 +817,14 @@ function parseCsvStatement(input: string, source: string, warnings: string[]): P
       date: formatDate(parsedDate),
       description,
       amount: amount.value,
-      currency: detectCurrency(`${rawAmountText} ${description}`),
+      currency,
       direction: amount.direction,
       normalizedMerchant: normalized.merchant,
       category: normalized.category,
     });
   });
+
+  if (invalidCurrencyRows) warnings.push(`${invalidCurrencyRows} row(s) with an invalid or ambiguous currency were skipped.`);
 
   if (!transactions.length) {
     warnings.push("No debit transactions were detected. Check whether expenses are positive, negative, or split into Debit/Credit columns.");
@@ -720,32 +833,32 @@ function parseCsvStatement(input: string, source: string, warnings: string[]): P
   return transactions.sort((left, right) => compareDate(left.date, right.date));
 }
 
-function detectMonthFirstDates(rawDates: string[]): boolean {
-  let dayFirstEvidence = 0;
-  let monthFirstEvidence = 0;
-
-  for (const raw of rawDates) {
-    const match = raw.trim().match(/^(\d{1,2})[/-](\d{1,2})[/-]\d{2,4}$/);
-    if (!match) continue;
-    const first = Number.parseInt(match[1], 10);
-    const second = Number.parseInt(match[2], 10);
-    if (first > 12 && second <= 12) dayFirstEvidence += 1;
-    if (second > 12 && first <= 12) monthFirstEvidence += 1;
+function parseStatementDate(value: string, numericOrder: NumericDateOrder | null) {
+  if (/^(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})$/.test(value.trim())) {
+    const parsed = parseLooseCalendarDate(value, numericOrder);
+    return parsed ? parseIsoDateOnly(parsed) : null;
   }
-
-  return monthFirstEvidence > dayFirstEvidence;
+  return parseDate(value);
 }
 
-function normalizeCurrency(value: string | undefined): string {
-  const trimmed = value?.trim().toUpperCase();
-  if (!trimmed) return primaryCurrency;
-  return /^[A-Z]{3}$/.test(trimmed) ? trimmed : primaryCurrency;
+export function normalizeCurrencyCode(value: unknown, fallback: string | null = primaryCurrency): string | null {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().toUpperCase();
+  if (!trimmed) return fallback;
+  return /^[A-Z]{3}$/.test(trimmed) ? trimmed : null;
 }
 
-function detectCurrency(text: string): string {
-  if (/\bUSD\b|\$/.test(text)) return "USD";
-  if (/\bEUR\b|€/.test(text)) return "EUR";
-  if (/\bGBP\b|£/.test(text)) return "GBP";
+function resolveStatementCurrency(columnValue: string | undefined, text: string): string | null {
+  if (columnValue?.trim()) return normalizeCurrencyCode(columnValue, null);
+  if (/\bCAD\b|CA\$/i.test(text)) return "CAD";
+  if (/\bAUD\b|AU\$/i.test(text)) return "AUD";
+  if (/\bUSD\b|US\$/i.test(text)) return "USD";
+  if (/\bEUR\b|€/i.test(text)) return "EUR";
+  if (/\bGBP\b|£/i.test(text)) return "GBP";
+  if (/\bJPY\b|JP¥|¥/i.test(text)) return "JPY";
+  if (/\bINR\b|₹|\bRs\.?\b/i.test(text)) return "INR";
+  if (/\$/.test(text)) return null;
   return primaryCurrency;
 }
 
@@ -882,6 +995,7 @@ function buildSingleOccurrenceItem(merchant: string, transaction: ParsedTransact
 
   return {
     id: slugify(`${merchant}-${transaction.date}`),
+    identityHint: statementIdentityHint(merchant, [transaction]),
     identityKey: `${merchant.trim().toLowerCase()}::${transaction.currency}`,
     merchant,
     normalizedMerchant: merchant,
@@ -935,9 +1049,11 @@ function buildRecurringItem(merchant: string, group: ParsedTransaction[], today:
   const currency = transactions[0].currency;
   const lastChargeDate = transactions[transactions.length - 1].date;
   const lastDate = parseDate(lastChargeDate) ?? today;
-  const anchorDay = monthAnchoredFrequencies.has(frequency.frequency)
-    ? medianDayOfMonth(transactionDates)
-    : undefined;
+  const anchorDay: DateAnchor | undefined = frequency.frequency === "semimonthly"
+    ? semimonthlyAnchors(transactionDates)
+    : monthAnchoredFrequencies.has(frequency.frequency)
+      ? recurringMonthAnchor(transactionDates)
+      : undefined;
   const cycleGapDays = frequency.expectedGapDays || averageGapDays || 30.44;
   const firstNext = advanceDateByFrequency(lastDate, frequency.frequency, cycleGapDays, anchorDay);
   const rolled = rollForwardDate(firstNext, today, frequency.frequency, cycleGapDays, anchorDay);
@@ -972,6 +1088,7 @@ function buildRecurringItem(merchant: string, group: ParsedTransaction[], today:
 
   return {
     id: slugify(`${merchant}-${lastChargeDate}`),
+    identityHint: statementIdentityHint(merchant, transactions),
     identityKey: `${merchant.trim().toLowerCase()}::${currency}`,
     merchant,
     normalizedMerchant: merchant,
@@ -1002,6 +1119,14 @@ function buildRecurringItem(merchant: string, group: ParsedTransaction[], today:
     missedCycles: rolled.missedCycles,
     priceChange,
   };
+}
+
+function statementIdentityHint(merchant: string, transactions: ParsedTransaction[]) {
+  const descriptors = transactions
+    .map((transaction) => normalizeIdentityDescriptor(transaction.description))
+    .filter(Boolean)
+    .sort((left, right) => left.length - right.length || left.localeCompare(right));
+  return `statement|${descriptors[0] || normalizeIdentityDescriptor(merchant)}`;
 }
 
 function detectPriceChange(amountsInDateOrder: number[]): PriceChange | null {
@@ -1199,7 +1324,7 @@ function rollForwardDate(
   today: Date,
   frequency: Frequency,
   fallbackGapDays: number,
-  anchorDay?: number,
+  anchorDay?: DateAnchor,
 ): { date: Date; missedCycles: number } {
   let date = start;
   let missedCycles = 0;
@@ -1218,14 +1343,46 @@ function addMonthsAnchored(date: Date, months: number, anchorDay?: number): Date
   return new Date(firstOfTarget.getFullYear(), firstOfTarget.getMonth(), day);
 }
 
+function advanceSemimonthly(date: Date, anchors: readonly [number, number]) {
+  const [first, second] = anchors[0] <= anchors[1] ? anchors : [anchors[1], anchors[0]];
+  const day = normalizedAnchorDay(date);
+  if (day < second) return anchoredDay(date.getFullYear(), date.getMonth(), second);
+  return anchoredDay(date.getFullYear(), date.getMonth() + 1, first);
+}
+
+function anchoredDay(year: number, month: number, anchor: number) {
+  const firstOfMonth = new Date(year, month, 1);
+  const day = Math.min(anchor, daysInMonth(firstOfMonth));
+  return new Date(firstOfMonth.getFullYear(), firstOfMonth.getMonth(), day);
+}
+
 function daysInMonth(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 }
 
-function medianDayOfMonth(dates: Date[]): number | undefined {
+function recurringMonthAnchor(dates: Date[]): number | undefined {
   if (!dates.length) return undefined;
+  if (dates.length >= 2 && dates.every((date) => date.getDate() === daysInMonth(date))) return 31;
   const days = dates.map((date) => date.getDate()).sort((left, right) => left - right);
   return days[Math.floor(days.length / 2)];
+}
+
+function semimonthlyAnchors(dates: Date[]): readonly [number, number] | undefined {
+  const normalized = dates.map(normalizedAnchorDay).sort((left, right) => left - right);
+  if (normalized.length < 4) return undefined;
+  const clusters: number[][] = [];
+  for (const day of normalized) {
+    const cluster = clusters.find((candidate) => Math.abs(average(candidate) - day) <= 2);
+    if (cluster) cluster.push(day);
+    else clusters.push([day]);
+  }
+  if (clusters.length !== 2 || clusters.some((cluster) => cluster.length < 2)) return undefined;
+  const anchors = clusters.map((cluster) => Math.round(average(cluster))).sort((left, right) => left - right);
+  return [anchors[0], anchors[1]];
+}
+
+function normalizedAnchorDay(date: Date) {
+  return date.getDate() === daysInMonth(date) ? 31 : date.getDate();
 }
 
 function parseMoney(value: string): number | null {
@@ -1274,7 +1431,8 @@ function parseDate(value: string | Date, preferMonthFirst = false): Date | null 
     }
 
     const date = new Date(year, month - 1, day);
-    return Number.isNaN(date.getTime()) ? null : startOfDay(date);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+    return startOfDay(date);
   }
 
   const nativeDate = new Date(trimmed);
@@ -1297,11 +1455,15 @@ function daysBetween(left: string, right: string): number {
   const leftDate = parseDate(left);
   const rightDate = parseDate(right);
   if (!leftDate || !rightDate) return 0;
-  return Math.round((rightDate.getTime() - leftDate.getTime()) / dayInMs);
+  return Math.round((civilDayNumber(rightDate) - civilDayNumber(leftDate)) / dayInMs);
 }
 
 function addDays(date: Date, days: number): Date {
-  return new Date(date.getTime() + Math.round(days) * dayInMs);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + Math.round(days));
+}
+
+function civilDayNumber(date: Date) {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function startOfDay(date: Date): Date {

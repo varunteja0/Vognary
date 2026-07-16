@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import RevealController from "./reveal-controller";
 
 const grotesk = Geist({
   variable: "--font-grotesk",
@@ -69,13 +68,12 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <a
-          href="#ledger-main"
+          href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-(--glow) focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[#0a0c10]"
         >
-          Skip to audit
+          Skip to main content
         </a>
-        <div className="relative z-10 flex min-h-full flex-col">{children}</div>
-        <RevealController />
+        <div id="main-content" tabIndex={-1} className="relative z-10 flex min-h-full flex-col outline-none">{children}</div>
       </body>
     </html>
   );

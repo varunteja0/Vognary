@@ -1,6 +1,8 @@
 import { buildConnectorConsentResourceKey } from "@/lib/consent";
+import { currentPrivacyNoticeVersion } from "@/lib/privacy-notice";
 import { getConnectorById, type Connector } from "@/lib/connectors";
 import { buildConnectorStartResponse } from "@/lib/connector-runtime";
+import { getConnectorAdapter } from "@/lib/connectors/adapter-registry";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { runConnectorSyncJob } from "@/lib/server/connector-sync-runner";
 import { getDatabasePool, isDatabaseConfigured } from "@/lib/server/database";
@@ -70,6 +72,13 @@ export async function POST(request: Request, context: ConnectorRouteContext) {
 async function connectApiKeyConnector(request: Request, connector: Connector, body: Record<string, unknown>, apiKey: string) {
   if (connector.authType !== "api-key") {
     return Response.json({ error: `${connector.name} does not accept API-key connection payloads.` }, { status: 400 });
+  }
+  const start = buildConnectorStartResponse(connector.id);
+  if (start.state !== "ready-to-connect" || !getConnectorAdapter(connector.id)) {
+    return Response.json({
+      error: `${connector.name} is not available for credential storage or synchronization in this deployment.`,
+      state: start.state,
+    }, { status: 409 });
   }
 
   if (!isDatabaseConfigured()) {
@@ -150,7 +159,7 @@ async function persistApiKeyConnector(input: {
       subjectEmail: input.email,
       resourceKey: buildConnectorConsentResourceKey(input.connector.id, input.providerAccountId),
       purpose: "provider-connector-sync",
-      noticeVersion: "privacy-2026-07-11",
+      noticeVersion: currentPrivacyNoticeVersion,
       source: "api-key-connector-start",
       scopes,
     }, client);

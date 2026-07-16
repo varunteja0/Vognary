@@ -1,9 +1,8 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { encodeCsvCell } from "@/lib/csv";
 import { connectors, type Connector, type ConnectorStatus } from "@/lib/connectors";
-import type { BillingPlan } from "@/lib/billing";
 import {
   analyzeStatements,
   applyMergeDecisionsToAudit,
@@ -32,6 +31,7 @@ import { redactText } from "@/lib/redaction";
 import { getCommitmentPolicy, isCommitmentActionAllowed, type CommitmentAction } from "@/lib/commitment-policy";
 import { resolveCommitmentDecisionIdentityKey } from "@/lib/commitment-decisions";
 import { buildConnectorCoverageWindows, connectorEvidenceSourceName } from "@/lib/connector-source-identity";
+import { guestAuditTransferKey, parseGuestAuditSnapshot, type GuestAuditSnapshot } from "@/lib/guest-audit-transfer";
 import type { ProductEventMetricName, ProductEventName } from "@/lib/product-events";
 import GuidedCapturePanel from "./guided-capture-panel";
 import { VognaryMark } from "./brand";
@@ -312,29 +312,38 @@ function getInitialWorkspace(): WorkspaceBackup | null {
 // cascade through four state updates after paint.
 function migrateLegacyWorkspaceKeys(workspace: WorkspaceBackup): WorkspaceBackup {
   const legacyPattern = /-\d{4}-\d{2}-\d{2}$/;
-  const records = [
-    workspace.userActions,
-    workspace.actionsMeta ?? {},
-    workspace.itemOwners,
-    workspace.reviewNotes,
-  ];
-  if (!records.some((record) => Object.keys(record).some((key) => legacyPattern.test(key)))) {
-    return workspace;
-  }
-
   const receiptItems = receiptTextToManualInputs(workspace.receiptText ?? "");
   const audit = analyzeStatements(
     workspace.statementSources.map(({ name, text }) => ({ name, text })),
     [...workspace.manualItems, ...receiptItems],
   );
   const mapKey = (key: string): string => {
-    if (!legacyPattern.test(key)) return key;
-    const merchantSlug = key.replace(legacyPattern, "");
-    const match = audit.recurringItems.find((item) => slugifyKey(item.normalizedMerchant) === merchantSlug);
-    return match?.identityKey ?? key;
+    if (audit.recurringItems.some((item) => item.identityKey === key)) return key;
+    if (legacyPattern.test(key)) {
+      const merchantSlug = key.replace(legacyPattern, "");
+      const match = audit.recurringItems.find((item) => slugifyKey(item.normalizedMerchant) === merchantSlug);
+      return match?.identityKey ?? key;
+    }
+
+    const rankedKey = key.match(/^(.*::[A-Z]{3})(?:::(\d+))?$/);
+    if (!rankedKey) return key;
+    const candidates = audit.recurringItems
+      .filter((item) => item.identityKey.startsWith(`${rankedKey[1]}::`))
+      .sort((left, right) => right.monthlyCost - left.monthlyCost || left.identityKey.localeCompare(right.identityKey));
+    const oldRank = Math.max(0, Number.parseInt(rankedKey[2] ?? "1", 10) - 1);
+    return candidates[oldRank]?.identityKey ?? key;
   };
   const remap = <T,>(record: Record<string, T>): Record<string, T> =>
     Object.fromEntries(Object.entries(record).map(([key, value]) => [mapKey(key), value]));
+  const remapPairs = (record: Record<string, MergeDecision>): Record<string, MergeDecision> =>
+    Object.fromEntries(Object.entries(record).map(([pairKey, value]) => {
+      const [left, right] = pairKey.split("||");
+      return [left && right ? [mapKey(left), mapKey(right)].sort().join("||") : pairKey, value];
+    }));
+  const remappedLastReview = workspace.lastReview ? {
+    ...workspace.lastReview,
+    items: workspace.lastReview.items.map((item) => ({ ...item, key: mapKey(item.key) })),
+  } : null;
 
   return {
     ...workspace,
@@ -342,6 +351,8 @@ function migrateLegacyWorkspaceKeys(workspace: WorkspaceBackup): WorkspaceBackup
     actionsMeta: remap(workspace.actionsMeta ?? {}),
     itemOwners: remap(workspace.itemOwners),
     reviewNotes: remap(workspace.reviewNotes),
+    mergeDecisions: remapPairs(workspace.mergeDecisions ?? {}),
+    lastReview: remappedLastReview,
   };
 }
 
@@ -415,14 +426,13 @@ const workspaceSectionIds = workspaceSections.map((section) => section.id);
 type WorkspaceSectionId = (typeof workspaceSections)[number]["id"];
 
 export default function VognaryMvpClient({ experienceMode = "signed-in" }: { experienceMode?: ExperienceMode }) {
-  const searchParams = useSearchParams();
   const [initialWorkspace] = useState<WorkspaceBackup | null>(() => {
     const workspace = experienceMode === "demo" ? buildDemoWorkspace() : null;
     return workspace ? migrateLegacyWorkspaceKeys(workspace) : null;
   });
   const [statementSources, setStatementSources] = useState<StatementFile[]>(initialWorkspace?.statementSources ?? []);
   const [manualItems, setManualItems] = useState<ManualRecurringInput[]>(initialWorkspace?.manualItems ?? []);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(() => searchParams.get("item"));
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [userActions, setUserActions] = useState<Record<string, RecommendationType>>(initialWorkspace?.userActions ?? {});
   const [actionsMeta, setActionsMeta] = useState<Record<string, ActionMeta>>(initialWorkspace?.actionsMeta ?? {});
   const [mergeDecisions, setMergeDecisions] = useState<Record<string, MergeDecision>>(initialWorkspace?.mergeDecisions ?? {});
@@ -442,6 +452,7 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
   const [serverSession, setServerSession] = useState<ServerSessionPayload | null>(null);
   const [serverSaveStatus, setServerSaveStatus] = useState<string | null>(null);
   const [serverWorkspaceHydrated, setServerWorkspaceHydrated] = useState(false);
+  const [serverSaveRetry, setServerSaveRetry] = useState(0);
   const [connectorStartResults, setConnectorStartResults] = useState<Record<string, ConnectorStartPayload>>({});
   const [connectingConnectorId, setConnectingConnectorId] = useState<string | null>(null);
   const [syncingConnectorId, setSyncingConnectorId] = useState<string | null>(null);
@@ -453,14 +464,17 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
   const [disconnectedConnectorIds, setDisconnectedConnectorIds] = useState<string[]>([]);
   const [mobileSection, setMobileSection] = useState<WorkspaceSectionId>("overview");
   const [mobileViewport, setMobileViewport] = useState(false);
-  const [billingPlan, setBillingPlan] = useState<Exclude<BillingPlan, "annual">>("founder");
-  const [checkoutBusy, setCheckoutBusy] = useState(false);
   const activationEventSent = useRef(false);
   const ledgerViewEventSent = useRef(false);
   const serverRevisionRef = useRef<number | null>(null);
   const lastServerSnapshotRef = useRef<string | null>(null);
   const serverSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const serverSyncGenerationRef = useRef(0);
+  const guestTransferImportedRef = useRef(false);
+  const guestTransferPendingSyncRef = useRef(false);
+  const guestTransferSnapshotRef = useRef<GuestAuditSnapshot | null>(null);
+  const serverSaveRetryCountRef = useRef(0);
+  const serverSaveRetryTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (experienceMode !== "guest") return;
@@ -505,30 +519,6 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
       window.removeEventListener("hashchange", updateHash);
     };
   }, []);
-
-  useEffect(() => {
-    if (!serverSession?.authenticated || typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    if (url.searchParams.get("billing") !== "returned") return;
-    let cancelled = false;
-    void fetch("/api/billing/entitlements", { cache: "no-store" })
-      .then(async (response) => ({ response, payload: await response.json().catch(() => ({})) as { entitlements?: Array<{ status?: string; expiresAt?: string }> } }))
-      .then(({ response, payload }) => {
-        if (cancelled) return;
-        const active = payload.entitlements?.find((entitlement) => entitlement.status === "active");
-        setNotice(response.ok && active
-          ? `Monitoring access is active through ${active.expiresAt?.slice(0, 10) ?? "the current paid period"}.`
-          : "Payment returned, but settlement is still being verified. Access activates only after the signed Razorpay webhook is processed.");
-        url.searchParams.delete("billing");
-        window.history.replaceState(null, "", url);
-      })
-      .catch(() => {
-        if (!cancelled) setNotice("Payment returned, but entitlement status could not be checked yet. Retry from this workspace shortly.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [serverSession]);
 
   // Deferred so fast typing in the receipt box never blocks the frame on a
   // full re-analysis; the ledger catches up when typing pauses.
@@ -623,15 +613,6 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // Selected item is URL-addressable: refresh and share keep the position.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const url = new URL(window.location.href);
-    if (selectedItemId) url.searchParams.set("item", selectedItemId);
-    else url.searchParams.delete("item");
-    window.history.replaceState(null, "", url);
-  }, [selectedItemId]);
-
   useEffect(() => {
     let ignore = false;
 
@@ -724,6 +705,38 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
   }, [serverSession?.authenticated, serverSession?.session?.workspaceId]);
 
   useEffect(() => {
+    if (!serverSession?.authenticated || !serverWorkspaceHydrated || guestTransferImportedRef.current) return;
+    const rawGuest = window.sessionStorage.getItem(guestAuditTransferKey);
+    const guest = parseGuestAuditSnapshot(rawGuest);
+    guestTransferImportedRef.current = true;
+    if (!guest) {
+      if (rawGuest) window.sessionStorage.removeItem(guestAuditTransferKey);
+      return;
+    }
+
+    guestTransferSnapshotRef.current = guest;
+    guestTransferPendingSyncRef.current = true;
+    queueMicrotask(() => {
+      setStatementSources((current) => {
+        const next = [...current];
+        guest.statementSources.forEach((source) => {
+          if (!next.some((candidate) => candidate.text === source.text)) next.push(source);
+        });
+        return next;
+      });
+      setManualItems((current) => {
+        const next = [...current];
+        guest.manualItems.forEach((item) => {
+          if (!next.some((candidate) => candidate.id === item.id)) next.push(item);
+        });
+        return next;
+      });
+      setReceiptText((current) => mergeReceiptText(current, guest.receiptText));
+      setNotice("Your guest audit is intact. Saving it to this encrypted workspace now…");
+    });
+  }, [serverSession?.authenticated, serverWorkspaceHydrated]);
+
+  useEffect(() => {
     if (!serverSession?.authenticated || !serverWorkspaceHydrated) return;
     const snapshot = buildWorkspaceBackup({
       statementSources,
@@ -745,37 +758,46 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
       serverSaveQueueRef.current = serverSaveQueueRef.current.catch(() => undefined).then(async () => {
         if (generation !== serverSyncGenerationRef.current || serialized === lastServerSnapshotRef.current) return;
         setServerSaveStatus("Synchronizing encrypted workspace state...");
-        const response = await fetch("/api/workspaces/current/audit-snapshot", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            title: "Vognary workspace state",
-            expectedRevision: serverRevisionRef.current,
-            snapshot,
-            summary: {
-              recurringCount: audit.summary.recurringCount,
-              monthlyRecurringSpend: audit.summary.monthlyRecurringSpend,
-              annualRecurringSpend: audit.summary.annualRecurringSpend,
-              reviewableMonthlySpend: audit.summary.reviewableMonthlySpend,
-              sourceCount: statementSources.length,
-              manualCount: manualItems.length,
-            },
-          }),
-        });
+        let response: Response;
+        try {
+          response = await fetch("/api/workspaces/current/audit-snapshot", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              title: "Vognary workspace state",
+              expectedRevision: serverRevisionRef.current,
+              snapshot,
+              summary: {
+                recurringCount: audit.summary.recurringCount,
+                monthlyRecurringSpend: audit.summary.monthlyRecurringSpend,
+                annualRecurringSpend: audit.summary.annualRecurringSpend,
+                reviewableMonthlySpend: audit.summary.reviewableMonthlySpend,
+                sourceCount: statementSources.length,
+                manualCount: manualItems.length,
+              },
+            }),
+          });
+        } catch {
+          setServerSaveStatus("Automatic workspace sync could not reach the server; this tab retains the current edits and will retry.");
+          scheduleServerSaveRetry();
+          return;
+        }
         const payload = await response.json().catch(() => ({}));
         if (generation !== serverSyncGenerationRef.current) return;
         if (response.status === 409) {
+          guestTransferImportedRef.current = false;
+          guestTransferPendingSyncRef.current = false;
           setServerWorkspaceHydrated(false);
-          setServerSaveStatus("Workspace changed on another device. Reload server state before continuing; this tab did not overwrite it.");
+          setServerSaveStatus("Workspace changed on another device. Reloading and merging this tab's guest audit before retrying.");
+          window.location.reload();
           return;
         }
         if (!response.ok) {
           setServerSaveStatus(payload.message ?? payload.error ?? "Automatic workspace sync failed; this tab retains the current edits.");
+          if (response.status >= 500) scheduleServerSaveRetry();
           return;
         }
-        serverRevisionRef.current = payload.snapshot?.revision ?? serverRevisionRef.current;
-        lastServerSnapshotRef.current = serialized;
-        setServerSaveStatus(`Encrypted workspace synchronized at revision ${serverRevisionRef.current}.`);
+        finishSuccessfulServerSave(snapshot, serialized, payload);
       });
     }, 900);
 
@@ -794,6 +816,7 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
     reviewCompletedAt,
     reviewNotes,
     serverSession?.authenticated,
+    serverSaveRetry,
     serverWorkspaceHydrated,
     statementSources,
     teamMembers,
@@ -1234,35 +1257,45 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
     const generation = serverSyncGenerationRef.current;
     setServerSaveStatus("Synchronizing encrypted workspace state...");
     const snapshot = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt });
-    const response = await fetch("/api/workspaces/current/audit-snapshot", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        title: "Vognary workspace snapshot",
-        expectedRevision: serverRevisionRef.current,
-        snapshot,
-        summary: {
-          recurringCount: audit.summary.recurringCount,
-          monthlyRecurringSpend: audit.summary.monthlyRecurringSpend,
-          annualRecurringSpend: audit.summary.annualRecurringSpend,
-          reviewableMonthlySpend: audit.summary.reviewableMonthlySpend,
-          sourceCount: statementSources.length,
-          manualCount: manualItems.length,
-        },
-      }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (generation !== serverSyncGenerationRef.current) return;
-    if (response.status === 409) {
-      setServerWorkspaceHydrated(false);
-      const message = "Workspace changed on another device. Reload server state before saving; no overwrite occurred.";
+    let response: Response;
+    try {
+      response = await fetch("/api/workspaces/current/audit-snapshot", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: "Vognary workspace snapshot",
+          expectedRevision: serverRevisionRef.current,
+          snapshot,
+          summary: {
+            recurringCount: audit.summary.recurringCount,
+            monthlyRecurringSpend: audit.summary.monthlyRecurringSpend,
+            annualRecurringSpend: audit.summary.annualRecurringSpend,
+            reviewableMonthlySpend: audit.summary.reviewableMonthlySpend,
+            sourceCount: statementSources.length,
+            manualCount: manualItems.length,
+          },
+        }),
+      });
+    } catch {
+      const message = "Could not reach encrypted workspace sync. This tab and the same-tab transfer still retain your audit.";
       setServerSaveStatus(message);
       setNotice(message);
       return;
     }
+    const payload = await response.json().catch(() => ({}));
+    if (generation !== serverSyncGenerationRef.current) return;
+    if (response.status === 409) {
+      guestTransferImportedRef.current = false;
+      guestTransferPendingSyncRef.current = false;
+      setServerWorkspaceHydrated(false);
+      const message = "Workspace changed on another device. Reloading and merging this tab's guest audit before retrying.";
+      setServerSaveStatus(message);
+      setNotice(message);
+      window.location.reload();
+      return;
+    }
     if (response.ok) {
-      serverRevisionRef.current = payload.snapshot?.revision ?? serverRevisionRef.current;
-      lastServerSnapshotRef.current = serializeWorkspaceForSync(snapshot);
+      finishSuccessfulServerSave(snapshot, serializeWorkspaceForSync(snapshot), payload);
       setServerWorkspaceHydrated(true);
     }
     const message = response.ok
@@ -1270,6 +1303,34 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
       : payload.message ?? payload.error ?? "Could not save server snapshot.";
     setServerSaveStatus(message);
     setNotice(message);
+  }
+
+  function scheduleServerSaveRetry() {
+    if (serverSaveRetryTimerRef.current !== null) return;
+    const delayMs = Math.min(30_000, 1_000 * 2 ** Math.min(serverSaveRetryCountRef.current, 5));
+    serverSaveRetryCountRef.current += 1;
+    serverSaveRetryTimerRef.current = window.setTimeout(() => {
+      serverSaveRetryTimerRef.current = null;
+      setServerSaveRetry((value) => value + 1);
+    }, delayMs);
+  }
+
+  function finishSuccessfulServerSave(snapshot: WorkspaceBackup, serialized: string, payload: { snapshot?: { revision?: number } }) {
+    serverRevisionRef.current = payload.snapshot?.revision ?? serverRevisionRef.current;
+    lastServerSnapshotRef.current = serialized;
+    serverSaveRetryCountRef.current = 0;
+    if (serverSaveRetryTimerRef.current !== null) {
+      window.clearTimeout(serverSaveRetryTimerRef.current);
+      serverSaveRetryTimerRef.current = null;
+    }
+    setServerSaveStatus(`Encrypted workspace synchronized at revision ${serverRevisionRef.current}.`);
+    const guest = guestTransferSnapshotRef.current;
+    if (guestTransferPendingSyncRef.current && guest && workspaceContainsGuestTransfer(snapshot, guest)) {
+      window.sessionStorage.removeItem(guestAuditTransferKey);
+      guestTransferPendingSyncRef.current = false;
+      guestTransferSnapshotRef.current = null;
+      setNotice("Guest audit saved to this encrypted workspace. The same-tab transfer copy has been cleared.");
+    }
   }
 
   async function loadServerWorkspace() {
@@ -1281,8 +1342,16 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
     const generation = ++serverSyncGenerationRef.current;
     setServerWorkspaceHydrated(false);
     setServerSaveStatus("Loading encrypted workspace state...");
-    const response = await fetch("/api/workspaces/current/audit-snapshot", { cache: "no-store" });
-    const payload = await response.json();
+    let response: Response;
+    try {
+      response = await fetch("/api/workspaces/current/audit-snapshot", { cache: "no-store" });
+    } catch {
+      const message = "Could not reach encrypted workspace sync. This tab and the same-tab transfer still retain your audit.";
+      setServerSaveStatus(message);
+      setNotice(message);
+      return;
+    }
+    const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const message = payload.message ?? payload.error ?? "Could not load server snapshot.";
       setServerSaveStatus(message);
@@ -1543,37 +1612,6 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
     }
   }
 
-  async function startMonitoringCheckout() {
-    if (!serverSession?.authenticated) {
-      window.location.assign("/login?next=%2Fapp%23overview");
-      return;
-    }
-    setCheckoutBusy(true);
-    try {
-      const response = await fetch("/api/checkout", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "idempotency-key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({ plan: billingPlan }),
-      });
-      const payload = await response.json().catch(() => ({})) as { error?: string; message?: string; paymentUrl?: string; settlementTracking?: boolean };
-      if (!response.ok || !payload.paymentUrl) {
-        setNotice(payload.error ?? payload.message ?? "Tracked monitoring checkout is not configured yet.");
-        return;
-      }
-      if (!payload.settlementTracking) {
-        setNotice("This deployment exposes only an untracked payment link. Access must be reconciled manually after payment.");
-      }
-      window.location.assign(payload.paymentUrl);
-    } catch {
-      setNotice("Checkout could not be reached. No entitlement was created.");
-    } finally {
-      setCheckoutBusy(false);
-    }
-  }
-
   async function runConnectorSyncNow(connector: Connector) {
     const account = getActiveServerAccount(serverConnectors, connector.id);
     if (!account) {
@@ -1584,9 +1622,9 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
     setSyncingConnectorId(connector.id);
     try {
       const response = await fetch(`/api/workspaces/current/connectors/${account.id}/sync`, { method: "POST" });
-      const payload = await response.json().catch(() => ({})) as { status?: string; error?: string; message?: string; result?: { evidenceWritten?: number; error?: string } };
+      const payload = await response.json().catch(() => ({})) as { status?: string; error?: string; message?: string; result?: { status?: string; evidenceWritten?: number; error?: string } };
       await refreshWorkspaceConnectors();
-      if (!response.ok) {
+      if (!response.ok || payload.status !== "synced" || payload.result?.status === "skipped") {
         setNotice(payload.result?.error ?? payload.message ?? payload.error ?? `${connector.name} sync failed.`);
         return;
       }
@@ -1629,9 +1667,9 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
             </a>
             <div className="hidden h-8 w-px bg-(--dossier-line) lg:block" />
             <div className="hidden flex-1 flex-wrap items-center gap-x-6 gap-y-2 lg:flex">
-              <TickerStat label="Monthly total" value={formatCurrency(audit.summary.monthlyRecurringSpend)} tone="ember" />
-              <TickerStat label="Yearly total" value={formatCurrency(audit.summary.annualRecurringSpend)} tone="paper" />
-              <TickerStat label="Needs review" value={formatCurrency(audit.summary.reviewableMonthlySpend)} tone="ochre" />
+              <TickerStat label={`Monthly · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)} tone="ember" />
+              <TickerStat label={`Yearly · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.annualRecurringSpend, audit.summary.primaryCurrency)} tone="paper" />
+              <TickerStat label={`Review · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)} tone="ochre" />
               <TickerStat label="Renewals in 10d" value={`${audit.summary.renewalsNextTenDays}`} tone="paper" />
             </div>
             <div className="flex items-center gap-2 ml-auto">
@@ -1660,11 +1698,6 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
             onExportPack={exportReport}
             onExportCsv={exportCsv}
             onExportPdf={exportPdf}
-            billingPlan={billingPlan}
-            checkoutBusy={checkoutBusy}
-            signedIn={Boolean(serverSession?.authenticated)}
-            onBillingPlan={setBillingPlan}
-            onCheckout={startMonitoringCheckout}
           />
         </section>
 
@@ -1719,9 +1752,9 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
         <section id="ledger" aria-labelledby="ledger-heading" className={`${mobileSection === "ledger" ? "flex" : "hidden sm:flex"} scroll-mt-36 flex-col gap-5`}>
           <StageHeader id="ledger-heading" folio="02" title="Recurring ledger" note="Every detected item with proof, cadence, and a decision." />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-reveal>
-            <Metric label="Monthly recurring" value={formatCurrency(audit.summary.monthlyRecurringSpend)} tone="ink" />
-            <Metric label="Yearly total" value={formatCurrency(audit.summary.annualRecurringSpend)} tone="blue" />
-            <Metric label="Needs review" value={formatCurrency(audit.summary.reviewableMonthlySpend)} tone="caution" />
+            <Metric label={`Monthly recurring · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)} tone="ink" />
+            <Metric label={`Yearly total · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.annualRecurringSpend, audit.summary.primaryCurrency)} tone="blue" />
+            <Metric label={`Needs review · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)} tone="caution" />
             <Metric label="Renewing in 10 days" value={`${audit.summary.renewalsNextTenDays}`} tone="accent" />
           </div>
           <RenewalTimelinePanel timeline={renewalTimeline} onSelect={setSelectedItemId} />
@@ -1806,21 +1839,19 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/security">Security</a>
             <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-(--ink)" href="/sources">How to add sources</a>
-            <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-(--ink)" href="/integrations">Integrations</a>
+            <a className="transition hover:text-(--ink)" href="/sources">Sources</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/partners">Partners</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/terms">Terms</a>
             <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-(--ink)" href="/beta-readiness">Beta status</a>
+            <a className="transition hover:text-(--ink)" href="/beta-readiness">Capability status</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/profile">Profile</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/login">Sign in</a>
             <span className="text-(--line-strong)">·</span>
-            <a className="transition hover:text-(--ink)" href="/launch">Launch</a>
+            <a className="transition hover:text-(--ink)" href="/private-audit">Assisted audit</a>
             <span className="text-(--line-strong)">·</span>
             <a className="transition hover:text-(--ink)" href="/brand">Brand</a>
           </div>
@@ -1971,9 +2002,9 @@ function IntegrationCommandCenter({
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <DossierStat label="Items" value={`${audit.summary.recurringCount}`} />
-          <DossierStat label="Monthly" value={formatCurrency(audit.summary.monthlyRecurringSpend)} />
-          <DossierStat label="Yearly" value={formatCurrency(audit.summary.annualRecurringSpend)} />
-          <DossierStat label="Review" value={formatCurrency(audit.summary.reviewableMonthlySpend)} />
+          <DossierStat label={`Monthly · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)} />
+          <DossierStat label={`Yearly · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.annualRecurringSpend, audit.summary.primaryCurrency)} />
+          <DossierStat label={`Review · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)} />
         </div>
       </div>
 
@@ -2016,7 +2047,7 @@ function IntegrationCommandCenter({
             />
           </label>
           <p className="mt-2 text-xs leading-5 muted-on-dark">
-            {signedIn ? "Stored through the token vault, then queued for scheduled sync." : "API-key connectors require a signed-in beta workspace."}
+            {signedIn ? "Stored through the token vault, then queued for scheduled sync." : "API-key connectors require a signed-in configured workspace."}
           </p>
         </div>
       ) : null}
@@ -2148,7 +2179,7 @@ function FirstSuccessPanel({
                 placeholder="Paste one or more receipt snippets. Keep merchant, amount, date, and renewal text visible; remove account numbers and private identifiers."
               />
             </label>
-            <p className="mt-2 text-xs leading-5 text-(--muted)">Pasted receipts become ledger candidates immediately and merge with matching statement evidence. For approved beta users, configured Gmail OAuth now backfills and refreshes receipt evidence automatically.</p>
+            <p className="mt-2 text-xs leading-5 text-(--muted)">Pasted receipts become ledger candidates immediately and merge with matching statement evidence. For Google-approved users, configured Gmail OAuth backfills and refreshes receipt evidence on its declared schedule.</p>
           </details>
         </div>
       </div>
@@ -2258,7 +2289,7 @@ function connectorEvidenceToStatementSources(evidence: ServerConnectorEvidence[]
       `${item.merchantRaw} ${(item.currency ?? "INR").toUpperCase()}`,
       String(item.amount),
       "",
-    ].map(escapeCsvCell).join(","));
+    ].map(encodeCsvCell).join(","));
 
     return {
       id: `synced-source-${sourceName}`,
@@ -2268,10 +2299,6 @@ function connectorEvidenceToStatementSources(evidence: ServerConnectorEvidence[]
       kind: "csv" as const,
     };
   });
-}
-
-function escapeCsvCell(value: string) {
-  return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
 }
 
 function normalizeEvidenceFrequency(value: string | null): Frequency {
@@ -2359,11 +2386,6 @@ function OverviewPanel({
   onExportPack,
   onExportCsv,
   onExportPdf,
-  billingPlan,
-  checkoutBusy,
-  signedIn,
-  onBillingPlan,
-  onCheckout,
 }: {
   audit: AuditResult;
   timeline: RenewalTimeline;
@@ -2377,11 +2399,6 @@ function OverviewPanel({
   onExportPack: () => void;
   onExportCsv: () => void;
   onExportPdf: () => void;
-  billingPlan: Exclude<BillingPlan, "annual">;
-  checkoutBusy: boolean;
-  signedIn: boolean;
-  onBillingPlan: (plan: Exclude<BillingPlan, "annual">) => void;
-  onCheckout: () => void;
 }) {
   const nextEvent = timeline.events[0] ?? null;
   const topAction = priorityItems[0] ?? null;
@@ -2409,9 +2426,9 @@ function OverviewPanel({
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <div className="inset p-4">
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Monthly burn</p>
-          <p className="font-data mt-2 text-2xl font-semibold tnum text-(--ink)">{formatCurrency(audit.summary.monthlyRecurringSpend)}</p>
+          <p className="font-data mt-2 text-2xl font-semibold tnum text-(--ink)">{formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)}</p>
           <p className="mt-1 font-data text-[0.66rem] text-(--muted)">
-            {formatCurrency(audit.summary.annualRecurringSpend)}/yr · {audit.summary.recurringCount} commitments
+            {formatCurrency(audit.summary.annualRecurringSpend, audit.summary.primaryCurrency)}/yr · {audit.summary.recurringCount} commitments
             {foreignEntries.map(([code, total]) => (
               <span key={code} className="ml-2 text-ochre">+ {formatCurrency(total, code)}/mo</span>
             ))}
@@ -2434,7 +2451,7 @@ function OverviewPanel({
         <div className="inset p-4">
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Due in 30 days</p>
           <p className="font-data mt-2 text-2xl font-semibold tnum text-ochre">{formatCurrency(timeline.dueNext30Days)}</p>
-          <p className="mt-1 font-data text-[0.66rem] text-(--muted)">Needs review: {formatCurrency(audit.summary.reviewableMonthlySpend)}/mo</p>
+          <p className="mt-1 font-data text-[0.66rem] text-(--muted)">Needs review ({audit.summary.primaryCurrency}): {formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)}/mo</p>
         </div>
         <div className="inset p-4">
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Verified savings</p>
@@ -2463,21 +2480,7 @@ function OverviewPanel({
         <button type="button" onClick={onExportPack} className="btn btn-ghost h-9 px-3 text-xs">Sealed pack (JSON)</button>
         <button type="button" onClick={onExportCsv} className="btn btn-ghost h-9 px-3 text-xs">Export CSV</button>
         <button type="button" onClick={() => { void onExportPdf(); }} className="btn btn-ghost h-9 px-3 text-xs">Export PDF</button>
-        <select value={billingPlan} onChange={(event) => onBillingPlan(event.target.value as Exclude<BillingPlan, "annual">)} className="field h-9 w-auto text-xs" aria-label="Monitoring plan">
-          <option value="personal">Personal monitoring</option>
-          <option value="founder">Founder monitoring</option>
-          <option value="team">Team monitoring</option>
-        </select>
-        {signedIn ? (
-          <button type="button" onClick={onCheckout} disabled={checkoutBusy} className="btn btn-primary h-9 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60">
-            {checkoutBusy ? "Opening checkout…" : "Monitor this workspace"}
-          </button>
-        ) : (
-          <>
-            <a href="/private-audit" className="btn btn-primary h-9 px-3 text-xs">Get a private audit</a>
-            <a href="/login?next=%2Fapp%23overview" className="btn btn-ghost h-9 px-3 text-xs">Sign in to monitor</a>
-          </>
-        )}
+        <a href="/private-audit" className="btn btn-primary h-9 px-3 text-xs">Request assisted audit</a>
         <p className="font-data text-[0.64rem] text-(--muted)">Every JSON export has an offline tamper checksum; /verify separately reports whether a trusted Vognary issuer signature is present.</p>
       </div>
     </section>
@@ -2557,10 +2560,10 @@ function UserControlPanel({
               Save on this device
             </button>
           )}
-          <a href="/integrations" className="btn btn-ghost">Open integrations</a>
+          <a href="/sources" className="btn btn-ghost">Manage sources</a>
         </div>
         <div className="mt-4 rounded-[11px] border border-line bg-(--card-2) p-3">
-          <p className="font-data text-[0.68rem] text-(--muted)">Beta account</p>
+          <p className="font-data text-[0.68rem] text-(--muted)">Configured account</p>
           <p className="mt-2 text-sm leading-6 text-(--muted)">
             {signedInEmail ? <>Signed in as <strong className="text-(--ink)">{signedInEmail}</strong>. Changes synchronize after a short pause.</> : <>Not signed in. Use login to synchronize encrypted workspace state across devices.</>}
           </p>
@@ -3272,7 +3275,7 @@ function SpendSpectrum({ audit, userActions, onSelect }: { audit: AuditResult; u
         kicker="Spend"
         title="Spend by merchant"
         desc={`Shows which ${audit.summary.primaryCurrency} recurring payments cost the most each month; other currencies stay separate.`}
-        right={<span className="font-data text-xs text-(--muted)">{formatCurrency(audit.summary.monthlyRecurringSpend)}/mo</span>}
+        right={<span className="font-data text-xs text-(--muted)">{formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)}/mo</span>}
       />
       {items.length ? (
         <>
@@ -3549,6 +3552,26 @@ function serializeWorkspaceForSync(workspace: WorkspaceBackup) {
   return JSON.stringify({ ...workspace, exportedAt: null });
 }
 
+function mergeReceiptText(current: string, incoming: string) {
+  const snippets = [current, incoming]
+    .flatMap((value) => value.split(/\n\s*\n/))
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return [...new Set(snippets)].join("\n\n");
+}
+
+function workspaceContainsGuestTransfer(workspace: WorkspaceBackup, guest: GuestAuditSnapshot) {
+  const hasStatements = guest.statementSources.every((source) => workspace.statementSources.some((candidate) => candidate.text === source.text));
+  const hasManualItems = guest.manualItems.every((item) => workspace.manualItems.some((candidate) => JSON.stringify(candidate) === JSON.stringify(item)));
+  const workspaceSnippets = new Set((workspace.receiptText ?? "").split(/\n\s*\n/).map((value) => value.trim()).filter(Boolean));
+  const hasReceipts = guest.receiptText
+    .split(/\n\s*\n/)
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .every((snippet) => workspaceSnippets.has(snippet));
+  return hasStatements && hasManualItems && hasReceipts;
+}
+
 function safePersist(key: string, value: string): boolean {
   if (typeof window === "undefined") return false;
   try {
@@ -3606,7 +3629,7 @@ function formatCurrency(value: number, currency = "INR"): string {
 }
 
 function csvCell(value: unknown): string {
-  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+  return encodeCsvCell(value);
 }
 
 function downloadBlob(content: string | Blob, mimeType: string, filename: string) {

@@ -13,7 +13,7 @@ export default function BetaReadinessPage() {
           <Link href="/app" className="btn btn-ghost">Back to app</Link>
         </div>
         <article className="panel p-6 sm:p-8 rise">
-          <span className="folio" data-folio="Status">Beta status</span>
+          <span className="folio" data-folio="Status">Capability status</span>
           <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">What works now and what is next</h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-(--muted)">The self-serve review works now. This table shows what is ready and what still needs setup before connected-account production.</p>
           <div className="mt-8 overflow-x-auto rounded-[11px] border border-line">
@@ -43,10 +43,9 @@ export default function BetaReadinessPage() {
 }
 
 const rows = [
-  { capability: "Self-serve audits", status: "Ready", next: "Run 30 real recurring-payment audits." },
-  { capability: "PDF ingestion", status: "Beta heuristic", next: "Improve bank-specific table extraction." },
-  { capability: "Manual commitments", status: "Ready", next: "Add source-specific templates for Apple, UPI, domains, and insurance." },
-  { capability: "Gmail receipts", status: "OAuth scaffold", next: "Configure Google OAuth, pass app verification, connect candidates to UI." },
-  { capability: "Persistence", status: "Schema ready", next: "Add auth, encryption, deletion, and audit log." },
-  { capability: "Regulated data integrations", status: "Blocked by approvals", next: "Choose Account Aggregator/TSP and mandate-data partners." },
+  { capability: "Guest self-audit", status: "Code ready", next: "Receipt paste, conservative PDF/CSV import, manual fallback, separate-currency totals, and proof-backed first action." },
+  { capability: "Signed-in persistence", status: "Code ready; deployment required", next: "Activate PostgreSQL, session secret, token-vault key, identity provider, backups, retention, and shared rate limiting." },
+  { capability: "Assisted audit payment", status: "Provider and legal gate", next: "Apply migration 0016; complete qualified legal review, Razorpay KYC/configuration, signed webhook, replay, refund, and reconciliation proof." },
+  { capability: "Gmail receipt sync", status: "Google approval gate", next: "Complete restricted-scope verification and prove consent, sync, resync, disconnect, deletion, and support." },
+  { capability: "Bank, UPI, and card mandates", status: "Partner and legal gate", next: "No direct access is offered until approved regulated partner paths and production consent are proven." },
 ];

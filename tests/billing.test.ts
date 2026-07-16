@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import test from "node:test";
 
-import { billingEntitlementForPlan, parseRazorpayBillingEvent, verifyRazorpayWebhookSignature } from "../src/lib/billing";
+import { billingEntitlementForPlan, parseRazorpayBillingEvent, publicOffer, verifyRazorpayWebhookSignature } from "../src/lib/billing";
 import { productEventNames } from "../src/lib/product-events";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -50,7 +50,24 @@ test("refund events and entitlement periods are deterministic", () => {
   }, "event-refund-0001");
   assert.equal(event.kind, "refund-processed");
   assert.deepEqual(billingEntitlementForPlan("founder"), { key: "monitoring", durationDays: 31 });
-  assert.deepEqual(billingEntitlementForPlan("annual"), { key: "annual-audit", durationDays: 365 });
+  assert.equal(billingEntitlementForPlan("annual"), null);
+  assert.equal(billingEntitlementForPlan("assisted-audit"), null);
+});
+
+test("the public offer has one canonical amount and entitlement promise", () => {
+  assert.deepEqual(publicOffer, {
+    id: "assisted-private-audit",
+    version: 1,
+    plan: "assisted-audit",
+    legacyPlan: "annual",
+    termsVersion: "terms-2026-07-13",
+    title: "Assisted private audit",
+    entitlementLabel: "One assisted private audit",
+    amountMinor: 99_900,
+    currency: "INR",
+    autoRenews: false,
+    refundSummary: "Request before evidence review begins for a full refund. After review begins, eligibility depends on work completed and applicable law. Vognary issues a full refund if it cancels the audit.",
+  });
 });
 test("revenue funnel events are allowlisted in code, migration, and consolidated schema", () => {
   const funnelEvents = ["private_audit.requested", "billing.checkout_started", "billing.payment_settled", "billing.payment_refunded"];
@@ -76,11 +93,31 @@ test("checkouts bind to audit leads with email verification and replay-safe idem
 
   const store = source("src/lib/server/billing-store.ts");
   assert.match(store, /checkout\.leadId !== input\.leadId/);
+  assert.match(store, /checkout\.offerId !== input\.offerId/);
+  assert.match(store, /checkout\.offerVersion !== input\.offerVersion/);
+  assert.match(store, /checkout\.termsVersion !== input\.termsVersion/);
   assert.match(store, /billing\.checkout_started/);
 
+  assert.match(route, /plan !== publicOffer\.plan/);
+  assert.match(route, /body\.termsVersion !== publicOffer\.termsVersion/);
+  assert.match(route, /idempotency-key/);
   const client = source("src/app/private-audit/private-audit-client.tsx");
-  assert.match(client, /`private-audit:\$\{lead\.id\}`/);
-  assert.match(client, /leadId: lead\.id/);
+  assert.match(client, /\/api\/checkout\?plan=/);
+  assert.match(client, /settlementTracking === true/);
+  assert.match(client, /Pay for this audit/);
+  assert.doesNotMatch(client, /link-only|fallback payment link/i);
+});
+
+test("the one-time assisted-audit migration preserves legacy rows and adds fulfillment/refund identity", () => {
+  const migration = source("infra/postgres/migrations/0016_assisted_audit_orders.sql");
+  const schema = source("infra/postgres/schema.sql");
+  for (const value of ["assisted-audit", "offer_id", "offer_version", "terms_version", "assisted_audit_orders", "billing_refunds", "provider_refund_id"]) {
+    assert.ok(migration.includes(value), `${value} missing from migration 0016`);
+    assert.ok(schema.includes(value), `${value} missing from schema.sql`);
+  }
+  assert.match(migration, /where plan = 'annual' and paid_at is not null/);
+  assert.match(migration, /on conflict \(checkout_session_id\) do nothing/);
+  assert.match(schema, /workspace_id uuid references workspaces\(id\) on delete set null/);
 });
 
 test("payment settlement and refunds emit funnel events inside the webhook transaction", () => {
@@ -92,10 +129,50 @@ test("payment settlement and refunds emit funnel events inside the webhook trans
   assert.match(store.slice(refunded, refunded + 220), /\}, client\)/);
 });
 
+test("billing reconciliation fails closed on unresolved refunds and failed refund webhooks", () => {
+  const sourceText = source("scripts/reconcile-billing.ts");
+  assert.match(sourceText, /status in \('pending_payment', 'rejected'\)/);
+  assert.match(sourceText, /event_type = 'refund\.processed'[\s\S]*status = 'failed'/);
+  const unresolvedQueries = sourceText.slice(sourceText.indexOf("const unresolvedRefunds"), sourceText.indexOf("for (const checkout"));
+  assert.doesNotMatch(unresolvedQueries, /120 days/);
+  assert.match(sourceText, /if \(mismatchCount\) process\.exitCode = 1/);
+});
+
+test("checkout recovery releases only an empty filtered provider result", () => {
+  const sourceText = source("scripts/recover-razorpay-checkout.ts");
+  assert.match(sourceText, /if \(payload\.items\.length === 0\)/);
+  assert.match(sourceText, /Razorpay returned nonmatching links for the filtered checkout reference/);
+  assert.ok(sourceText.indexOf("payload.items.length === 0") < sourceText.indexOf("await releaseBillingProviderCreationAfterVerifiedAbsence"));
+});
+
 test("payment returns land on the public status page, never the protected app", () => {
   const provider = source("src/lib/server/billing-provider.ts");
   assert.match(provider, /callback_url: `\$\{appUrl\}\/billing\/return\?checkout=\$\{input\.checkoutId\}`/);
+  assert.match(provider, /notify: \{ email: false, sms: false \}/);
+  assert.match(provider, /reminder_enable: false/);
   assert.doesNotMatch(provider, /\/app\?billing=returned/);
+
+  const returnClient = source("src/app/billing/return/billing-return-client.tsx");
+  assert.doesNotMatch(returnClient, /Razorpay receipt email|authoritative proof/i);
+  assert.match(returnClient, /confirmation shown by Razorpay/);
+  assert.match(returnClient, /support@vognary\.com/);
+});
+
+test("workspace primary totals use and name the audit primary currency", () => {
+  const client = source("src/app/vognary-mvp-client.tsx");
+  for (const field of ["monthlyRecurringSpend", "annualRecurringSpend", "reviewableMonthlySpend"]) {
+    assert.doesNotMatch(client, new RegExp(`formatCurrency\\(audit\\.summary\\.${field}\\)`));
+    assert.match(client, new RegExp(`formatCurrency\\(audit\\.summary\\.${field}, audit\\.summary\\.primaryCurrency\\)`));
+  }
+  assert.match(client, /Monthly · \$\{audit\.summary\.primaryCurrency\}/);
+  assert.match(client, /Yearly · \$\{audit\.summary\.primaryCurrency\}/);
+});
+
+test("magic-link save guidance keeps guest evidence in the same browser", () => {
+  const client = source("src/app/login/login-client.tsx");
+  assert.match(client, /guestTransferPresent = Boolean\(window\.sessionStorage\.getItem\(guestAuditTransferKey\)\)/);
+  assert.match(client, /open the link in this same browser/);
+  assert.match(client, /return here and open the link here instead/);
 });
 
 test("public checkout status exposes settlement state without payment credentials or identity", () => {

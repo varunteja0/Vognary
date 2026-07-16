@@ -24,6 +24,8 @@ test("feature readiness checks every persistent capability migration with bounde
     "0012_workspace_state_materialization",
     "0013_billing_entitlements",
     "0014_sync_run_invocation",
+    "0015_paid_audit_flow",
+    "0016_assisted_audit_orders",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -66,6 +68,7 @@ test("internal readiness distinguishes schema, observed evidence, and operator a
   assert.match(source, /invalid-attestation-no-cron-evidence/);
   assert.match(source, /schema-ready-shared-rate-limit-required/);
   assert.match(source, /settlement-observed/);
+  assert.match(read("src/lib/server/feature-readiness.ts"), /checkout\.plan = \$1[\s\S]*checkout\.offer_id = \$2[\s\S]*orders\.status in \('pending', 'in_progress', 'delivered'\)/);
 });
 
 test("activation probes are bounded and cover private lifecycle, renewal, decisions, and platform guards", () => {
@@ -122,7 +125,10 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.match(source, /"usage-only"/);
   assert.match(source, /"source-health-only"/);
   assert.match(source, /\[200, 401, 501\]\.includes\(gmailProductStartResponse\.status\)/);
+  assert.match(source, /fetch\(`\$\{baseUrl\}\/api\/audit-intake`\)/);
+  assert.match(source, /\['ready', 'not-configured'\]\.includes\(auditIntake\.status\)/);
+  assert.doesNotMatch(source, /fetch\(`\$\{baseUrl\}\/api\/audit-intake`,\s*\{[\s\S]*?method:\s*"POST"/);
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[200, 401, 501\]/);
-  assert.match(activation, /Feature migrations 0002 through 0014/);
+  assert.match(activation, /Feature migrations 0002 through 0016/);
 });

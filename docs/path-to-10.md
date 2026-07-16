@@ -112,8 +112,8 @@ The leaps stand on a chassis that must be boring, tested, and durable.
 
 ### Revenue ladder
 1. **Free self-audit** (forever): the honesty funnel — full engine, local-first, export included.
-2. **Audit packs:** ₹999 personal / ₹4,999 founder white-glove (human-assisted pack with an offline checksum and a Vognary issuer signature when signing is configured).
-3. **Monitoring:** ₹199/mo personal, ₹999/mo founder, ₹4,999/mo team — auto-generated monthly reviews, price-hike radar, renewal digests. *Verified-savings pricing option:* pay 20% of verified savings instead, capped — the offer only we can make (Leap 2).
+2. **Vognary 1.0 assisted audit:** one INR 999 redaction-first audit request, no auto-renewal and no monitoring entitlement. Activation still requires legal/provider proof.
+3. **Future monitoring research:** not a current SKU. Any recurring price, limits, tax treatment, renewal behavior, or regional currency path requires separate product, provider, and legal validation.
 4. **CA/accountant channel:** multi-client console + white-label audit packs; CAs run recurring audits as a service line. India-specific distribution hack: thousands of CAs, each carrying dozens of exactly-ICP clients.
 5. **B2B2C white-label:** bank/issuer/fintech embed of the graph + engine (the `bank-issuer-white-label` connector target), earned *after* the consumer proof, priced per-account.
 6. **API:** the audit engine and verification endpoints for partners (readonly, metered).

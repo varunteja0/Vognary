@@ -4,7 +4,7 @@ import { isDatabaseConfigured } from "@/lib/server/database";
 import { checkTokenVaultConfiguration } from "@/lib/server/token-vault";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
-import { requireSession } from "@/lib/server/workspace-auth";
+import { requireSession, requireWorkspaceRole, type WorkspaceRole } from "@/lib/server/workspace-auth";
 import { WorkspaceStateValidationError } from "@/lib/server/workspace-state-materializer";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const limit = await rateLimit(request, { namespace: "audit-snapshot-read", limit: 60, windowMs: 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
-  const ready = await getSnapshotReadiness(request);
+  const ready = await getSnapshotReadiness(request, "viewer");
   if (ready instanceof Response) return ready;
 
   const snapshot = await getLatestAuditSnapshot(ready.workspaceId);
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   const limit = await rateLimit(request, { namespace: "audit-snapshot-save", limit: 20, windowMs: 60 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
-  const ready = await getSnapshotReadiness(request);
+  const ready = await getSnapshotReadiness(request, "member");
   if (ready instanceof Response) return ready;
 
   const body = await readSnapshotJson(request);
@@ -85,17 +85,20 @@ export async function DELETE(request: Request) {
   const limit = await rateLimit(request, { namespace: "audit-snapshot-delete", limit: 8, windowMs: 60 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
-  const ready = await getSnapshotReadiness(request);
+  const ready = await getSnapshotReadiness(request, "admin");
   if (ready instanceof Response) return ready;
 
   const deletedCount = await deleteAuditSnapshots({ workspaceId: ready.workspaceId, userId: ready.session.userId });
   return Response.json({ status: "deleted", deletedCount });
 }
 
-async function getSnapshotReadiness(request: Request) {
+async function getSnapshotReadiness(request: Request, minimumRole: WorkspaceRole) {
   const session = await requireSession(request);
   if (session instanceof Response) return session;
   if (!session.workspaceId) return Response.json({ error: "Session has no workspace. Sign in again." }, { status: 400 });
+
+  const authorization = await requireWorkspaceRole(request, session.workspaceId, minimumRole);
+  if (authorization instanceof Response) return authorization;
   if (!isDatabaseConfigured()) return Response.json({ status: "not-configured", requiredEnv: ["DATABASE_URL"] }, { status: 501 });
 
   const tokenVault = checkTokenVaultConfiguration();

@@ -25,13 +25,13 @@ export async function POST(request: Request) {
   const limit = await rateLimit(request, { namespace: "product-events-write", limit: 120, windowMs: 60 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
 
+  const body = await readEventBody(request);
+  if (body instanceof Response) return body;
   const session = await requireSession(request);
   if (session instanceof Response) return session;
   if (!session.workspaceId) return Response.json({ error: "Session has no workspace." }, { status: 400 });
   if (!isDatabaseConfigured()) return Response.json({ status: "not-configured" }, { status: 501 });
 
-  const body = await readEventBody(request);
-  if (body instanceof Response) return body;
   if (typeof body.eventName !== "string" || !clientEventNames.has(body.eventName)) {
     return Response.json({ error: "Product event is not allowlisted." }, { status: 400 });
   }

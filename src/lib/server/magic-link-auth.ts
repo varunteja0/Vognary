@@ -33,9 +33,24 @@ export function checkMagicLinkConfiguration(): MagicLinkConfiguration {
     checkSessionConfiguration().status === "ready" ? null : "SESSION_SECRET",
     process.env.RESEND_API_KEY?.trim() ? null : "RESEND_API_KEY",
     process.env.RESEND_FROM_EMAIL?.trim() ? null : "RESEND_FROM_EMAIL",
+    process.env.NODE_ENV !== "production" || getMagicLinkAppOrigin() ? null : "NEXT_PUBLIC_APP_URL or APP_URL",
   ].filter((value): value is string => Boolean(value));
 
   return { status: missing.length ? "not-configured" : "ready", missing };
+}
+
+export function getMagicLinkAppOrigin(requestOrigin?: string) {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.APP_URL?.trim();
+  const candidate = configured || (process.env.NODE_ENV !== "production" ? requestOrigin : undefined);
+  if (!candidate) return null;
+  try {
+    const url = new URL(candidate);
+    if (!url.hostname || (process.env.NODE_ENV === "production" && url.protocol !== "https:")) return null;
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
 }
 
 export async function createMagicLinkChallenge(input: MagicLinkChallengeInput): Promise<MagicLinkChallenge> {

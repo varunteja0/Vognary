@@ -86,7 +86,7 @@ export async function saveAuditSnapshot(input: {
     await client.query(
       `insert into audit_log (workspace_id, user_id, action, entity_type, entity_id, metadata)
        values ($1, $2, 'workspace_state.saved', 'workspace_state', $1, $3::jsonb)`,
-      [input.workspaceId, input.userId, JSON.stringify({ title: input.title, summary: input.summary, revision: nextRevision, materialized })],
+      [input.workspaceId, input.userId, JSON.stringify({ revision: nextRevision, materialized })],
     );
     await client.query("commit");
 

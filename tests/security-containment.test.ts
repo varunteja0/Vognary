@@ -6,7 +6,7 @@ import { POST as logoutPost } from "../src/app/api/auth/logout/route";
 import { POST as connectorPreviewPost } from "../src/app/api/connectors/[id]/sync/route";
 import { openAiCostsAdapter } from "../src/lib/connectors/openai-costs-adapter";
 import { checkDevelopmentLoginConfiguration, validateDevelopmentLogin } from "../src/lib/server/development-login";
-import { normalizeRedirectPath } from "../src/lib/server/magic-link-auth";
+import { checkMagicLinkConfiguration, getMagicLinkAppOrigin, normalizeRedirectPath } from "../src/lib/server/magic-link-auth";
 import { isEnvironmentConnectorPreviewEnabled } from "../src/lib/server/connector-preview-policy";
 import { readSession, sessionCookieName } from "../src/lib/server/session";
 
@@ -48,6 +48,29 @@ test("magic-link redirects accept canonical local paths and reject parser-confus
     "/app%0d%0aLocation:%20https://evil.example",
   ]) {
     assert.equal(normalizeRedirectPath(attack), "/", attack);
+  }
+});
+
+test("production magic links require and use a canonical HTTPS app origin", () => {
+  const previous = {
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    APP_URL: process.env.APP_URL,
+  };
+  try {
+    Reflect.set(process.env, "NODE_ENV", "production");
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    delete process.env.APP_URL;
+    assert.equal(getMagicLinkAppOrigin("https://attacker.example"), null);
+    assert.ok(checkMagicLinkConfiguration().missing.includes("NEXT_PUBLIC_APP_URL or APP_URL"));
+
+    process.env.NEXT_PUBLIC_APP_URL = "https://www.vognary.com/path-is-ignored";
+    assert.equal(getMagicLinkAppOrigin("https://attacker.example"), "https://www.vognary.com");
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
   }
 });
 
@@ -130,8 +153,13 @@ test("signed cookie parsing rejects tampering and expiry without storing an emai
 test("logout always expires the browser cookie when no current session exists", async () => {
   const response = await logoutPost(new Request("https://vognary.example/api/auth/logout", { method: "POST" }));
   assert.equal(response.status, 200);
-  assert.match(response.headers.get("set-cookie") ?? "", /vognary_session=;/);
-  assert.match(response.headers.get("set-cookie") ?? "", /Max-Age=0/i);
+  const cookies = response.headers.get("set-cookie") ?? "";
+  assert.match(cookies, /vognary_session=;/);
+  assert.match(cookies, /vognary_gmail_oauth_state=;/);
+  assert.match(cookies, /vognary_gmail_oauth_binding=;/);
+  assert.match(cookies, /vognary_google_auth_state=;/);
+  assert.match(cookies, /vognary_google_auth_next=;/);
+  assert.match(cookies, /Max-Age=0/i);
 });
 
 function signCookie(payload: Record<string, unknown>, secret: string) {

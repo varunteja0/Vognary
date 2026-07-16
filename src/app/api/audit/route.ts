@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { receiptTextToManualInputs } from "@/lib/receipt-parser";
 import { buildRenewalTimeline } from "@/lib/renewal-timeline";
-import { analyzeStatements, type Frequency, type ManualRecurringInput, type StatementSource } from "@/lib/recurring-audit";
+import { analyzeStatements, normalizeCurrencyCode, type Frequency, type ManualRecurringInput, type StatementSource } from "@/lib/recurring-audit";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
+import { parseIsoDateOnly } from "@/lib/date-only";
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +93,8 @@ function isValidManualItem(item: ManualRecurringInput | undefined): boolean {
     && typeof item.merchant === "string" && item.merchant.trim().length > 0 && item.merchant.length <= 200
     && typeof item.amount === "number" && Number.isFinite(item.amount) && item.amount > 0
     && typeof item.frequency === "string" && validFrequencies.has(item.frequency)
-    && typeof item.nextExpectedDate === "string" && item.nextExpectedDate.length <= 40
+    && typeof item.nextExpectedDate === "string" && Boolean(parseIsoDateOnly(item.nextExpectedDate))
     && typeof item.category === "string" && item.category.length <= 100
+    && (item.currency === undefined || normalizeCurrencyCode(item.currency, null) !== null)
     && (item.sourceName === undefined || (typeof item.sourceName === "string" && item.sourceName.length <= 200));
 }

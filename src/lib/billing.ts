@@ -1,8 +1,22 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+export { publicOffer } from "./public-offer";
 
-export const billingPlans = ["personal", "founder", "team", "annual"] as const;
+export const billingPlans = ["personal", "founder", "team", "annual", "assisted-audit"] as const;
 export type BillingPlan = (typeof billingPlans)[number];
 export type BillingEntitlementKey = "monitoring" | "annual-audit";
+export type AssistedAuditOrderStatus = "review_required" | "pending" | "in_progress" | "delivered" | "cancelled" | "refunded";
+export type AssistedAuditOrderAction = "start" | "deliver" | "cancel";
+
+export function transitionAssistedAuditOrder(current: AssistedAuditOrderStatus, action: AssistedAuditOrderAction): AssistedAuditOrderStatus | null {
+  if (action === "start" && (current === "pending" || current === "review_required")) return "in_progress";
+  if (action === "deliver" && current === "in_progress") return "delivered";
+  if (action === "cancel" && (current === "pending" || current === "review_required" || current === "in_progress")) return "cancelled";
+  return null;
+}
+
+export function isAssistedAuditPlan(plan: BillingPlan) {
+  return plan === "assisted-audit" || plan === "annual";
+}
 
 export type RazorpayBillingEvent =
   | { kind: "paid"; eventId: string; eventType: "payment_link.paid"; checkoutId: string; providerCheckoutId: string; providerPaymentId: string; amountMinor: number; currency: string }
@@ -14,10 +28,8 @@ export function normalizeBillingPlan(value: unknown): BillingPlan | null {
   return typeof value === "string" && billingPlans.includes(value as BillingPlan) ? value as BillingPlan : null;
 }
 
-export function billingEntitlementForPlan(plan: BillingPlan): { key: BillingEntitlementKey; durationDays: number } {
-  return plan === "annual"
-    ? { key: "annual-audit", durationDays: 365 }
-    : { key: "monitoring", durationDays: 31 };
+export function billingEntitlementForPlan(plan: BillingPlan): { key: BillingEntitlementKey; durationDays: number } | null {
+  return isAssistedAuditPlan(plan) ? null : { key: "monitoring", durationDays: 31 };
 }
 
 export function verifyRazorpayWebhookSignature(rawBody: string, suppliedSignature: string, secret: string) {

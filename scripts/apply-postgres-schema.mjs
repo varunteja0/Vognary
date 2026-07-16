@@ -16,6 +16,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const schemaPath = path.join(root, "infra", "postgres", "schema.sql");
 const migrationsPath = path.join(root, "infra", "postgres", "migrations");
 const schema = await readFile(schemaPath, "utf8");
+const migrationLockId = 8_668_642_791;
 
 const pool = new Pool({
   connectionString: databaseUrl,
@@ -31,8 +32,16 @@ try {
   const client = await pool.connect();
   try {
     await ensureMigrationLedger(client);
-    await applyInitialSchema(client);
-    await applyPendingMigrations(client);
+    const lock = await client.query("select pg_try_advisory_lock($1) as acquired", [migrationLockId]);
+    if (lock.rows[0]?.acquired !== true) {
+      throw new Error("Another schema migration runner already holds the Vognary migration lock.");
+    }
+    try {
+      await applyInitialSchema(client);
+      await applyPendingMigrations(client);
+    } finally {
+      await client.query("select pg_advisory_unlock($1)", [migrationLockId]);
+    }
   } finally {
     client.release();
   }
@@ -54,7 +63,10 @@ async function ensureMigrationLedger(client) {
 
 async function applyInitialSchema(client) {
   const migrationId = "0001_initial_schema";
-  if (await hasMigration(client, migrationId)) return;
+  // The consolidated schema is intentionally mutable for fresh databases, so
+  // its baseline checksum is recorded but not compared on later runs. Forward
+  // migration files are immutable and are verified below.
+  if (await getMigrationChecksum(client, migrationId)) return;
 
   const existingUsers = await client.query("select to_regclass('public.users') as table_name");
   if (existingUsers.rows[0]?.table_name) {
@@ -80,11 +92,20 @@ async function applyPendingMigrations(client) {
 
   for (const file of files) {
     const id = path.basename(file, ".sql");
-    if (await hasMigration(client, id)) continue;
-
     const sql = await readFile(path.join(migrationsPath, file), "utf8");
+    const expectedChecksum = checksum(sql);
+    const recordedChecksum = await getMigrationChecksum(client, id);
+    if (recordedChecksum) {
+      if (recordedChecksum !== expectedChecksum) {
+        throw new Error(`Migration checksum mismatch for ${id}. Applied migrations are immutable; create a new forward migration.`);
+      }
+      continue;
+    }
+
     await client.query("begin");
     try {
+      await client.query("set local lock_timeout = '10s'");
+      await client.query("set local statement_timeout = '120s'");
       await client.query(sql);
       await recordMigration(client, id, sql);
       await client.query("commit");
@@ -106,16 +127,15 @@ async function listMigrationFiles() {
   }
 }
 
-async function hasMigration(client, id) {
-  const result = await client.query("select 1 from schema_migrations where id = $1", [id]);
-  return Boolean(result.rowCount);
+async function getMigrationChecksum(client, id) {
+  const result = await client.query("select checksum from schema_migrations where id = $1", [id]);
+  return result.rows[0]?.checksum ?? null;
 }
 
 async function recordMigration(client, id, sql) {
   await client.query(
     `insert into schema_migrations (id, checksum)
-     values ($1, $2)
-     on conflict (id) do nothing`,
+     values ($1, $2)`,
     [id, checksum(sql)],
   );
 }

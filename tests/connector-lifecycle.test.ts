@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { POST as receiveConnectorWebhook } from "../src/app/api/connectors/[id]/webhook/route";
 import { ConnectorReauthorizationRequiredError } from "../src/lib/connector-errors";
 import { revokeConnectorCredentialAtProviderWithDependencies } from "../src/lib/connector-provider-revocation";
 
@@ -93,6 +95,40 @@ test("API-key disconnects explicitly require provider-side rotation", async () =
   assert.equal(outcome.attempted, false);
   assert.equal(outcome.remoteCredentialMayRemainActive, true);
   assert.match(outcome.message, /revoke or rotate/i);
+});
+
+test("signed connector webhooks fail closed when durable storage is unavailable", async () => {
+  const previousDatabaseUrl = process.env.DATABASE_URL;
+  const previousSecret = process.env.CONNECTOR_WEBHOOK_SECRET_OPENAI_COSTS;
+  const secret = "connector-webhook-test-secret";
+  const rawBody = JSON.stringify({ id: "evt_test", type: "cost.updated" });
+  process.env.CONNECTOR_WEBHOOK_SECRET_OPENAI_COSTS = secret;
+  delete process.env.DATABASE_URL;
+
+  try {
+    const signature = createHmac("sha256", secret).update(rawBody).digest("hex");
+    const response = await receiveConnectorWebhook(new Request("https://vognary.test/api/connectors/openai-costs/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-vognary-signature": signature,
+      },
+      body: rawBody,
+    }), { params: Promise.resolve({ id: "openai-costs" }) });
+
+    assert.equal(response.status, 501);
+    assert.deepEqual(await response.json(), {
+      status: "not-configured",
+      connectorId: "openai-costs",
+      requiredEnv: ["DATABASE_URL"],
+      message: "Durable webhook storage is not configured. The event was not accepted.",
+    });
+  } finally {
+    if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = previousDatabaseUrl;
+    if (previousSecret === undefined) delete process.env.CONNECTOR_WEBHOOK_SECRET_OPENAI_COSTS;
+    else process.env.CONNECTOR_WEBHOOK_SECRET_OPENAI_COSTS = previousSecret;
+  }
 });
 
 test("sync and disconnect SQL enforce terminal lifecycle states and erase local token material", () => {

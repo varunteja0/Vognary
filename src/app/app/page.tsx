@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { readCurrentSession } from "@/lib/server/session";
-import VognaryMvpClient from "../vognary-mvp-client";
+import ExperienceClient from "./experience-client";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export default async function AppPage({ searchParams }: AppPageProps) {
   const session = await readRequestSession();
   if (!session && experienceMode === "signed-in") redirect("/login?next=/app");
 
-  return <VognaryMvpClient experienceMode={session ? "signed-in" : experienceMode} />;
+  return <ExperienceClient experienceMode={session ? "signed-in" : experienceMode} />;
 }
 
 async function readRequestSession() {

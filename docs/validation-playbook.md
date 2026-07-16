@@ -13,7 +13,7 @@ Founders, AI builders, freelancers, and small teams have enough scattered recurr
 
 ## Evidence To Collect
 
-For each beta audit, record:
+For each assisted or self-audit research session, record:
 
 - Number of recurring items found.
 - Monthly recurring spend.
@@ -21,7 +21,7 @@ For each beta audit, record:
 - Reviewable monthly spend.
 - At least one screenshot or quote from the user.
 - Whether the user found one forgotten or avoidable payment.
-- Whether the user would pay for monthly monitoring.
+- Whether the user independently asks for ongoing source refresh (research only; no current monitoring SKU).
 - Whether the user would connect Gmail read-only.
 - Whether the user would upload another statement next month.
 
@@ -50,11 +50,11 @@ For each beta audit, record:
 | Retention | 40% return after first audit |
 | Virality | 20% share audit report with a friend, founder, or team |
 
-## First Pricing Tests
+## Current Offer Test
 
-- Free: first audit with up to 10 recurring items.
-- Founder Pro: Rs 999/month for unlimited recurring detection, renewal alerts, cloud/SaaS labels, and export.
-- One-time Annual Audit: Rs 1,999 for a full private recurring-spend report.
+- Free: the self-audit engine with receipt paste, statement import, manual fallback, proof, and export.
+- One-time assisted audit: INR 999 for one redaction-first evidence review and report. It does not auto-renew or include monitoring/cancellation execution.
+- Payment remains disabled until qualified legal review, Razorpay activation, and the signed-webhook/replay/refund/reconciliation proof pass.
 
 ## Launch Assets
 

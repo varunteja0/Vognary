@@ -20,16 +20,16 @@ const noStoreHeaders = { "cache-control": "no-store", pragma: "no-cache" };
 export async function GET(request: Request) {
   const authorization = requireCronSecret(request);
   if (authorization) return authorization;
-  return deliverDueRenewalAlerts(request);
+  return deliverDueRenewalAlerts(request, "cron");
 }
 
 export async function POST(request: Request) {
   const authorization = requireInternalSecret(request);
   if (authorization) return authorization;
-  return deliverDueRenewalAlerts(request);
+  return deliverDueRenewalAlerts(request, "internal-api");
 }
 
-async function deliverDueRenewalAlerts(request: Request) {
+async function deliverDueRenewalAlerts(request: Request, invocation: "internal-api" | "cron") {
   const limit = await rateLimit(request, { namespace: "internal-renewal-alert-delivery", limit: 20, windowMs: 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
   if (!isDatabaseConfigured()) {
@@ -48,7 +48,7 @@ async function deliverDueRenewalAlerts(request: Request) {
   const url = new URL(request.url);
   const batchSize = clampNumber(Number.parseInt(url.searchParams.get("limit") ?? "10", 10), 1, 25);
   const workerId = `renewal-alert-${randomUUID()}`;
-  const deliveries = await claimDueRenewalAlerts({ limit: batchSize, workerId });
+  const deliveries = await claimDueRenewalAlerts({ limit: batchSize, workerId, invocation });
   const outcomes = await mapWithConcurrency(deliveries, 3, async (delivery) => {
     if (!await isRenewalAlertStillDeliverable(delivery.deliveryId, workerId)) {
       await markRenewalAlertCancelled(delivery.deliveryId, workerId);
@@ -88,6 +88,7 @@ async function deliverDueRenewalAlerts(request: Request) {
     sent,
     failed,
     cancelled,
+    invocation,
   }, { status: failed ? 207 : 200, headers: noStoreHeaders });
 }
 

@@ -31,13 +31,17 @@ const groups = [
       "RAZORPAY_KEY_ID",
       "RAZORPAY_KEY_SECRET",
       "RAZORPAY_WEBHOOK_SECRET",
-      "PAYMENT_AMOUNT_PERSONAL_INR",
-      "PAYMENT_AMOUNT_FOUNDER_INR",
-      "PAYMENT_AMOUNT_TEAM_INR",
-      "PAYMENT_AMOUNT_ANNUAL_AUDIT_INR",
+      "ASSISTED_AUDIT_LEGAL_TERMS_STATUS",
     ],
+    requiredValues: {
+      RAZORPAY_ACCOUNT_STATUS: "live-kyc-approved",
+      RAZORPAY_WEBHOOK_PROOF_STATUS: "passed",
+      RAZORPAY_REPLAY_PROOF_STATUS: "passed",
+      RAZORPAY_REFUND_PROOF_STATUS: "passed",
+      RAZORPAY_RECONCILIATION_STATUS: "passed",
+    },
     probe: isPaymentReady,
-    why: "Requires tracked checkout creation, signed settlement webhooks, and at least one observed paid entitlement. Static payment links are an untracked fallback only.",
+    why: "Requires the versioned one-time assisted-audit offer, legal terms approval, tracked checkout creation, signed settlement webhooks, and an observed assisted-audit order. Static payment links stay hidden.",
   },
   {
     id: "gmail-oauth",
@@ -55,7 +59,7 @@ const groups = [
   },
   {
     id: "feature-migrations",
-    label: "Feature migrations 0002 through 0014",
+    label: "Feature migrations 0002 through 0016",
     required: ["DATABASE_URL"],
     probe: isFeatureMigrationsReady,
     why: "Confirms the target database recorded every forward migration and can query persistent capability schema.",
@@ -165,12 +169,7 @@ const endpointChecks = [
     },
   },
   { id: "auth-login-status", path: "/api/auth/login", expected: [200, 501], captureJson: true },
-  ...["personal", "founder", "team", "annual"].map((plan) => ({
-    id: `checkout-${plan}`,
-    path: `/api/checkout?plan=${plan}`,
-    expected: [200, 501],
-    captureJson: true,
-  })),
+  { id: "checkout-assisted-audit", path: "/api/checkout?plan=assisted-audit", expected: [200, 501], captureJson: true },
   { id: "audit-snapshot-auth-guard", path: "/api/workspaces/current/audit-snapshot", expected: [401] },
   { id: "workspace-connectors-auth-guard", path: "/api/workspaces/current/connectors", expected: [401] },
   { id: "workspace-decisions-auth-guard", path: "/api/workspaces/current/decisions", expected: [401] },
@@ -370,7 +369,7 @@ function isLeadPersistenceReady({ endpointPayloads }) {
 }
 
 function isPaymentReady({ endpointPayloads }) {
-  return ["personal", "founder", "team", "annual"].every((plan) => endpointPayloads[`checkout-${plan}`]?.status === "ready")
+  return endpointPayloads["checkout-assisted-audit"]?.status === "ready"
     && endpointPayloads.readiness?.hardening?.payments === "settlement-observed";
 }
 

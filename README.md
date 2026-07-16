@@ -1,10 +1,10 @@
 # Vognary
 
-Vognary is a connector-first recurring-money intelligence product for founders, builders, freelancers, teams, and modern households. The current product delivers a stateless recurring-spend audit and a production-shaped connector control plane: live/manual/fallback evidence works now, Gmail is ready behind OAuth configuration, and 30+ direct or partner connectors are modeled with explicit blockers instead of fake readiness.
+Vognary 1.0 is an evidence-first recurring-spend audit for founders, builders, freelancers, teams, and households. The guest path works before login with receipt paste, conservative CSV/PDF import, manual fallback, separate-currency totals, one ranked action, and proof. Signed-in persistence and provider connections are deployment- and approval-gated; registry entries are not claims of active financial coverage.
 
 ## Current Product
 
-- Live-source-first audit workflow with fallback statement import.
+- Receipt-first guest audit with statement import as a secondary path and manual entry as a quiet fallback.
 - PDF/statement export ingestion through stateless processing when direct sources are unavailable.
 - Deterministic recurring-payment detector with regression tests (`npm test`).
 - Cross-source evidence merging: statement rows, Gmail receipts, pasted snippets, and connector evidence describing the same commitment become one item with all proof rows and a `multi-source verified` tag instead of double-counted duplicates.
@@ -16,7 +16,7 @@ Vognary is a connector-first recurring-money intelligence product for founders, 
 - Merchant normalization for AI tools, cloud hosting, SaaS, app stores, utilities, SIPs, EMIs, and insurance.
 - Recurring Money Graph dashboard.
 - Confidence scores, next debit prediction, evidence trail, and founder action labels.
-- Fine-grained connector honesty states (`live`, `setup-ready`, `token-required`, `oauth-required`, `verification-required`, `partner-gated`, `blocked`, `evidence-only`, `planned`) surfaced in `/api/connectors` and on `/integrations`.
+- Fine-grained connector honesty states (`live`, `setup-ready`, `token-required`, `oauth-required`, `verification-required`, `partner-gated`, `blocked`, `evidence-only`, `planned`) surfaced in `/api/connectors` and `/sources`; each state describes code/access status, not universal financial coverage.
 - Audit-pack trust levels: every JSON export has an offline SHA-256 self-checksum and local chain metadata; authenticated exports additionally receive an Ed25519 Vognary issuer signature when signing is configured. `/verify` checks both locally and states clearly that a self-checksum alone does not prove authorship.
 - Verified Savings: cancel/downgrade outcomes proven by evidence-of-absence — a saving is only "verified" when expected debits pass inside covered evidence without recurring.
 - Proof Graph: single-source vs multi-source spend, stale evidence, and the ranked next-best source to connect, computed from what is actually at stake.
@@ -38,7 +38,8 @@ Vognary is a connector-first recurring-money intelligence product for founders, 
 - Signed session-cookie and workspace authorization primitives, exposed through closed-by-default auth/workspace APIs.
 - Resend magic-link login route with one-time PostgreSQL challenges for public session issuance once email credentials are configured.
 - Gmail OAuth receipt connector with state validation, browser import fallback, and encrypted token persistence for signed-in users when the database and token vault are configured.
-- PostgreSQL schema for the future persistent connected-account backend.
+- PostgreSQL schema and migrations through `0016_assisted_audit_orders`, including encrypted workspace state, connector lifecycle, privacy controls, and one-time assisted-audit fulfillment.
+- One server-owned INR 999 assisted-audit SKU with no auto-renewal or monitoring entitlement. Checkout remains hidden until qualified legal review and tracked Razorpay configuration are proven.
 
 ## Quick Start
 
@@ -49,14 +50,15 @@ npm run dev
 
 Open http://localhost:3000.
 
-Copy `.env.example` to `.env.local` when enabling waitlist persistence, payment links, Gmail OAuth, or future connected-account storage.
+Copy `.env.example` to `.env.local` when enabling durable intake, tracked assisted-audit checkout, identity, Gmail OAuth, or connected-account storage.
 
-Launch page: http://localhost:3000/launch
-Private beta login: http://localhost:3000/login
+Guest audit: http://localhost:3000/app?guest=1
+Login: http://localhost:3000/login
 Profile and data controls: http://localhost:3000/profile
 Private audit intake: http://localhost:3000/private-audit
-Source guide: http://localhost:3000/sources
-Integration hub: http://localhost:3000/integrations
+Source management: http://localhost:3000/sources
+
+Legacy `/connect` and `/integrations` URLs permanently redirect to `/sources`; `/launch` redirects to `/private-audit`.
 
 ## Validation Command
 

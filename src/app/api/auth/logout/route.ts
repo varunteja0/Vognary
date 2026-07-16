@@ -1,4 +1,11 @@
 import { NextResponse } from "next/server";
+import {
+  gmailOAuthBindingCookie,
+  gmailOAuthStateCookie,
+  googleAuthNextCookie,
+  googleAuthStateCookie,
+  oauthStateCookieOptions,
+} from "@/lib/oauth-state";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 import { revokeCurrentSession, sessionCookieName } from "@/lib/server/session";
 
@@ -13,11 +20,8 @@ export async function POST(request: Request) {
   try {
     revoked = await revokeCurrentSession(request);
   } catch {
-    // Clear the browser credential even during a database outage. A copied
-    // credential cannot authorize requests while current-session validation is
-    // unavailable; the non-2xx response tells the caller to retry revocation.
-    const response = NextResponse.json({ status: "local-session-cleared", revoked: false }, { status: 503 });
-    clearSessionCookie(response);
+    const response = NextResponse.json({ status: "revocation-pending", revoked: false }, { status: 503 });
+    clearOAuthCookies(response);
     return response;
   }
 
@@ -34,4 +38,11 @@ function clearSessionCookie(response: NextResponse) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
+  clearOAuthCookies(response);
+}
+
+function clearOAuthCookies(response: NextResponse) {
+  for (const name of [gmailOAuthStateCookie, gmailOAuthBindingCookie, googleAuthStateCookie, googleAuthNextCookie]) {
+    response.cookies.set(name, "", { ...oauthStateCookieOptions(), maxAge: 0 });
+  }
 }

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
-import { gmailOAuthStateCookie, oauthStateCookieOptions } from "@/lib/oauth-state";
+import { gmailOAuthBindingCookie, gmailOAuthStateCookie, oauthStateCookieOptions } from "@/lib/oauth-state";
+import { currentPrivacyNoticeVersion } from "@/lib/privacy-notice";
+import { isDatabaseConfigured } from "@/lib/server/database";
+import { createOAuthSessionBinding } from "@/lib/server/oauth-session-binding";
 import { readCurrentSession } from "@/lib/server/session";
+import { checkTokenVaultConfiguration } from "@/lib/server/token-vault";
+import { requireWorkspaceRole } from "@/lib/server/workspace-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,15 +17,23 @@ export async function GET(request: Request) {
   const session = await readCurrentSession(request);
   if (!session) {
     if (wantsJson) return NextResponse.json({ status: "unauthenticated", message: "Sign in before connecting Gmail." }, { status: 401 });
-    return NextResponse.redirect(new URL("/login?next=/connect", url.origin));
+    return NextResponse.redirect(new URL("/login?next=/sources", url.origin));
   }
+  if (!session.workspaceId) return NextResponse.json({ error: "Session has no workspace. Sign in again." }, { status: 400 });
+  const authorization = await requireWorkspaceRole(request, session.workspaceId, "admin");
+  if (authorization instanceof Response) return authorization;
   const clientId = getGmailClientId();
   const clientSecret = getGmailClientSecret();
   const redirectUri = getGmailRedirectUri(url.origin);
   const missingEnv = [
+    isDatabaseConfigured() ? null : "DATABASE_URL",
+    checkTokenVaultConfiguration().status === "ready" ? null : "TOKEN_ENCRYPTION_KEY",
     clientId ? null : "GOOGLE_CLIENT_ID or GOOGLE_AUTH_CLIENT_ID",
     clientSecret ? null : "GOOGLE_CLIENT_SECRET or GOOGLE_AUTH_CLIENT_SECRET",
     redirectUri ? null : "GOOGLE_REDIRECT_URI",
+    process.env.NODE_ENV !== "production" || process.env.GOOGLE_OAUTH_VERIFICATION_COMPLETE === "true"
+      ? null
+      : "GOOGLE_OAUTH_VERIFICATION_COMPLETE=true",
   ].filter((value): value is string => Boolean(value));
 
   if (missingEnv.length) {
@@ -30,6 +43,7 @@ export async function GET(request: Request) {
       requiredEnv: missingEnv,
       redirectUri,
       scope: gmailReadonlyScope,
+      noticeVersion: currentPrivacyNoticeVersion,
     };
 
     if (wantsJson) return NextResponse.json(payload);
@@ -49,6 +63,7 @@ export async function GET(request: Request) {
   authUrl.searchParams.set("prompt", "consent");
   authUrl.searchParams.set("include_granted_scopes", "true");
   const state = crypto.randomUUID();
+  const binding = createOAuthSessionBinding(session, "gmail-readonly");
   authUrl.searchParams.set("state", state);
 
   if (wantsJson) {
@@ -58,13 +73,16 @@ export async function GET(request: Request) {
       authUrl: authUrl.toString(),
       redirectUri,
       scope: gmailReadonlyScope,
+      noticeVersion: currentPrivacyNoticeVersion,
     });
     response.cookies.set(gmailOAuthStateCookie, state, oauthStateCookieOptions());
+    response.cookies.set(gmailOAuthBindingCookie, binding, oauthStateCookieOptions());
     return response;
   }
 
   const response = NextResponse.redirect(authUrl);
   response.cookies.set(gmailOAuthStateCookie, state, oauthStateCookieOptions());
+  response.cookies.set(gmailOAuthBindingCookie, binding, oauthStateCookieOptions());
   return response;
 }
 
@@ -78,6 +96,13 @@ function getGmailClientSecret() {
 
 function getGmailRedirectUri(origin: string) {
   const configured = process.env.GOOGLE_REDIRECT_URI?.trim();
-  if (configured) return configured;
+  if (configured) {
+    try {
+      const url = new URL(configured);
+      if (url.protocol === "https:" || (process.env.NODE_ENV !== "production" && url.protocol === "http:")) return url.toString();
+    } catch {
+      return "";
+    }
+  }
   return process.env.NODE_ENV === "production" ? "" : `${origin.replace(/\/$/, "")}/api/integrations/gmail/callback`;
 }

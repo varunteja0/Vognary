@@ -1,4 +1,3 @@
-1. Apply the forward-only PostgreSQL migrations (`0002`–`0013`) and verify `schema_migrations` before enabling dependent routes.
 # Vognary Product Architecture
 
 ## Positioning
@@ -31,7 +30,7 @@ The product is organized around fourteen durable surfaces:
 | Connector Control Plane | Registry, start/sync planning, honesty states, adapters, token vault | `src/lib/connectors.ts`, `src/lib/connector-runtime.ts`, `src/lib/connectors/*`, `/api/connectors/*` |
 | Trust, Consent & Privacy Lifecycle | Resource-scoped consent, complete access exports without credential material, retention policy/enforcement, raw-payload minimization, delete paths, and profile controls | `/profile`, `/api/privacy/*`, `src/lib/server/privacy-lifecycle-store.ts`, `retention-executor.ts` |
 | Team Review Workflow | Revisioned encrypted owners/notes/review/merge state plus relational canonical commitment decisions | `/app` section 03, `workspace_states`, `commitment_decisions` |
-| Monthly Monitoring Loop | Scheduled sync jobs, cron runner, evidence refresh | `/api/internal/sync-jobs/*`, `vercel.json` cron |
+| Scheduled Source Refresh | Scheduled sync jobs, cron runner, evidence refresh | `/api/internal/sync-jobs/*`, `vercel.json` cron |
 | Read-only Platform API | Expiring, revocable, hashed tokens expose cursor-paginated canonical ledger/decisions and source health through explicit read scopes | `/api/platform/tokens`, `/api/v1/ledger`, `/api/v1/sources` |
 | Privacy-safe Benchmarks | Opt-in category/currency/frequency aggregates use prior-day data, workspace-level contribution caps, coarsening, and a 25-workspace minimum | `/api/workspaces/current/benchmarks`, `src/lib/aggregate-insights.ts` |
 | Partner Rail Readiness | Explicit AA/UPI/card-mandate partner status tracked as env truth | `src/lib/partner-rails.ts`, `/api/readiness` |
@@ -90,7 +89,7 @@ Beyond the four registry statuses (`live`, `ready-with-env`, `partner-required`,
 
 `live` · `usage-only` · `source-health-only` · `setup-ready` · `token-required` · `oauth-required` · `verification-required` · `partner-gated` · `blocked` · `evidence-only` · `planned`
 
-The state is derived from status + auth type + environment configuration (`getConnectorHonestyState` in `src/lib/connectors.ts`, env-aware wrapper in `connector-runtime.ts`), surfaced in `/api/connectors` and on `/integrations`. A connector may never claim more readiness than its weakest missing requirement.
+The state is derived from status + auth type + environment configuration (`getConnectorHonestyState` in `src/lib/connectors.ts`, env-aware wrapper in `connector-runtime.ts`), surfaced in `/api/connectors` and on `/sources`. A connector may never claim more readiness than its weakest missing requirement.
 
 A connector is only "real" at its declared materialization level when: the user can connect through an official path, tokens are encrypted at rest, sync persists the declared financial/usage/inventory evidence, errors are actionable, disconnect/delete works, and source coverage updates. Inventory-only adapters do not claim spend.
 
@@ -157,7 +156,7 @@ record remains authoritative for UI workflow fields and source text, with optimi
 
 These are deployment or business dependencies, not missing application modules:
 
-1. Apply the forward-only PostgreSQL migrations (`0002`–`0014`) and verify `schema_migrations` before enabling dependent routes.
+1. Apply the forward-only PostgreSQL migrations through `0016` and verify `schema_migrations` before enabling dependent routes.
 2. Complete Google OAuth restricted-scope verification before opening Gmail receipt sync beyond approved test users.
 3. Verify the Resend domain/sender and configure email, session, database, encryption, cron, and shared-rate-limit secrets before enabling public magic links or renewal delivery.
 4. Activate and monitor three distinct worker paths: connector sync cron, renewal-alert cron, and the fixed-policy authenticated privacy-retention GET cron.

@@ -1,5 +1,5 @@
 import type { ManualRecurringInput } from "./recurring-audit";
-import { formatCalendarDate, parseIsoDateOnly } from "./date-only";
+import { parseLooseCalendarDate } from "./loose-date";
 
 export type ReceiptCandidate = ManualRecurringInput & {
   confidenceScore: number;
@@ -15,16 +15,16 @@ const merchantPatterns = [
   /(?:towards|in favou?r of)\s+(?!INR\b|Rs\.?\b|USD\b)([A-Z][A-Za-z0-9 .&-]{2,40}?)(?:\s+(?:on|via|of|dated|will|is|has|for)\b|[.,]|$)/,
   // Leading proper-noun phrase directly before a billing keyword, e.g.
   // "Acme Cloud invoice ..." or "Foo domain renewal notice ...".
-  /^([A-Z][A-Za-z0-9.&+-]*(?:\s+[A-Z][A-Za-z0-9.&+-]*){0,2})\s+(?:domain|invoice|receipt|subscription|renewal|premium|bill|plan)\b/,
+  /^([A-Z][A-Za-z0-9.&+-]*(?:\s+[A-Z][A-Za-z0-9.&+-]*){0,2})\s+(?:domain|invoice|receipt|subscription|renewal|premium|bill|plan|membership)\b/,
 ];
 
 const mandateLikePattern = /pre-?debit|e-?mandate|\bmandate\b|standing instruction|autopay|auto-?debit/i;
 
-const amountPattern = /(?:₹|Rs\.?|INR|USD|\$)\s*([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i;
+const amountPattern = /(?:₹|Rs\.?|INR|USD|EUR|GBP|CAD|AUD|US\$|CA\$|AU\$|€|£|\$)\s*([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i;
 
 export function extractReceiptCandidates(messages: string[]): ReceiptCandidate[] {
   return messages
-    .map((message, index) => extractReceiptCandidate(message, index))
+    .map((message) => extractReceiptCandidate(message))
     .filter((candidate): candidate is ReceiptCandidate => Boolean(candidate));
 }
 
@@ -54,7 +54,7 @@ export function receiptTextToManualInputs(text: string, sourceName = "Pasted rec
   }));
 }
 
-function extractReceiptCandidate(message: string, index: number): ReceiptCandidate | null {
+function extractReceiptCandidate(message: string): ReceiptCandidate | null {
   const normalized = message.replace(/\s+/g, " ").trim();
   if (!normalized) return null;
 
@@ -74,20 +74,41 @@ function extractReceiptCandidate(message: string, index: number): ReceiptCandida
   // RBI pre-debit notifications are the strongest mandate-freshness signal we
   // can legally read today: they arrive by email for the rail we already have.
   const category = baseCategory === "Other" && mandateLike ? "Mandates" : baseCategory;
-  const currency = /\$|USD/.test(amountMatch[0]) ? "USD" : /€|EUR/.test(amountMatch[0]) ? "EUR" : "INR";
+  const currency = detectReceiptCurrency(amountMatch[0]);
+  if (!currency) return null;
+  const frequency = inferReceiptFrequency(normalized, mandateLike);
+  if (!frequency) return null;
+  const nextDate = inferNextDate(normalized, frequency);
+  if (!nextDate) return null;
 
   return {
-    id: `receipt-${index}-${slugify(merchant)}`,
+    id: `receipt-${slugify(merchant)}-${stableReceiptFingerprint(normalized)}`,
     merchant,
     amount,
     currency,
-    frequency: /annual|yearly|per year/i.test(normalized) ? "yearly" : "monthly",
-    nextExpectedDate: inferNextDate(normalized),
+    frequency,
+    nextExpectedDate: nextDate,
     category,
     sourceName: "gmail receipt preview",
     confidenceScore: mandateLike ? 78 : /renewal|recurring|subscription/i.test(normalized) ? 76 : 62,
     evidenceText: normalized.slice(0, 500),
   };
+}
+
+function stableReceiptFingerprint(value: string) {
+  const descriptor = value
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\b\d{1,4}[-/]\d{1,2}[-/]\d{1,4}\b/g, " ")
+    .replace(/(?:₹|rs\.?|inr|usd|eur|gbp|cad|aud|\$|€|£)?\s*\d[\d,.]*/g, " ")
+    .replace(/[^a-z]+/g, " ")
+    .trim();
+  let hash = 2_166_136_261;
+  for (let offset = 0; offset < descriptor.length; offset += 1) {
+    hash ^= descriptor.charCodeAt(offset);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(36);
 }
 
 function inferCategory(merchant: string): string {
@@ -105,43 +126,58 @@ function inferCategory(merchant: string): string {
   return "Other";
 }
 
-function inferNextDate(message: string): string {
-  const explicitDate = message.match(/(?:renews?|next billing|next charge|due|debit(?:ed)? on|scheduled (?:for|on)|next debit(?: date)?)\D{0,20}(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i);
+function inferReceiptFrequency(message: string, mandateLike: boolean): ManualRecurringInput["frequency"] | null {
+  if (/twice (?:a|per) month|semi-?monthly/i.test(message)) return "semimonthly";
+  if (/every (?:two|2) weeks|bi-?weekly|fortnightly/i.test(message)) return "biweekly";
+  if (/weekly|per week|every week/i.test(message)) return "weekly";
+  if (/every (?:two|2) months|bi-?monthly/i.test(message)) return "bimonthly";
+  if (/quarterly|every (?:three|3) months/i.test(message)) return "quarterly";
+  if (/annual|yearly|per year|every year/i.test(message)) return "yearly";
+  if (/monthly|per month|every month/i.test(message)) return "monthly";
+  return mandateLike || /will be debited|pre-?debit|next charge|next debit|next billing|scheduled (?:for|on)|renew(?:s|al|ed)?\b/i.test(message) ? "irregular" : null;
+}
+
+function inferNextDate(message: string, frequency: ManualRecurringInput["frequency"]): string | null {
+  const explicitDate = message.match(/(?:renews?\b|next billing|next charge|due|will be debited|pre-?debit|scheduled (?:for|on)|next debit(?: date)?)[^.\n]{0,120}?(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i);
   if (explicitDate) {
-    const parsed = parseLooseDate(explicitDate[1]);
-    if (parsed) return parsed;
+    return parseLooseCalendarDate(explicitDate[1]);
   }
 
-  const nextMonth = new Date();
-  nextMonth.setMonth(nextMonth.getMonth() + 1);
-  return nextMonth.toISOString().slice(0, 10);
+  const chargeDate = message.match(/(?:paid|charged|billed|debited)[\s\S]{0,80}?(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i);
+  const parsedChargeDate = chargeDate ? parseLooseCalendarDate(chargeDate[1]) : null;
+  return parsedChargeDate ? advanceReceiptDate(parsedChargeDate, frequency) : null;
 }
 
-// Indian receipts write dates day-first ("15/08/2026"); native Date parsing
-// assumes month-first and silently fails, so apply the day>12 heuristic.
-function parseLooseDate(value: string): string | null {
-  const isoDate = parseIsoDateOnly(value);
-  if (isoDate) return formatCalendarDate(isoDate);
-  const native = new Date(value);
-  if (!Number.isNaN(native.getTime())) return formatIsoDate(native);
-
-  const match = value.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
-  if (!match) return null;
-
-  const first = Number.parseInt(match[1], 10);
-  const second = Number.parseInt(match[2], 10);
-  const year = Number.parseInt(match[3].length === 2 ? `20${match[3]}` : match[3], 10);
-  const day = first > 12 ? first : second > 12 ? second : first;
-  const month = first > 12 ? second : second > 12 ? first : second;
-  const parsed = new Date(year, month - 1, day);
-  return Number.isNaN(parsed.getTime()) ? null : formatIsoDate(parsed);
+function advanceReceiptDate(value: string, frequency: ManualRecurringInput["frequency"]) {
+  const [year, month, day] = value.split("-").map(Number);
+  const source = new Date(year, month - 1, day);
+  let result: Date;
+  if (frequency === "weekly" || frequency === "biweekly") {
+    result = new Date(year, month - 1, day + (frequency === "weekly" ? 7 : 14));
+  } else if (frequency === "semimonthly") {
+    result = day === 1
+      ? new Date(year, month - 1, 15)
+      : day === 15
+        ? new Date(year, month, 1)
+        : new Date(year, month - 1, day + 15);
+  } else {
+    const months = frequency === "bimonthly" ? 2 : frequency === "quarterly" ? 3 : frequency === "yearly" ? 12 : 1;
+    const target = new Date(year, month - 1 + months, 1);
+    const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    const endOfMonth = day === new Date(source.getFullYear(), source.getMonth() + 1, 0).getDate();
+    result = new Date(target.getFullYear(), target.getMonth(), endOfMonth ? lastDay : Math.min(day, lastDay));
+  }
+  return `${result.getFullYear()}-${`${result.getMonth() + 1}`.padStart(2, "0")}-${`${result.getDate()}`.padStart(2, "0")}`;
 }
 
-function formatIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function detectReceiptCurrency(value: string) {
+  if (/\bCAD\b|CA\$/i.test(value)) return "CAD";
+  if (/\bAUD\b|AU\$/i.test(value)) return "AUD";
+  if (/\bEUR\b|€/i.test(value)) return "EUR";
+  if (/\bGBP\b|£/i.test(value)) return "GBP";
+  if (/\bUSD\b|US\$/i.test(value)) return "USD";
+  if (/\$/.test(value)) return null;
+  return "INR";
 }
 
 function slugify(value: string): string {

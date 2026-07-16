@@ -11,8 +11,8 @@ not be described as active merely because their routes exist.
 
 Copy `.env.example` to `.env.local` for local configuration. The app stays functional without optional env vars, but these features are gated:
 
-- `WAITLIST_WEBHOOK_URL` for persisted launch/audit requests.
-- `PAYMENT_LINK_*` for paid checkout links.
+- `DATABASE_URL` or `AUDIT_INTAKE_WEBHOOK_URL` for durable private-audit requests.
+- `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `NEXT_PUBLIC_APP_URL`, and legally approved `ASSISTED_AUDIT_LEGAL_TERMS_STATUS=approved` for the tracked one-time assisted-audit checkout.
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` for Gmail read-only receipt discovery.
 - `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, and `SESSION_SECRET`, plus verified Google identity or Resend magic links, for revocable sessions and automatic encrypted workspace state.
 - `GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`, and `GOOGLE_AUTH_REDIRECT_URI` for Google sign-in. This uses basic identity scopes and is separate from Gmail receipt access.
@@ -157,7 +157,7 @@ curl http://localhost:3000/api/readiness
 
 Compose waits for PostgreSQL 16, runs the schema migration service to completion, and then starts the web service. The migration command keeps a `schema_migrations` ledger. On a fresh database it applies `infra/postgres/schema.sql` as `0001_initial_schema`; on an existing database that already has the initial tables it records a baseline; then it applies forward-only SQL files from `infra/postgres/migrations` in sorted order.
 
-Readiness requires every forward migration from `0002_revocable_sessions` through `0014_sync_run_invocation`, then runs bounded aggregate queries against capability tables. `capabilities.schema.status=ready` means the migration ledger and those queries succeeded; it does not prove a deployed schedule, delivered renewal email, paid entitlement, or platform adoption. Sync-worker production status additionally requires a successful cron-invoked run that wrote evidence. CI applies the schema to PostgreSQL 16 and runs `npm run test:postgres`.
+Readiness requires every forward migration from `0002_revocable_sessions` through `0016_assisted_audit_orders`, then runs bounded aggregate queries against capability tables. `capabilities.schema.status=ready` means the migration ledger and those queries succeeded; it does not prove a deployed schedule, delivered renewal email, paid assisted-audit order, legal approval, provider approval, or platform adoption. Sync-worker production status additionally requires a successful cron-invoked run that wrote evidence. CI applies the schema to PostgreSQL 16 and runs `npm run test:postgres`.
 
 Add future production schema changes as `infra/postgres/migrations/0002_short_description.sql`, `0003_short_description.sql`, and so on. Do not edit already-applied migration files.
 

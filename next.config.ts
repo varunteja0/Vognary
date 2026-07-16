@@ -21,6 +21,13 @@ const contentSecurityPolicy = [
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  async redirects() {
+    return [
+      { source: "/connect", destination: "/sources", permanent: true },
+      { source: "/integrations", destination: "/sources", permanent: true },
+      { source: "/launch", destination: "/private-audit", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

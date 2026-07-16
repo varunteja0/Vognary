@@ -63,6 +63,19 @@ create table users (
   deleted_at timestamptz
 );
 
+create table auth_identities (
+  id uuid primary key default gen_random_uuid(),
+  provider text not null check (provider in ('google')),
+  issuer text not null,
+  subject text not null,
+  user_id uuid not null references users(id) on delete cascade,
+  email_at_link text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (provider, issuer, subject),
+  unique (provider, user_id)
+);
+
 create table auth_magic_links (
   id uuid primary key default gen_random_uuid(),
   token_hash text unique not null,
@@ -160,13 +173,16 @@ create index platform_api_tokens_active_hash_idx on platform_api_tokens(token_ha
 
 create table billing_checkout_sessions (
   id uuid primary key default gen_random_uuid(),
-  workspace_id uuid references workspaces(id) on delete cascade,
+  workspace_id uuid references workspaces(id) on delete set null,
   user_id uuid references users(id) on delete set null,
   lead_id uuid references private_audit_leads(id) on delete set null,
   customer_email text not null check (length(btrim(customer_email)) between 3 and 320),
-  plan text not null check (plan in ('personal', 'founder', 'team', 'annual')),
+  plan text not null check (plan in ('personal', 'founder', 'team', 'annual', 'assisted-audit')),
+  offer_id text not null default 'legacy-unversioned-offer',
+  offer_version integer not null default 1 check (offer_version > 0),
+  terms_version text not null default 'legacy-unversioned',
   provider text not null check (provider in ('razorpay', 'payment-link')),
-  status text not null default 'created' check (status in ('created', 'pending', 'paid', 'failed', 'cancelled', 'expired', 'refunded')),
+  status text not null default 'created' check (status in ('created', 'pending', 'paid', 'partially_refunded', 'failed', 'reconciliation_required', 'cancelled', 'expired', 'refunded')),
   currency char(3) not null default 'INR',
   amount_minor bigint not null check (amount_minor > 0),
   refunded_amount_minor bigint not null default 0 check (refunded_amount_minor >= 0 and refunded_amount_minor <= amount_minor),
@@ -174,19 +190,21 @@ create table billing_checkout_sessions (
   provider_checkout_id text,
   provider_payment_id text,
   provider_checkout_url text,
+  provider_creation_started_at timestamptz,
   paid_at timestamptz,
   refunded_at timestamptz,
   failed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  check ((status = 'paid') = (paid_at is not null) or status = 'refunded'),
+  check ((status in ('paid', 'partially_refunded', 'refunded')) = (paid_at is not null)),
   check (status <> 'refunded' or refunded_at is not null)
 );
 
 create unique index billing_checkout_provider_id_idx on billing_checkout_sessions(provider, provider_checkout_id) where provider_checkout_id is not null;
 create index billing_checkout_workspace_created_idx on billing_checkout_sessions(workspace_id, created_at desc);
-create index billing_checkout_payment_idx on billing_checkout_sessions(provider, provider_payment_id) where provider_payment_id is not null;
+create unique index billing_checkout_payment_idx on billing_checkout_sessions(provider, provider_payment_id) where provider_payment_id is not null;
 create index billing_checkout_lead_idx on billing_checkout_sessions(lead_id) where lead_id is not null;
+create unique index billing_checkout_assisted_offer_idx on billing_checkout_sessions(lead_id, offer_id, offer_version) where plan = 'assisted-audit' and lead_id is not null;
 
 create table billing_webhook_events (
   id uuid primary key default gen_random_uuid(),
@@ -202,6 +220,42 @@ create table billing_webhook_events (
 );
 
 create index billing_webhook_received_idx on billing_webhook_events(received_at desc);
+
+create table billing_refunds (
+  id uuid primary key default gen_random_uuid(),
+  provider text not null check (provider in ('razorpay')),
+  provider_refund_id text not null,
+  provider_payment_id text not null,
+  checkout_session_id uuid references billing_checkout_sessions(id) on delete restrict,
+  amount_minor bigint not null check (amount_minor > 0),
+  currency char(3) not null,
+  status text not null check (status in ('pending_payment', 'applied', 'rejected')),
+  rejection_code text,
+  created_at timestamptz not null default now(),
+  applied_at timestamptz,
+  unique (provider, provider_refund_id)
+);
+
+create index billing_refunds_payment_idx on billing_refunds(provider, provider_payment_id, created_at);
+
+create table assisted_audit_orders (
+  id uuid primary key default gen_random_uuid(),
+  checkout_session_id uuid not null unique references billing_checkout_sessions(id) on delete restrict,
+  workspace_id uuid references workspaces(id) on delete set null,
+  user_id uuid references users(id) on delete set null,
+  lead_id uuid references private_audit_leads(id) on delete set null,
+  offer_id text not null,
+  offer_version integer not null check (offer_version > 0),
+  terms_version text not null,
+  status text not null check (status in ('review_required', 'pending', 'in_progress', 'delivered', 'cancelled', 'refunded')),
+  created_at timestamptz not null default now(),
+  started_at timestamptz,
+  delivered_at timestamptz,
+  refunded_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+create index assisted_audit_orders_status_created_idx on assisted_audit_orders(status, created_at);
 
 create table workspace_entitlements (
   workspace_id uuid not null references workspaces(id) on delete cascade,
@@ -661,6 +715,7 @@ create table renewal_alert_deliveries (
   status text not null default 'scheduled' check (status in ('scheduled', 'sending', 'sent', 'failed', 'cancelled')),
   attempt_count smallint not null default 0 check (attempt_count between 0 and 5),
   next_attempt_at timestamptz,
+  last_invocation text check (last_invocation is null or last_invocation in ('internal-api', 'cron')),
   locked_at timestamptz,
   locked_by text check (locked_by is null or length(locked_by) between 1 and 80),
   sent_at timestamptz,

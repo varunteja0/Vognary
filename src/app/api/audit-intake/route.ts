@@ -4,6 +4,8 @@ import { isLeadDatabaseConfigured, persistAuditLead } from "@/lib/server/lead-st
 import { recordProductEvent } from "@/lib/server/product-event-store";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
+import { buildRedactionFirstSourcePlan } from "@/lib/private-audit-plan";
+import { currentPrivacyNoticeVersion } from "@/lib/privacy-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -145,16 +147,17 @@ export async function POST(request: NextRequest) {
     message,
     score: scoreLead({ persona, paymentTypes, sourceTypes }),
     consentPurpose: "private-audit-contact",
-    consentNoticeVersion: "privacy-2026-07-11",
+    consentNoticeVersion: currentPrivacyNoticeVersion,
     consentGrantedAt: createdAt,
   };
+  const sourcePlan = buildRedactionFirstSourcePlan({ paymentTypes, sourceTypes });
 
   if (isLeadDatabaseConfigured()) {
     try {
       const leadId = await persistAuditLead(payload);
       await recordProductEvent({ eventName: "private_audit.requested", source: "workspace-api", status: "succeeded" }).catch(() => undefined);
       await mirrorToWebhook(process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL, payload);
-      return NextResponse.json({ status: "accepted", persisted: true, storage: "database", leadId, score: payload.score });
+      return NextResponse.json({ status: "accepted", persisted: true, storage: "database", leadId, score: payload.score, sourcePlan });
     } catch {
       return NextResponse.json({ error: "The audit request could not be stored right now. Please try again later." }, { status: 502 });
     }
@@ -163,10 +166,10 @@ export async function POST(request: NextRequest) {
   const webhookUrl = process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL;
   if (!webhookUrl) {
     return NextResponse.json({
-      status: "accepted-preview",
+      status: "prepared-not-persisted",
       persisted: false,
       nextStep: "Set DATABASE_URL for free database lead storage, or set AUDIT_INTAKE_WEBHOOK_URL / WAITLIST_WEBHOOK_URL for webhook persistence.",
-      lead: payload,
+      sourcePlan,
     });
   }
 
@@ -180,7 +183,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Audit intake webhook failed." }, { status: 502 });
   }
 
-  return NextResponse.json({ status: "accepted", persisted: true, score: payload.score });
+  return NextResponse.json({ status: "accepted", persisted: true, score: payload.score, sourcePlan });
 }
 
 async function mirrorToWebhook(webhookUrl: string | undefined, payload: Record<string, unknown>) {

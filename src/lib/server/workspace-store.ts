@@ -13,6 +13,13 @@ export type WorkspaceUser = {
   displayName: string | null;
 };
 
+export class WorkspaceIdentityConflictError extends Error {
+  constructor() {
+    super("This email is already linked to a different Google identity.");
+    this.name = "WorkspaceIdentityConflictError";
+  }
+}
+
 export function assertDatabaseReadyForWorkspaces() {
   if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is required for workspace authorization.");
 }
@@ -50,6 +57,97 @@ export async function getOrCreateUserByEmail(input: { email: string; displayName
   const row = result.rows[0];
   if (!row) throw new Error("User upsert did not return a user.");
   return { id: row.id, email: row.email, displayName: row.display_name };
+}
+
+export async function getOrCreateUserByGoogleIdentity(input: {
+  issuer: string;
+  subject: string;
+  email: string;
+  displayName?: string;
+}): Promise<WorkspaceUser> {
+  assertDatabaseReadyForWorkspaces();
+  const client = await getDatabasePool().connect();
+  try {
+    await client.query("begin");
+    const identityKey = `google:${input.issuer}:${input.subject}`;
+    await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [identityKey]);
+
+    const existingIdentity = await client.query<WorkspaceUserRow>(
+      `select users.id, users.email, users.display_name
+       from auth_identities identity
+       join users on users.id = identity.user_id
+       where identity.provider = 'google' and identity.issuer = $1 and identity.subject = $2`,
+      [input.issuer, input.subject],
+    );
+    if (existingIdentity.rows[0]) {
+      const updated = await client.query<WorkspaceUserRow>(
+        `update users
+         set display_name = coalesce(nullif($2, ''), display_name), updated_at = now(), deleted_at = null
+         where id = $1
+         returning id, email, display_name`,
+        [existingIdentity.rows[0].id, input.displayName?.trim() ?? ""],
+      );
+      await client.query(
+        `update auth_identities set email_at_link = $3, updated_at = now()
+         where provider = 'google' and issuer = $1 and subject = $2`,
+        [input.issuer, input.subject, input.email],
+      );
+      await client.query("commit");
+      return mapWorkspaceUser(updated.rows[0]);
+    }
+
+    const emailUser = await client.query<WorkspaceUserRow>(
+      `select id, email, display_name from users where lower(email) = lower($1) for update`,
+      [input.email],
+    );
+    let user = emailUser.rows[0];
+    if (user) {
+      const conflictingIdentity = await client.query(
+        `select 1 from auth_identities where provider = 'google' and user_id = $1`,
+        [user.id],
+      );
+      if (conflictingIdentity.rows[0]) throw new WorkspaceIdentityConflictError();
+      const establishedAccount = await client.query(
+        `select exists (
+           select 1 from workspace_members where user_id = $1
+           union all
+           select 1 from auth_sessions where user_id = $1
+         ) as established`,
+        [user.id],
+      );
+      if (establishedAccount.rows[0]?.established) throw new WorkspaceIdentityConflictError();
+      const updated = await client.query<WorkspaceUserRow>(
+        `update users
+         set display_name = coalesce(nullif($2, ''), display_name), updated_at = now(), deleted_at = null
+         where id = $1
+         returning id, email, display_name`,
+        [user.id, input.displayName?.trim() ?? ""],
+      );
+      user = updated.rows[0];
+    } else {
+      const inserted = await client.query<WorkspaceUserRow>(
+        `insert into users (email, display_name)
+         values ($1, nullif($2, ''))
+         returning id, email, display_name`,
+        [input.email, input.displayName?.trim() ?? ""],
+      );
+      user = inserted.rows[0];
+    }
+    if (!user) throw new Error("Google identity user upsert did not return a user.");
+
+    await client.query(
+      `insert into auth_identities (provider, issuer, subject, user_id, email_at_link)
+       values ('google', $1, $2, $3, $4)`,
+      [input.issuer, input.subject, user.id, input.email],
+    );
+    await client.query("commit");
+    return mapWorkspaceUser(user);
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getOrCreateDefaultWorkspaceForUser(input: { userId: string; workspaceName?: string }) {
@@ -127,6 +225,11 @@ type WorkspaceUserRow = {
   email: string;
   display_name: string | null;
 };
+
+function mapWorkspaceUser(row: WorkspaceUserRow | undefined): WorkspaceUser {
+  if (!row) throw new Error("User query did not return a user.");
+  return { id: row.id, email: row.email, displayName: row.display_name };
+}
 
 function mapWorkspaceMembership(row: WorkspaceMembershipRow): WorkspaceMembership {
   return {

@@ -1,5 +1,7 @@
+import { currentPrivacyNoticeVersion } from "./privacy-notice";
+
 export const renewalAlertConsentPurpose = "renewal-alerts" as const;
-export const renewalAlertNoticeVersion = "privacy-2026-07-11";
+export const renewalAlertNoticeVersion = currentPrivacyNoticeVersion;
 export const renewalAlertWindows = ["7_day", "1_day"] as const;
 export const renewalAlertFailureCodes = [
   "configuration",

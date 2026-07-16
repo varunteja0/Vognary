@@ -98,6 +98,7 @@ const missingEnv = (connector: Connector) => {
     return [
       process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_AUTH_CLIENT_ID ? null : "GOOGLE_CLIENT_ID or GOOGLE_AUTH_CLIENT_ID",
       process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_AUTH_CLIENT_SECRET ? null : "GOOGLE_CLIENT_SECRET or GOOGLE_AUTH_CLIENT_SECRET",
+      process.env.NODE_ENV !== "production" || process.env.GOOGLE_REDIRECT_URI ? null : "GOOGLE_REDIRECT_URI",
     ].filter((value): value is string => Boolean(value));
   }
 

@@ -83,6 +83,8 @@ export type PrivacyExportDocument = {
   renewalAlertDeliveries: Array<Record<string, unknown>>;
   apiTokens: Array<Record<string, unknown>>;
   billingCheckouts: Array<Record<string, unknown>>;
+  assistedAuditOrders: Array<Record<string, unknown>>;
+  billingRefunds: Array<Record<string, unknown>>;
   entitlements: Array<Record<string, unknown>>;
   auditHistory: Array<Record<string, unknown>>;
   exclusions: string[];

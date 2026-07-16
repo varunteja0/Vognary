@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { googleAuthStateCookie, oauthStateCookieOptions } from "@/lib/oauth-state";
+import { googleAuthNextCookie, googleAuthStateCookie, oauthStateCookieOptions, sanitizeOAuthReturnPath } from "@/lib/oauth-state";
 import { getGoogleAuthClientId, getGoogleAuthOrigin, getGoogleAuthRedirectUri } from "@/lib/server/google-auth";
 
 export const dynamic = "force-dynamic";
@@ -9,15 +9,20 @@ const googleAuthScope = "openid email profile";
 
 export function GET(request: NextRequest) {
   const wantsJson = request.nextUrl.searchParams.get("mode") === "json";
+  const nextPath = sanitizeOAuthReturnPath(request.nextUrl.searchParams.get("next"));
   const origin = getGoogleAuthOrigin(request.nextUrl.origin);
   const clientId = getGoogleAuthClientId();
   const redirectUri = getGoogleAuthRedirectUri(origin);
 
-  if (!clientId) {
+  if (!clientId || !origin || !redirectUri) {
     const payload = {
       status: "not-configured",
       provider: "google-auth",
-      requiredEnv: ["GOOGLE_AUTH_CLIENT_ID or GOOGLE_CLIENT_ID"],
+      requiredEnv: [
+        !clientId ? "GOOGLE_AUTH_CLIENT_ID or GOOGLE_CLIENT_ID" : null,
+        !origin ? "NEXT_PUBLIC_APP_URL or APP_URL" : null,
+        !redirectUri ? "GOOGLE_AUTH_REDIRECT_URI" : null,
+      ].filter((value): value is string => Boolean(value)),
       redirectUri,
       message: "Google login needs a Google OAuth client ID.",
     };
@@ -42,10 +47,12 @@ export function GET(request: NextRequest) {
       scope: googleAuthScope,
     });
     response.cookies.set(googleAuthStateCookie, state, oauthStateCookieOptions());
+    response.cookies.set(googleAuthNextCookie, nextPath, oauthStateCookieOptions());
     return response;
   }
 
   const response = NextResponse.redirect(authUrl);
   response.cookies.set(googleAuthStateCookie, state, oauthStateCookieOptions());
+  response.cookies.set(googleAuthNextCookie, nextPath, oauthStateCookieOptions());
   return response;
 }

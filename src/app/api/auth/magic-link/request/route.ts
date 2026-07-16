@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
-import { checkMagicLinkConfiguration, createMagicLinkChallenge, maskEmail, sendMagicLinkEmail } from "@/lib/server/magic-link-auth";
+import { checkMagicLinkConfiguration, createMagicLinkChallenge, getMagicLinkAppOrigin, maskEmail, sendMagicLinkEmail } from "@/lib/server/magic-link-auth";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 
@@ -43,7 +43,9 @@ export async function POST(request: NextRequest) {
     workspaceName: body.workspaceName,
     redirectPath: body.redirectPath,
   });
-  const verifyUrl = new URL("/api/auth/magic-link/verify", getAppOrigin(request));
+  const appOrigin = getMagicLinkAppOrigin(request.nextUrl.origin);
+  if (!appOrigin) return NextResponse.json({ status: "not-configured", requiredEnv: ["NEXT_PUBLIC_APP_URL or APP_URL"] }, { status: 501 });
+  const verifyUrl = new URL("/api/auth/magic-link/verify", appOrigin);
   verifyUrl.searchParams.set("token", challenge.token);
 
   try {
@@ -54,17 +56,13 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ status: "sent", email: maskEmail(email), expiresAt: challenge.expiresAt });
 }
-
 async function readMagicLinkJson(request: Request): Promise<MagicLinkRequest | Response> {
   try {
-    return await readLimitedJson<MagicLinkRequest>(request, 8 * 1024);
+    return await readLimitedJson<MagicLinkRequest>(request, maxMagicLinkBodyBytes);
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) return NextResponse.json({ error: "Magic-link request is too large." }, { status: 413 });
     if (error instanceof UnsupportedContentTypeError) return NextResponse.json({ error: "Content-Type must be application/json." }, { status: 415 });
     return NextResponse.json({ error: "Magic-link request must be valid JSON." }, { status: 400 });
   }
 }
-
-function getAppOrigin(request: NextRequest) {
-  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || request.nextUrl.origin;
-}
+const maxMagicLinkBodyBytes = 8 * 1024;

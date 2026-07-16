@@ -286,7 +286,7 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
   return { touched: scheduled.rowCount ?? 0, cancelled: cancelled.rowCount ?? 0 };
 }
 
-export async function claimDueRenewalAlerts(input: { limit: number; workerId: string }): Promise<ClaimedRenewalAlert[]> {
+export async function claimDueRenewalAlerts(input: { limit: number; workerId: string; invocation: "internal-api" | "cron" }): Promise<ClaimedRenewalAlert[]> {
   const result = await getDatabasePool().query<{
     delivery_id: string;
     email: string;
@@ -331,6 +331,7 @@ export async function claimDueRenewalAlerts(input: { limit: number; workerId: st
        update renewal_alert_deliveries delivery
        set status = 'sending',
            attempt_count = delivery.attempt_count + 1,
+           last_invocation = $4,
            locked_at = now(),
            locked_by = $3,
            updated_at = now()
@@ -347,7 +348,7 @@ export async function claimDueRenewalAlerts(input: { limit: number; workerId: st
      from claimed
      join users recipient on recipient.id = claimed.user_id and recipient.deleted_at is null
      join recurring_items item on item.id = claimed.recurring_item_id`,
-    [Math.max(1, Math.min(input.limit, 25)), maxDeliveryAttempts, input.workerId],
+    [Math.max(1, Math.min(input.limit, 25)), maxDeliveryAttempts, input.workerId, input.invocation],
   );
 
   return result.rows.map((row) => ({

@@ -7,8 +7,9 @@ import ProfileClient from "./profile-client";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Profile And Data",
-  description: "Review your Vognary profile, workspace, integrations, saved data, pending sources, and deletion controls.",
+  title: "Account Settings",
+  description: "Manage your Vognary account, notifications, privacy, developer access, and deletion controls.",
+  robots: { index: false, follow: false },
 };
 
 export default async function ProfilePage() {

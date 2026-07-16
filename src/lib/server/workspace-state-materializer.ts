@@ -2,8 +2,10 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
+import { parseIsoDateOnly } from "@/lib/date-only";
 import {
   analyzeStatements,
+  normalizeCurrencyCode,
   type Frequency,
   type ManualRecurringInput,
   type RecurringItem,
@@ -92,7 +94,7 @@ export async function materializeWorkspaceState(
     );
     const transactionId = result.rows[0]?.id;
     if (!transactionId) throw new Error("Workspace transaction upsert did not return an id.");
-    transactionIds.set(transactionEvidenceKey(transaction.source, transaction.rowNumber), transactionId);
+    transactionIds.set(transactionEvidenceKey(transaction), transactionId);
   }
 
   for (const item of audit.recurringItems) {
@@ -126,7 +128,7 @@ export async function materializeWorkspaceState(
                        amount = excluded.amount`,
         [
           recurringItemId,
-          transactionIds.get(transactionEvidenceKey(evidence.source, evidence.rowNumber)) ?? null,
+          transactionIds.get(transactionEvidenceKey(evidence)) ?? null,
           sourceId,
           evidenceReference,
           evidence.kind === "scheduled" ? "scheduled" : "transaction",
@@ -197,14 +199,22 @@ function normalizeManualItem(value: unknown, index: number): ManualRecurringInpu
   if (!Number.isFinite(amount) || amount <= 0 || !frequencies.has(frequency)) {
     throw new WorkspaceStateValidationError(`Manual commitment ${index + 1} has an invalid amount or frequency.`);
   }
+  const nextExpectedDate = boundedText(item.nextExpectedDate, 10, `Manual commitment ${index + 1} date`);
+  if (!parseIsoDateOnly(nextExpectedDate)) {
+    throw new WorkspaceStateValidationError(`Manual commitment ${index + 1} has an invalid calendar date.`);
+  }
+  const currency = item.currency === undefined ? undefined : normalizeCurrencyCode(item.currency, null);
+  if (item.currency !== undefined && !currency) {
+    throw new WorkspaceStateValidationError(`Manual commitment ${index + 1} has an invalid currency code.`);
+  }
   return {
     id: boundedText(item.id, 240, `Manual commitment ${index + 1} id`),
     canonicalRecurringItemId: typeof item.canonicalRecurringItemId === "string" ? item.canonicalRecurringItemId : undefined,
     merchant: boundedText(item.merchant, 180, `Manual commitment ${index + 1} merchant`),
     amount,
-    currency: typeof item.currency === "string" ? item.currency.slice(0, 3).toUpperCase() : undefined,
+    currency: currency ?? undefined,
     frequency,
-    nextExpectedDate: boundedText(item.nextExpectedDate, 10, `Manual commitment ${index + 1} date`),
+    nextExpectedDate,
     category: boundedText(item.category, 100, `Manual commitment ${index + 1} category`),
     sourceName: typeof item.sourceName === "string" ? item.sourceName.trim().slice(0, 240) : undefined,
   };
@@ -343,8 +353,20 @@ async function updateWorkspaceSourceCoverage(
   );
 }
 
-function transactionEvidenceKey(source: string, rowNumber: number) {
-  return `${source}\u0000${rowNumber}`;
+function transactionEvidenceKey(evidence: {
+  source: string;
+  rowNumber: number;
+  date: string;
+  amount: number;
+  description: string;
+}) {
+  return [
+    evidence.source,
+    String(evidence.rowNumber),
+    evidence.date,
+    evidence.amount.toFixed(2),
+    evidence.description.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim(),
+  ].join("\u0000");
 }
 
 function workspaceStateReference(value: unknown) {

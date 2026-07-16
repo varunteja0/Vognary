@@ -40,7 +40,7 @@ export default function PartnersPage() {
             <VognaryMark size={22} /> Vognary
           </Link>
           <div className="flex flex-wrap gap-2">
-            <Link href="/integrations" className="btn btn-ghost">Integration status</Link>
+            <Link href="/sources" className="btn btn-ghost">Source status</Link>
             <a href="mailto:partners@vognary.com" className="btn btn-primary">Start a partner review</a>
           </div>
         </nav>

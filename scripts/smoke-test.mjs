@@ -8,13 +8,18 @@ async function assertOk(path, init) {
 
 await assertOk("/");
 await assertOk("/verify");
-await assertOk("/launch");
 await assertOk("/sources");
-await assertOk("/integrations");
 await assertOk("/privacy");
 await assertOk("/security");
 await assertOk("/private-audit");
 await assertOk("/login");
+
+for (const [legacy, destination] of [["/connect", "/sources"], ["/integrations", "/sources"], ["/launch", "/private-audit"]]) {
+  const response = await fetch(`${baseUrl}${legacy}`, { redirect: "manual" });
+  if (response.status !== 308) throw new Error(`${legacy} compatibility redirect returned ${response.status}`);
+  const location = response.headers.get("location");
+  if (!location || new URL(location, baseUrl).pathname !== destination) throw new Error(`${legacy} did not redirect to ${destination}`);
+}
 
 const health = await (await assertOk("/api/health")).json();
 if (health.status !== "ok") throw new Error("Health endpoint did not return ok");
@@ -160,24 +165,13 @@ const invalidAuditResponse = await fetch(`${baseUrl}/api/audit`, {
 });
 if (invalidAuditResponse.status !== 400) throw new Error(`Invalid manual item returned ${invalidAuditResponse.status} instead of 400`);
 
-const auditIntakeResponse = await fetch(`${baseUrl}/api/audit-intake`, {
-  method: "POST",
-  headers: { "content-type": "application/json", "x-forwarded-for": `smoke-${Date.now()}` },
-  body: JSON.stringify({
-    name: "Smoke Founder",
-    email: "smoke@example.com",
-    contact: "LinkedIn",
-    persona: "Founder",
-    spendGuess: "50000",
-    paymentTypes: ["AI tools", "SaaS tools"],
-    sourceTypes: ["Redacted bank/card statement"],
-    biggestConcern: "Privacy",
-    canContact: true,
-    message: "Smoke audit intake validation",
-  }),
-});
-if (!auditIntakeResponse.ok) throw new Error(`Audit intake endpoint returned ${auditIntakeResponse.status}`);
+const auditIntakeResponse = await fetch(`${baseUrl}/api/audit-intake`);
+if (![200, 501].includes(auditIntakeResponse.status)) {
+  throw new Error(`Audit intake readiness endpoint returned ${auditIntakeResponse.status}`);
+}
 const auditIntake = await auditIntakeResponse.json();
-if (!auditIntake.status) throw new Error("Audit intake endpoint did not return a status");
+if (!['ready', 'not-configured'].includes(auditIntake.status) || typeof auditIntake.persisted !== "boolean") {
+  throw new Error("Audit intake readiness endpoint returned an invalid contract");
+}
 
 console.log(JSON.stringify({ status: "ok", baseUrl, routes: "verified" }, null, 2));

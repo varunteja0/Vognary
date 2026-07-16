@@ -41,15 +41,12 @@ test("clearing a workspace is confirmed and recoverable with undo", async ({ pag
 
 test("guest first run reaches a useful sample ledger in one action", async ({ page }) => {
   await page.goto("/app?guest=1");
-  await expect(page.getByText("Nothing connected yet")).toBeVisible();
-  await page.getByRole("button", { name: "Load sample workspace" }).first().click();
-  await expect(page.getByText("Sample data", { exact: true })).toBeVisible();
-  if (test.info().project.name === "mobile-chromium") {
-    await expect(page.locator("#ledger")).toBeVisible();
-    await expect(page.locator("#recurring-ledger tbody tr")).toHaveCount(8);
-  } else {
-    await expect(page.locator("#overview").getByText("₹11,867", { exact: true }).first()).toBeVisible();
-  }
+  await expect(page.getByRole("heading", { name: "Audit your recurring spend" })).toBeVisible();
+  await page.getByRole("button", { name: "See sample" }).click();
+  const result = page.getByRole("region", { name: "Your first audit result" });
+  await expect(result).toBeVisible();
+  await expect(result.getByText("₹2,829")).toBeVisible();
+  await expect(result.getByText("Proof", { exact: true })).toBeVisible();
 });
 
 test("monthly review controls are named and completion is visible", async ({ page }) => {
@@ -81,10 +78,20 @@ test("a downloaded audit pack verifies locally without uploading report content"
 });
 
 async function expectNoSeriousAxeViolations(page: Page) {
-  await page.waitForTimeout(2_100);
+  await waitForEntranceAnimations(page);
   const result = await new AxeBuilder({ page }).analyze();
   const serious = result.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical");
   expect(serious, serious.map((violation) => `${violation.id}: ${violation.help}`).join("\n")).toEqual([]);
+}
+
+async function waitForEntranceAnimations(page: Page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    const animations = [...document.querySelectorAll<HTMLElement>(".rise")]
+      .flatMap((element) => element.getAnimations())
+      .filter((animation) => animation.playState !== "finished");
+    await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
+  });
 }
 
 async function pageMetrics(page: Page) {

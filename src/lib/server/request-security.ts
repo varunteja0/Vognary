@@ -27,8 +27,18 @@ export function rejectCrossSiteMutation(request: Request): Response | null {
 
 function getAllowedOrigins(request: Request) {
   const origins = new Set<string>();
-  const requestOrigin = normalizeOrigin(new URL(request.url).origin);
+  const requestUrl = new URL(request.url);
+  const requestOrigin = normalizeOrigin(requestUrl.origin);
   if (requestOrigin) origins.add(requestOrigin);
+
+  // Next's local server can normalize Request.url to `localhost` even when the
+  // browser reached `127.0.0.1`. The browser-controlled Origin must still match
+  // the HTTP Host header; callers cannot set Host from cross-origin JavaScript.
+  const host = request.headers.get("host")?.trim();
+  if (host && !host.includes(",") && !/[\/\\@]/.test(host)) {
+    const hostOrigin = normalizeOrigin(`${requestUrl.protocol}//${host}`);
+    if (hostOrigin) origins.add(hostOrigin);
+  }
 
   for (const configured of [
     process.env.APP_URL,
