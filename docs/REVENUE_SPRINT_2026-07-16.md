@@ -78,6 +78,12 @@ the service converts into SaaS revenue using features that already exist.
   (respect self-promo rules — lead with findings, not links), founder WhatsApp/
   Telegram groups, Shopify India groups — 20 rows.
 
+The first 100 funding-announcement rows, 43 savings playbooks, 40 founder-reviewed
+outreach variants, and 10 objection replies are in
+[`docs/research-content-pack-2026-07-16.md`](research-content-pack-2026-07-16.md).
+Run `npm run research:check` before using the pack, re-check live sources, and copy
+only reviewed prospects into the gitignored operating pipeline.
+
 **Intake link (live now):** `https://www.vognary.com/private-audit?src=<channel>`
 (`src=li-dm`, `src=x`, `src=wa`, `src=reddit` — keep attribution honest per channel).
 

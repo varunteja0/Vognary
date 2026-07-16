@@ -142,8 +142,10 @@ includes you, the operator — enough for delivering paid audits today).
 ## Block E — the standing business steps (no software involved)
 
 1. Run your **self-audit** — the ₹ number every outreach script needs.
-2. Paste **GPT-5.6's output** (registry JSON, prospect CSV, UX teardown) back
-   into the Claude session for validation and merge.
+2. Review `docs/research-content-pack-2026-07-16.md`, re-check each live source,
+   replace evidence placeholders only with observed facts, and copy approved rows
+   into the gitignored private-audit pipeline. `npm run research:check` guards the
+   pack's promised row/playbook/message counts.
 3. Send **20 personalized messages a day**, logged in the tracker. The paid
    audits are what make Google, AWS partners, and AA TSPs say yes to
    everything above.
