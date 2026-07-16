@@ -1,12 +1,15 @@
 import type { ConnectorAdapter, ConnectorConnection } from "@/lib/connector-runtime";
+import { anthropicUsageAdapter } from "@/lib/connectors/anthropic-costs-adapter";
 import { gmailReadonlyAdapter } from "@/lib/connectors/gmail-readonly-adapter";
 import { openAiCostsAdapter } from "@/lib/connectors/openai-costs-adapter";
-import { cloudflareBillingAdapter, githubCopilotAdapter, renderPlatformAdapter, vercelPlatformAdapter } from "@/lib/connectors/platform-api-adapters";
+import { cloudflareBillingAdapter, githubBillingAdapter, githubCopilotAdapter, renderPlatformAdapter, vercelPlatformAdapter } from "@/lib/connectors/platform-api-adapters";
 
 const adapters = new Map<string, ConnectorAdapter>([
   [gmailReadonlyAdapter.id, gmailReadonlyAdapter],
   [openAiCostsAdapter.id, openAiCostsAdapter],
+  [anthropicUsageAdapter.id, anthropicUsageAdapter],
   [githubCopilotAdapter.id, githubCopilotAdapter],
+  [githubBillingAdapter.id, githubBillingAdapter],
   [cloudflareBillingAdapter.id, cloudflareBillingAdapter],
   [renderPlatformAdapter.id, renderPlatformAdapter],
   [vercelPlatformAdapter.id, vercelPlatformAdapter],

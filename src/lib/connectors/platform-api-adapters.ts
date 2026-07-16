@@ -44,6 +44,23 @@ type GitHubCopilotReportResponse = {
   report_day?: string;
 };
 
+// Verified 2026-07-16 against docs.github.com/en/rest/billing/usage:
+// GET /organizations/{org}/settings/billing/usage — enhanced billing platform
+// organizations only; optional year/month narrow the window.
+type GitHubBillingUsageResponse = {
+  usageItems?: Array<{
+    date?: string;
+    product?: string;
+    sku?: string;
+    quantity?: number;
+    unitType?: string;
+    netAmount?: number;
+    grossAmount?: number;
+    discountAmount?: number;
+    repositoryName?: string;
+  }>;
+};
+
 export const vercelPlatformAdapter: ConnectorAdapter = {
   id: "vercel-platform",
   async connect(connection) {
@@ -190,6 +207,59 @@ export const githubCopilotAdapter: ConnectorAdapter = {
       sourcePayloadHash: hashPayload({ provider: "github", org, payload, workspaceId: connection.workspaceId }),
       confidence: payload.download_links?.length ? 88 : 72,
     }];
+  },
+};
+
+export const githubBillingAdapter: ConnectorAdapter = {
+  id: "github-billing",
+  async connect(connection) {
+    if (!connection.providerAccountId || connection.providerAccountId === "default") throw new Error("GitHub organization slug is required for billing usage.");
+    return ensureApiKeyConnection(connection, "GitHub token with organization billing read access is required.");
+  },
+  async sync(connection) {
+    const org = connection.providerAccountId;
+    if (!org || org === "default") throw new Error("GitHub organization slug is required for billing usage.");
+    const apiKey = getApiKey(connection, "GitHub token with organization billing read access is required.");
+
+    const now = new Date();
+    const url = new URL(`https://api.github.com/organizations/${encodeURIComponent(org)}/settings/billing/usage`);
+    url.searchParams.set("year", String(now.getUTCFullYear()));
+    url.searchParams.set("month", String(now.getUTCMonth() + 1));
+
+    const payload = await fetchJson<GitHubBillingUsageResponse>(url, {
+      accept: "application/vnd.github+json",
+      authorization: `Bearer ${apiKey}`,
+      "x-github-api-version": "2022-11-28",
+    }, "GitHub billing usage sync");
+
+    // Usage items arrive per repository per day; aggregate to one evidence
+    // row per product so the ledger sees "GitHub Actions", not 300 rows.
+    const totals = new Map<string, { netAmount: number; itemCount: number; latestDate: string }>();
+    for (const item of payload.usageItems ?? []) {
+      if (typeof item.netAmount !== "number" || item.netAmount <= 0) continue;
+      const product = item.product ?? "unknown";
+      const entry = totals.get(product) ?? { netAmount: 0, itemCount: 0, latestDate: "" };
+      entry.netAmount += item.netAmount;
+      entry.itemCount += 1;
+      if (item.date && item.date > entry.latestDate) entry.latestDate = item.date;
+      totals.set(product, entry);
+    }
+
+    const monthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+    return Array.from(totals.entries()).map(([product, entry]): ConnectorEvidence => ({
+      connectorId: githubBillingAdapter.id,
+      externalId: `github-billing:${org}:${monthKey}:${product}`,
+      provider: "github",
+      observedAt: entry.latestDate ? `${entry.latestDate.slice(0, 10)}T00:00:00.000Z` : new Date().toISOString(),
+      evidenceType: "cost",
+      merchantRaw: `GitHub ${product} for ${org}`,
+      amount: Math.round(entry.netAmount * 100) / 100,
+      currency: "USD",
+      category: "Developer tools",
+      cadenceHint: "monthly",
+      sourcePayloadHash: hashPayload({ provider: "github-billing", org, monthKey, product, netAmount: entry.netAmount, itemCount: entry.itemCount, workspaceId: connection.workspaceId }),
+      confidence: 94,
+    }));
   },
 };
 

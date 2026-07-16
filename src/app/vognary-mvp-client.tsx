@@ -362,6 +362,7 @@ const integrationConnectorIds = [
   "claude-subscription",
   "kling-subscription",
   "openai-costs",
+  "anthropic-usage",
   "vercel-platform",
   "render-platform",
   "x-premium-subscription",
