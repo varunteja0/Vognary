@@ -41,9 +41,12 @@ test("feature readiness checks every persistent capability migration with bounde
 });
 
 test("CI executes the production schema against PostgreSQL before application checks", () => {
-  const workflow = parse(read(".github/workflows/ci.yml")) as {
+  const workflowSource = read(".github/workflows/ci.yml");
+  const workflow = parse(workflowSource) as {
     jobs?: { validate?: { services?: { postgres?: { image?: string } }; env?: { DATABASE_URL?: string }; steps?: Array<{ run?: string }> } };
   };
+  assert.match(workflowSource, /uses: actions\/checkout@v6/);
+  assert.match(workflowSource, /uses: actions\/setup-node@v6/);
   const validate = workflow.jobs?.validate;
   assert.equal(validate?.services?.postgres?.image, "postgres:16");
   assert.equal(validate?.env?.DATABASE_URL, "postgresql://postgres:vognary_ci@127.0.0.1:5432/vognary_ci");
