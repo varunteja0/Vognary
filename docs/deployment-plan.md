@@ -19,7 +19,7 @@ Copy `.env.example` to `.env.local` for local configuration. The app stays funct
 - `INTERNAL_SYNC_SECRET` for internal sync job APIs.
 - `CRON_SECRET` for Vercel Cron to authenticate connector-sync, renewal-alert, and retention workers.
 - `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `NEXT_PUBLIC_APP_URL` for opted-in renewal email delivery.
-- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` for production multi-instance and platform-API rate limiting.
+- A migrated `DATABASE_URL` provides production multi-instance and platform-API rate limiting automatically; `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` optionally take priority at higher scale.
 - `SYNC_SCHEDULER_STATUS`, `RENEWAL_ALERT_DELIVERY_STATUS`, and `RETENTION_SCHEDULER_STATUS` only after the production runbook evidence
   gates are complete. Leave them blank during setup.
 
@@ -40,7 +40,7 @@ curl -X POST http://localhost:3000/api/audit \
 	-d '{"sources":[{"name":"statement.csv","text":"Date,Description,Debit,Credit\n2026-01-01,OPENAI CHATGPT,1999,"}],"manualItems":[]}'
 ```
 
-The API returns an audit result and stores nothing. It is rate-limited in process; use a trusted proxy plus a shared limiter such as Redis before multi-instance public scale.
+The API returns an audit result and stores nothing. Production rate limits are shared through atomic Postgres buckets, or Upstash REST when configured.
 
 ### Stateless File Ingestion API
 
@@ -157,7 +157,9 @@ curl http://localhost:3000/api/readiness
 
 Compose waits for PostgreSQL 16, runs the schema migration service to completion, and then starts the web service. The migration command keeps a `schema_migrations` ledger. On a fresh database it applies `infra/postgres/schema.sql` as `0001_initial_schema`; on an existing database that already has the initial tables it records a baseline; then it applies forward-only SQL files from `infra/postgres/migrations` in sorted order.
 
-Readiness requires every forward migration from `0002_revocable_sessions` through `0016_assisted_audit_orders`, then runs bounded aggregate queries against capability tables. `capabilities.schema.status=ready` means the migration ledger and those queries succeeded; it does not prove a deployed schedule, delivered renewal email, paid assisted-audit order, legal approval, provider approval, or platform adoption. Sync-worker production status additionally requires a successful cron-invoked run that wrote evidence. CI applies the schema to PostgreSQL 16 and runs `npm run test:postgres`.
+Vercel production deployments run the same checksummed, advisory-locked migration command before `next build`. Preview and local builds skip this production mutation. A migration failure stops the deployment before the new application artifact can become live.
+
+Readiness requires every forward migration from `0002_revocable_sessions` through `0017_shared_rate_limits`, then runs bounded aggregate queries against capability tables. `capabilities.schema.status=ready` means the migration ledger and those queries succeeded; it does not prove a deployed schedule, delivered renewal email, paid assisted-audit order, legal approval, provider approval, or platform adoption. Sync-worker production status additionally requires a successful cron-invoked run that wrote evidence. CI applies the schema to PostgreSQL 16 and runs `npm run test:postgres`.
 
 Add future production schema changes as `infra/postgres/migrations/0002_short_description.sql`, `0003_short_description.sql`, and so on. Do not edit already-applied migration files.
 
@@ -202,7 +204,7 @@ Use the private beta activation check after deployment:
 npm run production:check -- https://www.vognary.com --beta
 ```
 
-`--strict` is intentionally broader and should fail until payments, Gmail OAuth, identity provider, feature migrations, Redis rate
+`--strict` is intentionally broader and should fail until payments, Gmail OAuth, identity provider, feature migrations, shared rate
 limiting, the attested scheduled-sync worker, privacy enforcement, a proven renewal delivery, the platform API guard, monitoring,
 backups, and partner rails are actually configured or evidenced as specified in the activation runbook.
 

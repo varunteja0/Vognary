@@ -70,7 +70,7 @@ The codebase is modular; each engine has one home and a typed contract:
 | Reporting/export layer | JSON/PDF/CSV exports in `src/app/vognary-mvp-client.tsx` |
 | Readiness/ops layer | `/api/health`, `/api/readiness`, `scripts/check-*.mjs`, `scripts/backup-*.mjs` |
 | Monitoring | `src/lib/server/monitoring.ts`, `/api/internal/monitoring/test` |
-| Rate limiting | `src/lib/rate-limit.ts` (Upstash-backed, fails closed in production) |
+| Rate limiting | `src/lib/rate-limit.ts` (atomic Postgres buckets with optional Upstash priority; fails closed without a shared backend) |
 
 ## Intelligence Rules (current engine behavior)
 
@@ -103,7 +103,7 @@ credentials, worker/scheduler, provider approval, and an end-to-end proof run.
 | --- | --- | --- |
 | Connector living ledger | Sync normalization idempotently writes canonical connector evidence, transactions, recurring items, evidence links, coverage, and usage observations | Apply `0003`; configure PostgreSQL, encrypted credentials, provider access, and sync workers; prove a real account sync |
 | Persisted decisions | Members can read/write safety-checked keep/watch/downgrade/cancel/investigate decisions for canonical connector items; encrypted revisioned state preserves all review actions across devices | Apply migrations and exercise authenticated UI/API; promote remaining workflow fields to relational tables only when multi-user query/approval requirements demand it |
-| Renewal alerts | Explicit consent, preferences, 7-day/1-day scheduling, deduplication, bounded retries, safe email templates, and due worker are implemented | Apply `0006`; verify Resend sender/domain, configure secrets/Upstash and the deployed cron, then prove opt-in, delivery, disable, and cancellation |
+| Renewal alerts | Explicit consent, preferences, 7-day/1-day scheduling, deduplication, bounded retries, safe email templates, and due worker are implemented | Apply migrations; verify Resend sender/domain, configure secrets and the deployed cron, then prove opt-in, delivery, disable, and cancellation |
 | Privacy lifecycle | Bounded policies, complete requester access exports, dry-run-first minimization, audit records, stale-webhook dead-lettering, and authenticated daily enforcement cron are implemented | Configure shared rate limiting, cron secret, backup/restore proof, review dry runs, then monitor destructive runs |
 | Read-only platform API | Hashed, expiring, revocable tokens and cursor-paginated scoped `/api/v1/ledger` and `/api/v1/sources` endpoints are implemented with an OpenAPI contract | Configure database/shared rate limiting, issue an admin token, and complete a consumer integration test |
 | Thresholded aggregate insights | Consented workspaces contribute workspace-bounded category/currency/frequency statistics; daily coarsened results fail closed below 25 workspaces | Build a cohort of at least 25 actively opted-in workspaces with prior-day canonical items. Until then the endpoint correctly returns no benchmarks |
@@ -137,7 +137,7 @@ record remains authoritative for UI workflow fields and source text, with optimi
 - Opt-in aggregate benchmarks limited to category, currency, and frequency; prior-day workspace-level contributions are capped/coarsened and cohorts under 25 workspaces fail closed.
 - Connector registry (42 targets), start/sync planning APIs, honesty states, and six registered token-backed adapters (OpenAI costs, Gmail receipts, GitHub Copilot metrics, Vercel domains, Render services, Cloudflare accounts).
 - Encrypted token vault, internal-secret-gated sync job API, Vercel-cron-compatible due-job runner, HMAC-verified webhook receiver.
-- Rate limiting that fails closed in production without a shared Redis backend.
+- Atomic shared rate limiting through Postgres, with optional Upstash priority and production fail-closed behavior when neither backend is usable.
 - PostgreSQL schema + forward-only migration runner, encrypted backup + restore-drill scripts with S3/R2 upload, ops preflight and production activation checks, monitoring delivery test (Sentry/Better Stack), partner-rail status validation.
 - Regression tests cover the audit/timeline/parser engines, security boundaries, connector lifecycle, privacy lifecycle, alerts, decisions, API scopes, and aggregate fail-closed behavior (`npm test`).
 
@@ -156,11 +156,11 @@ record remains authoritative for UI workflow fields and source text, with optimi
 
 These are deployment or business dependencies, not missing application modules:
 
-1. Apply the forward-only PostgreSQL migrations through `0016` and verify `schema_migrations` before enabling dependent routes.
+1. Apply the forward-only PostgreSQL migrations through `0017` and verify `schema_migrations` before enabling dependent routes.
 2. Complete Google OAuth restricted-scope verification before opening Gmail receipt sync beyond approved test users.
 3. Verify the Resend domain/sender and configure email, session, database, encryption, cron, and shared-rate-limit secrets before enabling public magic links or renewal delivery.
 4. Activate and monitor three distinct worker paths: connector sync cron, renewal-alert cron, and the fixed-policy authenticated privacy-retention GET cron.
-5. Prove backup upload and restore, monitoring delivery, production Upstash, and incident contacts before storing production financial evidence.
+5. Prove backup upload and restore, monitoring delivery, shared-rate-limit readiness, and incident contacts before storing production financial evidence.
 6. Obtain provider credentials/account permissions for each direct SaaS/cloud connector; registry presence does not grant production data access.
 7. Sign provider contracts and complete legal/security review for any commercial data partnership.
 8. Obtain AA/FIU/TSP and PSP/bank/issuer approvals for regulated bank, UPI AutoPay, or card-mandate rails; code cannot substitute for those permissions.

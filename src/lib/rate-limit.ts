@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+import { getDatabasePool, isDatabaseConfigured } from "@/lib/server/database";
+import { readSession } from "@/lib/server/session";
+
 type RateLimitOptions = {
   namespace: string;
   limit: number;
@@ -36,6 +40,7 @@ type UpstashPipelineItem = {
 
 type RateLimitBackendStatus =
   | "upstash-rest"
+  | "postgres"
   | "upstash-missing-token"
   | "redis-url-configured-not-wired"
   | "shared-required-not-configured"
@@ -46,6 +51,24 @@ export async function rateLimit(request: Request, options: RateLimitOptions): Pr
   if (upstash) {
     try {
       return await upstashRateLimit(request, options, upstash);
+    } catch {
+      if (isDatabaseConfigured()) {
+        try {
+          return await postgresRateLimit(request, options);
+        } catch {
+          if (requiresSharedBackend(options)) return sharedBackendUnavailable(options, "shared-backend-error");
+        }
+      } else if (requiresSharedBackend(options)) {
+        return sharedBackendUnavailable(options, "shared-backend-error");
+      }
+
+      return memoryRateLimit(request, options);
+    }
+  }
+
+  if (isDatabaseConfigured()) {
+    try {
+      return await postgresRateLimit(request, options);
     } catch {
       if (requiresSharedBackend(options)) return sharedBackendUnavailable(options, "shared-backend-error");
       return memoryRateLimit(request, options);
@@ -58,6 +81,7 @@ export async function rateLimit(request: Request, options: RateLimitOptions): Pr
 
 export function getRateLimitBackendStatus(): RateLimitBackendStatus {
   if (getUpstashConfig()) return "upstash-rest";
+  if (isDatabaseConfigured()) return "postgres";
   if (process.env.UPSTASH_REDIS_REST_URL?.trim()) return "upstash-missing-token";
   if (process.env.REDIS_URL?.trim()) return "redis-url-configured-not-wired";
   if (requiresSharedBackend()) return "shared-required-not-configured";
@@ -121,6 +145,56 @@ async function upstashRateLimit(
   return buildResult(count <= options.limit, options.limit, Math.max(0, options.limit - count), resetAt, now, "upstash-rest", count > options.limit ? "limit-exceeded" : undefined);
 }
 
+async function postgresRateLimit(request: Request, options: RateLimitOptions): Promise<RateLimitResult> {
+  const identity = options.identity ?? getClientIdentity(request);
+  const key = `rate-limit:${options.namespace}:${identity}`;
+  const result = await getDatabasePool().query<{ request_count: number; reset_at_ms: string }>(
+    `with expired as (
+       select bucket_key
+       from rate_limit_buckets
+       where reset_at < now() - interval '1 day' and bucket_key <> $1
+       order by reset_at
+       limit 25
+       for update skip locked
+     ), pruned as (
+       delete from rate_limit_buckets buckets
+       using expired
+       where buckets.bucket_key = expired.bucket_key
+     )
+     insert into rate_limit_buckets (bucket_key, request_count, reset_at, updated_at)
+     values ($1, 1, now() + ($2::double precision * interval '1 millisecond'), now())
+     on conflict (bucket_key) do update
+     set request_count = case
+           when rate_limit_buckets.reset_at <= now() then 1
+           else least(rate_limit_buckets.request_count + 1, $3::integer)
+         end,
+         reset_at = case
+           when rate_limit_buckets.reset_at <= now() then excluded.reset_at
+           else rate_limit_buckets.reset_at
+         end,
+         updated_at = now()
+     returning request_count,
+       (extract(epoch from reset_at) * 1000)::bigint::text as reset_at_ms`,
+    [key, options.windowMs, options.limit + 1],
+  );
+  const count = result.rows[0]?.request_count;
+  const resetAt = Number(result.rows[0]?.reset_at_ms);
+  if (!Number.isInteger(count) || !Number.isFinite(resetAt)) {
+    throw new Error("Postgres rate limit query returned an invalid bucket.");
+  }
+
+  const now = Date.now();
+  return buildResult(
+    count <= options.limit,
+    options.limit,
+    Math.max(0, options.limit - count),
+    resetAt,
+    now,
+    "postgres",
+    count > options.limit ? "limit-exceeded" : undefined,
+  );
+}
+
 export function rateLimitExceeded(result: RateLimitResult) {
   const unavailable = result.blockReason === "shared-backend-required" || result.blockReason === "shared-backend-error";
   return Response.json(
@@ -128,7 +202,7 @@ export function rateLimitExceeded(result: RateLimitResult) {
       error: result.blockReason === "shared-backend-error"
         ? "Shared rate limit backend is unavailable. Try again shortly."
         : "Shared rate limit backend is required before this production endpoint can accept traffic.",
-      requiredEnv: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
+      requiredEnv: ["DATABASE_URL or UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN"],
       backend: result.backend,
       retryAfter: result.retryAfter,
     } : {
@@ -204,5 +278,3 @@ function pruneExpiredBuckets(now: number) {
     if (bucket.resetAt <= now) buckets.delete(key);
   }
 }
-import { createHash } from "node:crypto";
-import { readSession } from "@/lib/server/session";

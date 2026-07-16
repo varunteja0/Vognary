@@ -26,6 +26,7 @@ test("feature readiness checks every persistent capability migration with bounde
     "0014_sync_run_invocation",
     "0015_paid_audit_flow",
     "0016_assisted_audit_orders",
+    "0017_shared_rate_limits",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -54,6 +55,19 @@ test("CI executes the production schema against PostgreSQL before application ch
   );
 });
 
+test("Vercel production builds apply checksummed migrations before compiling the deployment", () => {
+  const config = JSON.parse(read("vercel.json")) as { buildCommand?: string };
+  const packageJson = JSON.parse(read("package.json")) as { scripts?: Record<string, string> };
+  const build = read("scripts/vercel-build.mjs");
+  assert.equal(config.buildCommand, "npm run vercel-build");
+  assert.equal(packageJson.scripts?.["vercel-build"], "node scripts/vercel-build.mjs");
+  assert.match(build, /VERCEL_ENV === "production"/);
+  assert.ok(
+    build.indexOf("scripts/apply-postgres-schema.mjs") < build.indexOf('["run", "build"]'),
+    "production migrations must complete before the Next.js build",
+  );
+});
+
 test("internal readiness distinguishes schema, observed evidence, and operator attestation", () => {
   const source = read("src/app/api/readiness/route.ts");
   assert.match(source, /capabilities: features/);
@@ -67,6 +81,8 @@ test("internal readiness distinguishes schema, observed evidence, and operator a
   assert.match(source, /invalid-attestation-no-delivery-observed/);
   assert.match(source, /invalid-attestation-no-cron-evidence/);
   assert.match(source, /schema-ready-shared-rate-limit-required/);
+  assert.match(source, /sharedRateLimiting/);
+  assert.match(source, /configured-postgres/);
   assert.match(source, /settlement-observed/);
   assert.match(read("src/lib/server/feature-readiness.ts"), /checkout\.plan = \$1[\s\S]*checkout\.offer_id = \$2[\s\S]*orders\.status in \('pending', 'in_progress', 'delivered'\)/);
 });
@@ -130,5 +146,5 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.doesNotMatch(source, /fetch\(`\$\{baseUrl\}\/api\/audit-intake`,\s*\{[\s\S]*?method:\s*"POST"/);
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[200, 401, 501\]/);
-  assert.match(activation, /Feature migrations 0002 through 0016/);
+  assert.match(activation, /Feature migrations 0002 through 0017/);
 });

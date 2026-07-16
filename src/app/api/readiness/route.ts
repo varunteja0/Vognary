@@ -58,7 +58,8 @@ export async function GET(request: Request) {
     },
     capabilities: features,
     hardening: {
-      apiRateLimiting: rateLimitBackend === "upstash-rest" ? "shared-upstash" : rateLimitBackend === "shared-required-not-configured" ? "blocked-shared-backend-required" : "in-memory",
+      apiRateLimiting: getApiRateLimitStatus(rateLimitBackend),
+      sharedRateLimiting: getSharedRateLimitStatus(rateLimitBackend),
       redisRateLimiting: getRedisRateLimitStatus(rateLimitBackend),
       oauthStateValidation: "ready",
       securityHeaders: "configured",
@@ -89,8 +90,25 @@ export async function GET(request: Request) {
   }, { headers: { "cache-control": "no-store" } });
 }
 
+function getApiRateLimitStatus(rateLimitBackend: ReturnType<typeof getRateLimitBackendStatus>) {
+  if (rateLimitBackend === "upstash-rest") return "shared-upstash";
+  if (rateLimitBackend === "postgres") return "shared-postgres";
+  if (rateLimitBackend === "shared-required-not-configured") return "blocked-shared-backend-required";
+  return "in-memory";
+}
+
+function getSharedRateLimitStatus(rateLimitBackend: ReturnType<typeof getRateLimitBackendStatus>) {
+  if (rateLimitBackend === "upstash-rest") return "configured-upstash-rest";
+  if (rateLimitBackend === "postgres") return "configured-postgres";
+  if (rateLimitBackend === "upstash-missing-token") return "missing-upstash-token";
+  if (rateLimitBackend === "redis-url-configured-not-wired") return "redis-url-configured-not-wired";
+  if (rateLimitBackend === "shared-required-not-configured") return "required-not-configured";
+  return "not-configured";
+}
+
 function getRedisRateLimitStatus(rateLimitBackend: ReturnType<typeof getRateLimitBackendStatus>) {
   if (rateLimitBackend === "upstash-rest") return "configured";
+  if (rateLimitBackend === "postgres") return "not-configured-postgres-active";
   if (rateLimitBackend === "upstash-missing-token") return "missing-upstash-token";
   if (rateLimitBackend === "redis-url-configured-not-wired") return "redis-url-configured-not-wired";
   if (rateLimitBackend === "shared-required-not-configured") return "required-not-configured";
@@ -170,6 +188,6 @@ function getPlatformApiStatus(
   rateLimitBackend: ReturnType<typeof getRateLimitBackendStatus>,
 ) {
   if (feature.status === "migration-pending" || feature.status === "migration-ledger-unavailable" || feature.status === "schema-query-failed") return feature.status;
-  if (rateLimitBackend !== "upstash-rest") return "schema-ready-shared-rate-limit-required";
+  if (rateLimitBackend !== "upstash-rest" && rateLimitBackend !== "postgres") return "schema-ready-shared-rate-limit-required";
   return feature.status;
 }

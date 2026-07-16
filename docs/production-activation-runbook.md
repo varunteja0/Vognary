@@ -68,7 +68,7 @@ Goal: a durably stored private-audit lead can create one tracked INR 999 assiste
 Static `PAYMENT_LINK_*` URLs and legacy monitoring plans are not exposed in Vognary 1.0.
 
 1. Complete Razorpay business/KYC activation and create keys for the intended mode. Follow Razorpay's current official key instructions: `https://razorpay.com/docs/payments/dashboard/settings/api-keys/`.
-2. Apply migrations through `0016_assisted_audit_orders` to the production database.
+2. Apply migrations through `0017_shared_rate_limits` to the production database.
 3. Obtain qualified legal review of Terms and Privacy. Only after approval, configure `ASSISTED_AUDIT_LEGAL_TERMS_STATUS=approved` with `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, a live-mode `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET`. The INR 999 amount is server-owned.
 4. In Razorpay, configure `https://www.vognary.com/api/billing/webhooks/razorpay` as the webhook URL using the same independently generated webhook secret. Follow the current official webhook instructions: `https://razorpay.com/docs/webhooks/setup-edit-payments/`.
 5. Subscribe the webhook to `payment_link.paid`, `payment_link.cancelled`, `payment_link.expired`, and `refund.processed`.
@@ -419,11 +419,18 @@ Stop condition:
 
 - Do not market saved workspaces until `npm run production:check -- https://www.vognary.com --strict` reports `Identity provider / magic link` as `READY` and `/api/workspaces` returns workspaces for a signed-in user.
 
-## 7. Redis / Trusted Proxy Rate Limiting
+## 7. Shared Multi-Instance Rate Limiting
 
-Production rate limiting fails closed when Upstash is absent. When `NODE_ENV=production`, rate-limited endpoints require `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; otherwise they return `503` with the missing envs. `ALLOW_IN_MEMORY_RATE_LIMITS=true` is an emergency bypass only, not a launch state.
+Production rate limiting automatically uses atomic Postgres buckets when `DATABASE_URL` is configured and migration `0017_shared_rate_limits` is applied. Upstash REST remains an optional preferred backend for higher traffic. When neither shared backend is usable, production endpoints fail closed with `503`. `ALLOW_IN_MEMORY_RATE_LIMITS=true` is an emergency bypass only, not a launch state.
 
-Fast path using Upstash:
+Required Postgres path:
+
+1. Configure the production `DATABASE_URL`.
+2. Run `npm run db:apply-schema` against production and confirm `0017_shared_rate_limits` in `schema_migrations`.
+3. Redeploy production.
+4. Verify `npm run production:check -- https://www.vognary.com` reports `Shared multi-instance rate limiting` as `READY`.
+
+Optional high-scale Upstash path:
 
 1. Open `https://console.upstash.com/`.
 2. Click `Create Database`.
@@ -434,11 +441,11 @@ Fast path using Upstash:
 7. Copy `UPSTASH_REDIS_REST_TOKEN`.
 8. Add both to Vercel.
 9. Redeploy production.
-10. Verify `npm run production:check -- https://www.vognary.com` reports `Redis / trusted proxy rate limiting` as `READY`.
+10. Verify `npm run production:check -- https://www.vognary.com` still reports `Shared multi-instance rate limiting` as `READY` and `/api/readiness` reports `configured-upstash-rest`.
 
 Stop condition:
 
-- Do not run high-traffic campaigns until `/api/readiness` reports `hardening.redisRateLimiting` as `configured`.
+- Do not run high-traffic campaigns until `/api/readiness` reports `hardening.sharedRateLimiting` with a `configured-` status.
 
 ## 8. Monitoring, Alerts, Backups
 
@@ -604,7 +611,7 @@ Readiness reports:
 
 - `capabilities.commitmentDecisions.status`: `schema-ready-no-decisions` until a user saves a decision, then `decisions-observed`.
 - `capabilities.platformApi.status`: distinguishes no active token, token creation without consumer traffic, and observed token use.
-- `hardening.platformApi`: remains `schema-ready-shared-rate-limit-required` until Upstash REST rate limiting is active.
+- `hardening.platformApi`: remains `schema-ready-shared-rate-limit-required` until Postgres or Upstash shared rate limiting is active.
 
 The platform surface is:
 

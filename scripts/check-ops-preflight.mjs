@@ -23,8 +23,6 @@ const checks = [
   { id: "backup-key", label: "Backup encryption key", ready: backupKey.ready, missing: backupKey.ready ? [] : ["BACKUP_ENCRYPTION_KEY"], detail: backupKey.detail },
   { id: "backup-storage-upload", label: "Encrypted backup object storage upload", ready: storage.ready, missing: storage.missing },
   envCheck("BACKUP_RESTORE_DRILL_STATUS", (value) => value.trim().toLowerCase() === "passed", "BACKUP_RESTORE_DRILL_STATUS=passed"),
-  envCheck("UPSTASH_REDIS_REST_URL"),
-  envCheck("UPSTASH_REDIS_REST_TOKEN"),
   anyEnvCheck("monitoring", "Monitoring delivery backend", ["SENTRY_DSN", "BETTER_STACK_SOURCE_TOKEN"]),
   envCheck("INTERNAL_SYNC_SECRET"),
   envCheck("CRON_SECRET"),
@@ -96,8 +94,11 @@ async function readProductionReadiness(baseUrl) {
       payload.capabilities?.commitmentDecisions,
       payload.capabilities?.platformApi,
     ].every((capability) => capability?.status && capability.status !== "schema-query-failed");
+    const sharedRateLimitingReady = typeof hardening.sharedRateLimiting === "string"
+      ? hardening.sharedRateLimiting.startsWith("configured-")
+      : hardening.redisRateLimiting === "configured";
     const blocked = [
-      hardening.redisRateLimiting === "configured" ? null : "redisRateLimiting",
+      sharedRateLimitingReady ? null : "sharedRateLimiting",
       typeof hardening.monitoring === "string" && hardening.monitoring.startsWith("configured-") ? null : "monitoring",
       hardening.backups === "configured" ? null : "backups",
       hardening.syncWorkers === "operator-attested-production-live" ? null : "syncWorkers",
@@ -113,6 +114,7 @@ async function readProductionReadiness(baseUrl) {
       httpStatus: response.status,
       ready: response.ok && blocked.length === 0,
       hardening: {
+        sharedRateLimiting: hardening.sharedRateLimiting,
         redisRateLimiting: hardening.redisRateLimiting,
         monitoring: hardening.monitoring,
         backups: hardening.backups,

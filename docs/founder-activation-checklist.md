@@ -22,13 +22,13 @@ Copy both blocks somewhere temporary (delete after Step A3).
 openssl rand -hex 32
 ```
 
-### A3. Create the Upstash Redis database (10 min)
+### A3. Verify shared Postgres rate limiting (5 min)
 
-1. Go to `https://console.upstash.com` → sign up / sign in (GitHub login is fine).
-2. Click **Create Database** → name `vognary-prod` → region: pick the closest to
-   your Vercel region (Mumbai/Singapore) → **Create**.
-3. On the database page, scroll to the **REST API** section.
-4. Copy `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (two fields shown there).
+1. Apply the production schema through `0017_shared_rate_limits`.
+2. Redeploy and call authenticated `/api/readiness`.
+3. Confirm `hardening.sharedRateLimiting` is `configured-postgres`.
+
+Upstash is optional at higher traffic. If added later, configure both REST variables and confirm readiness changes to `configured-upstash-rest`.
 
 ### A4. Create the Resend key and sender (10 min)
 
@@ -49,8 +49,6 @@ for each row below click **Add New**, paste, scope **Production**, **Save**:
 | `AUDIT_PACK_SIGNING_KEY_ID` | `vognary-2026-07` |
 | `AUDIT_PACK_TRUSTED_PUBLIC_KEYS` | `{"vognary-2026-07":"<PUBLIC PEM from A1, with newlines replaced by \n>"}` |
 | `CRON_SECRET` | the hex string from A2 |
-| `UPSTASH_REDIS_REST_URL` | from A3 |
-| `UPSTASH_REDIS_REST_TOKEN` | from A3 |
 | `RESEND_API_KEY` | from A4 |
 | `RESEND_FROM_EMAIL` | `alerts@vognary.com` |
 | `AUDIT_INTAKE_WEBHOOK_URL` | the Apps Script `/exec` URL — full setup in `docs/intake-webhook-setup.md` (10 steps, ~30 min, do it now if not done) |

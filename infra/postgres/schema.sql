@@ -89,6 +89,18 @@ create table auth_magic_links (
 
 create index auth_magic_links_expires_idx on auth_magic_links(expires_at);
 
+-- Shared API rate-limit buckets persist only namespaced opaque identities.
+-- The application hashes network and user identifiers before they reach this
+-- table, so raw IP addresses, emails, and session tokens are not retained.
+create table rate_limit_buckets (
+  bucket_key text primary key check (length(bucket_key) between 16 and 240),
+  request_count integer not null check (request_count > 0),
+  reset_at timestamptz not null,
+  updated_at timestamptz not null default now()
+);
+
+create index rate_limit_buckets_reset_idx on rate_limit_buckets(reset_at);
+
 create table private_audit_leads (
   id uuid primary key default gen_random_uuid(),
   source text not null,

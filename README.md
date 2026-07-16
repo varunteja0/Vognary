@@ -38,7 +38,7 @@ Vognary 1.0 is an evidence-first recurring-spend audit for founders, builders, f
 - Signed session-cookie and workspace authorization primitives, exposed through closed-by-default auth/workspace APIs.
 - Resend magic-link login route with one-time PostgreSQL challenges for public session issuance once email credentials are configured.
 - Gmail OAuth receipt connector with state validation, browser import fallback, and encrypted token persistence for signed-in users when the database and token vault are configured.
-- PostgreSQL schema and migrations through `0016_assisted_audit_orders`, including encrypted workspace state, connector lifecycle, privacy controls, and one-time assisted-audit fulfillment.
+- PostgreSQL schema and migrations through `0017_shared_rate_limits`, including encrypted workspace state, connector lifecycle, privacy controls, one-time assisted-audit fulfillment, and atomic shared rate limiting.
 - One server-owned INR 999 assisted-audit SKU with no auto-renewal or monitoring entitlement. Checkout remains hidden until qualified legal review and tracked Razorpay configuration are proven.
 
 ## Quick Start
@@ -168,6 +168,8 @@ DATABASE_URL='<postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
 
 The command maintains `schema_migrations`, baselines the initial schema when needed, and applies forward-only SQL files from `infra/postgres/migrations`.
 
+Vercel production builds run this same checksummed, advisory-locked migration step before compiling the deployment; preview and local builds do not mutate production data.
+
 With a migrated disposable PostgreSQL database, run the real repository integration tests:
 
 ```bash
@@ -181,14 +183,14 @@ DATABASE_URL='<production-postgres-url>' BACKUP_ENCRYPTION_KEY='<backup-key>' PO
 RESTORE_DATABASE_URL='<disposable-postgres-url>' RESTORE_CONFIRM_DISPOSABLE=true BACKUP_ENCRYPTION_KEY='<backup-key>' POSTGRES_SSL=true npm run backup:restore-drill -- backups/postgres/<backup>.manifest.json
 ```
 
-Use `npm run ops:preflight -- --report-only https://www.vognary.com` to check local PostgreSQL client tools, backup storage upload envs, restore-drill proof, Upstash, monitoring, internal cron secrets, and live production hardening without printing secret values.
+Use `npm run ops:preflight -- --report-only https://www.vognary.com` to check local PostgreSQL client tools, backup storage upload envs, restore-drill proof, shared rate limiting, monitoring, internal cron secrets, and live production hardening without printing secret values.
 If `pg_dump` or `pg_restore` are not installed locally, the backup scripts use Docker with the official `postgres:16` image as a fallback when Docker is available.
 
-Production rate-limited endpoints fail closed when `NODE_ENV=production` and Upstash is not configured. Set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; use `ALLOW_IN_MEMORY_RATE_LIMITS=true` only as a temporary emergency bypass.
+Production rate-limited endpoints use atomic Postgres buckets whenever a migrated `DATABASE_URL` is configured, with Upstash REST preferred when both Upstash variables are present. They fail closed when neither shared backend is available. Use `ALLOW_IN_MEMORY_RATE_LIMITS=true` only as a temporary emergency bypass.
 
 ## Deployment
 
-See [docs/deployment-plan.md](docs/deployment-plan.md). The current app supports self-serve audits plus automatic encrypted signed-in workspace state and normalized upload/manual ledger rows. Production persistence, connected-account token references, scheduled sync/alerts/retention, and privacy exports require `DATABASE_URL`, `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY`, `INTERNAL_SYNC_SECRET`, `CRON_SECRET`, Upstash Redis, monitoring, backup/restore proof, and relevant provider credentials. Original financial files are processed request-time and should not be retained until encrypted object storage, field-level retention, and restore/deletion operations are proven.
+See [docs/deployment-plan.md](docs/deployment-plan.md). The current app supports self-serve audits plus automatic encrypted signed-in workspace state and normalized upload/manual ledger rows. Production persistence, connected-account token references, scheduled sync/alerts/retention, and privacy exports require a migrated `DATABASE_URL`, `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY`, `INTERNAL_SYNC_SECRET`, `CRON_SECRET`, monitoring, backup/restore proof, and relevant provider credentials. Upstash is an optional high-scale rate-limit backend. Original financial files are processed request-time and should not be retained until encrypted object storage, field-level retention, and restore/deletion operations are proven.
 
 ## Product Direction
 

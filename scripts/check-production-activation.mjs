@@ -59,7 +59,7 @@ const groups = [
   },
   {
     id: "feature-migrations",
-    label: "Feature migrations 0002 through 0016",
+    label: "Feature migrations 0002 through 0017",
     required: ["DATABASE_URL"],
     probe: isFeatureMigrationsReady,
     why: "Confirms the target database recorded every forward migration and can query persistent capability schema.",
@@ -104,15 +104,15 @@ const groups = [
   },
   {
     id: "redis-rate-limit",
-    label: "Redis / trusted proxy rate limiting",
-    required: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
-    probe: isRedisRateLimitReady,
-    why: "Required before multi-instance public traffic; uses Upstash Redis REST when configured.",
+    label: "Shared multi-instance rate limiting",
+    requiredAny: ["DATABASE_URL", "UPSTASH_REDIS_REST_URL"],
+    probe: isSharedRateLimitReady,
+    why: "Required before multi-instance public traffic; uses Postgres automatically or Upstash Redis REST when configured.",
   },
   {
     id: "platform-api",
     label: "Read-only platform API surface",
-    required: ["DATABASE_URL", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
+    required: ["DATABASE_URL"],
     probe: isPlatformApiReady,
     why: "Confirms migration 0008, shared rate limiting, and unauthenticated denial on the read-only ledger/source routes. It does not claim partner adoption.",
   },
@@ -448,9 +448,12 @@ function isIdentityProviderReady({ endpointPayloads }) {
   return status === "magic-link-ready" || status === "google-ready";
 }
 
-function isRedisRateLimitReady({ endpointPayloads }) {
-  const status = endpointPayloads.readiness?.hardening?.redisRateLimiting;
-  return typeof status === "string" ? status === "configured" : undefined;
+function isSharedRateLimitReady({ endpointPayloads }) {
+  const status = endpointPayloads.readiness?.hardening?.sharedRateLimiting;
+  if (typeof status === "string") return status.startsWith("configured-");
+
+  const legacyStatus = endpointPayloads.readiness?.hardening?.redisRateLimiting;
+  return typeof legacyStatus === "string" ? legacyStatus === "configured" : undefined;
 }
 
 function isMonitoringReady({ endpointPayloads }) {

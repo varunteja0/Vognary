@@ -4,7 +4,7 @@ Vognary 1.0 supports one tracked Razorpay Payment Link SKU: the one-time INR 999
 
 ## Required configuration
 
-- `DATABASE_URL` with migrations through `0016_assisted_audit_orders` applied.
+- `DATABASE_URL` with migrations through `0017_shared_rate_limits` applied.
 - `NEXT_PUBLIC_APP_URL` using the deployed HTTPS origin.
 - `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` from the intended Razorpay mode.
 - `RAZORPAY_WEBHOOK_SECRET` configured independently in the Razorpay dashboard.
@@ -65,7 +65,7 @@ Funnel telemetry (privacy-safe counts only, no identifiers): `private_audit.requ
 ## Test-mode proof
 
 1. In a non-production deployment only, set `ASSISTED_AUDIT_CHECKOUT_MODE=test` with Razorpay test credentials. This bypasses live activation attestations only outside `NODE_ENV=production`; production rejects it.
-2. Apply migrations and confirm `0013_billing_entitlements` through `0016_assisted_audit_orders` in `schema_migrations`.
+2. Apply migrations and confirm `0013_billing_entitlements` through `0017_shared_rate_limits` in `schema_migrations`.
 3. Submit a test private-audit request and start checkout from that durable lead.
 4. Confirm the returned Razorpay link has a local checkout UUID as `reference_id`.
 5. Complete a Razorpay test payment and wait for `payment_link.paid`.

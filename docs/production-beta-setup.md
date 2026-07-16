@@ -44,7 +44,7 @@ These can be activated without monthly software spend, though some still require
 | Private beta login | Google OAuth basic identity or Resend email link | Yes | You must configure Google OAuth or verify a Resend sender/domain. |
 | Magic-link login | Resend free tier | Yes | You must verify a sender/domain and set `RESEND_API_KEY`, `RESEND_FROM_EMAIL`. |
 | Gmail receipt sync | Google OAuth + Gmail API | Yes for preview sync | You must create OAuth credentials and complete Google verification before public users. |
-| Shared rate limiting | Upstash Redis free tier | Yes | You must create Upstash Redis and set REST URL/token. |
+| Shared rate limiting | Existing Neon/Postgres database | Yes | Apply migration `0017_shared_rate_limits`; Upstash is optional at higher scale. |
 | Monitoring | Sentry or Better Stack free tier | Yes | You must create the project/source and set DSN/token. |
 | Backups | Neon PITR/free backup controls where available | Partly | You must run a restore drill and set `BACKUP_RESTORE_DRILL_STATUS=passed`. |
 | Payment links | Razorpay/Stripe has no monthly fee | No | You must complete account/KYC and create real links. |
@@ -238,7 +238,7 @@ Endpoint health: PASS
 Private beta activation: READY
 ```
 
-Do not use `--strict` for today's private beta. `--strict` expects payments, Gmail OAuth, real identity provider, Redis rate limiting, monitoring, backup storage, and partner rails. It should fail until those are actually configured.
+Do not use `--strict` for today's private beta. `--strict` expects payments, Gmail OAuth, a real identity provider, shared rate limiting, monitoring, backup storage, and partner rails. It should fail until those are actually configured.
 
 Use strict only later:
 

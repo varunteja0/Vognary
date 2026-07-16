@@ -2,7 +2,29 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
 
-import { getClientIdentity } from "../src/lib/rate-limit";
+import { getClientIdentity, getRateLimitBackendStatus } from "../src/lib/rate-limit";
+
+test("Postgres is the shared production rate-limit backend when Upstash is absent", () => {
+  const previous = {
+    databaseUrl: process.env.DATABASE_URL,
+    upstashUrl: process.env.UPSTASH_REDIS_REST_URL,
+    upstashToken: process.env.UPSTASH_REDIS_REST_TOKEN,
+    redisUrl: process.env.REDIS_URL,
+  };
+  process.env.DATABASE_URL = "postgresql://vognary.test/shared-rate-limits";
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  delete process.env.REDIS_URL;
+
+  try {
+    assert.equal(getRateLimitBackendStatus(), "postgres");
+  } finally {
+    restoreEnv("DATABASE_URL", previous.databaseUrl);
+    restoreEnv("UPSTASH_REDIS_REST_URL", previous.upstashUrl);
+    restoreEnv("UPSTASH_REDIS_REST_TOKEN", previous.upstashToken);
+    restoreEnv("REDIS_URL", previous.redisUrl);
+  }
+});
 
 test("authenticated requests share a user bucket across changing IP addresses", () => {
   const previous = process.env.SESSION_SECRET;
@@ -50,4 +72,9 @@ function signedSessionCookie(secret: string) {
   })).toString("base64url");
   const signature = createHmac("sha256", secret).update(payload).digest("base64url");
   return `vognary_session=${payload}.${signature}`;
+}
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
 }

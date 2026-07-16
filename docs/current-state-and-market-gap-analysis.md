@@ -45,11 +45,11 @@ described as operating in production.
 | Session status API | Done | `/api/auth/session`. |
 | Workspace auth gate | Done | Workspace APIs require signed session. |
 | Encrypted synchronized workspace state | Done | Signed-in workspaces load automatically, save after a short debounce, reject stale revisions with `409`, and can pause/delete/resume synchronization through `/api/workspaces/current/audit-snapshot`. |
-| PostgreSQL schema + forward migrations | Code complete | Users/workspaces/sessions, immutable Google identities, connector control plane, canonical ledger, revisioned workspace state, privacy lifecycle, alerts, decisions, API tokens, and assisted-audit settlement/fulfillment are modeled through `0016`. CI applies the real schema to PostgreSQL 16 and runs database integration tests. Production databases must still apply them. |
+| PostgreSQL schema + forward migrations | Code complete | Users/workspaces/sessions, immutable Google identities, connector control plane, canonical ledger, revisioned workspace state, privacy lifecycle, alerts, decisions, API tokens, assisted-audit settlement/fulfillment, and shared rate-limit buckets are modeled through `0017`. CI applies the real schema to PostgreSQL 16 and runs database integration tests. Production databases must still apply them. |
 | Canonical living ledger | Code complete | Connector batches and revisioned upload/manual workspace state idempotently materialize normalized sources, evidence, transactions, recurring items, evidence links, coverage, and usage observations. |
 | Persisted commitment decisions | Code complete | Workspace members can save safety-checked actions on canonical recurring items; reads/writes are scoped and audited, and the UI hydrates them from PostgreSQL. Requires migration `0007`. |
 | Consent-gated renewal alerts | Code complete | Authenticated opt-in preferences, 7-day/1-day deduplicated scheduling, privacy-minimized delivery rows, bounded retries, safe templates, and cron worker exist. Requires `0006`, verified email delivery, secrets, and a proven cron run. |
-| Privacy lifecycle | Code complete | Bounded retention policy, complete requester access export, raw connector/error minimization, product-event deletion, stale-webhook dead-lettering, run audit trail, and authenticated daily retention cron exist. Requires production migrations, Upstash, backup proof, and observed enforcement runs. |
+| Privacy lifecycle | Code complete | Bounded retention policy, complete requester access export, raw connector/error minimization, product-event deletion, stale-webhook dead-lettering, run audit trail, and authenticated daily retention cron exist. Requires production migrations, shared rate limiting, backup proof, and observed enforcement runs. |
 | Read-only platform API | Code complete | Admin-issued hashed/expiring/revocable tokens expose cursor-paginated canonical ledger/decision and source-health endpoints with request IDs and an OpenAPI contract. Requires a production consumer proof. |
 | Thresholded aggregate insights | Code complete, cohort gated | Only opted-in canonical items contribute; statistics aggregate at workspace level, cap contribution, publish daily coarsened output, and fail closed below 25 distinct workspaces. |
 | Connector registry | Done | Models 42 targets with explicit live/setup/verification/partner/evidence/planned states. Registry presence is not provider activation. |
@@ -79,11 +79,11 @@ described as operating in production.
 | --- | --- | --- |
 | Public magic-link identity | Implemented | Production `SESSION_SECRET`/PostgreSQL, verified Resend sender, delivery test, shared rate limiting, and abuse monitoring |
 | Google identity + Gmail receipt sync | Implemented for approved/test users | Google restricted-scope verification, production OAuth credentials/redirects, token-vault key, and a real queued sync proof |
-| Database-backed product modules | Migrations `0002`–`0016` exist | Apply migrations in staging/production, verify `schema_migrations`, backup first, and run route/worker/database smoke tests |
-| Connector synchronization | Scheduler/runner and registered adapters exist | Configure cron/internal secrets, Upstash, provider-owned credentials, permissions, and successful retry/disconnect/delete tests |
+| Database-backed product modules | Migrations `0002`–`0017` exist | Apply migrations in staging/production, verify `schema_migrations`, backup first, and run route/worker/database smoke tests |
+| Connector synchronization | Scheduler/runner and registered adapters exist | Configure cron/internal secrets, shared rate limiting, provider-owned credentials, permissions, and successful retry/disconnect/delete tests |
 | Renewal-alert delivery | Preference, schedule, worker, retry, and template code exists | Apply `0006`, verify email domain/sender, deploy cron, then prove opt-in → send → disable/cancel without payload leakage |
-| Privacy retention enforcement | Policy/export/executor and authenticated daily GET cron exist | Verify backup/restore, configure `CRON_SECRET` and Upstash, review a dry run, then observe and monitor enforced runs |
-| Read-only platform API | Token lifecycle and cursor-paginated `/api/v1` endpoints exist | Configure database/Upstash, issue and revoke a test token, validate a real consumer against `docs/api/openapi.yaml` |
+| Privacy retention enforcement | Policy/export/executor and authenticated daily GET cron exist | Verify backup/restore, configure `CRON_SECRET` and shared rate limiting, review a dry run, then observe and monitor enforced runs |
+| Read-only platform API | Token lifecycle and cursor-paginated `/api/v1` endpoints exist | Configure database/shared rate limiting, issue and revoke a test token, validate a real consumer against `docs/api/openapi.yaml` |
 | Aggregate benchmarks | Consent, contribution-cap, daily coarsening, and threshold code exist | At least 25 distinct opted-in workspaces with prior-day canonical items; smaller cohorts intentionally return nothing |
 | Direct SaaS/cloud connectors | Adapter code exists by provider | Real credentials/account permissions, endpoint validation, provider terms, and where required commercial contracts |
 | AA, bank, UPI, and card-mandate rails | Partner-readiness model/manual evidence only | Regulatory role, FIU/TSP/PSP/bank/issuer approval, contracts, DPA/security review, sandbox proof, then production credentials |
@@ -182,8 +182,8 @@ Pause if:
 
 ## Next Build Priority
 
-1. Apply migrations through `0016` to staging/production and repeat the PostgreSQL integration suite plus route/worker smoke tests (the disposable PostgreSQL 16 proof is automated in CI).
-2. Activate production infrastructure: Upstash, monitoring delivery, encrypted backups plus restore drill, connector/renewal/retention cron secrets, and a verified Resend sender.
+1. Apply migrations through `0017` to staging/production and repeat the PostgreSQL integration suite plus route/worker smoke tests (the disposable PostgreSQL 16 proof is automated in CI).
+2. Activate production infrastructure: shared rate limiting, monitoring delivery, encrypted backups plus restore drill, connector/renewal/retention cron secrets, and a verified Resend sender.
 3. Complete Google restricted-scope verification and prove Gmail connect → refresh → queued sync → canonical ledger → disconnect with approved test accounts before public rollout.
 4. Configure durable audit/waitlist lead persistence and run five real paid/serious audits; measure surprise findings, willingness to pay, and demand for monitoring.
 5. Validate multi-device revision conflicts and normalized upload/manual materialization with real beta workspaces; introduce typed owner/note/approval tables only when multi-user workflow evidence justifies them.

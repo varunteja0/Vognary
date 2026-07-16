@@ -10,7 +10,7 @@ This rail sends email reminders from canonical `recurring_items` dates. It is im
 - `NEXT_PUBLIC_APP_URL`: HTTPS production origin used for review and preference links.
 - `CRON_SECRET`: bearer token supplied by Vercel Cron to the `GET` worker.
 - `INTERNAL_SYNC_SECRET`: bearer token for manual `POST` worker runs.
-- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`: production rate limiting. Production workers fail closed without the shared limiter unless the documented emergency override is active.
+- A migrated `DATABASE_URL`: production workers use its shared Postgres rate limiter automatically. Upstash REST is optional and preferred when configured. Workers fail closed without either shared backend unless the documented emergency override is active.
 - `RENEWAL_ALERT_DELIVERY_STATUS`: leave blank until an opted-in reminder is recorded as sent and the deployed cron invocation is verified. The only accepted activation value is `production-live`.
 
 Never expose Resend or worker secrets to browser code. Apply the database migration before deploying application code:

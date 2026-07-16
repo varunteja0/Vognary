@@ -19,6 +19,7 @@ export const productionFeatureMigrations = [
   "0014_sync_run_invocation",
   "0015_paid_audit_flow",
   "0016_assisted_audit_orders",
+  "0017_shared_rate_limits",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];

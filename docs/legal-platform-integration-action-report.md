@@ -1,6 +1,6 @@
 # Vognary Legal Platform Integration Action Report
 
-Updated: 2026-07-13 IST
+Updated: 2026-07-16 IST
 
 ## Executive Decision
 
@@ -14,9 +14,8 @@ The repository contains the guest audit, encrypted signed-in persistence, source
 
 Missing before full production activation:
 
-- Assisted-audit payment: qualified legal review, Razorpay KYC/keys/webhook, migration 0016, test payment, fresh-event replay, duplicate/out-of-order refund proof, and reconciliation. Static payment links are not a V1 path.
+- Assisted-audit payment: qualified legal review, Razorpay KYC/keys/webhook, migrations through 0017, test payment, fresh-event replay, duplicate/out-of-order refund proof, and reconciliation. Static payment links are not a V1 path.
 - OpenAI direct sync key: a per-workspace key stored through the encrypted connector flow. `OPENAI_ADMIN_API_KEY` is local-preview-only.
-- Redis-backed public rate limiting: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
 - Monitoring and incident alerts: `SENTRY_DSN` or `BETTER_STACK_SOURCE_TOKEN`.
 - Backup/object storage and restore drill: `BACKUP_STORAGE_BUCKET`, `S3_BUCKET`, or `R2_BUCKET`, plus `BACKUP_RESTORE_DRILL_STATUS=passed`.
 - Regulated partner statuses: `ACCOUNT_AGGREGATOR_PARTNER_STATUS`, `UPI_MANDATE_PARTNER_STATUS`, `CARD_MANDATE_PARTNER_STATUS`.
@@ -226,7 +225,7 @@ Stop condition:
 These cannot be completed by code alone:
 
 1. Create Razorpay or Stripe payment links and set payment env vars.
-2. Configure Upstash Redis env vars for shared rate limiting.
+2. Apply migration `0017_shared_rate_limits` and confirm production readiness reports the Postgres shared backend; Upstash is optional at higher scale.
 3. Configure Sentry or Better Stack.
 4. Configure backup/object storage and perform a restore drill.
 5. Add OpenAI admin key or approve workspace-level key capture UX.
