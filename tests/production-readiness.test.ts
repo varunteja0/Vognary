@@ -156,6 +156,9 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.match(source, /fetch\(`\$\{baseUrl\}\/api\/audit-intake`\)/);
   assert.match(source, /\['ready', 'not-configured'\]\.includes\(auditIntake\.status\)/);
   assert.doesNotMatch(source, /fetch\(`\$\{baseUrl\}\/api\/audit-intake`,\s*\{[\s\S]*?method:\s*"POST"/);
+  assert.match(source, /connectors\.adapters\?\.includes\("anthropic-usage"\)/);
+  assert.match(source, /connector\.status === "planned"/);
+  assert.doesNotMatch(source, /\/api\/connectors\/anthropic-usage\/(?:start|sync)["`]/);
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[200, 401, 501\]/);
   assert.match(activation, /Feature migrations 0002 through 0017/);

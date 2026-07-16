@@ -71,6 +71,7 @@ if (!connectors.connectors?.length) throw new Error("Connector registry is empty
 if (typeof connectors.syncSummary?.total !== "number" || connectors.syncSummary.total < 30) throw new Error("Connector registry does not include the live-sync target surface");
 if (!connectors.readiness?.length) throw new Error("Connector readiness map is missing");
 if (!connectors.adapters?.includes("openai-costs")) throw new Error("OpenAI costs adapter is not registered");
+if (!connectors.adapters?.includes("anthropic-usage")) throw new Error("Anthropic usage adapter is not registered");
 if (!connectors.honesty?.length) throw new Error("Connector honesty map is missing");
 const honestyStates = new Set(connectors.honesty.map((entry) => entry.state));
 const allowedHonestyStates = new Set(["live", "usage-only", "source-health-only", "setup-ready", "token-required", "oauth-required", "verification-required", "partner-gated", "blocked", "evidence-only", "planned"]);
@@ -92,16 +93,19 @@ if (gmailProductStartResponse.ok) {
   if (!["ready", "not-configured"].includes(gmailProductStart.status)) throw new Error("Gmail product start endpoint returned an invalid state");
 }
 
-const plannedStart = await (await assertOk("/api/connectors/anthropic-usage/start")).json();
-if (plannedStart.state === "ready-to-connect") throw new Error("Planned connector must not claim ready-to-connect");
+const plannedConnector = connectors.connectors.find((connector) => connector.status === "planned");
+if (!plannedConnector) throw new Error("Connector registry does not expose a planned connector contract");
+const plannedConnectorPath = encodeURIComponent(plannedConnector.id);
+const plannedStart = await (await assertOk(`/api/connectors/${plannedConnectorPath}/start`)).json();
+if (plannedStart.state !== "adapter-planned") throw new Error("Planned connector did not report adapter-planned start state");
 
 const partnerStart = await (await assertOk("/api/connectors/account-aggregator/start")).json();
 if (partnerStart.state !== "partner-gated") throw new Error("Partner-required connector did not report partner-gated start state");
 
-const plannedSync = await (await assertOk("/api/connectors/anthropic-usage/sync")).json();
+const plannedSync = await (await assertOk(`/api/connectors/${plannedConnectorPath}/sync`)).json();
 if (!plannedSync.plan?.blockers?.length) throw new Error("Planned connector did not explain sync blockers");
 
-const blockedPlannedSync = await fetch(`${baseUrl}/api/connectors/anthropic-usage/sync`, {
+const blockedPlannedSync = await fetch(`${baseUrl}/api/connectors/${plannedConnectorPath}/sync`, {
   method: "POST",
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ workspaceId: "smoke" }),
