@@ -20,10 +20,9 @@ The founder performs every external send. Nothing here auto-sends.
   day you post; Indian startup subreddits change promo rules frequently. Reddit is optional for the first five —
   use it only if your direct network stalls.
 
-## Tracked links (live in production)
+## Attribution links (verify after deployment)
 
-`/private-audit?src=<tag>` now persists the tag server-side: the lead row's `source` column becomes
-`vognary-private-audit-intake:<tag>`. Use one tag per target:
+`/private-audit?src=<tag>` stores the bounded tag only when durable intake is configured and the same artifact is deployed. Verify one disposable submission before outreach; otherwise stop. The lead row's `source` column becomes `vognary-private-audit-intake:<tag>`.
 
 | Target slot | Tracked link |
 | --- | --- |
@@ -71,7 +70,7 @@ If neither, pick someone else; cold routes are not worth it for the first five.
 > source is missing. No passwords, OTPs, CVV, or bank credentials — redact everything sensitive.
 >
 > Start here (no login needed): [tracked link]
-> If the audit finds nothing useful, don't pay. If it's useful, it's ₹999.
+> The one-time assisted audit is ₹999 when tracked checkout is activated. Payment is not requested through a manual link.
 
 **A4 (partner referral):**
 
@@ -105,15 +104,11 @@ If neither, pick someone else; cold routes are not worth it for the first five.
 6. Deliver by reply on the same channel: 3-line summary (burn, top avoidable item, next debit) + attachments + one recommended action.
 7. Record outcomes in the ledger below immediately.
 
-## Payment ask
+## Payment ask (superseded 2026-07-16 by the revenue sprint)
 
-- After delivery, if they found it useful: "It's ₹999 for this audit — link below."
-- **Tracked checkout state (honest):** the code path is live but Razorpay production keys are not yet
-  configured, so the intake page's pay button correctly reports payment as not activated. Until the founder
-  completes `docs/billing-activation-runbook.md`, create a manual Razorpay Payment Link for ₹999 in the
-  dashboard and reconcile by hand. Never claim automatic settlement before the runbook's test-mode proof passes.
-- One-time audit ≠ monitoring. Pitch monthly monitoring only after they ask "can this stay updated?" — record
-  that ask in the ledger; it is the retention signal Phase 5 measures.
+- Per `docs/REVENUE_SPRINT_2026-07-16.md` §1: SKU A (₹4,999) and SKU B (success fee) are founder-billed services — payment is UPI against a manual invoice (`docs/templates/invoice-template.md`), sent personally after the audit is delivered.
+- The product's tracked ₹999 checkout remains gated by `docs/billing-activation-runbook.md` until 5 paid manual invoices. Never wire manual/static payment links into the product UI — the manual invoice lives in email/WhatsApp, not on the site.
+- One-time audit does not include monitoring. Spend Guard (₹999/mo, shipped features only) is pitched at day-30 verification calls per the sprint plan — never before delivery, never as an unbuilt promise.
 
 ## Outcome ledger (fill as you go)
 

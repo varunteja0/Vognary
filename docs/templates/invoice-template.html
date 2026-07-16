@@ -1,0 +1,135 @@
+<!--
+  Vognary manual service invoice — SKU A/B/C.
+  Usage: open in a browser, edit the [BRACKETED] placeholders via any text editor
+  first (or use the .md plain-text version), then Print → Save as PDF.
+  Numbering: VOG-2026-001, incremented per invoice, never reused. See
+  docs/templates/invoice-template.md for tax notes and the email version.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invoice VOG-2026-001</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    color: #1a1a1a; background: #fff;
+    max-width: 760px; margin: 0 auto; padding: 48px 40px;
+    line-height: 1.5; font-size: 15px;
+  }
+  header { display: flex; justify-content: space-between; align-items: flex-start;
+    border-bottom: 3px solid #1a1a1a; padding-bottom: 20px; margin-bottom: 28px; }
+  h1 { font-size: 28px; letter-spacing: 1px; }
+  .muted { color: #555; font-size: 13px; }
+  .meta { text-align: right; }
+  .meta strong { font-size: 17px; }
+  .parties { display: flex; gap: 40px; margin-bottom: 28px; }
+  .parties > div { flex: 1; }
+  .parties h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: #777; margin-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+    border-bottom: 2px solid #1a1a1a; padding: 8px 6px; }
+  td { padding: 12px 6px; border-bottom: 1px solid #ddd; vertical-align: top; }
+  .num { text-align: right; white-space: nowrap; }
+  .total-row td { border-bottom: none; font-weight: bold; font-size: 17px; padding-top: 16px; }
+  .words { font-style: italic; color: #555; font-size: 13px; margin: -12px 0 28px; }
+  .pay { background: #f6f6f2; border: 1px solid #ddd; padding: 16px 20px; margin-bottom: 28px; }
+  .pay h2, .terms h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: #777; margin-bottom: 8px; }
+  .terms ol { margin-left: 18px; }
+  .terms li { margin-bottom: 6px; font-size: 13.5px; }
+  footer { margin-top: 48px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .sign { border-top: 1px solid #1a1a1a; padding-top: 6px; width: 240px; font-size: 13px; }
+  @media print { body { padding: 24px 8px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>INVOICE</h1>
+    <div class="muted">Vognary — Recurring-Spend Audit</div>
+  </div>
+  <div class="meta">
+    <strong>VOG-2026-001</strong><br>
+    <span class="muted">Date: [DD Mon 2026]<br>Due: On receipt</span>
+  </div>
+</header>
+
+<div class="parties">
+  <div>
+    <h2>From</h2>
+    [YOUR FULL LEGAL NAME]<br>
+    Sole proprietor, trading as Vognary<br>
+    [ADDRESS LINE, CITY, STATE, PIN]<br>
+    PAN: [ABCDE1234F]<br>
+    [you@email] · [+91 XXXXX XXXXX]
+  </div>
+  <div>
+    <h2>Bill To</h2>
+    [CLIENT LEGAL / COMPANY NAME]<br>
+    [CONTACT PERSON]<br>
+    [ADDRESS or CITY]<br>
+    [client@email]<br>
+    GSTIN (if provided): [—]
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr><th>Description</th><th class="num">Qty</th><th class="num">Amount (₹)</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <strong>Founder Spend Audit (flat fee)</strong><br>
+        <span class="muted">Evidence-backed audit of recurring spend (SaaS, cloud, AI tools,
+        mandates): ranked kill-list with per-item ₹/year and cancellation steps; signed
+        export pack (PDF + checksummed JSON); 30-minute walkthrough call.
+        Engagement dated [DD Mon 2026].</span>
+      </td>
+      <td class="num">1</td>
+      <td class="num">4,999.00</td>
+    </tr>
+    <tr class="total-row">
+      <td colspan="2">Total due</td>
+      <td class="num">₹ 4,999.00</td>
+    </tr>
+  </tbody>
+</table>
+<p class="words">Rupees four thousand nine hundred ninety-nine only.</p>
+
+<div class="pay">
+  <h2>Payment — UPI preferred</h2>
+  UPI ID: <strong>[yourid@upi]</strong> &nbsp;·&nbsp; Name on UPI: [YOUR NAME]<br>
+  <span class="muted">Please put <strong>VOG-2026-001</strong> in the payment remark.
+  Bank transfer on request. A receipt is emailed on settlement.</span>
+</div>
+
+<div class="terms">
+  <h2>Terms</h2>
+  <ol>
+    <li><strong>Guarantee:</strong> if the delivered audit does not identify at least
+      ₹50,000/year of avoidable recurring spend (evidence attached per item), the full
+      fee is refunded within 7 days of delivery, no questions asked.</li>
+    <li><strong>GST:</strong> not charged — supplier is not registered under the CGST
+      Act, 2017 (aggregate turnover below the registration threshold).</li>
+    <li><strong>TDS:</strong> if you deduct TDS under §194J, deduct from the invoice
+      total against the PAN above and share Form 16A for the quarter.</li>
+    <li><strong>Data:</strong> client evidence is processed for this audit only,
+      redaction-first; deletion on request after delivery. Mutual NDA available.</li>
+    <li>This invoice covers the one-time audit only; it does not include ongoing
+      monitoring.</li>
+  </ol>
+</div>
+
+<footer>
+  <div class="muted">Thank you — payment confirms acceptance of the terms above.</div>
+  <div class="sign">[YOUR NAME]<br><span class="muted">Signature / date</span></div>
+</footer>
+
+</body>
+</html>
