@@ -215,3 +215,45 @@ Day-30 scoring + first Spend Guard retainer pitches at day-30 calls.
   (`docs/templates/invoice-template.html` + usage notes in `.md`), mutual NDA
   (`docs/templates/mutual-nda-template.md`), live tracker copied to
   `docs/private-audit-pipeline.csv` (gitignored — it will hold prospect PII).
+
+---
+
+## 11. North-star product roadmap (parked, decided 2026-07-16 — not relitigated)
+
+**The agreed destination:** link accounts once → live ledger of every recurring
+commitment → observe, cancel, and renew from one dashboard → near-zero manual
+evidence. This is the correct product and the current architecture already points
+at it (connector framework + sync scheduler + renewal alerts + price-change
+detection + Verified Savings all exist).
+
+**What stands between today and that product is not code:**
+- Bank / UPI AutoPay / card-mandate visibility is partner-gated (AA TSP, PSP,
+  issuer rails) — see `docs/partner-rails-access-playbook.md`. "Connect once, see
+  everything" sits in the prohibited-claims CI because it is false until those
+  partners confirm production access in writing.
+- Client-side Gmail auto-sync at public scale requires Google OAuth verification +
+  CASA security assessment (weeks-to-months lead time, real cost).
+- Universal cancel-from-app is not a rail that exists anywhere; the US analog
+  (Rocket Money, ~$1.3B) does it with human concierge plus per-merchant work.
+
+**Stages — each unlocked by revenue proof, never by a build sprint:**
+- **Stage 0 (now → Day 30, §9 guards intact):** in SKU A/B the *client* already does
+  near-zero manual work — they grant viewer access or forward exports once; the
+  operator does the rest. Every audit logs which evidence needed manual handling;
+  that log is the connector backlog ranked by data, not taste.
+- **Stage 1 (Day-30 GO, ≥10 paid):** the B2B zero-upload wedge. Activate planned
+  billing-API connectors in demand order (AWS Cost Explorer, GitHub Billing,
+  Anthropic usage, payment-gateway fee data, Google Workspace seats). Submit Google
+  OAuth verification (start paperwork at Day 14 if ≥3 paid). Spend Guard live =
+  paying clients "observe dynamically" for ₹999/mo.
+- **Stage 2 (~₹5L banked):** AA TSP + mandate-rail partnerships per the playbook
+  (Sahamati-ecosystem candidates; status env vars move only on written approval).
+  This makes "link once" true for banks/UPI/cards; SKU C becomes self-serve.
+- **Stage 3 (rails live + revenue):** assisted-cancel playbooks first, then
+  per-merchant cancel/modify actions where rails expose them; the full autonomous
+  dashboard for households and companies.
+
+**Sequencing law:** a stage does not start early because a build week feels more
+productive than a selling week. That instinct is the documented failure mode (§9).
+Nobody grants AA sandboxes or OAuth exceptions to a zero-revenue founder; the 10
+paid audits are the entry ticket to every rail above.
