@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { findCancelAction, manageUrlHostname } from "@/lib/cancel-actions";
 import { rankFirstAction } from "@/lib/first-action";
 import {
   buildGuestAuditSnapshot,
@@ -50,6 +51,10 @@ export default function GuestAuditClient() {
   const firstAction = useMemo(() => rankFirstAction(audit.recurringItems), [audit.recurringItems]);
   const nextRenewal = useMemo(() => findNextRenewal(audit.recurringItems), [audit.recurringItems]);
   const proofExcerpt = useMemo(() => findProofExcerpt(receiptText, firstAction?.item ?? null), [firstAction, receiptText]);
+  const cancelAction = useMemo(() => {
+    if (!firstAction || !["cancel", "downgrade", "investigate"].includes(firstAction.action)) return null;
+    return findCancelAction(firstAction.item.merchant, firstAction.item.category);
+  }, [firstAction]);
   const monthlyTotals = useMemo(() => buildMonthlyTotals(audit.recurringItems), [audit.recurringItems]);
   const hasEvidence = Boolean(receiptText.trim() || statementSources.length || manualItems.length);
   const hasResult = audit.recurringItems.length > 0;
@@ -265,6 +270,22 @@ export default function GuestAuditClient() {
               <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{proofExcerpt ?? firstAction.item.evidence[0]?.description ?? firstAction.proof}</p>
               <p className="mt-2 text-xs text-(--muted)">{firstAction.item.evidence[0]?.source ?? "User-confirmed evidence"}. {firstAction.reason}</p>
             </div>
+            {cancelAction ? (
+              <div className="mt-3 rounded-xl border border-line bg-(--card-2) p-4">
+                <p className="font-data text-[0.64rem] uppercase tracking-[0.16em] text-verdict">{cancelAction.kind === "rail-guide" ? "How to stop this payment" : "Cancel on the provider's own page"}</p>
+                {cancelAction.manageUrl ? (
+                  <a href={cancelAction.manageUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm font-semibold text-(--ink) underline underline-offset-4">
+                    Open {manageUrlHostname(cancelAction)} ↗
+                  </a>
+                ) : null}
+                <ol className="mt-2 grid gap-1 text-sm leading-6 text-(--ink-soft)">
+                  {cancelAction.steps.map((step, index) => (
+                    <li key={step}>{index + 1}. {step}</li>
+                  ))}
+                </ol>
+                {cancelAction.caveat ? <p className="mt-2 text-xs leading-5 text-(--muted)">{cancelAction.caveat}</p> : null}
+              </div>
+            ) : null}
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
               <Link href="/private-audit" prefetch={false} className="btn btn-primary btn-lg">Request private audit</Link>
               {transferReady
