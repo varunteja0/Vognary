@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findCancelAction, manageUrlHostname, normalizeMerchantKey } from "../src/lib/cancel-actions";
+import { findActionableCancelAction, findCancelAction, manageUrlHostname, normalizeMerchantKey } from "../src/lib/cancel-actions";
 
 test("known merchants resolve to their own manage surface", () => {
   const netflix = findCancelAction("Netflix");
@@ -68,6 +68,21 @@ test("every linked action uses an https URL on a parseable hostname and has step
       assert.ok(manageUrlHostname(action!), `${merchant} URL must parse`);
     }
   }
+});
+
+test("the actionable gate never shows a cancel path under keep or watch", () => {
+  assert.ok(findActionableCancelAction("Netflix", "Streaming", "cancel"));
+  assert.ok(findActionableCancelAction("Netflix", "Streaming", "downgrade"));
+  assert.ok(findActionableCancelAction("Netflix", "Streaming", "investigate"));
+  assert.equal(findActionableCancelAction("Netflix", "Streaming", "watch"), null);
+  assert.equal(findActionableCancelAction("Netflix", "Streaming", "keep"), null);
+});
+
+test("a recognizable service beats its payment rail; bare PayPal descriptors get autopay guidance", () => {
+  assert.equal(findCancelAction("PAYPAL *SPOTIFY")?.merchantLabel, "Spotify");
+  const bare = findCancelAction("PAYPAL RECURRING PAYMENT");
+  assert.equal(bare?.merchantLabel, "PayPal automatic payments");
+  assert.equal(manageUrlHostname(bare!), "www.paypal.com");
 });
 
 test("normalization strips separators and case", () => {

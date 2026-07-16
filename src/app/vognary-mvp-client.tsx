@@ -16,6 +16,7 @@ import {
   type RecurringItem,
   type StatementSource,
 } from "@/lib/recurring-audit";
+import { findActionableCancelAction, findCancelAction, manageUrlHostname } from "@/lib/cancel-actions";
 import { receiptTextToManualInputs, type ReceiptCandidate } from "@/lib/receipt-parser";
 import { buildRenewalTimeline, type RenewalTimeline } from "@/lib/renewal-timeline";
 import { buildProofGraphSummary, type ProofGraphSummary } from "@/lib/proof-graph";
@@ -1129,13 +1130,17 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
       teamMembers,
       itemOwners,
       reviewNotes,
-      recurringItems: audit.recurringItems.map((item) => ({
-        ...item,
-        evidence: item.evidence.map((link) => ({ ...link, description: redactText(link.description).text })),
-        userAction: userActions[item.identityKey] ?? item.recommendationType,
-        owner: getOwnerName(itemOwners[item.identityKey], teamMembers),
-        reviewNote: reviewNotes[item.identityKey] ?? "",
-      })),
+      recurringItems: audit.recurringItems.map((item) => {
+        const effectiveAction = userActions[item.identityKey] ?? item.recommendationType;
+        return {
+          ...item,
+          evidence: item.evidence.map((link) => ({ ...link, description: redactText(link.description).text })),
+          userAction: effectiveAction,
+          owner: getOwnerName(itemOwners[item.identityKey], teamMembers),
+          reviewNote: reviewNotes[item.identityKey] ?? "",
+          cancelPath: findActionableCancelAction(item.merchant, item.category, effectiveAction),
+        };
+      }),
       warnings: audit.warnings,
     };
 
@@ -1178,21 +1183,26 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
   }
 
   function exportCsv() {
-    const header = ["Merchant", "Category", "Currency", "Frequency", "Monthly cost", "Average amount", "Next expected", "Confidence", "Action", "Owner", "Note", "Sources"];
-    const rows = audit.recurringItems.map((item) => [
-      item.merchant,
-      item.category,
-      item.currency,
-      item.frequency,
-      Math.round(item.monthlyCost),
-      Math.round(item.averageAmount),
-      item.nextExpectedDate,
-      item.confidenceScore,
-      userActions[item.identityKey] ?? item.recommendationType,
-      getOwnerName(itemOwners[item.identityKey], teamMembers),
-      reviewNotes[item.identityKey] ?? "",
-      item.sourceNames.join("; "),
-    ]);
+    const header = ["Merchant", "Category", "Currency", "Frequency", "Monthly cost", "Average amount", "Next expected", "Confidence", "Action", "Cancel path", "Owner", "Note", "Sources"];
+    const rows = audit.recurringItems.map((item) => {
+      const action = userActions[item.identityKey] ?? item.recommendationType;
+      const cancelPath = findActionableCancelAction(item.merchant, item.category, action);
+      return [
+        item.merchant,
+        item.category,
+        item.currency,
+        item.frequency,
+        Math.round(item.monthlyCost),
+        Math.round(item.averageAmount),
+        item.nextExpectedDate,
+        item.confidenceScore,
+        action,
+        cancelPath ? cancelPath.manageUrl ?? cancelPath.steps[0] : "",
+        getOwnerName(itemOwners[item.identityKey], teamMembers),
+        reviewNotes[item.identityKey] ?? "",
+        item.sourceNames.join("; "),
+      ];
+    });
     const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
     downloadBlob(csv, "text/csv;charset=utf-8", "vognary-recurring-ledger.csv");
     if (serverSession?.authenticated) void trackProductEvent("export.created", { commitmentsTouched: audit.recurringItems.length });
@@ -1233,6 +1243,11 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
       for (const item of audit.recurringItems) {
         const action = userActions[item.identityKey] ?? item.recommendationType;
         line(`${item.merchant} — ${item.currency} ${Math.round(item.monthlyCost)}/mo — next ${item.nextExpectedDate} — ${action} (${item.confidenceScore}% confidence)`, 10, 14);
+        const cancelPath = findActionableCancelAction(item.merchant, item.category, action);
+        if (cancelPath) {
+          const target = cancelPath.manageUrl ? `${manageUrlHostname(cancelPath)} — ` : "";
+          line(`   Action path: ${target}${cancelPath.steps[0]}`, 9, 13);
+        }
       }
       y += 10;
       const chain = loadPackChain();
@@ -2773,6 +2788,7 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
   const allowedReviewActions = recommendationActions.filter((candidate) => isReviewActionAllowed(item.category, candidate.value));
   const displayedAction = allowedReviewActions.some((candidate) => candidate.value === action) ? action : "investigate";
   const managementTarget = getCommitmentManagementTarget(item);
+  const cancelGuide = findCancelAction(item.merchant, item.category);
 
   return (
     <section className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
@@ -2809,11 +2825,21 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
           <p className="mt-2 text-sm leading-6 text-ochre">{policy.consequenceWarning}</p>
           <p className="mt-2 text-xs leading-5 muted-on-dark">Safe next steps: {policy.safeActions.map(formatPolicyAction).join(" · ")}</p>
         </div>
-        {managementTarget ? (
+        {cancelGuide || managementTarget ? (
           <div className="mt-4 rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
-            <p className="font-display text-base font-semibold text-(--dossier-ink)">Continue at the official account</p>
+            <p className="font-display text-base font-semibold text-(--dossier-ink)">{cancelGuide?.kind === "rail-guide" ? "How to stop this payment" : "Continue at the official account"}</p>
             <p className="mt-2 text-xs leading-5 muted-on-dark">Vognary takes you directly to the provider&apos;s own management surface. You keep control of the final confirmation; if the source remains connected, later evidence can verify the financial outcome.</p>
-            <a href={managementTarget.url} target="_blank" rel="noreferrer" className="btn btn-ondark mt-3 h-9 px-3 text-xs">Open {managementTarget.label}</a>
+            {cancelGuide ? (
+              <ol className="mt-3 grid gap-1 text-xs leading-5 muted-on-dark">
+                {cancelGuide.steps.map((step, index) => <li key={step}>{index + 1}. {step}</li>)}
+              </ol>
+            ) : null}
+            {cancelGuide?.caveat ? <p className="mt-2 text-xs leading-5 text-ochre">{cancelGuide.caveat}</p> : null}
+            {cancelGuide?.manageUrl ? (
+              <a href={cancelGuide.manageUrl} target="_blank" rel="noreferrer" className="btn btn-ondark mt-3 h-9 px-3 text-xs">Open {manageUrlHostname(cancelGuide)}</a>
+            ) : managementTarget ? (
+              <a href={managementTarget.url} target="_blank" rel="noreferrer" className="btn btn-ondark mt-3 h-9 px-3 text-xs">Open {managementTarget.label}</a>
+            ) : null}
           </div>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-2">

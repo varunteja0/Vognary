@@ -253,6 +253,14 @@ const merchantRegistry: RegistryEntry[] = [
     steps: ["Sign in", "Settings → Subscription", "Manage → Cancel"],
   },
   {
+    patterns: ["paypal"],
+    merchantLabel: "PayPal automatic payments",
+    kind: "direct",
+    manageUrl: "https://www.paypal.com/myaccount/autopay/",
+    steps: ["Open PayPal automatic payments", "Pick the merchant", "Cancel the automatic payment"],
+    caveat: "This stops PayPal billing; the merchant may still expect payment another way — cancel with them too.",
+  },
+  {
     patterns: ["airtel"],
     merchantLabel: "Airtel",
     kind: "direct",
@@ -354,6 +362,14 @@ export function findCancelAction(merchant: string, category?: string): CancelAct
   }
   const fallback = category ? categoryFallbacks[category] : undefined;
   return fallback ? railGuides[fallback] : null;
+}
+
+/** Recommendations where showing a cancellation path is honest and helpful. */
+export const actionableRecommendations: ReadonlySet<string> = new Set(["cancel", "downgrade", "investigate"]);
+
+/** Gate + lookup in one step: no cancel path is ever shown under keep/watch. */
+export function findActionableCancelAction(merchant: string, category: string | undefined, action: string): CancelAction | null {
+  return actionableRecommendations.has(action) ? findCancelAction(merchant, category) : null;
 }
 
 export function manageUrlHostname(action: CancelAction): string | null {

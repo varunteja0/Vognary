@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { findCancelAction, manageUrlHostname } from "@/lib/cancel-actions";
+import { findActionableCancelAction, manageUrlHostname } from "@/lib/cancel-actions";
 import { rankFirstAction } from "@/lib/first-action";
 import {
   buildGuestAuditSnapshot,
@@ -51,10 +51,10 @@ export default function GuestAuditClient() {
   const firstAction = useMemo(() => rankFirstAction(audit.recurringItems), [audit.recurringItems]);
   const nextRenewal = useMemo(() => findNextRenewal(audit.recurringItems), [audit.recurringItems]);
   const proofExcerpt = useMemo(() => findProofExcerpt(receiptText, firstAction?.item ?? null), [firstAction, receiptText]);
-  const cancelAction = useMemo(() => {
-    if (!firstAction || !["cancel", "downgrade", "investigate"].includes(firstAction.action)) return null;
-    return findCancelAction(firstAction.item.merchant, firstAction.item.category);
-  }, [firstAction]);
+  const cancelAction = useMemo(
+    () => (firstAction ? findActionableCancelAction(firstAction.item.merchant, firstAction.item.category, firstAction.action) : null),
+    [firstAction],
+  );
   const monthlyTotals = useMemo(() => buildMonthlyTotals(audit.recurringItems), [audit.recurringItems]);
   const hasEvidence = Boolean(receiptText.trim() || statementSources.length || manualItems.length);
   const hasResult = audit.recurringItems.length > 0;
