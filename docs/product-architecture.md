@@ -16,20 +16,25 @@ Every recommendation carries its evidence, and every gap is named instead of pap
 
 ## Operating System
 
-The product is organized around fourteen durable surfaces:
+The product is organized around eighteen durable surfaces:
 
 | Surface | What it does | Where it lives |
 | --- | --- | --- |
 | Recurring Money Graph | One deduplicated graph of recurring commitments with cadence, cost, and confidence | `src/lib/recurring-audit.ts`, `/app` section 02 |
 | Canonical Living Ledger | Connector batches plus revisioned upload/manual workspace state idempotently materialize normalized sources, evidence, transactions, recurring items, evidence links, coverage, and usage observations | `src/lib/server/living-ledger-store.ts`, `workspace-state-materializer.ts`, migrations `0003` and `0012` |
+| Living Proof Graph | Typed commitment/evidence/source/merchant/rail/action/saving nodes, temporal edges, explainable confidence, and append-only hash-chained workspace events | `src/lib/server/proof-graph-store.ts`, `ledger-event-store.ts`, migration `0018` |
+| Cited Ledger Answers | Natural questions compile to bounded deterministic graph queries; every claim must resolve to a returned citation and unsupported questions fail closed | `src/lib/proof-questions.ts`, `/api/workspaces/current/ask`, `/app` Ask your proof |
 | Evidence Ledger | Every item links to the statement rows, receipts, and connector records that proved it | `RecurringItem.evidence`, `connector_evidence`, `evidence_links`, selected-item proof panel |
 | Renewal Calendar | Projected next debits over a 45-day horizon with bucket totals | `src/lib/renewal-timeline.ts`, `/app` calendar panel |
 | Renewal Alerts | Explicitly opted-in 7-day/1-day reminders with deduplicated schedules and bounded email retries | `src/lib/server/renewal-alert-store.ts`, `/api/renewal-alerts/preferences`, internal due worker |
 | Source Coverage Map | Which evidence rails are represented and which are still missing | coverage signals in `/app` section 04 |
 | Action Center | Keep / watch / downgrade / cancel / investigate labels plus safety-checked, persisted decisions on canonical items | `commitment_decisions`, `/api/workspaces/current/decisions`, priority panel |
+| Permissioned Outcome Loop | Exact one-action authorization, operator/system transition separation, same-source verification windows, checksummed savings receipts, and capped fee invoices | `src/lib/server/outcome-case-store.ts`, `outcome-verification-store.ts`, migrations `0019`–`0020` |
 | Connector Control Plane | Registry, start/sync planning, honesty states, adapters, token vault | `src/lib/connectors.ts`, `src/lib/connector-runtime.ts`, `src/lib/connectors/*`, `/api/connectors/*` |
 | Trust, Consent & Privacy Lifecycle | Resource-scoped consent, complete access exports without credential material, retention policy/enforcement, raw-payload minimization, delete paths, and profile controls | `/profile`, `/api/privacy/*`, `src/lib/server/privacy-lifecycle-store.ts`, `retention-executor.ts` |
 | Team Review Workflow | Revisioned encrypted owners/notes/review/merge state plus relational canonical commitment decisions | `/app` section 03, `workspace_states`, `commitment_decisions` |
+| Adaptive Workspace | Personal/family/founder/team modes change collaboration language and controls without fragmenting the canonical product | `workspaces.workspace_type`, `/api/workspaces/current`, `/app` |
+| Installable Private Shell | PWA manifest/icons and an offline fallback; only public static assets are cached, never workspace navigation or APIs | `src/app/manifest.ts`, `public/sw.js`, `/offline` |
 | Scheduled Source Refresh | Scheduled sync jobs, cron runner, evidence refresh | `/api/internal/sync-jobs/*`, `vercel.json` cron |
 | Read-only Platform API | Expiring, revocable, hashed tokens expose cursor-paginated canonical ledger/decisions and source health through explicit read scopes | `/api/platform/tokens`, `/api/v1/ledger`, `/api/v1/sources` |
 | Privacy-safe Benchmarks | Opt-in category/currency/frequency aggregates use prior-day data, workspace-level contribution caps, coarsening, and a 25-workspace minimum | `/api/workspaces/current/benchmarks`, `src/lib/aggregate-insights.ts` |
@@ -44,7 +49,9 @@ The codebase is modular; each engine has one home and a typed contract:
 | Audit engine (recurrence, cadence, confidence, merge, price change, duplicate resolution) | `src/lib/recurring-audit.ts` |
 | Renewal timeline engine | `src/lib/renewal-timeline.ts` |
 | Proof graph engine (source diversity, freshness, next-best-source) | `src/lib/proof-graph.ts` |
-| Verified savings engine (evidence-of-absence outcomes) | `src/lib/verified-savings.ts` |
+| Durable proof graph + workspace event ledger | `src/lib/server/proof-graph-store.ts`, `ledger-event-store.ts` |
+| Cited proof-question compiler | `src/lib/proof-questions.ts`, `src/lib/server/proof-question-store.ts` |
+| Verified savings engines (local projection + durable permissioned outcomes) | `src/lib/verified-savings.ts`, `src/lib/server/outcome-case-store.ts`, `outcome-verification-store.ts` |
 | Review diff engine (month-over-month changes) | `src/lib/review-diff.ts` |
 | Audit-pack integrity (offline SHA-256 self-checksum, optional Ed25519 issuer signature, verifier) | `src/lib/audit-pack.ts`, `src/lib/server/audit-pack-signing.ts`, `/verify` |
 | Redaction engine (PII masking for exports/previews) | `src/lib/redaction.ts` |
@@ -107,6 +114,8 @@ credentials, worker/scheduler, provider approval, and an end-to-end proof run.
 | Privacy lifecycle | Bounded policies, complete requester access exports, dry-run-first minimization, audit records, stale-webhook dead-lettering, and authenticated daily enforcement cron are implemented | Configure shared rate limiting, cron secret, backup/restore proof, review dry runs, then monitor destructive runs |
 | Read-only platform API | Hashed, expiring, revocable tokens and cursor-paginated scoped `/api/v1/ledger` and `/api/v1/sources` endpoints are implemented with an OpenAPI contract | Configure database/shared rate limiting, issue an admin token, and complete a consumer integration test |
 | Thresholded aggregate insights | Consented workspaces contribute workspace-bounded category/currency/frequency statistics; daily coarsened results fail closed below 25 workspaces | Build a cohort of at least 25 actively opted-in workspaces with prior-day canonical items. Until then the endpoint correctly returns no benchmarks |
+| Living Proof Graph and cited answers | Relational graph/event projection, explainable confidence, protected graph API, and citation-invariant natural query compiler are implemented | Apply `0018`; exercise an authenticated materialization and cited query; configure signing only when issuer proof is desired |
+| Permissioned verified outcomes | Exact versioned authorization, safe transition roles, proof-only receipt minting, disputes, invoices, privacy export, and daily verification worker are implemented | Apply `0019`–`0020`; obtain legal/privacy/operations approval; configure `CRON_SECRET`; prove one real end-to-end case before exposing the surface |
 
 CSV/PDF/paste/manual evidence and connector evidence now converge into normalized PostgreSQL ledger rows. The encrypted `workspace_states`
 record remains authoritative for UI workflow fields and source text, with optimistic revisions preventing silent multi-device overwrite.
@@ -117,6 +126,10 @@ record remains authoritative for UI workflow fields and source text, with optimi
 - Renewal calendar with 45-day projected debits and bucket totals (UI + `/api/audit` response + export pack).
 - Evidence merge across statements, receipts, manual entries, and connector evidence.
 - Proof Graph panel: single-source vs multi-source spend, stale-evidence spend, and ranked next-best-source by monthly amount at stake.
+- Living Proof Graph persistence: typed nodes/temporal edges, hash-chained events, explainable confidence snapshots, authenticated graph reads, and cited natural-language queries that cannot emit uncited claims.
+- Permissioned outcome cases: exact one-commitment authorization, customer withdrawal/dispute, operator execution states, system-only verification, same-source proof windows, durable receipts, and capped success-fee invoices.
+- Privacy export v2 includes the graph/event history, exact new authorization text, action cases, verification windows, saving receipts, and fee invoices while excluding credentials and internal payload hashes.
+- Adaptive personal/family/founder/team workspaces and a privacy-safe installable shell that never offline-caches financial pages or APIs.
 - Audit-pack integrity: every export is canonicalized and carries an offline SHA-256 self-checksum plus local chain metadata. When an authenticated workspace exports while signing is configured, the server signs only the hash and issuance metadata with Ed25519. `/verify` keeps report content in the browser, fetches public keys, and distinguishes checksum integrity from trusted, invalid, or unavailable issuer signatures. A checksum alone is not evidence of Vognary authorship, and even a valid issuer signature does not certify the underlying financial claims.
 - Verified Savings: cancel/downgrade decisions are proven by watching predicted debits stop appearing inside covered evidence (watching → verifying → verified / not-eliminated).
 - Guided Proof Capture wizard for GPay/PhonePe/Paytm/Play/App Store/bank e-mandate screens producing user-confirmed evidence.
@@ -148,7 +161,7 @@ record remains authoritative for UI workflow fields and source text, with optimi
 - Encrypted raw-file object storage with retention controls.
 - Account Aggregator, UPI AutoPay, and card e-mandate direct sync (regulated partner access required; manual evidence paths are live).
 - Apple/Google Play user-wide subscription APIs (do not exist for third parties; receipt/manual evidence is the honest path).
-- Cancellation automation.
+- General-purpose or protected-category cancellation automation. The implemented concierge is restricted to eligible actions, one explicit authorization, and production approval gates.
 - Checkout methods beyond tracked Razorpay Payment Links.
 - Production benchmark output before 25 distinct workspaces explicitly opt in; the code intentionally returns no cohort below that threshold.
 
@@ -156,7 +169,7 @@ record remains authoritative for UI workflow fields and source text, with optimi
 
 These are deployment or business dependencies, not missing application modules:
 
-1. Apply the forward-only PostgreSQL migrations through `0017` and verify `schema_migrations` before enabling dependent routes.
+1. Apply the forward-only PostgreSQL migrations through `0020` and verify `schema_migrations` before enabling dependent routes.
 2. Complete Google OAuth restricted-scope verification before opening Gmail receipt sync beyond approved test users.
 3. Verify the Resend domain/sender and configure email, session, database, encryption, cron, and shared-rate-limit secrets before enabling public magic links or renewal delivery.
 4. Activate and monitor three distinct worker paths: connector sync cron, renewal-alert cron, and the fixed-policy authenticated privacy-retention GET cron.

@@ -159,7 +159,7 @@ Compose waits for PostgreSQL 16, runs the schema migration service to completion
 
 Vercel production deployments run the same checksummed, advisory-locked migration command before `next build`. Preview and local builds skip this production mutation. A migration failure stops the deployment before the new application artifact can become live.
 
-Readiness requires every forward migration from `0002_revocable_sessions` through `0017_shared_rate_limits`, then runs bounded aggregate queries against capability tables. `capabilities.schema.status=ready` means the migration ledger and those queries succeeded; it does not prove a deployed schedule, delivered renewal email, paid assisted-audit order, legal approval, provider approval, or platform adoption. Sync-worker production status additionally requires a successful cron-invoked run that wrote evidence. CI applies the schema to PostgreSQL 16 and runs `npm run test:postgres`.
+Readiness requires every forward migration from `0002_revocable_sessions` through `0020_authorization_evidence`, then runs bounded aggregate queries against capability tables. `capabilities.schema.status=ready` means the migration ledger and those queries succeeded; it does not prove a deployed schedule, delivered renewal email, paid assisted-audit order, concierge legal/privacy/operations approval, provider approval, or platform adoption. Sync-worker production status additionally requires a successful cron-invoked run that wrote evidence. CI applies the schema to PostgreSQL 16 and runs `npm run test:postgres`.
 
 Add future production schema changes as `infra/postgres/migrations/0002_short_description.sql`, `0003_short_description.sql`, and so on. Do not edit already-applied migration files.
 

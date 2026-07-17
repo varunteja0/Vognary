@@ -18,8 +18,10 @@ Vognary 1.0 is an evidence-first recurring-spend audit for founders, builders, f
 - Confidence scores, next debit prediction, evidence trail, and founder action labels.
 - Fine-grained connector honesty states (`live`, `setup-ready`, `token-required`, `oauth-required`, `verification-required`, `partner-gated`, `blocked`, `evidence-only`, `planned`) surfaced in `/api/connectors` and `/sources`; each state describes code/access status, not universal financial coverage.
 - Audit-pack trust levels: every JSON export has an offline SHA-256 self-checksum and local chain metadata; authenticated exports additionally receive an Ed25519 Vognary issuer signature when signing is configured. `/verify` checks both locally and states clearly that a self-checksum alone does not prove authorship.
-- Verified Savings: cancel/downgrade outcomes proven by evidence-of-absence — a saving is only "verified" when expected debits pass inside covered evidence without recurring.
-- Proof Graph: single-source vs multi-source spend, stale evidence, and the ranked next-best source to connect, computed from what is actually at stake.
+- Living Proof Graph: durable typed nodes/edges for commitments, evidence, sources, merchants, rails, authorized actions, and verified savings, plus an append-only hash-chained event history and explainable confidence components.
+- Permissioned outcomes: one explicitly authorized cancel/downgrade action can move through a visible lifecycle; only the system proof worker can mint a Verified Saving after same-source evidence covers the required clean cycles. Fee terms and the exact accepted authorization are versioned and exportable.
+- Ask your proof: natural questions compile into bounded graph queries. Every financial claim carries a ledger citation; unsupported questions refuse to guess and unlike currencies are never added.
+- Adaptive personal/family/founder/team workspaces and an installable PWA shell whose service worker never caches financial pages or API responses.
 - Guided Proof Capture wizard for UPI AutoPay, app-store, and bank e-mandate screens; RBI pre-debit notification parsing (day-first dates) through the receipt path.
 - Month-over-month review diffs, explainable duplicate resolution with user merge decisions, PII redaction on exports, and Indian bank statement format detection (HDFC/ICICI/SBI/Axis/Kotak).
 - The 10/10 master plan with measurable exit criteria lives in [docs/path-to-10.md](docs/path-to-10.md).
@@ -40,7 +42,7 @@ Vognary 1.0 is an evidence-first recurring-spend audit for founders, builders, f
 - Signed session-cookie and workspace authorization primitives, exposed through closed-by-default auth/workspace APIs.
 - Resend magic-link login route with one-time PostgreSQL challenges for public session issuance once email credentials are configured.
 - Gmail OAuth receipt connector with state validation, browser import fallback, and encrypted token persistence for signed-in users when the database and token vault are configured.
-- PostgreSQL schema and migrations through `0017_shared_rate_limits`, including encrypted workspace state, connector lifecycle, privacy controls, one-time assisted-audit fulfillment, and atomic shared rate limiting.
+- PostgreSQL schema and migrations through `0020_authorization_evidence`, including encrypted workspace state, connector lifecycle, privacy controls, one-time assisted-audit fulfillment, atomic shared rate limiting, the Living Proof Graph, verified outcomes, and exact authorization evidence.
 - One server-owned INR 999 assisted-audit SKU with no auto-renewal or monitoring entitlement. Checkout remains hidden until qualified legal review and tracked Razorpay configuration are proven.
 
 ## Quick Start
@@ -54,7 +56,7 @@ Open http://localhost:3000.
 
 Copy `.env.example` to `.env.local` when enabling durable intake, tracked assisted-audit checkout, identity, Gmail OAuth, or connected-account storage.
 
-Guest audit: http://localhost:3000/app?guest=1
+Canonical workspace: http://localhost:3000/app
 Login: http://localhost:3000/login
 Profile and data controls: http://localhost:3000/profile
 Private audit intake: http://localhost:3000/private-audit
@@ -97,10 +99,10 @@ The response includes the audit (with cross-source-merged recurring items) and a
 curl http://localhost:3000/api/connectors
 curl http://localhost:3000/api/connectors/gmail-readonly/start
 curl http://localhost:3000/api/connectors/openai-costs/sync
-curl http://localhost:3000/api/readiness
+curl http://localhost:3000/api/readiness -H 'Authorization: Bearer <INTERNAL_SYNC_SECRET>'
 ```
 
-`GET` returns the public readiness plan. Provider execution uses an authenticated workspace account and that account's encrypted credential. Environment-backed previews are hard-disabled in production and are opt-in outside production.
+In production, detailed readiness is internal-secret protected because it describes operational configuration. Provider execution uses an authenticated workspace account and that account's encrypted credential. Environment-backed previews are hard-disabled in production and are opt-in outside production.
 
 Webhook route shape:
 
@@ -143,6 +145,10 @@ curl -X POST http://localhost:3000/api/auth/logout
 curl http://localhost:3000/api/profile
 curl http://localhost:3000/api/workspaces
 curl http://localhost:3000/api/workspaces/current/audit-snapshot
+curl -X POST http://localhost:3000/api/workspaces/current/ask \
+	-H 'Content-Type: application/json' \
+	-H 'Cookie: vognary_session=<signed-session-cookie>' \
+	-d '{"question":"Which commitments have the weakest proof?"}'
 curl -X POST http://localhost:3000/api/workspaces/current/audit-snapshot \
 	-H 'Content-Type: application/json' \
 	-d '{"title":"Vognary workspace state","expectedRevision":null,"summary":{"recurringCount":0},"snapshot":{"version":1,"exportedAt":"2026-07-11T00:00:00.000Z","statementSources":[],"manualItems":[],"userActions":{},"itemOwners":{},"reviewNotes":{},"teamMembers":[]}}'

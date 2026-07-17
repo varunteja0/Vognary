@@ -73,7 +73,7 @@ test("cited questions execute against the materialized Living Proof Graph", {
     const merchant = await askWorkspaceProofGraph(workspaceId, "What do we know about OpenAI?");
     assert.equal(merchant.intent, "merchant");
     assert.equal(merchant.citations[0].kind, "commitment");
-    assert.ok(merchant.citations[0].sourceNames.includes("bank-statement.csv"));
+    assert.ok(merchant.citations[0].sourceNames.includes("Workspace uploads and manual evidence"));
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
     await pool.query(`delete from users where id = $1`, [userId]);

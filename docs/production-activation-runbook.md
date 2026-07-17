@@ -68,7 +68,7 @@ Goal: a durably stored private-audit lead can create one tracked INR 999 assiste
 Static `PAYMENT_LINK_*` URLs and legacy monitoring plans are not exposed in Vognary 1.0.
 
 1. Complete Razorpay business/KYC activation and create keys for the intended mode. Follow Razorpay's current official key instructions: `https://razorpay.com/docs/payments/dashboard/settings/api-keys/`.
-2. Apply migrations through `0017_shared_rate_limits` to the production database.
+2. Apply migrations through `0020_authorization_evidence` to the production database.
 3. Obtain qualified legal review of Terms and Privacy. Only after approval, configure `ASSISTED_AUDIT_LEGAL_TERMS_STATUS=approved` with `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, a live-mode `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET`. The INR 999 amount is server-owned.
 4. In Razorpay, configure `https://www.vognary.com/api/billing/webhooks/razorpay` as the webhook URL using the same independently generated webhook secret. Follow the current official webhook instructions: `https://razorpay.com/docs/webhooks/setup-edit-payments/`.
 5. Subscribe the webhook to `payment_link.paid`, `payment_link.cancelled`, `payment_link.expired`, and `refund.processed`.
@@ -208,7 +208,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-18. Add `CRON_SECRET` in Vercel. Vercel Cron sends this as the `Authorization` header to the connector-sync and renewal-alert `GET` workers.
+18. Add `CRON_SECRET` in Vercel. Vercel Cron sends this as the `Authorization` header to the connector-sync, renewal-alert, verified-savings, and retention `GET` workers.
 19. Redeploy production.
 20. Apply schema from a trusted terminal with production `DATABASE_URL` set:
 
@@ -231,7 +231,7 @@ Expected:
 - `tokenVault.status` is `ready`.
 - `hardening.connectorTokenStore` is `ready` or `configured`.
 - `capabilities.schema.status` is `ready`, with every migration from `0002_revocable_sessions` through
-  `0014_sync_run_invocation` in `capabilities.schema.applied`.
+  `0020_authorization_evidence` in `capabilities.schema.applied`.
 - Each capability status is queryable rather than `migration-pending`, `migration-ledger-unavailable`, or `schema-query-failed`.
 - `hardening.syncWorkers` is `cron-secret-configured-deployment-schedule-unverified` until a cron-invoked successful sync writes evidence. It becomes `operator-attested-production-live` only after that evidence exists and `SYNC_SCHEDULER_STATUS=production-live` is set.
 
@@ -384,6 +384,36 @@ The response must contain aggregate selected/sent/failed/cancelled counts only. 
 Stop condition:
 
 - Do not advertise renewal email alerts until one explicitly opted-in test user receives a reminder, repeat scheduling remains idempotent, opt-out cancels unsent rows, and cron failures are monitored.
+
+## 5C. Permissioned Verified-Savings Concierge
+
+Goal: an eligible customer can authorize exactly one cancel or downgrade action, see every state transition, and receive a saving receipt only after the system proves the changed debit across the required same-source windows.
+
+1. Apply migrations `0019_verified_outcome_loop` and `0020_authorization_evidence`; verify both checksums in `schema_migrations`.
+2. Obtain qualified approval for the exact authorization, success-fee terms, dispute process, operator playbook, and privacy treatment. Do not infer approval from completed code.
+3. Only after those reviews, set all three production gates exactly:
+
+```text
+CONCIERGE_LEGAL_TERMS_STATUS=approved
+CONCIERGE_OPERATIONS_STATUS=production-ready
+CONCIERGE_PRIVACY_REVIEW_STATUS=approved
+```
+
+`CONCIERGE_MODE=test` is local-only and is rejected in production.
+
+4. Confirm `DATABASE_URL`, `INTERNAL_SYNC_SECRET`, and `CRON_SECRET` are configured, deploy, and run `npm run production:check -- https://www.vognary.com --strict`.
+5. In a disposable production-owned workspace, select an eligible discretionary subscription, create a case, read the complete authorization, and authorize it. Verify one `action_authorizations` row contains the exact accepted `authorization_text`, version, terms version, fee basis points, and maximum fee.
+6. Exercise customer withdrawal before execution and confirm the authorization is revoked. Create a new case for the real proof run.
+7. From the protected operator system, move only through an allowed path such as `authorized → in-progress → provider-pending → executed`, using a fresh Idempotency-Key on every call. Operators cannot transition a case to `verified`.
+8. Let `/api/internal/savings-verification/due/run` open the verification windows. Connect or refresh the same financial source that established the baseline so coverage passes beyond every expected debit window.
+9. For cancellation, require two clean covered cycles unless the commitment is yearly; for downgrade, require an observed meaningfully lower charge. Missing coverage remains `verifying`; a continuing charge fails the case.
+10. Confirm the system—not an operator—created exactly one active `verified_saving_receipts` row, a Proof Graph `action → saving` edge, a hash-chained ledger event, and at most one capped `success_fee_invoices` row. Confirm the customer can dispute it and that the privacy export includes the full case history.
+11. Observe at least two deployed cron invocations and alert on any `completed-with-failures` response before opening the feature broadly.
+
+Stop conditions:
+
+- Keep the concierge hidden if any of the three approval gates is absent, the exact authorization text is not stored, an operator can mint verification, same-source coverage is missing, a receipt duplicates, a fee exceeds its authorization cap, or withdrawal/dispute fails.
+- Never use this flow for debt/EMI, insurance, SIP/investment, utility, or another protected class. Those remain guidance-only.
 
 ## 6. Identity Provider Or Magic Link
 
