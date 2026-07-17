@@ -179,7 +179,7 @@ function SignedOut() {
 }
 
 function Unavailable() {
-  return <div className="inset mt-6 p-5 sm:p-6"><span className="pill pill-blocked">Workspace ledger unavailable</span><h2 className="mt-3 font-display text-lg font-semibold text-(--ink)">Connected-source status is not active here</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Fallback evidence still works; automatic source history needs the workspace data service to be configured.</p><Link href="/app?guest=1" prefetch={false} className="btn btn-ghost mt-4">Use fallback evidence</Link></div>;
+  return <div className="inset mt-6 p-5 sm:p-6"><span className="pill pill-blocked">Workspace ledger unavailable</span><h2 className="mt-3 font-display text-lg font-semibold text-(--ink)">Connected-source status is not active here</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Fallback evidence still works; automatic source history needs the workspace data service to be configured.</p><Link href="/app" prefetch={false} className="btn btn-ghost mt-4">Use fallback evidence</Link></div>;
 }
 
 function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {

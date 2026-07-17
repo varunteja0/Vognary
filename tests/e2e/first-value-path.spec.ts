@@ -19,22 +19,22 @@ test("the landing page makes the real audit the single primary path", async ({ p
 
   const primary = page.getByRole("link", { name: "Audit my recurring spend" });
   await expect(primary).toBeVisible();
-  await expect(primary).toHaveAttribute("href", "/app?guest=1");
-  await expect(page.getByRole("link", { name: "See sample" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Try sample workspace|Open a working sample/ })).toHaveCount(0);
+  await expect(primary).toHaveAttribute("href", "/app");
+  await expect(page.getByRole("link", { name: "See product output" })).toHaveAttribute("href", "#product-ledger");
+  await expect(page.locator('a[href*="demo="], a[href*="guest="]')).toHaveCount(0);
   expect(failures).toEqual([]);
 });
 
 test("two pasted receipts produce one proof-backed first result without login", async ({ page }) => {
   const failures = collectRuntimeFailures(page);
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto("/app?guest=1");
+  await page.goto("/app");
 
   const initial = await pageMetrics(page);
   expect(initial.visibleControls).toBeLessThanOrEqual(10);
   expect(initial.scrollHeight).toBeLessThanOrEqual(812 * 2.5);
   expect(initial.horizontalOverflow).toBe(false);
-  await expect(page.getByRole("heading", { name: "Audit your recurring spend" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Know what renews before it charges" })).toBeVisible();
   await expect(page.getByLabel("Paste receipts or invoices")).toBeVisible();
   await expect(page.getByText("Connector catalog")).toHaveCount(0);
   await expect(page.getByText("Verified savings")).toHaveCount(0);
@@ -121,7 +121,7 @@ test("private audit intake immediately gives a safe source plan and continuation
   await expect(plan).toBeVisible();
   await expect(plan.getByText(/Start with/i)).toBeVisible();
   await expect(plan.getByText(/Never share passwords, OTPs, CVV/i)).toBeVisible();
-  await expect(plan.getByRole("link", { name: "Continue my audit" })).toHaveAttribute("href", "/app?guest=1");
+  await expect(plan.getByRole("link", { name: "Continue my audit" })).toHaveAttribute("href", "/app");
   await expect(page.getByText(/will reply with the safest minimum source/i)).toHaveCount(0);
   await expect(page.getByText(/Online payment is not activated|Payment status could not/i)).toHaveCount(0);
   expect(failures).toEqual([]);

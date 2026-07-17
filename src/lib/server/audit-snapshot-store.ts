@@ -1,6 +1,7 @@
 import { getDatabasePool } from "@/lib/server/database";
 import { decryptSecret, encryptSecret, type EncryptedSecret } from "@/lib/server/token-vault";
 import { materializeWorkspaceState } from "@/lib/server/workspace-state-materializer";
+import { syncWorkspaceProofGraph } from "@/lib/server/proof-graph-store";
 
 export type AuditSnapshotSummary = {
   recurringCount: number;
@@ -82,11 +83,16 @@ export async function saveAuditSnapshot(input: {
     const row = result.rows[0];
     if (!row) throw new Error("Workspace state upsert did not return a row.");
     const materialized = await materializeWorkspaceState(client, input.workspaceId, input.snapshot);
+    const graph = await syncWorkspaceProofGraph({
+      workspaceId: input.workspaceId,
+      actorUserId: input.userId,
+      idempotencyKey: `graph:workspace-state:${input.workspaceId}:${nextRevision}`,
+    }, client);
 
     await client.query(
       `insert into audit_log (workspace_id, user_id, action, entity_type, entity_id, metadata)
        values ($1, $2, 'workspace_state.saved', 'workspace_state', $1, $3::jsonb)`,
-      [input.workspaceId, input.userId, JSON.stringify({ revision: nextRevision, materialized })],
+      [input.workspaceId, input.userId, JSON.stringify({ revision: nextRevision, materialized, graph })],
     );
     await client.query("commit");
 
@@ -96,7 +102,7 @@ export async function saveAuditSnapshot(input: {
       revision: Number(row.revision),
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
-      materialized,
+      materialized: { ...materialized, graph },
     };
   } catch (error) {
     await client.query("rollback");

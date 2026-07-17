@@ -1,11 +1,10 @@
 import type { CSSProperties } from "react";
 
 /**
- * Vognary identity — "The Convergence".
- * Two platinum strokes funnel down and resolve into a single faceted gold
- * diamond — every recurring charge brought to one decision. Gold = money and
- * the verdict; the diamond = value resolved. The strokes use `currentColor` so
- * the mark inherits the surrounding text colour; the node stays gold.
+ * Vognary identity — "Ledger to Verdict".
+ * Two tiers of evidence rows converge into one gold V: scattered recurring
+ * commitments become a single, reviewable action. The rows inherit the
+ * surrounding text colour; the verdict stays champagne gold.
  */
 
 const GOLD = "#d8b87a";
@@ -30,7 +29,7 @@ export function VognaryMark({
     <svg
       width={size}
       height={size}
-      viewBox="0 0 48 48"
+      viewBox="0 0 64 64"
       fill="none"
       className={`${animated ? "mark-draw " : ""}${className ?? ""}`}
       style={style}
@@ -39,21 +38,34 @@ export function VognaryMark({
       aria-hidden={title ? undefined : true}
     >
       <path
-        d="M11.5 13.5 21.7 29.6"
-        pathLength={1}
-        stroke="currentColor"
-        strokeWidth={5}
-        strokeLinecap="round"
+        className="mark-source mark-source-left"
+        d="M7 11h17l5 7H12l-5-7ZM13 23h15l5 7H18l-5-7Z"
+        fill="currentColor"
       />
       <path
-        d="M36.5 13.5 26.3 29.6"
-        pathLength={1}
-        stroke="currentColor"
-        strokeWidth={5}
-        strokeLinecap="round"
+        className="mark-source mark-source-right"
+        d="M57 11H40l-5 7h17l5-7ZM51 23H36l-5 7h15l5-7Z"
+        fill="currentColor"
       />
-      <path d="M24 26 29.4 31.8 24 37.6 18.6 31.8Z" fill={mono ? "currentColor" : GOLD} />
-      <path d="M24 26 29.4 31.8 18.6 31.8Z" fill={mono ? "currentColor" : GOLD_HIGHLIGHT} />
+      <path
+        className="mark-verdict"
+        d="m20.5 35 11.5 14L43.5 35"
+        stroke={mono ? "currentColor" : GOLD}
+        strokeWidth={8}
+        strokeLinecap="square"
+        strokeLinejoin="miter"
+      />
+      {!mono ? (
+        <path
+          className="mark-verdict mark-verdict-highlight"
+          d="m23 35 9 11 9-11"
+          stroke={GOLD_HIGHLIGHT}
+          strokeWidth={2}
+          strokeLinecap="square"
+          strokeLinejoin="miter"
+          opacity={0.72}
+        />
+      ) : null}
     </svg>
   );
 }

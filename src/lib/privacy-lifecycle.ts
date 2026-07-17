@@ -29,7 +29,7 @@ export type RetentionExecutionOptions = {
 export type PrivacyRequestType = "access_export";
 
 export type PrivacyExportDocument = {
-  exportVersion: 1;
+  exportVersion: 2;
   requestId: string;
   generatedAt: string;
   scope: {
@@ -47,6 +47,7 @@ export type PrivacyExportDocument = {
     id: string;
     name: string;
     plan: string;
+    workspaceType: string;
     role: string;
     createdAt: string;
     updatedAt: string;
@@ -86,6 +87,20 @@ export type PrivacyExportDocument = {
   assistedAuditOrders: Array<Record<string, unknown>>;
   billingRefunds: Array<Record<string, unknown>>;
   entitlements: Array<Record<string, unknown>>;
+  proofGraph: {
+    nodes: Array<Record<string, unknown>>;
+    edges: Array<Record<string, unknown>>;
+    confidenceExplanations: Array<Record<string, unknown>>;
+    ledgerEvents: Array<Record<string, unknown>>;
+  };
+  verifiedOutcomes: {
+    actionCases: Array<Record<string, unknown>>;
+    authorizations: Array<Record<string, unknown>>;
+    caseEvents: Array<Record<string, unknown>>;
+    verificationWindows: Array<Record<string, unknown>>;
+    savingReceipts: Array<Record<string, unknown>>;
+    successFeeInvoices: Array<Record<string, unknown>>;
+  };
   auditHistory: Array<Record<string, unknown>>;
   exclusions: string[];
 };
@@ -255,7 +270,7 @@ export const assertPrivacyExportIsMetadataOnly = assertPrivacyExportExcludesSecr
 
 export function buildPrivacyExportDocument(input: Omit<PrivacyExportDocument, "exportVersion" | "exclusions">): PrivacyExportDocument {
   const document: PrivacyExportDocument = {
-    exportVersion: 1,
+    exportVersion: 2,
     ...input,
     exclusions: [
       "Authentication sessions and token hashes",

@@ -264,8 +264,8 @@ export default function LoginClient({ initialGoogleReason, initialMagicReason, i
                   <span className="text-sm font-medium text-(--ink-soft)">Fastest and most secure</span>
                 </div>
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  <Link href="/app?demo=1" className="btn btn-primary btn-lg">Try sample audit</Link>
-                  <Link href="/app?guest=1" className="btn btn-ghost btn-lg">Start without account</Link>
+                  <Link href="/app" className="btn btn-primary btn-lg">Continue privately</Link>
+                  <Link href="/private-audit" className="btn btn-ghost btn-lg">Request private audit</Link>
                 </div>
                 <button disabled={googleSubmitting} type="button" onClick={startGoogleSignIn} className="btn btn-google btn-block mt-3">
                   <GoogleGlyph />
@@ -273,7 +273,7 @@ export default function LoginClient({ initialGoogleReason, initialMagicReason, i
                 </button>
                 <p className="mt-3 text-xs leading-5 text-(--muted)">Browser-only mode lets you see the ledger before trusting Vognary with real evidence. Google creates a workspace when OAuth is configured.</p>
                 <Notice banner={googleStatus} />
-                <Link href="/#sample-audit" className="btn btn-ghost btn-block mt-3">Preview static sample</Link>
+                <Link href="/#product-ledger" className="btn btn-ghost btn-block mt-3">See product output</Link>
               </div>
 
               <details className="rounded-xl border border-line bg-(--card-2) p-4">

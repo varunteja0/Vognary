@@ -1,9 +1,38 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { analyzeStatements, type ManualRecurringInput } from "../src/lib/recurring-audit";
-import { buildProofGraphSummary } from "../src/lib/proof-graph";
+import { analyzeStatements, type ManualRecurringInput, type RecurringItem } from "../src/lib/recurring-audit";
+import { buildProofGraphSummary, explainProofConfidence } from "../src/lib/proof-graph";
 
 const today = new Date(2026, 6, 10); // 2026-07-10
+
+function recurringItem(overrides: Partial<RecurringItem> = {}): RecurringItem {
+  return {
+    id: "openai",
+    identityKey: "openai::inr::monthly",
+    merchant: "OpenAI",
+    normalizedMerchant: "openai",
+    category: "AI tools",
+    currency: "INR",
+    frequency: "monthly",
+    averageGapDays: 30.44,
+    amountMin: 1999,
+    amountMax: 1999,
+    averageAmount: 1999,
+    monthlyCost: 1999,
+    annualCost: 23988,
+    lastChargeDate: "2026-06-06",
+    nextExpectedDate: "2026-07-06",
+    confidenceScore: 90,
+    recommendationType: "keep",
+    recommendationReason: "Stable recurring charge.",
+    riskTags: [],
+    evidence: [],
+    sourceNames: [],
+    missedCycles: 0,
+    priceChange: null,
+    ...overrides,
+  };
+}
 
 function csv(rows: string[]): string {
   return ["Date,Description,Debit,Credit", ...rows].join("\n");
@@ -126,4 +155,33 @@ test("never combines foreign commitments into primary-currency proof totals", ()
   assert.equal(graph.totalMonthly, 1000, "money totals remain INR-only");
   assert.equal(graph.singleSourceMonthly, 1000);
   assert.equal(graph.nextBestSources[0]?.monthlyAtStake, 1000);
+});
+
+test("confidence is derived from evidence structure and exposes every component", () => {
+  const item = recurringItem({
+    sourceNames: ["bank.csv", "Gmail receipts"],
+    evidence: [
+      { date: "2026-04-06", amount: 1999, description: "OPENAI", source: "bank.csv", rowNumber: 1 },
+      { date: "2026-05-06", amount: 1999, description: "OPENAI", source: "bank.csv", rowNumber: 2 },
+      { date: "2026-06-06", amount: 1999, description: "OPENAI", source: "Gmail receipts", rowNumber: 3 },
+    ],
+  });
+  const explanation = explainProofConfidence(item, { today: new Date(2026, 5, 10) });
+  assert.ok(explanation.score > 80 && explanation.score <= 99);
+  assert.equal(explanation.proofDensity, 1);
+  assert.equal(explanation.sourceDiversity, 0.82);
+  assert.ok(explanation.freshness > 0.9);
+  assert.ok(explanation.cadenceStability > 0.9);
+  assert.equal(explanation.reasons.length, 4);
+});
+
+test("confidence fails honestly when no observed evidence exists", () => {
+  const item = recurringItem({
+    sourceNames: ["manual"],
+    evidence: [{ date: "2026-07-06", amount: 1999, description: "expected", source: "manual", rowNumber: 1, kind: "scheduled" }],
+  });
+  const explanation = explainProofConfidence(item, { today: new Date(2026, 5, 10) });
+  assert.equal(explanation.score, 0);
+  assert.equal(explanation.proofDensity, 0);
+  assert.equal(explanation.freshness, 0);
 });

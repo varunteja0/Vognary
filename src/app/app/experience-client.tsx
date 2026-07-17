@@ -10,12 +10,8 @@ const VognaryMvpClient = dynamic(() => import("../vognary-mvp-client"), {
   loading: () => <ExperienceLoading label="Opening the workspace…" />,
 });
 
-type ExperienceMode = "signed-in" | "guest" | "demo";
-
-export default function ExperienceClient({ experienceMode }: { experienceMode: ExperienceMode }) {
-  return experienceMode === "guest"
-    ? <GuestAuditClient />
-    : <VognaryMvpClient experienceMode={experienceMode} />;
+export default function ExperienceClient({ signedIn }: { signedIn: boolean }) {
+  return signedIn ? <VognaryMvpClient /> : <GuestAuditClient />;
 }
 
 function ExperienceLoading({ label }: { label: string }) {

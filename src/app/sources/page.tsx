@@ -39,7 +39,7 @@ export default async function SourcesPage() {
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/app?guest=1" prefetch={false} className="btn btn-ghost">Back to audit</Link>
+          <Link href="/app" prefetch={false} className="btn btn-ghost">Back to audit</Link>
         </div>
 
         <article className="panel p-6 sm:p-8 rise">
@@ -60,7 +60,7 @@ export default async function SourcesPage() {
                 {redactionChecklist.map((item) => <li key={item}>- {item}</li>)}
               </ul>
             </div>
-            <Link href="/app?guest=1" prefetch={false} className="btn btn-ghost">Add fallback evidence</Link>
+            <Link href="/app" prefetch={false} className="btn btn-ghost">Add fallback evidence</Link>
           </div>
         </details>
 

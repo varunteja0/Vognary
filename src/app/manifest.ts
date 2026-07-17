@@ -10,15 +10,17 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Vognary",
     description:
       "Find subscriptions, mandates, and recurring charges, review the proof, and decide what to keep, change, or cancel.",
-    id: "/",
-    start_url: "/",
+    id: "/app",
+    start_url: "/app",
+    scope: "/",
     display: "standalone",
     background_color: "#0b0c0f",
     theme_color: "#0b0c0f",
     categories: ["finance", "productivity", "business"],
     icons: [
-      { src: "/icon.svg", type: "image/svg+xml", sizes: "any" },
-      { src: "/apple-icon", type: "image/png", sizes: "180x180", purpose: "maskable" },
+      { src: "/pwa/icon-192.png", type: "image/png", sizes: "192x192", purpose: "any" },
+      { src: "/pwa/icon-512.png", type: "image/png", sizes: "512x512", purpose: "any" },
+      { src: "/pwa/icon-maskable-512.png", type: "image/png", sizes: "512x512", purpose: "maskable" },
     ],
   };
 }

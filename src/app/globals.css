@@ -34,6 +34,7 @@
   --gold: #d8b87a;
   --gold-soft: #e7ce9b;
   --gold-deep: #bd9c5f;
+  --gold-line: rgba(216, 184, 122, 0.34);
   --glow: var(--gold);
   --glow-soft: var(--gold-soft);
   --glow-deep: var(--gold-deep);
@@ -153,10 +154,14 @@ select {
  * Typographic devices
  * ------------------------------------------------------------------ */
 
+/* Display voice — Fraunces. The engraved-ledger serif that separates
+   Vognary from every grotesk-on-graphite dashboard. Falls back to the
+   UI grotesk while the serif loads. */
 .font-display {
-  font-family: var(--font-grotesk), ui-sans-serif, sans-serif;
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
   font-optical-sizing: auto;
-  letter-spacing: 0;
+  letter-spacing: 0.005em;
+  font-weight: 500;
 }
 
 .font-data {
@@ -675,6 +680,34 @@ select.field option {
   animation: stamp-in 0.28s ease-out both;
 }
 
+/* Workspace chapters settle in as they appear — on mobile this replays on
+   every section switch because the display toggles. */
+@keyframes section-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+#overview, #connect, #ledger, #review, #data {
+  animation: section-in 0.45s cubic-bezier(0.22, 0.7, 0.25, 1) both;
+}
+
+/* Nakul badge heartbeat — quiet loading pulse. */
+@keyframes nakul-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.nakul-pulse {
+  animation: nakul-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #overview, #connect, #ledger, #review, #data {
+    animation: none;
+  }
+  .nakul-pulse {
+    animation: none;
+  }
+}
+
 /* ------------------------------------------------------------------ *
  * Spectral signatures
  * ------------------------------------------------------------------ */
@@ -807,25 +840,30 @@ select.field option {
 .seg-cancel { background: color-mix(in srgb, var(--ember) 48%, #0c111a); box-shadow: inset 0 0 16px color-mix(in srgb, var(--ember) 52%, transparent); }
 .seg-investigate { background: color-mix(in srgb, var(--ink-soft) 30%, #0c111a); box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.08); }
 
-/* Logo draw-in — the V resolves into its gold node */
-.mark-draw path[stroke] {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: mark-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.15s forwards;
-}
-.mark-draw path:not([stroke]),
-.mark-draw circle {
+/* Logo resolve — evidence rows arrive first, then the gold verdict locks in. */
+.mark-draw .mark-source {
+  --mark-source-x: 0;
   opacity: 0;
   transform-box: fill-box;
   transform-origin: center;
-  animation: mark-node 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.9s forwards;
+  animation: mark-source-in 0.5s cubic-bezier(0.22, 0.7, 0.25, 1) 0.08s forwards;
 }
-@keyframes mark-draw {
-  to { stroke-dashoffset: 0; }
+.mark-draw .mark-source-left { --mark-source-x: -5px; }
+.mark-draw .mark-source-right { --mark-source-x: 5px; }
+.mark-draw .mark-verdict {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mark-verdict-in 0.48s cubic-bezier(0.34, 1.36, 0.64, 1) 0.38s forwards;
 }
-@keyframes mark-node {
-  from { opacity: 0; transform: scale(0.3); }
-  to { opacity: 1; transform: scale(1); }
+.mark-draw .mark-verdict-highlight { animation-delay: 0.48s; }
+@keyframes mark-source-in {
+  from { opacity: 0; transform: translate(var(--mark-source-x), -3px); }
+  to { opacity: 1; transform: translate(0, 0); }
+}
+@keyframes mark-verdict-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.72); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {

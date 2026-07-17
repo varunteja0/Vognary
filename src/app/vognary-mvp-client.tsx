@@ -20,8 +20,9 @@ import { findActionableCancelAction, findCancelAction, manageUrlHostname } from 
 import { receiptTextToManualInputs, type ReceiptCandidate } from "@/lib/receipt-parser";
 import { buildRenewalTimeline, type RenewalTimeline } from "@/lib/renewal-timeline";
 import { buildProofGraphSummary, type ProofGraphSummary } from "@/lib/proof-graph";
+import type { CitedProofAnswer } from "@/lib/proof-questions";
 import { buildVerifiedSavings, type ActionMeta, type VerifiedSavingsSummary } from "@/lib/verified-savings";
-import { buildReviewSnapshot, diffReviews, isReviewSnapshot, type ReviewDiff, type ReviewSnapshot } from "@/lib/review-diff";
+import { buildReviewSnapshot, diffReviews, type ReviewDiff, type ReviewSnapshot } from "@/lib/review-diff";
 import {
   attachIssuerSignature,
   sealAuditPack,
@@ -29,6 +30,8 @@ import {
   type PackIssuerSignature,
 } from "@/lib/audit-pack";
 import { redactText } from "@/lib/redaction";
+import { buildSavingsCardSvg } from "@/lib/savings-card";
+import { buildSavingsReceipt, buildSavingsShareText } from "@/lib/savings-receipt";
 import { getCommitmentPolicy, isCommitmentActionAllowed, type CommitmentAction } from "@/lib/commitment-policy";
 import { resolveCommitmentDecisionIdentityKey } from "@/lib/commitment-decisions";
 import { buildConnectorCoverageWindows, connectorEvidenceSourceName } from "@/lib/connector-source-identity";
@@ -36,6 +39,9 @@ import { guestAuditTransferKey, parseGuestAuditSnapshot, type GuestAuditSnapshot
 import type { ProductEventMetricName, ProductEventName } from "@/lib/product-events";
 import GuidedCapturePanel from "./guided-capture-panel";
 import { VognaryMark } from "./brand";
+import { Nakul } from "./character";
+import { CommandPalette, type PaletteItem } from "./command-palette";
+import { NextDebitTicker, WorkspaceSidebar } from "./workspace-shell";
 
 const statusStyles: Record<RecommendationType, string> = {
   keep: "stamp stamp-keep",
@@ -206,7 +212,58 @@ type WorkspaceDecisionsPayload = {
   error?: string;
 };
 
-type ExperienceMode = "signed-in" | "guest" | "demo";
+type WorkspaceType = "personal" | "family" | "founder" | "team";
+
+type WorkspaceProfilePayload = {
+  status?: string;
+  workspace?: {
+    workspaceId: string;
+    workspaceName: string;
+    role: "owner" | "admin" | "member" | "viewer";
+    plan: string;
+    workspaceType: WorkspaceType;
+  };
+};
+
+type ServerActionCase = {
+  id: string;
+  recurringItemId: string;
+  action: "cancel" | "downgrade" | "renegotiate";
+  status: string;
+  merchant: string;
+  currency: string;
+  baselineAnnualAmount: number;
+  maximumSuccessFeeMinor: number;
+  authorization: { id: string; termsVersion: string; authorizedAt: string | null } | null;
+  receipt: { id: string; verifiedAnnualSaving: number } | null;
+  invoice: { id: string; status: string; amountMinor: number } | null;
+  updatedAt: string;
+  authorizationPreview?: AuthorizationPreview | null;
+};
+
+type AuthorizationPreview = {
+  scope: "one-action-one-commitment";
+  termsVersion: string;
+  authorizationVersion: number;
+  successFeeBasisPoints: number;
+  maximumSuccessFeeMinor: number;
+  text: string;
+};
+
+type WorkspaceActionsPayload = {
+  status?: string;
+  concierge?: { available: boolean };
+  actionCases?: ServerActionCase[];
+  authorizationPreview?: AuthorizationPreview;
+  actionCase?: ServerActionCase;
+  error?: string;
+  message?: string;
+};
+
+type WorkspaceCommitmentsPayload = {
+  status?: string;
+  commitments?: ServerRecurringItem[];
+};
 
 type IngestSourcePayload = {
   name: string;
@@ -226,86 +283,6 @@ const workspaceStorageKey = "vognary.workspace.v1";
 const gmailReceiptStorageKey = "vognary.gmail.receipts.v1";
 const lastReviewStorageKey = "vognary.lastReview.v1";
 const packChainStorageKey = "vognary.packChain.v1";
-
-const demoReceiptText = [
-  "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly. Usage source not connected yet.",
-  "GitHub Copilot Business invoice INR 1,520 paid on 2026-07-02. Review inactive seats before next billing cycle.",
-  "Cloudflare domain renewal notice INR 1,200 annual renewal due 2026-09-10. Auto-renew enabled.",
-].join("\n\n");
-
-const demoStatementCsv = `Date,Description,Debit,Credit
-2026-04-02,GITHUB COPILOT BUSINESS,1520,
-2026-05-02,GITHUB COPILOT BUSINESS,1520,
-2026-06-02,GITHUB COPILOT BUSINESS,1520,
-2026-07-02,GITHUB COPILOT BUSINESS,1520,
-2026-04-06,OPENAI CHATGPT PLUS,1999,
-2026-05-06,OPENAI CHATGPT PLUS,1999,
-2026-06-06,OPENAI CHATGPT PLUS,1999,
-2026-07-06,OPENAI CHATGPT PLUS,1999,
-2026-04-18,VERCEL PRO TEAM,1600,
-2026-05-18,VERCEL PRO TEAM,1600,
-2026-06-18,VERCEL PRO TEAM,1600,
-2026-01-10,CLOUDFLARE DOMAIN RENEWAL,1200,
-2026-04-10,INSURANCE POLICY PREMIUM,4200,
-2026-05-15,SIP MUTUAL FUND AUTOPAY,5000,
-2026-06-15,SIP MUTUAL FUND AUTOPAY,5000,`;
-
-function buildDemoWorkspace(): WorkspaceBackup {
-  return {
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    statementSources: [
-      {
-        id: "demo-founder-stack-statement",
-        name: "demo-founder-stack.csv",
-        text: demoStatementCsv,
-        rowCount: 15,
-        kind: "csv",
-        warnings: [],
-      },
-    ],
-    manualItems: [
-      {
-        id: "demo-upi-mandate",
-        merchant: "UPI AutoPay mandate - AI video tool",
-        amount: 999,
-        frequency: "monthly",
-        nextExpectedDate: "2026-08-03",
-        category: "AI tools",
-        sourceName: "User-confirmed UPI mandate screen",
-      },
-      {
-        id: "demo-google-play",
-        merchant: "Google Play subscription",
-        amount: 299,
-        frequency: "monthly",
-        nextExpectedDate: "2026-08-12",
-        category: "App store",
-        sourceName: "Google Play subscription screen",
-      },
-    ],
-    userActions: {},
-    itemOwners: {},
-    reviewNotes: {},
-    teamMembers: [{ id: "founder", name: "Founder", role: "Owner" }],
-    receiptText: demoReceiptText,
-  };
-}
-
-function getInitialWorkspace(): WorkspaceBackup | null {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const saved = window.localStorage.getItem(workspaceStorageKey);
-    if (!saved) return null;
-    const backup = JSON.parse(saved) as Partial<WorkspaceBackup>;
-    if (backup.version !== 1 || !Array.isArray(backup.statementSources) || !Array.isArray(backup.manualItems)) return null;
-    return backup as WorkspaceBackup;
-  } catch {
-    window.localStorage.removeItem(workspaceStorageKey);
-    return null;
-  }
-}
 
 // Workspaces written before stable identity keys used item ids ending in the
 // last charge date. Migrate those records before initializing React state so
@@ -427,29 +404,25 @@ const workspaceSections = [
 const workspaceSectionIds = workspaceSections.map((section) => section.id);
 type WorkspaceSectionId = (typeof workspaceSections)[number]["id"];
 
-export default function VognaryMvpClient({ experienceMode = "signed-in" }: { experienceMode?: ExperienceMode }) {
-  const [initialWorkspace] = useState<WorkspaceBackup | null>(() => {
-    const workspace = experienceMode === "demo" ? buildDemoWorkspace() : null;
-    return workspace ? migrateLegacyWorkspaceKeys(workspace) : null;
-  });
-  const [statementSources, setStatementSources] = useState<StatementFile[]>(initialWorkspace?.statementSources ?? []);
-  const [manualItems, setManualItems] = useState<ManualRecurringInput[]>(initialWorkspace?.manualItems ?? []);
+export default function VognaryMvpClient() {
+  const [statementSources, setStatementSources] = useState<StatementFile[]>([]);
+  const [manualItems, setManualItems] = useState<ManualRecurringInput[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [userActions, setUserActions] = useState<Record<string, RecommendationType>>(initialWorkspace?.userActions ?? {});
-  const [actionsMeta, setActionsMeta] = useState<Record<string, ActionMeta>>(initialWorkspace?.actionsMeta ?? {});
-  const [mergeDecisions, setMergeDecisions] = useState<Record<string, MergeDecision>>(initialWorkspace?.mergeDecisions ?? {});
-  const [lastReview, setLastReview] = useState<ReviewSnapshot | null>(() => initialWorkspace?.lastReview ?? null);
+  const [userActions, setUserActions] = useState<Record<string, RecommendationType>>({});
+  const [actionsMeta, setActionsMeta] = useState<Record<string, ActionMeta>>({});
+  const [mergeDecisions, setMergeDecisions] = useState<Record<string, MergeDecision>>({});
+  const [lastReview, setLastReview] = useState<ReviewSnapshot | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmRequest | null>(null);
   const [undoAvailable, setUndoAvailable] = useState(false);
   const undoSnapshotRef = useRef<WorkspaceBackup | null>(null);
   const undoTimerRef = useRef<number | null>(null);
-  const [itemOwners, setItemOwners] = useState<Record<string, string>>(initialWorkspace?.itemOwners ?? {});
-  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>(initialWorkspace?.reviewNotes ?? {});
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(initialWorkspace?.teamMembers?.length ? initialWorkspace.teamMembers : [{ id: "founder", name: "Founder", role: "Owner" }]);
+  const [itemOwners, setItemOwners] = useState<Record<string, string>>({});
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([{ id: "founder", name: "You", role: "Owner" }]);
   const [memberDraft, setMemberDraft] = useState({ name: "", role: "Finance / Ops" });
-  const [receiptText, setReceiptText] = useState(initialWorkspace?.receiptText ?? "");
-  const [reviewCompletedAt, setReviewCompletedAt] = useState<string | null>(initialWorkspace?.reviewCompletedAt ?? null);
-  const [localSaveEnabled, setLocalSaveEnabled] = useState(experienceMode !== "demo" && Boolean(initialWorkspace));
+  const [receiptText, setReceiptText] = useState("");
+  const [reviewCompletedAt, setReviewCompletedAt] = useState<string | null>(null);
+  const [localSaveEnabled, setLocalSaveEnabled] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [serverSession, setServerSession] = useState<ServerSessionPayload | null>(null);
   const [serverSaveStatus, setServerSaveStatus] = useState<string | null>(null);
@@ -463,9 +436,20 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
   const [connectorAccountDraft, setConnectorAccountDraft] = useState("");
   const [serverConnectors, setServerConnectors] = useState<WorkspaceConnectorStatusPayload | null>(null);
   const [serverDecisions, setServerDecisions] = useState<ServerCommitmentDecision[]>([]);
+  const [serverCommitments, setServerCommitments] = useState<ServerRecurringItem[]>([]);
+  const [serverActionCases, setServerActionCases] = useState<ServerActionCase[]>([]);
+  const [conciergeAvailable, setConciergeAvailable] = useState(false);
+  const [conciergeBusy, setConciergeBusy] = useState(false);
+  const [authorizationRequest, setAuthorizationRequest] = useState<{ actionCase: ServerActionCase; preview: AuthorizationPreview } | null>(null);
+  const [workspaceType, setWorkspaceType] = useState<WorkspaceType>("personal");
+  const [workspaceTypeSaving, setWorkspaceTypeSaving] = useState(false);
+  const [proofQuestion, setProofQuestion] = useState("What is my total recurring spend?");
+  const [proofAnswer, setProofAnswer] = useState<CitedProofAnswer | null>(null);
+  const [proofQuestionBusy, setProofQuestionBusy] = useState(false);
   const [disconnectedConnectorIds, setDisconnectedConnectorIds] = useState<string[]>([]);
   const [mobileSection, setMobileSection] = useState<WorkspaceSectionId>("overview");
   const [mobileViewport, setMobileViewport] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const activationEventSent = useRef(false);
   const ledgerViewEventSent = useRef(false);
   const serverRevisionRef = useRef<number | null>(null);
@@ -477,31 +461,6 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
   const guestTransferSnapshotRef = useRef<GuestAuditSnapshot | null>(null);
   const serverSaveRetryCountRef = useRef(0);
   const serverSaveRetryTimerRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (experienceMode !== "guest") return;
-    const savedWorkspace = getInitialWorkspace();
-    const savedReview = loadLastReviewSnapshot();
-    queueMicrotask(() => {
-      if (savedWorkspace) {
-        const restored = migrateLegacyWorkspaceKeys(savedWorkspace);
-        setStatementSources(restored.statementSources);
-        setManualItems(restored.manualItems);
-        setUserActions(restored.userActions ?? {});
-        setActionsMeta(restored.actionsMeta ?? {});
-        setMergeDecisions(restored.mergeDecisions ?? {});
-        setItemOwners(restored.itemOwners ?? {});
-        setReviewNotes(restored.reviewNotes ?? {});
-        setTeamMembers(restored.teamMembers?.length ? restored.teamMembers : [{ id: "founder", name: "Founder", role: "Owner" }]);
-        setReceiptText(restored.receiptText ?? "");
-        setLastReview(restored.lastReview ?? savedReview);
-        setReviewCompletedAt(restored.reviewCompletedAt ?? null);
-        setLocalSaveEnabled(true);
-      } else if (savedReview) {
-        setLastReview(savedReview);
-      }
-    });
-  }, [experienceMode]);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 639px)");
@@ -568,6 +527,10 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
     [actionsMeta, audit.recurringItems, verifiedCoverageWindows],
   );
   const selectedItem = audit.recurringItems.find((item) => item.identityKey === selectedItemId) ?? audit.recurringItems[0] ?? null;
+  const selectedServerRecurringItemId = selectedItem ? resolveServerCommitmentId(selectedItem, serverCommitments) : null;
+  const selectedActionCase = selectedServerRecurringItemId
+    ? serverActionCases.find((entry) => entry.recurringItemId === selectedServerRecurringItemId && !["withdrawn", "failed"].includes(entry.status)) ?? null
+    : null;
   const hasRealData = allStatementSources.length > 0 || allManualItems.length > 0 || receiptText.trim().length > 0;
   const coverageSignals = useMemo(
     () => getCoverageSignals(allStatementSources, allManualItems, receiptText),
@@ -833,16 +796,28 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
       if (!serverSession?.authenticated) {
         setServerConnectors(null);
         setServerDecisions([]);
+        setServerCommitments([]);
+        setServerActionCases([]);
+        setConciergeAvailable(false);
+        setWorkspaceType("personal");
+        setProofAnswer(null);
         return;
       }
 
-      const [connectorPayload, decisionPayload] = await Promise.all([
+      const [connectorPayload, decisionPayload, workspacePayload, commitmentPayload, actionPayload] = await Promise.all([
         fetchWorkspaceConnectors(),
         fetchWorkspaceDecisions(),
+        fetchCurrentWorkspace(),
+        fetchWorkspaceCommitments(),
+        fetchWorkspaceActions(),
       ]);
       if (!ignore) {
         setServerConnectors(connectorPayload);
         setServerDecisions(decisionPayload.decisions ?? []);
+        setServerCommitments(commitmentPayload.commitments ?? []);
+        setServerActionCases(actionPayload.actionCases ?? []);
+        setConciergeAvailable(Boolean(actionPayload.concierge?.available));
+        setWorkspaceType(workspacePayload.workspace?.workspaceType ?? "personal");
       }
     }
 
@@ -969,8 +944,67 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
 
   const activeSection = useActiveSection(workspaceSectionIds);
   const workspaceNavSection = mobileViewport ? mobileSection : activeSection;
-  const sampleDataPresent = statementSources.some((source) => source.id.startsWith("demo-"))
-    || manualItems.some((item) => item.id.startsWith("demo-"));
+
+  function navigateToSection(id: WorkspaceSectionId) {
+    setMobileSection(id);
+    const url = new URL(window.location.href);
+    url.hash = id;
+    window.history.replaceState(null, "", url);
+    window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
+  // Universal search — every section, ledger item, action, source, and page
+  // reachable from one field.
+  const paletteItems = useMemo<PaletteItem[]>(() => {
+    const items: PaletteItem[] = workspaceSections.map((section) => ({
+      id: `section-${section.id}`,
+      group: "Go to",
+      label: section.title,
+      hint: section.folio,
+      keywords: `${section.label} ${section.note}`,
+      run: () => navigateToSection(section.id),
+    }));
+    for (const item of audit.recurringItems) {
+      items.push({
+        id: `ledger-${item.identityKey}`,
+        group: "Ledger",
+        label: item.merchant,
+        hint: formatCurrency(item.averageAmount, item.currency),
+        keywords: `${item.category} ${item.normalizedMerchant} ${item.frequency}`,
+        run: () => selectAndReviewItem(item.identityKey),
+      });
+    }
+    items.push(
+      { id: "action-export-pack", group: "Actions", label: "Export audit pack (JSON)", keywords: "download proof report", run: () => void exportReport() },
+      { id: "action-export-csv", group: "Actions", label: "Export ledger CSV", keywords: "download spreadsheet", run: () => exportCsv() },
+      { id: "action-export-pdf", group: "Actions", label: "Export PDF report", keywords: "download print", run: () => void exportPdf() },
+      { id: "action-mint-receipt", group: "Actions", label: "Mint savings receipt", keywords: "verified savings proof share seal", run: () => void mintSavingsReceipt() },
+      { id: "action-share-card", group: "Actions", label: "Download savings share card", keywords: "png image social post verified", run: () => void downloadSavingsCard() },
+      { id: "action-clear", group: "Actions", label: "Clear this workspace", keywords: "delete reset remove", run: () => requestClearWorkspace() },
+    );
+    for (const connector of connectors) {
+      items.push({
+        id: `source-${connector.id}`,
+        group: "Sources",
+        label: connector.name,
+        hint: connectorStatusLabels[connector.status],
+        keywords: `${connector.category} connect link integration`,
+        run: () => {
+          setSelectedConnectorId(connector.id);
+          navigateToSection("connect");
+        },
+      });
+    }
+    items.push(
+      { id: "page-guide", group: "Pages", label: "How Vognary works — guide", keywords: "help onboarding manual how to start", run: () => { window.location.href = "/guide"; } },
+      { id: "page-sources", group: "Pages", label: "Source health", keywords: "connections freshness", run: () => { window.location.href = "/sources"; } },
+      { id: "page-profile", group: "Pages", label: "Profile & data controls", keywords: "account privacy delete export", run: () => { window.location.href = "/profile"; } },
+      { id: "page-verify", group: "Pages", label: "Verify an audit pack", keywords: "checksum signature proof", run: () => { window.location.href = "/verify"; } },
+      { id: "page-security", group: "Pages", label: "Security & trust", keywords: "encryption privacy readiness", run: () => { window.location.href = "/security"; } },
+    );
+    return items;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audit.recurringItems]);
 
   function selectAndReviewItem(itemId?: string) {
     if (itemId) setSelectedItemId(itemId);
@@ -1023,7 +1057,7 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
     setMergeDecisions(backup.mergeDecisions ?? {});
     setItemOwners(backup.itemOwners ?? {});
     setReviewNotes(backup.reviewNotes ?? {});
-    setTeamMembers(backup.teamMembers?.length ? backup.teamMembers : [{ id: "founder", name: "Founder", role: "Owner" }]);
+    setTeamMembers(backup.teamMembers?.length ? backup.teamMembers : [{ id: "founder", name: "You", role: "Owner" }]);
     setReceiptText(backup.receiptText ?? "");
     setLastReview(backup.lastReview ?? null);
     setReviewCompletedAt(backup.reviewCompletedAt ?? null);
@@ -1064,23 +1098,6 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
         setNotice("Workspace cleared. This browser has no audit data now.");
       },
     });
-  }
-
-  function loadDemoWorkspace() {
-    const demo = buildDemoWorkspace();
-    setStatementSources(demo.statementSources);
-    setManualItems(demo.manualItems);
-    setUserActions({});
-    setActionsMeta({});
-    setMergeDecisions({});
-    setItemOwners({});
-    setReviewNotes({});
-    setTeamMembers(demo.teamMembers);
-    setReceiptText(demo.receiptText ?? "");
-    setSelectedItemId(null);
-    setDisconnectedConnectorIds([]);
-    setNotice("Sample workspace loaded. You can review the ledger, change actions, export it, or replace it with your own evidence.");
-    window.setTimeout(() => selectAndReviewItem(), 80);
   }
 
   async function importStatementFiles(files: File[]) {
@@ -1261,6 +1278,96 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
       setNotice("PDF report downloaded. Use the JSON pack to check its offline checksum and, when present, its separate Vognary issuer signature.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not render the PDF in this browser.");
+    }
+  }
+
+  // Verified Savings receipts — the shareable, checkable proof artifact.
+  async function mintSavingsReceipt() {
+    const receipt = buildSavingsReceipt(verifiedSavings);
+    if (!receipt) {
+      setNotice("No verified savings to mint yet. Mark a cancel or downgrade, then let the next expected debits pass clean inside covered evidence.");
+      return;
+    }
+    try {
+      const { sealed, chain } = await sealAuditPack(receipt as unknown as Record<string, unknown>, loadPackChain());
+      let downloadable = sealed;
+      let issuerSigned = false;
+      if (serverSession?.authenticated && serverSession.session?.workspaceId) {
+        try {
+          const response = await fetch("/api/audit-packs/sign", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ integrity: sealed.integrity }),
+          });
+          const payload = await response.json().catch(() => ({})) as { issuerSignature?: unknown };
+          if (response.ok && isPackIssuerSignature(payload.issuerSignature)) {
+            downloadable = attachIssuerSignature(sealed, payload.issuerSignature);
+            issuerSigned = true;
+          }
+        } catch {
+          // Offline checksum receipts remain useful without the issuer signature.
+        }
+      }
+      savePackChain(chain);
+      triggerBlobDownload(
+        new Blob([JSON.stringify(downloadable, null, 2)], { type: "application/json" }),
+        `vognary-savings-receipt-${chain.chainIndex}.json`,
+      );
+      if (serverSession?.authenticated) void trackProductEvent("export.created", { commitmentsTouched: receipt.verifiedCount });
+      setNotice(issuerSigned
+        ? `Savings receipt #${chain.chainIndex} minted with an offline checksum and a Vognary issuer signature — anyone can check it at /verify.`
+        : `Savings receipt #${chain.chainIndex} minted with an offline self-checksum; /verify explains what that level proves.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not mint the savings receipt in this browser.");
+    }
+  }
+
+  async function downloadSavingsCard() {
+    const receipt = buildSavingsReceipt(verifiedSavings);
+    if (!receipt) {
+      setNotice("The share card unlocks with your first verified saving — a cancel proven clean across its expected debits.");
+      return;
+    }
+    const svg = buildSavingsCardSvg(receipt);
+    const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+    try {
+      const image = new Image();
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("SVG rasterization failed"));
+        image.src = url;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = 2400;
+      canvas.height = 1260;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Canvas unavailable");
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!pngBlob) throw new Error("PNG encoding failed");
+      triggerBlobDownload(pngBlob, "vognary-savings-card.png");
+      setNotice("Share card downloaded as PNG. The number on it comes from the sealed receipt, so anyone can check it.");
+    } catch {
+      triggerBlobDownload(svgBlob, "vognary-savings-card.svg");
+      setNotice("Share card downloaded as SVG (this browser could not rasterize a PNG).");
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  async function copySavingsShareText() {
+    const receipt = buildSavingsReceipt(verifiedSavings);
+    if (!receipt) {
+      setNotice("Share text unlocks with your first verified saving.");
+      return;
+    }
+    const text = buildSavingsShareText(receipt);
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice("Share text copied. Post it with the card; the receipt backs the number.");
+    } catch {
+      setNotice(text);
     }
   }
 
@@ -1628,6 +1735,167 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
     }
   }
 
+  async function changeWorkspaceType(nextType: WorkspaceType) {
+    if (!serverSession?.authenticated || workspaceTypeSaving || nextType === workspaceType) return;
+    setWorkspaceTypeSaving(true);
+    try {
+      const response = await fetch("/api/workspaces/current", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `workspace-type:${crypto.randomUUID()}`,
+        },
+        body: JSON.stringify({ workspaceType: nextType }),
+      });
+      const payload = await response.json().catch(() => ({})) as WorkspaceProfilePayload & { error?: string };
+      if (!response.ok || !payload.workspace) {
+        setNotice(payload.error ?? "Workspace mode could not be updated.");
+        return;
+      }
+      setWorkspaceType(payload.workspace.workspaceType);
+      setNotice(`Workspace adapted for ${workspaceTypeLabel(payload.workspace.workspaceType).toLowerCase()} reviews.`);
+    } catch {
+      setNotice("Workspace mode could not be updated. Your current layout is unchanged.");
+    } finally {
+      setWorkspaceTypeSaving(false);
+    }
+  }
+
+  async function startConciergeAction(item: RecurringItem, action: "cancel" | "downgrade") {
+    if (!serverSession?.authenticated || !serverSession.session?.workspaceId) {
+      setNotice("Sign in before asking Vognary to execute an action so authorization and proof stay bound to your workspace.");
+      return;
+    }
+    setConciergeBusy(true);
+    try {
+      let commitments = serverCommitments;
+      let recurringItemId = resolveServerCommitmentId(item, commitments);
+      if (!recurringItemId) {
+        await saveServerWorkspace();
+        const refreshed = await fetchWorkspaceCommitments();
+        commitments = refreshed.commitments ?? [];
+        setServerCommitments(commitments);
+        recurringItemId = resolveServerCommitmentId(item, commitments);
+      }
+      if (!recurringItemId) {
+        setNotice("Vognary could not bind this item to a durable proof node yet. Add fresh evidence or sync the workspace, then retry.");
+        return;
+      }
+      const response = await fetch("/api/workspaces/current/actions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `action-case:${crypto.randomUUID()}`,
+        },
+        body: JSON.stringify({ recurringItemId, action }),
+      });
+      const payload = await response.json().catch(() => ({})) as WorkspaceActionsPayload;
+      if (!response.ok || !payload.actionCase || !payload.authorizationPreview) {
+        if (response.status === 501) setConciergeAvailable(false);
+        setNotice(payload.message ?? payload.error ?? "The action case could not be opened.");
+        return;
+      }
+      setServerActionCases((current) => [payload.actionCase as ServerActionCase, ...current.filter((entry) => entry.id !== payload.actionCase?.id)]);
+      setAuthorizationRequest({ actionCase: payload.actionCase, preview: payload.authorizationPreview });
+      setNotice("Action case created. Review the exact one-commitment authorization before Vognary can begin.");
+    } catch {
+      setNotice("The action case could not reach the server. Nothing was authorized or executed.");
+    } finally {
+      setConciergeBusy(false);
+    }
+  }
+
+  async function authorizeConciergeAction() {
+    if (!authorizationRequest || conciergeBusy) return;
+    setConciergeBusy(true);
+    try {
+      const response = await fetch(`/api/workspaces/current/actions/${authorizationRequest.actionCase.id}/authorize`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `action-authorization:${crypto.randomUUID()}`,
+        },
+        body: JSON.stringify({ accepted: true, termsVersion: authorizationRequest.preview.termsVersion }),
+      });
+      const payload = await response.json().catch(() => ({})) as WorkspaceActionsPayload;
+      if (!response.ok || !payload.actionCase) {
+        setNotice(payload.error ?? "Authorization could not be recorded. No action has started.");
+        return;
+      }
+      setServerActionCases((current) => [payload.actionCase as ServerActionCase, ...current.filter((entry) => entry.id !== payload.actionCase?.id)]);
+      setAuthorizationRequest(null);
+      setNotice("Authorization recorded. Vognary can now accept this one action; every transition will remain visible here.");
+    } catch {
+      setNotice("Authorization could not reach the server. No action has started.");
+    } finally {
+      setConciergeBusy(false);
+    }
+  }
+
+  async function customerTransitionActionCase(actionCaseId: string, status: "withdrawn" | "disputed") {
+    if (conciergeBusy) return;
+    setConciergeBusy(true);
+    try {
+      const response = await fetch(`/api/workspaces/current/actions/${actionCaseId}`, {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `action-${status}:${crypto.randomUUID()}`,
+        },
+        body: JSON.stringify({ status }),
+      });
+      const payload = await response.json().catch(() => ({})) as WorkspaceActionsPayload;
+      if (!response.ok || !payload.actionCase) {
+        setNotice(payload.error ?? `The action case could not be ${status}.`);
+        return;
+      }
+      setServerActionCases((current) => [payload.actionCase as ServerActionCase, ...current.filter((entry) => entry.id !== payload.actionCase?.id)]);
+      setNotice(status === "withdrawn" ? "Action authorization withdrawn." : "Receipt and fee marked disputed for review.");
+    } catch {
+      setNotice("The action-case update could not reach the server.");
+    } finally {
+      setConciergeBusy(false);
+    }
+  }
+
+  async function askProofGraph(question = proofQuestion) {
+    const normalized = question.trim();
+    if (!serverSession?.authenticated) {
+      setNotice("Sign in to ask the protected Proof Graph. Guest evidence stays in this browser and is never sent implicitly.");
+      return;
+    }
+    if (proofQuestionBusy || normalized.length < 3) return;
+    setProofQuestion(normalized);
+    setProofQuestionBusy(true);
+    try {
+      const response = await fetch("/api/workspaces/current/ask", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question: normalized }),
+      });
+      const payload = await response.json().catch(() => ({})) as { answer?: CitedProofAnswer; error?: string };
+      if (!response.ok || !payload.answer) {
+        setNotice(payload.error ?? "The Proof Graph could not answer that question.");
+        return;
+      }
+      setProofAnswer(payload.answer);
+    } catch {
+      setNotice("The Proof Graph could not be reached. No answer was generated.");
+    } finally {
+      setProofQuestionBusy(false);
+    }
+  }
+
+  function openProofCitation(entityId: string | null) {
+    if (!entityId) return;
+    const item = audit.recurringItems.find((candidate) => candidate.canonicalRecurringItemId === entityId);
+    if (!item) {
+      setNotice("That proof entity is in the server ledger but is not materialized in this browser yet. Refresh the workspace to open it.");
+      return;
+    }
+    selectAndReviewItem(item.identityKey);
+  }
+
   async function runConnectorSyncNow(connector: Connector) {
     const account = getActiveServerAccount(serverConnectors, connector.id);
     if (!account) {
@@ -1653,8 +1921,22 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
   }
 
   return (
-    <main id="ledger-main" className="relative px-4 pb-24 pt-3 text-foreground sm:px-6 sm:pb-12 sm:pt-4 lg:px-8">
+    <main id="ledger-main" className="relative px-4 pb-24 pt-3 text-foreground sm:px-6 sm:pb-12 sm:pt-4 lg:pl-[264px] lg:pr-8">
       <h1 className="sr-only">Vognary recurring money workspace</h1>
+      <WorkspaceSidebar
+        sections={workspaceSections}
+        activeId={workspaceNavSection}
+        counts={{
+          connect: connectedConnectorIds.size,
+          ledger: audit.recurringItems.length,
+          review: audit.recurringItems.filter((item) => !userActions[item.identityKey]).length,
+        }}
+        watching={audit.recurringItems.length}
+        signedIn={Boolean(serverSession?.authenticated)}
+        onNavigate={(id) => navigateToSection(id as WorkspaceSectionId)}
+        onOpenSearch={() => setPaletteOpen(true)}
+      />
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} items={paletteItems} />
       <GlobalNotice
         notice={notice}
         onDismiss={() => setNotice(null)}
@@ -1689,13 +1971,44 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
               <TickerStat label="Renewals in 10d" value={`${audit.summary.renewalsNextTenDays}`} tone="paper" />
             </div>
             <div className="flex items-center gap-2 ml-auto">
-              {sampleDataPresent ? <span className="pill pill-partial whitespace-nowrap">Sample data</span> : null}
+              {serverSession?.authenticated ? (
+                <label className="hidden items-center gap-2 xl:flex">
+                  <span className="sr-only">Workspace mode</span>
+                  <select
+                    value={workspaceType}
+                    disabled={workspaceTypeSaving}
+                    onChange={(event) => void changeWorkspaceType(event.target.value as WorkspaceType)}
+                    className="h-9 rounded-lg border border-white/15 bg-white/6 px-2 font-data text-[0.64rem] uppercase tracking-[0.1em] text-(--dossier-ink) outline-none disabled:opacity-60"
+                    aria-label="Workspace mode"
+                  >
+                    <option value="personal">Personal</option>
+                    <option value="family">Family</option>
+                    <option value="founder">Founder</option>
+                    <option value="team">Team</option>
+                  </select>
+                </label>
+              ) : null}
               <span className="live-dot" aria-hidden />
               <span className="hidden eyebrow muted-on-dark sm:inline" style={{ fontSize: "0.58rem" }}>{serverSession?.authenticated ? "Synced workspace" : "On this device"}</span>
+              <button
+                type="button"
+                onClick={() => setPaletteOpen(true)}
+                className="btn btn-ondark h-9 px-3 text-xs"
+                aria-label="Open universal search"
+              >
+                Search <kbd className="ml-1 hidden rounded border border-white/15 px-1 font-data text-[0.58rem] sm:inline">⌘K</kbd>
+              </button>
               <a href="/profile" className="btn btn-ondark h-9 px-3 text-xs">Profile</a>
             </div>
           </div>
-          <WorkspaceNav activeId={workspaceNavSection} onSelect={setMobileSection} />
+          {audit.recurringItems.length ? (
+            <div className="dossier glass hidden items-center px-5 py-2 lg:flex">
+              <NextDebitTicker timeline={renewalTimeline} />
+            </div>
+          ) : null}
+          <div className="lg:hidden">
+            <WorkspaceNav activeId={workspaceNavSection} onSelect={setMobileSection} />
+          </div>
         </div>
 
         {/* 00 · Overview — the five-second answer */}
@@ -1710,10 +2023,18 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
             userActions={userActions}
             hasRealData={hasRealData}
             onSelect={(key) => selectAndReviewItem(key)}
-            onLoadDemo={loadDemoWorkspace}
             onExportPack={exportReport}
             onExportCsv={exportCsv}
             onExportPdf={exportPdf}
+          />
+          <AskProofPanel
+            signedIn={Boolean(serverSession?.authenticated)}
+            question={proofQuestion}
+            answer={proofAnswer}
+            busy={proofQuestionBusy}
+            onQuestion={setProofQuestion}
+            onAsk={(question) => void askProofGraph(question)}
+            onOpenCitation={openProofCitation}
           />
         </section>
 
@@ -1744,7 +2065,6 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
           <FirstSuccessPanel
             audit={audit}
             coverageScore={coverageScore}
-            experienceMode={experienceMode}
             hasRealData={hasRealData}
             localSaveEnabled={localSaveEnabled}
             receiptText={receiptText}
@@ -1752,7 +2072,6 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
             onExportReport={exportReport}
             onImportFiles={importStatementFiles}
             onJumpToLedger={() => selectAndReviewItem()}
-            onLoadDemoWorkspace={loadDemoWorkspace}
             onReceiptTextChange={setReceiptText}
             onSaveLocal={enableLocalSave}
           />
@@ -1798,11 +2117,26 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
             />
           ) : null}
           {selectedItem ? (
-            <SelectedItemPanel
-              item={selectedItem}
-              action={userActions[selectedItem.identityKey] ?? selectedItem.recommendationType}
-              onAction={(action) => recordAction(selectedItem.identityKey, action)}
-            />
+            <>
+              <SelectedItemPanel
+                item={selectedItem}
+                action={userActions[selectedItem.identityKey] ?? selectedItem.recommendationType}
+                onAction={(action) => recordAction(selectedItem.identityKey, action)}
+              />
+              <ConciergeOutcomePanel
+                item={selectedItem}
+                selectedAction={userActions[selectedItem.identityKey] ?? selectedItem.recommendationType}
+                actionCase={selectedActionCase}
+                authorizationRequest={authorizationRequest?.actionCase.id === selectedActionCase?.id || (!selectedActionCase && authorizationRequest?.actionCase.recurringItemId === selectedServerRecurringItemId) ? authorizationRequest : null}
+                available={conciergeAvailable}
+                signedIn={Boolean(serverSession?.authenticated)}
+                busy={conciergeBusy}
+                onStart={(action) => void startConciergeAction(selectedItem, action)}
+                onAuthorize={() => void authorizeConciergeAction()}
+                onWithdraw={(id) => void customerTransitionActionCase(id, "withdrawn")}
+                onDispute={(id) => void customerTransitionActionCase(id, "disputed")}
+              />
+            </>
           ) : null}
         </section>
 
@@ -1810,9 +2144,16 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
         <section id="review" aria-labelledby="review-heading" className={`${mobileSection === "review" ? "flex" : "hidden sm:flex"} scroll-mt-36 flex-col gap-5`}>
           <StageHeader id="review-heading" folio="03" title="Monthly review" note="Assign owners, capture notes, and close the review." />
           {reviewDiff ? <SinceLastReviewPanel diff={reviewDiff} onSelectMerchant={() => selectAndReviewItem()} /> : null}
-          <VerifiedSavingsPanel savings={verifiedSavings} onSelect={setSelectedItemId} />
+          <VerifiedSavingsPanel
+            savings={verifiedSavings}
+            onSelect={setSelectedItemId}
+            onMintReceipt={() => void mintSavingsReceipt()}
+            onDownloadCard={() => void downloadSavingsCard()}
+            onCopyShareText={() => void copySavingsShareText()}
+          />
           <TeamReviewPanel
             audit={audit}
+            collaborative={workspaceType !== "personal"}
             teamMembers={teamMembers}
             memberDraft={memberDraft}
             itemOwners={itemOwners}
@@ -1838,6 +2179,9 @@ export default function VognaryMvpClient({ experienceMode = "signed-in" }: { exp
             localSaveEnabled={localSaveEnabled}
             serverSession={serverSession}
             serverSaveStatus={serverSaveStatus}
+            workspaceType={workspaceType}
+            workspaceTypeSaving={workspaceTypeSaving}
+            onWorkspaceType={(value) => void changeWorkspaceType(value)}
             onEnableLocalSave={enableLocalSave}
             onDisableLocalSave={requestDisableLocalSave}
             onSaveServerWorkspace={saveServerWorkspace}
@@ -2100,7 +2444,6 @@ function IntegrationCommandCenter({
 function FirstSuccessPanel({
   audit,
   coverageScore,
-  experienceMode,
   hasRealData,
   localSaveEnabled,
   receiptText,
@@ -2108,13 +2451,11 @@ function FirstSuccessPanel({
   onExportReport,
   onImportFiles,
   onJumpToLedger,
-  onLoadDemoWorkspace,
   onReceiptTextChange,
   onSaveLocal,
 }: {
   audit: AuditResult;
   coverageScore: number;
-  experienceMode: ExperienceMode;
   hasRealData: boolean;
   localSaveEnabled: boolean;
   receiptText: string;
@@ -2122,31 +2463,25 @@ function FirstSuccessPanel({
   onExportReport: () => void;
   onImportFiles: (files: File[]) => void;
   onJumpToLedger: () => void;
-  onLoadDemoWorkspace: () => void;
   onReceiptTextChange: (value: string) => void;
   onSaveLocal: () => void;
 }) {
   const hasLedger = audit.summary.recurringCount > 0;
   const saved = localSaveEnabled || signedIn;
   const steps = [
-    { label: "Add evidence", done: hasRealData, detail: "Sample, receipt snippets, CSV/PDF statement, or manual source." },
+    { label: "Add evidence", done: hasRealData, detail: "Receipt snippets, CSV/PDF statement, guided capture, or connected source." },
     { label: "Review ledger", done: hasLedger, detail: "Check amount, cadence, next debit, confidence, and proof." },
     { label: "Fill gaps", done: coverageScore >= 70, detail: "Add missing Gmail, UPI, card, app-store, SaaS, cloud, EMI, SIP, insurance, or utility sources." },
-    { label: "Keep control", done: saved, detail: "Export, browser-save, or sign in for automatic encrypted workspace sync." },
+    { label: "Keep control", done: saved, detail: "Export, enable an on-device backup, and let encrypted workspace sync run automatically." },
   ];
-  const modeCopy = experienceMode === "demo"
-    ? "You are viewing a complete sample workspace. Replace it with your own evidence whenever ready."
-    : experienceMode === "guest"
-      ? "Browser-only mode is active. Nothing is stored on the server unless you sign in; signed-in workspaces synchronize encrypted state automatically."
-      : "Signed-in workspace. Use this guide to complete the first review and improve coverage.";
 
   return (
     <section id="first-success" className="panel p-5 sm:p-6" data-reveal>
       <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
         <div>
           <span className="folio" data-folio="1.2">First successful audit</span>
-          <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Reach the useful ledger before login friction.</h3>
-          <p className="mt-2 text-sm leading-6 text-(--muted)">{modeCopy}</p>
+          <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Complete your first recurring-money review.</h3>
+          <p className="mt-2 text-sm leading-6 text-(--muted)">Your encrypted workspace is ready. Add the first source, review every detected commitment, and improve evidence coverage over time.</p>
           <div className="mt-5 grid gap-2 sm:grid-cols-4">
             {steps.map((step, index) => (
               <div key={step.label} className="inset p-3">
@@ -2162,10 +2497,9 @@ function FirstSuccessPanel({
         </div>
 
         <div className="rounded-xl border border-line bg-(--card-2) p-4">
-          <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Start in one click</p>
+          <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Add your first evidence</p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={onLoadDemoWorkspace} className="btn btn-primary">Load sample workspace</button>
-            <label className="btn btn-ghost cursor-pointer text-center">
+            <label className="btn btn-primary cursor-pointer text-center">
               Import statement
               <input
                 type="file"
@@ -2182,7 +2516,7 @@ function FirstSuccessPanel({
             <button type="button" onClick={onJumpToLedger} className="btn btn-ghost" disabled={!hasLedger}>Open ledger</button>
             <button type="button" onClick={onExportReport} className="btn btn-ghost" disabled={!hasRealData}>Download report</button>
             <button type="button" onClick={onSaveLocal} className="btn btn-ghost" disabled={!hasRealData || localSaveEnabled}>{localSaveEnabled ? "Saved on device" : "Save on this device"}</button>
-            <a href="/login" className="btn btn-ghost">Sign in to sync</a>
+            <a href="/sources" className="btn btn-ghost">Manage connected sources</a>
           </div>
           <details className="mt-4 rounded-[11px] border border-line bg-card p-3" open={!hasRealData}>
             <summary className="cursor-pointer select-none font-display text-sm font-semibold text-(--ink)">Paste receipt snippets</summary>
@@ -2229,6 +2563,33 @@ async function fetchWorkspaceDecisions(): Promise<WorkspaceDecisionsPayload> {
     return await response.json() as WorkspaceDecisionsPayload;
   } catch (error) {
     return { status: "error", error: error instanceof Error ? error.message : "Could not load workspace decisions." };
+  }
+}
+
+async function fetchCurrentWorkspace(): Promise<WorkspaceProfilePayload> {
+  try {
+    const response = await fetch("/api/workspaces/current", { cache: "no-store" });
+    return await response.json() as WorkspaceProfilePayload;
+  } catch {
+    return { status: "error" };
+  }
+}
+
+async function fetchWorkspaceCommitments(): Promise<WorkspaceCommitmentsPayload> {
+  try {
+    const response = await fetch("/api/workspaces/current/commitments", { cache: "no-store" });
+    return await response.json() as WorkspaceCommitmentsPayload;
+  } catch {
+    return { status: "error", commitments: [] };
+  }
+}
+
+async function fetchWorkspaceActions(): Promise<WorkspaceActionsPayload> {
+  try {
+    const response = await fetch("/api/workspaces/current/actions", { cache: "no-store" });
+    return await response.json() as WorkspaceActionsPayload;
+  } catch {
+    return { status: "error", actionCases: [], concierge: { available: false } };
   }
 }
 
@@ -2398,7 +2759,6 @@ function OverviewPanel({
   userActions,
   hasRealData,
   onSelect,
-  onLoadDemo,
   onExportPack,
   onExportCsv,
   onExportPdf,
@@ -2411,7 +2771,6 @@ function OverviewPanel({
   userActions: Record<string, RecommendationType>;
   hasRealData: boolean;
   onSelect: (identityKey: string) => void;
-  onLoadDemo: () => void;
   onExportPack: () => void;
   onExportCsv: () => void;
   onExportPdf: () => void;
@@ -2427,11 +2786,11 @@ function OverviewPanel({
         <p className="font-data text-xs text-(--muted)">{hasRealData ? "No recurring pattern proven yet" : "Nothing connected yet"}</p>
         <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Your recurring money, answered in five seconds.</h3>
         <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">
-          Load the sample to see a full working review, or connect your first evidence below — a statement export, pasted receipts, or the guided mandate capture.
+          Connect your first real evidence below — a provider source, statement export, pasted receipt, or guided mandate capture.
         </p>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <button type="button" onClick={onLoadDemo} className="btn btn-primary">Load sample workspace</button>
-          <a href="#connect" className="btn btn-ghost">Connect evidence</a>
+          <a href="#connect" className="btn btn-primary">Connect evidence</a>
+          <a href="/guide" className="btn btn-ghost">Read the setup guide</a>
         </div>
       </section>
     );
@@ -2474,7 +2833,13 @@ function OverviewPanel({
           <p className={`font-data mt-2 text-2xl font-semibold tnum ${savings.verifiedAnnual > 0 ? "text-verdict" : "text-(--muted)"}`}>
             {formatCurrency(savings.verifiedAnnual)}/yr
           </p>
-          <p className="mt-1 font-data text-[0.66rem] text-(--muted)">{savings.entries.length ? `${savings.entries.length} decision(s) tracked` : "Mark a cancel to start proving savings"}</p>
+          <p className="mt-1 font-data text-[0.66rem] text-(--muted)">
+            {savings.verifiedAnnual > 0
+              ? `${savings.entries.length} decision(s) tracked · mint the receipt in Review`
+              : savings.entries.length
+                ? `${savings.entries.length} decision(s) tracked`
+                : "Mark a cancel to start proving savings"}
+          </p>
         </div>
         <div className="inset p-4">
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Proof strength</p>
@@ -2503,6 +2868,130 @@ function OverviewPanel({
   );
 }
 
+const proofQuestionPrompts = [
+  "What is my total recurring spend?",
+  "Which commitments have the weakest proof?",
+  "What renews next?",
+  "How much have I verifiably stopped paying?",
+];
+
+function AskProofPanel({
+  signedIn,
+  question,
+  answer,
+  busy,
+  onQuestion,
+  onAsk,
+  onOpenCitation,
+}: {
+  signedIn: boolean;
+  question: string;
+  answer: CitedProofAnswer | null;
+  busy: boolean;
+  onQuestion: (value: string) => void;
+  onAsk: (value: string) => void;
+  onOpenCitation: (entityId: string | null) => void;
+}) {
+  return (
+    <section className="panel overflow-hidden" data-reveal aria-labelledby="ask-proof-heading">
+      <div className="grid lg:grid-cols-[0.78fr_1.22fr]">
+        <div className="dossier p-5 sm:p-6">
+          <span className="folio" data-folio="0.6" style={{ color: "var(--dossier-muted)" }}>Cited answers</span>
+          <h3 id="ask-proof-heading" className="mt-4 font-display text-2xl font-semibold text-(--dossier-ink)">Ask your proof</h3>
+          <p className="mt-2 text-sm leading-6 muted-on-dark">Every question compiles into a bounded ledger query. Every financial claim links to its graph evidence. If Vognary cannot prove an answer, it refuses to guess.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {proofQuestionPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                disabled={!signedIn || busy}
+                onClick={() => onAsk(prompt)}
+                className="rounded-full border px-3 py-1.5 text-left font-data text-[0.62rem] transition disabled:opacity-45"
+                style={{ borderColor: "var(--dossier-line)", color: "var(--dossier-muted)" }}
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="p-5 sm:p-6">
+          {signedIn ? (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                onAsk(question);
+              }}
+              className="flex flex-col gap-2 sm:flex-row"
+            >
+              <label className="sr-only" htmlFor="proof-question">Question for the Proof Graph</label>
+              <input
+                id="proof-question"
+                value={question}
+                onChange={(event) => onQuestion(event.target.value)}
+                maxLength={300}
+                className="field flex-1"
+                placeholder="Ask about spend, renewals, confidence, sources, or verified savings"
+              />
+              <button type="submit" disabled={busy || question.trim().length < 3} className="btn btn-primary shrink-0 disabled:opacity-60">
+                {busy ? "Reading proof…" : "Answer with citations"}
+              </button>
+            </form>
+          ) : (
+            <div className="inset p-4">
+              <p className="text-sm font-semibold text-(--ink)">Protected workspace required</p>
+              <p className="mt-1 text-xs leading-5 text-(--muted)">Sign in before asking the server-side graph. Guest evidence stays on this device unless you explicitly transfer it.</p>
+              <a href="/login?next=%2Fapp" className="btn btn-primary mt-3 h-9 px-3 text-xs">Sign in</a>
+            </div>
+          )}
+
+          {answer ? (
+            <div className="mt-4" aria-live="polite">
+              <div className={`rounded-xl border p-4 ${answer.answerable ? "border-(--gold-line) bg-(--gold-tint)" : "border-ember bg-(--ember-tint)"}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="eyebrow">{answer.answerable ? "Evidence-backed answer" : "No supported query"}</p>
+                  <span className={answer.answerable ? "pill pill-ready" : "pill pill-blocked"}>{answer.answerable ? `${answer.citations.length} citation${answer.citations.length === 1 ? "" : "s"}` : "No guess"}</span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-(--ink)">{answer.summary.text}</p>
+              </div>
+              {answer.claims.length ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {answer.claims.map((claim, index) => (
+                    <div key={`${claim.label}-${index}`} className="inset p-3">
+                      <p className="font-data text-[0.62rem] uppercase tracking-[0.12em] text-(--muted)">{claim.label}</p>
+                      <p className="mt-1 font-display text-lg font-semibold text-(--ink)">{claim.value}</p>
+                      <p className="mt-1 text-xs leading-5 text-(--muted)">{claim.text}</p>
+                      <p className="mt-2 font-data text-[0.6rem] text-indigo">{claim.citationIds.map((id) => `[${answer.citations.findIndex((citation) => citation.id === id) + 1}]`).join(" ")}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {answer.citations.length ? (
+                <details className="mt-3 rounded-xl border border-line bg-card p-3" open>
+                  <summary className="cursor-pointer font-display text-sm font-semibold text-(--ink)">Proof citations</summary>
+                  <ol className="mt-3 grid gap-2">
+                    {answer.citations.map((citation, index) => (
+                      <li key={citation.id} className="flex flex-col gap-2 rounded-lg border border-line bg-(--card-2) p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-(--ink)">[{index + 1}] {citation.title}</p>
+                          <p className="mt-1 font-data text-[0.6rem] text-(--muted)">Graph r{citation.graphRevision} · observed {citation.observedAt} · {citation.sourceNames.join(", ")}</p>
+                        </div>
+                        {citation.kind === "commitment" ? (
+                          <button type="button" onClick={() => onOpenCitation(citation.entityId)} className="btn btn-ghost h-8 shrink-0 px-2.5 text-[0.66rem]">Open proof</button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ol>
+                </details>
+              ) : null}
+              {answer.limitations.length ? <p className="mt-3 font-data text-[0.6rem] leading-5 text-(--muted)">{answer.limitations.join(" · ")}</p> : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function trackSpotlightPointer(event: React.MouseEvent<HTMLElement>) {
   const rect = event.currentTarget.getBoundingClientRect();
   event.currentTarget.style.setProperty("--mx", `${((event.clientX - rect.left) / rect.width) * 100}%`);
@@ -2515,6 +3004,9 @@ function UserControlPanel({
   localSaveEnabled,
   serverSession,
   serverSaveStatus,
+  workspaceType,
+  workspaceTypeSaving,
+  onWorkspaceType,
   onEnableLocalSave,
   onDisableLocalSave,
   onSaveServerWorkspace,
@@ -2526,6 +3018,9 @@ function UserControlPanel({
   localSaveEnabled: boolean;
   serverSession: ServerSessionPayload | null;
   serverSaveStatus: string | null;
+  workspaceType: WorkspaceType;
+  workspaceTypeSaving: boolean;
+  onWorkspaceType: (value: WorkspaceType) => void;
   onEnableLocalSave: () => void;
   onDisableLocalSave: () => void;
   onSaveServerWorkspace: () => void;
@@ -2579,6 +3074,24 @@ function UserControlPanel({
           <a href="/sources" className="btn btn-ghost">Manage sources</a>
         </div>
         <div className="mt-4 rounded-[11px] border border-line bg-(--card-2) p-3">
+          <div className="flex flex-col gap-2 border-b border-line pb-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-data text-[0.68rem] text-(--muted)">Adaptive workspace</p>
+              <p className="mt-1 text-xs leading-5 text-(--muted)">{workspaceTypeDescription(workspaceType)}</p>
+            </div>
+            <select
+              value={workspaceType}
+              disabled={!signedInEmail || workspaceTypeSaving}
+              onChange={(event) => onWorkspaceType(event.target.value as WorkspaceType)}
+              className="field h-10 sm:w-40"
+              aria-label="Adaptive workspace mode"
+            >
+              <option value="personal">Personal</option>
+              <option value="family">Family</option>
+              <option value="founder">Founder</option>
+              <option value="team">Team</option>
+            </select>
+          </div>
           <p className="font-data text-[0.68rem] text-(--muted)">Configured account</p>
           <p className="mt-2 text-sm leading-6 text-(--muted)">
             {signedInEmail ? <>Signed in as <strong className="text-(--ink)">{signedInEmail}</strong>. Changes synchronize after a short pause.</> : <>Not signed in. Use login to synchronize encrypted workspace state across devices.</>}
@@ -2883,6 +3396,112 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
   );
 }
 
+function ConciergeOutcomePanel({
+  item,
+  selectedAction,
+  actionCase,
+  authorizationRequest,
+  available,
+  signedIn,
+  busy,
+  onStart,
+  onAuthorize,
+  onWithdraw,
+  onDispute,
+}: {
+  item: RecurringItem;
+  selectedAction: RecommendationType;
+  actionCase: ServerActionCase | null;
+  authorizationRequest: { actionCase: ServerActionCase; preview: AuthorizationPreview } | null;
+  available: boolean;
+  signedIn: boolean;
+  busy: boolean;
+  onStart: (action: "cancel" | "downgrade") => void;
+  onAuthorize: () => void;
+  onWithdraw: (id: string) => void;
+  onDispute: (id: string) => void;
+}) {
+  const policy = getCommitmentPolicy(item.category);
+  const executableAction = selectedAction === "cancel" || selectedAction === "downgrade" ? selectedAction : null;
+  if (!actionCase && (!available || policy.class !== "discretionary-subscription" || !executableAction)) return null;
+  const preview = authorizationRequest?.preview ?? actionCase?.authorizationPreview ?? null;
+  const withdrawable = actionCase && ["awaiting-authorization", "authorized", "in-progress", "provider-pending"].includes(actionCase.status);
+  const disputable = actionCase && ["executed", "verifying", "verified"].includes(actionCase.status);
+
+  return (
+    <section className="panel p-5 sm:p-6" data-reveal aria-labelledby="concierge-outcome-heading">
+      <SectionHead
+        folio="2.8"
+        kicker="Permissioned outcome"
+        title="From decision to proven result"
+        desc="Vognary can carry out one explicitly authorized action, then watch the commitment's own debit windows. Only the proof worker—not an operator—can mark the saving verified."
+        right={actionCase ? <span className={actionCaseStatusClass(actionCase.status)}>{formatCaseStatus(actionCase.status)}</span> : <span className="pill pill-ready">Available</span>}
+      />
+      {!actionCase && executableAction ? (
+        <div className="mt-4 grid gap-3 rounded-xl border border-(--gold-line) bg-(--card-2) p-4 md:grid-cols-[1fr_auto] md:items-center">
+          <div>
+            <h4 id="concierge-outcome-heading" className="text-sm font-semibold text-(--ink)">Ask Vognary to {executableAction} {item.merchant}</h4>
+            <p className="mt-1 text-xs leading-5 text-(--muted)">First Vognary opens a case and shows the exact scope and maximum fee. Nothing starts until you accept that one-action authorization.</p>
+          </div>
+          <button type="button" disabled={busy} onClick={() => onStart(executableAction)} className="btn btn-primary disabled:opacity-60">
+            {busy ? "Opening case…" : signedIn ? "Review authorization" : "Sign in to continue"}
+          </button>
+        </div>
+      ) : null}
+      {actionCase ? (
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="inset p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="font-display text-lg font-semibold text-(--ink)">{actionCase.merchant} · {actionCase.action}</p>
+                <p className="mt-1 font-data text-[0.66rem] uppercase tracking-[0.12em] text-(--muted)">Case {actionCase.id.slice(0, 8)} · updated {new Date(actionCase.updatedAt).toLocaleString("en-IN")}</p>
+              </div>
+              <span className={actionCaseStatusClass(actionCase.status)}>{formatCaseStatus(actionCase.status)}</span>
+            </div>
+            <ol className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4" aria-label="Action case progress">
+              {[
+                ["Authorized", actionCase.authorization !== null],
+                ["Executed", ["executed", "verifying", "verified"].includes(actionCase.status)],
+                ["Proof window", ["verifying", "verified"].includes(actionCase.status)],
+                ["Verified", actionCase.status === "verified"],
+              ].map(([label, done]) => (
+                <li key={String(label)} className={`rounded-lg border px-2 py-2 ${done ? "border-verdict bg-(--verdict-tint) text-verdict" : "border-line text-(--muted)"}`}>{String(label)}</li>
+              ))}
+            </ol>
+            {actionCase.receipt ? (
+              <div className="mt-4 rounded-lg border border-verdict bg-(--verdict-tint) p-3">
+                <p className="text-sm font-semibold text-verdict">Verified {formatCurrency(actionCase.receipt.verifiedAnnualSaving, actionCase.currency)}/year stopped leaving</p>
+                <p className="mt-1 text-xs leading-5 text-(--muted)">A durable checksummed receipt is attached to the Proof Graph. The success-fee review remains separate and disputable.</p>
+              </div>
+            ) : null}
+          </div>
+          <div className="inset p-4">
+            <p className="eyebrow">Commercial guardrail</p>
+            <p className="mt-2 text-sm leading-6 text-(--ink-soft)">No verified saving, no success-fee invoice. The maximum authorized fee for this case is <strong className="text-(--ink)">{formatMinorCurrency(actionCase.maximumSuccessFeeMinor, actionCase.currency)}</strong>.</p>
+            {actionCase.invoice ? (
+              <p className="mt-3 rounded-lg border border-line bg-card p-3 text-xs leading-5 text-(--muted)">Invoice: <strong className="text-(--ink)">{formatMinorCurrency(actionCase.invoice.amountMinor, actionCase.currency)}</strong> · {formatCaseStatus(actionCase.invoice.status)}</p>
+            ) : null}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {withdrawable ? <button type="button" disabled={busy} onClick={() => onWithdraw(actionCase.id)} className="btn btn-ghost btn-sm disabled:opacity-60">Withdraw authorization</button> : null}
+              {disputable ? <button type="button" disabled={busy} onClick={() => onDispute(actionCase.id)} className="btn btn-ghost btn-sm disabled:opacity-60">Dispute result</button> : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {actionCase?.status === "awaiting-authorization" && preview ? (
+        <div className="mt-4 rounded-xl border border-ochre bg-(--ochre-tint) p-4">
+          <p className="eyebrow text-ochre">Read before authorizing</p>
+          <p className="mt-2 text-sm leading-6 text-(--ink)">{preview.text}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button type="button" disabled={busy} onClick={onAuthorize} className="btn btn-primary disabled:opacity-60">{busy ? "Recording…" : "Authorize this one action"}</button>
+            <span className="font-data text-[0.66rem] text-(--muted)">Terms {preview.termsVersion} · scope {preview.scope}</span>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 const recommendationActions: Array<{ value: RecommendationType; label: string }> = [
   { value: "keep", label: "Keep / continue" },
   { value: "watch", label: "Monitor" },
@@ -2947,6 +3566,7 @@ function DossierStat({ label, value }: { label: string; value: string }) {
 
 function TeamReviewPanel({
   audit,
+  collaborative,
   teamMembers,
   memberDraft,
   itemOwners,
@@ -2960,6 +3580,7 @@ function TeamReviewPanel({
   onCompleteReview,
 }: {
   audit: AuditResult;
+  collaborative: boolean;
   teamMembers: TeamMember[];
   memberDraft: { name: string; role: string };
   itemOwners: Record<string, string>;
@@ -2980,18 +3601,18 @@ function TeamReviewPanel({
       <SectionHead
         folio="3.3"
         kicker="Review"
-        title="Monthly review"
-        desc="Assign payments to owners, record notes, and close the monthly review."
+        title={collaborative ? "Shared monthly review" : "Personal monthly review"}
+        desc={collaborative ? "Assign payments to owners, record notes, and close the monthly review." : "Record why each payment stays or changes, then close the review."}
         right={<button type="button" onClick={onCompleteReview} className="btn btn-primary">Mark review complete</button>}
       />
       <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
-        <MiniStat label="Team members" value={`${teamMembers.length}`} />
+        <MiniStat label={collaborative ? "Reviewers" : "Workspace"} value={collaborative ? `${teamMembers.length}` : "Personal"} />
         <MiniStat label="Assigned items" value={`${assignedCount}/${audit.recurringItems.length}`} />
         <MiniStat label="Needs review" value={`${actionedCount}`} />
       </div>
       {reviewCompletedAt ? <p className="mt-3 rounded-md border border-verdict bg-(--verdict-tint) px-3 py-2 text-sm text-verdict">Review completed at {new Date(reviewCompletedAt).toLocaleString("en-IN")}.</p> : null}
 
-      <div className="mt-4 inset p-4">
+      {collaborative ? <div className="mt-4 inset p-4">
         <p className="eyebrow">People reviewing</p>
         <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
           <input value={memberDraft.name} onChange={(event) => onMemberDraft({ ...memberDraft, name: event.target.value })} className="field" placeholder="Name" aria-label="Reviewer name" />
@@ -3006,7 +3627,7 @@ function TeamReviewPanel({
             </span>
           ))}
         </div>
-      </div>
+      </div> : null}
 
       <div className="mt-4 overflow-x-auto rounded-[11px] border border-line">
         <table className="w-full min-w-184 border-separate border-spacing-0 text-left text-sm">
@@ -3120,7 +3741,20 @@ const savingStatusPill: Record<string, string> = {
 
 // Verified Savings — Vognary does not claim savings, it proves them by
 // watching the item's own predicted debits stop appearing in covered evidence.
-function VerifiedSavingsPanel({ savings, onSelect }: { savings: VerifiedSavingsSummary; onSelect: (id: string) => void }) {
+function VerifiedSavingsPanel({
+  savings,
+  onSelect,
+  onMintReceipt,
+  onDownloadCard,
+  onCopyShareText,
+}: {
+  savings: VerifiedSavingsSummary;
+  onSelect: (id: string) => void;
+  onMintReceipt: () => void;
+  onDownloadCard: () => void;
+  onCopyShareText: () => void;
+}) {
+  const hasVerified = savings.verifiedAnnual > 0;
   return (
     <section className="panel p-5 sm:p-6" data-reveal>
       <SectionHead
@@ -3137,6 +3771,22 @@ function VerifiedSavingsPanel({ savings, onSelect }: { savings: VerifiedSavingsS
             <MiniStat label="Verified annual" value={formatCurrency(savings.verifiedAnnual)} />
             <MiniStat label="Pending proof" value={`${formatCurrency(savings.pendingMonthly)}/mo`} />
           </div>
+          {hasVerified ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-(--gold-line) bg-(--card-2) p-4">
+              <Nakul pose="celebrate" size={56} className="shrink-0 text-(--ink)" title="Nakul celebrating a verified saving" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-(--ink)">Money you verifiably stopped paying</p>
+                <p className="mt-0.5 text-xs leading-5 text-(--muted)">
+                  Mint the sealed receipt — a checkable proof of {formatCurrency(savings.verifiedAnnual)}/yr, not a claim. Anyone can verify it at /verify without seeing your data.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={onMintReceipt} className="btn btn-primary btn-sm">Mint sealed receipt</button>
+                <button type="button" onClick={onDownloadCard} className="btn btn-ghost btn-sm">Download share card</button>
+                <button type="button" onClick={onCopyShareText} className="btn btn-ghost btn-sm">Copy share text</button>
+              </div>
+            </div>
+          ) : null}
           <div className="mt-4 grid gap-2">
             {savings.entries.map((entry) => (
               <button key={entry.itemId} type="button" onClick={() => onSelect(entry.itemId)} className="inset w-full p-3 text-left transition hover:border-ember">
@@ -3613,16 +4263,13 @@ function slugifyKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
-function loadLastReviewSnapshot(): ReviewSnapshot | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(lastReviewStorageKey);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return isReviewSnapshot(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+function triggerBlobDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function loadPackChain(): PackChainState | null {
@@ -3645,6 +4292,67 @@ function savePackChain(chain: PackChainState) {
 function getOwnerName(ownerId: string | undefined, teamMembers: TeamMember[]): string {
   if (!ownerId) return "Unassigned";
   return teamMembers.find((member) => member.id === ownerId)?.name ?? "Unassigned";
+}
+
+function resolveServerCommitmentId(item: RecurringItem, commitments: ServerRecurringItem[]): string | null {
+  if (item.canonicalRecurringItemId && commitments.some((candidate) => candidate.id === item.canonicalRecurringItemId)) {
+    return item.canonicalRecurringItemId;
+  }
+
+  const merchant = item.normalizedMerchant.trim().toLowerCase();
+  const exact = commitments.find((candidate) => (
+    candidate.normalizedMerchant.trim().toLowerCase() === merchant
+    && candidate.currency === item.currency
+    && candidate.frequency === item.frequency
+  ));
+  if (exact) return exact.id;
+
+  const sameMerchant = commitments
+    .filter((candidate) => candidate.normalizedMerchant.trim().toLowerCase() === merchant && candidate.currency === item.currency)
+    .sort((left, right) => Math.abs(left.monthlyCost - item.monthlyCost) - Math.abs(right.monthlyCost - item.monthlyCost));
+  return sameMerchant[0]?.id ?? null;
+}
+
+function workspaceTypeLabel(workspaceType: WorkspaceType): string {
+  return {
+    personal: "Personal",
+    family: "Family",
+    founder: "Founder",
+    team: "Team",
+  }[workspaceType];
+}
+
+function workspaceTypeDescription(workspaceType: WorkspaceType): string {
+  return {
+    personal: "A private recurring-money review built around your own evidence and decisions.",
+    family: "Shared household commitments, ownership, and review notes in one accountable workspace.",
+    founder: "Founder subscriptions, cloud costs, and renewal decisions organized around runway.",
+    team: "Collaborative recurring-spend review with assignments, notes, and an auditable decision trail.",
+  }[workspaceType];
+}
+
+function actionCaseStatusClass(status: string): string {
+  if (status === "verified") return "pill pill-ready";
+  if (["failed", "withdrawn", "disputed"].includes(status)) return "pill pill-blocked";
+  if (["authorized", "in-progress", "provider-pending", "executed", "verifying"].includes(status)) return "pill pill-partial";
+  return "pill pill-planned";
+}
+
+function formatCaseStatus(status: string): string {
+  return status
+    .replace(/_/g, "-")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
+    .join(" ");
+}
+
+function formatMinorCurrency(valueMinor: number, currency = "INR"): string {
+  return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(valueMinor / 100);
 }
 
 function formatCurrency(value: number, currency = "INR"): string {

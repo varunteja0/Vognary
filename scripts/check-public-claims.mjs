@@ -24,7 +24,7 @@ const publicSurfaces = [
   "src/app/beta-readiness/page.tsx",
   "src/app/integration-model/page.tsx",
   "src/app/manifest.ts",
-  "src/app/opengraph-image.tsx",
+  "public/brand/vognary-social-card.svg",
   "src/lib/connectors.ts",
   "docs/platform-api.md",
 ];

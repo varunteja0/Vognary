@@ -5,6 +5,7 @@ import type { PoolClient } from "pg";
 import type { CanonicalConnectorObservation, NormalizedConnectorSyncResult } from "@/lib/connector-evidence-normalizer";
 import { getDatabasePool } from "@/lib/server/database";
 import { recordProductEvent } from "@/lib/server/product-event-store";
+import { syncWorkspaceProofGraph } from "@/lib/server/proof-graph-store";
 import { scheduleRenewalAlertsForWorkspace } from "@/lib/server/renewal-alert-store";
 
 export type MaterializeConnectorBatchInput = {
@@ -79,6 +80,10 @@ export async function materializeConnectorBatch(
     }
 
     await updateSourceFreshness(client, input, sourceId);
+    await syncWorkspaceProofGraph({
+      workspaceId: input.workspaceId,
+      idempotencyKey: `graph:connector-sync:${input.syncRunId}`,
+    }, client);
     if (result.commitmentsTouched > 0) {
       await scheduleRenewalAlertsForWorkspace(input.workspaceId, client);
     }
@@ -157,8 +162,9 @@ async function ensureDataSource(
        provider,
        display_name,
        consent_scope,
-       status
-     ) values ($1, $2, $3, $4, $5, 'active')
+       status,
+       rail_id
+     ) values ($1, $2, $3, $4, $5, 'active', $6)
      returning id`,
     [
       input.workspaceId,
@@ -166,6 +172,7 @@ async function ensureDataSource(
       input.connectorId,
       account.display_name,
       account.scopes.join(" ") || null,
+      input.connectorId === "gmail-readonly" ? "email-receipt" : "cloud-provider",
     ],
   );
   const sourceId = inserted.rows[0]?.id;

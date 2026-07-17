@@ -1,0 +1,65 @@
+<!-- X profile header master. 1500 × 500. Critical copy is kept right of the avatar-overlap zone and inside responsive crop-safe margins. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="500" viewBox="0 0 1500 500" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Vognary X profile header</title>
+  <desc id="desc">Find what renews next. Act before it charges.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1500" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#050609"/>
+      <stop offset=".5" stop-color="#0A0C10"/>
+      <stop offset="1" stop-color="#121720"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1270 50) rotate(127) scale(570 450)">
+      <stop stop-color="#D8B87A" stop-opacity=".18"/>
+      <stop offset=".62" stop-color="#D8B87A" stop-opacity=".025"/>
+      <stop offset="1" stop-color="#D8B87A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="goldRule" x1="520" y1="0" x2="1400" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D8B87A"/>
+      <stop offset="1" stop-color="#D8B87A" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="goldShadow" x="-40%" y="-60%" width="180%" height="220%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#D8B87A" flood-opacity=".13"/>
+    </filter>
+  </defs>
+
+  <rect width="1500" height="500" fill="url(#background)"/>
+  <rect width="1500" height="500" fill="url(#glow)"/>
+
+  <!-- Quiet ledger grid: texture, never decoration that competes with the message. -->
+  <g stroke="#FFFFFF" stroke-opacity=".035">
+    <path d="M0 70h1500M0 150h1500M0 230h1500M0 310h1500M0 390h1500M0 470h1500"/>
+    <path d="M80 0v500M240 0v500M400 0v500M560 0v500M720 0v500M880 0v500M1040 0v500M1200 0v500M1360 0v500"/>
+  </g>
+
+  <!-- Cropped source-to-verdict motif lives in the non-critical avatar zone. -->
+  <g transform="translate(-100 -22) scale(8.2)" opacity=".19">
+    <path d="M7 11h17l5 7H12l-5-7ZM13 23h15l5 7H18l-5-7Z" fill="#F0F1F5"/>
+    <path d="M57 11H40l-5 7h17l5-7ZM51 23H36l-5 7h15l5-7Z" fill="#F0F1F5"/>
+    <path d="m20.5 35 11.5 14L43.5 35" stroke="#D8B87A" stroke-width="8" stroke-linecap="square" stroke-linejoin="miter"/>
+  </g>
+  <path d="M458 54v392" stroke="#FFFFFF" stroke-opacity=".1"/>
+  <path d="M459 54v82" stroke="#D8B87A" stroke-opacity=".68" stroke-width="2"/>
+
+  <!-- Miniature lockup. -->
+  <g transform="translate(510 45) scale(.62)">
+    <path d="M7 11h17l5 7H12l-5-7ZM13 23h15l5 7H18l-5-7Z" fill="#F0F1F5"/>
+    <path d="M57 11H40l-5 7h17l5-7ZM51 23H36l-5 7h15l5-7Z" fill="#F0F1F5"/>
+    <path d="m20.5 35 11.5 14L43.5 35" stroke="#D8B87A" stroke-width="8" stroke-linecap="square" stroke-linejoin="miter"/>
+  </g>
+  <text x="562" y="83" fill="#F0F1F5" font-family="Geist, Arial, sans-serif" font-size="28" font-weight="650" letter-spacing="-.5">Vognary</text>
+  <text x="510" y="134" fill="#8F96A2" font-family="Geist, Arial, sans-serif" font-size="15" font-weight="600" letter-spacing="3.3">EVIDENCE-FIRST RECURRING MONEY</text>
+  <rect x="510" y="158" width="870" height="2" fill="url(#goldRule)"/>
+
+  <!-- Primary message: large, literal, and inside X's resilient crop-safe area. -->
+  <text x="510" y="252" fill="#F0F1F5" font-family="Fraunces, Georgia, serif" font-size="69" font-weight="600" letter-spacing="-1.2">Find what renews next.</text>
+  <text x="510" y="333" fill="#D8B87A" font-family="Fraunces, Georgia, serif" font-size="69" font-weight="600" letter-spacing="-1.2" filter="url(#goldShadow)">Act before it charges.</text>
+
+  <g font-family="Geist, Arial, sans-serif" font-size="18" font-weight="500">
+    <text x="510" y="406" fill="#C5C9D0">No login</text>
+    <circle cx="596" cy="400" r="3" fill="#D8B87A"/>
+    <text x="612" y="406" fill="#C5C9D0">No bank passwords</text>
+    <circle cx="790" cy="400" r="3" fill="#D8B87A"/>
+    <text x="806" y="406" fill="#C5C9D0">Proof beside every item</text>
+  </g>
+  <text x="1378" y="446" text-anchor="end" fill="#8F96A2" font-family="Geist Mono, monospace" font-size="17" letter-spacing="1">vognary.com</text>
+</svg>

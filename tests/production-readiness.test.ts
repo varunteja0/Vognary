@@ -27,6 +27,9 @@ test("feature readiness checks every persistent capability migration with bounde
     "0015_paid_audit_flow",
     "0016_assisted_audit_orders",
     "0017_shared_rate_limits",
+    "0018_living_proof_graph",
+    "0019_verified_outcome_loop",
+    "0020_authorization_evidence",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -111,6 +114,12 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
     "renewal-alerts",
     "platform-api",
     "workspace-decisions-auth-guard",
+    "workspace-proof-graph-auth-guard",
+    "workspace-current-auth-guard",
+    "workspace-actions-auth-guard",
+    "workspace-ask-auth-guard",
+    "workspace-commitments-auth-guard",
+    "savings-verification-due-run-cron-guard",
     "renewal-alert-preferences-auth-guard",
     "privacy-retention-worker-secret-guard",
     "platform-ledger-token-guard",
@@ -164,5 +173,5 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.doesNotMatch(source, /\/api\/connectors\/anthropic-usage\/(?:start|sync)["`]/);
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[200, 401, 501\]/);
-  assert.match(activation, /Feature migrations 0002 through 0017/);
+  assert.match(activation, /Feature migrations 0002 through 0020/);
 });

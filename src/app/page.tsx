@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { VognaryMark } from "./brand";
+import { Nakul } from "./character";
 
 const checks = [
   {
@@ -46,7 +47,7 @@ const proofRows = [
   { source: "Partner rails", proves: "Direct UPI/card mandate state and regulated account data", status: "Needs approval" },
 ];
 
-const sampleAuditRows = [
+const productLedgerRows = [
   { merchant: "OpenAI / ChatGPT", monthly: "INR 1,999", renews: "Aug 6", source: "Gmail receipt", proof: "Paid invoice found; usage source still missing", action: "downgrade", actionClass: "stamp stamp-downgrade" },
   { merchant: "Vercel Pro", monthly: "INR 1,600", renews: "Jul 18", source: "Dashboard path", proof: "Team plan renewal; project usage should be checked", action: "watch", actionClass: "stamp stamp-watch" },
   { merchant: "Domain renewal", monthly: "INR 100", renews: "Sep 10", source: "Registrar email", proof: "Annual renewal normalized into monthly burn", action: "keep", actionClass: "stamp stamp-keep" },
@@ -65,12 +66,13 @@ export default function Home() {
           </Link>
           <div className="hidden items-center gap-1 md:flex">
             <a href="#solves" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">What it solves</a>
-            <a href="#sample-audit" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Sample audit</a>
+            <a href="#product-ledger" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Product output</a>
             <a href="#how" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">How it works</a>
+            <Link href="/guide" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Guide</Link>
             <Link href="/security" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Security</Link>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/app?guest=1" prefetch={false} className="btn btn-sm btn-primary">Start audit</Link>
+            <Link href="/app" prefetch={false} className="btn btn-sm btn-primary">Start audit</Link>
           </div>
         </nav>
 
@@ -86,8 +88,8 @@ export default function Home() {
                 Paste receipts or invoices and get your monthly burn, next renewal, and one evidence-backed action—without creating an account.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link href="/app?guest=1" prefetch={false} className="btn btn-primary btn-lg">Audit my recurring spend</Link>
-                <Link href="/app?demo=1" prefetch={false} className="btn btn-ondark btn-lg">See sample</Link>
+                <Link href="/app" prefetch={false} className="btn btn-primary btn-lg">Audit my recurring spend</Link>
+                <a href="#product-ledger" className="btn btn-ondark btn-lg">See product output</a>
               </div>
               <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2">
                 {trust.map((item) => (
@@ -98,7 +100,7 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div className="border-t border-(--dossier-line) p-7 sm:p-10 lg:border-l lg:border-t-0">
+            <div className="relative border-t border-(--dossier-line) p-7 sm:p-10 lg:border-l lg:border-t-0">
               <p className="eyebrow muted-on-dark">Your first result</p>
               <div className="mt-4 flex flex-col gap-3">
                 {firstResult.map((item) => (
@@ -107,7 +109,13 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-              <Link href="/app?guest=1" prefetch={false} className="btn btn-primary btn-block mt-6">Start with receipt paste</Link>
+              <Link href="/app" prefetch={false} className="btn btn-primary btn-block mt-6">Start with receipt paste</Link>
+              <div className="mt-6 flex items-end justify-between gap-3 border-t border-(--dossier-line) pt-5">
+                <p className="max-w-[15rem] text-xs leading-5 muted-on-dark">
+                  Nakul, the ledger mongoose, watches every commitment you prove — and flags the renewal before it charges.
+                </p>
+                <Nakul pose="sentinel" size={84} className="shrink-0 text-(--dossier-ink)" title="Nakul, the ledger mongoose" />
+              </div>
             </div>
           </div>
         </section>
@@ -132,11 +140,11 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Sample audit result */}
-        <section id="sample-audit" className="panel scroll-mt-24 overflow-hidden">
+        {/* Product ledger result */}
+        <section id="product-ledger" className="panel scroll-mt-24 overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-line px-5 py-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <span className="folio" data-folio="Demo">Sample audit result</span>
+              <span className="folio" data-folio="Product">Recurring audit output</span>
               <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">What a useful review should show in five minutes.</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">A ledger row is useful only when it carries amount, renewal timing, proof, missing source, and a decision label.</p>
             </div>
@@ -156,8 +164,8 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="divide-y divide-line sm:hidden" aria-label="Sample recurring spend audit">
-            {sampleAuditRows.map((row) => (
+          <div className="divide-y divide-line sm:hidden" aria-label="Recurring spend audit output">
+            {productLedgerRows.map((row) => (
               <article key={row.merchant} className="grid gap-3 px-5 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -174,7 +182,7 @@ export default function Home() {
               </article>
             ))}
           </div>
-          <div className="hidden overflow-x-auto sm:block" role="region" aria-label="Sample recurring spend audit table" tabIndex={0}>
+          <div className="hidden overflow-x-auto sm:block" role="region" aria-label="Recurring spend audit output table" tabIndex={0}>
             <table className="w-full min-w-220 border-separate border-spacing-0 text-left text-sm">
               <thead>
                 <tr>
@@ -187,7 +195,7 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {sampleAuditRows.map((row) => (
+                {productLedgerRows.map((row) => (
                   <tr key={row.merchant}>
                     <td className="border-b border-line px-5 py-3.5 font-semibold text-(--ink)">{row.merchant}</td>
                     <td className="border-b border-line px-5 py-3.5 font-data tnum text-(--ink-soft)">{row.monthly}</td>
@@ -203,7 +211,7 @@ export default function Home() {
           <div className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm leading-6 text-(--muted)">This is the product promise: not a list of subscriptions, but a reviewable evidence table with gaps called out honestly.</p>
             <div className="flex flex-wrap gap-2">
-              <Link href="/app?demo=1" prefetch={false} className="btn btn-primary">Open sample workspace</Link>
+              <Link href="/app" prefetch={false} className="btn btn-primary">Open Vognary</Link>
               <Link href="/private-audit" className="btn btn-ghost">Request this audit</Link>
             </div>
           </div>
@@ -251,6 +259,40 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Verified savings — proved, not promised */}
+        <section id="proved" className="dossier spotlight scroll-mt-24 overflow-hidden">
+          <div className="grid gap-0 lg:grid-cols-[1fr_0.9fr]">
+            <div className="p-7 sm:p-10">
+              <span className="folio" data-folio="Proved" style={{ color: "var(--dossier-muted)" }}>Verified savings</span>
+              <h2 className="mt-4 font-display text-3xl font-semibold text-(--dossier-ink) sm:text-4xl">
+                Every tracker recommends cancels.<br />Vognary proves the money stopped leaving.
+              </h2>
+              <p className="mt-5 max-w-xl text-sm leading-7 muted-on-dark sm:text-base">
+                After you cancel, the engine keeps watching the exact debit dates it predicted for that commitment.
+                When they pass clean inside evidence that actually covers them, the saving is marked <em>verified</em> —
+                proof by absence. You can mint it as a sealed receipt and a share card; anyone can check the number
+                at <Link href="/verify" className="underline underline-offset-4">/verify</Link> without seeing your data.
+              </p>
+              <div className="mt-7 flex flex-wrap gap-3">
+                <Link href="/app" prefetch={false} className="btn btn-primary">Start proving savings</Link>
+                <Link href="/guide" className="btn btn-ondark">Read how verification works</Link>
+              </div>
+            </div>
+            <div className="flex items-center justify-center border-t border-(--dossier-line) p-7 sm:p-10 lg:border-l lg:border-t-0">
+              <div className="w-full max-w-sm rounded-2xl border border-(--gold-line) bg-[#0e1013] p-6" aria-hidden>
+                <p className="font-data text-[0.62rem] uppercase tracking-[0.2em] text-(--gold)">Verified savings receipt</p>
+                <p className="mt-3 font-display text-4xl font-bold text-(--gold)">₹43,164<span className="text-xl">/yr</span></p>
+                <p className="mt-1 text-sm text-(--dossier-ink)">verifiably stopped leaving this account</p>
+                <p className="mt-3 font-data text-[0.66rem] text-(--dossier-muted)">3 recurring charges · proven by evidence of absence</p>
+                <div className="mt-4 flex items-end justify-between border-t border-(--dossier-line) pt-4">
+                  <p className="font-data text-[0.62rem] text-(--dossier-muted)">Check any receipt at<br />vognary.com/verify</p>
+                  <Nakul pose="celebrate" size={64} className="text-(--dossier-ink)" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* How it works */}
         <section id="how" className="scroll-mt-24">
           <div className="flex flex-wrap items-end justify-between gap-4">
@@ -290,7 +332,7 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <Link href="/app?guest=1" prefetch={false} className="btn btn-primary btn-lg">Start with receipts</Link>
+            <Link href="/app" prefetch={false} className="btn btn-primary btn-lg">Start with receipts</Link>
           </div>
         </section>
 

@@ -19,11 +19,7 @@ import {
 } from "@/lib/recurring-audit";
 import { receiptTextToManualInputs, splitReceiptSnippets } from "@/lib/receipt-parser";
 import { VognaryMark } from "./brand";
-
-const sampleReceipts = [
-  "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly.",
-  "Notion invoice paid INR 830 on 2026-07-01. Notion Plus renews monthly.",
-].join("\n\n");
+import { Nakul } from "./character";
 
 type IngestResponse = {
   sources?: Array<Omit<TransferStatementSource, "id">>;
@@ -210,17 +206,46 @@ export default function GuestAuditClient() {
           <Link href="/" className="inline-flex items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
             <VognaryMark size={24} /> Vognary
           </Link>
-          <Link href="/privacy" className="btn btn-sm btn-ghost">Privacy</Link>
+          <div className="flex items-center gap-2">
+            <Link href="/guide" className="btn btn-sm btn-ghost">How it works</Link>
+            <Link href="/privacy" className="btn btn-sm btn-ghost">Privacy</Link>
+          </div>
         </header>
 
-        <section className="guest-capture mt-5 rounded-2xl border border-line bg-card p-5 shadow-[0_18px_70px_rgba(0,0,0,0.28)] sm:p-7">
-          <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Private by default · no login</p>
-          <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-(--ink) sm:text-4xl">Audit your recurring spend</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-(--muted) sm:text-base">
-            Paste two or more receipts or invoices. Vognary will show your monthly burn, next renewal, one action, and the proof behind it.
+        <section aria-label="Choose how to start" className="mt-5 rounded-2xl border border-line bg-card p-5 shadow-[0_18px_70px_rgba(0,0,0,0.28)] sm:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Private by default · no login</p>
+              <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-(--ink) sm:text-4xl">Know what renews before it charges</h1>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-(--muted) sm:text-base">
+                Start with linked sources or evidence you already have. Pasted receipts work immediately in this private tab.
+              </p>
+            </div>
+            <Nakul pose="guide" size={92} className="hidden shrink-0 text-(--ink) sm:block" title="Nakul, the ledger mongoose, showing the way in" />
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <a href="/login?next=/app" className="group rounded-xl border border-(--gold-line) bg-(--card-2) p-4 transition hover:border-(--gold)">
+              <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--gold)">Link · stays fresh</p>
+              <p className="mt-2 font-display text-lg font-semibold text-(--ink)">Link live sources</p>
+              <p className="mt-1 text-xs leading-5 text-(--muted)">Gmail receipts read-only, provider billing APIs, and bank rails — each source shows its current connection and freshness status.</p>
+              <p className="mt-3 text-xs font-semibold text-(--gold) transition group-hover:translate-x-0.5">Sign in and link →</p>
+            </a>
+            <a href="#paste" className="group rounded-xl border border-line bg-(--card-2) p-4 transition hover:border-(--line-strong)">
+              <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--muted)">Paste · instant</p>
+              <p className="mt-2 font-display text-lg font-semibold text-(--ink)">Paste a receipt</p>
+              <p className="mt-1 text-xs leading-5 text-(--muted)">Two receipts are enough for your first result — monthly burn, next renewal, one action. Nothing leaves this tab.</p>
+              <p className="mt-3 text-xs font-semibold text-(--ink-soft) transition group-hover:translate-x-0.5">Start below →</p>
+            </a>
+          </div>
+        </section>
+
+        <section id="paste" className="guest-capture mt-5 rounded-2xl border border-line bg-card p-5 shadow-[0_18px_70px_rgba(0,0,0,0.28)] sm:p-7">
+          <h2 className="font-display text-xl font-semibold tracking-tight text-(--ink)">Paste receipts or invoices</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
+            Paste two or more receipts. Vognary shows your monthly burn, next renewal, one action, and the proof behind it.
           </p>
 
-          <label htmlFor="guest-receipts" className="field-label mt-5 block">Paste receipts or invoices</label>
+          <label htmlFor="guest-receipts" className="sr-only">Paste receipts or invoices</label>
           <textarea
             id="guest-receipts"
             value={receiptText}
@@ -233,7 +258,6 @@ export default function GuestAuditClient() {
               <input className="sr-only" type="file" multiple accept=".csv,.txt,.xls,.xlsx,.pdf" onChange={importStatements} />
               {importing ? "Processing statement…" : "Import statement"}
             </label>
-            <button type="button" onClick={() => setReceiptText(sampleReceipts)} className="btn btn-sm btn-ondark">See sample</button>
             {hasEvidence ? <button type="button" onClick={clearGuestAudit} className="btn btn-sm btn-ondark">Clear this tab</button> : null}
           </div>
           <p className="mt-3 text-xs leading-5 text-(--muted)">

@@ -3,7 +3,7 @@ import { isDatabaseConfigured } from "@/lib/server/database";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 import { requireSession } from "@/lib/server/workspace-auth";
-import { createWorkspaceForUser, listWorkspacesForUser } from "@/lib/server/workspace-store";
+import { createWorkspaceForUser, listWorkspacesForUser, workspaceTypes, type WorkspaceType } from "@/lib/server/workspace-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -40,7 +40,10 @@ export async function POST(request: Request) {
   const body = await readWorkspaceJson(request);
   if (body instanceof Response) return body;
   const name = typeof body.name === "string" && body.name.trim() ? body.name.trim().slice(0, 120) : "Vognary Workspace";
-  const workspace = await createWorkspaceForUser({ userId: session.userId, name });
+  const workspaceType = typeof body.workspaceType === "string" && workspaceTypes.includes(body.workspaceType as WorkspaceType)
+    ? body.workspaceType as WorkspaceType
+    : "personal";
+  const workspace = await createWorkspaceForUser({ userId: session.userId, name, workspaceType });
   return Response.json({ status: "created", workspace }, { status: 201 });
 }
 

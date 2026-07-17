@@ -11,6 +11,10 @@
       "schedule": "30 3 * * *"
     },
     {
+      "path": "/api/internal/savings-verification/due/run",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/internal/privacy/retention/run",
       "schedule": "30 21 * * *"
     }

@@ -27,6 +27,8 @@ Vognary 1.0 is an evidence-first recurring-spend audit for founders, builders, f
 - PDF report export, CSV export, and private workspace backup/import.
 - Source guide, completeness score, receipt snippet parsing, and priority actions.
 - Connector registry and readiness APIs for 42 provider targets.
+- Sandbox-ready Setu Account Aggregator adapter (consent → approval URL → data session → transaction evidence) registered behind the `partner-gated` honesty state; it activates when `SETU_AA_*` credentials exist and changes no public claim until then. Activation map: [docs/direct-linking-activation-dossier.md](docs/direct-linking-activation-dossier.md).
+- Brand character (Nakul, the ledger mongoose) with a reusable pose system on `/brand`, a four-chapter user guide at `/guide`, universal ⌘K search across sections/ledger/actions/sources/pages, a desktop workspace sidebar with live counts, and a real-time next-debit countdown in the workspace header.
 - Connector start/sync planning APIs with honest states for live, planned, and partner-required sources.
 - Direct provider adapters for OpenAI costs, Gmail receipt evidence, GitHub Copilot metrics reports, Vercel domains, Render services, and Cloudflare accounts.
 - Authenticated API-key connector storage for OpenAI, GitHub, Vercel, Render, and Cloudflare sync, with encrypted token refs and queued initial sync jobs.

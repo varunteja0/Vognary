@@ -59,10 +59,22 @@ const groups = [
   },
   {
     id: "feature-migrations",
-    label: "Feature migrations 0002 through 0017",
+    label: "Feature migrations 0002 through 0020",
     required: ["DATABASE_URL"],
     probe: isFeatureMigrationsReady,
     why: "Confirms the target database recorded every forward migration and can query persistent capability schema.",
+  },
+  {
+    id: "verified-outcomes",
+    label: "Permissioned verified-savings concierge",
+    required: ["DATABASE_URL", "INTERNAL_SYNC_SECRET", "CRON_SECRET"],
+    requiredValues: {
+      CONCIERGE_LEGAL_TERMS_STATUS: "approved",
+      CONCIERGE_OPERATIONS_STATUS: "production-ready",
+      CONCIERGE_PRIVACY_REVIEW_STATUS: "approved",
+    },
+    probe: isVerifiedOutcomesReady,
+    why: "Requires the permissioned action schema, explicit legal/privacy/operations approval, protected worker routes, and proof-gated savings receipts.",
   },
   {
     id: "sync-scheduler",
@@ -173,6 +185,20 @@ const endpointChecks = [
   { id: "audit-snapshot-auth-guard", path: "/api/workspaces/current/audit-snapshot", expected: [401] },
   { id: "workspace-connectors-auth-guard", path: "/api/workspaces/current/connectors", expected: [401] },
   { id: "workspace-decisions-auth-guard", path: "/api/workspaces/current/decisions", expected: [401] },
+  { id: "workspace-proof-graph-auth-guard", path: "/api/workspaces/current/proof-graph", expected: [401] },
+  { id: "workspace-current-auth-guard", path: "/api/workspaces/current", expected: [401] },
+  { id: "workspace-actions-auth-guard", path: "/api/workspaces/current/actions", expected: [401] },
+  {
+    id: "workspace-ask-auth-guard",
+    path: "/api/workspaces/current/ask",
+    expected: [401],
+    init: {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question: "What is my total recurring spend?" }),
+    },
+  },
+  { id: "workspace-commitments-auth-guard", path: "/api/workspaces/current/commitments", expected: [401] },
   { id: "renewal-alert-preferences-auth-guard", path: "/api/renewal-alerts/preferences", expected: [401] },
   { id: "privacy-retention-policy-auth-guard", path: "/api/privacy/retention-policy", expected: [401] },
   { id: "privacy-requests-auth-guard", path: "/api/privacy/requests", expected: [401] },
@@ -206,6 +232,7 @@ const endpointChecks = [
   { id: "gmail-callback-config", path: "/api/integrations/gmail/callback", expected: [400, 501], captureJson: true },
   { id: "sync-due-run-cron-guard", path: "/api/internal/sync-jobs/due/run", expected: [401, 501], captureJson: true },
   { id: "renewal-alert-due-run-cron-guard", path: "/api/internal/renewal-alerts/due/run", expected: [401, 501], captureJson: true },
+  { id: "savings-verification-due-run-cron-guard", path: "/api/internal/savings-verification/due/run", expected: [401, 501], captureJson: true },
   {
     id: "privacy-retention-worker-secret-guard",
     path: "/api/internal/privacy/retention/run",
@@ -404,6 +431,12 @@ function isFeatureMigrationsReady({ endpointPayloads }) {
     && capabilities.commitmentDecisions?.status !== "schema-query-failed"
     && capabilities.platformApi?.status !== "schema-query-failed"
     && capabilities.billing?.status !== "schema-query-failed";
+}
+
+function isVerifiedOutcomesReady({ endpointPayloads }) {
+  const capability = endpointPayloads.readiness?.capabilities?.verifiedOutcomes;
+  if (!capability) return undefined;
+  return capability.status !== "migration-pending" && capability.status !== "schema-query-failed";
 }
 
 function isPrivacyLifecycleReady({ endpointPayloads }) {

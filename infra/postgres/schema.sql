@@ -865,3 +865,291 @@ create table audit_log (
 );
 
 create index audit_log_workspace_created_idx on audit_log(workspace_id, created_at desc);
+
+-- Living Proof Graph and append-only workspace history. The normalized ledger
+-- tables remain the typed source of truth; these tables provide stable graph
+-- identities, edges, confidence explanations, and reconstructible mutations.
+alter table workspaces
+  add column if not exists workspace_type text not null default 'personal'
+    check (workspace_type in ('personal', 'family', 'founder', 'team'));
+
+create table merchant_entities (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  normalized_name text not null check (length(btrim(normalized_name)) between 1 and 240),
+  display_name text not null check (length(btrim(display_name)) between 1 and 240),
+  country_code char(2),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, normalized_name)
+);
+
+alter table recurring_items add column merchant_entity_id uuid references merchant_entities(id) on delete set null;
+create index recurring_items_merchant_entity_idx on recurring_items(workspace_id, merchant_entity_id);
+
+create table payment_rails (
+  id text primary key check (id ~ '^[a-z][a-z0-9-]{1,62}$'),
+  label text not null check (length(btrim(label)) between 1 and 120),
+  regulated boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table data_sources add column rail_id text references payment_rails(id) on delete set null;
+
+create table proof_nodes (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  kind text not null check (kind in ('commitment', 'evidence', 'source', 'merchant', 'rail', 'action', 'saving')),
+  entity_ref text not null check (length(btrim(entity_ref)) between 1 and 240),
+  status text not null default 'active' check (status in ('active', 'retired')),
+  created_at timestamptz not null default now(),
+  retired_at timestamptz,
+  unique (workspace_id, kind, entity_ref),
+  unique (workspace_id, id),
+  check ((status = 'retired') = (retired_at is not null))
+);
+
+create table workspace_event_counters (
+  workspace_id uuid primary key references workspaces(id) on delete cascade,
+  next_sequence bigint not null default 1 check (next_sequence > 0),
+  updated_at timestamptz not null default now()
+);
+
+create table ledger_events (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  workspace_sequence bigint not null check (workspace_sequence > 0),
+  event_type text not null check (event_type ~ '^[a-z][a-z0-9_.-]{2,119}$'),
+  schema_version integer not null default 1 check (schema_version > 0),
+  actor_user_id uuid references users(id) on delete set null,
+  entity_kind text not null check (length(btrim(entity_kind)) between 1 and 80),
+  entity_ref text not null check (length(btrim(entity_ref)) between 1 and 240),
+  idempotency_key text not null check (length(idempotency_key) between 16 and 160),
+  payload jsonb not null default '{}'::jsonb check (jsonb_typeof(payload) = 'object'),
+  payload_hash char(64) not null check (payload_hash ~ '^[0-9a-f]{64}$'),
+  previous_event_hash char(64),
+  event_hash char(64) not null check (event_hash ~ '^[0-9a-f]{64}$'),
+  occurred_at timestamptz not null default now(),
+  unique (workspace_id, workspace_sequence),
+  unique (workspace_id, idempotency_key),
+  unique (workspace_id, event_hash),
+  check (previous_event_hash is null or previous_event_hash ~ '^[0-9a-f]{64}$')
+);
+
+create index ledger_events_workspace_occurred_idx on ledger_events(workspace_id, occurred_at desc);
+create index ledger_events_entity_idx on ledger_events(workspace_id, entity_kind, entity_ref, workspace_sequence desc);
+
+create table proof_edges (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  from_node_id uuid not null,
+  to_node_id uuid not null,
+  edge_type text not null check (edge_type in ('describes', 'proven_by', 'observed_in', 'paid_via', 'resolved_to', 'authorized_by', 'produced', 'amends')),
+  valid_from timestamptz not null default now(),
+  valid_to timestamptz,
+  metadata jsonb not null default '{}'::jsonb check (jsonb_typeof(metadata) = 'object'),
+  created_by_event_id uuid references ledger_events(id) on delete set null,
+  foreign key (workspace_id, from_node_id) references proof_nodes(workspace_id, id) on delete cascade,
+  foreign key (workspace_id, to_node_id) references proof_nodes(workspace_id, id) on delete cascade,
+  check (from_node_id <> to_node_id),
+  check (valid_to is null or valid_to >= valid_from)
+);
+
+create unique index proof_edges_active_unique_idx
+  on proof_edges(workspace_id, from_node_id, to_node_id, edge_type)
+  where valid_to is null;
+create index proof_edges_from_idx on proof_edges(workspace_id, from_node_id, edge_type) where valid_to is null;
+create index proof_edges_to_idx on proof_edges(workspace_id, to_node_id, edge_type) where valid_to is null;
+
+create table confidence_explanations (
+  recurring_item_id uuid primary key references recurring_items(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  score integer not null check (score between 0 and 99),
+  proof_density numeric(6, 5) not null check (proof_density between 0 and 1),
+  source_diversity numeric(6, 5) not null check (source_diversity between 0 and 1),
+  freshness numeric(6, 5) not null check (freshness between 0 and 1),
+  cadence_stability numeric(6, 5) not null check (cadence_stability between 0 and 1),
+  model_version text not null check (length(btrim(model_version)) between 1 and 80),
+  graph_revision bigint not null check (graph_revision > 0),
+  explanation jsonb not null default '{}'::jsonb check (jsonb_typeof(explanation) = 'object'),
+  computed_at timestamptz not null default now()
+);
+
+create index confidence_explanations_workspace_score_idx on confidence_explanations(workspace_id, score desc);
+
+-- Permissioned concierge actions, proof-gated verification, and outcome billing.
+-- No action may begin until a versioned, single-commitment authorization exists.
+
+create table if not exists action_cases (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  recurring_item_id uuid not null references recurring_items(id) on delete restrict,
+  requested_by_user_id uuid not null references users(id) on delete restrict,
+  assigned_operator_user_id uuid references users(id) on delete set null,
+  action text not null check (action in ('cancel', 'downgrade', 'renegotiate')),
+  commitment_class text not null check (commitment_class in (
+    'discretionary-subscription', 'usage-based-cloud', 'debt-emi',
+    'insurance', 'investment-sip', 'utility', 'contractual-other'
+  )),
+  status text not null default 'awaiting-authorization' check (status in (
+    'awaiting-authorization', 'authorized', 'in-progress', 'provider-pending',
+    'executed', 'verifying', 'verified', 'failed', 'withdrawn', 'disputed'
+  )),
+  currency char(3) not null,
+  baseline_monthly_amount numeric(14, 2) not null check (baseline_monthly_amount >= 0),
+  baseline_annual_amount numeric(14, 2) not null check (baseline_annual_amount >= 0),
+  target_monthly_amount numeric(14, 2) check (target_monthly_amount >= 0),
+  maximum_success_fee_minor bigint not null check (maximum_success_fee_minor > 0),
+  idempotency_key text not null check (length(idempotency_key) between 16 and 128),
+  failure_code text check (failure_code is null or failure_code ~ '^[a-z][a-z0-9_-]{1,79}$'),
+  authorized_at timestamptz,
+  execution_started_at timestamptz,
+  executed_at timestamptz,
+  verification_started_at timestamptz,
+  verified_at timestamptz,
+  withdrawn_at timestamptz,
+  disputed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, idempotency_key),
+  unique (workspace_id, id),
+  check (action <> 'downgrade' or target_monthly_amount is null or target_monthly_amount < baseline_monthly_amount)
+);
+
+create index if not exists action_cases_workspace_status_idx
+  on action_cases(workspace_id, status, updated_at desc);
+create index if not exists action_cases_commitment_idx
+  on action_cases(workspace_id, recurring_item_id, created_at desc);
+
+create table if not exists action_authorizations (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  action_case_id uuid not null,
+  authorized_by_user_id uuid not null references users(id) on delete restrict,
+  action text not null check (action in ('cancel', 'downgrade', 'renegotiate')),
+  scope text not null check (scope = 'one-action-one-commitment'),
+  authorization_version integer not null check (authorization_version > 0),
+  terms_version text not null check (length(btrim(terms_version)) between 8 and 120),
+  authorization_text text
+    check (authorization_text is null or length(btrim(authorization_text)) between 40 and 4000),
+  authorization_text_hash char(64) not null check (authorization_text_hash ~ '^[0-9a-f]{64}$'),
+  success_fee_basis_points integer not null check (success_fee_basis_points between 0 and 10000),
+  minimum_fee_minor bigint not null check (minimum_fee_minor >= 0),
+  maximum_fee_minor bigint not null check (maximum_fee_minor > 0),
+  authorized_at timestamptz not null default now(),
+  revoked_at timestamptz,
+  foreign key (workspace_id, action_case_id) references action_cases(workspace_id, id) on delete cascade,
+  unique (action_case_id, authorization_version),
+  unique (workspace_id, id),
+  check (revoked_at is null or revoked_at >= authorized_at)
+);
+
+create unique index if not exists action_authorizations_active_idx
+  on action_authorizations(action_case_id) where revoked_at is null;
+
+create table if not exists action_case_events (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  action_case_id uuid not null,
+  previous_status text,
+  status text not null check (status in (
+    'awaiting-authorization', 'authorized', 'in-progress', 'provider-pending',
+    'executed', 'verifying', 'verified', 'failed', 'withdrawn', 'disputed'
+  )),
+  actor_kind text not null check (actor_kind in ('customer', 'operator', 'system')),
+  actor_user_id uuid references users(id) on delete set null,
+  reason_code text not null check (reason_code ~ '^[a-z][a-z0-9_-]{1,79}$'),
+  idempotency_key text not null check (length(idempotency_key) between 16 and 160),
+  occurred_at timestamptz not null default now(),
+  foreign key (workspace_id, action_case_id) references action_cases(workspace_id, id) on delete cascade,
+  unique (workspace_id, idempotency_key)
+);
+
+create index if not exists action_case_events_case_idx
+  on action_case_events(action_case_id, occurred_at, id);
+
+create table if not exists saving_verification_windows (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  action_case_id uuid not null,
+  ordinal integer not null check (ordinal between 1 and 120),
+  expected_debit_on date not null,
+  window_start_on date not null,
+  window_end_on date not null,
+  source_id uuid references data_sources(id) on delete set null,
+  status text not null default 'pending' check (status in (
+    'pending', 'coverage-missing', 'covered-clean', 'charge-observed',
+    'reduced-charge-observed', 'covered-no-charge'
+  )),
+  observed_transaction_id uuid references transactions(id) on delete set null,
+  coverage_confirmed_at timestamptz,
+  evaluated_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  foreign key (workspace_id, action_case_id) references action_cases(workspace_id, id) on delete cascade,
+  unique (action_case_id, ordinal),
+  check (window_start_on <= expected_debit_on and expected_debit_on <= window_end_on),
+  check ((status in ('charge-observed', 'reduced-charge-observed')) = (observed_transaction_id is not null))
+);
+
+create index if not exists saving_verification_windows_due_idx
+  on saving_verification_windows(status, window_end_on, workspace_id);
+
+create table if not exists verified_saving_receipts (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  action_case_id uuid not null,
+  status text not null default 'active' check (status in ('active', 'amended', 'reversed', 'disputed')),
+  currency char(3) not null,
+  baseline_monthly_amount numeric(14, 2) not null check (baseline_monthly_amount >= 0),
+  current_monthly_amount numeric(14, 2) not null check (current_monthly_amount >= 0),
+  verified_monthly_saving numeric(14, 2) not null check (verified_monthly_saving > 0),
+  verified_annual_saving numeric(14, 2) not null check (verified_annual_saving > 0),
+  clean_cycles integer not null check (clean_cycles > 0),
+  required_clean_cycles integer not null check (required_clean_cycles > 0),
+  coverage_start_on date not null,
+  coverage_end_on date not null,
+  proof_version text not null check (length(btrim(proof_version)) between 1 and 80),
+  evidence_manifest jsonb not null default '{}'::jsonb check (jsonb_typeof(evidence_manifest) = 'object'),
+  receipt_hash char(64) not null check (receipt_hash ~ '^[0-9a-f]{64}$'),
+  supersedes_receipt_id uuid references verified_saving_receipts(id) on delete restrict,
+  minted_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  foreign key (workspace_id, action_case_id) references action_cases(workspace_id, id) on delete cascade,
+  unique (workspace_id, receipt_hash)
+);
+
+create unique index if not exists verified_saving_receipts_active_idx
+  on verified_saving_receipts(action_case_id) where status = 'active';
+create index if not exists verified_saving_receipts_workspace_idx
+  on verified_saving_receipts(workspace_id, minted_at desc);
+
+create table if not exists success_fee_invoices (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  action_case_id uuid not null,
+  verified_saving_receipt_id uuid not null references verified_saving_receipts(id) on delete restrict,
+  checkout_session_id uuid references billing_checkout_sessions(id) on delete set null,
+  offer_id text not null,
+  offer_version integer not null check (offer_version > 0),
+  terms_version text not null,
+  success_fee_basis_points integer not null check (success_fee_basis_points between 0 and 10000),
+  amount_minor bigint not null check (amount_minor > 0),
+  currency char(3) not null,
+  status text not null default 'pending-review' check (status in (
+    'pending-review', 'ready-for-checkout', 'checkout-pending',
+    'paid', 'disputed', 'void', 'refunded'
+  )),
+  review_available_until timestamptz not null,
+  paid_at timestamptz,
+  disputed_at timestamptz,
+  voided_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  foreign key (workspace_id, action_case_id) references action_cases(workspace_id, id) on delete cascade,
+  unique (verified_saving_receipt_id),
+  check (review_available_until >= created_at)
+);
+
+create index if not exists success_fee_invoices_workspace_status_idx
+  on success_fee_invoices(workspace_id, status, review_available_until);

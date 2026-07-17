@@ -12,6 +12,7 @@ import {
   type StatementSource,
 } from "@/lib/recurring-audit";
 import { receiptTextToManualInputs } from "@/lib/receipt-parser";
+import { explainProofConfidence } from "@/lib/proof-graph";
 import { scheduleRenewalAlertsForWorkspace } from "@/lib/server/renewal-alert-store";
 
 const maxStatementSources = 25;
@@ -101,6 +102,36 @@ export async function materializeWorkspaceState(
     const externalReference = workspaceStateReference({ type: "commitment", identityKey: item.identityKey });
     recurringReferences.push(externalReference);
     const recurringItemId = await upsertRecurringItem(client, workspaceId, externalReference, item);
+    const confidence = explainProofConfidence(item);
+    await client.query(
+      `insert into confidence_explanations (
+         recurring_item_id, workspace_id, score, proof_density, source_diversity,
+         freshness, cadence_stability, model_version, graph_revision, explanation
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8,
+                 greatest(1, coalesce((select max(workspace_sequence) from ledger_events where workspace_id = $2), 1)),
+                 $9::jsonb)
+       on conflict (recurring_item_id)
+       do update set score = excluded.score,
+                     proof_density = excluded.proof_density,
+                     source_diversity = excluded.source_diversity,
+                     freshness = excluded.freshness,
+                     cadence_stability = excluded.cadence_stability,
+                     model_version = excluded.model_version,
+                     graph_revision = excluded.graph_revision,
+                     explanation = excluded.explanation,
+                     computed_at = now()`,
+      [
+        recurringItemId,
+        workspaceId,
+        confidence.score,
+        confidence.proofDensity,
+        confidence.sourceDiversity,
+        confidence.freshness,
+        confidence.cadenceStability,
+        confidence.modelVersion,
+        JSON.stringify({ reasons: confidence.reasons }),
+      ],
+    );
 
     for (const evidence of item.evidence) {
       const evidenceReference = workspaceStateReference({
@@ -224,9 +255,9 @@ async function upsertWorkspaceStateSource(client: PoolClient, workspaceId: strin
   const result = await client.query<{ id: string }>(
     `insert into data_sources (
        workspace_id, external_reference, kind, provider, display_name,
-       consent_scope, status, freshness_status
+       consent_scope, status, freshness_status, rail_id
      ) values ($1, 'workspace-state:evidence', 'manual_entry', 'workspace-state',
-               'Workspace uploads and manual evidence', 'user-submitted', 'active', 'fresh')
+               'Workspace uploads and manual evidence', 'user-submitted', 'active', 'fresh', 'manual-proof')
      on conflict (workspace_id, external_reference)
        where external_reference like 'workspace-state:%'
      do update set status = 'active', freshness_status = 'fresh', updated_at = now()

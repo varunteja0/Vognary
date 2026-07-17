@@ -20,6 +20,9 @@ export const productionFeatureMigrations = [
   "0015_paid_audit_flow",
   "0016_assisted_audit_orders",
   "0017_shared_rate_limits",
+  "0018_living_proof_graph",
+  "0019_verified_outcome_loop",
+  "0020_authorization_evidence",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];
@@ -38,6 +41,8 @@ export function getUnconfiguredFeatureReadiness() {
     platformApi: { status: "database-not-configured" as const, migrationId: "0008_platform_api" as const, activeTokens: null, lastUsedAt: null },
     billing: { status: "database-not-configured" as const, migrationId: "0016_assisted_audit_orders" as const, paidCheckouts: null, assistedAuditOrders: null, activeEntitlements: null, lastPaidAt: null },
     syncWorkers: { status: "database-not-configured" as const, migrationId: "0014_sync_run_invocation" as const, successfulCronRuns: null, lastCronEvidenceAt: null },
+    proofGraph: { status: "database-not-configured" as const, migrationId: "0018_living_proof_graph" as const, workspacesWithBaseline: null, latestSequence: null },
+    verifiedOutcomes: { status: "database-not-configured" as const, migrationId: "0019_verified_outcome_loop" as const, activeCases: null, verifiedReceipts: null, lastVerifiedAt: null },
   };
 }
 
@@ -69,20 +74,24 @@ export async function checkFeatureReadiness() {
       platformApi: { ...unavailable.platformApi, status: "migration-ledger-unavailable" as const },
       billing: { ...unavailable.billing, status: "migration-ledger-unavailable" as const },
       syncWorkers: { ...unavailable.syncWorkers, status: "migration-ledger-unavailable" as const },
+      proofGraph: { ...unavailable.proofGraph, status: "migration-ledger-unavailable" as const },
+      verifiedOutcomes: { ...unavailable.verifiedOutcomes, status: "migration-ledger-unavailable" as const },
     };
   }
 
   const appliedMigrations = productionFeatureMigrations.filter((id) => applied.has(id));
   const missingMigrations = productionFeatureMigrations.filter((id) => !applied.has(id));
-  const [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers] = await Promise.all([
+  const [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes] = await Promise.all([
     checkPrivacyLifecycle(applied),
     checkRenewalAlerts(applied),
     checkCommitmentDecisions(applied),
     checkPlatformApi(applied),
     checkBilling(applied),
     checkSyncWorkers(applied),
+    checkProofGraph(applied),
+    checkVerifiedOutcomes(applied),
   ]);
-  const capabilityQueryFailed = [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers]
+  const capabilityQueryFailed = [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes]
     .some((feature) => feature.status === "schema-query-failed");
 
   return {
@@ -102,7 +111,70 @@ export async function checkFeatureReadiness() {
     platformApi,
     billing,
     syncWorkers,
+    proofGraph,
+    verifiedOutcomes,
   };
+}
+
+async function checkVerifiedOutcomes(applied: Set<string>) {
+  const migrationId = "0019_verified_outcome_loop" as const;
+  if (!applied.has(migrationId)) {
+    return { status: "migration-pending" as const, migrationId, activeCases: null, verifiedReceipts: null, lastVerifiedAt: null };
+  }
+  try {
+    const result = await getDatabasePool().query<{
+      active_cases: number; verified_receipts: number; last_verified_at: Date | null;
+    }>(
+      `select
+         (select count(*)::int from action_cases
+          where status in ('authorized', 'in-progress', 'provider-pending', 'executed', 'verifying')) as active_cases,
+         (select count(*)::int from verified_saving_receipts where status = 'active') as verified_receipts,
+         (select max(minted_at) from verified_saving_receipts where status = 'active') as last_verified_at`,
+    );
+    const row = result.rows[0];
+    const activeCases = row?.active_cases ?? 0;
+    const verifiedReceipts = row?.verified_receipts ?? 0;
+    const lastVerifiedAt = row?.last_verified_at?.toISOString() ?? null;
+    return {
+      status: verifiedReceipts > 0
+        ? "verified-receipt-observed" as const
+        : activeCases > 0
+          ? "active-cases-observed-proof-pending" as const
+          : "schema-ready-no-cases" as const,
+      migrationId,
+      activeCases,
+      verifiedReceipts,
+      lastVerifiedAt,
+    };
+  } catch {
+    return { status: "schema-query-failed" as const, migrationId, activeCases: null, verifiedReceipts: null, lastVerifiedAt: null };
+  }
+}
+
+async function checkProofGraph(applied: Set<string>) {
+  const migrationId = "0018_living_proof_graph" as const;
+  if (!applied.has(migrationId)) {
+    return { status: "migration-pending" as const, migrationId, workspacesWithBaseline: null, latestSequence: null };
+  }
+  try {
+    const result = await getDatabasePool().query<{ workspaces_with_baseline: number; latest_sequence: string | null }>(
+      `select
+         count(distinct workspace_id) filter (where event_type = 'graph.baseline.created')::int as workspaces_with_baseline,
+         max(workspace_sequence)::text as latest_sequence
+       from ledger_events`,
+    );
+    const row = result.rows[0];
+    const workspacesWithBaseline = row?.workspaces_with_baseline ?? 0;
+    const latestSequence = row?.latest_sequence ? Number(row.latest_sequence) : null;
+    return {
+      status: workspacesWithBaseline > 0 ? "baseline-observed" as const : "schema-ready-no-workspaces" as const,
+      migrationId,
+      workspacesWithBaseline,
+      latestSequence,
+    };
+  } catch {
+    return { status: "schema-query-failed" as const, migrationId, workspacesWithBaseline: null, latestSequence: null };
+  }
 }
 
 async function checkPrivacyLifecycle(applied: Set<string>) {

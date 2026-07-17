@@ -1,0 +1,8 @@
+<!-- Vognary one-colour mark for embossing, engraving, favicons, and constrained production. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Vognary monochrome mark</title>
+  <desc id="desc">Two tiers of ledger rows converging into a V</desc>
+  <path d="M7 11h17l5 7H12l-5-7ZM13 23h15l5 7H18l-5-7Z" fill="#15171C"/>
+  <path d="M57 11H40l-5 7h17l5-7ZM51 23H36l-5 7h15l5-7Z" fill="#15171C"/>
+  <path d="m20.5 35 11.5 14L43.5 35" stroke="#15171C" stroke-width="8" stroke-linecap="square" stroke-linejoin="miter"/>
+</svg>

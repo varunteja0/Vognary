@@ -162,7 +162,7 @@ export default function PrivateAuditClient() {
           </Link>
           <div className="flex flex-wrap gap-2">
             <Link href="/sources" className="btn btn-ghost">Source guide</Link>
-            <Link href="/app?guest=1" prefetch={false} className="btn btn-primary">Open audit app</Link>
+            <Link href="/app" prefetch={false} className="btn btn-primary">Open audit app</Link>
           </div>
         </div>
 
@@ -322,7 +322,7 @@ function SourcePlan({ plan }: { plan: RedactionFirstSourcePlan }) {
         <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-(--muted)">Remove first</p><ul className="mt-2 space-y-1 text-sm text-(--ink-soft)">{plan.remove.map((item) => <li key={item}>{item}</li>)}</ul></div>
       </div>
       <p className="mt-3 text-xs leading-5 text-(--muted)">Never share passwords, OTPs, CVV, card numbers, or bank credentials.</p>
-      <Link href="/app?guest=1" prefetch={false} className="btn btn-primary mt-4">Continue my audit</Link>
+      <Link href="/app" prefetch={false} className="btn btn-primary mt-4">Continue my audit</Link>
     </section>
   );
 }

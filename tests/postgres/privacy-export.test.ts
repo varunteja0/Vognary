@@ -11,6 +11,8 @@ import { updateRenewalAlertPreference } from "../../src/lib/server/renewal-alert
 import { saveAuditSnapshot } from "../../src/lib/server/audit-snapshot-store";
 import { upsertWorkspaceCommitmentDecision } from "../../src/lib/server/commitment-decision-store";
 import { getDatabasePool } from "../../src/lib/server/database";
+import { authorizeWorkspaceActionCase, createWorkspaceActionCase } from "../../src/lib/server/outcome-case-store";
+import { outcomeOffer } from "../../src/lib/outcome-cases";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
 
@@ -88,6 +90,20 @@ test("privacy export includes held product data and excludes all credential mate
     const recurringItemId = recurring.rows[0]?.id;
     assert.ok(recurringItemId);
     await upsertWorkspaceCommitmentDecision({ workspaceId, recurringItemId, userId, action: "watch" });
+    const actionCase = await createWorkspaceActionCase({
+      workspaceId,
+      recurringItemId,
+      requestedByUserId: userId,
+      action: "cancel",
+      idempotencyKey: `privacy-case:${randomUUID()}`,
+    });
+    await authorizeWorkspaceActionCase({
+      workspaceId,
+      actionCaseId: actionCase.actionCase.id,
+      authorizedByUserId: userId,
+      termsVersion: outcomeOffer.termsVersion,
+      idempotencyKey: `privacy-auth:${randomUUID()}`,
+    });
     await updateRenewalAlertPreference({
       workspaceId,
       userId,
@@ -135,6 +151,12 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.apiTokens[0].tokenPrefix, platformToken.summary.tokenPrefix);
     assert.ok(Array.isArray(document.assistedAuditOrders));
     assert.ok(Array.isArray(document.billingRefunds));
+    assert.ok(document.proofGraph.nodes.length > 0);
+    assert.ok(document.proofGraph.ledgerEvents.length > 0);
+    assert.equal(document.verifiedOutcomes.actionCases.length, 1);
+    assert.equal(document.verifiedOutcomes.authorizations.length, 1);
+    assert.match(document.verifiedOutcomes.authorizations[0].authorizationText, /I authorize Vognary/i);
+    assert.ok(document.verifiedOutcomes.caseEvents.length >= 2);
     assert.ok(document.auditHistory.length >= 4);
 
     for (const forbidden of [

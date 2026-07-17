@@ -32,6 +32,16 @@ const exportRowLimits = {
   assistedAuditOrders: 1_000,
   billingRefunds: 2_000,
   entitlements: 100,
+  proofNodes: 20_000,
+  proofEdges: 40_000,
+  confidenceExplanations: 5_000,
+  ledgerEvents: 20_000,
+  actionCases: 5_000,
+  actionAuthorizations: 5_000,
+  actionCaseEvents: 20_000,
+  verificationWindows: 20_000,
+  savingReceipts: 5_000,
+  successFeeInvoices: 5_000,
   auditHistory: 10_000,
 };
 const maxSerializedExportBytes = 16 * 1024 * 1024;
@@ -361,7 +371,7 @@ async function buildAccessExport(client: PoolClient, input: {
   const accountResult = await client.query<AccountWorkspaceRow>(
     `select u.id as user_id, u.email, u.display_name, u.created_at as user_created_at,
             u.updated_at as user_updated_at, w.id as workspace_id, w.name as workspace_name,
-            w.plan, w.created_at as workspace_created_at, w.updated_at as workspace_updated_at
+            w.plan, w.workspace_type, w.created_at as workspace_created_at, w.updated_at as workspace_updated_at
      from users u
      join workspace_members wm on wm.user_id = u.id
      join workspaces w on w.id = wm.workspace_id
@@ -394,6 +404,16 @@ async function buildAccessExport(client: PoolClient, input: {
     assistedAuditOrderResult,
     billingRefundResult,
     entitlementResult,
+    proofNodeResult,
+    proofEdgeResult,
+    confidenceResult,
+    ledgerEventResult,
+    actionCaseResult,
+    actionAuthorizationResult,
+    actionCaseEventResult,
+    verificationWindowResult,
+    savingReceiptResult,
+    successFeeInvoiceResult,
     auditResult,
   ] = await Promise.all([
     query<ConsentExportRow>(
@@ -741,6 +761,245 @@ async function buildAccessExport(client: PoolClient, input: {
     ),
     query<{
       id: string;
+      kind: string;
+      entity_ref: string;
+      status: string;
+      created_at: Date;
+      retired_at: Date | null;
+    }>(
+      `select id, kind, entity_ref, status, created_at, retired_at
+       from proof_nodes
+       where workspace_id = $1
+       order by created_at asc, id asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.proofNodes + 1],
+    ),
+    query<{
+      id: string;
+      from_node_id: string;
+      to_node_id: string;
+      edge_type: string;
+      valid_from: Date;
+      valid_to: Date | null;
+      created_by_event_id: string | null;
+    }>(
+      `select id, from_node_id, to_node_id, edge_type, valid_from, valid_to,
+              created_by_event_id
+       from proof_edges
+       where workspace_id = $1
+       order by valid_from asc, id asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.proofEdges + 1],
+    ),
+    query<{
+      recurring_item_id: string;
+      score: number;
+      proof_density: string;
+      source_diversity: string;
+      freshness: string;
+      cadence_stability: string;
+      model_version: string;
+      graph_revision: string;
+      explanation: Record<string, unknown>;
+      computed_at: Date;
+    }>(
+      `select recurring_item_id, score, proof_density::text, source_diversity::text,
+              freshness::text, cadence_stability::text, model_version,
+              graph_revision::text, explanation, computed_at
+       from confidence_explanations
+       where workspace_id = $1
+       order by computed_at asc, recurring_item_id asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.confidenceExplanations + 1],
+    ),
+    query<{
+      id: string;
+      workspace_sequence: string;
+      event_type: string;
+      schema_version: number;
+      actor_user_id: string | null;
+      entity_kind: string;
+      entity_ref: string;
+      payload: Record<string, unknown>;
+      previous_event_hash: string | null;
+      event_hash: string;
+      occurred_at: Date;
+    }>(
+      `select id, workspace_sequence::text, event_type, schema_version,
+              actor_user_id, entity_kind, entity_ref, payload,
+              previous_event_hash, event_hash, occurred_at
+       from ledger_events
+       where workspace_id = $1
+       order by workspace_sequence asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.ledgerEvents + 1],
+    ),
+    query<{
+      id: string;
+      recurring_item_id: string;
+      requested_by_user_id: string;
+      assigned_operator_user_id: string | null;
+      action: string;
+      commitment_class: string;
+      status: string;
+      currency: string;
+      baseline_monthly_amount: string;
+      baseline_annual_amount: string;
+      target_monthly_amount: string | null;
+      maximum_success_fee_minor: string;
+      failure_code: string | null;
+      authorized_at: Date | null;
+      execution_started_at: Date | null;
+      executed_at: Date | null;
+      verification_started_at: Date | null;
+      verified_at: Date | null;
+      withdrawn_at: Date | null;
+      disputed_at: Date | null;
+      created_at: Date;
+      updated_at: Date;
+    }>(
+      `select id, recurring_item_id, requested_by_user_id, assigned_operator_user_id,
+              action, commitment_class, status, currency,
+              baseline_monthly_amount::text, baseline_annual_amount::text,
+              target_monthly_amount::text, maximum_success_fee_minor::text,
+              failure_code, authorized_at, execution_started_at, executed_at,
+              verification_started_at, verified_at, withdrawn_at, disputed_at,
+              created_at, updated_at
+       from action_cases
+       where workspace_id = $1
+       order by created_at asc, id asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.actionCases + 1],
+    ),
+    query<{
+      id: string;
+      action_case_id: string;
+      authorized_by_user_id: string;
+      action: string;
+      scope: string;
+      authorization_version: number;
+      terms_version: string;
+      authorization_text: string | null;
+      success_fee_basis_points: number;
+      minimum_fee_minor: string;
+      maximum_fee_minor: string;
+      authorized_at: Date;
+      revoked_at: Date | null;
+    }>(
+      `select id, action_case_id, authorized_by_user_id, action, scope,
+              authorization_version, terms_version, authorization_text,
+              success_fee_basis_points, minimum_fee_minor::text,
+              maximum_fee_minor::text, authorized_at, revoked_at
+       from action_authorizations
+       where workspace_id = $1
+       order by authorized_at asc, id asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.actionAuthorizations + 1],
+    ),
+    query<{
+      id: string;
+      action_case_id: string;
+      previous_status: string | null;
+      status: string;
+      actor_kind: string;
+      actor_user_id: string | null;
+      reason_code: string;
+      occurred_at: Date;
+    }>(
+      `select id, action_case_id, previous_status, status, actor_kind,
+              actor_user_id, reason_code, occurred_at
+       from action_case_events
+       where workspace_id = $1
+       order by occurred_at asc, id asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.actionCaseEvents + 1],
+    ),
+    query<{
+      id: string;
+      action_case_id: string;
+      ordinal: number;
+      expected_debit_on: Date | string;
+      window_start_on: Date | string;
+      window_end_on: Date | string;
+      source_id: string | null;
+      status: string;
+      observed_transaction_id: string | null;
+      coverage_confirmed_at: Date | null;
+      evaluated_at: Date | null;
+      created_at: Date;
+      updated_at: Date;
+    }>(
+      `select id, action_case_id, ordinal, expected_debit_on, window_start_on,
+              window_end_on, source_id, status, observed_transaction_id,
+              coverage_confirmed_at, evaluated_at, created_at, updated_at
+       from saving_verification_windows
+       where workspace_id = $1
+       order by action_case_id asc, ordinal asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.verificationWindows + 1],
+    ),
+    query<{
+      id: string;
+      action_case_id: string;
+      status: string;
+      currency: string;
+      baseline_monthly_amount: string;
+      current_monthly_amount: string;
+      verified_monthly_saving: string;
+      verified_annual_saving: string;
+      clean_cycles: number;
+      required_clean_cycles: number;
+      coverage_start_on: Date | string;
+      coverage_end_on: Date | string;
+      proof_version: string;
+      evidence_manifest: Record<string, unknown>;
+      receipt_hash: string;
+      supersedes_receipt_id: string | null;
+      minted_at: Date;
+      updated_at: Date;
+    }>(
+      `select id, action_case_id, status, currency, baseline_monthly_amount::text,
+              current_monthly_amount::text, verified_monthly_saving::text,
+              verified_annual_saving::text, clean_cycles, required_clean_cycles,
+              coverage_start_on, coverage_end_on, proof_version, evidence_manifest,
+              receipt_hash, supersedes_receipt_id, minted_at, updated_at
+       from verified_saving_receipts
+       where workspace_id = $1
+       order by minted_at asc, id asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.savingReceipts + 1],
+    ),
+    query<{
+      id: string;
+      action_case_id: string;
+      verified_saving_receipt_id: string;
+      checkout_session_id: string | null;
+      offer_id: string;
+      offer_version: number;
+      terms_version: string;
+      success_fee_basis_points: number;
+      amount_minor: string;
+      currency: string;
+      status: string;
+      review_available_until: Date;
+      paid_at: Date | null;
+      disputed_at: Date | null;
+      voided_at: Date | null;
+      created_at: Date;
+      updated_at: Date;
+    }>(
+      `select id, action_case_id, verified_saving_receipt_id, checkout_session_id,
+              offer_id, offer_version, terms_version, success_fee_basis_points,
+              amount_minor::text, currency, status, review_available_until,
+              paid_at, disputed_at, voided_at, created_at, updated_at
+       from success_fee_invoices
+       where workspace_id = $1
+       order by created_at asc, id asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.successFeeInvoices + 1],
+    ),
+    query<{
+      id: string;
       user_id: string | null;
       action: string;
       entity_type: string;
@@ -774,6 +1033,16 @@ async function buildAccessExport(client: PoolClient, input: {
   assertWithinExportLimit("assistedAuditOrders", assistedAuditOrderResult.rows.length);
   assertWithinExportLimit("billingRefunds", billingRefundResult.rows.length);
   assertWithinExportLimit("entitlements", entitlementResult.rows.length);
+  assertWithinExportLimit("proofNodes", proofNodeResult.rows.length);
+  assertWithinExportLimit("proofEdges", proofEdgeResult.rows.length);
+  assertWithinExportLimit("confidenceExplanations", confidenceResult.rows.length);
+  assertWithinExportLimit("ledgerEvents", ledgerEventResult.rows.length);
+  assertWithinExportLimit("actionCases", actionCaseResult.rows.length);
+  assertWithinExportLimit("actionAuthorizations", actionAuthorizationResult.rows.length);
+  assertWithinExportLimit("actionCaseEvents", actionCaseEventResult.rows.length);
+  assertWithinExportLimit("verificationWindows", verificationWindowResult.rows.length);
+  assertWithinExportLimit("savingReceipts", savingReceiptResult.rows.length);
+  assertWithinExportLimit("successFeeInvoices", successFeeInvoiceResult.rows.length);
   assertWithinExportLimit("auditHistory", auditResult.rows.length);
 
   return buildPrivacyExportDocument({
@@ -791,6 +1060,7 @@ async function buildAccessExport(client: PoolClient, input: {
       id: account.workspace_id,
       name: account.workspace_name,
       plan: account.plan,
+      workspaceType: account.workspace_type,
       role: input.role,
       createdAt: account.workspace_created_at.toISOString(),
       updatedAt: account.workspace_updated_at.toISOString(),
@@ -984,6 +1254,155 @@ async function buildAccessExport(client: PoolClient, input: {
       revokedAt: toIso(row.revoked_at),
       updatedAt: row.updated_at.toISOString(),
     })),
+    proofGraph: {
+      nodes: proofNodeResult.rows.map((row) => ({
+        id: row.id,
+        kind: row.kind,
+        entityReference: row.entity_ref,
+        status: row.status,
+        createdAt: row.created_at.toISOString(),
+        retiredAt: toIso(row.retired_at),
+      })),
+      edges: proofEdgeResult.rows.map((row) => ({
+        id: row.id,
+        fromNodeId: row.from_node_id,
+        toNodeId: row.to_node_id,
+        relationship: row.edge_type,
+        validFrom: row.valid_from.toISOString(),
+        validTo: toIso(row.valid_to),
+        createdByEventId: row.created_by_event_id,
+      })),
+      confidenceExplanations: confidenceResult.rows.map((row) => ({
+        recurringItemId: row.recurring_item_id,
+        score: row.score,
+        proofDensity: Number(row.proof_density),
+        sourceDiversity: Number(row.source_diversity),
+        freshness: Number(row.freshness),
+        cadenceStability: Number(row.cadence_stability),
+        modelVersion: row.model_version,
+        graphRevision: Number(row.graph_revision),
+        explanation: row.explanation,
+        computedAt: row.computed_at.toISOString(),
+      })),
+      ledgerEvents: ledgerEventResult.rows.map((row) => ({
+        id: row.id,
+        sequence: Number(row.workspace_sequence),
+        eventType: row.event_type,
+        schemaVersion: row.schema_version,
+        actorUserId: row.actor_user_id,
+        entityKind: row.entity_kind,
+        entityReference: row.entity_ref,
+        details: row.payload,
+        previousEventHash: row.previous_event_hash,
+        eventHash: row.event_hash,
+        occurredAt: row.occurred_at.toISOString(),
+      })),
+    },
+    verifiedOutcomes: {
+      actionCases: actionCaseResult.rows.map((row) => ({
+        id: row.id,
+        recurringItemId: row.recurring_item_id,
+        requestedByUserId: row.requested_by_user_id,
+        assignedOperatorUserId: row.assigned_operator_user_id,
+        action: row.action,
+        commitmentClass: row.commitment_class,
+        status: row.status,
+        currency: row.currency,
+        baselineMonthlyAmount: Number(row.baseline_monthly_amount),
+        baselineAnnualAmount: Number(row.baseline_annual_amount),
+        targetMonthlyAmount: row.target_monthly_amount === null ? null : Number(row.target_monthly_amount),
+        maximumSuccessFeeMinor: Number(row.maximum_success_fee_minor),
+        failureCode: row.failure_code,
+        authorizedAt: toIso(row.authorized_at),
+        executionStartedAt: toIso(row.execution_started_at),
+        executedAt: toIso(row.executed_at),
+        verificationStartedAt: toIso(row.verification_started_at),
+        verifiedAt: toIso(row.verified_at),
+        withdrawnAt: toIso(row.withdrawn_at),
+        disputedAt: toIso(row.disputed_at),
+        createdAt: row.created_at.toISOString(),
+        updatedAt: row.updated_at.toISOString(),
+      })),
+      authorizations: actionAuthorizationResult.rows.map((row) => ({
+        id: row.id,
+        actionCaseId: row.action_case_id,
+        authorizedByUserId: row.authorized_by_user_id,
+        action: row.action,
+        scope: row.scope,
+        authorizationVersion: row.authorization_version,
+        termsVersion: row.terms_version,
+        authorizationText: row.authorization_text,
+        successFeeBasisPoints: row.success_fee_basis_points,
+        minimumFeeMinor: Number(row.minimum_fee_minor),
+        maximumFeeMinor: Number(row.maximum_fee_minor),
+        authorizedAt: row.authorized_at.toISOString(),
+        revokedAt: toIso(row.revoked_at),
+      })),
+      caseEvents: actionCaseEventResult.rows.map((row) => ({
+        id: row.id,
+        actionCaseId: row.action_case_id,
+        previousStatus: row.previous_status,
+        status: row.status,
+        actorKind: row.actor_kind,
+        actorUserId: row.actor_user_id,
+        reasonCode: row.reason_code,
+        occurredAt: row.occurred_at.toISOString(),
+      })),
+      verificationWindows: verificationWindowResult.rows.map((row) => ({
+        id: row.id,
+        actionCaseId: row.action_case_id,
+        ordinal: row.ordinal,
+        expectedDebitOn: toDateOnly(row.expected_debit_on),
+        windowStartOn: toDateOnly(row.window_start_on),
+        windowEndOn: toDateOnly(row.window_end_on),
+        dataSourceId: row.source_id,
+        status: row.status,
+        observedTransactionId: row.observed_transaction_id,
+        coverageConfirmedAt: toIso(row.coverage_confirmed_at),
+        evaluatedAt: toIso(row.evaluated_at),
+        createdAt: row.created_at.toISOString(),
+        updatedAt: row.updated_at.toISOString(),
+      })),
+      savingReceipts: savingReceiptResult.rows.map((row) => ({
+        id: row.id,
+        actionCaseId: row.action_case_id,
+        status: row.status,
+        currency: row.currency,
+        baselineMonthlyAmount: Number(row.baseline_monthly_amount),
+        currentMonthlyAmount: Number(row.current_monthly_amount),
+        verifiedMonthlySaving: Number(row.verified_monthly_saving),
+        verifiedAnnualSaving: Number(row.verified_annual_saving),
+        cleanCycles: row.clean_cycles,
+        requiredCleanCycles: row.required_clean_cycles,
+        coverageStartOn: toDateOnly(row.coverage_start_on),
+        coverageEndOn: toDateOnly(row.coverage_end_on),
+        proofVersion: row.proof_version,
+        evidenceManifest: row.evidence_manifest,
+        receiptHash: row.receipt_hash,
+        supersedesReceiptId: row.supersedes_receipt_id,
+        mintedAt: row.minted_at.toISOString(),
+        updatedAt: row.updated_at.toISOString(),
+      })),
+      successFeeInvoices: successFeeInvoiceResult.rows.map((row) => ({
+        id: row.id,
+        actionCaseId: row.action_case_id,
+        verifiedSavingReceiptId: row.verified_saving_receipt_id,
+        checkoutSessionId: row.checkout_session_id,
+        offerId: row.offer_id,
+        offerVersion: row.offer_version,
+        termsVersion: row.terms_version,
+        successFeeBasisPoints: row.success_fee_basis_points,
+        amountMinor: Number(row.amount_minor),
+        currency: row.currency,
+        status: row.status,
+        reviewAvailableUntil: row.review_available_until.toISOString(),
+        paidAt: toIso(row.paid_at),
+        disputedAt: toIso(row.disputed_at),
+        voidedAt: toIso(row.voided_at),
+        createdAt: row.created_at.toISOString(),
+        updatedAt: row.updated_at.toISOString(),
+      })),
+    },
     auditHistory: auditResult.rows.map((row) => ({
       id: row.id,
       userId: row.user_id,
@@ -1262,6 +1681,7 @@ type AccountWorkspaceRow = {
   workspace_id: string;
   workspace_name: string;
   plan: string;
+  workspace_type: string;
   workspace_created_at: Date;
   workspace_updated_at: Date;
 };

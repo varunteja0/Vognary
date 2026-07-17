@@ -1,10 +1,15 @@
 import { getDatabasePool, isDatabaseConfigured } from "@/lib/server/database";
+import { appendLedgerEvent } from "@/lib/server/ledger-event-store";
+
+export const workspaceTypes = ["personal", "family", "founder", "team"] as const;
+export type WorkspaceType = typeof workspaceTypes[number];
 
 export type WorkspaceMembership = {
   workspaceId: string;
   workspaceName: string;
   role: "owner" | "admin" | "member" | "viewer";
   plan: string;
+  workspaceType: WorkspaceType;
 };
 
 export type WorkspaceUser = {
@@ -28,7 +33,7 @@ export async function listWorkspacesForUser(userId: string): Promise<WorkspaceMe
   assertDatabaseReadyForWorkspaces();
 
   const result = await getDatabasePool().query<WorkspaceMembershipRow>(
-    `select w.id as workspace_id, w.name as workspace_name, w.plan, wm.role
+    `select w.id as workspace_id, w.name as workspace_name, w.plan, w.workspace_type, wm.role
      from workspace_members wm
      join workspaces w on w.id = wm.workspace_id
      where wm.user_id = $1
@@ -165,7 +170,7 @@ export async function getWorkspaceMembership(userId: string, workspaceId: string
   assertDatabaseReadyForWorkspaces();
 
   const result = await getDatabasePool().query<WorkspaceMembershipRow>(
-    `select w.id as workspace_id, w.name as workspace_name, w.plan, wm.role
+    `select w.id as workspace_id, w.name as workspace_name, w.plan, w.workspace_type, wm.role
      from workspace_members wm
      join workspaces w on w.id = wm.workspace_id
      where wm.user_id = $1
@@ -177,17 +182,17 @@ export async function getWorkspaceMembership(userId: string, workspaceId: string
   return row ? mapWorkspaceMembership(row) : null;
 }
 
-export async function createWorkspaceForUser(input: { userId: string; name: string; plan?: string }) {
+export async function createWorkspaceForUser(input: { userId: string; name: string; plan?: string; workspaceType?: WorkspaceType }) {
   assertDatabaseReadyForWorkspaces();
 
   const client = await getDatabasePool().connect();
   try {
     await client.query("begin");
-    const workspace = await client.query<{ id: string; name: string; plan: string }>(
-      `insert into workspaces (owner_user_id, name, plan)
-       values ($1, $2, $3)
-       returning id, name, plan`,
-      [input.userId, input.name, input.plan ?? "founder"],
+    const workspace = await client.query<{ id: string; name: string; plan: string; workspace_type: WorkspaceType }>(
+      `insert into workspaces (owner_user_id, name, plan, workspace_type)
+       values ($1, $2, $3, $4)
+       returning id, name, plan, workspace_type`,
+      [input.userId, input.name, input.plan ?? "founder", input.workspaceType ?? "personal"],
     );
     const workspaceId = workspace.rows[0]?.id;
     if (!workspaceId) throw new Error("Workspace insert did not return an id.");
@@ -203,10 +208,64 @@ export async function createWorkspaceForUser(input: { userId: string; name: stri
       workspaceId,
       workspaceName: workspace.rows[0]?.name ?? input.name,
       plan: workspace.rows[0]?.plan ?? input.plan ?? "founder",
+      workspaceType: workspace.rows[0]?.workspace_type ?? input.workspaceType ?? "personal",
       role: "owner" as const,
     };
   } catch (error) {
     await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateWorkspaceType(input: {
+  workspaceId: string;
+  userId: string;
+  workspaceType: WorkspaceType;
+  idempotencyKey: string;
+}) {
+  if (!workspaceTypes.includes(input.workspaceType)) throw new Error("Workspace type is invalid.");
+  if (!/^[A-Za-z0-9._:-]{16,128}$/.test(input.idempotencyKey)) throw new Error("A valid Idempotency-Key is required.");
+  const client = await getDatabasePool().connect();
+  try {
+    await client.query("begin");
+    const current = await client.query<{ workspace_type: WorkspaceType; name: string; plan: string }>(
+      `select workspace_type, name, plan from workspaces where id = $1 for update`,
+      [input.workspaceId],
+    );
+    const row = current.rows[0];
+    if (!row) throw new Error("Workspace was not found.");
+    if (row.workspace_type !== input.workspaceType) {
+      await client.query(
+        `update workspaces set workspace_type = $2, updated_at = now() where id = $1`,
+        [input.workspaceId, input.workspaceType],
+      );
+      await appendLedgerEvent({
+        workspaceId: input.workspaceId,
+        actorUserId: input.userId,
+        eventType: "workspace.type.updated",
+        entityKind: "workspace",
+        entityRef: input.workspaceId,
+        idempotencyKey: `workspace-type:${input.idempotencyKey}`,
+        payload: { previousWorkspaceType: row.workspace_type, workspaceType: input.workspaceType },
+      }, client);
+      await client.query(
+        `insert into audit_log (workspace_id, user_id, action, entity_type, entity_id, metadata)
+         values ($1, $2, 'workspace.type.updated', 'workspace', $1,
+                 jsonb_build_object('previousType', $3::text, 'workspaceType', $4::text))`,
+        [input.workspaceId, input.userId, row.workspace_type, input.workspaceType],
+      );
+    }
+    await client.query("commit");
+    return {
+      workspaceId: input.workspaceId,
+      workspaceName: row.name,
+      plan: row.plan,
+      workspaceType: input.workspaceType,
+    };
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
     throw error;
   } finally {
     client.release();
@@ -218,6 +277,7 @@ type WorkspaceMembershipRow = {
   workspace_name: string;
   role: WorkspaceMembership["role"];
   plan: string;
+  workspace_type: WorkspaceType;
 };
 
 type WorkspaceUserRow = {
@@ -237,5 +297,6 @@ function mapWorkspaceMembership(row: WorkspaceMembershipRow): WorkspaceMembershi
     workspaceName: row.workspace_name,
     role: row.role,
     plan: row.plan,
+    workspaceType: row.workspace_type,
   };
 }

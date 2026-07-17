@@ -110,6 +110,7 @@ test("privacy export builder emits an allowlisted metadata-only document", () =>
       id: "workspace-1",
       name: "Example workspace",
       plan: "private_beta",
+      workspaceType: "personal",
       role: "owner",
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-07-01T00:00:00.000Z",
@@ -136,10 +137,19 @@ test("privacy export builder emits an allowlisted metadata-only document", () =>
     assistedAuditOrders: [],
     billingRefunds: [],
     entitlements: [],
+    proofGraph: { nodes: [], edges: [], confidenceExplanations: [], ledgerEvents: [] },
+    verifiedOutcomes: {
+      actionCases: [],
+      authorizations: [],
+      caseEvents: [],
+      verificationWindows: [],
+      savingReceipts: [],
+      successFeeInvoices: [],
+    },
     auditHistory: [],
   });
 
-  assert.equal(document.exportVersion, 1);
+  assert.equal(document.exportVersion, 2);
   assert.equal(document.generatedAt, "2026-07-11T00:00:00.000Z");
   assert.ok(document.exclusions.some((entry) => entry.includes("Connector secrets")));
   assert.equal(assertPrivacyExportIsMetadataOnly(document), document);

@@ -10,7 +10,7 @@ type PrimaryRoute = {
 
 const primaryRoutes: PrimaryRoute[] = [
   { label: "landing", path: "/", public: true },
-  { label: "guest audit", path: "/app?guest=1", public: true },
+  { label: "audit app", path: "/app", public: true },
   { label: "private audit", path: "/private-audit", public: true },
   { label: "login", path: "/login", public: true },
   { label: "sources", path: "/sources", public: true },

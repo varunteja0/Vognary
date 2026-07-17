@@ -1,0 +1,109 @@
+{
+  "brand": "Vognary",
+  "identity": "Ledger to Verdict",
+  "version": 2,
+  "palette": {
+    "graphite": "#08090C",
+    "platinum": "#F0F1F5",
+    "champagneGold": "#D8B87A",
+    "goldHighlight": "#F1DCA6",
+    "ink": "#15171C"
+  },
+  "meaning": {
+    "platinumRows": "Evidence from scattered recurring-payment sources",
+    "goldV": "The single reviewable verdict and next action"
+  },
+  "standards": {
+    "clearSpace": "At least one quarter of the mark width on every side",
+    "minimumFullColor": "20px",
+    "minimumMonochrome": "16px",
+    "doNot": [
+      "rotate",
+      "stretch",
+      "outline",
+      "recolor individual evidence rows",
+      "move or recolor the gold verdict",
+      "place copy inside the mark"
+    ]
+  },
+  "exports": [
+    {
+      "file": "vognary-mark.svg",
+      "format": "SVG",
+      "canvas": "64x64 viewBox",
+      "use": "Primary mark on dark backgrounds"
+    },
+    {
+      "file": "vognary-mark-ink.svg",
+      "format": "SVG",
+      "canvas": "64x64 viewBox",
+      "use": "Primary mark on light backgrounds"
+    },
+    {
+      "file": "vognary-mark-mono.svg",
+      "format": "SVG",
+      "canvas": "64x64 viewBox",
+      "use": "One-color production, engraving, and very small sizes"
+    },
+    {
+      "file": "vognary-lockup.svg",
+      "format": "SVG",
+      "canvas": "376x96 viewBox",
+      "use": "Horizontal wordmark lockup on dark backgrounds"
+    },
+    {
+      "file": "vognary-lockup-ink.svg",
+      "format": "SVG",
+      "canvas": "376x96 viewBox",
+      "use": "Horizontal wordmark lockup on light backgrounds"
+    },
+    {
+      "file": "vognary-mark-1024.png",
+      "format": "PNG",
+      "canvas": "1024x1024",
+      "use": "Transparent raster applications"
+    },
+    {
+      "file": "vognary-x-avatar.svg",
+      "format": "SVG",
+      "canvas": "800x800",
+      "use": "Editable vector master for the X profile avatar"
+    },
+    {
+      "file": "vognary-x-avatar.png",
+      "format": "PNG",
+      "canvas": "800x800",
+      "use": "X profile avatar; circle-crop safe"
+    },
+    {
+      "file": "vognary-x-header.svg",
+      "format": "SVG",
+      "canvas": "1500x500",
+      "use": "Editable vector master for the X profile header"
+    },
+    {
+      "file": "vognary-x-header.png",
+      "format": "PNG",
+      "canvas": "1500x500",
+      "use": "X profile header; critical copy is outside the avatar-overlap zone"
+    },
+    {
+      "file": "vognary-social-card.svg",
+      "format": "SVG",
+      "canvas": "1200x630",
+      "use": "Editable vector master for the Open Graph and X shared-link card"
+    },
+    {
+      "file": "vognary-social-card.png",
+      "format": "PNG",
+      "canvas": "1200x630",
+      "use": "Open Graph and X shared-link card; never use as a profile header"
+    }
+  ],
+  "provenance": {
+    "construction": "Deterministic SVG geometry; no generated raster logo",
+    "rasterBuild": "npm run brand:build",
+    "verification": "npm run brand:check",
+    "colorSpace": "sRGB"
+  }
+}

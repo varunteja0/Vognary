@@ -2,6 +2,7 @@ import "server-only";
 
 import { isCommitmentDecisionAllowed, normalizeCommitmentDecisionAction } from "@/lib/commitment-decisions";
 import { getDatabasePool } from "@/lib/server/database";
+import { appendLedgerEvent } from "@/lib/server/ledger-event-store";
 import type { RecommendationType } from "@/lib/recurring-audit";
 
 export type WorkspaceCommitmentDecision = {
@@ -58,11 +59,17 @@ export async function upsertWorkspaceCommitmentDecision(input: {
   const client = await getDatabasePool().connect();
   try {
     await client.query("begin");
-    const item = await client.query<{ category: string }>(
-      `select category from recurring_items where id = $1 and workspace_id = $2 for update`,
+    const item = await client.query<{ category: string; previous_action: RecommendationType | null }>(
+      `select item.category, decision.action as previous_action
+       from recurring_items item
+       left join commitment_decisions decision
+         on decision.workspace_id = item.workspace_id and decision.recurring_item_id = item.id
+       where item.id = $1 and item.workspace_id = $2
+       for update of item`,
       [input.recurringItemId, input.workspaceId],
     );
     const category = item.rows[0]?.category;
+    const previousAction = item.rows[0]?.previous_action ?? null;
     if (!category) {
       await client.query("rollback");
       return { status: "not-found" as const };
@@ -94,6 +101,16 @@ export async function upsertWorkspaceCommitmentDecision(input: {
        values ($1, $2, 'commitment.decision.updated', 'recurring_item', $3, jsonb_build_object('action', $4::text))`,
       [input.workspaceId, input.userId, input.recurringItemId, action],
     );
+    const saved = result.rows[0];
+    await appendLedgerEvent({
+      workspaceId: input.workspaceId,
+      actorUserId: input.userId,
+      eventType: "commitment.decision.updated",
+      entityKind: "commitment",
+      entityRef: input.recurringItemId,
+      idempotencyKey: `decision:${saved.id}:${saved.updated_at.getTime()}`,
+      payload: { action, previousAction },
+    }, client);
     await client.query("commit");
     return { status: "saved" as const, decision: mapDecision(result.rows[0]) };
   } catch (error) {

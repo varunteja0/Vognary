@@ -3,10 +3,12 @@ import { anthropicUsageAdapter } from "@/lib/connectors/anthropic-costs-adapter"
 import { awsCostExplorerAdapter } from "@/lib/connectors/aws-cost-explorer-adapter";
 import { gmailReadonlyAdapter } from "@/lib/connectors/gmail-readonly-adapter";
 import { openAiCostsAdapter } from "@/lib/connectors/openai-costs-adapter";
+import { setuAccountAggregatorAdapter } from "@/lib/connectors/setu-aa-adapter";
 import { cloudflareBillingAdapter, githubBillingAdapter, githubCopilotAdapter, renderPlatformAdapter, vercelPlatformAdapter } from "@/lib/connectors/platform-api-adapters";
 
 const adapters = new Map<string, ConnectorAdapter>([
   [gmailReadonlyAdapter.id, gmailReadonlyAdapter],
+  [setuAccountAggregatorAdapter.id, setuAccountAggregatorAdapter],
   [openAiCostsAdapter.id, openAiCostsAdapter],
   [anthropicUsageAdapter.id, anthropicUsageAdapter],
   [awsCostExplorerAdapter.id, awsCostExplorerAdapter],
