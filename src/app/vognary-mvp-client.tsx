@@ -7,6 +7,7 @@ import {
   describeTileCoverage,
   matchTileItems,
   merchantTiles,
+  resolveConnectedConnectorIds,
   type ConnectTile,
 } from "@/lib/connect-rails";
 import {
@@ -106,6 +107,7 @@ type CoverageSignal = {
 type ConnectorStartPayload = {
   status?: string;
   state?: string;
+  availability?: "available" | "company-activation-pending";
   error?: string;
   missingEnv?: string[];
   nextSteps?: string[];
@@ -343,7 +345,6 @@ function migrateLegacyWorkspaceKeys(workspace: WorkspaceBackup): WorkspaceBackup
 }
 
 const connectorLaunchTargets: Record<string, { label: string; url: string }> = {
-  "gmail-readonly": { label: "Google OAuth", url: "https://console.cloud.google.com/apis/credentials" },
   "claude-subscription": { label: "Claude account", url: "https://claude.ai/settings/billing" },
   "kling-subscription": { label: "Kling account", url: "https://klingai.com/" },
   "openai-costs": { label: "OpenAI usage", url: "https://platform.openai.com/settings/organization/usage" },
@@ -522,15 +523,11 @@ export default function VognaryMvpClient() {
     return diffReviews(lastReview, buildReviewSnapshot(audit, userActions, coverageScore));
   }, [lastReview, audit, userActions, coverageScore]);
   const connectedConnectorIds = useMemo(() => {
-    const connected = new Set<string>();
-    for (const [id, result] of Object.entries(connectorStartResults)) {
-      if (result.status?.startsWith("connected")) connected.add(id);
-    }
-    for (const account of serverConnectors?.accounts ?? []) {
-      if (account.status === "active") connected.add(account.connectorId);
-    }
-    for (const id of disconnectedConnectorIds) connected.delete(id);
-    return connected;
+    return resolveConnectedConnectorIds(
+      connectorStartResults,
+      serverConnectors?.accounts ?? [],
+      disconnectedConnectorIds,
+    );
   }, [connectorStartResults, disconnectedConnectorIds, serverConnectors]);
   const persistFailureNotified = useRef(false);
   useEffect(() => {
@@ -1590,10 +1587,9 @@ export default function VognaryMvpClient() {
           return;
         }
 
-        openOfficialConnectorTarget(connector.id);
-        setNotice(payload.requiredEnv?.length
-          ? `Gmail needs production OAuth setup first: ${payload.requiredEnv.join(", ")}. Required redirect URI: ${payload.redirectUri ?? "not available"}.`
-          : "Opening the official Gmail setup path.");
+        setNotice(payload.availability === "company-activation-pending" || payload.requiredEnv?.length
+          ? "Email connection is not available yet. Vognary is completing the provider approval and company setup; no technical setup is required from you."
+          : payload.message ?? payload.error ?? "Email connection could not be started.");
         return;
       }
 
@@ -1602,9 +1598,9 @@ export default function VognaryMvpClient() {
       setConnectorStartResults((current) => ({ ...current, [connector.id]: payload }));
 
       openOfficialConnectorTarget(connector.id);
-      const missing = payload.missingEnv?.length ? ` Missing setup: ${payload.missingEnv.join(", ")}.` : "";
-      const state = payload.state ? ` State: ${payload.state}.` : "";
-      setNotice(`${connector.name} integration started through the official provider path.${state}${missing}`);
+      setNotice(payload.availability === "company-activation-pending" || payload.missingEnv?.length
+        ? `${connector.name} is not available yet. Vognary is completing the company-side provider setup.`
+        : `${connector.name} connection started through the official provider path.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not start this integration.");
     } finally {
@@ -1690,15 +1686,15 @@ export default function VognaryMvpClient() {
       setConnectorStartResults((current) => ({ ...current, "account-aggregator": payload }));
 
       if (!response.ok) {
-        setNotice(payload.requiredEnv?.length
-          ? `The bank rail is not activated on this deployment yet (needs ${payload.requiredEnv.join(", ")}). Once active, you review and approve in the regulated Account Aggregator flow.`
+        setNotice(payload.availability === "company-activation-pending" || payload.requiredEnv?.length
+          ? "Bank connection is not available yet. Vognary is completing the regulated provider agreement and company setup; no technical setup is required from you."
           : payload.message ?? payload.error ?? "The bank consent could not be started.");
         return;
       }
 
       setAaVuaDraft("");
       await refreshWorkspaceConnectors();
-      if (payload.approvalUrl) window.open(payload.approvalUrl, "_blank", "noopener,noreferrer");
+      if (payload.approvalUrl) window.location.assign(payload.approvalUrl);
       setNotice(payload.message ?? "Review and approve the request in the Account Aggregator flow. The source stays pending until approval is confirmed.");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The bank consent could not be started.");
@@ -2355,24 +2351,10 @@ function IntegrationCommandCenter({
 
       <div className="mt-5 grid gap-3 lg:grid-cols-2">
         <RailCard
-          title="Email receipts"
-          eyebrow="Rail 01 · Google consent page"
-          connectorId="gmail-readonly"
-          description="One click opens Google's own consent page for read-only receipts. Renewal notices become ledger evidence on a schedule."
-          connectorStartResults={connectorStartResults}
-          connectingConnectorId={connectingConnectorId}
-          syncingConnectorId={syncingConnectorId}
-          connected={rails.gmailConnected}
-          serverConnectors={serverConnectors}
-          onStartConnector={onStartConnector}
-          onDisconnectConnector={onDisconnectConnector}
-          onRunConnectorSync={onRunConnectorSync}
-        />
-        <RailCard
-          title="Bank & UPI"
-          eyebrow="Rail 02 · RBI Account Aggregator"
+          title="Bank transactions"
+          eyebrow="Rail 01 · Primary automatic account feed"
           connectorId="account-aggregator"
-          description="Review and approve consent in the regulated Account Aggregator flow. Supported bank transaction evidence can then arrive read-only."
+          description="A regulated partner handles account access. You approve a scoped, revocable request; supported bank-debit evidence can refresh while that consent remains active."
           connectorStartResults={connectorStartResults}
           connectingConnectorId={connectingConnectorId}
           syncingConnectorId={syncingConnectorId}
@@ -2382,6 +2364,20 @@ function IntegrationCommandCenter({
           onDisconnectConnector={onDisconnectConnector}
           onRunConnectorSync={onRunConnectorSync}
           bankRail={{ signedIn, vuaDraft: aaVuaDraft, onVuaDraftChange: onAaVuaDraftChange, onStart: onStartBankRail }}
+        />
+        <RailCard
+          title="Email receipts"
+          eyebrow="Rail 02 · Optional coverage"
+          connectorId="gmail-readonly"
+          description="Optional coverage for receipts that a bank feed cannot identify. Vognary manages the integration; Google still requires one secure, revocable approval."
+          connectorStartResults={connectorStartResults}
+          connectingConnectorId={connectingConnectorId}
+          syncingConnectorId={syncingConnectorId}
+          connected={rails.gmailConnected}
+          serverConnectors={serverConnectors}
+          onStartConnector={onStartConnector}
+          onDisconnectConnector={onDisconnectConnector}
+          onRunConnectorSync={onRunConnectorSync}
         />
       </div>
 
@@ -2436,7 +2432,7 @@ function IntegrationCommandCenter({
 
       <div className="mt-4 flex flex-col gap-3 rounded-[11px] border p-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
         <p className="text-xs leading-5 muted-on-dark">
-          Gmail and bank access is approved on provider consent pages and stays revocable there. Merchant watches are local workspace preferences; they do not connect to merchant accounts. Workspace admins with provider keys can register scoped read access on <a href="/sources" className="underline">/sources</a>.
+          Vognary owns the provider setup and keeps company credentials away from this workspace. You only grant revocable access to your own data. Merchant watches are local preferences; they do not connect to merchant accounts.
         </p>
         <div className="flex shrink-0 flex-wrap gap-2">
           <button type="button" onClick={onJumpToLedger} className="btn btn-ondark h-9 px-3 text-xs">Open ledger</button>
@@ -2488,17 +2484,19 @@ function RailCard({
   const busy = connectingConnectorId === connectorId;
   const syncing = syncingConnectorId === connectorId;
   const missing = result?.missingEnv ?? result?.requiredEnv ?? [];
+  const activationPending = result?.availability === "company-activation-pending" || missing.length > 0;
   const serverAccount = getServerAccount(serverConnectors, connectorId);
   const pendingApproval = serverAccount?.status === "pending";
   const needsReauth = serverAccount?.status === "needs_reauth";
+  const isConnected = connected && !pendingApproval && !needsReauth;
   const syncNeedsAttention = !pendingApproval && !needsReauth && (
     serverAccount?.freshnessStatus === "stale"
     || serverAccount?.freshnessStatus === "error"
     || serverAccount?.latestRunStatus === "failed"
     || serverAccount?.latestRunStatus === "blocked"
   );
-  const statusLabel = connected ? "Connected" : pendingApproval ? "Awaiting approval" : needsReauth ? "Reconnect required" : "Consent required";
-  const statusClass = connected ? "pill pill-ready" : needsReauth ? "pill pill-blocked" : "pill pill-partial";
+  const statusLabel = pendingApproval ? "Awaiting approval" : needsReauth ? "Reconnect required" : isConnected ? "Connected" : activationPending ? "Company activation pending" : "Review access";
+  const statusClass = needsReauth ? "pill pill-blocked" : isConnected ? "pill pill-ready" : "pill pill-partial";
 
   return (
     <div className="rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.05)" }}>
@@ -2511,7 +2509,7 @@ function RailCard({
       </div>
       <p className="mt-2 text-xs leading-5 muted-on-dark">{description}</p>
 
-      {bankRail && !connected && !pendingApproval ? (
+      {bankRail && !isConnected && !pendingApproval ? (
         <label className="mt-3 block">
           <span className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Account Aggregator handle</span>
           <input
@@ -2531,7 +2529,7 @@ function RailCard({
 
       {pendingApproval ? <p className="mt-3 text-xs leading-5 text-ochre">The source is not connected yet. Vognary is waiting for the Account Aggregator to confirm your approval.</p> : null}
 
-      {missing.length ? <p className="mt-2 text-xs leading-5 text-ochre">Activation pending on this deployment: {missing.join(", ")}. Nothing is needed from you once it is live.</p> : null}
+      {activationPending ? <p className="mt-2 text-xs leading-5 text-ochre">Vognary is completing this provider connection. No credentials or technical setup are required from you.</p> : null}
 
       {serverAccount ? (
         <div className="mt-2 grid gap-1 font-data text-[0.68rem] leading-5 muted-on-dark">
@@ -2543,22 +2541,22 @@ function RailCard({
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={busy || (pendingApproval && !result?.approvalUrl)}
+          disabled={busy || activationPending || (pendingApproval && !result?.approvalUrl)}
           onClick={() => {
-            if (connected) return onDisconnectConnector(connector);
+            if (isConnected) return onDisconnectConnector(connector);
             if (pendingApproval && result?.approvalUrl) {
-              window.open(result.approvalUrl, "_blank", "noopener,noreferrer");
+              window.location.assign(result.approvalUrl);
               return;
             }
             if (pendingApproval) return;
             if (bankRail) return bankRail.onStart();
             return onStartConnector(connector);
           }}
-          className={`${connected ? "btn btn-ondark" : "btn btn-primary"} h-10 px-4 text-xs disabled:cursor-not-allowed disabled:opacity-60`}
+          className={`${isConnected ? "btn btn-ondark" : "btn btn-primary"} h-10 px-4 text-xs disabled:cursor-not-allowed disabled:opacity-60`}
         >
-          {busy ? "Connecting..." : connected ? "Disconnect" : pendingApproval ? (result?.approvalUrl ? "Continue approval" : "Approval pending") : needsReauth ? "Reconnect" : "Connect"}
+          {busy ? "Connecting..." : isConnected ? "Disconnect" : activationPending ? "Not available yet" : pendingApproval ? (result?.approvalUrl ? "Continue approval" : "Approval pending") : needsReauth ? "Reconnect" : "Connect"}
         </button>
-        {serverAccount && !connected ? <button type="button" disabled={busy} onClick={() => onDisconnectConnector(connector)} className="btn btn-ondark h-10 px-3 text-xs disabled:opacity-60">Disconnect source</button> : null}
+        {serverAccount && !isConnected ? <button type="button" disabled={busy} onClick={() => onDisconnectConnector(connector)} className="btn btn-ondark h-10 px-3 text-xs disabled:opacity-60">Disconnect source</button> : null}
         {syncNeedsAttention ? <button type="button" disabled={syncing} onClick={() => onRunConnectorSync(connector)} className="btn btn-ondark h-10 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60">{syncing ? "Retrying" : "Retry sync"}</button> : null}
       </div>
     </div>
@@ -3213,7 +3211,7 @@ function UserControlPanel({
           </div>
           {serverSaveStatus ? <p className="mt-3 text-xs leading-5 text-(--muted)">{serverSaveStatus}</p> : null}
         </div>
-        <p className="mt-3 text-xs leading-5 text-(--muted)">Do not enable browser save on shared machines. Local backups contain source text. Automatic server sync requires configured login, database, and TOKEN_ENCRYPTION_KEY; revision conflicts pause uploads instead of overwriting another device.</p>
+        <p className="mt-3 text-xs leading-5 text-(--muted)">Do not enable browser save on shared machines. Local backups contain source text. Automatic encrypted sync is available only when the company-managed account service is active; revision conflicts pause uploads instead of overwriting another device.</p>
       </div>
     </section>
   );
@@ -4174,12 +4172,12 @@ function StatusRow({ label, value, state }: { label: string; value: string; stat
 
 function getCoverageItems() {
   return [
-    { label: "Google identity", value: "OAuth route exists; workspace sessions require configured Google auth, database, and session secret", state: "partial" as const },
-    { label: "Gmail receipts", value: "OAuth path exists; production Gmail receipt sync needs Google app verification", state: "partial" as const },
-    { label: "Cloud and AI tools", value: "OpenAI adapter exists; Claude, Kling, Vercel, Render, GitHub, and X are connector targets", state: "partial" as const },
+    { label: "Google identity", value: "Company activation is required before Google sign-in is publicly available", state: "partial" as const },
+    { label: "Email receipts", value: "Optional receipt sync remains unavailable until provider approval is complete", state: "partial" as const },
+    { label: "Cloud and AI tools", value: "Organization billing sources require source-specific administrator approval", state: "partial" as const },
     { label: "App-store subscriptions", value: "Apple and Google Play need official source access or provider-supported evidence", state: "planned" as const },
     { label: "Bank/card data", value: "Needs Account Aggregator, issuer, network, or payment partner access", state: "blocked" as const },
-    { label: "UPI/card mandates", value: "Needs PSP, issuer, bank, network, or regulated partner API access", state: "blocked" as const },
+    { label: "UPI/card mandates", value: "Needs an approved issuer, bank, network, or regulated partner connection", state: "blocked" as const },
   ];
 }
 
@@ -4189,7 +4187,7 @@ function getReadinessItems() {
     { label: "Recurring ledger", value: "Connected evidence lands in one review table with next debit and action labels", state: "ready" as const },
     { label: "Data handling", value: "Signed-in workspaces automatically synchronize encrypted state and normalized upload/manual ledger rows; browser mode remains a local fallback", state: "ready" as const },
     { label: "Exports", value: "JSON audit pack export remains available from the review workspace", state: "ready" as const },
-    { label: "Provider APIs", value: "Each real auto-sync needs OAuth, API keys, or provider partnership per source", state: "partial" as const },
+    { label: "Company-managed connections", value: "Every automatic source requires its own approved access path", state: "partial" as const },
     { label: "Regulated rails", value: "Bank, UPI, and card mandate discovery cannot be universal without approved partners", state: "blocked" as const },
   ];
 }

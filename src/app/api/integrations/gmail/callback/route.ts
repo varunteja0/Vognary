@@ -51,9 +51,10 @@ export async function GET(request: NextRequest) {
   if (missingEnv.length) {
     return NextResponse.json(
       {
-        status: "not-configured",
+        status: "not-available",
         integration: "gmail-readonly",
-        requiredEnv: missingEnv,
+        availability: "company-activation-pending",
+        message: "Email connection is not available yet. Vognary is completing the provider approval and company setup.",
       },
       { status: 501 },
     );

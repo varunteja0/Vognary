@@ -38,12 +38,10 @@ export async function GET(request: Request) {
 
   if (missingEnv.length) {
     const payload = {
-      status: "not-configured",
+      status: "not-available",
       integration: "gmail-readonly",
-      requiredEnv: missingEnv,
-      redirectUri,
-      scope: gmailReadonlyScope,
-      noticeVersion: currentPrivacyNoticeVersion,
+      availability: "company-activation-pending",
+      message: "Email connection is not available yet. Vognary is completing the provider approval and company setup.",
     };
 
     if (wantsJson) return NextResponse.json(payload);

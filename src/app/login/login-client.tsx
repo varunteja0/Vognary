@@ -20,8 +20,7 @@ type GoogleStartPayload = {
   status?: string;
   authUrl?: string;
   message?: string;
-  redirectUri?: string;
-  requiredEnv?: string[];
+  availability?: "company-activation-pending";
 };
 
 type Tone = "info" | "error" | "success";
@@ -196,13 +195,10 @@ export default function LoginClient({ initialGoogleReason, initialMagicReason, i
       const response = await fetch(`/api/auth/google/start?mode=json&next=${encodeURIComponent(nextPath)}`, { cache: "no-store" });
       const payload = await response.json() as GoogleStartPayload;
       if (!response.ok || payload.status !== "ready" || !payload.authUrl) {
-        const missing = payload.requiredEnv?.length ? ` Missing: ${payload.requiredEnv.join(", ")}.` : "";
-        const redirect = payload.redirectUri ? ` Redirect URI: ${payload.redirectUri}` : "";
-        setGoogleStatus({ tone: "error", text: `${payload.message ?? "Google login is not configured yet."}${missing}${redirect}` });
+        setGoogleStatus({ tone: "error", text: payload.message ?? "Google sign-in is not available yet." });
         setGoogleSubmitting(false);
         return;
       }
-      if (payload.redirectUri) window.sessionStorage.setItem("vognary.google.redirectUri", payload.redirectUri);
       window.location.href = payload.authUrl;
     } catch {
       setGoogleStatus({ tone: "error", text: "Could not start Google sign-in. Please try again." });
@@ -349,13 +345,6 @@ export default function LoginClient({ initialGoogleReason, initialMagicReason, i
             <Link href="/privacy" className="text-(--ink-soft) underline underline-offset-2 transition hover:text-(--ink)">Privacy Policy</Link>.
           </p>
 
-          {isDevEnv ? (
-            <details className="mt-5 rounded-xl border border-dashed border-line bg-(--card-2) p-4 text-sm leading-6 text-(--muted)">
-              <summary className="cursor-pointer font-data text-xs uppercase tracking-[0.14em] text-(--muted)">Developer configuration (dev only)</summary>
-              <p className="mt-3"><strong className="text-(--ink)">Session secret:</strong> {session?.configuration.status ?? "checking"}.</p>
-              <p className="mt-1">Google env: <span className="font-data">GOOGLE_AUTH_CLIENT_ID</span>, <span className="font-data">GOOGLE_AUTH_CLIENT_SECRET</span>, <span className="font-data">GOOGLE_AUTH_REDIRECT_URI</span>. Local fallback: <span className="font-data">ENABLE_DEVELOPMENT_LOGIN</span>, <span className="font-data">DEVELOPMENT_LOGIN_EMAIL</span>, and <span className="font-data">DEVELOPMENT_LOGIN_ACCESS_CODE</span>.</p>
-            </details>
-          ) : null}
         </section>
       </div>
     </main>
@@ -401,15 +390,15 @@ function getGoogleFailureMessage(reason: string) {
   const messages: Record<string, string> = {
     "missing-code": "Google did not return an authorization code.",
     "invalid-state": "Google sign-in state expired. Try again.",
-    "token-exchange-failed": "Google token exchange failed. Check OAuth client settings.",
+    "token-exchange-failed": "Google sign-in could not be completed. Try again.",
     "missing-id-token": "Google did not return an identity token.",
     "token-validation-failed": "Google identity validation failed.",
-    "audience-mismatch": "Google OAuth client mismatch. Check client ID and redirect URI.",
+    "audience-mismatch": "Google sign-in could not be verified. Try again or contact support.",
     "email-not-verified": "Google email is not verified.",
     "missing-email": "Google did not return an email address.",
     "missing-subject": "Google did not return a stable account identity.",
     "identity-conflict": "This email is already linked to a different Google account. Use the originally linked account or email sign-in.",
-    "not-allowed": "This Google account is not allowed for this deployment.",
+    "not-allowed": "Google sign-in is not available for this account.",
   };
   return messages[reason] ?? "Google sign-in failed. Try again.";
 }

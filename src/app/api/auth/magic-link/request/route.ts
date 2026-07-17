@@ -24,9 +24,9 @@ export async function POST(request: NextRequest) {
   const configuration = checkMagicLinkConfiguration();
   if (configuration.status !== "ready") {
     return NextResponse.json({
-      status: "not-configured",
-      requiredEnv: configuration.missing,
-      message: "Magic-link login needs database, signed sessions, Resend API credentials, and a verified sender.",
+      status: "not-available",
+      availability: "company-activation-pending",
+      message: "Email sign-in is not available yet. Vognary is completing the company setup.",
     }, { status: 501 });
   }
 
@@ -44,7 +44,11 @@ export async function POST(request: NextRequest) {
     redirectPath: body.redirectPath,
   });
   const appOrigin = getMagicLinkAppOrigin(request.nextUrl.origin);
-  if (!appOrigin) return NextResponse.json({ status: "not-configured", requiredEnv: ["NEXT_PUBLIC_APP_URL or APP_URL"] }, { status: 501 });
+  if (!appOrigin) return NextResponse.json({
+    status: "not-available",
+    availability: "company-activation-pending",
+    message: "Email sign-in is not available yet. Vognary is completing the company setup.",
+  }, { status: 501 });
   const verifyUrl = new URL("/api/auth/magic-link/verify", appOrigin);
   verifyUrl.searchParams.set("token", challenge.token);
 

@@ -182,7 +182,7 @@ export const merchantTiles: ConnectTile[] = [
     name: "GitHub",
     category: "Developer & cloud",
     rail: "merchant-watch",
-    tagline: "Personal GitHub and Copilot charges tracked from receipts and card debits. Org admins can add scoped keys on /sources.",
+    tagline: "Personal GitHub and Copilot charges tracked from receipts and card debits. Organization billing can be connected separately by an admin.",
     merchantPatterns: ["github"],
     feeds: ["gmail", "bank"],
     backingConnectorIds: ["gmail-readonly", "account-aggregator"],
@@ -192,7 +192,7 @@ export const merchantTiles: ConnectTile[] = [
     name: "Vercel",
     category: "Developer & cloud",
     rail: "merchant-watch",
-    tagline: "Vercel invoices tracked from receipts and card debits. Team admins can add scoped keys on /sources.",
+    tagline: "Vercel invoices tracked from receipts and card debits. Team billing can be connected separately by an admin.",
     merchantPatterns: ["vercel"],
     feeds: ["gmail", "bank"],
     backingConnectorIds: ["gmail-readonly", "account-aggregator"],
@@ -202,7 +202,7 @@ export const merchantTiles: ConnectTile[] = [
     name: "AWS",
     category: "Developer & cloud",
     rail: "merchant-watch",
-    tagline: "AWS invoices tracked from billing emails and card debits. Account admins can add read-only access on /sources.",
+    tagline: "AWS invoices tracked from billing emails and card debits. Account billing can be connected separately by an admin.",
     merchantPatterns: ["aws", "amazon\\s*web\\s*services"],
     feeds: ["gmail", "bank"],
     backingConnectorIds: ["gmail-readonly", "account-aggregator"],
@@ -212,7 +212,7 @@ export const merchantTiles: ConnectTile[] = [
     name: "OpenAI API",
     category: "Developer & cloud",
     rail: "merchant-watch",
-    tagline: "OpenAI platform invoices tracked from billing emails and card debits. Org admins can add scoped keys on /sources.",
+    tagline: "OpenAI platform invoices tracked from billing emails and card debits. Organization billing can be connected separately by an admin.",
     merchantPatterns: ["openai"],
     feeds: ["gmail", "bank"],
     backingConnectorIds: ["gmail-readonly", "account-aggregator"],
@@ -253,6 +253,26 @@ export type TileCoverage = {
   state: "fed" | "partially-fed" | "waiting-for-rail";
   message: string;
 };
+
+export function resolveConnectedConnectorIds(
+  startResults: Record<string, { status?: string }>,
+  accounts: Array<{ connectorId: string; status: string }>,
+  disconnectedIds: string[],
+) {
+  const connected = new Set<string>();
+  const durableConnectorIds = new Set(accounts.map((account) => account.connectorId));
+
+  for (const [connectorId, result] of Object.entries(startResults)) {
+    if (!durableConnectorIds.has(connectorId) && result.status?.startsWith("connected")) {
+      connected.add(connectorId);
+    }
+  }
+  for (const account of accounts) {
+    if (account.status === "active") connected.add(account.connectorId);
+  }
+  for (const connectorId of disconnectedIds) connected.delete(connectorId);
+  return connected;
+}
 
 /**
  * Honest coverage line for a merchant tile given which rails are live.

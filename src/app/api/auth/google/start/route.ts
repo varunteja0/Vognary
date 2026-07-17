@@ -16,15 +16,10 @@ export function GET(request: NextRequest) {
 
   if (!clientId || !origin || !redirectUri) {
     const payload = {
-      status: "not-configured",
+      status: "not-available",
       provider: "google-auth",
-      requiredEnv: [
-        !clientId ? "GOOGLE_AUTH_CLIENT_ID or GOOGLE_CLIENT_ID" : null,
-        !origin ? "NEXT_PUBLIC_APP_URL or APP_URL" : null,
-        !redirectUri ? "GOOGLE_AUTH_REDIRECT_URI" : null,
-      ].filter((value): value is string => Boolean(value)),
-      redirectUri,
-      message: "Google login needs a Google OAuth client ID.",
+      availability: "company-activation-pending",
+      message: "Google sign-in is not available yet. Vognary is completing the company setup.",
     };
     return NextResponse.json(payload, { status: wantsJson ? 200 : 501 });
   }
@@ -43,8 +38,6 @@ export function GET(request: NextRequest) {
       status: "ready",
       provider: "google-auth",
       authUrl: authUrl.toString(),
-      redirectUri,
-      scope: googleAuthScope,
     });
     response.cookies.set(googleAuthStateCookie, state, oauthStateCookieOptions());
     response.cookies.set(googleAuthNextCookie, nextPath, oauthStateCookieOptions());

@@ -1,11 +1,11 @@
 # Consent Rails and Merchant Watches — Activation Plan
 
 Date: 2026-07-17
-Goal: users never paste provider credentials in the Connections panel. They authorize supported evidence rails on provider consent pages, then save clearly labelled local merchant watches. Pair with [direct-linking-activation-dossier.md](direct-linking-activation-dossier.md) (the market-reality research this plan implements).
+Goal: Vognary contracts and operates the product integration while a named regulated FIU remains the accountable AA data recipient. Users never see provider credentials or deployment configuration. A user reviews the scoped, revocable consent required to access that user's data and returns automatically to Vognary; expiry or provider policy may require reauthorization. Pair with [direct-linking-activation-dossier.md](direct-linking-activation-dossier.md) for the procurement and regulatory gates.
 
 ## The model in one paragraph
 
-Two consent rails can supply data: **email receipts** (Gmail OAuth — the user approves on Google's page) and **bank evidence** (RBI Account Aggregator — the user approves in the regulated AA flow). Every consumer platform tile (Netflix, Spotify, Prime, ChatGPT, Claude, Apple, Google Play, …) is a **merchant watch**: one click saves a local matching preference, and qualifying evidence from connected rails can be organized by merchant descriptors. It does not connect to the merchant account. No API keys are collected on this consumer surface; workspace admins can still register scoped provider keys (OpenAI org, AWS, GitHub org) on `/sources`.
+The primary target is a **company-managed bank-transaction product** through an approved Account Aggregator/FIU arrangement. The regulated FIU receives AA financial information; Vognary processes or displays derived recurring-spend insights only to the extent the FIU contract, customer consent, and applicable law explicitly permit. Supported transaction evidence may refresh while the scoped periodic consent and FIP remain active. **Email receipts** are optional coverage for merchants that bank narration cannot identify and require a separate Google approval. Merchant tiles remain local matching preferences, not direct merchant connections. No customer supplies an API key, redirect URI, provider secret, or developer-console setting.
 
 ## What shipped in code (this change)
 
@@ -15,23 +15,25 @@ Two consent rails can supply data: **email receipts** (Gmail OAuth — the user 
 | Connections panel: 2 consent rail cards + clearly labelled merchant-watch grid | `src/app/vognary-mvp-client.tsx` (`IntegrationCommandCenter`, `RailCard`) | Done |
 | Merchant watches included in the encrypted/opt-in workspace snapshot, with instant matching against existing ledger evidence | `WorkspaceBackup.merchantLinks` | Done |
 | Account Aggregator consent start: create pending Setu consent → return approval URL → poll → activate only after provider confirmation | `src/app/api/integrations/aa/start/route.ts` + `requestSetuConsent` in `setu-aa-adapter.ts` | Done; sandbox requires credentials plus `sandbox-approved`; production requires the approved endpoint plus `production-live` |
-| Gmail one-click OAuth redirect | existing `/api/integrations/gmail/start` | Already live (needs Google verification for >100 users) |
+| Gmail top-level browser authorization and automatic return | existing `/api/integrations/gmail/start` | Code-ready for supported browsers; public availability remains closed until Google restricted-scope verification and security assessment are complete |
 
 ## Exact activation sequence (founder-only steps)
 
-1. **Setu sandbox.** Create the FIU product instance, configure its consent object and callback/redirect, obtain the issued sandbox credentials, then set `SETU_AA_CLIENT_ID`, `SETU_AA_CLIENT_SECRET`, `SETU_AA_PRODUCT_INSTANCE_ID`, `SETU_AA_BASE_URL`, and `ACCOUNT_AGGREGATOR_PARTNER_STATUS=sandbox-approved`. Validate consent creation, approval, polling, and transaction fetch against the provider's test FIP before enabling testers.
-2. **This week — Google OAuth verification.** Submit the restricted-scope (`gmail.readonly`) verification in Google Cloud Console. Until approved, Gmail one-click works for up to 100 test users — enough for the private-audit pipeline.
-3. **Setu/Finvu FIU agreement.** Complete the partner, eligibility, security, consent-object, and production endpoint reviews. Set `ACCOUNT_AGGREGATOR_PARTNER_STATUS=production-live` only after the partner confirms the production FIU path; the application refuses to use a sandbox endpoint in production.
-4. **Later — provider OAuth rail (optional third rail).** Register developer apps where true OAuth exists (GitHub, Google, Microsoft). Each adds a direct one-click connection for that provider without touching the tile UX.
+1. **Qualify the regulated structure.** Before buying anything, obtain written confirmation naming the regulated FIU, the consent purpose, the data recipient, and Vognary's permitted role. A gateway or TSP subscription alone is insufficient.
+2. **Contract the FIU and gateway structure.** Compare a Setu quote with Finvu's published per-fetch/per-active-account ranges, active-FIP coverage, periodic-fetch support, consent theming, uptime metrics, deletion, and support SLA. The agreement must name the FIU as recipient and define Vognary's processor and display rights. Users never receive company credentials.
+3. **Prove the full lifecycle in sandbox.** Test the regulated FIU's consent request, approval and return, permitted processing, recurrence detection, scheduled refresh, failure recovery, expiry, reauthorization, revocation, deletion, and fallback when an FIP is inactive.
+4. **Complete the Google supplement separately.** Submit `gmail.readonly` for restricted-scope verification and complete the annual security assessment required when server-side systems transmit or store restricted Gmail data.
+5. **Open production only on evidence.** Signed FIU/provider contracts, qualified legal approval, production credentials, approved consent copy, and observed fetch/revocation evidence are mandatory. The customer UI receives only `available` or `company-activation-pending`.
 
 ## What this deliberately does not claim
 
 - No universal "connect once, everything appears" promise — coverage is per-rail and the UI says so per tile.
 - No Netflix/Spotify/Hotstar direct APIs exist; the tiles say evidence arrives via bank descriptors and receipts.
-- UPI mandate *registries* (PhonePe/GPay) remain partner-gated; pre-debit notification emails via the Gmail rail are the honest interim coverage.
+- Merchant payment-processor APIs cover only mandates created through that merchant account. Consumer-wide UPI/card mandate visibility remains unavailable until an authorized party validates a broader user-consented route.
 
 ## How a user experiences it
 
-1. Open Connections → click **Connect** on Email receipts → approve on Google's page → receipts import.
-2. Click **Connect** on Bank & UPI → enter only the AA handle (identity, not a password) → review and approve in the regulated AA flow → Vognary keeps the source pending until provider confirmation, then starts scheduled evidence sync.
-3. Click **Watch** on Netflix (or any tile) → matching commitments already in the ledger surface instantly; future matching evidence can attach as connected rails sync.
+1. Open Connections and choose **Bank transactions**. Vognary has already arranged the company-side FIU and provider integration.
+2. Enter the AA handle and review the scoped request in the regulated consent experience. When the provider supplies a browser return URL, Vognary continues in the same tab; otherwise approval completes in the Account Aggregator app while Vognary waits for provider confirmation.
+3. The regulated FIU receives the permitted transaction history. Vognary detects and displays recurring streams only under its approved processing role. Refresh continues only while consent and provider coverage remain active; inactive institutions fall back to receipt paste or statement import.
+4. Optionally connect **Email receipts** through Google's secure approval to improve merchant and renewal detail.

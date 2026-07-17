@@ -34,10 +34,9 @@ export async function GET(request: Request) {
     ...listSetuMissingEnv(),
   ];
   return Response.json({
-    status: requiredEnv.length ? "not-configured" : "ready",
+    status: requiredEnv.length ? "not-available" : "ready",
     integration: connectorId,
-    requiredEnv,
-    partnerStatus: process.env.ACCOUNT_AGGREGATOR_PARTNER_STATUS?.trim() || "not-started",
+    availability: requiredEnv.length ? "company-activation-pending" : "available",
   });
 }
 
@@ -64,10 +63,10 @@ export async function POST(request: Request) {
   ];
   if (requiredEnv.length) {
     return Response.json({
-      status: "not-configured",
+      status: "not-available",
       integration: connectorId,
-      requiredEnv,
-      message: "The Account Aggregator rail activates once Setu FIU credentials are configured. Nothing is needed from the account holder.",
+      availability: "company-activation-pending",
+      message: "Bank connection is not available yet. Vognary is completing the regulated provider agreement and company setup.",
     }, { status: 501 });
   }
 
