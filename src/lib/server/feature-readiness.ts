@@ -23,6 +23,7 @@ export const productionFeatureMigrations = [
   "0018_living_proof_graph",
   "0019_verified_outcome_loop",
   "0020_authorization_evidence",
+  "0021_pending_connector_consent",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];

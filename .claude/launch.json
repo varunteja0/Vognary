@@ -1,0 +1,51 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vognary-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3005"
+      ],
+      "port": 3005,
+      "env": {
+        "DATABASE_URL": "postgres://postgres:vognary_ci@localhost:55433/vognary_dev",
+        "POSTGRES_SSL": "false",
+        "SESSION_SECRET": "local-dev-session-secret-at-least-32-bytes-long",
+        "TOKEN_ENCRYPTION_KEY": "1111111111111111111111111111111111111111111111111111111111111111",
+        "ALLOW_IN_MEMORY_RATE_LIMITS": "true",
+        "ENABLE_DEVELOPMENT_LOGIN": "true",
+        "DEVELOPMENT_LOGIN_EMAIL": "founder@vognary.test",
+        "DEVELOPMENT_LOGIN_ACCESS_CODE": "local-dev-code-123",
+        "APP_URL": "http://localhost:3005"
+      }
+    },
+    {
+      "name": "vognary-prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "start",
+        "--",
+        "--port",
+        "3007"
+      ],
+      "port": 3007,
+      "env": {
+        "DATABASE_URL": "postgres://postgres:vognary_ci@localhost:55433/vognary_dev",
+        "POSTGRES_SSL": "false",
+        "SESSION_SECRET": "local-dev-session-secret-at-least-32-bytes-long",
+        "TOKEN_ENCRYPTION_KEY": "1111111111111111111111111111111111111111111111111111111111111111",
+        "ALLOW_IN_MEMORY_RATE_LIMITS": "true",
+        "ENABLE_DEVELOPMENT_LOGIN": "true",
+        "DEVELOPMENT_LOGIN_EMAIL": "founder@vognary.test",
+        "DEVELOPMENT_LOGIN_ACCESS_CODE": "local-dev-code-123",
+        "APP_URL": "http://localhost:3007"
+      }
+    }
+  ]
+}

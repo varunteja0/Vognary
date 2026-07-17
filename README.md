@@ -42,7 +42,7 @@ Vognary 1.0 is an evidence-first recurring-spend audit for founders, builders, f
 - Signed session-cookie and workspace authorization primitives, exposed through closed-by-default auth/workspace APIs.
 - Resend magic-link login route with one-time PostgreSQL challenges for public session issuance once email credentials are configured.
 - Gmail OAuth receipt connector with state validation, browser import fallback, and encrypted token persistence for signed-in users when the database and token vault are configured.
-- PostgreSQL schema and migrations through `0020_authorization_evidence`, including encrypted workspace state, connector lifecycle, privacy controls, one-time assisted-audit fulfillment, atomic shared rate limiting, the Living Proof Graph, verified outcomes, and exact authorization evidence.
+- PostgreSQL schema and migrations through `0021_pending_connector_consent`, including encrypted workspace state, connector lifecycle, privacy controls, one-time assisted-audit fulfillment, atomic shared rate limiting, the Living Proof Graph, verified outcomes, exact authorization evidence, and fail-closed pending provider consent.
 - One server-owned INR 999 assisted-audit SKU with no auto-renewal or monitoring entitlement. Checkout remains hidden until qualified legal review and tracked Razorpay configuration are proven.
 
 ## Quick Start

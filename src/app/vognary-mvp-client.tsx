@@ -4,6 +4,12 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { encodeCsvCell } from "@/lib/csv";
 import { connectors, type Connector, type ConnectorStatus } from "@/lib/connectors";
 import {
+  describeTileCoverage,
+  matchTileItems,
+  merchantTiles,
+  type ConnectTile,
+} from "@/lib/connect-rails";
+import {
   analyzeStatements,
   applyMergeDecisionsToAudit,
   findDuplicateCandidates,
@@ -78,6 +84,7 @@ type WorkspaceBackup = {
   mergeDecisions?: Record<string, MergeDecision>;
   lastReview?: ReviewSnapshot | null;
   reviewCompletedAt?: string | null;
+  merchantLinks?: string[];
 };
 
 type ServerSessionPayload = {
@@ -105,6 +112,7 @@ type ConnectorStartPayload = {
   requiredEnv?: string[];
   message?: string;
   authUrl?: string;
+  approvalUrl?: string | null;
   redirectUri?: string;
   initialSync?: {
     status?: string;
@@ -334,27 +342,6 @@ function migrateLegacyWorkspaceKeys(workspace: WorkspaceBackup): WorkspaceBackup
   };
 }
 
-const integrationConnectorIds = [
-  "gmail-readonly",
-  "claude-subscription",
-  "kling-subscription",
-  "openai-costs",
-  "anthropic-usage",
-  "vercel-platform",
-  "render-platform",
-  "x-premium-subscription",
-  "github-billing",
-  "github-copilot",
-  "cloudflare-billing",
-  "aws-cost-explorer",
-  "paypal-automatic-payments",
-  "apple-receipt-evidence",
-  "google-play-receipt-evidence",
-  "account-aggregator",
-  "upi-autopay-mandates",
-  "card-emandates",
-];
-
 const connectorLaunchTargets: Record<string, { label: string; url: string }> = {
   "gmail-readonly": { label: "Google OAuth", url: "https://console.cloud.google.com/apis/credentials" },
   "claude-subscription": { label: "Claude account", url: "https://claude.ai/settings/billing" },
@@ -382,13 +369,6 @@ const connectorStatusLabels: Record<ConnectorStatus, string> = {
   "ready-with-env": "Needs setup",
   "partner-required": "Needs partner",
   planned: "Planned",
-};
-
-const connectorStatusClass: Record<ConnectorStatus, string> = {
-  live: "pill pill-ready",
-  "ready-with-env": "pill pill-partial",
-  "partner-required": "pill pill-blocked",
-  planned: "pill pill-planned",
 };
 
 // Workspace information architecture — the ordered chapters of the review.
@@ -429,11 +409,10 @@ export default function VognaryMvpClient() {
   const [serverWorkspaceHydrated, setServerWorkspaceHydrated] = useState(false);
   const [serverSaveRetry, setServerSaveRetry] = useState(0);
   const [connectorStartResults, setConnectorStartResults] = useState<Record<string, ConnectorStartPayload>>({});
+  const [merchantLinks, setMerchantLinks] = useState<string[]>([]);
+  const [aaVuaDraft, setAaVuaDraft] = useState("");
   const [connectingConnectorId, setConnectingConnectorId] = useState<string | null>(null);
   const [syncingConnectorId, setSyncingConnectorId] = useState<string | null>(null);
-  const [selectedConnectorId, setSelectedConnectorId] = useState("gmail-readonly");
-  const [connectorApiKeyDraft, setConnectorApiKeyDraft] = useState("");
-  const [connectorAccountDraft, setConnectorAccountDraft] = useState("");
   const [serverConnectors, setServerConnectors] = useState<WorkspaceConnectorStatusPayload | null>(null);
   const [serverDecisions, setServerDecisions] = useState<ServerCommitmentDecision[]>([]);
   const [serverCommitments, setServerCommitments] = useState<ServerRecurringItem[]>([]);
@@ -556,14 +535,14 @@ export default function VognaryMvpClient() {
   const persistFailureNotified = useRef(false);
   useEffect(() => {
     if (!localSaveEnabled || typeof window === "undefined") return;
-    const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt });
+    const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt, merchantLinks });
     const saved = safePersist(workspaceStorageKey, JSON.stringify(backup));
     if (!saved && !persistFailureNotified.current) {
       persistFailureNotified.current = true;
       setNotice("Browser storage is full — the on-device save is NOT updating. Export a sealed audit pack now, then remove an old statement source.");
     }
     if (saved) persistFailureNotified.current = false;
-  }, [actionsMeta, itemOwners, lastReview, localSaveEnabled, manualItems, mergeDecisions, receiptText, reviewCompletedAt, reviewNotes, statementSources, teamMembers, userActions]);
+  }, [actionsMeta, itemOwners, lastReview, localSaveEnabled, manualItems, merchantLinks, mergeDecisions, receiptText, reviewCompletedAt, reviewNotes, statementSources, teamMembers, userActions]);
 
   // Cross-tab safety: if another tab writes this workspace, warn before this
   // tab silently overwrites that work with an older in-memory copy.
@@ -651,6 +630,7 @@ export default function VognaryMvpClient() {
         setReceiptText(restored.receiptText ?? "");
         setLastReview(restored.lastReview ?? null);
         setReviewCompletedAt(restored.reviewCompletedAt ?? null);
+        setMerchantLinks(sanitizeMerchantLinks(restored.merchantLinks));
         setSelectedItemId(null);
         serverRevisionRef.current = payload.snapshot.revision;
         lastServerSnapshotRef.current = serializeWorkspaceForSync(restored);
@@ -715,6 +695,7 @@ export default function VognaryMvpClient() {
       mergeDecisions,
       lastReview,
       reviewCompletedAt,
+      merchantLinks,
     });
     const serialized = serializeWorkspaceForSync(snapshot);
     if (serialized === lastServerSnapshotRef.current) return;
@@ -776,6 +757,7 @@ export default function VognaryMvpClient() {
     itemOwners,
     lastReview,
     manualItems,
+    merchantLinks,
     mergeDecisions,
     receiptText,
     reviewCompletedAt,
@@ -990,7 +972,6 @@ export default function VognaryMvpClient() {
         hint: connectorStatusLabels[connector.status],
         keywords: `${connector.category} connect link integration`,
         run: () => {
-          setSelectedConnectorId(connector.id);
           navigateToSection("connect");
         },
       });
@@ -1061,11 +1042,12 @@ export default function VognaryMvpClient() {
     setReceiptText(backup.receiptText ?? "");
     setLastReview(backup.lastReview ?? null);
     setReviewCompletedAt(backup.reviewCompletedAt ?? null);
+    setMerchantLinks(sanitizeMerchantLinks(backup.merchantLinks));
   }
 
   // Destructive actions are confirmed first and undoable for 30 seconds after.
   function offerUndo() {
-    undoSnapshotRef.current = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt });
+    undoSnapshotRef.current = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt, merchantLinks });
     setUndoAvailable(true);
     if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
     undoTimerRef.current = window.setTimeout(() => setUndoAvailable(false), 30_000);
@@ -1095,6 +1077,7 @@ export default function VognaryMvpClient() {
         setReviewNotes({});
         setSelectedItemId(null);
         setReceiptText("");
+        setMerchantLinks([]);
         setNotice("Workspace cleared. This browser has no audit data now.");
       },
     });
@@ -1379,7 +1362,7 @@ export default function VognaryMvpClient() {
 
     const generation = serverSyncGenerationRef.current;
     setServerSaveStatus("Synchronizing encrypted workspace state...");
-    const snapshot = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt });
+    const snapshot = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt, merchantLinks });
     let response: Response;
     try {
       response = await fetch("/api/workspaces/current/audit-snapshot", {
@@ -1568,7 +1551,7 @@ export default function VognaryMvpClient() {
 
   function enableLocalSave() {
     setLocalSaveEnabled(true);
-    const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt });
+    const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt, merchantLinks });
     const saved = safePersist(workspaceStorageKey, JSON.stringify(backup));
     setNotice(saved
       ? "Local save enabled on this device. Do not use it on shared computers."
@@ -1593,45 +1576,6 @@ export default function VognaryMvpClient() {
     setDisconnectedConnectorIds((current) => current.filter((id) => id !== connector.id));
 
     try {
-      if (connector.authType === "api-key" && connectorApiKeyDraft.trim()) {
-        const workspaceId = serverSession?.session?.workspaceId;
-        if (!serverSession?.authenticated || !workspaceId) {
-          setNotice("Sign in before storing an encrypted provider API key.");
-          return;
-        }
-
-        if (connector.id === "github-copilot" && !connectorAccountDraft.trim()) {
-          setNotice("Add the GitHub organization slug before storing a Copilot metrics token.");
-          return;
-        }
-
-        const response = await fetch(`/api/connectors/${connector.id}/start`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            workspaceId,
-            apiKey: connectorApiKeyDraft.trim(),
-            providerAccountId: connectorAccountDraft.trim() || undefined,
-            displayName: `${connector.name} sync`,
-          }),
-        });
-        const payload = await response.json().catch(() => ({})) as ConnectorStartPayload;
-        setConnectorStartResults((current) => ({ ...current, [connector.id]: payload }));
-
-        if (!response.ok) {
-          setNotice(payload.message ?? payload.error ?? `Could not connect ${connector.name}.`);
-          return;
-        }
-
-        setConnectorApiKeyDraft("");
-        setConnectorAccountDraft("");
-        await refreshWorkspaceConnectors();
-        setNotice(payload.initialSync?.status === "succeeded"
-          ? `${connector.name} connected. Its first sync populated ${payload.initialSync.evidenceWritten ?? 0} evidence record(s) and will refresh automatically.`
-          : `${connector.name} connected, but its first sync needs attention: ${payload.initialSync?.error ?? "the source did not complete"}. Vognary will retain the failure state for retry.`);
-        return;
-      }
-
       if (connector.id === "gmail-readonly") {
         if (!serverSession?.authenticated) {
           setNotice("Sign in before connecting Gmail so the OAuth consent and encrypted refresh token belong to your workspace.");
@@ -1707,6 +1651,60 @@ export default function VognaryMvpClient() {
   async function refreshWorkspaceConnectors() {
     if (!serverSession?.authenticated) return;
     setServerConnectors(await fetchWorkspaceConnectors());
+  }
+
+  function linkMerchantTile(tile: ConnectTile) {
+    setMerchantLinks((current) => current.includes(tile.id) ? current : [...current, tile.id]);
+    const matches = matchTileItems(tile, audit.recurringItems);
+    const railsLive = connectedConnectorIds.has("gmail-readonly") || connectedConnectorIds.has("account-aggregator");
+    setNotice(matches.length
+      ? `${tile.name} watch added. ${matches.length} matching commitment(s) are already in your ledger.`
+      : railsLive
+        ? `${tile.name} watch added. Matching evidence can appear as your connected rails sync.`
+        : `${tile.name} watch added. Connect the email or bank rail so matching evidence can arrive.`);
+  }
+
+  function unlinkMerchantTile(tile: ConnectTile) {
+    setMerchantLinks((current) => current.filter((id) => id !== tile.id));
+    setNotice(`${tile.name} watch removed. Evidence already in the ledger stays until you clear it.`);
+  }
+
+  async function startBankRail() {
+    setConnectingConnectorId("account-aggregator");
+    try {
+      if (!serverSession?.authenticated) {
+        setNotice("Sign in before linking bank data so the consent belongs to your workspace.");
+        return;
+      }
+      const vua = aaVuaDraft.trim();
+      if (!vua) {
+        setNotice("Add your Account Aggregator handle first (for example 9999999999@onemoney). It identifies your account — it is not a password.");
+        return;
+      }
+      const response = await fetch("/api/integrations/aa/start", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ vua }),
+      });
+      const payload = await response.json().catch(() => ({})) as ConnectorStartPayload & { approvalUrl?: string | null };
+      setConnectorStartResults((current) => ({ ...current, "account-aggregator": payload }));
+
+      if (!response.ok) {
+        setNotice(payload.requiredEnv?.length
+          ? `The bank rail is not activated on this deployment yet (needs ${payload.requiredEnv.join(", ")}). Once active, you review and approve in the regulated Account Aggregator flow.`
+          : payload.message ?? payload.error ?? "The bank consent could not be started.");
+        return;
+      }
+
+      setAaVuaDraft("");
+      await refreshWorkspaceConnectors();
+      if (payload.approvalUrl) window.open(payload.approvalUrl, "_blank", "noopener,noreferrer");
+      setNotice(payload.message ?? "Review and approve the request in the Account Aggregator flow. The source stays pending until approval is confirmed.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "The bank consent could not be started.");
+    } finally {
+      setConnectingConnectorId(null);
+    }
   }
 
   async function saveServerCommitmentDecision(recurringItemId: string, action: RecommendationType) {
@@ -2047,17 +2045,17 @@ export default function VognaryMvpClient() {
             connectingConnectorId={connectingConnectorId}
             syncingConnectorId={syncingConnectorId}
             connectedConnectorIds={connectedConnectorIds}
-            selectedConnectorId={selectedConnectorId}
             serverSession={serverSession}
             serverConnectors={serverConnectors}
-            apiKeyDraft={connectorApiKeyDraft}
-            accountDraft={connectorAccountDraft}
-            onSelectedConnector={setSelectedConnectorId}
-            onApiKeyDraftChange={setConnectorApiKeyDraft}
-            onAccountDraftChange={setConnectorAccountDraft}
+            merchantLinks={merchantLinks}
+            aaVuaDraft={aaVuaDraft}
+            onAaVuaDraftChange={setAaVuaDraft}
             onStartConnector={startConnector}
             onDisconnectConnector={disconnectConnector}
             onRunConnectorSync={runConnectorSyncNow}
+            onStartBankRail={() => void startBankRail()}
+            onLinkMerchant={linkMerchantTile}
+            onUnlinkMerchant={unlinkMerchantTile}
             onJumpToLedger={() => selectAndReviewItem()}
             onExportReport={exportReport}
             onClearWorkspace={requestClearWorkspace}
@@ -2297,17 +2295,17 @@ function IntegrationCommandCenter({
   connectingConnectorId,
   syncingConnectorId,
   connectedConnectorIds,
-  selectedConnectorId,
   serverSession,
   serverConnectors,
-  apiKeyDraft,
-  accountDraft,
-  onSelectedConnector,
-  onApiKeyDraftChange,
-  onAccountDraftChange,
+  merchantLinks,
+  aaVuaDraft,
+  onAaVuaDraftChange,
   onStartConnector,
   onDisconnectConnector,
   onRunConnectorSync,
+  onStartBankRail,
+  onLinkMerchant,
+  onUnlinkMerchant,
   onJumpToLedger,
   onExportReport,
   onClearWorkspace,
@@ -2317,48 +2315,35 @@ function IntegrationCommandCenter({
   connectingConnectorId: string | null;
   syncingConnectorId: string | null;
   connectedConnectorIds: Set<string>;
-  selectedConnectorId: string;
   serverSession: ServerSessionPayload | null;
   serverConnectors: WorkspaceConnectorStatusPayload | null;
-  apiKeyDraft: string;
-  accountDraft: string;
-  onSelectedConnector: (connectorId: string) => void;
-  onApiKeyDraftChange: (value: string) => void;
-  onAccountDraftChange: (value: string) => void;
+  merchantLinks: string[];
+  aaVuaDraft: string;
+  onAaVuaDraftChange: (value: string) => void;
   onStartConnector: (connector: Connector) => void;
   onDisconnectConnector: (connector: Connector) => void;
   onRunConnectorSync: (connector: Connector) => void;
+  onStartBankRail: () => void;
+  onLinkMerchant: (tile: ConnectTile) => void;
+  onUnlinkMerchant: (tile: ConnectTile) => void;
   onJumpToLedger: () => void;
   onExportReport: () => void;
   onClearWorkspace: () => void;
 }) {
-  const integrationConnectors = getIntegrationConnectors();
-  const selectedConnector = integrationConnectors.find((connector) => connector.id === selectedConnectorId) ?? integrationConnectors[0];
-  const result = connectorStartResults[selectedConnector.id];
-  const connected = connectedConnectorIds.has(selectedConnector.id);
-  const busy = connectingConnectorId === selectedConnector.id;
-  const missing = result?.missingEnv ?? result?.requiredEnv ?? [];
-  const serverAccount = getServerAccount(serverConnectors, selectedConnector.id);
-  const needsReauth = serverAccount?.status === "needs_reauth";
-  const statusLabel = connected ? "Connected" : needsReauth ? "Reconnect required" : connectorStatusLabels[selectedConnector.status];
-  const statusClass = connected ? "pill pill-ready" : needsReauth ? "pill pill-blocked" : connectorStatusClass[selectedConnector.status];
   const signedIn = Boolean(serverSession?.authenticated && serverSession.session?.workspaceId);
-  const hasApiKeyDraft = Boolean(apiKeyDraft.trim());
-  const showApiKeyControl = selectedConnector.authType === "api-key";
-  const syncing = syncingConnectorId === selectedConnector.id;
-  const syncNeedsAttention = !needsReauth && (
-    serverAccount?.freshnessStatus === "stale"
-    || serverAccount?.freshnessStatus === "error"
-    || serverAccount?.latestRunStatus === "failed"
-    || serverAccount?.latestRunStatus === "blocked"
-  );
+  const rails = {
+    gmailConnected: connectedConnectorIds.has("gmail-readonly"),
+    bankConnected: connectedConnectorIds.has("account-aggregator"),
+  };
+  const linked = new Set(merchantLinks);
 
   return (
     <section className="dossier spotlight scan p-5 sm:p-6" data-reveal onMouseMove={trackSpotlightPointer}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <span className="folio" data-folio="1.1" style={{ color: "var(--dossier-muted)" }}>Connections</span>
-          <h3 className="mt-3 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-4xl">Connect proof. Reveal renewals.</h3>
+          <h3 className="mt-3 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-4xl">Connect evidence. Choose what to watch.</h3>
+          <p className="mt-2 max-w-xl text-sm leading-6 muted-on-dark">Email and bank consent rails can supply evidence. Merchant watches organize matching evidence from those rails; their coverage always depends on the sources you connect.</p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <DossierStat label="Items" value={`${audit.summary.recurringCount}`} />
@@ -2368,76 +2353,215 @@ function IntegrationCommandCenter({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
-        <label className="block">
-          <span className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Platform</span>
-          <select value={selectedConnector.id} onChange={(event) => { onSelectedConnector(event.target.value); onApiKeyDraftChange(""); onAccountDraftChange(""); }} className="mt-2 h-13 w-full rounded-[10px] border px-4 text-base font-semibold outline-none" style={{ background: "rgba(243,234,214,0.06)", borderColor: "var(--dossier-line)", color: "var(--dossier-ink)" }}>
-            {integrationConnectors.map((connector) => <option key={connector.id} value={connector.id}>{connector.name}</option>)}
-          </select>
-        </label>
-        <button type="button" disabled={busy} onClick={() => connected ? onDisconnectConnector(selectedConnector) : onStartConnector(selectedConnector)} className={`${connected ? "btn btn-ondark" : "btn btn-primary"} h-13 self-end px-6 disabled:cursor-not-allowed disabled:opacity-60`}>
-          {busy ? "Connecting..." : connected ? "Disconnect" : needsReauth ? "Reconnect" : showApiKeyControl && hasApiKeyDraft ? "Store & sync" : "Connect"}
-        </button>
+      <div className="mt-5 grid gap-3 lg:grid-cols-2">
+        <RailCard
+          title="Email receipts"
+          eyebrow="Rail 01 · Google consent page"
+          connectorId="gmail-readonly"
+          description="One click opens Google's own consent page for read-only receipts. Renewal notices become ledger evidence on a schedule."
+          connectorStartResults={connectorStartResults}
+          connectingConnectorId={connectingConnectorId}
+          syncingConnectorId={syncingConnectorId}
+          connected={rails.gmailConnected}
+          serverConnectors={serverConnectors}
+          onStartConnector={onStartConnector}
+          onDisconnectConnector={onDisconnectConnector}
+          onRunConnectorSync={onRunConnectorSync}
+        />
+        <RailCard
+          title="Bank & UPI"
+          eyebrow="Rail 02 · RBI Account Aggregator"
+          connectorId="account-aggregator"
+          description="Review and approve consent in the regulated Account Aggregator flow. Supported bank transaction evidence can then arrive read-only."
+          connectorStartResults={connectorStartResults}
+          connectingConnectorId={connectingConnectorId}
+          syncingConnectorId={syncingConnectorId}
+          connected={rails.bankConnected}
+          serverConnectors={serverConnectors}
+          onStartConnector={onStartConnector}
+          onDisconnectConnector={onDisconnectConnector}
+          onRunConnectorSync={onRunConnectorSync}
+          bankRail={{ signedIn, vuaDraft: aaVuaDraft, onVuaDraftChange: onAaVuaDraftChange, onStart: onStartBankRail }}
+        />
       </div>
 
-      {showApiKeyControl ? (
-        <div className="mt-3 rounded-[11px] border p-3" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
-          <label className="block">
-            <span className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>{getConnectorAccountLabel(selectedConnector.id)}</span>
-            <input
-              value={accountDraft}
-              onChange={(event) => onAccountDraftChange(event.target.value)}
-              type="text"
-              disabled={!signedIn || busy}
-              placeholder={getConnectorAccountPlaceholder(selectedConnector.id)}
-              className="mt-2 h-11 w-full rounded-[10px] border px-3 font-data text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
-              style={{ background: "rgba(10,12,16,0.28)", borderColor: "var(--dossier-line)", color: "var(--dossier-ink)" }}
-            />
-          </label>
-          <label className="block">
-            <span className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Encrypted API key</span>
-            <input
-              value={apiKeyDraft}
-              onChange={(event) => onApiKeyDraftChange(event.target.value)}
-              type="password"
-              disabled={!signedIn || busy}
-              placeholder={signedIn ? "Paste read/admin key" : "Sign in to store a key"}
-              className="mt-2 h-11 w-full rounded-[10px] border px-3 font-data text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
-              style={{ background: "rgba(10,12,16,0.28)", borderColor: "var(--dossier-line)", color: "var(--dossier-ink)" }}
-            />
-          </label>
-          <p className="mt-2 text-xs leading-5 muted-on-dark">
-            {signedIn ? "Stored through the token vault, then queued for scheduled sync." : "API-key connectors require a signed-in configured workspace."}
-          </p>
+      <div className="mt-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <span className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Merchant watches · local workspace preferences</span>
+          <span className="font-data text-[0.66rem] muted-on-dark">{merchantLinks.length ? `${merchantLinks.length} watched` : "Watch the merchants you pay"}</span>
         </div>
-      ) : null}
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {merchantTiles.map((tile) => {
+            const isLinked = linked.has(tile.id);
+            const matches = matchTileItems(tile, audit.recurringItems);
+            const coverage = describeTileCoverage(tile, rails);
+            const matchCurrency = matches[0]?.currency ?? audit.summary.primaryCurrency;
+            const matchedMonthly = matches
+              .filter((item) => item.currency === matchCurrency)
+              .reduce((sum, item) => sum + item.monthlyCost, 0);
+            return (
+              <div key={tile.id} className="flex flex-col justify-between rounded-[11px] border p-3" style={{ borderColor: "var(--dossier-line)", background: isLinked ? "rgba(243,234,214,0.07)" : "rgba(243,234,214,0.03)" }}>
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-display text-base font-semibold text-(--dossier-ink)">{tile.name}</p>
+                      <p className="font-data text-[0.62rem] uppercase tracking-[0.14em] muted-on-dark">{tile.category}</p>
+                    </div>
+                    <span className={isLinked ? (matches.length || coverage.state === "fed" ? "pill pill-ready" : "pill pill-partial") : "pill pill-planned"}>
+                      {isLinked ? (matches.length ? "In ledger" : coverage.state === "waiting-for-rail" ? "Needs rail" : "Watching") : "Not watched"}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 muted-on-dark">
+                    {isLinked
+                      ? matches.length
+                        ? `${matches.length} matching commitment(s) · ${formatCurrency(matchedMonthly, matchCurrency)}/mo already detected.`
+                        : coverage.message
+                      : tile.tagline}
+                  </p>
+                </div>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => (isLinked ? onUnlinkMerchant(tile) : onLinkMerchant(tile))}
+                    className={`${isLinked ? "btn btn-ondark" : "btn btn-primary"} h-9 w-full text-xs`}
+                  >
+                    {isLinked ? "Stop watching" : "Watch"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="mt-4 flex flex-col gap-3 rounded-[11px] border p-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={statusClass}>{statusLabel}</span>
-            <span className="font-data text-xs muted-on-dark">{selectedConnector.category} · {selectedConnector.authType}</span>
-          </div>
-          {missing.length ? <p className="mt-2 text-xs leading-5 text-ochre">Needs setup: {missing.join(", ")}</p> : null}
-          {result?.redirectUri ? <p className="mt-2 break-all font-data text-[0.68rem] muted-on-dark">Redirect URI: {result.redirectUri}</p> : null}
-          {serverAccount ? (
-            <div className="mt-2 grid gap-1 font-data text-[0.68rem] leading-5 muted-on-dark sm:grid-cols-2">
-              <p>Source: <span className="text-(--dossier-ink)">{serverAccount.displayName}</span> · {serverAccount.evidenceCount} evidence record(s)</p>
-              <p>Freshness: <span className="text-(--dossier-ink)">{serverAccount.freshnessStatus ?? "unknown"}</span> · Coverage {serverAccount.coverageCompleteness ?? "unknown"}</p>
-              <p>Last synced: <span className="text-(--dossier-ink)">{formatSyncTime(serverAccount.lastSyncedAt)}</span></p>
-              <p>Next automatic sync: <span className="text-(--dossier-ink)">{formatSyncTime(serverAccount.nextSyncAt)}</span></p>
-            </div>
-          ) : null}
-        </div>
+        <p className="text-xs leading-5 muted-on-dark">
+          Gmail and bank access is approved on provider consent pages and stays revocable there. Merchant watches are local workspace preferences; they do not connect to merchant accounts. Workspace admins with provider keys can register scoped read access on <a href="/sources" className="underline">/sources</a>.
+        </p>
         <div className="flex shrink-0 flex-wrap gap-2">
-          {serverAccount && !connected ? <button type="button" disabled={busy} onClick={() => onDisconnectConnector(selectedConnector)} className="btn btn-ondark h-9 px-3 text-xs disabled:opacity-60">Disconnect source</button> : null}
-          {syncNeedsAttention ? <button type="button" disabled={syncing} onClick={() => onRunConnectorSync(selectedConnector)} className="btn btn-ondark h-9 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60">{syncing ? "Retrying" : "Retry sync"}</button> : null}
           <button type="button" onClick={onJumpToLedger} className="btn btn-ondark h-9 px-3 text-xs">Open ledger</button>
           <button type="button" onClick={onExportReport} className="btn btn-ondark h-9 px-3 text-xs">Download report</button>
           <button type="button" onClick={onClearWorkspace} className="btn btn-ondark h-9 px-3 text-xs">Clear</button>
         </div>
       </div>
     </section>
+  );
+}
+
+function RailCard({
+  title,
+  eyebrow,
+  connectorId,
+  description,
+  connectorStartResults,
+  connectingConnectorId,
+  syncingConnectorId,
+  connected,
+  serverConnectors,
+  onStartConnector,
+  onDisconnectConnector,
+  onRunConnectorSync,
+  bankRail,
+}: {
+  title: string;
+  eyebrow: string;
+  connectorId: string;
+  description: string;
+  connectorStartResults: Record<string, ConnectorStartPayload>;
+  connectingConnectorId: string | null;
+  syncingConnectorId: string | null;
+  connected: boolean;
+  serverConnectors: WorkspaceConnectorStatusPayload | null;
+  onStartConnector: (connector: Connector) => void;
+  onDisconnectConnector: (connector: Connector) => void;
+  onRunConnectorSync: (connector: Connector) => void;
+  bankRail?: {
+    signedIn: boolean;
+    vuaDraft: string;
+    onVuaDraftChange: (value: string) => void;
+    onStart: () => void;
+  };
+}) {
+  const connector = connectors.find((entry) => entry.id === connectorId) ?? null;
+  if (!connector) return null;
+  const result = connectorStartResults[connectorId];
+  const busy = connectingConnectorId === connectorId;
+  const syncing = syncingConnectorId === connectorId;
+  const missing = result?.missingEnv ?? result?.requiredEnv ?? [];
+  const serverAccount = getServerAccount(serverConnectors, connectorId);
+  const pendingApproval = serverAccount?.status === "pending";
+  const needsReauth = serverAccount?.status === "needs_reauth";
+  const syncNeedsAttention = !pendingApproval && !needsReauth && (
+    serverAccount?.freshnessStatus === "stale"
+    || serverAccount?.freshnessStatus === "error"
+    || serverAccount?.latestRunStatus === "failed"
+    || serverAccount?.latestRunStatus === "blocked"
+  );
+  const statusLabel = connected ? "Connected" : pendingApproval ? "Awaiting approval" : needsReauth ? "Reconnect required" : "Consent required";
+  const statusClass = connected ? "pill pill-ready" : needsReauth ? "pill pill-blocked" : "pill pill-partial";
+
+  return (
+    <div className="rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.05)" }}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="eyebrow muted-on-dark" style={{ fontSize: "0.6rem" }}>{eyebrow}</span>
+          <p className="mt-1 font-display text-xl font-semibold text-(--dossier-ink)">{title}</p>
+        </div>
+        <span className={statusClass}>{statusLabel}</span>
+      </div>
+      <p className="mt-2 text-xs leading-5 muted-on-dark">{description}</p>
+
+      {bankRail && !connected && !pendingApproval ? (
+        <label className="mt-3 block">
+          <span className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Account Aggregator handle</span>
+          <input
+            value={bankRail.vuaDraft}
+            onChange={(event) => bankRail.onVuaDraftChange(event.target.value)}
+            type="text"
+            inputMode="text"
+            autoComplete="off"
+            disabled={!bankRail.signedIn || busy}
+            placeholder={bankRail.signedIn ? "9999999999@onemoney" : "Sign in to link bank data"}
+            className="mt-2 h-11 w-full rounded-[10px] border px-3 font-data text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            style={{ background: "rgba(10,12,16,0.28)", borderColor: "var(--dossier-line)", color: "var(--dossier-ink)" }}
+          />
+          <span className="mt-1 block text-[0.68rem] leading-4 muted-on-dark">Your AA handle identifies you in the consent flow — it is not a password. Approval happens in the Account Aggregator experience.</span>
+        </label>
+      ) : null}
+
+      {pendingApproval ? <p className="mt-3 text-xs leading-5 text-ochre">The source is not connected yet. Vognary is waiting for the Account Aggregator to confirm your approval.</p> : null}
+
+      {missing.length ? <p className="mt-2 text-xs leading-5 text-ochre">Activation pending on this deployment: {missing.join(", ")}. Nothing is needed from you once it is live.</p> : null}
+
+      {serverAccount ? (
+        <div className="mt-2 grid gap-1 font-data text-[0.68rem] leading-5 muted-on-dark">
+          <p>Source: <span className="text-(--dossier-ink)">{serverAccount.displayName}</span> · {serverAccount.evidenceCount} evidence record(s)</p>
+          <p>Last synced: <span className="text-(--dossier-ink)">{formatSyncTime(serverAccount.lastSyncedAt)}</span> · Next: <span className="text-(--dossier-ink)">{formatSyncTime(serverAccount.nextSyncAt)}</span></p>
+        </div>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy || (pendingApproval && !result?.approvalUrl)}
+          onClick={() => {
+            if (connected) return onDisconnectConnector(connector);
+            if (pendingApproval && result?.approvalUrl) {
+              window.open(result.approvalUrl, "_blank", "noopener,noreferrer");
+              return;
+            }
+            if (pendingApproval) return;
+            if (bankRail) return bankRail.onStart();
+            return onStartConnector(connector);
+          }}
+          className={`${connected ? "btn btn-ondark" : "btn btn-primary"} h-10 px-4 text-xs disabled:cursor-not-allowed disabled:opacity-60`}
+        >
+          {busy ? "Connecting..." : connected ? "Disconnect" : pendingApproval ? (result?.approvalUrl ? "Continue approval" : "Approval pending") : needsReauth ? "Reconnect" : "Connect"}
+        </button>
+        {serverAccount && !connected ? <button type="button" disabled={busy} onClick={() => onDisconnectConnector(connector)} className="btn btn-ondark h-10 px-3 text-xs disabled:opacity-60">Disconnect source</button> : null}
+        {syncNeedsAttention ? <button type="button" disabled={syncing} onClick={() => onRunConnectorSync(connector)} className="btn btn-ondark h-10 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60">{syncing ? "Retrying" : "Retry sync"}</button> : null}
+      </div>
+    </div>
   );
 }
 
@@ -2537,11 +2661,6 @@ function FirstSuccessPanel({
   );
 }
 
-function getIntegrationConnectors() {
-  const selected = new Set(integrationConnectorIds);
-  return connectors.filter((connector) => selected.has(connector.id));
-}
-
 function openOfficialConnectorTarget(connectorId: string) {
   const target = connectorLaunchTargets[connectorId];
   if (!target) return;
@@ -2615,21 +2734,6 @@ function getActiveServerAccount(payload: WorkspaceConnectorStatusPayload | null,
 
 function getServerAccount(payload: WorkspaceConnectorStatusPayload | null, connectorId: string) {
   return payload?.accounts?.find((account) => account.connectorId === connectorId && account.status !== "revoked") ?? null;
-}
-
-function getConnectorAccountLabel(connectorId: string) {
-  if (connectorId === "github-copilot") return "GitHub organization slug";
-  if (connectorId === "vercel-platform") return "Vercel team slug";
-  if (connectorId === "render-platform") return "Render owner ID";
-  return "Account identifier";
-}
-
-function getConnectorAccountPlaceholder(connectorId: string) {
-  if (connectorId === "github-copilot") return "Required, for example your-org";
-  if (connectorId === "vercel-platform") return "Optional team slug";
-  if (connectorId === "render-platform") return "Optional owner/workspace ID";
-  if (connectorId === "cloudflare-billing") return "Optional label";
-  return "Optional account id";
 }
 
 function serverRecurringItemToManualInput(item: ServerRecurringItem): ManualRecurringInput {
@@ -4081,7 +4185,7 @@ function getCoverageItems() {
 
 function getReadinessItems() {
   return [
-    { label: "Integration launchpad", value: "Users start from one platform selector and one connect/disconnect action", state: "ready" as const },
+    { label: "Integration launchpad", value: "Users connect consent rails and save merchant watches without implying direct merchant access", state: "ready" as const },
     { label: "Recurring ledger", value: "Connected evidence lands in one review table with next debit and action labels", state: "ready" as const },
     { label: "Data handling", value: "Signed-in workspaces automatically synchronize encrypted state and normalized upload/manual ledger rows; browser mode remains a local fallback", state: "ready" as const },
     { label: "Exports", value: "JSON audit pack export remains available from the review workspace", state: "ready" as const },
@@ -4195,6 +4299,7 @@ function buildWorkspaceBackup({
   mergeDecisions,
   lastReview,
   reviewCompletedAt,
+  merchantLinks,
 }: {
   statementSources: StatementFile[];
   manualItems: ManualRecurringInput[];
@@ -4207,6 +4312,7 @@ function buildWorkspaceBackup({
   mergeDecisions?: Record<string, MergeDecision>;
   lastReview?: ReviewSnapshot | null;
   reviewCompletedAt?: string | null;
+  merchantLinks?: string[];
 }): WorkspaceBackup {
   return {
     version: 1,
@@ -4222,7 +4328,14 @@ function buildWorkspaceBackup({
     mergeDecisions: mergeDecisions ?? {},
     lastReview: lastReview ?? null,
     reviewCompletedAt: reviewCompletedAt ?? null,
+    merchantLinks: sanitizeMerchantLinks(merchantLinks),
   };
+}
+
+function sanitizeMerchantLinks(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  const known = new Set(merchantTiles.map((tile) => tile.id));
+  return [...new Set(value.filter((id): id is string => typeof id === "string" && known.has(id)))];
 }
 
 function serializeWorkspaceForSync(workspace: WorkspaceBackup) {

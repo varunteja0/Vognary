@@ -58,6 +58,9 @@ export type ConnectorSyncResult = {
   /** True when the adapter intentionally returned a bounded page and the same
    * job must be queued promptly to finish the provider window. */
   continuation?: boolean;
+  /** Provider authorization state observed during this sync. A pending batch
+   * is never materialized as evidence and must not make a source look active. */
+  activationState?: "pending" | "active";
 };
 
 export type ConnectorSyncContext = {

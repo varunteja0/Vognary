@@ -68,7 +68,7 @@ Goal: a durably stored private-audit lead can create one tracked INR 999 assiste
 Static `PAYMENT_LINK_*` URLs and legacy monitoring plans are not exposed in Vognary 1.0.
 
 1. Complete Razorpay business/KYC activation and create keys for the intended mode. Follow Razorpay's current official key instructions: `https://razorpay.com/docs/payments/dashboard/settings/api-keys/`.
-2. Apply migrations through `0020_authorization_evidence` to the production database.
+2. Apply migrations through `0021_pending_connector_consent` to the production database.
 3. Obtain qualified legal review of Terms and Privacy. Only after approval, configure `ASSISTED_AUDIT_LEGAL_TERMS_STATUS=approved` with `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, a live-mode `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET`. The INR 999 amount is server-owned.
 4. In Razorpay, configure `https://www.vognary.com/api/billing/webhooks/razorpay` as the webhook URL using the same independently generated webhook secret. Follow the current official webhook instructions: `https://razorpay.com/docs/webhooks/setup-edit-payments/`.
 5. Subscribe the webhook to `payment_link.paid`, `payment_link.cancelled`, `payment_link.expired`, and `refund.processed`.
@@ -231,7 +231,7 @@ Expected:
 - `tokenVault.status` is `ready`.
 - `hardening.connectorTokenStore` is `ready` or `configured`.
 - `capabilities.schema.status` is `ready`, with every migration from `0002_revocable_sessions` through
-  `0020_authorization_evidence` in `capabilities.schema.applied`.
+  `0021_pending_connector_consent` in `capabilities.schema.applied`.
 - Each capability status is queryable rather than `migration-pending`, `migration-ledger-unavailable`, or `schema-query-failed`.
 - `hardening.syncWorkers` is `cron-secret-configured-deployment-schedule-unverified` until a cron-invoked successful sync writes evidence. It becomes `operator-attested-production-live` only after that evidence exists and `SYNC_SCHEDULER_STATUS=production-live` is set.
 

@@ -9,7 +9,7 @@ There is no public "Netflix API" or "PhonePe API" that any consumer app in India
 
 ## What shipped in code today
 
-- `src/lib/connectors/setu-aa-adapter.ts` — a complete Setu FIU adapter (consent create → approval URL → data session → transaction evidence), registered in the adapter registry under `account-aggregator`. It activates the moment `SETU_AA_CLIENT_ID`, `SETU_AA_CLIENT_SECRET`, `SETU_AA_PRODUCT_INSTANCE_ID` exist. No code change needed on signing day.
+- `src/lib/connectors/setu-aa-adapter.ts` — a Setu FIU adapter (consent create → pending approval → provider confirmation → data session → transaction evidence), registered under `account-aggregator`. Sandbox use also requires `ACCOUNT_AGGREGATOR_PARTNER_STATUS=sandbox-approved`; production fails closed unless the status is `production-live` and an approved non-sandbox endpoint is configured.
 - Registry honesty is untouched: the connector stays `partner-required` / `partner-gated` until production access is real, exactly as `npm run smoke` enforces.
 
 ## Rail 1 — Account Aggregator (bank/card/deposit data): the real "link your bank"
@@ -20,11 +20,11 @@ There is no public "Netflix API" or "PhonePe API" that any consumer app in India
 
 | Route | What it is | Cost & time | Founder action |
 | --- | --- | --- | --- |
-| A. Sandbox now | Setu Bridge sandbox keys are self-serve; full consent + data flow against test banks | Free; ~30 minutes | Sign up at bridge.setu.co, create an AA product instance, paste the three keys into env. The adapter and demo work end-to-end same day. |
+| A. Provider sandbox | Setu Bridge sandbox can exercise consent and test-FIP data flow after the product instance is configured | Confirm current access and terms with Setu | Configure the product instance, issued credentials, redirect/callback, and `sandbox-approved`; run the consent lifecycle test before inviting testers. |
 | B. Operate under a regulated partner | TSPs (Setu, Finvu, Decentro-class) onboard FIUs and absorb Sahamati certification (Setu uses empanelled certifier Aujas). Several consumer PFM products run under a regulated partner's FIU registration while their own registration is in flight. | Per-fetch pricing ~₹0.01–₹25 (Setu published band); commercial agreement; typical 4–10 weeks | Email Setu/Finvu sales with the use case ("recurring-payment audit, read-only, PFM class"). Templates are ready in partner-rails-founder-comms.md. Ask explicitly about the unregulated-entity path and Fair Use template fit (mandatory since 1 Jun 2025). |
 | C. Become regulated | The route several PFM apps took: SEBI RIA registration (or NBFC route) to qualify as an FIU in Vognary's own name | ₹ lakhs + net-worth requirements + months; do this after revenue, not before | Park until Route B is live and paying. |
 
-**Decision:** do A this week (it makes the product demo real), start B in parallel with the existing outreach kit, defer C.
+**Decision:** do A this week (it proves the consent lifecycle in a controlled provider environment), start B in parallel with the existing outreach kit, defer C.
 
 ## Rail 2 — Gmail receipts (the rail already owned)
 
@@ -53,7 +53,7 @@ Vognary's coverage story for these merchants is therefore already correct; Rail 
 
 ## Sequenced founder checklist (only items Claude cannot do)
 
-1. **Today (30 min):** create the Setu Bridge sandbox account → paste `SETU_AA_*` keys into `.env.local` → the AA flow runs against sandbox banks.
+1. **Sandbox activation:** configure the Setu FIU product, its consent object and endpoints; add the issued `SETU_AA_*` values and `ACCOUNT_AGGREGATOR_PARTNER_STATUS=sandbox-approved`; verify the full pending-to-active lifecycle against a test FIP.
 2. **This week:** send the two prepared Setu/Finvu emails (partner-rails-send-queue.md) with the Fair Use question added; book the Google OAuth verification start (Cloud Console → OAuth consent screen → submit for restricted-scope review).
 3. **On sandbox approval:** set `ACCOUNT_AGGREGATOR_PARTNER_STATUS=sandbox-approved` in Vercel so the trust pages advance one honest notch.
 4. **On production agreement:** set `production-live`, flip the registry status in one line, and the sidebar's "Link live sources" door becomes the primary onboarding path for every user.

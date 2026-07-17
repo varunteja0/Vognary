@@ -5,6 +5,7 @@ import { buildConnectorConsentResourceKey } from "../../src/lib/consent";
 import { revokeWorkspaceConnectedAccount } from "../../src/lib/server/connected-account-store";
 import { recordConsentGrant } from "../../src/lib/server/consent-store";
 import {
+  activateConnectedAccount,
   buildStoredConnectorConnection,
   storeConnectorSecret,
   upsertConnectedAccount,
@@ -163,6 +164,55 @@ test("rolling back connector setup leaves no grant, account, token, or job", {
     client.release();
     await deleteWorkspaceFixture(fixture);
     restoreEnvironment("TOKEN_ENCRYPTION_KEY", previousKey);
+  }
+});
+
+test("provider consent stays pending until an observed approval activates it", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const fixture = await createWorkspaceFixture();
+  try {
+    const consent = await recordConsentGrant({
+      workspaceId: fixture.workspaceId,
+      userId: fixture.userId,
+      subjectEmail: fixture.email,
+      resourceKey: buildConnectorConsentResourceKey("account-aggregator", "consent-pending-test"),
+      purpose: "provider-connector-sync",
+      noticeVersion: "privacy-2026-07-11",
+      source: "postgres-pending-consent-test",
+      scopes: ["aa:consent", "aa:fi-data:deposit"],
+    });
+    const account = await upsertConnectedAccount({
+      workspaceId: fixture.workspaceId,
+      consentGrantId: consent.id,
+      connectorId: "account-aggregator",
+      authType: "partner-api",
+      providerAccountId: "consent-pending-test",
+      displayName: "Pending AA consent",
+      scopes: ["aa:consent", "aa:fi-data:deposit"],
+      status: "pending",
+    });
+    assert.equal(account.status, "pending");
+
+    const resumable = await buildStoredConnectorConnection({
+      workspaceId: fixture.workspaceId,
+      connectedAccountId: account.id,
+      connectorId: "account-aggregator",
+    });
+    assert.equal(resumable?.providerAccountId, "consent-pending-test", "the worker must be able to poll pending consent");
+
+    await activateConnectedAccount({
+      workspaceId: fixture.workspaceId,
+      connectedAccountId: account.id,
+      connectorId: "account-aggregator",
+    });
+    const state = await getDatabasePool().query<{ status: string }>(
+      `select status from connected_accounts where id = $1`,
+      [account.id],
+    );
+    assert.equal(state.rows[0]?.status, "active");
+  } finally {
+    await deleteWorkspaceFixture(fixture);
   }
 });
 

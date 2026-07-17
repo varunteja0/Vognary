@@ -30,6 +30,7 @@ test("feature readiness checks every persistent capability migration with bounde
     "0018_living_proof_graph",
     "0019_verified_outcome_loop",
     "0020_authorization_evidence",
+    "0021_pending_connector_consent",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -173,5 +174,5 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.doesNotMatch(source, /\/api\/connectors\/anthropic-usage\/(?:start|sync)["`]/);
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[200, 401, 501\]/);
-  assert.match(activation, /Feature migrations 0002 through 0020/);
+  assert.match(activation, /Feature migrations 0002 through 0021/);
 });

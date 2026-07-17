@@ -7,7 +7,7 @@ import {
 import { normalizeConnectorSyncResult } from "@/lib/connector-evidence-normalizer";
 import { getConnectorById } from "@/lib/connectors";
 import { buildEnvironmentConnection, getConnectorAdapter } from "@/lib/connectors/adapter-registry";
-import { buildStoredConnectorConnection } from "@/lib/server/connector-token-store";
+import { activateConnectedAccount, buildStoredConnectorConnection } from "@/lib/server/connector-token-store";
 import { materializeConnectorBatch } from "@/lib/server/living-ledger-store";
 import { recordProductEvent } from "@/lib/server/product-event-store";
 import {
@@ -66,7 +66,23 @@ export async function runConnectorSyncJob(jobId: string, invocation: ConnectorSy
       startedAt,
       cursorState: job.cursorState,
     });
-    const materialized = job.connectedAccountId
+    if (job.connectedAccountId && batch.activationState === "active") {
+      await activateConnectedAccount({
+        connectedAccountId: job.connectedAccountId,
+        connectorId: job.connectorId,
+        workspaceId: job.workspaceId,
+      });
+    }
+    const awaitingAuthorization = batch.activationState === "pending";
+    const materialized = awaitingAuthorization
+      ? {
+        sourceId: null,
+        evidenceWritten: 0,
+        transactionsWritten: 0,
+        commitmentsTouched: 0,
+        usageObservationsWritten: 0,
+      }
+      : job.connectedAccountId
       ? await materializeConnectorBatch({
         workspaceId: job.workspaceId,
         connectedAccountId: job.connectedAccountId,
@@ -122,6 +138,7 @@ export async function runConnectorSyncJob(jobId: string, invocation: ConnectorSy
 
     return {
       status: "succeeded" as const,
+      activationState: batch.activationState,
       jobId: job.id,
       runId,
       evidenceSeen: batch.evidence.length,

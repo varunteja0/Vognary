@@ -169,7 +169,7 @@ record remains authoritative for UI workflow fields and source text, with optimi
 
 These are deployment or business dependencies, not missing application modules:
 
-1. Apply the forward-only PostgreSQL migrations through `0020` and verify `schema_migrations` before enabling dependent routes.
+1. Apply the forward-only PostgreSQL migrations through `0021` and verify `schema_migrations` before enabling dependent routes.
 2. Complete Google OAuth restricted-scope verification before opening Gmail receipt sync beyond approved test users.
 3. Verify the Resend domain/sender and configure email, session, database, encryption, cron, and shared-rate-limit secrets before enabling public magic links or renewal delivery.
 4. Activate and monitor three distinct worker paths: connector sync cron, renewal-alert cron, and the fixed-policy authenticated privacy-retention GET cron.

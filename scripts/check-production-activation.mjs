@@ -59,7 +59,7 @@ const groups = [
   },
   {
     id: "feature-migrations",
-    label: "Feature migrations 0002 through 0020",
+    label: "Feature migrations 0002 through 0021",
     required: ["DATABASE_URL"],
     probe: isFeatureMigrationsReady,
     why: "Confirms the target database recorded every forward migration and can query persistent capability schema.",

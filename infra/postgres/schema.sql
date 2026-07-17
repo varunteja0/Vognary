@@ -317,7 +317,7 @@ create table connected_accounts (
   provider_account_id text,
   display_name text not null,
   scopes text[] not null default '{}',
-  status text not null default 'active' check (status in ('active', 'needs_reauth', 'blocked', 'revoked', 'manual')),
+  status text not null default 'active' check (status in ('pending', 'active', 'needs_reauth', 'blocked', 'revoked', 'manual')),
   consent_expires_at timestamptz,
   last_synced_at timestamptz,
   last_error text,

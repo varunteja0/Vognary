@@ -121,3 +121,15 @@ test("connector identity mismatches and empty external ids fail closed", () => {
 
   assert.throws(() => canonicalizeConnectorEvidence({ ...monthlyReceipt, externalId: " " }), /stable external id/);
 });
+
+test("pending provider authorization cannot materialize evidence", () => {
+  assert.throws(() => normalizeConnectorSyncResult({
+    evidence: [monthlyReceipt],
+    activationState: "pending",
+    continuation: true,
+  }, {
+    connectorId: "gmail-readonly",
+    syncMode: "polling",
+    startedAt: "2026-07-11T00:00:00.000Z",
+  }), /pending provider authorization cannot emit connector evidence/i);
+});

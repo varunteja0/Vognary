@@ -44,12 +44,12 @@ Perfection bar — a journey or surface is DONE only when all seven hold:
 | 12 | **No overview.** `/app` opens into 10+ panels across 4 chapters; the "5-second answer" (monthly burn, next renewal, one action) requires scrolling. | New **Overview** chapter 00: one screen — burn, next 3 renewals, top action, proof strength, savings counter — each tile deep-linking into its chapter. Everything below becomes drill-down. |
 | 13 | **No progressive disclosure.** Proof graph, duplicates, guided capture, savings all render expanded for a first-time user with 3 items. | Panel shell with collapsed/summary mode + "expand"; default collapsed until the panel has signal (candidates>0, savings>0); remembered per workspace. |
 | 14 | **Destructive actions unconfirmed.** `Clear` wipes the workspace in one click; "Delete browser save" likewise; no undo anywhere. | Confirm dialogs with typed-out consequence + 15-second undo snackbar (workspace snapshot kept in memory); export-first shortcut in the dialog. |
-| 15 | **No URL state.** Selected item, active chapter, demo mode aren't in the URL; refresh loses position; nothing is shareable/bookmarkable. | Router-synced state: `/app?item=<identityKey>&chapter=ledger`; back/forward works; demo stays `?demo=1`. |
+| 15 | **No URL state.** Selected item and active chapter aren't in the URL; refresh loses position; nothing is shareable/bookmarkable. | Router-synced state: `/app?item=<identityKey>&chapter=ledger`; back/forward works. Legacy `demo` and `guest` parameters permanently canonicalize to `/app` and are never product states. |
 | 16 | **No search/filter/sort.** The ledger table is fixed-order; 50+ items become unusable. | Sticky toolbar: text search, category and action filters, sort by cost/date/confidence; counts update; empty-filter state designed. |
 | 17 | **Transient-only feedback.** One toast, then history is gone; imports/syncs/errors leave no trail. | Activity log drawer (session-scoped, exportable) — every import, merge, action, sync, and error with timestamps. |
 | 18 | **Mobile top-stack too tall.** Money tape + section nav + chapter header consume ~40% of a 667px viewport. | Mobile: tape collapses to a single-line burn+next-renewal ticker; section nav becomes a bottom tab bar; test at 320/375/412 widths. |
 | 19 | **A11y unaudited.** Focus order untested, spectrum segments are unlabeled color buttons for SR users beyond aria-label, reveal animations ignore `prefers-reduced-motion`, contrast of muted-on-dark unverified. | Full axe + manual SR pass (VoiceOver/NVDA); reduced-motion kills reveal/spotlight; contrast tokens fixed at the CSS variable level; skip-links; visible focus rings everywhere. |
-| 20 | **First-run has no path for the fearful.** "Try sample" works, but a user with no CSV and fear of uploads has no 60-second win. | First-run interview (3 taps: "founder/personal/team" → "which apps do you pay for?" chip-picker seeding manual items from a known-merchant price book) → instant ledger with `unverified` tags → then asks for proof. Price book = static, honest defaults ("typical ₹1,999 — confirm yours"). |
+| 20 | **First-run needs a path for the fearful.** A user with no export and understandable concern about linking a source still needs a 60-second win. | First-run interview (3 taps: "founder/personal/team" → "which apps do you pay for?" chip-picker seeding manual items from a known-merchant price book) → instant ledger with `unverified` tags → then asks for proof. Price book = static, honest defaults ("typical ₹1,999 — confirm yours"). |
 | 21 | **Copy inconsistencies.** INR vs ₹ mixed; "folio" jargon; notices vary in voice. | Copy system doc: one glossary (commitment, proof, source, mandate), one currency renderer, sentence-case buttons, every notice states *what happened + what changed + next step*. |
 | 22 | **No theme/appearance settings.** Single dark theme; bright-environment readability suffers. | Light theme via existing CSS variables; system-follow default; toggle in profile. |
 | 23 | **No print/PDF-friendly review.** The monthly review can't be handed to a CA/co-founder except as JSON. | Print stylesheet + "Review PDF" (same renderer as #10) with sealed-hash footer. |
@@ -85,13 +85,13 @@ Perfection bar — a journey or surface is DONE only when all seven hold:
 | 38 | **axe-core a11y scan** on every route + keyboard-walk script. | CI-blocking on serious/critical. |
 | 39 | **Engine property tests** (fast-check): date roll-forward never past, totals never double under merge permutations, parse(format(x))=x for money/dates. | CI-blocking. |
 | 40 | **Statement corpus harness** `npm run corpus`: drop real redacted files + expectation YAML; precision/recall report; release gate ≥97/92 once ≥100 real files exist (collection is a Phase-0 GTM task). | CI-reporting now, blocking at n≥100. |
-| 41 | **Perf budgets in CI**: size-limit + Lighthouse-CI on `/`, `/app?demo=1`, `/verify`. | CI-blocking. |
+| 41 | **Perf budgets in CI**: size-limit + Lighthouse-CI on `/`, `/app`, `/verify`. | CI-blocking. |
 | 42 | **Load test** (k6): /api/audit at 200 rps sustained, p95 <300ms; ingest 20 concurrent 8MB PDFs. | Release gate. |
 | 43 | **Release checklist automation**: `npm run release:gate` = lint+test+build+e2e+axe+budgets+smoke+production:check. One command answers "may we ship?". | Manual ships forbidden. |
 
 ## The 12 canonical journeys (each gets spec → states → E2E → visual → a11y)
 
-1. First visit → sample workspace → understand burn in 60s.
+1. First visit → paste two receipts → understand burn in 60s.
 2. First visit → fearful path (interview seed) → first unverified ledger → first proof added.
 3. Import CSV (each supported bank format) → correct ledger → notes survive next month's import (#1 regression).
 4. Import duplicate/overlapping file → deduped with report (#2).

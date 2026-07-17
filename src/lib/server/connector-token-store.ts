@@ -29,6 +29,7 @@ export type UpsertConnectedAccountInput = {
   displayName: string;
   scopes?: string[];
   metadata?: Record<string, unknown>;
+  status?: "pending" | "active";
 };
 
 export type StoreConnectorSecretInput = {
@@ -59,8 +60,9 @@ export async function upsertConnectedAccount(input: UpsertConnectedAccountInput,
       provider_account_id,
       display_name,
       scopes,
-      metadata
-    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      metadata,
+      status
+    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     on conflict (workspace_id, connector_id, provider_account_id)
     do update set
       source_id = excluded.source_id,
@@ -69,7 +71,7 @@ export async function upsertConnectedAccount(input: UpsertConnectedAccountInput,
       display_name = excluded.display_name,
       scopes = excluded.scopes,
       metadata = connected_accounts.metadata || excluded.metadata,
-      status = 'active',
+      status = excluded.status,
       last_error = null,
       last_error_at = null,
       updated_at = now()
@@ -84,6 +86,7 @@ export async function upsertConnectedAccount(input: UpsertConnectedAccountInput,
       input.displayName,
       input.scopes ?? [],
       input.metadata ?? {},
+      input.status ?? "active",
     ],
   );
 
@@ -190,12 +193,29 @@ export async function getConnectedAccount(input: {
      where account.id = $1
        and account.workspace_id = $2
        and account.connector_id = $3
-       and account.status = 'active'`,
+       and account.status in ('pending', 'active')`,
     [input.connectedAccountId, input.workspaceId, input.connectorId],
   );
 
   const row = result.rows[0];
   return row ? mapConnectedAccount(row) : null;
+}
+
+export async function activateConnectedAccount(input: {
+  connectedAccountId: string;
+  connectorId: string;
+  workspaceId: string;
+}) {
+  const result = await getDatabasePool().query(
+    `update connected_accounts
+     set status = 'active', last_error = null, last_error_at = null, updated_at = now()
+     where id = $1
+       and workspace_id = $2
+       and connector_id = $3
+       and status in ('pending', 'active')`,
+    [input.connectedAccountId, input.workspaceId, input.connectorId],
+  );
+  if (!result.rowCount) throw new Error("Pending connected account could not be activated.");
 }
 
 export async function loadConnectorSecret(connectedAccountId: string, tokenKind: TokenKind) {

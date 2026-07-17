@@ -42,6 +42,7 @@ export type NormalizedConnectorSyncResult = {
   nextSyncAt: string | null;
   coverage: ConnectorCoverageWindow;
   continuation: boolean;
+  activationState: "pending" | "active" | null;
 };
 
 type NormalizeSyncOptions = {
@@ -91,6 +92,12 @@ export function normalizeConnectorSyncResult(
 
   const evidence = [...evidenceByExternalId.values()];
   const coverage = normalizeCoverage(batch.coverage, evidence, startedAt);
+  const activationState = batch.activationState === "pending" || batch.activationState === "active"
+    ? batch.activationState
+    : null;
+  if (activationState === "pending" && evidence.length) {
+    throw new Error("A pending provider authorization cannot emit connector evidence.");
+  }
 
   return {
     evidence,
@@ -101,6 +108,7 @@ export function normalizeConnectorSyncResult(
     nextSyncAt: normalizeNextSyncAt(batch.nextSyncAt, options.syncMode, startedAt),
     coverage,
     continuation: Boolean(batch.continuation),
+    activationState,
   };
 }
 

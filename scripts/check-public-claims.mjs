@@ -26,6 +26,7 @@ const publicSurfaces = [
   "src/app/manifest.ts",
   "public/brand/vognary-social-card.svg",
   "src/lib/connectors.ts",
+  "src/lib/connect-rails.ts",
   "docs/platform-api.md",
 ];
 

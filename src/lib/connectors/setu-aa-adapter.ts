@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ConnectorAdapter, ConnectorConnection, ConnectorEvidence, ConnectorSyncResult } from "@/lib/connector-runtime";
+import { ConnectorReauthorizationRequiredError } from "@/lib/connector-errors";
 
 /**
  * India Account Aggregator adapter — Setu FIU rail (RBI-regulated, consent-based).
@@ -25,6 +26,7 @@ import type { ConnectorAdapter, ConnectorConnection, ConnectorEvidence, Connecto
 const DEFAULT_BASE_URL = "https://fiu-sandbox.setu.co";
 const REQUEST_TIMEOUT_MS = 15_000;
 const DATA_WINDOW_DAYS = 180;
+const CONSENT_POLL_INTERVAL_MS = 5 * 60_000;
 
 type SetuConsentResponse = {
   id?: string;
@@ -95,6 +97,16 @@ export const setuAccountAggregatorAdapter: ConnectorAdapter = {
     }
 
     // Existing consent id — verify it is real before storing the connection.
+    // Durable accounts are re-checked by sync immediately below; avoid making
+    // two identical provider calls for every scheduled run.
+    if (connection.connectedAccountId) {
+      return {
+        ...connection,
+        providerAccountId: target,
+        accessRef: connection.accessRef ?? "env:SETU_AA_CLIENT_ID",
+        scopes: connection.scopes.length ? connection.scopes : ["aa:consent", "aa:fi-data:deposit"],
+      };
+    }
     await getConsent(credentials, target);
     return {
       ...connection,
@@ -122,19 +134,28 @@ export const setuAccountAggregatorAdapter: ConnectorAdapter = {
       return {
         evidence: [],
         nextCursorState: { ...context?.cursorState, pendingSessionId },
+        nextSyncAt: nextConsentPollAt(),
         continuation: true,
+        activationState: "active",
       };
     }
 
     const consent = await getConsent(credentials, consentId);
     const consentStatus = (consent.status ?? "").toUpperCase();
     if (consentStatus === "PENDING") {
-      throw new Error(
-        `Consent ${consentId} is awaiting the account holder's approval${consent.url ? ` at ${consent.url}` : ""}. Sync resumes automatically once approved.`,
-      );
+      return {
+        evidence: [],
+        nextCursorState: { ...context?.cursorState, consentStatus: "pending" },
+        nextSyncAt: nextConsentPollAt(),
+        continuation: true,
+        activationState: "pending",
+      };
     }
     if (consentStatus !== "ACTIVE" && consentStatus !== "APPROVED") {
-      throw new Error(`Consent ${consentId} is ${consent.status ?? "in an unknown state"}; a new consent is required.`);
+      throw new ConnectorReauthorizationRequiredError(
+        "setu-aa",
+        "The bank-data consent was rejected, expired, or revoked. Start a new consent to connect this source.",
+      );
     }
 
     const now = new Date();
@@ -154,7 +175,9 @@ export const setuAccountAggregatorAdapter: ConnectorAdapter = {
     return {
       evidence: [],
       nextCursorState: { pendingSessionId: session.id, coveredUntil: from },
+      nextSyncAt: nextConsentPollAt(),
       continuation: true,
+      activationState: "active",
     };
   },
 };
@@ -166,7 +189,61 @@ type SetuCredentials = {
   productInstanceId: string;
 };
 
+export type SetuConsentRequest = {
+  consentId: string;
+  /** The AA page where the account holder approves; null if Setu omitted it. */
+  approvalUrl: string | null;
+  consentExpiry?: string;
+};
+
+export function listSetuMissingEnv(): string[] {
+  const requirements = [
+    process.env.SETU_AA_CLIENT_ID ? null : "SETU_AA_CLIENT_ID",
+    process.env.SETU_AA_CLIENT_SECRET ? null : "SETU_AA_CLIENT_SECRET",
+    process.env.SETU_AA_PRODUCT_INSTANCE_ID ? null : "SETU_AA_PRODUCT_INSTANCE_ID",
+  ].filter((value): value is string => Boolean(value));
+  const partnerStatus = process.env.ACCOUNT_AGGREGATOR_PARTNER_STATUS?.trim().toLowerCase();
+  if (process.env.NODE_ENV === "production") {
+    if (partnerStatus !== "production-live") requirements.push("ACCOUNT_AGGREGATOR_PARTNER_STATUS=production-live");
+    const baseUrl = process.env.SETU_AA_BASE_URL?.trim();
+    if (!baseUrl || /sandbox/i.test(baseUrl)) requirements.push("SETU_AA_BASE_URL (approved production FIU endpoint)");
+  } else if (partnerStatus !== "sandbox-approved" && partnerStatus !== "production-live") {
+    requirements.push("ACCOUNT_AGGREGATOR_PARTNER_STATUS=sandbox-approved");
+  }
+  return requirements;
+}
+
+/**
+ * Open a fresh consent for the holder's VUA and hand back the approval URL so
+ * a start route can redirect the user. Kept separate from `connect()` because
+ * ConnectorConnection has no field for the one-time approval link.
+ */
+export async function requestSetuConsent(vua: string, redirectUrl: string): Promise<SetuConsentRequest> {
+  assertSetuActivationReady();
+  const credentials = getSetuCredentials({ connectorId: "account-aggregator", workspaceId: "consent-start", scopes: [] });
+  const consent = await createConsent(credentials, vua, redirectUrl);
+  if (!consent.id) throw new Error("Setu did not return a consent id.");
+  return {
+    consentId: consent.id,
+    approvalUrl: normalizeApprovalUrl(consent.url, credentials.baseUrl),
+    consentExpiry: consent.detail?.consentExpiry,
+  };
+}
+
+function normalizeApprovalUrl(value: string | undefined, baseUrl: string) {
+  if (!value) return null;
+  try {
+    const approval = new URL(value);
+    const provider = new URL(baseUrl);
+    if (approval.protocol !== "https:" || approval.origin !== provider.origin) return null;
+    return approval.toString();
+  } catch {
+    return null;
+  }
+}
+
 function getSetuCredentials(connection: ConnectorConnection): SetuCredentials {
+  assertSetuActivationReady();
   const clientId = process.env.SETU_AA_CLIENT_ID;
   const clientSecret = connection.apiKey ?? process.env.SETU_AA_CLIENT_SECRET;
   const productInstanceId = process.env.SETU_AA_PRODUCT_INSTANCE_ID;
@@ -201,7 +278,7 @@ async function setuFetch<T>(credentials: SetuCredentials, path: string, init?: R
   return await response.json() as T;
 }
 
-function createConsent(credentials: SetuCredentials, vua: string) {
+function createConsent(credentials: SetuCredentials, vua: string, redirectUrl?: string) {
   const now = new Date();
   const dataFrom = new Date(now.getTime() - DATA_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const consentExpiry = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
@@ -212,7 +289,8 @@ function createConsent(credentials: SetuCredentials, vua: string) {
       vua,
       dataRange: { from: dataFrom.toISOString(), to: consentExpiry.toISOString() },
       context: [],
-      additionalParams: { tags: ["vognary-recurring-audit"] },
+      ...(redirectUrl ? { redirectUrl } : {}),
+      ...(process.env.SETU_AA_TAG ? { additionalParams: { tags: [process.env.SETU_AA_TAG] } } : {}),
     }),
   });
 }
@@ -258,7 +336,19 @@ function buildResultFromSession(session: SetuSessionResponse, consentId: string)
     nextCursorState: { coveredUntil: nowIso },
     nextSyncAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     coverage: { endAt: nowIso, completeness: session.status?.toUpperCase() === "PARTIAL" ? "partial" : "complete" },
+    activationState: "active",
   };
+}
+
+function nextConsentPollAt() {
+  return new Date(Date.now() + CONSENT_POLL_INTERVAL_MS).toISOString();
+}
+
+function assertSetuActivationReady() {
+  const missing = listSetuMissingEnv();
+  if (missing.length) {
+    throw new Error(`Account Aggregator activation is incomplete: ${missing.join(", ")}.`);
+  }
 }
 
 function extractTransactions(session: SetuSessionResponse): SetuTransaction[] {
