@@ -70,7 +70,17 @@ async function pageMetrics(page: Page) {
     const visible = (element: Element) => {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
-      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      const isInsideClosedDetails = element.closest("details:not([open])") !== null;
+      const isInsideViewport =
+        rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth;
+      return (
+        !isInsideClosedDetails &&
+        isInsideViewport &&
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden"
+      );
     };
     return {
       visibleControls: [...document.querySelectorAll("button,a,input,textarea,select")].filter(visible).length,
