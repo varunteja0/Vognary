@@ -39,11 +39,13 @@ import {
 import { redactText } from "@/lib/redaction";
 import { buildSavingsCardSvg } from "@/lib/savings-card";
 import { buildSavingsReceipt, buildSavingsShareText } from "@/lib/savings-receipt";
+import { rankSuggestedCuts } from "@/lib/suggested-cuts";
 import { getCommitmentPolicy, isCommitmentActionAllowed, type CommitmentAction } from "@/lib/commitment-policy";
 import { resolveCommitmentDecisionIdentityKey } from "@/lib/commitment-decisions";
 import { buildConnectorCoverageWindows, connectorEvidenceSourceName } from "@/lib/connector-source-identity";
 import { guestAuditTransferKey, parseGuestAuditSnapshot, type GuestAuditSnapshot } from "@/lib/guest-audit-transfer";
 import type { ProductEventMetricName, ProductEventName } from "@/lib/product-events";
+import { applyHydrationArrayDelta, applyHydrationRecordDelta, applyHydrationTextDelta } from "@/lib/workspace-hydration";
 import GuidedCapturePanel from "./guided-capture-panel";
 import { VognaryMark } from "./brand";
 import { Nakul } from "./character";
@@ -86,6 +88,27 @@ type WorkspaceBackup = {
   lastReview?: ReviewSnapshot | null;
   reviewCompletedAt?: string | null;
   merchantLinks?: string[];
+  monthlyBudget?: number | null;
+  categoryBudgets?: Record<string, number>;
+};
+
+type HydrationWorkspaceState = Pick<WorkspaceBackup,
+  | "statementSources"
+  | "manualItems"
+  | "userActions"
+  | "itemOwners"
+  | "reviewNotes"
+  | "teamMembers"
+  | "receiptText"
+  | "actionsMeta"
+  | "mergeDecisions"
+  | "lastReview"
+  | "reviewCompletedAt"
+  | "monthlyBudget"
+  | "categoryBudgets"
+> & {
+  merchantLinks: string[];
+  selectedItemId: string | null;
 };
 
 type ServerSessionPayload = {
@@ -102,6 +125,18 @@ type ServerSessionPayload = {
 type CoverageSignal = {
   label: string;
   done: boolean;
+};
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
+type SyncCelebration = {
+  rail: string;
+  count: number;
+  monthlyTotals: Array<[string, number]>;
+  merchants: string[];
 };
 
 type ConnectorStartPayload = {
@@ -344,6 +379,37 @@ function migrateLegacyWorkspaceKeys(workspace: WorkspaceBackup): WorkspaceBackup
   };
 }
 
+function mergeWorkspaceHydration(
+  server: WorkspaceBackup,
+  baseline: HydrationWorkspaceState,
+  current: HydrationWorkspaceState,
+): WorkspaceBackup {
+  return {
+    ...server,
+    statementSources: applyHydrationArrayDelta(server.statementSources, baseline.statementSources, current.statementSources, (source) => source.id),
+    manualItems: applyHydrationArrayDelta(server.manualItems, baseline.manualItems, current.manualItems, (item) => item.id),
+    userActions: applyHydrationRecordDelta(server.userActions ?? {}, baseline.userActions, current.userActions),
+    actionsMeta: applyHydrationRecordDelta(server.actionsMeta ?? {}, baseline.actionsMeta ?? {}, current.actionsMeta ?? {}),
+    mergeDecisions: applyHydrationRecordDelta(server.mergeDecisions ?? {}, baseline.mergeDecisions ?? {}, current.mergeDecisions ?? {}),
+    itemOwners: applyHydrationRecordDelta(server.itemOwners ?? {}, baseline.itemOwners, current.itemOwners),
+    reviewNotes: applyHydrationRecordDelta(server.reviewNotes ?? {}, baseline.reviewNotes, current.reviewNotes),
+    teamMembers: applyHydrationArrayDelta(server.teamMembers ?? [], baseline.teamMembers, current.teamMembers, (member) => member.id),
+    receiptText: applyHydrationTextDelta(server.receiptText ?? "", baseline.receiptText ?? "", current.receiptText ?? ""),
+    lastReview: current.lastReview === baseline.lastReview ? server.lastReview ?? null : current.lastReview,
+    reviewCompletedAt: current.reviewCompletedAt === baseline.reviewCompletedAt
+      ? server.reviewCompletedAt ?? null
+      : current.reviewCompletedAt,
+    merchantLinks: applyHydrationArrayDelta(
+      sanitizeMerchantLinks(server.merchantLinks),
+      baseline.merchantLinks,
+      current.merchantLinks,
+      (id) => id,
+    ),
+    monthlyBudget: current.monthlyBudget === baseline.monthlyBudget ? server.monthlyBudget ?? null : current.monthlyBudget,
+    categoryBudgets: applyHydrationRecordDelta(server.categoryBudgets ?? {}, baseline.categoryBudgets ?? {}, current.categoryBudgets ?? {}),
+  };
+}
+
 const connectorLaunchTargets: Record<string, { label: string; url: string }> = {
   "claude-subscription": { label: "Claude account", url: "https://claude.ai/settings/billing" },
   "kling-subscription": { label: "Kling account", url: "https://klingai.com/" },
@@ -375,14 +441,16 @@ const connectorStatusLabels: Record<ConnectorStatus, string> = {
 // Workspace information architecture — the ordered chapters of the review.
 // Drives the sticky section index (table of contents) and the scroll-spy state.
 const workspaceSections = [
-  { id: "overview", folio: "00", label: "Overview", title: "Overview", note: "The five-second answer: burn, next renewal, one action." },
-  { id: "connect", folio: "01", label: "Connect", title: "Connect evidence", note: "Bring receipts, statements, and provider sources into one workspace." },
-  { id: "ledger", folio: "02", label: "Ledger", title: "Recurring ledger", note: "Every detected item with proof, cadence, and a decision." },
-  { id: "review", folio: "03", label: "Review", title: "Monthly review", note: "Assign owners, capture notes, and close the review." },
-  { id: "data", folio: "04", label: "Data", title: "Data & readiness", note: "Control where data lives and what is already live." },
+  { id: "overview", folio: "01", label: "Home", title: "Home", note: "Burn, next renewal, and one action." },
+  { id: "ledger", folio: "02", label: "Subscriptions", title: "Subscriptions", note: "Every recurring payment and its proof." },
+  { id: "connect", folio: "03", label: "Connect", title: "Connect", note: "Add fresh evidence with revocable access." },
+  { id: "review", folio: "04", label: "Review", title: "Review", note: "Decisions, notes, and verified outcomes." },
+  { id: "data", folio: "05", label: "Data", title: "Data", note: "Storage, exports, and readiness." },
 ] as const;
 
 const workspaceSectionIds = workspaceSections.map((section) => section.id);
+const primaryWorkspaceSections = workspaceSections.slice(0, 3);
+const secondaryWorkspaceSections = workspaceSections.slice(3);
 type WorkspaceSectionId = (typeof workspaceSections)[number]["id"];
 
 export default function VognaryMvpClient() {
@@ -411,6 +479,8 @@ export default function VognaryMvpClient() {
   const [serverSaveRetry, setServerSaveRetry] = useState(0);
   const [connectorStartResults, setConnectorStartResults] = useState<Record<string, ConnectorStartPayload>>({});
   const [merchantLinks, setMerchantLinks] = useState<string[]>([]);
+  const [monthlyBudget, setMonthlyBudget] = useState<number | null>(null);
+  const [categoryBudgets, setCategoryBudgets] = useState<Record<string, number>>({});
   const [aaVuaDraft, setAaVuaDraft] = useState("");
   const [connectingConnectorId, setConnectingConnectorId] = useState<string | null>(null);
   const [syncingConnectorId, setSyncingConnectorId] = useState<string | null>(null);
@@ -428,8 +498,10 @@ export default function VognaryMvpClient() {
   const [proofQuestionBusy, setProofQuestionBusy] = useState(false);
   const [disconnectedConnectorIds, setDisconnectedConnectorIds] = useState<string[]>([]);
   const [mobileSection, setMobileSection] = useState<WorkspaceSectionId>("overview");
-  const [mobileViewport, setMobileViewport] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [installPromptAvailable, setInstallPromptAvailable] = useState(false);
+  const [connectorReturn, setConnectorReturn] = useState<{ label: string; connectorId: string } | null>(null);
+  const [syncCelebration, setSyncCelebration] = useState<SyncCelebration | null>(null);
   const activationEventSent = useRef(false);
   const ledgerViewEventSent = useRef(false);
   const serverRevisionRef = useRef<number | null>(null);
@@ -441,22 +513,116 @@ export default function VognaryMvpClient() {
   const guestTransferSnapshotRef = useRef<GuestAuditSnapshot | null>(null);
   const serverSaveRetryCountRef = useRef(0);
   const serverSaveRetryTimerRef = useRef<number | null>(null);
+  const latestWorkspaceStateRef = useRef<HydrationWorkspaceState | null>(null);
+  const installPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
+  latestWorkspaceStateRef.current = {
+    statementSources,
+    manualItems,
+    userActions,
+    itemOwners,
+    reviewNotes,
+    teamMembers,
+    receiptText,
+    actionsMeta,
+    mergeDecisions,
+    lastReview,
+    reviewCompletedAt,
+    merchantLinks,
+    selectedItemId,
+    monthlyBudget,
+    categoryBudgets,
+  };
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 639px)");
-    const updateViewport = () => setMobileViewport(media.matches);
+    const captureInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      installPromptRef.current = event as BeforeInstallPromptEvent;
+      setInstallPromptAvailable(window.sessionStorage.getItem("vognary.install-prompt-dismissed") !== "1");
+    };
+    const installed = () => {
+      installPromptRef.current = null;
+      setInstallPromptAvailable(false);
+    };
+    window.addEventListener("beforeinstallprompt", captureInstallPrompt);
+    window.addEventListener("appinstalled", installed);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", captureInstallPrompt);
+      window.removeEventListener("appinstalled", installed);
+    };
+  }, []);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("aa") !== "returned") return;
+    let cancelled = false;
+    let timer: number | null = null;
+    let attempts = 0;
+    url.searchParams.delete("aa");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setConnectorReturn({ label: "Bank connection", connectorId: "account-aggregator" });
+      setNotice("Bank approval returned. Confirming consent and waiting for the first evidence sync…");
+    });
+    const poll = async () => {
+      const payload = await fetchWorkspaceConnectors();
+      if (cancelled) return;
+      setServerConnectors(payload);
+      const account = getServerAccount(payload, "account-aggregator");
+      if (account?.status === "active" && payload.recurringItems?.length) return;
+      if (account?.status === "active" && ["completed", "succeeded", "success"].includes(account.latestRunStatus ?? "")) {
+        setConnectorReturn(null);
+        setNotice("Bank connection is active. The first sync completed without enough evidence to prove a recurring payment yet.");
+        return;
+      }
+      attempts += 1;
+      if (attempts >= 10) {
+        setConnectorReturn(null);
+        setNotice("Bank approval returned and is still being confirmed. Connect shows the live pending state and will refresh automatically.");
+        return;
+      }
+      timer = window.setTimeout(() => void poll(), 2_000);
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!connectorReturn || !serverConnectors?.recurringItems?.length) return;
+    const returnedItems = serverConnectors.recurringItems.filter((item) => item.connectorIds.includes(connectorReturn.connectorId));
+    if (!returnedItems.length) return;
+    const monthlyTotals = returnedItems.reduce<Record<string, number>>((totals, item) => {
+      totals[item.currency] = (totals[item.currency] ?? 0) + item.monthlyCost;
+      return totals;
+    }, {});
+    queueMicrotask(() => {
+      setSyncCelebration({
+        rail: connectorReturn.label,
+        count: returnedItems.length,
+        monthlyTotals: Object.entries(monthlyTotals).sort(([left], [right]) => left.localeCompare(right)),
+        merchants: returnedItems.slice().sort((left, right) => right.monthlyCost - left.monthlyCost).slice(0, 4).map((item) => item.merchant),
+      });
+      setConnectorReturn(null);
+      setMobileSection("overview");
+      const url = new URL(window.location.href);
+      url.hash = "overview";
+      window.history.replaceState(null, "", url);
+    });
+  }, [connectorReturn, serverConnectors?.recurringItems]);
+
+  useEffect(() => {
     const updateHash = () => {
       const section = window.location.hash.slice(1);
       if (workspaceSectionIds.includes(section as WorkspaceSectionId)) {
         setMobileSection(section as WorkspaceSectionId);
       }
     };
-    updateViewport();
     updateHash();
-    media.addEventListener("change", updateViewport);
     window.addEventListener("hashchange", updateHash);
     return () => {
-      media.removeEventListener("change", updateViewport);
       window.removeEventListener("hashchange", updateHash);
     };
   }, []);
@@ -532,14 +698,14 @@ export default function VognaryMvpClient() {
   const persistFailureNotified = useRef(false);
   useEffect(() => {
     if (!localSaveEnabled || typeof window === "undefined") return;
-    const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt, merchantLinks });
+    const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt, merchantLinks, monthlyBudget, categoryBudgets });
     const saved = safePersist(workspaceStorageKey, JSON.stringify(backup));
     if (!saved && !persistFailureNotified.current) {
       persistFailureNotified.current = true;
       setNotice("Browser storage is full — the on-device save is NOT updating. Export a sealed audit pack now, then remove an old statement source.");
     }
     if (saved) persistFailureNotified.current = false;
-  }, [actionsMeta, itemOwners, lastReview, localSaveEnabled, manualItems, merchantLinks, mergeDecisions, receiptText, reviewCompletedAt, reviewNotes, statementSources, teamMembers, userActions]);
+  }, [actionsMeta, categoryBudgets, itemOwners, lastReview, localSaveEnabled, manualItems, merchantLinks, mergeDecisions, monthlyBudget, receiptText, reviewCompletedAt, reviewNotes, statementSources, teamMembers, userActions]);
 
   // Cross-tab safety: if another tab writes this workspace, warn before this
   // tab silently overwrites that work with an older in-memory copy.
@@ -576,6 +742,7 @@ export default function VognaryMvpClient() {
   useEffect(() => {
     const workspaceId = serverSession?.session?.workspaceId;
     const generation = ++serverSyncGenerationRef.current;
+    const hydrationBaseline = latestWorkspaceStateRef.current;
     if (!serverSession?.authenticated || !workspaceId) {
       serverRevisionRef.current = null;
       lastServerSnapshotRef.current = null;
@@ -616,19 +783,25 @@ export default function VognaryMvpClient() {
           return;
         }
         const restored = migrateLegacyWorkspaceKeys(snapshot as WorkspaceBackup);
-        setStatementSources(restored.statementSources);
-        setManualItems(restored.manualItems);
-        setUserActions(restored.userActions ?? {});
-        setActionsMeta(restored.actionsMeta ?? {});
-        setMergeDecisions(restored.mergeDecisions ?? {});
-        setItemOwners(restored.itemOwners ?? {});
-        setReviewNotes(restored.reviewNotes ?? {});
-        setTeamMembers(restored.teamMembers?.length ? restored.teamMembers : [{ id: "founder", name: "Founder", role: "Owner" }]);
-        setReceiptText(restored.receiptText ?? "");
-        setLastReview(restored.lastReview ?? null);
-        setReviewCompletedAt(restored.reviewCompletedAt ?? null);
-        setMerchantLinks(sanitizeMerchantLinks(restored.merchantLinks));
-        setSelectedItemId(null);
+        const current = latestWorkspaceStateRef.current;
+        const merged = hydrationBaseline && current
+          ? mergeWorkspaceHydration(restored, hydrationBaseline, current)
+          : restored;
+        setStatementSources(merged.statementSources);
+        setManualItems(merged.manualItems);
+        setUserActions(merged.userActions ?? {});
+        setActionsMeta(merged.actionsMeta ?? {});
+        setMergeDecisions(merged.mergeDecisions ?? {});
+        setItemOwners(merged.itemOwners ?? {});
+        setReviewNotes(merged.reviewNotes ?? {});
+        setTeamMembers(merged.teamMembers?.length ? merged.teamMembers : [{ id: "founder", name: "Founder", role: "Owner" }]);
+        setReceiptText(merged.receiptText ?? "");
+        setLastReview(merged.lastReview ?? null);
+        setReviewCompletedAt(merged.reviewCompletedAt ?? null);
+        setMerchantLinks(sanitizeMerchantLinks(merged.merchantLinks));
+        setMonthlyBudget(sanitizeBudget(merged.monthlyBudget));
+        setCategoryBudgets(sanitizeCategoryBudgets(merged.categoryBudgets));
+        setSelectedItemId(current?.selectedItemId === hydrationBaseline?.selectedItemId ? null : current?.selectedItemId ?? null);
         serverRevisionRef.current = payload.snapshot.revision;
         lastServerSnapshotRef.current = serializeWorkspaceForSync(restored);
         setServerWorkspaceHydrated(true);
@@ -657,6 +830,21 @@ export default function VognaryMvpClient() {
     }
 
     guestTransferSnapshotRef.current = guest;
+    const currentWorkspace = latestWorkspaceStateRef.current;
+    if (currentWorkspace) {
+      const currentSnapshot = buildWorkspaceBackup({
+        ...currentWorkspace,
+        receiptText: currentWorkspace.receiptText ?? "",
+        monthlyBudget: currentWorkspace.monthlyBudget,
+        categoryBudgets: currentWorkspace.categoryBudgets,
+      });
+      if (workspaceContainsGuestTransfer(currentSnapshot, guest)) {
+        window.sessionStorage.removeItem(guestAuditTransferKey);
+        guestTransferSnapshotRef.current = null;
+        setNotice(buildGuestTransferNotice(guest));
+        return;
+      }
+    }
     guestTransferPendingSyncRef.current = true;
     queueMicrotask(() => {
       setStatementSources((current) => {
@@ -693,6 +881,8 @@ export default function VognaryMvpClient() {
       lastReview,
       reviewCompletedAt,
       merchantLinks,
+      monthlyBudget,
+      categoryBudgets,
     });
     const serialized = serializeWorkspaceForSync(snapshot);
     if (serialized === lastServerSnapshotRef.current) return;
@@ -751,11 +941,13 @@ export default function VognaryMvpClient() {
     audit.summary.monthlyRecurringSpend,
     audit.summary.recurringCount,
     audit.summary.reviewableMonthlySpend,
+    categoryBudgets,
     itemOwners,
     lastReview,
     manualItems,
     merchantLinks,
     mergeDecisions,
+    monthlyBudget,
     receiptText,
     reviewCompletedAt,
     reviewNotes,
@@ -864,6 +1056,7 @@ export default function VognaryMvpClient() {
       if (!gmailOutcome) return;
 
       queueMicrotask(() => {
+        if (gmailOutcome === "connected" || gmailOutcome === "sync-pending") setConnectorReturn({ label: "Gmail connection", connectorId: "gmail-readonly" });
         setNotice(gmailOutcome === "connected"
           ? "Gmail connected and its first receipt-history sync completed. The ledger now refreshes automatically."
           : gmailOutcome === "sync-pending"
@@ -921,8 +1114,7 @@ export default function VognaryMvpClient() {
     }
   }, []);
 
-  const activeSection = useActiveSection(workspaceSectionIds);
-  const workspaceNavSection = mobileViewport ? mobileSection : activeSection;
+  const workspaceNavSection = mobileSection;
 
   function navigateToSection(id: WorkspaceSectionId) {
     setMobileSection(id);
@@ -930,6 +1122,21 @@ export default function VognaryMvpClient() {
     url.hash = id;
     window.history.replaceState(null, "", url);
     window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
+  async function requestPwaInstall() {
+    const prompt = installPromptRef.current;
+    if (!prompt) return;
+    await prompt.prompt();
+    const choice = await prompt.userChoice;
+    installPromptRef.current = null;
+    setInstallPromptAvailable(false);
+    setNotice(choice.outcome === "accepted" ? "Vognary was added to this device." : "Install dismissed. You can still use the full workspace in this browser.");
+  }
+
+  function dismissPwaInstall() {
+    window.sessionStorage.setItem("vognary.install-prompt-dismissed", "1");
+    setInstallPromptAvailable(false);
   }
 
   // Universal search — every section, ledger item, action, source, and page
@@ -1040,11 +1247,13 @@ export default function VognaryMvpClient() {
     setLastReview(backup.lastReview ?? null);
     setReviewCompletedAt(backup.reviewCompletedAt ?? null);
     setMerchantLinks(sanitizeMerchantLinks(backup.merchantLinks));
+    setMonthlyBudget(sanitizeBudget(backup.monthlyBudget));
+    setCategoryBudgets(sanitizeCategoryBudgets(backup.categoryBudgets));
   }
 
   // Destructive actions are confirmed first and undoable for 30 seconds after.
   function offerUndo() {
-    undoSnapshotRef.current = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt, merchantLinks });
+    undoSnapshotRef.current = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt, merchantLinks, monthlyBudget, categoryBudgets });
     setUndoAvailable(true);
     if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
     undoTimerRef.current = window.setTimeout(() => setUndoAvailable(false), 30_000);
@@ -1075,6 +1284,8 @@ export default function VognaryMvpClient() {
         setSelectedItemId(null);
         setReceiptText("");
         setMerchantLinks([]);
+        setMonthlyBudget(null);
+        setCategoryBudgets({});
         setNotice("Workspace cleared. This browser has no audit data now.");
       },
     });
@@ -1359,7 +1570,7 @@ export default function VognaryMvpClient() {
 
     const generation = serverSyncGenerationRef.current;
     setServerSaveStatus("Synchronizing encrypted workspace state...");
-    const snapshot = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt, merchantLinks });
+    const snapshot = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt, merchantLinks, monthlyBudget, categoryBudgets });
     let response: Response;
     try {
       response = await fetch("/api/workspaces/current/audit-snapshot", {
@@ -1432,7 +1643,7 @@ export default function VognaryMvpClient() {
       window.sessionStorage.removeItem(guestAuditTransferKey);
       guestTransferPendingSyncRef.current = false;
       guestTransferSnapshotRef.current = null;
-      setNotice("Guest audit saved to this encrypted workspace. The same-tab transfer copy has been cleared.");
+      setNotice(buildGuestTransferNotice(guest));
     }
   }
 
@@ -1548,7 +1759,7 @@ export default function VognaryMvpClient() {
 
   function enableLocalSave() {
     setLocalSaveEnabled(true);
-    const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt, merchantLinks });
+    const backup = buildWorkspaceBackup({ statementSources, manualItems, userActions, itemOwners, reviewNotes, teamMembers, receiptText, actionsMeta, mergeDecisions, lastReview, reviewCompletedAt, merchantLinks, monthlyBudget, categoryBudgets });
     const saved = safePersist(workspaceStorageKey, JSON.stringify(backup));
     setNotice(saved
       ? "Local save enabled on this device. Do not use it on shared computers."
@@ -1918,7 +2129,8 @@ export default function VognaryMvpClient() {
     <main id="ledger-main" className="relative px-4 pb-24 pt-3 text-foreground sm:px-6 sm:pb-12 sm:pt-4 lg:pl-[264px] lg:pr-8">
       <h1 className="sr-only">Vognary recurring money workspace</h1>
       <WorkspaceSidebar
-        sections={workspaceSections}
+        sections={primaryWorkspaceSections}
+        moreSections={hasRealData ? secondaryWorkspaceSections : []}
         activeId={workspaceNavSection}
         counts={{
           connect: connectedConnectorIds.size,
@@ -1936,6 +2148,37 @@ export default function VognaryMvpClient() {
         onDismiss={() => setNotice(null)}
         action={undoAvailable ? { label: "Undo", onClick: undoLastDestructiveAction } : undefined}
       />
+      {syncCelebration ? (
+        <div className="fixed inset-0 z-70 grid place-items-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="sync-celebration-heading">
+          <section className="panel w-full max-w-xl overflow-hidden">
+            <div className="dossier flex items-center gap-4 p-5 sm:p-6">
+              <Nakul pose="found" size={72} className="shrink-0 text-(--dossier-ink)" title="Nakul found recurring payments" />
+              <div>
+                <p className="eyebrow muted-on-dark">First sync complete</p>
+                <h2 id="sync-celebration-heading" className="mt-2 font-display text-2xl font-semibold text-(--dossier-ink)">
+                  Found {syncCelebration.count} recurring payment{syncCelebration.count === 1 ? "" : "s"}
+                </h2>
+                <p className="mt-1 text-sm muted-on-dark">{syncCelebration.rail} supplied the evidence. Every result opens back to its proof.</p>
+              </div>
+            </div>
+            <div className="p-5 sm:p-6">
+              <div className="grid gap-2 sm:grid-cols-2">
+                {syncCelebration.monthlyTotals.map(([currency, total]) => (
+                  <div key={currency} className="inset p-3">
+                    <p className="eyebrow">Monthly burn · {currency}</p>
+                    <p className="font-data mt-2 text-2xl font-semibold tnum text-(--ink)">{formatCurrency(total, currency)}/mo</p>
+                  </div>
+                ))}
+                <div className="inset p-3">
+                  <p className="eyebrow">Largest finds</p>
+                  <p className="mt-2 text-sm leading-6 text-(--ink)">{syncCelebration.merchants.join(" · ")}</p>
+                </div>
+              </div>
+              <button type="button" autoFocus onClick={() => setSyncCelebration(null)} className="btn btn-primary mt-5 w-full">Continue to Home</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       {confirmState ? (
         <ConfirmDialog
           request={confirmState}
@@ -2001,13 +2244,13 @@ export default function VognaryMvpClient() {
             </div>
           ) : null}
           <div className="lg:hidden">
-            <WorkspaceNav activeId={workspaceNavSection} onSelect={setMobileSection} />
+            <WorkspaceNav activeId={workspaceNavSection} onSelect={navigateToSection} showMore={hasRealData} />
           </div>
         </div>
 
         {/* 00 · Overview — the five-second answer */}
-        <section id="overview" aria-labelledby="overview-heading" className={`${mobileSection === "overview" ? "flex" : "hidden sm:flex"} scroll-mt-36 flex-col gap-5`}>
-          <StageHeader id="overview-heading" folio="00" title="Overview" note="Monthly burn, what renews next, and the one action to take first." />
+        <section id="overview" aria-labelledby="overview-heading" className={`${mobileSection === "overview" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
+          <StageHeader id="overview-heading" folio="01" title="Home" note="Monthly burn, next renewal, one action." />
           <OverviewPanel
             audit={audit}
             timeline={renewalTimeline}
@@ -2016,12 +2259,40 @@ export default function VognaryMvpClient() {
             priorityItems={priorityItems}
             userActions={userActions}
             hasRealData={hasRealData}
+            monthlyBudget={monthlyBudget}
+            categoryBudgets={categoryBudgets}
+            sourceHealth={serverConnectors?.sourceHealth ?? []}
             onSelect={(key) => selectAndReviewItem(key)}
+            onOpenSubscriptions={() => selectAndReviewItem()}
+            onMonthlyBudgetChange={setMonthlyBudget}
+            onCategoryBudgetChange={(category, value) => {
+              setCategoryBudgets((current) => {
+                const next = { ...current };
+                if (value === null) delete next[category];
+                else next[category] = value;
+                return next;
+              });
+            }}
             onExportPack={exportReport}
             onExportCsv={exportCsv}
             onExportPdf={exportPdf}
           />
-          <AskProofPanel
+          {hasRealData && installPromptAvailable ? (
+            <section className="panel flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="Install Vognary">
+              <div className="flex items-center gap-3">
+                <Nakul pose="found" size={48} className="shrink-0 text-(--ink)" title="Nakul found your recurring ledger" />
+                <div>
+                  <p className="text-sm font-semibold text-(--ink)">Keep renewals one tap away</p>
+                  <p className="mt-1 text-xs leading-5 text-(--muted)">Install Vognary after your first proven ledger; financial pages remain network-only.</p>
+                </div>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button type="button" onClick={dismissPwaInstall} className="btn btn-ghost h-9 px-3 text-xs">Not now</button>
+                <button type="button" onClick={() => void requestPwaInstall()} className="btn btn-primary h-9 px-3 text-xs">Install Vognary</button>
+              </div>
+            </section>
+          ) : null}
+          {hasRealData ? <AskProofPanel
             signedIn={Boolean(serverSession?.authenticated)}
             question={proofQuestion}
             answer={proofAnswer}
@@ -2029,12 +2300,12 @@ export default function VognaryMvpClient() {
             onQuestion={setProofQuestion}
             onAsk={(question) => void askProofGraph(question)}
             onOpenCitation={openProofCitation}
-          />
+          /> : null}
         </section>
 
         {/* 01 · Connect evidence */}
-        <section id="connect" aria-labelledby="connect-heading" className={`${mobileSection === "connect" ? "flex" : "hidden sm:flex"} scroll-mt-36 flex-col gap-5`}>
-          <StageHeader id="connect-heading" folio="01" title="Connect evidence" note="Bring receipts, statements, and provider sources into one workspace." />
+        <section id="connect" aria-labelledby="connect-heading" className={`${mobileSection === "connect" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
+          <StageHeader id="connect-heading" folio="03" title="Connect" note="Add fresh evidence with revocable access." />
           <IntegrationCommandCenter
             audit={audit}
             connectorStartResults={connectorStartResults}
@@ -2064,7 +2335,6 @@ export default function VognaryMvpClient() {
             receiptText={receiptText}
             signedIn={Boolean(serverSession?.authenticated)}
             onExportReport={exportReport}
-            onImportFiles={importStatementFiles}
             onJumpToLedger={() => selectAndReviewItem()}
             onReceiptTextChange={setReceiptText}
             onSaveLocal={enableLocalSave}
@@ -2078,8 +2348,14 @@ export default function VognaryMvpClient() {
         </section>
 
         {/* 02 · Recurring ledger */}
-        <section id="ledger" aria-labelledby="ledger-heading" className={`${mobileSection === "ledger" ? "flex" : "hidden sm:flex"} scroll-mt-36 flex-col gap-5`}>
-          <StageHeader id="ledger-heading" folio="02" title="Recurring ledger" note="Every detected item with proof, cadence, and a decision." />
+        <section id="ledger" aria-labelledby="ledger-heading" className={`${mobileSection === "ledger" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
+          <StageHeader id="ledger-heading" folio="02" title="Subscriptions" note="Every recurring payment and its proof." />
+          {!audit.recurringItems.length ? (
+            <section className="panel p-7 text-center sm:p-9" aria-label="No subscriptions yet">
+              <p className="text-sm text-(--muted)">No subscriptions are proven yet; connect one evidence source to build this list.</p>
+              <button type="button" onClick={() => navigateToSection("connect")} className="btn btn-primary mt-5">Connect evidence</button>
+            </section>
+          ) : <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-reveal>
             <Metric label={`Monthly recurring · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)} tone="ink" />
             <Metric label={`Yearly total · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.annualRecurringSpend, audit.summary.primaryCurrency)} tone="blue" />
@@ -2090,9 +2366,9 @@ export default function VognaryMvpClient() {
           <div className="grid gap-5 xl:grid-cols-[1.12fr_0.88fr]" data-reveal>
             <RecurringGraph
               audit={audit}
-              hasRealData={hasRealData}
               selectedItem={selectedItem}
               userActions={userActions}
+              categoryBudgets={categoryBudgets}
               onSelect={setSelectedItemId}
             />
             <div className="flex flex-col gap-5">
@@ -2132,11 +2408,12 @@ export default function VognaryMvpClient() {
               />
             </>
           ) : null}
+          </>}
         </section>
 
         {/* 03 · Monthly review */}
-        <section id="review" aria-labelledby="review-heading" className={`${mobileSection === "review" ? "flex" : "hidden sm:flex"} scroll-mt-36 flex-col gap-5`}>
-          <StageHeader id="review-heading" folio="03" title="Monthly review" note="Assign owners, capture notes, and close the review." />
+        <section id="review" aria-labelledby="review-heading" className={`${mobileSection === "review" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
+          <StageHeader id="review-heading" folio="04" title="Review" note="Decisions, notes, and verified outcomes." />
           {reviewDiff ? <SinceLastReviewPanel diff={reviewDiff} onSelectMerchant={() => selectAndReviewItem()} /> : null}
           <VerifiedSavingsPanel
             savings={verifiedSavings}
@@ -2163,8 +2440,9 @@ export default function VognaryMvpClient() {
         </section>
 
         {/* 04 · Data & readiness */}
-        <section id="data" aria-labelledby="data-heading" className={`${mobileSection === "data" ? "flex" : "hidden sm:flex"} scroll-mt-36 flex-col gap-5`}>
-          <StageHeader id="data-heading" folio="04" title="Data & readiness" note="Control where data lives and what is already live." />
+        <section id="data" aria-labelledby="data-heading" className={`${mobileSection === "data" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
+          <StageHeader id="data-heading" folio="05" title="Data" note="Storage, exports, and readiness." />
+          <AdvancedImportPanel onImportFiles={importStatementFiles} />
           <ProofGraphPanel graph={proofGraph} />
           <ReadinessPanel />
           <UserControlPanel
@@ -2215,39 +2493,12 @@ export default function VognaryMvpClient() {
   );
 }
 
-// Scroll-spy: reports which workspace chapter is currently in the reading band.
-function useActiveSection(ids: readonly string[]): string {
-  const [active, setActive] = useState(ids[0] ?? "");
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !("IntersectionObserver" in window)) return;
-    const elements = ids
-      .map((id) => document.getElementById(id))
-      .filter((element): element is HTMLElement => Boolean(element));
-    if (!elements.length) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible[0]) setActive(visible[0].target.id);
-      },
-      { rootMargin: "-45% 0px -50% 0px", threshold: 0 },
-    );
-
-    elements.forEach((element) => observer.observe(element));
-    return () => observer.disconnect();
-  }, [ids]);
-
-  return active;
-}
-
-// Sticky section index — the workspace table of contents with active-chapter state.
-function WorkspaceNav({ activeId, onSelect }: { activeId: string; onSelect: (id: WorkspaceSectionId) => void }) {
+// Three primary destinations stay visible; review and data appear after the
+// first evidence lands, under one compact More disclosure.
+function WorkspaceNav({ activeId, onSelect, showMore }: { activeId: string; onSelect: (id: WorkspaceSectionId) => void; showMore: boolean }) {
   return (
-    <nav aria-label="Workspace sections" className="glass fixed bottom-2 left-4 right-4 z-40 grid grid-cols-5 items-center gap-1 rounded-2xl border border-line px-1.5 py-1.5 sm:static sm:flex sm:overflow-x-auto">
-      {workspaceSections.map((section) => {
+    <nav aria-label="Workspace sections" className={`glass fixed bottom-2 left-4 right-4 z-40 grid ${showMore ? "grid-cols-4" : "grid-cols-3"} items-center gap-1 rounded-2xl border border-line px-1.5 py-1.5 sm:static sm:flex sm:overflow-visible`}>
+      {primaryWorkspaceSections.map((section) => {
         const active = activeId === section.id;
         return (
           <a
@@ -2256,20 +2507,27 @@ function WorkspaceNav({ activeId, onSelect }: { activeId: string; onSelect: (id:
             onClick={(event) => {
               event.preventDefault();
               onSelect(section.id);
-              const url = new URL(window.location.href);
-              url.hash = section.id;
-              window.history.replaceState(null, "", url);
-              window.setTimeout(() => document.getElementById(section.id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
             }}
             aria-current={active ? "true" : undefined}
-            className={`flex min-w-0 shrink-0 items-center justify-center gap-2 rounded-xl px-1 py-2 text-[0.68rem] font-medium transition sm:justify-start sm:px-3 sm:py-1.5 sm:text-sm ${active ? "bg-(--gold) text-[#17130a]" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"}`}
+            className={`flex min-h-11 min-w-0 shrink-0 items-center justify-center gap-2 rounded-xl px-1 py-2 text-[0.68rem] font-medium transition sm:justify-start sm:px-3 sm:py-1.5 sm:text-sm ${active ? "bg-(--gold) text-[#17130a]" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"}`}
           >
             <span className={`hidden font-data text-[0.6rem] tnum sm:inline ${active ? "opacity-70" : "text-(--muted)"}`}>{section.folio}</span>
             <span className="truncate">{section.label}</span>
           </a>
         );
       })}
-      <a href="#ledger-main" className="ml-auto hidden shrink-0 items-center rounded-xl px-3 py-1.5 font-data text-[0.6rem] uppercase tracking-[0.14em] text-(--muted) transition hover:text-(--ink) sm:inline-flex" aria-label="Back to top of workspace">Top</a>
+      {showMore ? (
+        <details className="group relative min-w-0 sm:ml-auto">
+          <summary className={`flex min-h-11 cursor-pointer list-none items-center justify-center rounded-xl px-2 text-[0.68rem] font-medium transition sm:px-3 sm:text-sm ${secondaryWorkspaceSections.some((section) => section.id === activeId) ? "bg-(--gold) text-[#17130a]" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"}`}>More</summary>
+          <div className="absolute bottom-full right-0 mb-2 grid min-w-40 gap-1 rounded-xl border border-line bg-(--paper-2) p-1.5 shadow-2xl sm:bottom-auto sm:top-full sm:mt-2">
+            {secondaryWorkspaceSections.map((section) => (
+              <button key={section.id} type="button" onClick={() => onSelect(section.id)} className="min-h-11 rounded-lg px-3 text-left text-sm text-(--ink-soft) transition hover:bg-white/5 hover:text-(--ink)">
+                {section.label}
+              </button>
+            ))}
+          </div>
+        </details>
+      ) : null}
     </nav>
   );
 }
@@ -2571,7 +2829,6 @@ function FirstSuccessPanel({
   receiptText,
   signedIn,
   onExportReport,
-  onImportFiles,
   onJumpToLedger,
   onReceiptTextChange,
   onSaveLocal,
@@ -2583,7 +2840,6 @@ function FirstSuccessPanel({
   receiptText: string;
   signedIn: boolean;
   onExportReport: () => void;
-  onImportFiles: (files: File[]) => void;
   onJumpToLedger: () => void;
   onReceiptTextChange: (value: string) => void;
   onSaveLocal: () => void;
@@ -2591,7 +2847,7 @@ function FirstSuccessPanel({
   const hasLedger = audit.summary.recurringCount > 0;
   const saved = localSaveEnabled || signedIn;
   const steps = [
-    { label: "Add evidence", done: hasRealData, detail: "Receipt snippets, CSV/PDF statement, guided capture, or connected source." },
+    { label: "Add evidence", done: hasRealData, detail: "Paste receipt text, use guided capture, or connect a source." },
     { label: "Review ledger", done: hasLedger, detail: "Check amount, cadence, next debit, confidence, and proof." },
     { label: "Fill gaps", done: coverageScore >= 70, detail: "Add missing Gmail, UPI, card, app-store, SaaS, cloud, EMI, SIP, insurance, or utility sources." },
     { label: "Keep control", done: saved, detail: "Export, enable an on-device backup, and let encrypted workspace sync run automatically." },
@@ -2621,20 +2877,6 @@ function FirstSuccessPanel({
         <div className="rounded-xl border border-line bg-(--card-2) p-4">
           <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Add your first evidence</p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <label className="btn btn-primary cursor-pointer text-center">
-              Import statement
-              <input
-                type="file"
-                accept=".csv,.txt,.xls,.xlsx,.pdf,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf"
-                multiple
-                className="sr-only"
-                onChange={(event) => {
-                  const files = Array.from(event.currentTarget.files ?? []);
-                  event.currentTarget.value = "";
-                  onImportFiles(files);
-                }}
-              />
-            </label>
             <button type="button" onClick={onJumpToLedger} className="btn btn-ghost" disabled={!hasLedger}>Open ledger</button>
             <button type="button" onClick={onExportReport} className="btn btn-ghost" disabled={!hasRealData}>Download report</button>
             <button type="button" onClick={onSaveLocal} className="btn btn-ghost" disabled={!hasRealData || localSaveEnabled}>{localSaveEnabled ? "Saved on device" : "Save on this device"}</button>
@@ -2651,10 +2893,32 @@ function FirstSuccessPanel({
                 placeholder="Paste one or more receipt snippets. Keep merchant, amount, date, and renewal text visible; remove account numbers and private identifiers."
               />
             </label>
-            <p className="mt-2 text-xs leading-5 text-(--muted)">Pasted receipts become ledger candidates immediately and merge with matching statement evidence. For Google-approved users, configured Gmail OAuth backfills and refreshes receipt evidence on its declared schedule.</p>
+            <p className="mt-2 text-xs leading-5 text-(--muted)">Pasted receipts become ledger candidates immediately and merge with matching connected evidence. Approved Gmail connections refresh receipt evidence on their displayed schedule.</p>
           </details>
         </div>
       </div>
+    </section>
+  );
+}
+
+function AdvancedImportPanel({ onImportFiles }: { onImportFiles: (files: File[]) => void }) {
+  return (
+    <section className="panel p-5 sm:p-6" data-reveal>
+      <SectionHead folio="5.1" kicker="Advanced import" title="Bring an existing export" desc="Use this only when a connected source or receipt paste is not available. The original file is processed request-time and is not intentionally retained." />
+      <label className="btn btn-ghost mt-4 cursor-pointer text-center">
+        Choose statement files
+        <input
+          type="file"
+          accept=".csv,.txt,.xls,.xlsx,.pdf,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf"
+          multiple
+          className="sr-only"
+          onChange={(event) => {
+            const files = Array.from(event.currentTarget.files ?? []);
+            event.currentTarget.value = "";
+            onImportFiles(files);
+          }}
+        />
+      </label>
     </section>
   );
 }
@@ -2860,7 +3124,13 @@ function OverviewPanel({
   priorityItems,
   userActions,
   hasRealData,
+  monthlyBudget,
+  categoryBudgets,
+  sourceHealth,
   onSelect,
+  onOpenSubscriptions,
+  onMonthlyBudgetChange,
+  onCategoryBudgetChange,
   onExportPack,
   onExportCsv,
   onExportPdf,
@@ -2872,7 +3142,13 @@ function OverviewPanel({
   priorityItems: RecurringItem[];
   userActions: Record<string, RecommendationType>;
   hasRealData: boolean;
+  monthlyBudget: number | null;
+  categoryBudgets: Record<string, number>;
+  sourceHealth: ServerSourceHealth[];
   onSelect: (identityKey: string) => void;
+  onOpenSubscriptions: () => void;
+  onMonthlyBudgetChange: (value: number | null) => void;
+  onCategoryBudgetChange: (category: string, value: number | null) => void;
   onExportPack: () => void;
   onExportCsv: () => void;
   onExportPdf: () => void;
@@ -2881,19 +3157,37 @@ function OverviewPanel({
   const topAction = priorityItems[0] ?? null;
   const proofStrength = proofGraph.totalMonthly > 0 ? Math.round((1 - proofGraph.singleSourceShare) * 100) : 0;
   const foreignEntries = Object.entries(audit.summary.foreignMonthlyTotals);
+  const categorySpend = audit.recurringItems.reduce<Record<string, number>>((totals, item) => {
+    if (item.currency !== audit.summary.primaryCurrency) return totals;
+    totals[item.category] = (totals[item.category] ?? 0) + item.monthlyCost;
+    return totals;
+  }, {});
+  const categoryBudgetAlerts = Object.entries(categorySpend)
+    .filter(([category, spend]) => Boolean(categoryBudgets[category]) && spend > categoryBudgets[category])
+    .map(([category, spend]) => `${category} is ${formatCurrency(spend - categoryBudgets[category], audit.summary.primaryCurrency)} over`);
+  const alerts = [
+    monthlyBudget !== null && audit.summary.monthlyRecurringSpend > monthlyBudget
+      ? `Monthly burn is ${formatCurrency(audit.summary.monthlyRecurringSpend - monthlyBudget, audit.summary.primaryCurrency)} over budget`
+      : null,
+    ...categoryBudgetAlerts,
+    audit.recurringItems.some((item) => item.priceChange?.direction === "increase")
+      ? `${audit.recurringItems.filter((item) => item.priceChange?.direction === "increase").length} price increase${audit.recurringItems.filter((item) => item.priceChange?.direction === "increase").length === 1 ? "" : "s"} detected`
+      : null,
+    timeline.events.some((event) => event.daysAway <= 3)
+      ? `${timeline.events.filter((event) => event.daysAway <= 3).length} renewal${timeline.events.filter((event) => event.daysAway <= 3).length === 1 ? "" : "s"} due within 3 days`
+      : null,
+    sourceHealth.some((source) => source.freshnessStatus === "stale" || source.freshnessStatus === "error")
+      ? "One or more evidence sources needs attention"
+      : null,
+  ].filter((alert): alert is string => Boolean(alert));
+  const suggestedCuts = rankSuggestedCuts(audit.recurringItems, userActions);
 
   if (!audit.summary.recurringCount) {
     return (
       <section className="panel p-6 text-center sm:p-8" data-reveal>
-        <p className="font-data text-xs text-(--muted)">{hasRealData ? "No recurring pattern proven yet" : "Nothing connected yet"}</p>
         <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Your recurring money, answered in five seconds.</h3>
-        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">
-          Connect your first real evidence below — a provider source, statement export, pasted receipt, or guided mandate capture.
-        </p>
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
-          <a href="#connect" className="btn btn-primary">Connect evidence</a>
-          <a href="/guide" className="btn btn-ghost">Read the setup guide</a>
-        </div>
+        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">{hasRealData ? "Add one more evidence source to prove a recurring pattern." : "Connect one source to reveal your burn, next renewal, and first action."}</p>
+        <a href="#connect" className="btn btn-primary mt-5">Connect evidence</a>
       </section>
     );
   }
@@ -2901,7 +3195,7 @@ function OverviewPanel({
   return (
     <section className="panel p-5 sm:p-6" data-reveal>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <div className="inset p-4">
+        <button type="button" onClick={onOpenSubscriptions} className="inset p-4 text-left transition hover:border-ember">
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Monthly burn</p>
           <p className="font-data mt-2 text-2xl font-semibold tnum text-(--ink)">{formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)}</p>
           <p className="mt-1 font-data text-[0.66rem] text-(--muted)">
@@ -2910,7 +3204,7 @@ function OverviewPanel({
               <span key={code} className="ml-2 text-ochre">+ {formatCurrency(total, code)}/mo</span>
             ))}
           </p>
-        </div>
+        </button>
         {nextEvent ? (
           <button type="button" onClick={() => onSelect(nextEvent.itemId)} className="inset p-4 text-left transition hover:border-ember">
             <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Renews next</p>
@@ -2943,10 +3237,30 @@ function OverviewPanel({
                 : "Mark a cancel to start proving savings"}
           </p>
         </div>
-        <div className="inset p-4">
-          <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Proof strength</p>
-          <p className="font-data mt-2 text-2xl font-semibold tnum text-(--ink)">{proofStrength}%</p>
-          <p className="mt-1 font-data text-[0.66rem] text-(--muted)">of monthly spend is multi-source verified</p>
+        <div className={`inset p-4 ${monthlyBudget !== null && audit.summary.monthlyRecurringSpend > monthlyBudget ? "border-ochre" : ""}`}>
+          <label htmlFor="monthly-budget" className="eyebrow" style={{ fontSize: "0.6rem" }}>Monthly budget · {audit.summary.primaryCurrency}</label>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="font-data text-sm text-(--muted)">₹</span>
+            <input
+              id="monthly-budget"
+              type="number"
+              min="1"
+              max="100000000"
+              step="100"
+              inputMode="decimal"
+              value={monthlyBudget ?? ""}
+              onChange={(event) => onMonthlyBudgetChange(sanitizeBudget(event.target.valueAsNumber))}
+              placeholder="Set budget"
+              className="field h-10 min-w-0 flex-1 py-0 font-data text-sm"
+            />
+          </div>
+          <p className={`mt-2 font-data text-[0.66rem] ${monthlyBudget !== null && audit.summary.monthlyRecurringSpend > monthlyBudget ? "text-ochre" : "text-(--muted)"}`}>
+            {monthlyBudget === null
+              ? `${proofStrength}% of monthly spend is multi-source verified`
+              : audit.summary.monthlyRecurringSpend > monthlyBudget
+                ? `${formatCurrency(audit.summary.monthlyRecurringSpend - monthlyBudget, audit.summary.primaryCurrency)} over budget`
+                : `${formatCurrency(monthlyBudget - audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)} remaining`}
+          </p>
         </div>
         {topAction ? (
           <button type="button" onClick={() => onSelect(topAction.identityKey)} className="inset p-4 text-left transition hover:border-ember">
@@ -2959,6 +3273,84 @@ function OverviewPanel({
           </button>
         ) : null}
       </div>
+      {alerts.length ? (
+        <div className="mt-4 rounded-xl border border-ochre/50 bg-(--gold-tint) p-3" role="status" aria-label="Workspace alerts">
+          <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Needs attention</p>
+          <ul className="mt-2 grid gap-1 text-xs leading-5 text-(--ink-soft) sm:grid-cols-2">
+            {alerts.map((alert) => <li key={alert}>• {alert}</li>)}
+          </ul>
+        </div>
+      ) : null}
+      {suggestedCuts.length ? (
+        <section className="mt-4 rounded-xl border border-line bg-(--card-2) p-3" aria-labelledby="suggested-cuts-heading">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Suggested cuts</p>
+              <h4 id="suggested-cuts-heading" className="mt-1 font-display text-base font-semibold text-(--ink)">Review these first</h4>
+            </div>
+            <span className="font-data text-[0.62rem] text-(--muted)">Cost · proof · price movement</span>
+          </div>
+          <ol className="mt-3 grid gap-2 sm:grid-cols-3">
+            {suggestedCuts.map(({ item, action }, index) => {
+              const cancelPath = findActionableCancelAction(item.merchant, item.category, action);
+              return (
+                <li key={item.identityKey} className="inset flex min-w-0 flex-col p-3">
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="min-w-0">
+                      <span className="font-data text-[0.6rem] text-(--muted)">0{index + 1}</span>
+                      <span className="mt-1 block truncate text-sm font-semibold text-(--ink)">{item.merchant}</span>
+                    </span>
+                    <span className={statusStyles[action]}>{action}</span>
+                  </span>
+                  <button type="button" onClick={() => onSelect(item.identityKey)} className="mt-3 text-left font-data text-sm font-semibold tnum text-(--ink) hover:text-ember">
+                    {formatCurrency(item.monthlyCost, item.currency)}/mo <span className="text-[0.62rem] font-normal text-(--muted)">· view proof →</span>
+                  </button>
+                  {cancelPath ? (
+                    <a href={cancelPath.manageUrl ?? "#ledger"} target={cancelPath.manageUrl ? "_blank" : undefined} rel={cancelPath.manageUrl ? "noopener noreferrer" : undefined} onClick={cancelPath.manageUrl ? undefined : () => onSelect(item.identityKey)} className="mt-2 text-xs font-semibold text-ember underline underline-offset-4">
+                      {cancelPath.manageUrl ? `Open ${manageUrlHostname(cancelPath)} ↗` : "Open cancel guide"}
+                    </a>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      ) : null}
+      {Object.keys(categorySpend).length ? (
+        <details className="mt-4 rounded-xl border border-line bg-(--card-2) p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-(--ink)">Category budgets</summary>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {Object.entries(categorySpend).sort(([left], [right]) => left.localeCompare(right)).map(([category, spend]) => {
+              const budget = categoryBudgets[category] ?? null;
+              const over = budget !== null && spend > budget;
+              return (
+                <label key={category} className={`inset p-3 ${over ? "border-ochre" : ""}`}>
+                  <span className="flex items-center justify-between gap-2 text-xs font-semibold text-(--ink)">
+                    <span>{category}</span>
+                    <span className="font-data text-[0.64rem] text-(--muted)">{formatCurrency(spend, audit.summary.primaryCurrency)}/mo</span>
+                  </span>
+                  <span className="mt-2 flex items-center gap-2">
+                    <span className="font-data text-xs text-(--muted)">₹</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100000000"
+                      step="100"
+                      inputMode="decimal"
+                      value={budget ?? ""}
+                      onChange={(event) => onCategoryBudgetChange(category, sanitizeBudget(event.target.valueAsNumber))}
+                      placeholder="No limit"
+                      aria-label={`${category} monthly budget`}
+                      className="field h-9 min-w-0 flex-1 py-0 font-data text-xs"
+                    />
+                  </span>
+                  {over ? <span className="mt-1 block font-data text-[0.62rem] text-ochre">{formatCurrency(spend - budget, audit.summary.primaryCurrency)} over</span> : null}
+                </label>
+              );
+            })}
+          </div>
+        </details>
+      ) : null}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button type="button" onClick={onExportPack} className="btn btn-ghost h-9 px-3 text-xs">Sealed pack (JSON)</button>
         <button type="button" onClick={onExportCsv} className="btn btn-ghost h-9 px-3 text-xs">Export CSV</button>
@@ -3219,68 +3611,83 @@ function UserControlPanel({
 
 function RecurringGraph({
   audit,
-  hasRealData,
   selectedItem,
   userActions,
+  categoryBudgets,
   onSelect,
 }: {
   audit: AuditResult;
-  hasRealData: boolean;
   selectedItem: RecurringItem | null;
   userActions: Record<string, RecommendationType>;
+  categoryBudgets: Record<string, number>;
   onSelect: (id: string) => void;
 }) {
+  const [sortBy, setSortBy] = useState<"cost" | "renewal">("cost");
+  const sortedItems = [...audit.recurringItems].sort((left, right) => {
+    if (sortBy === "renewal") return left.nextExpectedDate.localeCompare(right.nextExpectedDate) || right.monthlyCost - left.monthlyCost;
+    return right.monthlyCost - left.monthlyCost || left.nextExpectedDate.localeCompare(right.nextExpectedDate);
+  });
+  const categorySpend = audit.recurringItems.reduce<Record<string, number>>((totals, item) => {
+    if (item.currency === audit.summary.primaryCurrency) totals[item.category] = (totals[item.category] ?? 0) + item.monthlyCost;
+    return totals;
+  }, {});
+
   return (
-    <section id="recurring-ledger" className="panel scroll-mt-36 overflow-hidden">
-      <div className="flex flex-col gap-2 border-b border-line px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+    <section id="recurring-ledger" className="panel scroll-mt-36 p-5 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <span className="folio" data-folio="2.1">Results</span>
-          <h3 className="mt-2 font-display text-xl font-semibold text-(--ink)">Recurring payments found</h3>
-          <p className="mt-1 text-sm text-(--muted)">{audit.summary.recurringCount} recurring items from {audit.summary.transactionCount} debit transactions.</p>
+          <h3 className="mt-2 font-display text-xl font-semibold text-(--ink)">Your subscriptions</h3>
+          <p className="mt-1 text-sm text-(--muted)">{audit.summary.recurringCount} recurring payment{audit.summary.recurringCount === 1 ? "" : "s"}, each linked to proof.</p>
         </div>
-        <p className="font-data text-xs text-(--muted)">Avg confidence {Math.round(audit.summary.averageConfidence)}%</p>
+        <label className="flex items-center gap-2 text-xs text-(--muted)">
+          Sort
+          <select value={sortBy} onChange={(event) => setSortBy(event.target.value as "cost" | "renewal")} className="field h-10 w-auto py-0 text-xs" aria-label="Sort subscriptions">
+            <option value="cost">Highest cost</option>
+            <option value="renewal">Renews next</option>
+          </select>
+        </label>
       </div>
 
-      {audit.recurringItems.length ? (
-        <div className="overflow-x-auto" tabIndex={0} aria-label="Recurring payment ledger table">
-          <table className="w-full min-w-184 border-separate border-spacing-0 text-left text-sm">
-            <thead>
-              <tr>
-                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Merchant</th>
-                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.68rem] font-semibold text-(--muted)">How often</th>
-                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Monthly</th>
-                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-(--muted)">Next debit</th>
-                <th className="border-b border-line bg-(--card-2) px-5 py-3 font-data text-[0.68rem] font-semibold text-(--muted)">Suggested action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {audit.recurringItems.map((item) => {
-                const action = userActions[item.identityKey] ?? item.recommendationType;
-                return (
-                  <tr key={item.identityKey} onClick={() => onSelect(item.identityKey)} data-active={selectedItem?.identityKey === item.identityKey} className="ledger-row cursor-pointer">
-                    <td className="border-b border-line px-5 py-3.5">
-                      <p className="font-semibold text-(--ink)">{item.merchant}</p>
-                      <p className="mt-0.5 font-data text-[11px] text-(--muted)">{item.category} · {item.confidenceScore}% confidence</p>
-                    </td>
-                    <td className="border-b border-line px-5 py-3.5 capitalize text-(--ink-soft)">{item.frequency}</td>
-                    <td className="border-b border-line px-5 py-3.5 font-data font-semibold tnum text-(--ink)">{formatCurrency(item.monthlyCost, item.currency)}</td>
-                    <td className="border-b border-line px-5 py-3.5 font-data text-xs text-(--muted)">{item.nextExpectedDate}</td>
-                    <td className="border-b border-line px-5 py-3.5"><span className={statusStyles[action]}>{action}</span></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="px-5 py-14 text-center">
-          <p className="font-data text-xs text-(--muted)">{hasRealData ? "No pattern yet" : "No proof connected yet"}</p>
-          <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">{hasRealData ? "No repeated payments found yet" : "Connect a source to reveal renewals"}</h3>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">
-            {hasRealData ? "Connect more official sources or wait for provider/partner access to deepen coverage." : "Start with Gmail receipts. If UPI, card, app-store, bank, SaaS, or cloud evidence is missing, Vognary keeps that gap visible instead of guessing."}
-          </p>
-        </div>
-      )}
+      <div className="mt-4 grid gap-3 md:grid-cols-2" aria-label="Subscriptions list">
+        {sortedItems.map((item) => {
+          const action = userActions[item.identityKey] ?? item.recommendationType;
+          const selected = selectedItem?.identityKey === item.identityKey;
+          const categoryOverBudget = Boolean(categoryBudgets[item.category]) && categorySpend[item.category] > categoryBudgets[item.category];
+          return (
+            <button
+              key={item.identityKey}
+              type="button"
+              onClick={() => onSelect(item.identityKey)}
+              aria-pressed={selected}
+              className={`group min-h-36 rounded-2xl border p-4 text-left transition ${selected ? "border-(--gold-line) bg-(--gold-tint)" : categoryOverBudget ? "border-ochre bg-(--gold-tint)" : "border-line bg-(--card-2) hover:border-(--line-strong)"}`}
+            >
+              <span className="flex items-start gap-3">
+                <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card font-display text-lg font-semibold text-(--ink)" aria-hidden>{item.merchant.slice(0, 1).toUpperCase()}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="min-w-0">
+                      <span className="block truncate font-display text-lg font-semibold text-(--ink)">{item.merchant}</span>
+                      <span className="mt-0.5 block truncate text-xs text-(--muted)">{item.category} · <span className="capitalize">{item.frequency}</span></span>
+                    </span>
+                    <span className="font-data text-lg font-semibold tnum text-(--ink)">{formatCurrency(item.monthlyCost, item.currency)}<span className="text-[0.62rem] font-normal text-(--muted)">/mo</span></span>
+                  </span>
+                  <span className="mt-4 flex flex-wrap items-center gap-2">
+                    <span className="pill pill-partial">{item.confidenceScore}% proof</span>
+                    <span className={statusStyles[action]}>{action}</span>
+                    {categoryOverBudget ? <span className="pill pill-blocked">Category over budget</span> : null}
+                    {item.priceChange?.direction === "increase" ? <span className="pill pill-blocked">↑ was {formatCurrency(item.priceChange.previousAmount, item.currency)}</span> : null}
+                  </span>
+                  <span className="mt-3 flex items-center justify-between gap-2 font-data text-[0.68rem] text-(--muted)">
+                    <span>Renews {item.nextExpectedDate}</span>
+                    <span className="text-(--ink-soft) transition group-hover:translate-x-0.5">View proof →</span>
+                  </span>
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -4298,6 +4705,8 @@ function buildWorkspaceBackup({
   lastReview,
   reviewCompletedAt,
   merchantLinks,
+  monthlyBudget,
+  categoryBudgets,
 }: {
   statementSources: StatementFile[];
   manualItems: ManualRecurringInput[];
@@ -4311,6 +4720,8 @@ function buildWorkspaceBackup({
   lastReview?: ReviewSnapshot | null;
   reviewCompletedAt?: string | null;
   merchantLinks?: string[];
+  monthlyBudget?: number | null;
+  categoryBudgets?: Record<string, number>;
 }): WorkspaceBackup {
   return {
     version: 1,
@@ -4327,6 +4738,8 @@ function buildWorkspaceBackup({
     lastReview: lastReview ?? null,
     reviewCompletedAt: reviewCompletedAt ?? null,
     merchantLinks: sanitizeMerchantLinks(merchantLinks),
+    monthlyBudget: sanitizeBudget(monthlyBudget),
+    categoryBudgets: sanitizeCategoryBudgets(categoryBudgets),
   };
 }
 
@@ -4334,6 +4747,21 @@ function sanitizeMerchantLinks(value: unknown) {
   if (!Array.isArray(value)) return [];
   const known = new Set(merchantTiles.map((tile) => tile.id));
   return [...new Set(value.filter((id): id is string => typeof id === "string" && known.has(id)))];
+}
+
+function sanitizeBudget(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value > 100_000_000) return null;
+  return Math.round(value * 100) / 100;
+}
+
+function sanitizeCategoryBudgets(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const budgets: Record<string, number> = {};
+  for (const [category, rawBudget] of Object.entries(value)) {
+    const budget = sanitizeBudget(rawBudget);
+    if (category.trim() && category.length <= 100 && budget !== null) budgets[category] = budget;
+  }
+  return budgets;
 }
 
 function serializeWorkspaceForSync(workspace: WorkspaceBackup) {
@@ -4358,6 +4786,14 @@ function workspaceContainsGuestTransfer(workspace: WorkspaceBackup, guest: Guest
     .filter(Boolean)
     .every((snippet) => workspaceSnippets.has(snippet));
   return hasStatements && hasManualItems && hasReceipts;
+}
+
+function buildGuestTransferNotice(guest: GuestAuditSnapshot) {
+  const commitmentCount = analyzeStatements(
+    guest.statementSources.map(({ name, text }) => ({ name, text })),
+    [...guest.manualItems, ...receiptTextToManualInputs(guest.receiptText)],
+  ).summary.recurringCount;
+  return `${commitmentCount} commitment${commitmentCount === 1 ? "" : "s"} carried into your encrypted workspace. The same-tab transfer copy has been cleared.`;
 }
 
 function safePersist(key: string, value: string): boolean {

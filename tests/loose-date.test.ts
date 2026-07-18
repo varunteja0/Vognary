@@ -45,3 +45,13 @@ test("year-first dates are deterministic with either separator", () => {
   assert.equal(parseLooseCalendarDate("2026-7-3"), "2026-07-03");
   assert.equal(parseLooseCalendarDate("2026/7/3"), "2026-07-03");
 });
+
+test("parses month-name dates the way real receipts write them", () => {
+  assert.equal(parseLooseCalendarDate("17 July 2026"), "2026-07-17");
+  assert.equal(parseLooseCalendarDate("17th Jul 2026"), "2026-07-17");
+  assert.equal(parseLooseCalendarDate("July 17, 2026"), "2026-07-17");
+  assert.equal(parseLooseCalendarDate("Aug 1 2026"), "2026-08-01");
+  assert.equal(parseLooseCalendarDate("1 Sept 2026"), "2026-09-01");
+  assert.equal(parseLooseCalendarDate("31 February 2026"), null);
+  assert.equal(parseLooseCalendarDate("17 Julember 2026"), null);
+});

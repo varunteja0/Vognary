@@ -23,6 +23,7 @@ export type RailSection = {
 
 export function WorkspaceSidebar({
   sections,
+  moreSections = [],
   activeId,
   counts,
   watching,
@@ -31,6 +32,7 @@ export function WorkspaceSidebar({
   onOpenSearch,
 }: {
   sections: readonly RailSection[];
+  moreSections?: readonly RailSection[];
   activeId: string;
   counts: Partial<Record<string, number>>;
   watching: number;
@@ -81,6 +83,39 @@ export function WorkspaceSidebar({
             </a>
           );
         })}
+        {moreSections.length ? (
+          <details className="group mt-1">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-(--ink-soft) transition hover:bg-white/5 hover:text-(--ink)">
+              <span className="font-data text-[0.6rem] text-(--muted)">•••</span>
+              <span>More</span>
+              <span className="ml-auto text-(--muted) transition group-open:rotate-180" aria-hidden>⌄</span>
+            </summary>
+            <div className="mt-1 grid gap-1 pl-3">
+              {moreSections.map((section) => {
+                const active = activeId === section.id;
+                const count = counts[section.id];
+                return (
+                  <a
+                    key={section.id}
+                    href={`#${section.id}`}
+                    aria-current={active ? "true" : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      onNavigate(section.id);
+                    }}
+                    className={`flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                      active ? "bg-(--gold) text-[#17130a]" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"
+                    }`}
+                  >
+                    <span className={`font-data text-[0.6rem] tnum ${active ? "opacity-70" : "text-(--muted)"}`}>{section.folio}</span>
+                    <span className="truncate">{section.label}</span>
+                    {typeof count === "number" && count > 0 ? <span className="ml-auto font-data text-[0.62rem] tnum">{count}</span> : null}
+                  </a>
+                );
+              })}
+            </div>
+          </details>
+        ) : null}
       </nav>
 
       <div className="mt-auto grid gap-3">

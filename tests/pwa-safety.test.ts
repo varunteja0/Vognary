@@ -20,3 +20,13 @@ test("service worker never caches financial navigation or APIs", async () => {
   assert.doesNotMatch(worker, /INSTALL_ASSETS[\s\S]*"\/app"/);
   assert.doesNotMatch(worker, /cache\.put\(request[\s\S]*request\.mode === "navigate"/);
 });
+
+test("the workspace offers installation only after a proven ledger and keeps financial pages network-only", async () => {
+  const workspace = await readFile(new URL("../src/app/vognary-mvp-client.tsx", import.meta.url), "utf8");
+  assert.match(workspace, /beforeinstallprompt/);
+  assert.match(workspace, /hasRealData && installPromptAvailable/);
+  assert.match(workspace, /Install Vognary/);
+  const worker = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
+  assert.match(worker, /request\.mode === "navigate"[\s\S]*fetch\(request\)\.catch/);
+  assert.doesNotMatch(worker, /cache\.put\(request[\s\S]*request\.mode === "navigate"/);
+});

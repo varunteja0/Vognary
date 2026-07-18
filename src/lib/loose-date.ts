@@ -54,12 +54,40 @@ export function parseLooseCalendarDate(
   const yearFirst = normalized.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
   if (yearFirst) return buildCalendarDate(yearFirst[1], yearFirst[2], yearFirst[3]);
 
+  const monthName = parseMonthNameDate(normalized);
+  if (monthName) return monthName;
+
   const classification = classifyNumericDate(normalized);
   if (classification.kind === "same") return classification.value;
   if (classification.kind === "day-first") return classification.dayFirst;
   if (classification.kind === "month-first") return classification.monthFirst;
   if (classification.kind !== "ambiguous" || !numericOrder) return null;
   return numericOrder === "day-first" ? classification.dayFirst : classification.monthFirst;
+}
+
+const monthNameNumbers: Record<string, number> = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4,
+  may: 5, jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11,
+  dec: 12, december: 12,
+};
+
+/**
+ * "17 July 2026", "17th Jul 2026", "July 17, 2026", "Aug 1 2026" — real
+ * receipts overwhelmingly write dates with month names. A named month is
+ * deterministic, so no day/month ambiguity is possible.
+ */
+function parseMonthNameDate(value: string): string | null {
+  const dayFirst = value.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})$/);
+  const monthFirst = value.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/);
+  const parts = dayFirst
+    ? { day: dayFirst[1], month: dayFirst[2], year: dayFirst[3] }
+    : monthFirst
+      ? { day: monthFirst[2], month: monthFirst[1], year: monthFirst[3] }
+      : null;
+  if (!parts) return null;
+  const month = monthNameNumbers[parts.month.toLowerCase()];
+  return month ? buildCalendarDate(parts.year, String(month), parts.day) : null;
 }
 
 function classifyNumericDate(value: string): NumericDateClassification {
