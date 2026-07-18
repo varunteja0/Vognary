@@ -29,6 +29,7 @@ export async function GET(request: Request) {
   const sourceHealth = accounts.map((account) => ({
     connectedAccountId: account.id,
     connectorId: account.connectorId,
+    displayName: account.displayName,
     status: account.status,
     freshnessStatus: account.freshnessStatus,
     coverageStartAt: account.coverageStartAt,

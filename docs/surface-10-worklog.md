@@ -2,6 +2,14 @@
 
 Append-only log per [surface-10-orchestration-plan.md](surface-10-orchestration-plan.md) Part VI. Newest first.
 
+## 2026-07-18 — WP-4.3 shipped: source-health chips
+
+**Shipped:** source freshness now has one shared presentation contract across `/sources`, Connect, and Home: Fresh, Needs refresh, Reconnect, Sync issue, or Awaiting sync. Connect shows that chip on each active rail and retains Retry sync for stale/failed/blocked runs. Home names the affected provider instead of saying “one or more sources” and adds a one-tap Review sources command that opens Connect. The connector status API now includes the provider display name in its health summary so consumer copy stays specific.
+
+**Proof:** focused source-health unit tests green (2/2); isolated authenticated Playwright spec green on desktop Chromium and mobile Chromium, proving Fresh → stale reload → named Home alert → Review sources → Needs refresh, with serious/critical axe results empty; `unset DATABASE_URL; npm run ci` green (339/339 tests, typecheck, claims/research/brand checks, production build). Evidence: [health desktop](evidence/surface-10/wp-4.3-source-health-desktop-chromium.png), [health mobile](evidence/surface-10/wp-4.3-source-health-mobile-chromium.png).
+
+**Honesty boundary:** chips render the latest server-recorded sync state. They do not claim fresh evidence before a provider run succeeds; live values still depend on G-A/G-B/G-C and real connected-account activity.
+
 ## 2026-07-18 — WP-1.2 complete: Home burn trend
 
 **Shipped:** the Monthly burn card now shows its signed change since the last completed review using the existing `ReviewDiff.monthlyDelta`. Increases use the attention tone, decreases use the verified tone, and an unchanged value stays muted. Before a baseline exists, Home states “No comparison yet” and tells the user that completing a review creates one. This completes the last missing Home acceptance criterion without pretending the single stored review is a multi-month chart.

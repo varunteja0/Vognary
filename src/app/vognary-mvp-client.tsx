@@ -40,6 +40,7 @@ import { redactText } from "@/lib/redaction";
 import { buildSavingsCardSvg } from "@/lib/savings-card";
 import { buildSavingsReceipt, buildSavingsShareText } from "@/lib/savings-receipt";
 import { rankSuggestedCuts } from "@/lib/suggested-cuts";
+import { sourceDisplayName, sourceHealthPresentation, sourceNeedsAttention } from "@/lib/source-health-presentation";
 import { getCommitmentPolicy, isCommitmentActionAllowed, type CommitmentAction } from "@/lib/commitment-policy";
 import { resolveCommitmentDecisionIdentityKey } from "@/lib/commitment-decisions";
 import { buildConnectorCoverageWindows, connectorEvidenceSourceName } from "@/lib/connector-source-identity";
@@ -220,6 +221,7 @@ type ServerRecurringItem = {
 type ServerSourceHealth = {
   connectedAccountId: string;
   connectorId: string;
+  displayName?: string | null;
   status: string;
   freshnessStatus: "unknown" | "fresh" | "stale" | "error" | null;
   coverageStartAt: string | null;
@@ -2290,6 +2292,7 @@ export default function VognaryMvpClient() {
             sourceHealth={serverConnectors?.sourceHealth ?? []}
             onSelect={openDetail}
             onOpenSubscriptions={() => selectAndReviewItem()}
+            onOpenConnect={() => navigateToSection("connect")}
             onMonthlyBudgetChange={setMonthlyBudget}
             onCategoryBudgetChange={(category, value) => {
               setCategoryBudgets((current) => {
@@ -2773,14 +2776,10 @@ function RailCard({
   const pendingApproval = serverAccount?.status === "pending";
   const needsReauth = serverAccount?.status === "needs_reauth";
   const isConnected = connected && !pendingApproval && !needsReauth;
-  const syncNeedsAttention = !pendingApproval && !needsReauth && (
-    serverAccount?.freshnessStatus === "stale"
-    || serverAccount?.freshnessStatus === "error"
-    || serverAccount?.latestRunStatus === "failed"
-    || serverAccount?.latestRunStatus === "blocked"
-  );
-  const statusLabel = pendingApproval ? "Awaiting approval" : needsReauth ? "Reconnect required" : isConnected ? "Connected" : activationPending ? "Company activation pending" : "Review access";
-  const statusClass = needsReauth ? "pill pill-blocked" : isConnected ? "pill pill-ready" : "pill pill-partial";
+  const health = serverAccount ? sourceHealthPresentation(serverAccount) : null;
+  const syncNeedsAttention = Boolean(serverAccount && !pendingApproval && !needsReauth && sourceNeedsAttention(serverAccount));
+  const statusLabel = pendingApproval ? "Awaiting approval" : needsReauth ? "Reconnect" : isConnected ? health?.label ?? "Awaiting sync" : activationPending ? "Company activation pending" : "Review access";
+  const statusClass = needsReauth ? "pill pill-blocked" : isConnected ? health?.className ?? "pill pill-planned" : "pill pill-partial";
 
   return (
     <div className="rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.05)" }}>
@@ -3156,6 +3155,7 @@ function OverviewPanel({
   sourceHealth,
   onSelect,
   onOpenSubscriptions,
+  onOpenConnect,
   onMonthlyBudgetChange,
   onCategoryBudgetChange,
   onExportPack,
@@ -3175,6 +3175,7 @@ function OverviewPanel({
   sourceHealth: ServerSourceHealth[];
   onSelect: (identityKey: string) => void;
   onOpenSubscriptions: () => void;
+  onOpenConnect: () => void;
   onMonthlyBudgetChange: (value: number | null) => void;
   onCategoryBudgetChange: (category: string, value: number | null) => void;
   onExportPack: () => void;
@@ -3183,6 +3184,7 @@ function OverviewPanel({
 }) {
   const nextEvent = timeline.events[0] ?? null;
   const topAction = priorityItems[0] ?? null;
+  const attentionSources = sourceHealth.filter(sourceNeedsAttention);
   const burnDeltaTone = reviewDiff?.monthlyDelta
     ? reviewDiff.monthlyDelta > 0 ? "text-ember" : "text-verdict"
     : "text-(--muted)";
@@ -3207,8 +3209,8 @@ function OverviewPanel({
     timeline.events.some((event) => event.daysAway <= 3)
       ? `${timeline.events.filter((event) => event.daysAway <= 3).length} renewal${timeline.events.filter((event) => event.daysAway <= 3).length === 1 ? "" : "s"} due within 3 days`
       : null,
-    sourceHealth.some((source) => source.freshnessStatus === "stale" || source.freshnessStatus === "error")
-      ? "One or more evidence sources needs attention"
+    attentionSources.length
+      ? `${attentionSources.length === 1 ? "Evidence source needs" : "Evidence sources need"} attention: ${attentionSources.map(sourceDisplayName).join(", ")}`
       : null,
   ].filter((alert): alert is string => Boolean(alert));
   const suggestedCuts = rankSuggestedCuts(audit.recurringItems, userActions);
@@ -3310,11 +3312,14 @@ function OverviewPanel({
         ) : null}
       </div>
       {alerts.length ? (
-        <div className="mt-4 rounded-xl border border-ochre/50 bg-(--gold-tint) p-3" role="status" aria-label="Workspace alerts">
-          <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Needs attention</p>
-          <ul className="mt-2 grid gap-1 text-xs leading-5 text-(--ink-soft) sm:grid-cols-2">
-            {alerts.map((alert) => <li key={alert}>• {alert}</li>)}
-          </ul>
+        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-ochre/50 bg-(--gold-tint) p-3 sm:flex-row sm:items-end sm:justify-between" role="status" aria-label="Workspace alerts">
+          <div>
+            <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Needs attention</p>
+            <ul className="mt-2 grid gap-1 text-xs leading-5 text-(--ink-soft) sm:grid-cols-2">
+              {alerts.map((alert) => <li key={alert}>• {alert}</li>)}
+            </ul>
+          </div>
+          {attentionSources.length ? <button type="button" onClick={onOpenConnect} className="btn btn-ghost h-9 shrink-0 px-3 text-xs">Review sources</button> : null}
         </div>
       ) : null}
       {suggestedCuts.length ? (

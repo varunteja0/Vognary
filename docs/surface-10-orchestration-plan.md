@@ -87,7 +87,7 @@ The first implementation tranche is in the working tree and browser-proved. Comp
 - **G-C (founder, 4–10 weeks):** FIU/regulated-partner agreement per [one-click-connect-plan.md](one-click-connect-plan.md) and [direct-linking-activation-dossier.md](direct-linking-activation-dossier.md). Sets `production-live`.
 - **WP-4.1 (M, code-complete; live proof waits on G-A/G-B) First-sync magic moment.** After OAuth/AA return, an import summary takes over: Nakul animation, "Found 14 recurring payments · ₹4,230/mo", top merchants reveal, then lands on Home. This is the single highest-emotion moment in the product — make it excellent.
 - **WP-4.2 (S, code-complete; live proof waits on G-B) AA return flow.** Handle `/app?aa=returned`: poll connector status, show pending→active transition toast, trigger WP-4.1 on activation.
-- **WP-4.3 (S) Source health chips.** Freshness/reconnect states (already computed server-side) as unobtrusive chips on Connect and Home alerts.
+- **WP-4.3 ✅ Source health chips.** Freshness/reconnect states use one shared presentation across `/sources`, Connect, and named Home alerts with a direct Review sources action. Shipped and browser-proved on desktop + mobile 2026-07-18.
 
 ### Phase 5 — God-level polish (Lane D, after Phase 1 lands)
 
