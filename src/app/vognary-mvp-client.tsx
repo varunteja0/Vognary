@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
 import { scrollIntoViewWithMotion } from "@/lib/client-motion";
 import { encodeCsvCell } from "@/lib/csv";
 import { connectors, type Connector, type ConnectorStatus } from "@/lib/connectors";
@@ -3241,6 +3241,48 @@ function ConfirmDialog({ request, onCancel, onConfirm }: { request: ConfirmReque
 }
 
 // Overview — the five-second answer. Every tile deep-links into its chapter.
+// WP-6.3 — a ₹ figure that is an aggregate (a sum of several commitments) has
+// no single detail sheet to open, so it carries its own proof chip: tapping it
+// reveals the exact evidence rows that compose the number. Per-item figures keep
+// tracing through the detail sheet; this closes the gap on Home's aggregates.
+function ProofDisclosure({
+  entries,
+  emptyText,
+}: {
+  entries: { key: string; label: string; detail: string }[];
+  emptyText: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const regionId = useId();
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-controls={regionId}
+        className="inline-flex items-center gap-1 rounded-full border border-line bg-(--card-2) px-2 py-0.5 font-data text-[0.58rem] uppercase tracking-[0.12em] text-(--muted) transition hover:border-(--line-strong) hover:text-(--ink)"
+      >
+        <span aria-hidden>◆</span> {open ? "Hide proof" : "Proof"}
+      </button>
+      {open ? (
+        <ul id={regionId} className="mt-2 grid gap-1 rounded-lg border border-line bg-(--card-2) p-2 font-data text-[0.66rem] leading-5 text-(--ink-soft)">
+          {entries.length ? (
+            entries.map((entry) => (
+              <li key={entry.key} className="flex items-center justify-between gap-3">
+                <span className="truncate">{entry.label}</span>
+                <span className="tnum shrink-0 text-(--muted)">{entry.detail}</span>
+              </li>
+            ))
+          ) : (
+            <li className="text-(--muted)">{emptyText}</li>
+          )}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function OverviewPanel({
   audit,
   timeline,
@@ -3361,6 +3403,12 @@ function OverviewPanel({
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Due in 30 days</p>
           <p className="font-data mt-2 text-2xl font-semibold tnum text-ochre">{formatCurrency(timeline.dueNext30Days)}</p>
           <p className="mt-1 font-data text-[0.66rem] text-(--muted)">Needs review ({audit.summary.primaryCurrency}): {formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)}/mo</p>
+          <ProofDisclosure
+            entries={timeline.events
+              .filter((event) => event.daysAway <= 30)
+              .map((event) => ({ key: `${event.itemId}-${event.date}`, label: event.merchant, detail: `${formatCurrency(event.amount, event.currency)} · ${event.date}` }))}
+            emptyText="No projected debits inside 30 days."
+          />
         </div>
         <div className="inset p-4">
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Verified savings</p>
@@ -3374,6 +3422,10 @@ function OverviewPanel({
                 ? `${savings.entries.length} decision(s) tracked`
                 : "Mark a cancel to start proving savings"}
           </p>
+          <ProofDisclosure
+            entries={savings.entries.map((entry) => ({ key: entry.itemId, label: `${entry.merchant} · ${entry.status}`, detail: `${formatCurrency(entry.annualSaving, entry.currency)}/yr` }))}
+            emptyText="Mark a cancel to start proving savings."
+          />
         </div>
         <div className={`inset p-4 ${monthlyBudget !== null && audit.summary.monthlyRecurringSpend > monthlyBudget ? "border-ochre" : ""}`}>
           <label htmlFor="monthly-budget" className="eyebrow" style={{ fontSize: "0.6rem" }}>Monthly budget · {audit.summary.primaryCurrency}</label>

@@ -2,6 +2,16 @@
 
 Append-only log per [surface-10-orchestration-plan.md](surface-10-orchestration-plan.md) Part VI. Newest first.
 
+## 2026-07-18 — WP-6.3 (Home slice): proof chips on aggregate ₹ figures
+
+**Shipped:** the Home aggregate figures that previously had **no proof trace** now carry a tappable proof chip. "Due in 30 days" and "Verified savings" are sums with no single detail sheet to open, so a new `ProofDisclosure` chip reveals the exact evidence rows composing each number — projected debits (merchant · amount · date) for the renewal total, and tracked decisions (merchant · status · ₹/yr) for verified savings. This closes the Workspace exit-criterion gap ("every number click-traces to its proof") for Home's aggregates; per-item figures already trace through the WP-1.3 detail sheet, and "Monthly burn" taps through to the full Subscriptions ledger.
+
+**Accessibility:** the chip is a proper disclosure — `aria-expanded` conveys state, `aria-controls` points at the evidence list, and the visible label ("Proof" ↔ "Hide proof") is the accessible name, satisfying WCAG Label-in-Name. The Home axe scan (serious/critical) stays empty with the chip present.
+
+**Proof:** signed-in harness green on desktop Chromium (20.1s) and mobile Chromium (19.3s) against the live Docker/Postgres stack — taps the "Due in 30 days" proof chip, asserts `aria-expanded` false→true, and confirms the revealed list shows the exact debits (Spotify ₹119 · 2026-08-05, Netflix ₹649 · 2026-08-16) composing ₹768. Full `unset DATABASE_URL; npm run ci` green (346 unit tests, typecheck, claims/research/brand, build, perf budgets + Lighthouse medians unchanged — the change is behind auth and not on a perf route). Evidence: [proof chip desktop](evidence/surface-10/wp-6.3-proof-chip-desktop-chromium.png), [proof chip mobile](evidence/surface-10/wp-6.3-proof-chip-mobile-chromium.png).
+
+**Scope honesty:** this is the Home slice of WP-6.3. Home aggregates now trace; the broader "every ₹ figure across Subscriptions/Review" sweep (where per-item figures already open detail sheets) is a follow-up before the package is marked ✅.
+
 ## 2026-07-18 — WP-0.2 (partial): receipt-parser category fix + real-format coverage
 
 **Shipped (receipt half):** the pasted-receipt parser now categorizes India's streaming services correctly and carries locked-in coverage across the WP-0.2 merchant list. Three focused tests assert exact merchant/currency/amount/frequency/category/next-date for JioHotstar, Hotstar, Amazon Prime, Prime Video, Jio telecom, LIC, Apple iCloud+, Anthropic/Claude, GitHub, Adobe, and Airtel postpaid, plus two documented justified rejections (a bare telecom bill with no cadence; a loan EMI pre-debit).

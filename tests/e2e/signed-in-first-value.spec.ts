@@ -105,6 +105,25 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(page.getByText(/over budget/i).first()).toBeVisible();
   await expect(home.getByText("Suggested cuts", { exact: true })).toBeVisible();
 
+  // WP-6.3 — an aggregate ₹ figure (a sum with no single detail sheet) carries
+  //   its own proof chip that reveals the exact evidence rows composing it.
+  // The Renewal Radar also carries a "Due in 30 days" mini-stat; the OverviewPanel
+  //   card is the one that also shows "Needs review", so pin it by both texts.
+  const dueCard = home.locator(".inset").filter({ hasText: "Due in 30 days" }).filter({ hasText: "Needs review" });
+  // Name toggles "Proof" -> "Hide proof" when open (visible text is the accessible
+  //   name, satisfying Label-in-Name), so match case-insensitively.
+  const proofChip = dueCard.getByRole("button", { name: /proof/i });
+  await expect(proofChip).toHaveAttribute("aria-expanded", "false");
+  await proofChip.click();
+  await expect(proofChip).toHaveAttribute("aria-expanded", "true");
+  const proofRegion = dueCard.getByRole("list");
+  await expect(proofRegion).toBeVisible();
+  await expect(proofRegion.getByText(/Netflix|Spotify|No projected debits/).first()).toBeVisible();
+  await positionForScreenshot(page, dueCard);
+  await page.screenshot({ path: `docs/evidence/surface-10/wp-6.3-proof-chip-${surface}.png`, fullPage: false, animations: "disabled" });
+  await proofChip.click();
+  await expect(proofChip).toHaveAttribute("aria-expanded", "false");
+
   // WP-6.1 — the Renewal Radar is Home's hero: proven upcoming debits as bars.
   const radar = page.locator('section[aria-labelledby="renewal-radar-heading"]');
   await expect(radar).toBeVisible();
