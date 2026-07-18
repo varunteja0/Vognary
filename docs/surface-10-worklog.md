@@ -2,6 +2,14 @@
 
 Append-only log per [surface-10-orchestration-plan.md](surface-10-orchestration-plan.md) Part VI. Newest first.
 
+## 2026-07-18 — WP-6.4 shipped: restrained Nakul moments
+
+**Shipped:** Nakul now has a pure priority state machine for first sync, verified savings, budget breach, and first evidence. Priority is first sync → savings → budget → evidence. Event-specific local keys prevent “first” moments from replaying on later sessions, and one session lock allows at most one moment per tab session. First sync keeps the existing full reveal; the other events use a compact inline panel with the matching found, celebrate, or guide pose and an explicit dismiss action.
+
+**Timing integrity:** signed-in moment selection waits until connector status/coverage has loaded, so a transient first-evidence state cannot steal priority from a verified saving or completed first sync. Guest/local evidence still appears immediately. The budget moment only explains and routes attention; it never claims or performs an automatic cancellation.
+
+**Proof:** focused selector tests green (2/2), including full priority and all-seen suppression; engine-backed verified-savings Playwright spec green on desktop Chromium and mobile Chromium, proving savings wins over first evidence, the panel dismisses, reload in the same session does not show a second moment, and the share loop still completes. `unset DATABASE_URL; npm run ci` green (343/343 tests, typecheck, claims/research/brand checks, production build). Evidence: [Nakul desktop](evidence/surface-10/wp-6.4-nakul-moment-desktop-chromium.png), [Nakul mobile](evidence/surface-10/wp-6.4-nakul-moment-mobile-chromium.png).
+
 ## 2026-07-18 — WP-5.2 shipped: consistent, reduced-motion-safe movement
 
 **Shipped:** workspace entry motion now uses shared duration/easing tokens instead of local timings. All three programmatic result/navigation scrolls route through one client helper: normal motion stays smooth; `prefers-reduced-motion: reduce` switches to instant scrolling. The root CSS scroll behavior also becomes `auto` under reduced motion, while chapter and Nakul animations remain disabled and reveal content still fails open.

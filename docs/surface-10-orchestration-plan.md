@@ -102,7 +102,7 @@ The first implementation tranche is in the working tree and browser-proved. Comp
 - **WP-6.1 ✅ Renewal Radar.** The 45-day projected-debit timeline is Home's hero visual: a horizontal radar of upcoming debits sized by amount with 44px touch targets and one-tap proof detail. Shipped and browser-proved on desktop + mobile 2026-07-18.
 - **WP-6.2 ✅ Verified-savings growth loop.** Verified outcomes auto-prepare a receipt; one Share proof action sends the card and sealed JSON receipt through Web Share with download/copy fallbacks. Shipped and browser-proved on desktop + mobile 2026-07-18.
 - **WP-6.3 (S) Proof-chip everywhere.** Every ₹ figure in the product carries a tappable chip showing the exact evidence that produced it (proof-graph queries exist). This is the trust moat made visible.
-- **WP-6.4 (S) Nakul moments.** A small state machine for the mascot: first evidence, first sync, budget breach, savings minted. Character with restraint — one moment per session max.
+- **WP-6.4 ✅ Nakul moments.** A prioritized first-sync/savings/budget/evidence state machine with persistent event suppression and one moment per session. Shipped and browser-proved on desktop + mobile 2026-07-18.
 
 ## Part V — Orchestration map
 

@@ -60,6 +60,15 @@ test("verified savings share includes the card and sealed receipt", async ({ pag
 
   const savingsPanel = page.locator("section.panel", { has: page.getByRole("heading", { name: "Verified savings" }) });
   await expect(savingsPanel.getByText(/₹7,788\/yr verified/i)).toBeVisible({ timeout: 20_000 });
+  const nakulMoment = page.getByRole("status", { name: "Nakul moment" });
+  await expect(nakulMoment.getByRole("heading", { name: "A saving is now proven" })).toBeVisible();
+  await expect(nakulMoment.getByText("Verified outcome", { exact: true })).toBeVisible();
+  await nakulMoment.screenshot({ path: `docs/evidence/surface-10/wp-6.4-nakul-moment-${surface}.png`, animations: "disabled" });
+  await nakulMoment.getByRole("button", { name: "Dismiss" }).click();
+  await expect(nakulMoment).toHaveCount(0);
+  await page.reload();
+  await expect(savingsPanel.getByText(/₹7,788\/yr verified/i)).toBeVisible({ timeout: 20_000 });
+  await expect(nakulMoment).toHaveCount(0);
   await expect(savingsPanel.getByRole("button", { name: "Share proof" })).toBeVisible();
   await savingsPanel.getByRole("button", { name: "Share proof" }).click();
 

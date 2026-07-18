@@ -41,6 +41,7 @@ import { redactText } from "@/lib/redaction";
 import { buildSavingsCardSvg } from "@/lib/savings-card";
 import { buildSavingsReceipt, buildSavingsShareText } from "@/lib/savings-receipt";
 import { rankSuggestedCuts } from "@/lib/suggested-cuts";
+import { nakulMomentSeenPrefix, nakulMomentSessionKey, selectNakulMoment, type NakulMoment, type NakulMomentId } from "@/lib/nakul-moments";
 import { sourceDisplayName, sourceHealthPresentation, sourceNeedsAttention } from "@/lib/source-health-presentation";
 import { getCommitmentPolicy, isCommitmentActionAllowed, type CommitmentAction } from "@/lib/commitment-policy";
 import { resolveCommitmentDecisionIdentityKey } from "@/lib/commitment-decisions";
@@ -506,6 +507,7 @@ export default function VognaryMvpClient() {
   const [installPromptAvailable, setInstallPromptAvailable] = useState(false);
   const [connectorReturn, setConnectorReturn] = useState<{ label: string; connectorId: string } | null>(null);
   const [syncCelebration, setSyncCelebration] = useState<SyncCelebration | null>(null);
+  const [nakulMoment, setNakulMoment] = useState<NakulMoment | null>(null);
   const activationEventSent = useRef(false);
   const ledgerViewEventSent = useRef(false);
   const serverRevisionRef = useRef<number | null>(null);
@@ -694,6 +696,22 @@ export default function VognaryMvpClient() {
     if (!lastReview) return null;
     return diffReviews(lastReview, buildReviewSnapshot(audit, userActions, coverageScore));
   }, [lastReview, audit, userActions, coverageScore]);
+  useEffect(() => {
+    if (typeof window === "undefined" || window.sessionStorage.getItem(nakulMomentSessionKey)) return;
+    if (serverSession?.authenticated && !serverConnectors) return;
+    const ids: NakulMomentId[] = ["first-sync", "savings-minted", "budget-breach", "first-evidence"];
+    const seen = new Set(ids.filter((id) => window.localStorage.getItem(`${nakulMomentSeenPrefix}${id}`) === "1"));
+    const moment = selectNakulMoment({
+      firstSync: Boolean(syncCelebration || (connectorReturn && syncedRecurringItems.length)),
+      savingsMinted: verifiedSavings.verifiedAnnual > 0,
+      budgetBreach: monthlyBudget !== null && audit.summary.monthlyRecurringSpend > monthlyBudget,
+      firstEvidence: audit.summary.recurringCount > 0,
+    }, seen);
+    if (!moment) return;
+    window.sessionStorage.setItem(nakulMomentSessionKey, moment.id);
+    window.localStorage.setItem(`${nakulMomentSeenPrefix}${moment.id}`, "1");
+    if (moment.id !== "first-sync") queueMicrotask(() => setNakulMoment(moment));
+  }, [audit.summary.monthlyRecurringSpend, audit.summary.recurringCount, connectorReturn, monthlyBudget, serverConnectors, serverSession?.authenticated, syncCelebration, syncedRecurringItems.length, verifiedSavings.verifiedAnnual]);
   const connectedConnectorIds = useMemo(() => {
     return resolveConnectedConnectorIds(
       connectorStartResults,
@@ -2339,6 +2357,7 @@ export default function VognaryMvpClient() {
             <WorkspaceNav activeId={workspaceNavSection} onSelect={navigateToSection} showMore={hasRealData} />
           </div>
         </div>
+        {nakulMoment ? <NakulMomentPanel moment={nakulMoment} onDismiss={() => setNakulMoment(null)} /> : null}
 
         {/* 00 · Overview — the five-second answer */}
         <section id="overview" aria-labelledby="overview-heading" className={`${mobileSection === "overview" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
@@ -2636,6 +2655,20 @@ function StageHeader({ id, folio, title, note }: { id: string; folio: string; ti
       <span className="hidden h-px flex-1 bg-line sm:block" aria-hidden />
       {note ? <p className="text-xs leading-5 text-(--muted) sm:max-w-sm sm:text-right">{note}</p> : null}
     </div>
+  );
+}
+
+function NakulMomentPanel({ moment, onDismiss }: { moment: NakulMoment; onDismiss: () => void }) {
+  return (
+    <section className="panel flex flex-col gap-4 border-(--gold-line) p-4 sm:flex-row sm:items-center" role="status" aria-label="Nakul moment" data-reveal>
+      <Nakul pose={moment.pose} size={64} className="shrink-0 text-(--ink)" title={`Nakul: ${moment.title}`} />
+      <div className="min-w-0 flex-1">
+        <p className="eyebrow" style={{ fontSize: "0.6rem" }}>{moment.kicker}</p>
+        <h3 className="mt-1 font-display text-lg font-semibold text-(--ink)">{moment.title}</h3>
+        <p className="mt-1 text-sm leading-6 text-(--muted)">{moment.detail}</p>
+      </div>
+      <button type="button" onClick={onDismiss} className="btn btn-ghost h-9 shrink-0 px-3 text-xs">Dismiss</button>
+    </section>
   );
 }
 
