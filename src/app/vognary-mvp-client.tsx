@@ -675,6 +675,7 @@ export default function VognaryMvpClient() {
     () => buildVerifiedSavings(audit.recurringItems, actionsMeta, { coverageWindows: verifiedCoverageWindows }),
     [actionsMeta, audit.recurringItems, verifiedCoverageWindows],
   );
+  const savingsReceipt = useMemo(() => buildSavingsReceipt(verifiedSavings), [verifiedSavings]);
   const selectedItem = audit.recurringItems.find((item) => item.identityKey === selectedItemId) ?? audit.recurringItems[0] ?? null;
   const detailItem = detailItemId ? audit.recurringItems.find((item) => item.identityKey === detailItemId) ?? null : null;
   const selectedServerRecurringItemId = selectedItem ? resolveServerCommitmentId(selectedItem, serverCommitments) : null;
@@ -1487,31 +1488,13 @@ export default function VognaryMvpClient() {
 
   // Verified Savings receipts — the shareable, checkable proof artifact.
   async function mintSavingsReceipt() {
-    const receipt = buildSavingsReceipt(verifiedSavings);
+    const receipt = savingsReceipt;
     if (!receipt) {
       setNotice("No verified savings to mint yet. Mark a cancel or downgrade, then let the next expected debits pass clean inside covered evidence.");
       return;
     }
     try {
-      const { sealed, chain } = await sealAuditPack(receipt as unknown as Record<string, unknown>, loadPackChain());
-      let downloadable = sealed;
-      let issuerSigned = false;
-      if (serverSession?.authenticated && serverSession.session?.workspaceId) {
-        try {
-          const response = await fetch("/api/audit-packs/sign", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ integrity: sealed.integrity }),
-          });
-          const payload = await response.json().catch(() => ({})) as { issuerSignature?: unknown };
-          if (response.ok && isPackIssuerSignature(payload.issuerSignature)) {
-            downloadable = attachIssuerSignature(sealed, payload.issuerSignature);
-            issuerSigned = true;
-          }
-        } catch {
-          // Offline checksum receipts remain useful without the issuer signature.
-        }
-      }
+      const { downloadable, chain, issuerSigned } = await prepareSealedSavingsReceipt(receipt);
       savePackChain(chain);
       triggerBlobDownload(
         new Blob([JSON.stringify(downloadable, null, 2)], { type: "application/json" }),
@@ -1527,13 +1510,112 @@ export default function VognaryMvpClient() {
   }
 
   async function downloadSavingsCard() {
-    const receipt = buildSavingsReceipt(verifiedSavings);
+    const receipt = savingsReceipt;
     if (!receipt) {
       setNotice("The share card unlocks with your first verified saving — a cancel proven clean across its expected debits.");
       return;
     }
-    const svg = buildSavingsCardSvg(receipt);
-    const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    try {
+      const card = await renderSavingsCard(receipt);
+      triggerBlobDownload(card.blob, card.fileName);
+      setNotice(`Share card downloaded as ${card.fileName.endsWith(".png") ? "PNG" : "SVG"}. The number on it comes from the verified receipt.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not render the savings share card.");
+    }
+  }
+
+  async function copySavingsShareText() {
+    const receipt = savingsReceipt;
+    if (!receipt) {
+      setNotice("Share text unlocks with your first verified saving.");
+      return;
+    }
+    const text = buildSavingsShareText(receipt);
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice("Share text copied. Post it with the card; the receipt backs the number.");
+    } catch {
+      setNotice(text);
+    }
+  }
+
+  async function shareSavingsProof() {
+    const receipt = savingsReceipt;
+    if (!receipt) {
+      setNotice("Sharing unlocks with your first verified saving.");
+      return;
+    }
+
+    try {
+      const [{ downloadable, chain, issuerSigned }, card] = await Promise.all([
+        prepareSealedSavingsReceipt(receipt),
+        renderSavingsCard(receipt),
+      ]);
+      const receiptFile = new File(
+        [JSON.stringify(downloadable, null, 2)],
+        `vognary-savings-receipt-${chain.chainIndex}.json`,
+        { type: "application/json" },
+      );
+      const cardFile = new File([card.blob], card.fileName, { type: card.blob.type });
+      const text = buildSavingsShareText(receipt);
+      const files = [cardFile, receiptFile];
+      const canShareFiles = typeof navigator.share === "function"
+        && (typeof navigator.canShare !== "function" || navigator.canShare({ files }));
+
+      if (canShareFiles) {
+        try {
+          await navigator.share({ title: "Vognary verified savings", text, files });
+          savePackChain(chain);
+          if (serverSession?.authenticated) void trackProductEvent("export.created", { commitmentsTouched: receipt.verifiedCount });
+          setNotice(`Savings proof shared with the card and ${issuerSigned ? "issuer-signed" : "self-checksummed"} receipt.`);
+          return;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            setNotice("Sharing cancelled. Your verified savings remain ready.");
+            return;
+          }
+        }
+      }
+
+      savePackChain(chain);
+      triggerBlobDownload(card.blob, card.fileName);
+      triggerBlobDownload(receiptFile, receiptFile.name);
+      try {
+        await navigator.clipboard.writeText(text);
+        setNotice("This browser cannot share files directly, so the card and receipt were downloaded and the verified share text was copied.");
+      } catch {
+        setNotice("This browser cannot share files directly, so the card and receipt were downloaded. Use the receipt to back the number on the card.");
+      }
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not prepare the savings proof for sharing.");
+    }
+  }
+
+  async function prepareSealedSavingsReceipt(receipt: NonNullable<typeof savingsReceipt>) {
+    const { sealed, chain } = await sealAuditPack(receipt as unknown as Record<string, unknown>, loadPackChain());
+    let downloadable = sealed;
+    let issuerSigned = false;
+    if (serverSession?.authenticated && serverSession.session?.workspaceId) {
+      try {
+        const response = await fetch("/api/audit-packs/sign", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ integrity: sealed.integrity }),
+        });
+        const payload = await response.json().catch(() => ({})) as { issuerSignature?: unknown };
+        if (response.ok && isPackIssuerSignature(payload.issuerSignature)) {
+          downloadable = attachIssuerSignature(sealed, payload.issuerSignature);
+          issuerSigned = true;
+        }
+      } catch {
+        // Offline checksum receipts remain useful without the issuer signature.
+      }
+    }
+    return { downloadable, chain, issuerSigned };
+  }
+
+  async function renderSavingsCard(receipt: NonNullable<typeof savingsReceipt>) {
+    const svgBlob = new Blob([buildSavingsCardSvg(receipt)], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(svgBlob);
     try {
       const image = new Image();
@@ -1550,28 +1632,11 @@ export default function VognaryMvpClient() {
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
       if (!pngBlob) throw new Error("PNG encoding failed");
-      triggerBlobDownload(pngBlob, "vognary-savings-card.png");
-      setNotice("Share card downloaded as PNG. The number on it comes from the sealed receipt, so anyone can check it.");
+      return { blob: pngBlob, fileName: "vognary-savings-card.png" };
     } catch {
-      triggerBlobDownload(svgBlob, "vognary-savings-card.svg");
-      setNotice("Share card downloaded as SVG (this browser could not rasterize a PNG).");
+      return { blob: svgBlob, fileName: "vognary-savings-card.svg" };
     } finally {
       URL.revokeObjectURL(url);
-    }
-  }
-
-  async function copySavingsShareText() {
-    const receipt = buildSavingsReceipt(verifiedSavings);
-    if (!receipt) {
-      setNotice("Share text unlocks with your first verified saving.");
-      return;
-    }
-    const text = buildSavingsShareText(receipt);
-    try {
-      await navigator.clipboard.writeText(text);
-      setNotice("Share text copied. Post it with the card; the receipt backs the number.");
-    } catch {
-      setNotice(text);
     }
   }
 
@@ -2447,6 +2512,7 @@ export default function VognaryMvpClient() {
           <VerifiedSavingsPanel
             savings={verifiedSavings}
             onSelect={openDetail}
+            onShareProof={() => void shareSavingsProof()}
             onMintReceipt={() => void mintSavingsReceipt()}
             onDownloadCard={() => void downloadSavingsCard()}
             onCopyShareText={() => void copySavingsShareText()}
@@ -4551,12 +4617,14 @@ const savingStatusPill: Record<string, string> = {
 function VerifiedSavingsPanel({
   savings,
   onSelect,
+  onShareProof,
   onMintReceipt,
   onDownloadCard,
   onCopyShareText,
 }: {
   savings: VerifiedSavingsSummary;
   onSelect: (id: string) => void;
+  onShareProof: () => void;
   onMintReceipt: () => void;
   onDownloadCard: () => void;
   onCopyShareText: () => void;
@@ -4588,6 +4656,7 @@ function VerifiedSavingsPanel({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={onShareProof} className="btn btn-primary btn-sm">Share proof</button>
                 <button type="button" onClick={onMintReceipt} className="btn btn-primary btn-sm">Mint sealed receipt</button>
                 <button type="button" onClick={onDownloadCard} className="btn btn-ghost btn-sm">Download share card</button>
                 <button type="button" onClick={onCopyShareText} className="btn btn-ghost btn-sm">Copy share text</button>

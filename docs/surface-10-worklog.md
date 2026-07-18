@@ -2,6 +2,14 @@
 
 Append-only log per [surface-10-orchestration-plan.md](surface-10-orchestration-plan.md) Part VI. Newest first.
 
+## 2026-07-18 — WP-6.2 shipped: verified-savings share loop
+
+**Shipped:** a savings receipt is now prepared automatically whenever the verification engine produces a verified saving. Review promotes one Share proof action that sends the generated card and sealed JSON receipt together through the browser Web Share API. Browsers without file sharing keep the existing honest fallbacks: card and receipt downloads plus copied share text when clipboard access exists. The separate Mint sealed receipt, Download share card, and Copy share text controls remain available.
+
+**Integrity:** the shared artifact still comes exclusively from `buildSavingsReceipt`, which filters to verified outcomes and keeps currencies separate. The receipt is self-checksummed offline and receives an issuer signature only when authenticated signing is configured. Cancels that are merely watching, verifying, or still charging never unlock sharing.
+
+**Proof:** 15/15 focused verified-savings/receipt/card tests green; isolated authenticated Playwright spec green on desktop Chromium and mobile Chromium, seeding a real three-charge Netflix history, a cancel decision, and matching continuous Account Aggregator coverage. The engine verifies ₹7,788/year, Share proof sends two non-empty files (`vognary-savings-card.(png|svg)` + sealed receipt JSON), and serious/critical axe results are empty. `unset DATABASE_URL; npm run ci` green (339/339 tests, typecheck, claims/research/brand checks, production build). Evidence: [share desktop](evidence/surface-10/wp-6.2-savings-share-desktop-chromium.png), [share mobile](evidence/surface-10/wp-6.2-savings-share-mobile-chromium.png).
+
 ## 2026-07-18 — WP-4.3 shipped: source-health chips
 
 **Shipped:** source freshness now has one shared presentation contract across `/sources`, Connect, and Home: Fresh, Needs refresh, Reconnect, Sync issue, or Awaiting sync. Connect shows that chip on each active rail and retains Retry sync for stale/failed/blocked runs. Home names the affected provider instead of saying “one or more sources” and adds a one-tap Review sources command that opens Connect. The connector status API now includes the provider display name in its health summary so consumer copy stays specific.
