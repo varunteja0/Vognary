@@ -2,6 +2,25 @@
 
 Append-only log per [surface-10-orchestration-plan.md](surface-10-orchestration-plan.md) Part VI. Newest first.
 
+## 2026-07-18 — WP-5.4 shipped: performance budget + Lighthouse gate
+
+**Shipped:** mobile LCP is now under 2s on every user-facing route, Lighthouse scores clear 95 across every enforced category, and CI owns both as blocking gates. Two new scripts back it: `perf:budget` (`scripts/check-performance-budget.mjs`) caps per-route initial JS/CSS from the build manifest, and `perf:lighthouse` (`scripts/check-lighthouse.mjs`) runs a three-sample median audit per route under direct DevTools mobile throttling. Both are wired into `npm run ci` after `build`, and into `.github/workflows/ci.yml` after the production build + browser install.
+
+**Measured medians (this run):** landing LCP 881ms — performance 99 / accessibility 96 / best-practices 100 / SEO 100; `/app` LCP 767ms — 100 / 100 / 100 (SEO excluded by design; see boundary); `/verify` LCP 735ms — 100 / 100 / 100 / 100. Initial JS 190.4/191.9/193.7 KB against a 214.8 KB ceiling; inlined CSS keeps the render path zero-round-trip.
+
+**The three fixes that moved LCP, each isolated and re-measured:**
+- **Fonts (`src/app/layout.tsx`).** All three self-hosted faces switched to `display: "optional"` and the mono/display preloads removed. Under mobile throttling a slow webfont was repainting the text LCP after arrival; optional display lets the metric-adjusted fallback paint once and never be redefined. Fast connections still get the brand faces. This alone took landing from 62→~89.
+- **Render-blocking CSS (`next.config.ts`).** Enabled `experimental.inlineCss`. The stylesheet was costing ~728ms of render-blocking time on the first visit; inlining removed the round-trip entirely and eliminated the last unstable sample (a 2013–2027ms boundary flake became a stable ~986ms median). Per this Next 16 version's own guidance, `inlineCss` targets exactly this Tailwind/first-visit/LCP case; CSS is only ~12.7 KB gzip.
+- **Verify entrance animation (`src/app/verify/page.tsx`).** Removed the whole-panel `.rise` opacity/translate entrance. Its LCP element was the first paragraph inside the animated article, delaying paint to ~2.5s; the content now paints immediately. Interaction and reduced-motion behavior are unchanged.
+
+**Lazy-export verification (acceptance clause):** confirmed `jspdf` and `xlsx` are `await import(...)` only and live in three separate build chunks (133.7 / 9.6 / 60.4 KB gzip), none present in the initial asset set for `/`, `/app`, or `/verify`. The 80 KB single-chunk budget ceiling fails CI if a heavy export bundle ever becomes initial.
+
+**Why DevTools throttling + medians, not the default:** Lighthouse's simulated-throttling model post-hoc predicted a 3.6s LCP from a trace whose page actually painted at ~0.2s and did not honor the optional-font paint behavior — an unfaithful contract. Direct DevTools throttling measures the throttled browser itself; three samples with the median absorb normal scheduling noise so one 13ms fluctuation cannot decide CI.
+
+**Honesty boundary:** the gate scores SEO on `/` and `/verify` but not `/app`. `/app` is deliberately `noindex` (private workspace), so an indexability score there would be a false signal, not a defect to "fix" by exposing product UI to crawlers. Accessibility/best-practices/performance are enforced on all three.
+
+**Proof:** `unset DATABASE_URL; npm run ci` green end-to-end, exit 0 — lint, typecheck (`tsc --noEmit`), claims/research/brand, 343/343 unit tests, clean production build (`inlineCss` confirmed), `perf:budget` pass, and the `perf:lighthouse` medians above. Evidence is the measured numbers, not screenshots (a rendering-timing package); the tracked screenshots for other WPs are unchanged.
+
 ## 2026-07-18 — WP-6.4 shipped: restrained Nakul moments
 
 **Shipped:** Nakul now has a pure priority state machine for first sync, verified savings, budget breach, and first evidence. Priority is first sync → savings → budget → evidence. Event-specific local keys prevent “first” moments from replaying on later sessions, and one session lock allows at most one moment per tab session. First sync keeps the existing full reveal; the other events use a compact inline panel with the matching found, celebrate, or guide pose and an explicit dismiss action.

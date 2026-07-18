@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "perf:budget": "node scripts/check-performance-budget.mjs",
+    "perf:lighthouse": "node scripts/check-lighthouse.mjs",
     "vercel-build": "node scripts/vercel-build.mjs",
     "start": "node scripts/start-standalone.mjs",
     "lint": "eslint",
@@ -19,7 +21,7 @@
     "brand:build": "node scripts/generate-brand-assets.mjs",
     "brand:check": "node scripts/check-brand-assets.mjs",
     "smoke": "node scripts/smoke-test.mjs",
-    "ci": "npm run lint && npm run typecheck && npm run claims:check && npm run research:check && npm run brand:check && npm run test && npm run build",
+    "ci": "npm run lint && npm run typecheck && npm run claims:check && npm run research:check && npm run brand:check && npm run test && npm run build && npm run perf:budget && npm run perf:lighthouse",
     "ci:database": "npm run db:apply-schema && npm run test:postgres",
     "ops:preflight": "node scripts/check-ops-preflight.mjs",
     "production:check": "node scripts/check-production-activation.mjs",
@@ -56,6 +58,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
+    "lighthouse": "^12.6.1",
     "tsx": "^4.23.0",
     "typescript": "^5",
     "yaml": "^2.9.0"

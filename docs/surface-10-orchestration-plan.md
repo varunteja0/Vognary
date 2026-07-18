@@ -49,7 +49,7 @@ The first implementation tranche is in the working tree and browser-proved. Comp
 
 - **Proved now:** hydration-safe encrypted workspace restore; three-screen IA; subscription detail sheet (one-tap proof + decision + cancel-guide); budget persistence; deterministic suggested cuts; price-change/budget chips; advanced-import demotion; counted guest handoff; install prompt; AA return polling + first-sync reveal; serious/critical axe checks on Home, Subscriptions, Connect, Login, Landing, and the open detail sheet.
 - **Harness proof (verified 2026-07-18):** full `npm run ci` green, exit 0 — lint, claims/research/brand checks, 337 unit tests, and a clean production `build` (type-checked); signed-in desktop + mobile core-loop spec; guest first-value/sample round-trip spec; tracked screenshots in `docs/evidence/surface-10/`. See the 2026-07-18 worklog entry for the build-gap fix.
-- **Still required before the scoreboard can read 10:** the ≥200 receipt performance corpus, live Google/Setu gates, consented weekly digest, full spacing/performance audit, and the remaining innovation packages.
+- **Still required before the scoreboard can read 10:** the ≥200 receipt performance corpus (WP-0.2), live Google/Setu gates (G-A/G-B/G-C), consented weekly digest (WP-3.3), the spacing/alignment audit (WP-5.1), and the remaining product/innovation packages (WP-0.4, 1.4, 2.1, 2.2, 5.5, 6.3). Performance (WP-5.4) is now measured and gated.
 - **External boundary:** G-A, G-B, and G-C require the founder/provider/legal actions described below. Code and mocked proof cannot honestly substitute for production approval or real financial data.
 
 ### Phase 0 — Core-loop integrity (Lane B) — *mostly done*
@@ -94,7 +94,7 @@ The first implementation tranche is in the working tree and browser-proved. Comp
 - **WP-5.1 (M) Alignment & spacing audit.** 8px grid; unify border radii/padding tokens across every card in `globals.css` + panels; fix every misaligned margin (the current #1 visual complaint). DoD: before/after full-page screenshots, desktop + mobile.
 - **WP-5.2 ✅ Motion.** Shared timing/easing tokens, fail-open reveals, and programmatic/CSS scrolling that becomes instant under `prefers-reduced-motion`. Browser-proved on desktop + mobile 2026-07-18.
 - **WP-5.3 ✅ Accessibility.** `@axe-core/playwright` clean on Home/Subscriptions/Connect/Login/Landing; visible focus states; keyboard-complete flows.
-- **WP-5.4 (M) Performance.** LCP < 2s mobile; verify lazy chunks (jspdf/xlsx); font subsetting; Lighthouse ≥ 95; add a CI budget script.
+- **WP-5.4 ✅ Performance.** Mobile LCP < 2s on landing/app/verify (881/767/735ms medians), Lighthouse ≥ 95 across every enforced category, `jspdf`/`xlsx` verified lazy and absent from initial route assets. Fonts moved to `display: optional` with preloads removed; `experimental.inlineCss` enabled; verify entrance animation dropped. Two CI budget scripts (`perf:budget`, `perf:lighthouse`, three-sample DevTools-throttled medians) gate `npm run ci` and GitHub CI. Shipped 2026-07-18; see worklog.
 - **WP-5.5 (M) Mobile + PWA.** Bottom-nav parity for new IA; install prompt after first proven ledger; icon/splash polish.
 
 ### Phase 6 — The innovation layer (Lane A/B, staggered; maps to path-to-10 Leaps)

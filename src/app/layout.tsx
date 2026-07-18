@@ -6,19 +6,22 @@ import "./globals.css";
 const grotesk = Geist({
   variable: "--font-grotesk",
   subsets: ["latin"],
-  display: "swap",
+  display: "optional",
+  preload: false,
 });
 
 const monoData = Geist_Mono({
   variable: "--font-mono-data",
   subsets: ["latin"],
-  display: "swap",
+  display: "optional",
+  preload: false,
 });
 
 const display = Fraunces({
   variable: "--font-display-serif",
   subsets: ["latin"],
-  display: "swap",
+  display: "optional",
+  preload: false,
   axes: ["opsz"],
 });
 

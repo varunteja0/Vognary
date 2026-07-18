@@ -20,7 +20,7 @@ export default function VerifyPage() {
           <Link href="/app" className="btn btn-ghost">Back to app</Link>
         </div>
 
-        <article className="panel p-6 sm:p-8 rise">
+        <article className="panel p-6 sm:p-8">
           <span className="folio" data-folio="Verify">Audit-pack integrity</span>
           <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">Verify an audit pack</h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-(--muted)">
