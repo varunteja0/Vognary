@@ -92,7 +92,7 @@ The first implementation tranche is in the working tree and browser-proved. Comp
 ### Phase 5 — God-level polish (Lane D, after Phase 1 lands)
 
 - **WP-5.1 (M) Alignment & spacing audit.** 8px grid; unify border radii/padding tokens across every card in `globals.css` + panels; fix every misaligned margin (the current #1 visual complaint). DoD: before/after full-page screenshots, desktop + mobile.
-- **WP-5.2 (S) Motion.** Consistent reveal/micro-interactions; respect `prefers-reduced-motion`.
+- **WP-5.2 ✅ Motion.** Shared timing/easing tokens, fail-open reveals, and programmatic/CSS scrolling that becomes instant under `prefers-reduced-motion`. Browser-proved on desktop + mobile 2026-07-18.
 - **WP-5.3 ✅ Accessibility.** `@axe-core/playwright` clean on Home/Subscriptions/Connect/Login/Landing; visible focus states; keyboard-complete flows.
 - **WP-5.4 (M) Performance.** LCP < 2s mobile; verify lazy chunks (jspdf/xlsx); font subsetting; Lighthouse ≥ 95; add a CI budget script.
 - **WP-5.5 (M) Mobile + PWA.** Bottom-nav parity for new IA; install prompt after first proven ledger; icon/splash polish.

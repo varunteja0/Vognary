@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { findActionableCancelAction, manageUrlHostname } from "@/lib/cancel-actions";
+import { scrollIntoViewWithMotion } from "@/lib/client-motion";
 import { rankFirstAction } from "@/lib/first-action";
 import {
   buildGuestAuditSnapshot,
@@ -155,7 +156,7 @@ export default function GuestAuditClient() {
     setManualItems([]);
     setSampleMode(true);
     setNotice("Sample audit loaded. These eight example subscriptions are not your data and will not be staged for sign-in.");
-    window.setTimeout(() => document.getElementById("guest-result")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    window.setTimeout(() => scrollIntoViewWithMotion(document.getElementById("guest-result"), { block: "start" }), 0);
   }
 
   function addManualItem(event: React.FormEvent<HTMLFormElement>) {

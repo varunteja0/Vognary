@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { scrollIntoViewWithMotion } from "@/lib/client-motion";
 import { encodeCsvCell } from "@/lib/csv";
 import { connectors, type Connector, type ConnectorStatus } from "@/lib/connectors";
 import {
@@ -1126,7 +1127,7 @@ export default function VognaryMvpClient() {
     const url = new URL(window.location.href);
     url.hash = id;
     window.history.replaceState(null, "", url);
-    window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    window.setTimeout(() => scrollIntoViewWithMotion(document.getElementById(id), { block: "start" }), 0);
   }
 
   async function requestPwaInstall() {
@@ -1203,7 +1204,7 @@ export default function VognaryMvpClient() {
       ledgerViewEventSent.current = true;
       void trackProductEvent("ledger.viewed", { commitmentsTouched: audit.recurringItems.length });
     }
-    window.setTimeout(() => document.getElementById("recurring-ledger")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    window.setTimeout(() => scrollIntoViewWithMotion(document.getElementById("recurring-ledger"), { block: "start" }), 0);
   }
 
   // Tapping any subscription/renewal/priority card opens the detail sheet in

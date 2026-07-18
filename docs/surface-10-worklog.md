@@ -2,6 +2,12 @@
 
 Append-only log per [surface-10-orchestration-plan.md](surface-10-orchestration-plan.md) Part VI. Newest first.
 
+## 2026-07-18 — WP-5.2 shipped: consistent, reduced-motion-safe movement
+
+**Shipped:** workspace entry motion now uses shared duration/easing tokens instead of local timings. All three programmatic result/navigation scrolls route through one client helper: normal motion stays smooth; `prefers-reduced-motion: reduce` switches to instant scrolling. The root CSS scroll behavior also becomes `auto` under reduced motion, while chapter and Nakul animations remain disabled and reveal content still fails open.
+
+**Proof:** focused motion/reveal tests green (3/3); unauthenticated sample-audit Playwright spec green on desktop Chromium and mobile Chromium, asserting the actual `scrollIntoView` call uses `behavior: "auto"`, computed root scroll behavior is `auto`, and serious/critical axe results are empty. `unset DATABASE_URL; npm run ci` green (341/341 tests, typecheck, claims/research/brand checks, production build). Evidence: [reduced motion desktop](evidence/surface-10/wp-5.2-reduced-motion-desktop-chromium.png), [reduced motion mobile](evidence/surface-10/wp-5.2-reduced-motion-mobile-chromium.png).
+
 ## 2026-07-18 — WP-6.2 shipped: verified-savings share loop
 
 **Shipped:** a savings receipt is now prepared automatically whenever the verification engine produces a verified saving. Review promotes one Share proof action that sends the generated card and sealed JSON receipt together through the browser Web Share API. Browsers without file sharing keep the existing honest fallbacks: card and receipt downloads plus copied share text when clipboard access exists. The separate Mint sealed receipt, Download share card, and Copy share text controls remain available.
