@@ -2,6 +2,16 @@
 
 Append-only log per [surface-10-orchestration-plan.md](surface-10-orchestration-plan.md) Part VI. Newest first.
 
+## 2026-07-18 — WP-6.1 shipped: Renewal Radar
+
+**Shipped:** Home now opens with a 45-day spatial Renewal Radar built from the existing proven-cadence timeline. Each upcoming debit is positioned by days away, sized by amount, and highlighted gold when due within seven days. The hero includes the next merchant/debit, 7-day and 30-day exposure, and the full 45-day total. Every marker has a 44px touch target and opens the existing subscription detail sheet in one tap, preserving the proof, decision, and cancel-guide path.
+
+**Accessibility and harness hardening:** the mobile workspace navigation's inactive labels now use the stronger ink token after axe measured the previous Subscriptions label at 4.48:1. The signed-in harness also tolerates the one-time guest-transfer notice being absent on repeat runs; durable Home totals, subscriptions, watched merchants, delayed-hydration merge, reload persistence, and connector-return assertions remain mandatory.
+
+**Proof:** `unset DATABASE_URL; npm run ci` green, exit 0 — lint, typecheck, claims/research/brand checks, 337/337 unit tests, and a clean Next.js production build. The signed-in Playwright journey passes independently on desktop Chromium and mobile Chromium, including axe checks on Home, the open detail sheet, Subscriptions, and Connect. The test taps a radar marker, asserts the proof dialog, records Monitor, closes with Escape, and continues through persisted merchant watches and provider-return reveal. Evidence: [radar desktop](evidence/surface-10/wp-6.1-radar-desktop-chromium.png), [radar mobile](evidence/surface-10/wp-6.1-radar-mobile-chromium.png).
+
+**Honesty boundary:** the radar projects debits only from detected recurring evidence and proven cadence. It does not claim bank forecasting or live provider coverage; those remain subject to G-A/G-B/G-C.
+
 ## 2026-07-18 — Gate hardening: `npm run ci` now type-checks test files
 
 **Closes the WP-1.3 follow-up.** `npm run ci` previously type-checked only the app (via `next build`) and *ran* tests via `tsx` (which strips types without checking), so type errors in test files never failed the gate. Added a `typecheck` script (`tsc --noEmit`) and inserted it into `ci` right after `lint`, so the whole project — app and tests — is now type-checked on every gate run.

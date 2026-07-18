@@ -2275,6 +2275,7 @@ export default function VognaryMvpClient() {
         {/* 00 · Overview — the five-second answer */}
         <section id="overview" aria-labelledby="overview-heading" className={`${mobileSection === "overview" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
           <StageHeader id="overview-heading" folio="01" title="Home" note="Monthly burn, next renewal, one action." />
+          {audit.recurringItems.length ? <RenewalRadar timeline={renewalTimeline} onSelect={openDetail} /> : null}
           <OverviewPanel
             audit={audit}
             timeline={renewalTimeline}
@@ -2533,7 +2534,7 @@ function WorkspaceNav({ activeId, onSelect, showMore }: { activeId: string; onSe
               onSelect(section.id);
             }}
             aria-current={active ? "true" : undefined}
-            className={`flex min-h-11 min-w-0 shrink-0 items-center justify-center gap-2 rounded-xl px-1 py-2 text-[0.68rem] font-medium transition sm:justify-start sm:px-3 sm:py-1.5 sm:text-sm ${active ? "bg-(--gold) text-[#17130a]" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"}`}
+            className={`flex min-h-11 min-w-0 shrink-0 items-center justify-center gap-2 rounded-xl px-1 py-2 text-[0.68rem] font-medium transition sm:justify-start sm:px-3 sm:py-1.5 sm:text-sm ${active ? "bg-(--gold) text-[#17130a]" : "text-(--ink) hover:bg-white/5"}`}
           >
             <span className={`hidden font-data text-[0.6rem] tnum sm:inline ${active ? "opacity-70" : "text-(--muted)"}`}>{section.folio}</span>
             <span className="truncate">{section.label}</span>
@@ -2542,7 +2543,7 @@ function WorkspaceNav({ activeId, onSelect, showMore }: { activeId: string; onSe
       })}
       {showMore ? (
         <details className="group relative min-w-0 sm:ml-auto">
-          <summary className={`flex min-h-11 cursor-pointer list-none items-center justify-center rounded-xl px-2 text-[0.68rem] font-medium transition sm:px-3 sm:text-sm ${secondaryWorkspaceSections.some((section) => section.id === activeId) ? "bg-(--gold) text-[#17130a]" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"}`}>More</summary>
+          <summary className={`flex min-h-11 cursor-pointer list-none items-center justify-center rounded-xl px-2 text-[0.68rem] font-medium transition sm:px-3 sm:text-sm ${secondaryWorkspaceSections.some((section) => section.id === activeId) ? "bg-(--gold) text-[#17130a]" : "text-(--ink) hover:bg-white/5"}`}>More</summary>
           <div className="absolute bottom-full right-0 mb-2 grid min-w-40 gap-1 rounded-xl border border-line bg-(--paper-2) p-1.5 shadow-2xl sm:bottom-auto sm:top-full sm:mt-2">
             {secondaryWorkspaceSections.map((section) => (
               <button key={section.id} type="button" onClick={() => onSelect(section.id)} className="min-h-11 rounded-lg px-3 text-left text-sm text-(--ink-soft) transition hover:bg-white/5 hover:text-(--ink)">
@@ -3718,6 +3719,93 @@ function RecurringGraph({
 
 // Renewal calendar — projects every proven cadence into the next debits, so the
 // workspace answers "what renews next and what will it cost" before anything else.
+function RenewalRadar({ timeline, onSelect }: { timeline: RenewalTimeline; onSelect: (id: string) => void }) {
+  const { events, horizonDays } = timeline;
+  const maxAmount = Math.max(1, ...events.map((event) => event.amount));
+  const ticks = Array.from(new Set([0, 7, 15, 30, horizonDays]))
+    .filter((tick) => tick <= horizonDays)
+    .sort((left, right) => left - right);
+  const nextEvent = events[0] ?? null;
+  const trackHeight = 128;
+
+  return (
+    <section className="panel overflow-hidden p-5 sm:p-6" data-reveal aria-labelledby="renewal-radar-heading">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Renewal Radar · next {horizonDays} days</p>
+          <h3 id="renewal-radar-heading" className="mt-1 font-display text-xl font-semibold text-(--ink)">
+            {events.length ? `${formatCurrency(timeline.totalDue)} across ${events.length} proven debit${events.length === 1 ? "" : "s"}` : "No projected debits yet"}
+          </h3>
+        </div>
+        {nextEvent ? (
+          <button type="button" onClick={() => onSelect(nextEvent.itemId)} className="inset px-3 py-2 text-left transition hover:border-ember">
+            <span className="eyebrow block" style={{ fontSize: "0.54rem" }}>Next up</span>
+            <span className="mt-0.5 block text-sm font-semibold text-(--ink)">{nextEvent.merchant} · {formatCurrency(nextEvent.amount, nextEvent.currency)}</span>
+            <span className="block font-data text-[0.62rem] text-(--muted)">{nextEvent.daysAway === 0 ? "today" : `in ${nextEvent.daysAway}d`} · {nextEvent.date}</span>
+          </button>
+        ) : null}
+      </div>
+
+      {events.length ? (
+        <>
+          <div className="relative mt-7 w-full" style={{ height: `${trackHeight}px` }}>
+            {ticks.map((tick) => (
+              <div key={`grid-${tick}`} className="absolute top-0 border-l border-line" style={{ left: `${(tick / horizonDays) * 100}%`, height: `${trackHeight}px`, opacity: 0.5 }} aria-hidden />
+            ))}
+            <div className="absolute inset-x-0 bottom-0 h-px bg-(--line-strong)" aria-hidden />
+            {events.map((event) => {
+              const leftPercent = Math.min(97.5, Math.max(2.5, (event.daysAway / horizonDays) * 100));
+              const barHeight = Math.round(20 + (event.amount / maxAmount) * (trackHeight - 34));
+              const dueSoon = event.daysAway <= 7;
+
+              return (
+                <button
+                  key={`${event.itemId}-${event.date}`}
+                  type="button"
+                  onClick={() => onSelect(event.itemId)}
+                  aria-label={`${event.merchant}, ${formatCurrency(event.amount, event.currency)}, renews ${event.daysAway === 0 ? "today" : `in ${event.daysAway} days`} (${event.date})`}
+                  className="group absolute bottom-0 z-10 w-11 -translate-x-1/2 focus-visible:z-20"
+                  style={{ left: `${leftPercent}%`, height: `${Math.max(44, barHeight)}px` }}
+                >
+                  <span
+                    className="pointer-events-none absolute bottom-0 left-1/2 w-3 -translate-x-1/2 rounded-t-md transition group-hover:brightness-110"
+                    style={{ height: `${barHeight}px`, background: dueSoon ? "var(--gold)" : "var(--muted)" }}
+                    aria-hidden
+                  />
+                  <span
+                    className="pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap font-data text-[0.54rem] text-(--ink-soft) opacity-0 transition group-hover:opacity-100 group-focus:opacity-100"
+                    style={{ bottom: `${barHeight + 4}px` }}
+                  >
+                    {event.merchant.split(" ")[0]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="relative mt-1.5 h-4 w-full">
+            {ticks.map((tick) => (
+              <span
+                key={`tick-${tick}`}
+                className="absolute font-data text-[0.56rem] text-(--muted)"
+                style={{ left: `${(tick / horizonDays) * 100}%`, transform: tick === 0 ? "translateX(0)" : tick === horizonDays ? "translateX(-100%)" : "translateX(-50%)" }}
+              >
+                {tick === 0 ? "today" : `+${tick}d`}
+              </span>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
+            <MiniStat label="Due in 7 days" value={formatCurrency(timeline.dueNext7Days)} />
+            <MiniStat label="Due in 30 days" value={formatCurrency(timeline.dueNext30Days)} />
+            <MiniStat label={`Total in ${horizonDays} days`} value={formatCurrency(timeline.totalDue)} />
+          </div>
+        </>
+      ) : (
+        <p className="inset mt-4 p-4 text-sm leading-6 text-(--muted)">No projected debits in the next {horizonDays} days yet. Connect a source or add receipts and proven renewals will appear here.</p>
+      )}
+    </section>
+  );
+}
+
 function RenewalTimelinePanel({ timeline, onSelect }: { timeline: RenewalTimeline; onSelect: (id: string) => void }) {
   const visibleEvents = 12;
 

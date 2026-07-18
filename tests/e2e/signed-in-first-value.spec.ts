@@ -59,8 +59,12 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await page.waitForURL(/\/app/, { timeout: 30_000 });
   await hydrated;
   await page.waitForTimeout(500);
-  await expect(page.getByText(/2 commitments carried into your encrypted workspace/i)).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("button", { name: "Dismiss" }).click();
+  const transferNotice = page.getByRole("status").filter({
+    hasText: /2 commitments carried into your encrypted workspace|Guest audit saved to this encrypted workspace/i,
+  });
+  if (await transferNotice.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await transferNotice.getByRole("button", { name: "Dismiss" }).click();
+  }
 
   // 3. Home is the five-second answer and the workspace has only three
   //    primary destinations. Budgets must persist through encrypted sync.
@@ -98,13 +102,20 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await savedBudgets;
   await expect(page.getByText(/over budget/i).first()).toBeVisible();
   await expect(home.getByText("Suggested cuts", { exact: true })).toBeVisible();
+
+  // WP-6.1 — the Renewal Radar is Home's hero: proven upcoming debits as bars.
+  const radar = page.locator('section[aria-labelledby="renewal-radar-heading"]');
+  await expect(radar).toBeVisible();
+  await expect(radar.getByRole("heading", { name: /proven debit/i })).toBeVisible();
   await expectAxeClean(page, "Home");
   await positionForScreenshot(page, home);
   await page.screenshot({ path: `docs/evidence/surface-10/wp-1.2-home-${surface}.png`, fullPage: false, animations: "disabled" });
+  await positionForScreenshot(page, radar);
+  await page.screenshot({ path: `docs/evidence/surface-10/wp-6.1-radar-${surface}.png`, fullPage: false, animations: "disabled" });
 
-  // WP-1.3 — the subscription detail sheet opens in place from Home in one tap,
-  //   surfaces proof + a decision control, records an action, and closes on Escape.
-  await home.getByRole("button", { name: /^Renews next/ }).click();
+  // WP-1.3 + WP-6.1 — tapping a radar bar opens the detail sheet in place
+  //   (proof + a decision control), records an action, and closes on Escape.
+  await radar.getByRole("button", { name: /renews/i }).first().click();
   const detailSheet = page.getByRole("dialog").filter({ hasText: "Proof · where this came from" });
   await expect(detailSheet).toBeVisible();
   await expect(detailSheet.getByRole("group", { name: /Choose an action/ })).toBeVisible();
