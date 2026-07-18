@@ -102,6 +102,21 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await positionForScreenshot(page, home);
   await page.screenshot({ path: `docs/evidence/surface-10/wp-1.2-home-${surface}.png`, fullPage: false, animations: "disabled" });
 
+  // WP-1.3 — the subscription detail sheet opens in place from Home in one tap,
+  //   surfaces proof + a decision control, records an action, and closes on Escape.
+  await home.getByRole("button", { name: /^Renews next/ }).click();
+  const detailSheet = page.getByRole("dialog").filter({ hasText: "Proof · where this came from" });
+  await expect(detailSheet).toBeVisible();
+  await expect(detailSheet.getByRole("group", { name: /Choose an action/ })).toBeVisible();
+  await expectAxeClean(page, "Detail sheet");
+  await positionForScreenshot(page, detailSheet);
+  await page.screenshot({ path: `docs/evidence/surface-10/wp-1.3-detail-${surface}.png`, fullPage: false, animations: "disabled" });
+  const monitorAction = detailSheet.getByRole("button", { name: "Monitor", exact: true });
+  await monitorAction.click();
+  await expect(monitorAction).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await expect(detailSheet).toHaveCount(0);
+
   await workspaceNav.getByText("Subscriptions", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Your subscriptions" })).toBeVisible();
   await expect(page.getByLabel("Sort subscriptions")).toBeVisible();

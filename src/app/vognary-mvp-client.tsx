@@ -457,6 +457,7 @@ export default function VognaryMvpClient() {
   const [statementSources, setStatementSources] = useState<StatementFile[]>([]);
   const [manualItems, setManualItems] = useState<ManualRecurringInput[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [detailItemId, setDetailItemId] = useState<string | null>(null);
   const [userActions, setUserActions] = useState<Record<string, RecommendationType>>({});
   const [actionsMeta, setActionsMeta] = useState<Record<string, ActionMeta>>({});
   const [mergeDecisions, setMergeDecisions] = useState<Record<string, MergeDecision>>({});
@@ -673,6 +674,7 @@ export default function VognaryMvpClient() {
     [actionsMeta, audit.recurringItems, verifiedCoverageWindows],
   );
   const selectedItem = audit.recurringItems.find((item) => item.identityKey === selectedItemId) ?? audit.recurringItems[0] ?? null;
+  const detailItem = detailItemId ? audit.recurringItems.find((item) => item.identityKey === detailItemId) ?? null : null;
   const selectedServerRecurringItemId = selectedItem ? resolveServerCommitmentId(selectedItem, serverCommitments) : null;
   const selectedActionCase = selectedServerRecurringItemId
     ? serverActionCases.find((entry) => entry.recurringItemId === selectedServerRecurringItemId && !["withdrawn", "failed"].includes(entry.status)) ?? null
@@ -1199,6 +1201,15 @@ export default function VognaryMvpClient() {
       void trackProductEvent("ledger.viewed", { commitmentsTouched: audit.recurringItems.length });
     }
     window.setTimeout(() => document.getElementById("recurring-ledger")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
+  // Tapping any subscription/renewal/priority card opens the detail sheet in
+  // place (proof + history + Keep/Watch/Cancel) without leaving the current
+  // screen. selectedItemId stays in sync so the inline deep-dive and the
+  // assisted-cancel flow reference the same item when the sheet is dismissed.
+  function openDetail(itemId: string) {
+    setSelectedItemId(itemId);
+    setDetailItemId(itemId);
   }
 
   // Record the action AND when it was decided — the Verified Savings engine
@@ -2179,6 +2190,19 @@ export default function VognaryMvpClient() {
           </section>
         </div>
       ) : null}
+      {detailItem ? (
+        <SubscriptionDetailSheet
+          item={detailItem}
+          action={userActions[detailItem.identityKey] ?? detailItem.recommendationType}
+          onAction={(action) => recordAction(detailItem.identityKey, action)}
+          onOpenFullReview={() => {
+            const target = detailItem.identityKey;
+            setDetailItemId(null);
+            selectAndReviewItem(target);
+          }}
+          onClose={() => setDetailItemId(null)}
+        />
+      ) : null}
       {confirmState ? (
         <ConfirmDialog
           request={confirmState}
@@ -2262,7 +2286,7 @@ export default function VognaryMvpClient() {
             monthlyBudget={monthlyBudget}
             categoryBudgets={categoryBudgets}
             sourceHealth={serverConnectors?.sourceHealth ?? []}
-            onSelect={(key) => selectAndReviewItem(key)}
+            onSelect={openDetail}
             onOpenSubscriptions={() => selectAndReviewItem()}
             onMonthlyBudgetChange={setMonthlyBudget}
             onCategoryBudgetChange={(category, value) => {
@@ -2362,18 +2386,18 @@ export default function VognaryMvpClient() {
             <Metric label={`Needs review · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)} tone="caution" />
             <Metric label="Renewing in 10 days" value={`${audit.summary.renewalsNextTenDays}`} tone="accent" />
           </div>
-          <RenewalTimelinePanel timeline={renewalTimeline} onSelect={setSelectedItemId} />
+          <RenewalTimelinePanel timeline={renewalTimeline} onSelect={openDetail} />
           <div className="grid gap-5 xl:grid-cols-[1.12fr_0.88fr]" data-reveal>
             <RecurringGraph
               audit={audit}
               selectedItem={selectedItem}
               userActions={userActions}
               categoryBudgets={categoryBudgets}
-              onSelect={setSelectedItemId}
+              onSelect={openDetail}
             />
             <div className="flex flex-col gap-5">
-              <SpendSpectrum audit={audit} userActions={userActions} onSelect={setSelectedItemId} />
-              <PriorityActionPanel priorityItems={priorityItems} userActions={userActions} onSelect={setSelectedItemId} />
+              <SpendSpectrum audit={audit} userActions={userActions} onSelect={openDetail} />
+              <PriorityActionPanel priorityItems={priorityItems} userActions={userActions} onSelect={openDetail} />
             </div>
           </div>
           {duplicateCandidates.length ? (
@@ -2417,7 +2441,7 @@ export default function VognaryMvpClient() {
           {reviewDiff ? <SinceLastReviewPanel diff={reviewDiff} onSelectMerchant={() => selectAndReviewItem()} /> : null}
           <VerifiedSavingsPanel
             savings={verifiedSavings}
-            onSelect={setSelectedItemId}
+            onSelect={openDetail}
             onMintReceipt={() => void mintSavingsReceipt()}
             onDownloadCard={() => void downloadSavingsCard()}
             onCopyShareText={() => void copySavingsShareText()}
@@ -3802,6 +3826,176 @@ function PriorityActionPanel({
         }) : <p className="inset px-3 py-3 text-sm text-(--muted)">Connect a proof source to generate an action plan.</p>}
       </div>
     </section>
+  );
+}
+
+// Relative countdown for a YYYY-MM-DD renewal date, computed against local
+// midnight so "in 3d" stays stable regardless of the current time of day.
+function renewalCountdown(dateStr: string): string | null {
+  if (!dateStr) return null;
+  const target = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((target.getTime() - startToday.getTime()) / 86_400_000);
+  if (days === 0) return "today";
+  return days > 0 ? `in ${days}d` : `${Math.abs(days)}d ago`;
+}
+
+function DetailStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="inset p-3">
+      <p className="eyebrow" style={{ fontSize: "0.58rem" }}>{label}</p>
+      <p className="font-data mt-1.5 text-base font-semibold tnum text-(--ink)">{value}</p>
+      {sub ? <p className="mt-0.5 font-data text-[0.6rem] text-(--muted)">{sub}</p> : null}
+    </div>
+  );
+}
+
+// WP-1.3 — the subscription detail sheet. Opens in place on any card tap so
+// the proof, history, and Keep/Watch/Cancel-guide are reachable in one tap from
+// Home or Subscriptions. Reuses recordAction, the commitment policy, and the
+// existing cancel-action registry; "Open full review" hands off to the inline
+// deep-dive + assisted-cancel flow.
+function SubscriptionDetailSheet({
+  item,
+  action,
+  onAction,
+  onOpenFullReview,
+  onClose,
+}: {
+  item: RecurringItem;
+  action: RecommendationType;
+  onAction: (action: RecommendationType) => void;
+  onOpenFullReview: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const policy = getCommitmentPolicy(item.category);
+  const cancelGuide = findCancelAction(item.merchant, item.category);
+  const allowedActions = recommendationActions.filter((candidate) => isReviewActionAllowed(item.category, candidate.value));
+  const countdown = renewalCountdown(item.nextExpectedDate);
+  // identityKey carries spaces/colons ("google one::INR::…"); a raw id would be
+  // read by aria-labelledby as several missing references, so slugify it.
+  const headingId = `subscription-detail-${item.identityKey.replace(/[^a-z0-9]+/gi, "-")}`;
+
+  return (
+    <div
+      className="fixed inset-0 z-70 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={headingId}
+      onClick={onClose}
+    >
+      <section
+        className="panel flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-b-none rounded-t-2xl sm:rounded-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start gap-4 border-b border-line bg-(--card-2) p-5 sm:p-6">
+          <span className="grid size-12 shrink-0 place-items-center rounded-xl border border-line bg-card font-display text-xl font-semibold text-(--ink)" aria-hidden>{item.merchant.slice(0, 1).toUpperCase()}</span>
+          <div className="min-w-0 flex-1">
+            <h2 id={headingId} className="truncate font-display text-2xl font-semibold text-(--ink)">{item.merchant}</h2>
+            <p className="mt-1 text-sm text-(--muted)">{item.category} · <span className="capitalize">{item.frequency}</span></p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="pill pill-partial">{item.confidenceScore}% proof</span>
+              <span className={statusStyles[action]}>{action}</span>
+              {item.priceChange?.direction === "increase" ? <span className="pill pill-blocked">↑ was {formatCurrency(item.priceChange.previousAmount, item.currency)}</span> : null}
+            </div>
+          </div>
+          <button type="button" autoFocus onClick={onClose} aria-label="Close subscription details" className="btn btn-ghost grid size-9 shrink-0 place-items-center p-0 text-lg leading-none">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <DetailStat label={`Monthly · ${item.currency}`} value={`${formatCurrency(item.monthlyCost, item.currency)}`} />
+            <DetailStat label="Annual" value={formatCurrency(item.annualCost, item.currency)} />
+            <DetailStat label="Renews" value={countdown ?? item.nextExpectedDate} sub={countdown ? item.nextExpectedDate : undefined} />
+            <DetailStat label="Amount range" value={`${formatCurrency(item.amountMin, item.currency)} – ${formatCurrency(item.amountMax, item.currency)}`} />
+            <DetailStat label="Proof rows" value={`${item.evidence.length}`} />
+            {item.priceChange ? (
+              <DetailStat label={`Price ${item.priceChange.direction === "increase" ? "up" : "down"} ${item.priceChange.changePercent}%`} value={`${formatCurrency(item.priceChange.previousAmount, item.currency)} → ${formatCurrency(item.priceChange.latestAmount, item.currency)}`} />
+            ) : item.missedCycles >= 2 ? (
+              <DetailStat label="Evidence gap" value={`${item.missedCycles} cycles`} />
+            ) : null}
+          </div>
+
+          <div className="mt-5">
+            <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Your decision</p>
+            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Choose an action for this subscription">
+              {allowedActions.map((candidate) => {
+                const active = candidate.value === action;
+                return (
+                  <button
+                    key={candidate.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => onAction(candidate.value)}
+                    className={`min-h-11 rounded-xl border px-4 text-sm font-semibold transition ${active ? "border-(--gold-line) bg-(--gold-tint) text-(--ink)" : "border-line bg-(--card-2) text-(--ink-soft) hover:border-(--line-strong)"}`}
+                  >
+                    {candidate.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs leading-5 text-ochre">{policy.consequenceWarning}</p>
+          </div>
+
+          {cancelGuide ? (
+            <div className="mt-5 rounded-xl border border-line bg-(--card-2) p-4">
+              <p className="font-display text-base font-semibold text-(--ink)">{cancelGuide.kind === "rail-guide" ? "How to stop this payment" : "Manage at the official account"}</p>
+              <ol className="mt-3 grid gap-1 text-xs leading-5 text-(--ink-soft)">
+                {cancelGuide.steps.map((step, index) => <li key={step}>{index + 1}. {step}</li>)}
+              </ol>
+              {cancelGuide.caveat ? <p className="mt-2 text-xs leading-5 text-ochre">{cancelGuide.caveat}</p> : null}
+              {cancelGuide.manageUrl ? <a href={cancelGuide.manageUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost mt-3 h-9 px-3 text-xs">Open {manageUrlHostname(cancelGuide)} ↗</a> : null}
+            </div>
+          ) : null}
+
+          <div className="mt-5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Proof · where this came from</p>
+              <span className="truncate font-data text-[0.62rem] text-(--muted)">{item.sourceNames.join(", ")}</span>
+            </div>
+            {item.evidence.length ? (
+              <div className="mt-2 overflow-hidden rounded-xl border border-line">
+                <table className="w-full border-separate border-spacing-0 text-left text-sm">
+                  <thead>
+                    <tr>
+                      <th className="border-b border-line bg-(--card-2) px-3 py-2 font-data text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-(--muted)">Date</th>
+                      <th className="border-b border-line bg-(--card-2) px-3 py-2 font-data text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-(--muted)">Amount</th>
+                      <th className="border-b border-line bg-(--card-2) px-3 py-2 font-data text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-(--muted)">Statement text</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {item.evidence.map((evidence) => (
+                      <tr key={`${evidence.source}-${evidence.rowNumber}-${evidence.date}`}>
+                        <td className="border-t border-line px-3 py-2 font-data text-xs text-(--muted)">{evidence.date}</td>
+                        <td className="border-t border-line px-3 py-2 font-data font-semibold tnum text-(--ink)">{formatCurrency(evidence.amount, item.currency)}</td>
+                        <td className="border-t border-line px-3 py-2 text-(--ink-soft)">{evidence.description}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-(--muted)">No individual proof rows yet — this pattern is inferred from summary evidence.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-line p-4">
+          <button type="button" onClick={onOpenFullReview} className="btn btn-ghost h-10 px-3 text-sm">Open full review →</button>
+          <button type="button" onClick={onClose} className="btn btn-primary h-10 px-4 text-sm">Done</button>
+        </div>
+      </section>
+    </div>
   );
 }
 

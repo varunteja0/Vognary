@@ -2,6 +2,20 @@
 
 Append-only log per [surface-10-orchestration-plan.md](surface-10-orchestration-plan.md) Part VI. Newest first.
 
+## 2026-07-18 — WP-1.3 shipped: subscription detail sheet
+
+**Shipped:** tapping any subscription — from a Home card ("Renews next", "Do this first", a suggested cut) or a Subscriptions card — now opens a focused modal **detail sheet in place** instead of navigating to another screen and scrolling. The sheet shows the header (merchant, category · cadence, confidence + status + price-change chips), a stats grid (monthly, annual, a live "renews in Nd" countdown, amount range, proof rows, price move / evidence gap), a **decision control** (Keep / Monitor / Downgrade / Cancel / Review, filtered by the commitment policy) wired to `recordAction`, the class-safe consequence warning, the merchant's **cancel-guide** steps + official-account link (the existing `cancel-actions` registry), and the **proof evidence table** (date / amount / statement text). "Open full review →" hands off to the inline deep-dive + assisted-cancel (concierge) flow; Escape, backdrop click, and Done all dismiss.
+
+**Design:** driven by new `detailItemId` state + `openDetail(key)` (sets `detailItemId` and `selectedItemId` together, so closing the sheet leaves the same item selected underneath and the concierge path is never lost). `SubscriptionDetailSheet` reuses `recordAction`, `getCommitmentPolicy`, `isReviewActionAllowed`, `recommendationActions`, `findCancelAction`, `statusStyles`, and `formatCurrency`; no new data, no new routes.
+
+**Proof:** `unset DATABASE_URL; npm run ci` green, exit 0 (lint, claims/research/brand, 337 unit tests, production build). Signed-in harness extended (`signed-in-first-value.spec.ts`) and green on desktop + mobile: opens the sheet from Home in one tap, asserts the proof section + decision group, records "Monitor" (aria-pressed), and closes on Escape — with a **serious/critical axe check on the open sheet**. Guest `first-value-path` 10/10 (no regression). Evidence: [detail desktop](evidence/surface-10/wp-1.3-detail-desktop-chromium.png), [detail mobile](evidence/surface-10/wp-1.3-detail-mobile-chromium.png).
+
+**Two axe bugs found and fixed while proving it:** (1) `aria-dialog-name` — the dialog id/`aria-labelledby` embedded the raw `identityKey` (`"google one::INR::…"`, spaces + colons), which `aria-labelledby` reads as several missing id references; slugified the id. (2) `color-contrast` — the reused `pill`/`stamp` chips and the active-action button inherited light text on gold inside a dark `dossier` header; switched the sheet header and active-button treatment to the proven-clean light card + `bg-(--gold-tint)`/`text-(--ink)` pattern used by the Subscriptions cards.
+
+**Follow-ups (filed, not in scope here):**
+- **CI does not type-check test files.** `npm run ci` type-checks the app via `next build` and *runs* tests via `tsx` (which strips types without checking). `npx tsc --noEmit` surfaces pre-existing/tranche test-type errors that never fail CI — e.g. `tests/suggested-cuts.test.ts` uses `percentChange` (should be `changePercent`) and a non-existent `occurrenceCount`; `tests/setu-aa-adapter.test.ts` has a `never`-typed access. Consider adding a `typecheck` script (`tsc --noEmit`) to the gate and fixing these. Same class of gap as the 2026-07-18 build gap, one layer down.
+- **Minor:** a fixed page-level brand avatar ("N", bottom-left) paints over the sheet footer's "Open full review" label; it sits above the modal's `z-70`. Raise the modal stacking or suppress that element while a modal is open.
+
 ## 2026-07-18 — Production build gap closed; full `npm run ci` is now the verified gate
 
 **What was wrong:** the 2026-07-17 checkpoint below reported `lint`, unit tests, e2e, and axe as green but never ran `npm run build`. It also undercounted the suite (`336`; the actual figure was `337` after the suggested-cuts tests landed). Because the dev-server e2e transpiles without type-checking, a real type error shipped uncaught.
