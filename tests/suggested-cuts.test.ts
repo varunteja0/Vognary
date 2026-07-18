@@ -11,7 +11,7 @@ test("suggested cuts combine cost, proof weakness, action, and price rises deter
     monthlyCost: 850,
     confidenceScore: 70,
     recommendationType: "watch",
-    priceChange: { direction: "increase", previousAmount: 700, latestAmount: 850, percentChange: 21 },
+    priceChange: { direction: "increase", previousAmount: 700, latestAmount: 850, changePercent: 21 },
   });
 
   const ranked = rankSuggestedCuts([expensiveKeep, review, increase], { increase: "cancel" });
@@ -25,29 +25,31 @@ test("suggested cuts respect the requested result limit", () => {
   assert.equal(rankSuggestedCuts(items, {}, 0).length, 0);
 });
 
-function item(overrides: Partial<RecurringItem> & Pick<RecurringItem, "identityKey" | "monthlyCost">): RecurringItem {
+function item({ identityKey, monthlyCost, ...rest }: Partial<RecurringItem> & Pick<RecurringItem, "identityKey" | "monthlyCost">): RecurringItem {
   return {
-    identityKey: overrides.identityKey,
-    merchant: overrides.identityKey,
-    normalizedMerchant: overrides.identityKey,
+    id: identityKey,
+    identityKey,
+    merchant: identityKey,
+    normalizedMerchant: identityKey,
     category: "Software",
     currency: "INR",
     frequency: "monthly",
-    monthlyCost: overrides.monthlyCost,
-    annualCost: overrides.monthlyCost * 12,
-    amountMin: overrides.monthlyCost,
-    amountMax: overrides.monthlyCost,
-    averageAmount: overrides.monthlyCost,
-    occurrenceCount: 2,
+    averageGapDays: 30,
+    amountMin: monthlyCost,
+    amountMax: monthlyCost,
+    averageAmount: monthlyCost,
+    monthlyCost,
+    annualCost: monthlyCost * 12,
     lastChargeDate: "2026-07-01",
     nextExpectedDate: "2026-08-01",
-    confidenceScore: overrides.confidenceScore ?? 75,
-    recommendationType: overrides.recommendationType ?? "watch",
-    recommendation: "Review",
+    confidenceScore: 75,
+    recommendationType: "watch",
     recommendationReason: "Test",
     riskTags: [],
-    sourceNames: ["Test"],
     evidence: [],
-    ...overrides,
+    sourceNames: ["Test"],
+    missedCycles: 0,
+    priceChange: null,
+    ...rest,
   };
 }

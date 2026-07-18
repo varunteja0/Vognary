@@ -2,6 +2,16 @@
 
 Append-only log per [surface-10-orchestration-plan.md](surface-10-orchestration-plan.md) Part VI. Newest first.
 
+## 2026-07-18 — Gate hardening: `npm run ci` now type-checks test files
+
+**Closes the WP-1.3 follow-up.** `npm run ci` previously type-checked only the app (via `next build`) and *ran* tests via `tsx` (which strips types without checking), so type errors in test files never failed the gate. Added a `typecheck` script (`tsc --noEmit`) and inserted it into `ci` right after `lint`, so the whole project — app and tests — is now type-checked on every gate run.
+
+Fixed the two latent errors this surfaced:
+- `tests/suggested-cuts.test.ts` — the `RecurringItem` factory set a non-existent `occurrenceCount`/`recommendation`, omitted required `id`/`averageGapDays`/`missedCycles`/`priceChange`, duplicated `identityKey`/`monthlyCost` via a trailing spread, and used `percentChange` instead of `changePercent`. Rewrote it to destructure the required keys out of the spread and match the real type; runtime behavior (ranking) is unchanged.
+- `tests/setu-aa-adapter.test.ts` — `let body: … | null = null` is assigned only inside the fetch-mock closure, so TS kept `body` narrowed to `null` at the assertions and typed the property access as `never`. Declared it `Record<string, unknown> = {}` (no null in the type) so the capture reads cleanly; a missing capture still fails the assertions loudly.
+
+**Proof:** `unset DATABASE_URL; npm run typecheck` exit 0; full `npm run ci` green (lint, **typecheck**, claims/research/brand, 337 tests, build).
+
 ## 2026-07-18 — WP-1.3 shipped: subscription detail sheet
 
 **Shipped:** tapping any subscription — from a Home card ("Renews next", "Do this first", a suggested cut) or a Subscriptions card — now opens a focused modal **detail sheet in place** instead of navigating to another screen and scrolling. The sheet shows the header (merchant, category · cadence, confidence + status + price-change chips), a stats grid (monthly, annual, a live "renews in Nd" countdown, amount range, proof rows, price move / evidence gap), a **decision control** (Keep / Monitor / Downgrade / Cancel / Review, filtered by the commitment policy) wired to `recordAction`, the class-safe consequence warning, the merchant's **cancel-guide** steps + official-account link (the existing `cancel-actions` registry), and the **proof evidence table** (date / amount / statement text). "Open full review →" hands off to the inline deep-dive + assisted-cancel (concierge) flow; Escape, backdrop click, and Done all dismiss.
