@@ -2,6 +2,16 @@
 
 Append-only log per [surface-10-orchestration-plan.md](surface-10-orchestration-plan.md) Part VI. Newest first.
 
+## 2026-07-18 — WP-0.2 (partial): receipt-parser category fix + real-format coverage
+
+**Shipped (receipt half):** the pasted-receipt parser now categorizes India's streaming services correctly and carries locked-in coverage across the WP-0.2 merchant list. Three focused tests assert exact merchant/currency/amount/frequency/category/next-date for JioHotstar, Hotstar, Amazon Prime, Prime Video, Jio telecom, LIC, Apple iCloud+, Anthropic/Claude, GitHub, Adobe, and Airtel postpaid, plus two documented justified rejections (a bare telecom bill with no cadence; a loan EMI pre-debit).
+
+**Bug fixed:** `inferCategory` (`src/lib/receipt-parser.ts`) matched merchants by naive substring, so "JioHotstar" hit the "Jio" telecom branch and was filed under **Utilities** instead of Streaming — miscategorizing a streaming service into the wrong budget bucket and skewing suggested-cut ranking. Hotstar, Amazon Prime, and Prime Video fell through to "Other" for the same reason. The Streaming branch now lists these services and is ordered before Utilities, so "JioHotstar" matches Streaming via the "Hotstar" substring while bare "Jio" telecom still resolves to Utilities. Verified empirically before and after the change. The rest of the app already resolved JioHotstar→Hotstar correctly (`merchant-normalize`), so this closes a parser-only inconsistency.
+
+**Honesty boundary — why this is partial, not ✅:** WP-0.2's DoD includes `npm run corpus:strict green`. That gate (`scripts/check-statement-corpus.ts`) only activates at **≥100 `consented-redacted-real` statement fixtures**, each requiring an opaque `consent-…` reference and passing a redaction check that throws on any surviving identifier. It cannot be made green with synthetic data, and fabricating "consented-real" fixtures with forged consent references would forge the exact provenance chain the product's trust rests on. Real consented-redacted statement collection is a data gate (same class as G-A/G-B), not a coding task. This slice advances the receipt-format half honestly; the statement-corpus quality gate remains open pending real consented data.
+
+**Proof:** `unset DATABASE_URL; npm run ci` green, exit 0 — lint, typecheck, claims/research/brand, 346/346 unit tests (was 343; +3), production build, perf budgets, and Lighthouse medians (/ 878ms 99/96/100/100, /app 760ms 100/100/100, /verify 749ms 100/100/100/100 — no regression from the parser change). Logic-only change; no browser surface to verify.
+
 ## 2026-07-18 — WP-5.4 shipped: performance budget + Lighthouse gate
 
 **Shipped:** mobile LCP is now under 2s on every user-facing route, Lighthouse scores clear 95 across every enforced category, and CI owns both as blocking gates. Two new scripts back it: `perf:budget` (`scripts/check-performance-budget.mjs`) caps per-route initial JS/CSS from the build manifest, and `perf:lighthouse` (`scripts/check-lighthouse.mjs`) runs a three-sample median audit per route under direct DevTools mobile throttling. Both are wired into `npm run ci` after `build`, and into `.github/workflows/ci.yml` after the production build + browser install.

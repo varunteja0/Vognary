@@ -117,7 +117,9 @@ function inferCategory(merchant: string): string {
   if (/Cloudflare|GoDaddy|Namecheap|Hostinger/i.test(merchant)) return "Domains";
   if (/Vercel|Render|AWS|Cloud|DigitalOcean/i.test(merchant)) return "Cloud hosting";
   if (/Apple|Google Play|Google One/i.test(merchant)) return "App store";
-  if (/Netflix|Spotify|YouTube/i.test(merchant)) return "Streaming";
+  // Streaming must be tested before Utilities: "JioHotstar" contains the "Jio"
+  // telecom substring, so match it here (via "Hotstar") before it falls through.
+  if (/Netflix|Spotify|YouTube|Hotstar|Prime Video|Amazon Prime|Disney/i.test(merchant)) return "Streaming";
   if (/Adobe|Canva|Figma/i.test(merchant)) return "Creative tools";
   if (/Notion|Slack|Zoom/i.test(merchant)) return "Productivity";
   if (/X Premium|X\.com/i.test(merchant)) return "Social tools";

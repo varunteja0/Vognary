@@ -55,7 +55,9 @@ The first implementation tranche is in the working tree and browser-proved. Comp
 ### Phase 0 — Core-loop integrity (Lane B) — *mostly done*
 
 - **WP-0.1 ✅ Month-name date parsing** (`loose-date.ts`, `receipt-parser.ts` + tests). Shipped 2026-07-17; commit if still in working tree.
-- **WP-0.2 (M) Receipt corpus expansion.** Collect ≥50 real receipt/renewal formats (Netflix, Spotify, Apple, Google Play/One, Prime, Hotstar, ChatGPT, Claude, Jio, Airtel, LIC, EMI pre-debit SMS/email texts; EN-IN). Add to `tests/receipt-parser.test.ts` + statement corpus. DoD: every format parses or is a documented, justified rejection; `npm run corpus:strict` green.
+- **WP-0.2 (M, partial) Receipt corpus expansion.** Collect ≥50 real receipt/renewal formats (Netflix, Spotify, Apple, Google Play/One, Prime, Hotstar, ChatGPT, Claude, Jio, Airtel, LIC, EMI pre-debit SMS/email texts; EN-IN). Add to `tests/receipt-parser.test.ts` + statement corpus. DoD: every format parses or is a documented, justified rejection; `npm run corpus:strict` green.
+  - **Receipt half advanced 2026-07-18:** real-format coverage across the merchant list plus an `inferCategory` bug fix (JioHotstar/Hotstar/Amazon Prime/Prime Video were miscategorized); documented justified rejections for bare telecom bills and loan EMIs. See worklog.
+  - **Blocked (data gate, not code):** `corpus:strict` needs ≥100 `consented-redacted-real` statement fixtures with opaque consent references and clean redaction. This is real-data collection (same class as G-A/G-B) and cannot be honestly force-greened with synthetic fixtures. Package stays partial until that data exists.
 - **WP-0.3 ✅ Signed-in e2e harness** (`tests/e2e/signed-in-first-value.spec.ts`, env-guarded).
 - **WP-0.4 (S) Empty-state audit.** Every panel in `vognary-mvp-client.tsx`: at most one sentence + exactly one action button. Kill instructional paragraphs (move to /guide). DoD: screenshot per section attached to worklog.
 
