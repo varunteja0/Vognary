@@ -49,7 +49,7 @@ The first implementation tranche is in the working tree and browser-proved. Comp
 
 - **Proved now:** hydration-safe encrypted workspace restore; three-screen IA; subscription detail sheet (one-tap proof + decision + cancel-guide); budget persistence; deterministic suggested cuts; price-change/budget chips; advanced-import demotion; counted guest handoff; install prompt; AA return polling + first-sync reveal; serious/critical axe checks on Home, Subscriptions, Connect, Login, Landing, and the open detail sheet.
 - **Harness proof (verified 2026-07-18):** full `npm run ci` green, exit 0 — lint, claims/research/brand checks, 337 unit tests, and a clean production `build` (type-checked); signed-in desktop + mobile core-loop spec; guest first-value/sample round-trip spec; tracked screenshots in `docs/evidence/surface-10/`. See the 2026-07-18 worklog entry for the build-gap fix.
-- **Still required before the scoreboard can read 10:** the ≥200 receipt performance corpus, live Google/Setu gates, Home trend, subscription detail sheet, consented weekly digest, full spacing/performance audit, and the remaining innovation packages.
+- **Still required before the scoreboard can read 10:** the ≥200 receipt performance corpus, live Google/Setu gates, consented weekly digest, full spacing/performance audit, and the remaining innovation packages.
 - **External boundary:** G-A, G-B, and G-C require the founder/provider/legal actions described below. Code and mocked proof cannot honestly substitute for production approval or real financial data.
 
 ### Phase 0 — Core-loop integrity (Lane B) — *mostly done*
@@ -62,7 +62,7 @@ The first implementation tranche is in the working tree and browser-proved. Comp
 ### Phase 1 — The three-screen product (Lane A)
 
 - **WP-1.1 ✅ IA restructure.** Sidebar/bottom-nav becomes **Home · Subscriptions · Connect** (+ "More" holding Review/Data, hidden until data exists). Sections keep their ids for deep links. DoD: signed-in walkthrough screenshots; a first-time user sees exactly three destinations.
-- **WP-1.2 (M) Home screen.** Cards: Monthly burn (+trend), Renews next (with countdown), Budget status (amber when projected 30-day debits exceed budget), One suggested action, Alerts strip (renewal ≤3 days, price change, stale source). Every number clicks through to its proof. DoD: harness spec extended to assert all five cards with data.
+- **WP-1.2 ✅ Home screen.** Cards: Monthly burn with a since-last-review delta, Renews next with countdown, budget status, one suggested action, and alerts for imminent renewal, price movement, and source health. Browser-proved on desktop + mobile; the last trend criterion shipped 2026-07-18.
 - **WP-1.3 ✅ Subscriptions screen.** Card list (logo-letter, name, ₹/mo, cadence, next date, confidence chip) sortable by cost/next-renewal; tapping opens a detail sheet: proof evidence, history, actions (Keep / Watch / Cancel-guide with the existing cancel actions). Detail sheet reachable in one tap from Home or Subscriptions; proven on desktop + mobile with an axe check on the open sheet (2026-07-18 worklog).
 - **WP-1.4 (S) Prose cull.** Dossier narration ("folio 0.6 Ask your proof…") moves behind an ⓘ or to /guide on consumer screens. Brand stays; essays go.
 

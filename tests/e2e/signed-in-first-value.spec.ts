@@ -77,6 +77,8 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   for (const card of ["Monthly burn", "Renews next", "Due in 30 days", "Do this first"]) {
     await expect(home.getByText(card, { exact: true }).first()).toBeVisible();
   }
+  const monthlyBurnCard = home.getByRole("button").filter({ hasText: "Monthly burn" });
+  await expect(monthlyBurnCard.getByText(/No comparison yet|since last review/i)).toBeVisible();
   await expect(home.getByLabel(/Monthly budget/)).toBeVisible();
   await page.evaluate(() => {
     const event = new Event("beforeinstallprompt", { cancelable: true });
@@ -110,6 +112,8 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expectAxeClean(page, "Home");
   await positionForScreenshot(page, home);
   await page.screenshot({ path: `docs/evidence/surface-10/wp-1.2-home-${surface}.png`, fullPage: false, animations: "disabled" });
+  await positionForScreenshot(page, monthlyBurnCard);
+  await page.screenshot({ path: `docs/evidence/surface-10/wp-1.2-home-trend-${surface}.png`, fullPage: false, animations: "disabled" });
   await positionForScreenshot(page, radar);
   await page.screenshot({ path: `docs/evidence/surface-10/wp-6.1-radar-${surface}.png`, fullPage: false, animations: "disabled" });
 

@@ -2284,6 +2284,7 @@ export default function VognaryMvpClient() {
             priorityItems={priorityItems}
             userActions={userActions}
             hasRealData={hasRealData}
+            reviewDiff={reviewDiff}
             monthlyBudget={monthlyBudget}
             categoryBudgets={categoryBudgets}
             sourceHealth={serverConnectors?.sourceHealth ?? []}
@@ -3149,6 +3150,7 @@ function OverviewPanel({
   priorityItems,
   userActions,
   hasRealData,
+  reviewDiff,
   monthlyBudget,
   categoryBudgets,
   sourceHealth,
@@ -3167,6 +3169,7 @@ function OverviewPanel({
   priorityItems: RecurringItem[];
   userActions: Record<string, RecommendationType>;
   hasRealData: boolean;
+  reviewDiff: ReviewDiff | null;
   monthlyBudget: number | null;
   categoryBudgets: Record<string, number>;
   sourceHealth: ServerSourceHealth[];
@@ -3180,6 +3183,9 @@ function OverviewPanel({
 }) {
   const nextEvent = timeline.events[0] ?? null;
   const topAction = priorityItems[0] ?? null;
+  const burnDeltaTone = reviewDiff?.monthlyDelta
+    ? reviewDiff.monthlyDelta > 0 ? "text-ember" : "text-verdict"
+    : "text-(--muted)";
   const proofStrength = proofGraph.totalMonthly > 0 ? Math.round((1 - proofGraph.singleSourceShare) * 100) : 0;
   const foreignEntries = Object.entries(audit.summary.foreignMonthlyTotals);
   const categorySpend = audit.recurringItems.reduce<Record<string, number>>((totals, item) => {
@@ -3228,6 +3234,11 @@ function OverviewPanel({
             {foreignEntries.map(([code, total]) => (
               <span key={code} className="ml-2 text-ochre">+ {formatCurrency(total, code)}/mo</span>
             ))}
+          </p>
+          <p className={`mt-1.5 font-data text-[0.66rem] ${burnDeltaTone}`}>
+            {reviewDiff
+              ? `${reviewDiff.monthlyDelta > 0 ? "+" : ""}${formatCurrency(reviewDiff.monthlyDelta, audit.summary.primaryCurrency)} since last review`
+              : "No comparison yet · complete a review to set the baseline"}
           </p>
         </button>
         {nextEvent ? (
