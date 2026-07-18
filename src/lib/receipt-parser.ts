@@ -7,7 +7,7 @@ export type ReceiptCandidate = ManualRecurringInput & {
 };
 
 const merchantPatterns = [
-  /(OpenAI|ChatGPT|Anthropic|Claude|Kling|Cursor|Perplexity|Midjourney|Runway|ElevenLabs|GitHub|Vercel|Render|AWS|Google Cloud|DigitalOcean|Cloudflare|GoDaddy|Namecheap|Hostinger|Apple|Google Play|Netflix|Spotify|YouTube|Adobe|Canva|Figma|Notion|Slack|Zoom|X Premium|X\.com|Airtel|Jio|LIC|Razorpay)/i,
+  /(OpenAI|ChatGPT|Anthropic|Claude|Kling|Cursor|Perplexity|Midjourney|Runway|ElevenLabs|GitHub|Vercel|Render|AWS|Google Cloud|DigitalOcean|Cloudflare|GoDaddy|Namecheap|Hostinger|Apple|Google Play|Google One|Netflix|Spotify|YouTube|Amazon Prime|Prime Video|Hotstar|JioHotstar|Adobe|Canva|Figma|Notion|Slack|Zoom|X Premium|X\.com|Airtel|Jio|LIC|Razorpay)/i,
   // Explicit label with a colon ("From: Acme Billing"); the capture must start
   // uppercase so phrases like "from your account" are never taken as merchants.
   /(?:[Mm]erchant|[Ss]eller|[Vv]endor|[Ff]rom)\s*:\s*([A-Z][A-Za-z0-9 .&+-]{2,60})/,
@@ -60,7 +60,7 @@ function extractReceiptCandidate(message: string): ReceiptCandidate | null {
 
   const mandateLike = mandateLikePattern.test(normalized);
   const subscriptionLike = mandateLike
-    || /subscription|renewal|invoice|receipt|charged|auto.?pay|recurring|plan|membership|will be debited/i.test(normalized);
+    || /subscription|renewal|renew(?:s|ed)?\b|billing|invoice|receipt|charged|auto.?pay|recurring|plan|membership|will be debited|payment (?:of|received|was)/i.test(normalized);
   const amountMatch = normalized.match(amountPattern);
   const merchantMatch = merchantPatterns.map((pattern) => normalized.match(pattern)).find(Boolean);
 
@@ -116,7 +116,7 @@ function inferCategory(merchant: string): string {
   if (/GitHub/i.test(merchant)) return "Developer tools";
   if (/Cloudflare|GoDaddy|Namecheap|Hostinger/i.test(merchant)) return "Domains";
   if (/Vercel|Render|AWS|Cloud|DigitalOcean/i.test(merchant)) return "Cloud hosting";
-  if (/Apple|Google Play/i.test(merchant)) return "App store";
+  if (/Apple|Google Play|Google One/i.test(merchant)) return "App store";
   if (/Netflix|Spotify|YouTube/i.test(merchant)) return "Streaming";
   if (/Adobe|Canva|Figma/i.test(merchant)) return "Creative tools";
   if (/Notion|Slack|Zoom/i.test(merchant)) return "Productivity";
@@ -137,13 +137,19 @@ function inferReceiptFrequency(message: string, mandateLike: boolean): ManualRec
   return mandateLike || /will be debited|pre-?debit|next charge|next debit|next billing|scheduled (?:for|on)|renew(?:s|al|ed)?\b/i.test(message) ? "irregular" : null;
 }
 
+// Numeric forms plus month-name forms ("17 July 2026", "July 17, 2026") —
+// the latter is how Netflix, Spotify, Google, and Apple receipts write dates.
+const receiptDateForms = "\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}|\\d{1,2}[-/]\\d{1,2}[-/]\\d{2,4}|\\d{1,2}(?:st|nd|rd|th)?\\s+[A-Za-z]{3,9}\\.?,?\\s+\\d{4}|[A-Za-z]{3,9}\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4}";
+const explicitNextDatePattern = new RegExp(`(?:renews?\\b|next billing|next charge|due|will be debited|pre-?debit|scheduled (?:for|on)|next debit(?: date)?)[^.\\n]{0,120}?(${receiptDateForms})`, "i");
+const chargeDatePattern = new RegExp(`(?:paid|payment date|charged|billed|debited)[\\s\\S]{0,80}?(${receiptDateForms})`, "i");
+
 function inferNextDate(message: string, frequency: ManualRecurringInput["frequency"]): string | null {
-  const explicitDate = message.match(/(?:renews?\b|next billing|next charge|due|will be debited|pre-?debit|scheduled (?:for|on)|next debit(?: date)?)[^.\n]{0,120}?(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i);
+  const explicitDate = message.match(explicitNextDatePattern);
   if (explicitDate) {
     return parseLooseCalendarDate(explicitDate[1]);
   }
 
-  const chargeDate = message.match(/(?:paid|charged|billed|debited)[\s\S]{0,80}?(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i);
+  const chargeDate = message.match(chargeDatePattern);
   const parsedChargeDate = chargeDate ? parseLooseCalendarDate(chargeDate[1]) : null;
   return parsedChargeDate ? advanceReceiptDate(parsedChargeDate, frequency) : null;
 }

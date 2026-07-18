@@ -21,11 +21,16 @@ import { receiptTextToManualInputs, splitReceiptSnippets } from "@/lib/receipt-p
 import { VognaryMark } from "./brand";
 import { Nakul } from "./character";
 
-type IngestResponse = {
-  sources?: Array<Omit<TransferStatementSource, "id">>;
-  error?: string;
-  message?: string;
-};
+const sampleReceiptText = [
+  "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly.",
+  "Notion invoice paid INR 830 on 2026-07-01. Notion Plus renews monthly.",
+  "Netflix subscription paid INR 649 on 2026-06-17. Renews monthly.",
+  "Spotify Premium receipt paid INR 119 on 2026-07-05. Renews monthly.",
+  "Google One subscription paid INR 130 on 2026-07-01. Renews monthly.",
+  "Canva subscription paid INR 499 on 2026-07-03. Renews monthly.",
+  "Amazon Prime subscription paid INR 1,499 on 2026-07-10. Renews yearly.",
+  "Adobe subscription paid INR 1,675 on 2026-07-12. Renews monthly.",
+].join("\n\n");
 
 export default function GuestAuditClient() {
   const [receiptText, setReceiptText] = useState("");
@@ -33,10 +38,10 @@ export default function GuestAuditClient() {
   const [manualItems, setManualItems] = useState<ManualRecurringInput[]>([]);
   const [manualDraft, setManualDraft] = useState({ merchant: "", amount: "", frequency: "monthly" as Frequency, nextExpectedDate: "" });
   const [notice, setNotice] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
   const [online, setOnline] = useState(true);
   const [transferHydrated, setTransferHydrated] = useState(false);
   const [transferReady, setTransferReady] = useState(false);
+  const [sampleMode, setSampleMode] = useState(false);
   const transferExportedAtRef = useRef<Date | null>(null);
 
   const receiptItems = useMemo(() => receiptTextToManualInputs(receiptText), [receiptText]);
@@ -89,6 +94,12 @@ export default function GuestAuditClient() {
 
   useEffect(() => {
     if (!transferHydrated) return;
+    if (sampleMode) {
+      window.sessionStorage.removeItem(guestAuditTransferKey);
+      transferExportedAtRef.current = null;
+      queueMicrotask(() => setTransferReady(false));
+      return;
+    }
     if (!hasEvidence) {
       window.sessionStorage.removeItem(guestAuditTransferKey);
       transferExportedAtRef.current = null;
@@ -108,7 +119,7 @@ export default function GuestAuditClient() {
       queueMicrotask(() => setTransferReady(false));
       queueMicrotask(() => setNotice("This tab could not stage the audit for sign-in. Keep this page open and retry after freeing browser storage."));
     }
-  }, [hasEvidence, manualItems, receiptText, statementSources, transferHydrated]);
+  }, [hasEvidence, manualItems, receiptText, sampleMode, statementSources, transferHydrated]);
 
   useEffect(() => {
     if (!transferReady || !transferExportedAtRef.current) return;
@@ -131,51 +142,20 @@ export default function GuestAuditClient() {
     setReceiptText("");
     setStatementSources([]);
     setManualItems([]);
+    setSampleMode(false);
     window.sessionStorage.removeItem(guestAuditTransferKey);
     transferExportedAtRef.current = null;
     setTransferReady(false);
     setNotice("This tab's guest evidence has been cleared.");
   }
 
-  async function importStatements(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = [...(event.target.files ?? [])];
-    event.target.value = "";
-    if (!files.length) return;
-    if (!online) {
-      setNotice("You are offline. Receipt paste and manual entry still work; statement import can retry when the connection returns.");
-      return;
-    }
-
-    setImporting(true);
-    setNotice("Processing the statement without retaining the original file…");
-    try {
-      const formData = new FormData();
-      files.forEach((file) => formData.append("files", file));
-      const response = await fetch("/api/ingest", { method: "POST", body: formData });
-      const payload = await response.json() as IngestResponse;
-      if (!response.ok || !payload.sources?.length) {
-        setNotice(payload.message ?? payload.error ?? "No readable statement rows were found. Try CSV or paste receipts instead.");
-        return;
-      }
-      const incoming = payload.sources.map((source, index) => ({
-        ...source,
-        id: `guest-source-${Date.now()}-${index}`,
-        rowCount: source.rowCount ?? 0,
-      }));
-      setStatementSources((current) => {
-        const next = [...current];
-        incoming.forEach((source) => {
-          if (!next.some((candidate) => candidate.text === source.text)) next.push(source);
-        });
-        return next;
-      });
-      const warnings = incoming.flatMap((source) => source.warnings ?? []);
-      setNotice(warnings.length ? `Statement added. ${warnings.join(" ")}` : "Statement added to this tab.");
-    } catch {
-      setNotice("Statement import could not finish. Your pasted and manual evidence is still here; retry when the connection is stable.");
-    } finally {
-      setImporting(false);
-    }
+  function loadSampleAudit() {
+    setReceiptText(sampleReceiptText);
+    setStatementSources([]);
+    setManualItems([]);
+    setSampleMode(true);
+    setNotice("Sample audit loaded. These eight example subscriptions are not your data and will not be staged for sign-in.");
+    window.setTimeout(() => document.getElementById("guest-result")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
   function addManualItem(event: React.FormEvent<HTMLFormElement>) {
@@ -195,6 +175,7 @@ export default function GuestAuditClient() {
       category: "Other",
       sourceName: "Manual entry (user confirmed)",
     }]);
+    setSampleMode(false);
     setManualDraft({ merchant: "", amount: "", frequency: "monthly", nextExpectedDate: "" });
     setNotice("Manual renewal added to this tab.");
   }
@@ -223,12 +204,12 @@ export default function GuestAuditClient() {
             </div>
             <Nakul pose="guide" size={92} className="hidden shrink-0 text-(--ink) sm:block" title="Nakul, the ledger mongoose, showing the way in" />
           </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <a href="/login?next=/app" className="group rounded-xl border border-(--gold-line) bg-(--card-2) p-4 transition hover:border-(--gold)">
-              <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--gold)">Link · stays fresh</p>
-              <p className="mt-2 font-display text-lg font-semibold text-(--ink)">Link live sources</p>
-              <p className="mt-1 text-xs leading-5 text-(--muted)">Gmail receipts read-only, provider billing APIs, and bank rails — each source shows its current connection and freshness status.</p>
-              <p className="mt-3 text-xs font-semibold text-(--gold) transition group-hover:translate-x-0.5">Sign in and link →</p>
+              <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--gold)">Link · read-only</p>
+              <p className="mt-2 font-display text-lg font-semibold text-(--ink)">Connect Gmail</p>
+              <p className="mt-1 text-xs leading-5 text-(--muted)">Sign in, grant revocable receipt access, and see freshness beside the connection.</p>
+              <p className="mt-3 text-xs font-semibold text-(--gold) transition group-hover:translate-x-0.5">Sign in to connect →</p>
             </a>
             <a href="#paste" className="group rounded-xl border border-line bg-(--card-2) p-4 transition hover:border-(--line-strong)">
               <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--muted)">Paste · instant</p>
@@ -236,6 +217,12 @@ export default function GuestAuditClient() {
               <p className="mt-1 text-xs leading-5 text-(--muted)">Two receipts are enough for your first result — monthly burn, next renewal, one action. Nothing leaves this tab.</p>
               <p className="mt-3 text-xs font-semibold text-(--ink-soft) transition group-hover:translate-x-0.5">Start below →</p>
             </a>
+            <button type="button" onClick={loadSampleAudit} className="group rounded-xl border border-line bg-(--card-2) p-4 text-left transition hover:border-(--line-strong)">
+              <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--muted)">Explore · no setup</p>
+              <p className="mt-2 font-display text-lg font-semibold text-(--ink)">See a sample audit</p>
+              <p className="mt-1 text-xs leading-5 text-(--muted)">Open eight clearly labelled example subscriptions, their burn, next renewal, and proof.</p>
+              <p className="mt-3 text-xs font-semibold text-(--ink-soft) transition group-hover:translate-x-0.5">Load sample →</p>
+            </button>
           </div>
         </section>
 
@@ -244,26 +231,31 @@ export default function GuestAuditClient() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
             Paste two or more receipts. Vognary shows your monthly burn, next renewal, one action, and the proof behind it.
           </p>
+          {sampleMode ? (
+            <div className="mt-4 flex flex-col gap-3 rounded-xl border border-(--gold-line) bg-(--gold-tint) p-3 sm:flex-row sm:items-center sm:justify-between" role="status">
+              <p className="text-sm leading-6 text-(--ink)"><strong>Sample audit.</strong> These are example subscriptions, not your data, and they will not transfer when you sign in.</p>
+              <button type="button" onClick={clearGuestAudit} className="btn btn-ghost h-9 shrink-0 px-3 text-xs">Clear sample</button>
+            </div>
+          ) : null}
 
           <label htmlFor="guest-receipts" className="sr-only">Paste receipts or invoices</label>
           <textarea
             id="guest-receipts"
             value={receiptText}
-            onChange={(event) => setReceiptText(event.target.value)}
+            onChange={(event) => {
+              setReceiptText(event.target.value);
+              setSampleMode(false);
+            }}
             className="field mt-2 min-h-44 resize-y text-base leading-6"
             placeholder="Paste receipt or renewal text with merchant, amount, and date. Separate receipts with a blank line."
           />
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <label className={`btn btn-ghost ${importing ? "pointer-events-none opacity-60" : "cursor-pointer"}`}>
-              <input className="sr-only" type="file" multiple accept=".csv,.txt,.xls,.xlsx,.pdf" onChange={importStatements} />
-              {importing ? "Processing statement…" : "Import statement"}
-            </label>
             {hasEvidence ? <button type="button" onClick={clearGuestAudit} className="btn btn-sm btn-ondark">Clear this tab</button> : null}
           </div>
           <p className="mt-3 text-xs leading-5 text-(--muted)">
-            Receipt text is analyzed in this tab. Statement originals are processed request-time and are not intentionally retained; converted evidence stays in this tab unless you save.
+            Receipt text is analyzed in this tab and stays here unless you choose to save the audit after sign-in.
           </p>
-          {!online ? <p role="status" className="mt-3 text-sm text-ochre">Offline: paste and manual entry work; statement import will wait.</p> : null}
+          {!online ? <p role="status" className="mt-3 text-sm text-ochre">Offline: paste and manual entry work in this tab.</p> : null}
           {notice ? <p role="status" aria-live="polite" className="mt-3 rounded-lg border border-line bg-(--card-2) px-3 py-2 text-sm leading-6 text-(--ink-soft)">{notice}</p> : null}
 
           <details className="mt-4 border-t border-line pt-4">
@@ -279,7 +271,7 @@ export default function GuestAuditClient() {
         </section>
 
         {hasResult && firstAction && nextRenewal ? (
-          <section aria-label="Your first audit result" aria-live="polite" className="mt-5 rounded-2xl border border-(--gold-line) bg-card p-5 sm:p-7">
+          <section id="guest-result" aria-label="Your first audit result" aria-live="polite" className="mt-5 scroll-mt-4 rounded-2xl border border-(--gold-line) bg-card p-5 sm:p-7">
             <div className={`grid gap-3 ${monthlyTotals.length === 1 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
               {monthlyTotals.map(([currency, amount]) => (
                 <ResultMetric key={currency} label={monthlyTotals.length === 1 ? "Monthly burn" : `Monthly total · ${currency}`} value={formatMoney(amount, currency)} />
@@ -312,11 +304,13 @@ export default function GuestAuditClient() {
             ) : null}
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
               <Link href="/private-audit" prefetch={false} className="btn btn-primary btn-lg">Request private audit</Link>
-              {transferReady
+              {sampleMode
+                ? <button type="button" onClick={clearGuestAudit} className="btn btn-ghost btn-lg">Clear sample</button>
+                : transferReady
                 ? <a href="/login?next=/app" className="btn btn-ghost btn-lg">Save this audit</a>
                 : <button type="button" className="btn btn-ghost btn-lg" disabled>Save unavailable in this tab</button>}
             </div>
-            <p className="mt-3 text-xs leading-5 text-(--muted)">Your exact evidence is staged only in this tab for the sign-in handoff and clears after encrypted workspace sync succeeds.</p>
+            <p className="mt-3 text-xs leading-5 text-(--muted)">{sampleMode ? "Sample evidence is never staged for sign-in." : "Your exact evidence is staged only in this tab for the sign-in handoff and clears after encrypted workspace sync succeeds."}</p>
           </section>
         ) : hasEvidence ? (
           <p role="status" className="mt-4 rounded-xl border border-line bg-(--card-2) px-4 py-3 text-sm leading-6 text-(--muted)">No recurring result yet. Add another receipt with a merchant, amount, and renewal or subscription cue.</p>

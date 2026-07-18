@@ -39,6 +39,7 @@ test("two pasted receipts produce one proof-backed first result without login", 
   await expect(page.getByText("Connector catalog")).toHaveCount(0);
   await expect(page.getByText("Verified savings")).toHaveCount(0);
   await expect(page.getByText("Proof graph", { exact: false })).toHaveCount(0);
+  await expect(page.getByText(/Import statement|Choose statement files/i)).toHaveCount(0);
 
   const startedAt = await page.evaluate(() => performance.now());
   await page.getByLabel("Paste receipts or invoices").fill(receiptEvidence);
@@ -90,6 +91,23 @@ test("two pasted receipts produce one proof-backed first result without login", 
   const checksBeforeFocus = sessionChecks;
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect.poll(() => sessionChecks).toBeGreaterThan(checksBeforeFocus);
+  expect(failures).toEqual([]);
+});
+
+test("the sample audit is clearly labelled, reversible, and never staged as user data", async ({ page }) => {
+  const failures = collectRuntimeFailures(page);
+  await page.goto("/app");
+
+  await page.getByRole("button", { name: "See a sample audit" }).click();
+  await expect(page.getByText("Sample audit.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your first audit result" })).toBeVisible();
+  await expect.poll(async () => (await page.getByLabel("Paste receipts or invoices").inputValue()).split(/\n\s*\n/).filter(Boolean).length).toBe(8);
+  await expect(page.getByRole("button", { name: "Clear sample" }).first()).toBeVisible();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("vognary.guest-audit-transfer.v1"))).toBeNull();
+
+  await page.getByRole("button", { name: "Clear sample" }).first().click();
+  await expect(page.getByRole("region", { name: "Your first audit result" })).toHaveCount(0);
+  await expect(page.getByLabel("Paste receipts or invoices")).toHaveValue("");
   expect(failures).toEqual([]);
 });
 
@@ -154,7 +172,7 @@ test("tracked assisted-audit checkout appears only for the exact server offer an
 
   let checkoutRequest: { headers: Record<string, string>; body: Record<string, unknown> } | null = null;
   await page.route("**/api/checkout", async (route) => {
-    if (route.request().method() !== "POST") return route.continue();
+    if (route.request().method() !== "POST") return route.fallback();
     checkoutRequest = {
       headers: route.request().headers(),
       body: route.request().postDataJSON() as Record<string, unknown>,
@@ -232,6 +250,7 @@ function collectRuntimeFailures(page: Page) {
     const headers = request.headers();
     const speculativePrefetch = headers["next-router-prefetch"] === "1" || headers.purpose === "prefetch";
     if (error === "net::ERR_ABORTED" && url.searchParams.has("_rsc") && speculativePrefetch) return;
+    if (error === "net::ERR_ABORTED" && request.method() === "GET" && url.pathname === "/api/checkout") return;
     failures.push(`request: ${request.url()} ${error}`);
   });
   return failures;

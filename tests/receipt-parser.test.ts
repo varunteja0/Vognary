@@ -127,3 +127,17 @@ test("receipt identity is stable when snippets reorder and price or date changes
   ]);
   assert.equal(before.find((item) => item.merchant === "OpenAI")?.id, after.find((item) => item.merchant === "OpenAI")?.id);
 });
+
+test("parses real-world receipts that write dates with month names", () => {
+  const pasted = [
+    "Netflix\nYour payment of ₹649.00 was successful.\nPayment date: 17 June 2026\nNext billing date: 17 July 2026",
+    "Spotify Premium\nReceipt: ₹119.00 charged to your card\nDate: 05 July 2026\nYour subscription renews monthly.",
+    "Google One\n₹130.00 payment received\nDate: 01 July 2026\nRenews: 01 August 2026",
+  ].join("\n\n");
+  const items = receiptTextToManualInputs(pasted);
+  assert.deepEqual(items.map((item) => [item.merchant, item.amount, item.nextExpectedDate]), [
+    ["Netflix", 649, "2026-07-17"],
+    ["Spotify", 119, "2026-08-05"],
+    ["Google One", 130, "2026-08-01"],
+  ]);
+});

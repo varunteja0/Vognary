@@ -1,0 +1,128 @@
+# Vognary Surface 10/10 — Orchestration Plan
+
+Date: 2026-07-17 · Status: adopted execution layer.
+This document is the **agent-facing execution plan** that raises every product surface to 10/10. It plugs into [path-to-10.md](path-to-10.md) (the company-level master plan; minimum-row scoring; the Five Leaps) — this plan raises the **Product UX** and **Live connector depth** rows. Any agent can open this file cold, pick an unclaimed work package (WP), and ship it.
+
+---
+
+## Part I — The soul of the product (read before any WP)
+
+A technically-naive person opens Vognary and, within minutes, sees **every subscription and recurring payment they have, live** — what it costs monthly, what renews next, what exceeds their budget, and what to cut. They never see the words API, CSV, key, token, or redirect URI. They click, they approve on a provider's own page, data flows. Daily use is: glance at burn → check what renews → act on one suggestion.
+
+Everything below serves that loop. Any feature that does not serve it is out of scope for this plan.
+
+## Part II — Agent Operating Protocol (AOP)
+
+Every agent working a WP follows these rules. They are enforced by CI where possible.
+
+1. **Ground truth:** `unset DATABASE_URL; npm run ci` must be green before any commit (lint + claims + research + brand + 331+ tests + build). Node 20, tsx test runner.
+2. **UI proof:** changes to anything a user sees require a real-browser check. Harness:
+   - Local stack: Docker postgres on `55433` (`postgres`/`vognary_ci`, db `vognary_dev`, `npm run db:apply-schema`), dev server via `.claude/launch.json` (`vognary-dev`, port 3005, dev login `founder@vognary.test` / `local-dev-code-123`).
+   - Signed-in end-to-end proof: `PLAYWRIGHT_EXTERNAL_SERVER=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3005 VOGNARY_E2E_DEV_LOGIN_EMAIL=founder@vognary.test VOGNARY_E2E_DEV_LOGIN_CODE=local-dev-code-123 npm run test:e2e -- signed-in-first-value`
+   - The embedded preview pane does not hydrate this app — always verify through Playwright or a real browser.
+3. **Honesty is law:** never write UI copy that claims more than the proven connector state. `npm run claims:check` and `tests/connect-rails.test.ts` enforce the taxonomy. Merchant tiles are **watches**, never "links"; rails "can supply" evidence. Consumer surfaces never show env-var names, redirect URIs, or credential inputs (tests enforce).
+4. **Brand is fixed:** Nakul the mongoose + Fraunces display + graphite/gold. Deepen it; never swap it. Consumer surfaces may soften the dossier prose, not the identity.
+5. **Code idioms:** route handlers use `params: Promise<…>`, `readLimitedJson`, `rejectCrossSiteMutation` (+ register new mutation routes in `tests/request-security.test.ts`); effects use `queueMicrotask` for state resets; heavy libs (jspdf/xlsx) stay lazily imported.
+6. **Scope discipline:** one WP per branch/commit series; commit message prefix `wp(<id>):`. If a WP reveals a bug outside its scope, file it in `docs/surface-10-worklog.md` (create on first use) instead of expanding scope.
+7. **No AI in the core loop** (decision of record): deterministic parsing + structured rail data only. AI may appear later solely as a fallback receipt parser or query helper — never as the source of a financial number shown to a user.
+
+## Part III — Scoreboard and exit criteria
+
+Score = the **minimum** row, per path-to-10 discipline.
+
+| Surface | Now | 10/10 exit criterion (measurable) |
+| --- | ---: | --- |
+| Landing | 7 | LCP < 2.0s mid-range mobile; one primary CTA above fold; interactive sample audit reachable in 1 click; Lighthouse ≥ 95 across categories. |
+| First-run | 7 | Paste→result < 5s for ≥95% of a 200+ real-receipt corpus (precision gate in CI); "Try a sample audit" path < 10s to full ledger; time-to-first-insight < 60s. |
+| Connect | 2 | Both rails `available` and completing a real first sync (needs founder gates G-A/G-B); first-sync moment implemented; every tile shows live matched evidence counts; reconnect health visible. |
+| Workspace | 5 | Three-screen IA (Home / Subscriptions / Connect); every number click-traces to its proof; budgets + suggested cuts live; zero empty states without exactly one action; < 3 min landing→proven ledger. |
+| Mobile | 6 | Full parity with desktop loop; PWA installable with prompt; touch targets ≥ 44px; axe clean on all five screens. |
+| Backend feel | 7 | First sync < 30s post-consent; freshness surfaced everywhere; weekly digest + price-change alerts shipping. |
+
+## Part IV — Phases and work packages
+
+Effort: S (≤half day) · M (≤2 days) · L (≤1 week). Lanes may run in parallel; gates (G-*) are founder-only.
+
+### Execution snapshot — 2026-07-17
+
+The first implementation tranche is in the working tree and browser-proved. Completed packages are marked ✅ below. Partial packages stay unmarked even when a substantial slice has shipped; this prevents the plan from awarding itself a score it has not measured.
+
+- **Proved now:** hydration-safe encrypted workspace restore; three-screen IA; budget persistence; deterministic suggested cuts; price-change/budget chips; advanced-import demotion; counted guest handoff; install prompt; AA return polling + first-sync reveal; serious/critical axe checks on Home, Subscriptions, Connect, Login, and Landing.
+- **Harness proof (verified 2026-07-18):** full `npm run ci` green, exit 0 — lint, claims/research/brand checks, 337 unit tests, and a clean production `build` (type-checked); signed-in desktop + mobile core-loop spec; guest first-value/sample round-trip spec; tracked screenshots in `docs/evidence/surface-10/`. See the 2026-07-18 worklog entry for the build-gap fix.
+- **Still required before the scoreboard can read 10:** the ≥200 receipt performance corpus, live Google/Setu gates, Home trend, subscription detail sheet, consented weekly digest, full spacing/performance audit, and the remaining innovation packages.
+- **External boundary:** G-A, G-B, and G-C require the founder/provider/legal actions described below. Code and mocked proof cannot honestly substitute for production approval or real financial data.
+
+### Phase 0 — Core-loop integrity (Lane B) — *mostly done*
+
+- **WP-0.1 ✅ Month-name date parsing** (`loose-date.ts`, `receipt-parser.ts` + tests). Shipped 2026-07-17; commit if still in working tree.
+- **WP-0.2 (M) Receipt corpus expansion.** Collect ≥50 real receipt/renewal formats (Netflix, Spotify, Apple, Google Play/One, Prime, Hotstar, ChatGPT, Claude, Jio, Airtel, LIC, EMI pre-debit SMS/email texts; EN-IN). Add to `tests/receipt-parser.test.ts` + statement corpus. DoD: every format parses or is a documented, justified rejection; `npm run corpus:strict` green.
+- **WP-0.3 ✅ Signed-in e2e harness** (`tests/e2e/signed-in-first-value.spec.ts`, env-guarded).
+- **WP-0.4 (S) Empty-state audit.** Every panel in `vognary-mvp-client.tsx`: at most one sentence + exactly one action button. Kill instructional paragraphs (move to /guide). DoD: screenshot per section attached to worklog.
+
+### Phase 1 — The three-screen product (Lane A)
+
+- **WP-1.1 ✅ IA restructure.** Sidebar/bottom-nav becomes **Home · Subscriptions · Connect** (+ "More" holding Review/Data, hidden until data exists). Sections keep their ids for deep links. DoD: signed-in walkthrough screenshots; a first-time user sees exactly three destinations.
+- **WP-1.2 (M) Home screen.** Cards: Monthly burn (+trend), Renews next (with countdown), Budget status (amber when projected 30-day debits exceed budget), One suggested action, Alerts strip (renewal ≤3 days, price change, stale source). Every number clicks through to its proof. DoD: harness spec extended to assert all five cards with data.
+- **WP-1.3 (M) Subscriptions screen.** Card list (logo-letter, name, ₹/mo, cadence, next date, confidence chip) sortable by cost/next-renewal; tapping opens a detail sheet: proof evidence, history, actions (Keep / Watch / Cancel-guide with the existing 103 cancel actions). DoD: detail sheet reachable in ≤2 taps from Home.
+- **WP-1.4 (S) Prose cull.** Dossier narration ("folio 0.6 Ask your proof…") moves behind an ⓘ or to /guide on consumer screens. Brand stays; essays go.
+
+### Phase 2 — Onboarding that converts (Lane A, after WP-1.1)
+
+- **WP-2.1 (M) One-screen onboarding.** Signed-out /app and post-signup: three buttons only — **Connect Gmail** (primary), **Paste receipts**, **See a sample audit**. Nothing else above the fold. DoD: zero mentions of CSV/statement/API on the screen.
+- **WP-2.2 (M) Sample audit mode.** One click seeds a clearly-labelled demo workspace (8–10 realistic INR subscriptions, banner "Sample data — clear anytime", one-click clear). Full product explorable without any input. DoD: sample→clear round-trip in harness; claims-safe labelling.
+- **WP-2.3 ✅ Demote file import.** Statement/CSV/PDF upload moves to Data → "Advanced import". First-run surfaces never show it.
+- **WP-2.4 ✅ Guest→sign-in continuity hardening.** The existing transfer works; add explicit post-signin toast with counts ("3 commitments carried into your encrypted workspace") and harness assertion.
+
+### Phase 3 — Daily-use engine (Lane B, parallel with Phase 1)
+
+- **WP-3.1 ✅ Budgets.** Monthly total + per-category caps stored in workspace state (extend `WorkspaceBackup`, restore paths, and server snapshot exactly as `merchantLinks` was). Over-budget renders amber on Home and on offending subscription cards. No new tables.
+- **WP-3.2 ✅ Suggested cuts.** Rank = monthly cost × weak-proof × watch/investigate status × price-rise flag. Top 3 as Home card with cancel-guide links. Pure client computation over existing audit data.
+- **WP-3.3 (M) Alerts in-app + weekly digest.** Surface existing renewal-alert rails in the Home alerts strip; digest email content (burn, next 7-day renewals, one suggestion) through `renewal-alert-mailer`. Respect existing consent gates.
+- **WP-3.4 ✅ Price-change chips.** Evidence normalizer already retains amounts; when latest amount > previous for same identity, show "↑ was ₹499" chip on the subscription card + alert entry.
+
+### Phase 4 — Rails go live (Lane C = founder gates + Lane B code)
+
+- **G-A (founder, 1–2h + review time):** Submit Google restricted-scope verification for `gmail.readonly`; add up to 100 test users immediately. Unblocks real Gmail one-click for beta today.
+- **G-B (founder, ~30 min):** Setu Bridge sandbox: product instance + `SETU_AA_CLIENT_ID/SECRET/PRODUCT_INSTANCE_ID` + `ACCOUNT_AGGREGATOR_PARTNER_STATUS=sandbox-approved`. Bank rail becomes demo-real same day.
+- **G-C (founder, 4–10 weeks):** FIU/regulated-partner agreement per [one-click-connect-plan.md](one-click-connect-plan.md) and [direct-linking-activation-dossier.md](direct-linking-activation-dossier.md). Sets `production-live`.
+- **WP-4.1 (M, code-complete; live proof waits on G-A/G-B) First-sync magic moment.** After OAuth/AA return, an import summary takes over: Nakul animation, "Found 14 recurring payments · ₹4,230/mo", top merchants reveal, then lands on Home. This is the single highest-emotion moment in the product — make it excellent.
+- **WP-4.2 (S, code-complete; live proof waits on G-B) AA return flow.** Handle `/app?aa=returned`: poll connector status, show pending→active transition toast, trigger WP-4.1 on activation.
+- **WP-4.3 (S) Source health chips.** Freshness/reconnect states (already computed server-side) as unobtrusive chips on Connect and Home alerts.
+
+### Phase 5 — God-level polish (Lane D, after Phase 1 lands)
+
+- **WP-5.1 (M) Alignment & spacing audit.** 8px grid; unify border radii/padding tokens across every card in `globals.css` + panels; fix every misaligned margin (the current #1 visual complaint). DoD: before/after full-page screenshots, desktop + mobile.
+- **WP-5.2 (S) Motion.** Consistent reveal/micro-interactions; respect `prefers-reduced-motion`.
+- **WP-5.3 ✅ Accessibility.** `@axe-core/playwright` clean on Home/Subscriptions/Connect/Login/Landing; visible focus states; keyboard-complete flows.
+- **WP-5.4 (M) Performance.** LCP < 2s mobile; verify lazy chunks (jspdf/xlsx); font subsetting; Lighthouse ≥ 95; add a CI budget script.
+- **WP-5.5 (M) Mobile + PWA.** Bottom-nav parity for new IA; install prompt after first proven ledger; icon/splash polish.
+
+### Phase 6 — The innovation layer (Lane A/B, staggered; maps to path-to-10 Leaps)
+
+- **WP-6.1 (M) Renewal Radar.** The 45-day projected-debit timeline becomes Home's hero visual: a horizontal radar of upcoming debits sized by amount, tap-through to proof. Nothing else in the market shows *proven* upcoming debits.
+- **WP-6.2 (M) Verified-savings growth loop.** After a proven cancel ("silence is proof" verification already exists), auto-mint the savings receipt + one-tap share card. The share card is the acquisition loop.
+- **WP-6.3 (S) Proof-chip everywhere.** Every ₹ figure in the product carries a tappable chip showing the exact evidence that produced it (proof-graph queries exist). This is the trust moat made visible.
+- **WP-6.4 (S) Nakul moments.** A small state machine for the mascot: first evidence, first sync, budget breach, savings minted. Character with restraint — one moment per session max.
+
+## Part V — Orchestration map
+
+```
+Lane A (product UI):    WP-1.1 → WP-1.2 → WP-1.3 → WP-1.4 → WP-2.1 → WP-2.2 → WP-2.3 → WP-2.4 → WP-6.1 → WP-6.4
+Lane B (engine/data):   WP-0.2 → WP-0.4 → WP-3.1 → WP-3.2 → WP-3.4 → WP-3.3 → WP-4.1 → WP-4.2 → WP-4.3 → WP-6.2 → WP-6.3
+Lane C (founder gates): G-A (today) · G-B (today) · G-C (start today, lands in weeks)
+Lane D (polish):        after WP-1.x: WP-5.1 → WP-5.3 → WP-5.4 → WP-5.2 → WP-5.5
+```
+
+Rules: Lanes A and B run in parallel. Phase 5 starts only after WP-1.1 lands (no polishing a layout that is about to change). WP-4.1/4.2 are code-complete against sandbox (G-B) and simply light up when G-C lands. Nothing in any lane waits on G-C except production bank data itself.
+
+## Part VI — Definition of Done (every WP)
+
+1. `unset DATABASE_URL; npm run ci` green.
+2. UI WPs: signed-in harness spec passes; screenshots (desktop + 390px mobile) attached to the worklog entry.
+3. New mutation routes registered in the CSRF inventory; new consumer copy passes `claims:check`.
+4. Worklog entry in `docs/surface-10-worklog.md`: WP id, what shipped, proof, follow-ups.
+5. Commit(s) prefixed `wp(<id>):`.
+
+---
+
+**Sequence for the very first agent picking this up:** commit WP-0.1 if uncommitted → WP-0.4 (fast win) → start WP-1.1. Founder starts G-A and G-B the same day. That combination alone moves the minimum row from 2 to ~6; the rest of the plan takes it to 10.
