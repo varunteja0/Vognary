@@ -10,6 +10,8 @@ Run this after every setup change:
 npm run production:check -- https://www.vognary.com
 ```
 
+The command loads `.env.production.local` when it exists. `/api/readiness` is intentionally internal-only: keep its guard in place and set the operator-only `PRODUCTION_INTERNAL_SYNC_SECRET` to the deployed `INTERNAL_SYNC_SECRET`. A `401` is configuration drift between the operator copy and the deployed secret, not a reason to make readiness public.
+
 Run strict mode only when you expect every external service to be configured:
 
 ```bash
@@ -17,6 +19,8 @@ npm run production:check -- https://www.vognary.com --strict
 ```
 
 Stop if endpoint health fails. Continue if only external activation is incomplete.
+
+Before a release candidate, preview the complete non-mutating gate plan with `npm run release:gate -- --plan https://www.vognary.com`. The real gate additionally requires a disposable `RELEASE_DATABASE_URL`, `RELEASE_CONFIRM_DISPOSABLE=true`, and the two `VOGNARY_E2E_DEV_LOGIN_*` values. It rejects the same normalized database identity even when credentials/query parameters differ, clears only disposable rate-limit buckets before browser tests, shadows production provider credentials with blank values in local child processes (including keys found in Next-loaded env files), writes browser evidence under ignored `output/release-evidence/`, and runs the audit/PDF load budget only against its loopback production-build server. `npm run load:gate` itself permanently rejects non-loopback targets.
 
 ## 1. Persist Private Audit Leads
 

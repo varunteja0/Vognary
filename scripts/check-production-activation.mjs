@@ -13,6 +13,9 @@ const betaRequiredGroupIds = new Set(["lead-persistence", "encrypted-snapshots"]
 const betaSignInGroupIds = new Set(["identity-provider"]);
 const targetUrl = new URL(baseUrl);
 const targetIsLocal = targetUrl.hostname === "localhost" || targetUrl.hostname === "127.0.0.1" || targetUrl.hostname === "::1";
+const targetInternalSecret = process.env.PRODUCTION_INTERNAL_SYNC_SECRET?.trim()
+  || process.env.INTERNAL_SYNC_SECRET?.trim()
+  || "";
 
 const groups = [
   {
@@ -184,7 +187,7 @@ const endpointChecks = [
     expected: [200],
     captureJson: true,
     init: {
-      headers: { authorization: `Bearer ${process.env.INTERNAL_SYNC_SECRET ?? ""}` },
+      headers: { authorization: `Bearer ${targetInternalSecret}` },
     },
   },
   { id: "connectors", path: "/api/connectors", expected: [200] },
@@ -379,6 +382,12 @@ function summarizeProbePayload(id, payload) {
   if (!payload || typeof payload !== "object") return undefined;
 
   if (id === "readiness") {
+    if (typeof payload.error === "string") {
+      return {
+        error: payload.error,
+        hint: "Set PRODUCTION_INTERNAL_SYNC_SECRET to the deployed INTERNAL_SYNC_SECRET; never weaken the readiness route guard.",
+      };
+    }
     return {
       status: payload.status,
       database: payload.database?.status,

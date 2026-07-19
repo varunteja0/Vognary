@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { evidencePath } from "./evidence";
+import { resetDevelopmentWorkspace } from "./workspace-reset";
 
 /**
  * WP-2.2 — a signed-in user with an empty workspace can seed a clearly-labelled
@@ -21,9 +22,9 @@ test.skip(!email || !accessCode, "development login env not configured");
 
 test("empty workspace seeds and clears a labelled sample audit", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
-  mkdirSync("docs/evidence/surface-10", { recursive: true });
   const surface = testInfo.project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   await page.setExtraHTTPHeaders({ "x-forwarded-for": `vognary-e2e-sample-${testInfo.project.name}-${Date.now()}` });
+  await resetDevelopmentWorkspace(page, email!, accessCode!, `sample-${surface}`);
 
   // Sign in directly to an empty workspace (no guest paste).
   await page.goto("/login");
@@ -39,14 +40,6 @@ test("empty workspace seeds and clears a labelled sample audit", async ({ page }
   await page.waitForTimeout(500);
 
   const banner = page.getByRole("status").filter({ hasText: /Sample data/ });
-  // Self-heal: a prior project in this run (both share one founder workspace)
-  // may have left a sample loaded. Normalize to an empty workspace first.
-  if (await banner.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    const normalized = page.waitForResponse(isSnapshotSavePost, { timeout: 20_000 });
-    await banner.getByRole("button", { name: "Clear sample" }).click();
-    await expect(banner).toHaveCount(0);
-    await normalized;
-  }
 
   // The empty onboarding offers the sample, and no ledger exists yet.
   const seedButton = page.getByRole("button", { name: "See a sample audit" });
@@ -78,7 +71,7 @@ test("empty workspace seeds and clears a labelled sample audit", async ({ page }
   await monthlyMetric.getByRole("button", { name: "Proof" }).click();
   await expect(monthlyMetric.getByText("Netflix", { exact: true })).toBeVisible();
   await expectAxeClean(page, "Sample subscriptions");
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-2.2-sample-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-2.2-sample-${surface}.png`), fullPage: false, animations: "disabled" });
 
   // Clear → Home returns to its empty state and the sample must not linger server-side.
   await workspaceNav.getByText("Home", { exact: true }).click();

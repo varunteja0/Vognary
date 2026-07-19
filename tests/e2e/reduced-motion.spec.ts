@@ -1,9 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
-import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
+import { evidencePath } from "./evidence";
 
 test("sample audit respects reduced motion", async ({ page }, testInfo) => {
-  mkdirSync("docs/evidence/surface-10", { recursive: true });
   const surface = testInfo.project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
@@ -29,5 +28,5 @@ test("sample audit respects reduced motion", async ({ page }, testInfo) => {
 
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-5.2-reduced-motion-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-5.2-reduced-motion-${surface}.png`), fullPage: false, animations: "disabled" });
 });

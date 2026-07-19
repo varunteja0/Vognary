@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { evidencePath } from "./evidence";
 
 const email = process.env.VOGNARY_E2E_DEV_LOGIN_EMAIL;
 const accessCode = process.env.VOGNARY_E2E_DEV_LOGIN_CODE;
@@ -12,7 +12,6 @@ test.skip(!email || !accessCode, "development login env not configured");
 
 test("verified savings share includes the card and sealed receipt", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
-  mkdirSync("docs/evidence/surface-10", { recursive: true });
   const surface = testInfo.project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
 
   await page.addInitScript(() => {
@@ -63,7 +62,7 @@ test("verified savings share includes the card and sealed receipt", async ({ pag
   const nakulMoment = page.getByRole("status", { name: "Nakul moment" });
   await expect(nakulMoment.getByRole("heading", { name: "A saving is now proven" })).toBeVisible();
   await expect(nakulMoment.getByText("Verified outcome", { exact: true })).toBeVisible();
-  await nakulMoment.screenshot({ path: `docs/evidence/surface-10/wp-6.4-nakul-moment-${surface}.png`, animations: "disabled" });
+  await nakulMoment.screenshot({ path: evidencePath(`wp-6.4-nakul-moment-${surface}.png`), animations: "disabled" });
   await nakulMoment.getByRole("button", { name: "Dismiss" }).click();
   await expect(nakulMoment).toHaveCount(0);
   await page.reload();
@@ -90,7 +89,7 @@ test("verified savings share includes the card and sealed receipt", async ({ pag
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
   await positionForScreenshot(page, savingsPanel);
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-6.2-savings-share-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-6.2-savings-share-${surface}.png`), fullPage: false, animations: "disabled" });
 });
 
 function snapshotPayload() {

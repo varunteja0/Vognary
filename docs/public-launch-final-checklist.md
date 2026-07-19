@@ -56,11 +56,15 @@ Proof: `npm run ops:preflight` and `npm run production:check -- https://www.vogn
 
 ## Phase 6 — Canary and release
 
+- [x] One-command `npm run release:gate` owns code CI, disposable-database integration, desktop/mobile E2E + axe, local production smoke, loopback-only load budgets, both private corpora, operations preflight, and strict production probes; it refuses to test against the production database.
+- [x] The load budget drives `/api/audit` at 200 rps for 10 seconds with p95 <300ms and ingests 20 concurrent readable 8MB PDFs; the command permanently refuses remote targets.
 - [ ] Deploy the exact CI-green commit; rerun strict activation against the deployed origin.
 - [ ] Run one fresh-user journey on desktop and mobile: landing → sign in → Gmail/AA consent → first sync → Home → proof → decision → digest preference → disconnect/delete.
 - [ ] Verify monitoring alert delivery, audit logs, backup/restore evidence, privacy export, consent withdrawal, and deletion.
 - [ ] Run a small invite canary, review errors/sync latency/first-value timing for 24–48 hours, and stop if any fail-closed boundary regresses.
 - [ ] Promote publicly only when strict activation, both private corpus gates, and the canary checklist are green.
+
+Preview safely with `npm run release:gate -- --plan https://www.vognary.com`. Run the real command only with `RELEASE_CONFIRM_DISPOSABLE=true` and a separately provisioned disposable release database.
 
 ## Current honest remainder
 

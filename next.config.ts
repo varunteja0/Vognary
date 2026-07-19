@@ -20,6 +20,13 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // pdf.js resolves its worker relative to its own module at runtime. Keep the
+  // parser external so standalone output preserves that module boundary, then
+  // trace the worker explicitly because pdf.js loads it dynamically.
+  serverExternalPackages: ["pdf-parse"],
+  outputFileTracingIncludes: {
+    "/api/ingest": ["./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+  },
   experimental: {
     inlineCss: true,
   },

@@ -86,8 +86,8 @@ Perfection bar — a journey or surface is DONE only when all seven hold:
 | 39 | **Engine property tests** (fast-check): date roll-forward never past, totals never double under merge permutations, parse(format(x))=x for money/dates. | CI-blocking. |
 | 40 | **Statement corpus harness** `npm run corpus`: drop real redacted files + expectation YAML; precision/recall report; release gate ≥97/92 once ≥100 real files exist (collection is a Phase-0 GTM task). | CI-reporting now, blocking at n≥100. |
 | 41 | **Perf budgets in CI**: size-limit + Lighthouse-CI on `/`, `/app`, `/verify`. | CI-blocking. |
-| 42 | **Load test** (k6): /api/audit at 200 rps sustained, p95 <300ms; ingest 20 concurrent 8MB PDFs. | Release gate. |
-| 43 | **Release checklist automation**: `npm run release:gate` = lint+test+build+e2e+axe+budgets+smoke+production:check. One command answers "may we ship?". | Manual ships forbidden. |
+| 42 | **Load test**: `/api/audit` at 200 rps for 10 seconds with p95 <300ms; ingest 20 concurrent readable 8MB PDFs. The self-contained harness permanently refuses non-loopback targets. | ✅ Shipped 2026-07-19 and owned by the release gate. |
+| 43 | **Release checklist automation**: `npm run release:gate` = lint+test+build+e2e+axe+budgets+smoke+corpora+ops+production check. One command answers "may we ship?" and refuses production DB test execution. | ✅ Shipped 2026-07-19; manual ships forbidden. |
 
 ## The 12 canonical journeys (each gets spec → states → E2E → visual → a11y)
 

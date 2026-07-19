@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { evidencePath } from "./evidence";
 
 const email = process.env.VOGNARY_E2E_DEV_LOGIN_EMAIL;
 const accessCode = process.env.VOGNARY_E2E_DEV_LOGIN_CODE;
@@ -9,7 +9,6 @@ test.skip(!email || !accessCode, "development login env not configured");
 
 test("workspace names stale sources and routes to their health chip", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
-  mkdirSync("docs/evidence/surface-10", { recursive: true });
   const surface = testInfo.project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   let payload = connectorPayload("fresh");
 
@@ -46,7 +45,7 @@ test("workspace names stale sources and routes to their health chip", async ({ p
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
   await positionForScreenshot(page, panel);
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-4.3-source-health-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-4.3-source-health-${surface}.png`), fullPage: false, animations: "disabled" });
 });
 
 function connectorPayload(freshnessStatus: "fresh" | "stale") {

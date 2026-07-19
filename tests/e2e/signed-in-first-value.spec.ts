@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { evidencePath } from "./evidence";
+import { resetDevelopmentWorkspace } from "./workspace-reset";
 
 /**
  * Signed-in first-value harness — the agent-facing proof that the core loop
@@ -34,9 +35,9 @@ test.skip(!email || !accessCode, "development login env not configured");
 
 test("guest paste produces first value, survives sign-in, and watches persist", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
-  mkdirSync("docs/evidence/surface-10", { recursive: true });
   const surface = testInfo.project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   await page.setExtraHTTPHeaders({ "x-forwarded-for": `vognary-e2e-${testInfo.project.name}-${Date.now()}` });
+  await resetDevelopmentWorkspace(page, email!, accessCode!, `first-value-${surface}`);
 
   // 1. Guest paste with month-name dates (the format real receipts use).
   await page.goto("/app");
@@ -120,7 +121,7 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(proofRegion).toBeVisible();
   await expect(proofRegion.getByText(/Netflix|Spotify|No projected debits/).first()).toBeVisible();
   await positionForScreenshot(page, dueCard);
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-6.3-proof-chip-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-6.3-proof-chip-${surface}.png`), fullPage: false, animations: "disabled" });
   await proofChip.click();
   await expect(proofChip).toHaveAttribute("aria-expanded", "false");
 
@@ -130,11 +131,11 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(radar.getByRole("heading", { name: /proven debit/i })).toBeVisible();
   await expectAxeClean(page, "Home");
   await positionForScreenshot(page, home);
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-1.2-home-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-1.2-home-${surface}.png`), fullPage: false, animations: "disabled" });
   await positionForScreenshot(page, monthlyBurnCard);
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-1.2-home-trend-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-1.2-home-trend-${surface}.png`), fullPage: false, animations: "disabled" });
   await positionForScreenshot(page, radar);
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-6.1-radar-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-6.1-radar-${surface}.png`), fullPage: false, animations: "disabled" });
 
   // WP-1.3 + WP-6.1 — tapping a radar bar opens the detail sheet in place
   //   (proof + a decision control), records an action, and closes on Escape.
@@ -144,7 +145,7 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(detailSheet.getByRole("group", { name: /Choose an action/ })).toBeVisible();
   await expectAxeClean(page, "Detail sheet");
   await positionForScreenshot(page, detailSheet);
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-1.3-detail-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-1.3-detail-${surface}.png`), fullPage: false, animations: "disabled" });
   const monitorAction = detailSheet.getByRole("button", { name: "Monitor", exact: true });
   await monitorAction.click();
   await expect(monitorAction).toHaveAttribute("aria-pressed", "true");
@@ -157,7 +158,7 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(page.getByText("Category over budget", { exact: true }).first()).toBeVisible();
   await expectAxeClean(page, "Subscriptions");
   await positionForScreenshot(page, page.locator("#recurring-ledger"));
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-1.3-subscriptions-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-1.3-subscriptions-${surface}.png`), fullPage: false, animations: "disabled" });
 
   await workspaceNav.getByText("Connect", { exact: true }).click();
 
@@ -168,7 +169,7 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(panel.getByPlaceholder(/key/i)).toHaveCount(0);
   await expectAxeClean(page, "Connect");
   await positionForScreenshot(page, panel);
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-1.1-connect-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-1.1-connect-${surface}.png`), fullPage: false, animations: "disabled" });
 
   // 5. Watch a merchant; the watch must survive a reload once the debounced
   //    encrypted workspace sync flushes.
