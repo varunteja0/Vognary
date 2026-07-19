@@ -39,6 +39,10 @@ export async function GET(request: Request) {
   const features = database.status === "ready" ? await checkFeatureReadiness() : getUnconfiguredFeatureReadiness();
   const renewalAlertEmail = checkRenewalAlertEmailConfiguration();
   const schemaDegraded = database.status === "ready" && features.schema.status !== "ready";
+  const coreConnectorLaunch = getCoreConnectorLaunchStatus({
+    databaseReady: database.status === "ready",
+    tokenVaultReady: tokenVault.status === "ready",
+  });
 
   return Response.json({
     service: "vognary-web",
@@ -72,6 +76,8 @@ export async function GET(request: Request) {
       partnerRails: getPartnerRailsStatus(),
       partnerRailStatuses: getPartnerRailStatuses(),
       partnerRailsMissingProduction: getPartnerRailsMissingProductionRails(),
+      coreConnectorLaunch: coreConnectorLaunch.status,
+      coreConnectorLaunchMissing: coreConnectorLaunch.missing,
       sessionCookies: session.status,
       workspaceAuthorization: database.status === "ready" && session.status === "ready" ? "primitives-ready-no-login" : "not-ready",
       persistentTokenVault: tokenVault.status,
@@ -88,6 +94,36 @@ export async function GET(request: Request) {
       webhookIngestion: process.env.CONNECTOR_WEBHOOK_SECRET ? "configured" : "ready-needs-secret",
     },
   }, { headers: { "cache-control": "no-store" } });
+}
+
+function getCoreConnectorLaunchStatus(input: { databaseReady: boolean; tokenVaultReady: boolean }) {
+  const missing = [
+    input.databaseReady ? null : "DATABASE_URL",
+    input.tokenVaultReady ? null : "TOKEN_ENCRYPTION_KEY",
+    process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_AUTH_CLIENT_ID ? null : "GOOGLE_CLIENT_ID or GOOGLE_AUTH_CLIENT_ID",
+    process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_AUTH_CLIENT_SECRET ? null : "GOOGLE_CLIENT_SECRET or GOOGLE_AUTH_CLIENT_SECRET",
+    process.env.GOOGLE_REDIRECT_URI?.trim() ? null : "GOOGLE_REDIRECT_URI",
+    process.env.GOOGLE_OAUTH_VERIFICATION_COMPLETE === "true" ? null : "GOOGLE_OAUTH_VERIFICATION_COMPLETE=true",
+    process.env.SETU_AA_CLIENT_ID?.trim() ? null : "SETU_AA_CLIENT_ID",
+    process.env.SETU_AA_CLIENT_SECRET?.trim() ? null : "SETU_AA_CLIENT_SECRET",
+    process.env.SETU_AA_PRODUCT_INSTANCE_ID?.trim() ? null : "SETU_AA_PRODUCT_INSTANCE_ID",
+    process.env.ACCOUNT_AGGREGATOR_PARTNER_STATUS?.trim() === "production-live" ? null : "ACCOUNT_AGGREGATOR_PARTNER_STATUS=production-live",
+    isApprovedProductionSetuUrl(process.env.SETU_AA_BASE_URL) ? null : "SETU_AA_BASE_URL (approved production FIU endpoint)",
+  ].filter((value): value is string => Boolean(value));
+  return {
+    status: missing.length ? "activation-pending" as const : "production-live" as const,
+    missing: [...new Set(missing)],
+  };
+}
+
+function isApprovedProductionSetuUrl(value: string | undefined) {
+  if (!value?.trim()) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !/sandbox/i.test(`${url.hostname}${url.pathname}`);
+  } catch {
+    return false;
+  }
 }
 
 function getApiRateLimitStatus(rateLimitBackend: ReturnType<typeof getRateLimitBackendStatus>) {

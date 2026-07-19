@@ -2,8 +2,10 @@ import "server-only";
 
 import {
   buildRenewalAlertEmail,
+  buildWeeklyDigestEmail,
   type RenewalAlertFailureCode,
   type RenewalAlertWindow,
+  type WeeklyDigestEmailInput,
 } from "@/lib/renewal-alerts";
 
 const resendTimeoutMs = 8_000;
@@ -47,20 +49,39 @@ export async function sendRenewalAlertEmail(input: {
     appBaseUrl,
   });
 
+  return sendWithResend({ email: input.email, idempotencyKey: `renewal-alert/${input.deliveryId}`, message });
+}
+
+export async function sendWeeklyDigestEmail(input: Omit<WeeklyDigestEmailInput, "appBaseUrl"> & { deliveryId: string; email: string }) {
+  const appBaseUrl = readAppBaseUrl();
+  if (!appBaseUrl) throw new RenewalAlertDeliveryError("configuration", false);
+  const message = buildWeeklyDigestEmail({ ...input, appBaseUrl });
+  return sendWithResend({ email: input.email, idempotencyKey: `weekly-digest/${input.deliveryId}`, message });
+}
+
+async function sendWithResend(input: {
+  email: string;
+  idempotencyKey: string;
+  message: { subject: string; text: string; html: string };
+}) {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM_EMAIL?.trim();
+  if (!apiKey || !from) throw new RenewalAlertDeliveryError("configuration", false);
+
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         authorization: `Bearer ${apiKey}`,
         "content-type": "application/json",
-        "idempotency-key": `renewal-alert/${input.deliveryId}`,
+        "idempotency-key": input.idempotencyKey,
       },
       body: JSON.stringify({
         from,
         to: input.email,
-        subject: message.subject,
-        text: message.text,
-        html: message.html,
+        subject: input.message.subject,
+        text: input.message.text,
+        html: input.message.html,
       }),
       signal: AbortSignal.timeout(resendTimeoutMs),
     });

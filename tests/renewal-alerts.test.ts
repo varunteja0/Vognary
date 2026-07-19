@@ -4,13 +4,14 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import test from "node:test";
 
-import { buildRenewalAlertEmail, normalizeRenewalAlertPreferenceInput } from "../src/lib/renewal-alerts";
+import { buildRenewalAlertEmail, buildWeeklyDigestEmail, normalizeRenewalAlertPreferenceInput } from "../src/lib/renewal-alerts";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 
 test("renewal alerts remain off until enabled and normalize bounded delivery preferences", () => {
   assert.deepEqual(normalizeRenewalAlertPreferenceInput({ enabled: false }), {
     enabled: false,
+    weeklyDigestEnabled: false,
     sevenDayEnabled: true,
     oneDayEnabled: true,
     timeZone: "UTC",
@@ -24,10 +25,33 @@ test("renewal alerts remain off until enabled and normalize bounded delivery pre
     sendHourLocal: 8,
   });
   assert.equal(enabled.enabled, true);
+  assert.equal(enabled.weeklyDigestEnabled, false);
   assert.equal(enabled.sevenDayEnabled, false);
   assert.equal(enabled.oneDayEnabled, true);
   assert.ok(["Asia/Kolkata", "Asia/Calcutta"].includes(enabled.timeZone));
   assert.equal(enabled.sendHourLocal, 8);
+});
+
+test("weekly digest stays a separate opt-in and keeps currencies separate", () => {
+  const preference = normalizeRenewalAlertPreferenceInput({ enabled: false, weeklyDigestEnabled: true });
+  assert.equal(preference.enabled, false);
+  assert.equal(preference.weeklyDigestEnabled, true);
+
+  const message = buildWeeklyDigestEmail({
+    weekStart: "2026-07-20",
+    monthlyBurn: 2_829,
+    currency: "INR",
+    foreignMonthlyTotals: { USD: 20 },
+    renewalCountNext7Days: 2,
+    renewalTotalNext7Days: 1_999,
+    suggestion: { merchant: "Cloud <script>", monthlyCost: 1_999 },
+    appBaseUrl: "https://vognary.example",
+  });
+  assert.equal(message.subject, "Your weekly recurring-money review from Vognary");
+  assert.doesNotMatch(message.subject, /2829|Cloud|USD/i);
+  assert.match(message.text, /Monthly recurring burn/);
+  assert.match(message.text, /Other currencies, kept separate/);
+  assert.doesNotMatch(message.html, /<script>/i);
 });
 
 test("renewal alert preferences reject ambiguous or unsafe settings", () => {
@@ -57,6 +81,7 @@ test("renewal email HTML escapes provider-controlled merchant text and avoids fi
 
 test("renewal scheduling and delivery source enforce opt-in, idempotency, bounded retries, and payload minimization", () => {
   const migration = source("infra/postgres/migrations/0006_renewal_alerts.sql");
+  const digestMigration = source("infra/postgres/migrations/0022_weekly_digest.sql");
   const store = source("src/lib/server/renewal-alert-store.ts");
   const ledger = source("src/lib/server/living-ledger-store.ts");
   const mailer = source("src/lib/server/renewal-alert-mailer.ts");
@@ -77,7 +102,14 @@ test("renewal scheduling and delivery source enforce opt-in, idempotency, bounde
   assert.match(store, /consent\.purpose = 'renewal-alerts'/);
   assert.match(ledger, /scheduleRenewalAlertsForWorkspace\(input\.workspaceId, client\)/);
   assert.match(mailer, /AbortSignal\.timeout\(resendTimeoutMs\)/);
-  assert.match(mailer, /"idempotency-key": `renewal-alert\/\$\{input\.deliveryId\}`/);
+  assert.match(mailer, /`renewal-alert\/\$\{input\.deliveryId\}`/);
+  assert.match(mailer, /`weekly-digest\/\$\{input\.deliveryId\}`/);
+  assert.match(digestMigration, /unique \(preference_id, week_start\)/);
+  assert.doesNotMatch(digestMigration.slice(digestMigration.indexOf("create table")), /\b(email|merchant|amount|payload|token)\b/i);
+  assert.match(store, /for update of delivery skip locked/);
+  assert.match(store, /extract\(isodow from preference\.local_now\) = 1/);
+  assert.doesNotMatch(store, /from candidates\s+where scheduled_for <= now\(\)/, "Monday rows must survive a worker run before the chosen local hour");
+  assert.match(store, /exists \(select 1 from recurring_items item where item\.workspace_id = preference\.workspace_id\)/);
   assert.doesNotMatch(mailer, /console\./);
   assert.doesNotMatch(worker, /console\./);
   assert.doesNotMatch(worker.slice(worker.indexOf("const sent =")), /delivery\.(email|merchant)/);

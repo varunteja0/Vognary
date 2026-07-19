@@ -27,6 +27,7 @@ const exportRowLimits = {
   productEvents: 5_000,
   renewalAlertPreferences: 500,
   renewalAlertDeliveries: 10_000,
+  weeklyDigestDeliveries: 1_000,
   apiTokens: 500,
   billingCheckouts: 1_000,
   assistedAuditOrders: 1_000,
@@ -399,6 +400,7 @@ async function buildAccessExport(client: PoolClient, input: {
     productEventResult,
     renewalPreferenceResult,
     renewalDeliveryResult,
+    weeklyDigestDeliveryResult,
     apiTokenResult,
     billingCheckoutResult,
     assistedAuditOrderResult,
@@ -601,6 +603,7 @@ async function buildAccessExport(client: PoolClient, input: {
       user_id: string;
       consent_grant_id: string | null;
       enabled: boolean;
+      weekly_digest_enabled: boolean;
       seven_day_enabled: boolean;
       one_day_enabled: boolean;
       time_zone: string;
@@ -609,7 +612,7 @@ async function buildAccessExport(client: PoolClient, input: {
       created_at: Date;
       updated_at: Date;
     }>(
-      `select id, user_id, consent_grant_id, enabled, seven_day_enabled,
+      `select id, user_id, consent_grant_id, enabled, weekly_digest_enabled, seven_day_enabled,
               one_day_enabled, time_zone, send_hour_local, disabled_at,
               created_at, updated_at
        from renewal_alert_preferences
@@ -645,6 +648,31 @@ async function buildAccessExport(client: PoolClient, input: {
        order by created_at asc
        limit $2`,
       [input.workspaceId, exportRowLimits.renewalAlertDeliveries + 1],
+    ),
+    query<{
+      id: string;
+      user_id: string;
+      preference_id: string;
+      consent_grant_id: string;
+      week_start: Date | string;
+      scheduled_for: Date;
+      status: string;
+      attempt_count: number;
+      next_attempt_at: Date | null;
+      sent_at: Date | null;
+      last_error_code: string | null;
+      last_error_at: Date | null;
+      created_at: Date;
+      updated_at: Date;
+    }>(
+      `select id, user_id, preference_id, consent_grant_id, week_start,
+              scheduled_for, status, attempt_count, next_attempt_at, sent_at,
+              last_error_code, last_error_at, created_at, updated_at
+       from weekly_digest_deliveries
+       where workspace_id = $1
+       order by created_at asc
+       limit $2`,
+      [input.workspaceId, exportRowLimits.weeklyDigestDeliveries + 1],
     ),
     query<{
       id: string;
@@ -1028,6 +1056,7 @@ async function buildAccessExport(client: PoolClient, input: {
   assertWithinExportLimit("productEvents", productEventResult.rows.length);
   assertWithinExportLimit("renewalAlertPreferences", renewalPreferenceResult.rows.length);
   assertWithinExportLimit("renewalAlertDeliveries", renewalDeliveryResult.rows.length);
+  assertWithinExportLimit("weeklyDigestDeliveries", weeklyDigestDeliveryResult.rows.length);
   assertWithinExportLimit("apiTokens", apiTokenResult.rows.length);
   assertWithinExportLimit("billingCheckouts", billingCheckoutResult.rows.length);
   assertWithinExportLimit("assistedAuditOrders", assistedAuditOrderResult.rows.length);
@@ -1161,6 +1190,7 @@ async function buildAccessExport(client: PoolClient, input: {
       userId: row.user_id,
       consentGrantId: row.consent_grant_id,
       enabled: row.enabled,
+      weeklyDigestEnabled: row.weekly_digest_enabled,
       sevenDayEnabled: row.seven_day_enabled,
       oneDayEnabled: row.one_day_enabled,
       timeZone: row.time_zone,
@@ -1177,6 +1207,22 @@ async function buildAccessExport(client: PoolClient, input: {
       recurringItemId: row.recurring_item_id,
       alertWindow: row.alert_window,
       renewalDate: toDateOnly(row.renewal_date),
+      scheduledFor: row.scheduled_for.toISOString(),
+      status: row.status,
+      attemptCount: row.attempt_count,
+      nextAttemptAt: toIso(row.next_attempt_at),
+      sentAt: toIso(row.sent_at),
+      lastErrorCode: row.last_error_code,
+      lastErrorAt: toIso(row.last_error_at),
+      createdAt: row.created_at.toISOString(),
+      updatedAt: row.updated_at.toISOString(),
+    })),
+    weeklyDigestDeliveries: weeklyDigestDeliveryResult.rows.map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      preferenceId: row.preference_id,
+      consentGrantId: row.consent_grant_id,
+      weekStart: toDateOnly(row.week_start),
       scheduledFor: row.scheduled_for.toISOString(),
       status: row.status,
       attemptCount: row.attempt_count,

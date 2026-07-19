@@ -59,7 +59,7 @@ const groups = [
   },
   {
     id: "feature-migrations",
-    label: "Feature migrations 0002 through 0021",
+    label: "Feature migrations 0002 through 0022",
     required: ["DATABASE_URL"],
     probe: isFeatureMigrationsReady,
     why: "Confirms the target database recorded every forward migration and can query persistent capability schema.",
@@ -144,11 +144,32 @@ const groups = [
     why: "Required before storing files or long-lived reports server-side.",
   },
   {
+    id: "core-connectors",
+    label: "Public launch connectors (Gmail + Account Aggregator)",
+    required: [
+      "DATABASE_URL",
+      "TOKEN_ENCRYPTION_KEY",
+      "GOOGLE_REDIRECT_URI",
+      "SETU_AA_CLIENT_ID",
+      "SETU_AA_CLIENT_SECRET",
+      "SETU_AA_PRODUCT_INSTANCE_ID",
+      "SETU_AA_BASE_URL",
+    ],
+    requiredAny: ["GOOGLE_CLIENT_ID", "GOOGLE_AUTH_CLIENT_ID"],
+    requiredValues: {
+      GOOGLE_OAUTH_VERIFICATION_COMPLETE: "true",
+      ACCOUNT_AGGREGATOR_PARTNER_STATUS: "production-live",
+    },
+    probe: isCoreConnectorsReady,
+    why: "Public launch requires verified Gmail read-only consent plus an approved production Account Aggregator FIU endpoint. UPI/card mandate rails remain claims-safe follow-on work.",
+  },
+  {
     id: "partner-rails",
     label: "AA / UPI / card mandate partner rails",
     required: ["ACCOUNT_AGGREGATOR_PARTNER_STATUS", "UPI_MANDATE_PARTNER_STATUS", "CARD_MANDATE_PARTNER_STATUS"],
     probe: isPartnerRailsReady,
-    why: "Required for regulated real-time mandate and bank data access. Strict readiness requires all three statuses to be production-live.",
+    launchBlocking: false,
+    why: "Tracks the full AA / UPI / card mandate moat. Public launch blocks on AA through core-connectors; UPI and card remain non-blocking until their own regulated production access exists.",
   },
 ];
 
@@ -289,7 +310,7 @@ const summary = {
   strict,
   beta,
   endpointsReady: endpointReport.every((item) => item.ok),
-  activationReady: envReport.every((item) => item.ready),
+  activationReady: envReport.filter((item) => item.launchBlocking).every((item) => item.ready),
   betaReady: endpointReport.every((item) => item.ok)
     && envReport.filter((item) => betaRequiredGroupIds.has(item.id)).every((item) => item.ready)
     && envReport.some((item) => betaSignInGroupIds.has(item.id) && item.ready),
@@ -329,6 +350,7 @@ function buildActivationReport(group, context) {
   return {
     id: group.id,
     label: group.label,
+    launchBlocking: group.launchBlocking !== false,
     ready,
     source: hasTargetEvidence ? "target-probe" : targetIsLocal ? "local-env" : "target-evidence-unavailable",
     present,
@@ -501,6 +523,11 @@ function isBackupStorageReady({ endpointPayloads }) {
 
 function isPartnerRailsReady({ endpointPayloads }) {
   const status = endpointPayloads.readiness?.hardening?.partnerRails;
+  return typeof status === "string" ? status === "production-live" : undefined;
+}
+
+function isCoreConnectorsReady({ endpointPayloads }) {
+  const status = endpointPayloads.readiness?.hardening?.coreConnectorLaunch;
   return typeof status === "string" ? status === "production-live" : undefined;
 }
 

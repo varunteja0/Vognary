@@ -31,6 +31,7 @@ test("feature readiness checks every persistent capability migration with bounde
     "0019_verified_outcome_loop",
     "0020_authorization_evidence",
     "0021_pending_connector_consent",
+    "0022_weekly_digest",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -113,6 +114,7 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
     "feature-migrations",
     "privacy-lifecycle",
     "renewal-alerts",
+    "core-connectors",
     "platform-api",
     "workspace-decisions-auth-guard",
     "workspace-proof-graph-auth-guard",
@@ -137,6 +139,9 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.match(source, /target activation evidence/);
   assert.match(source, /capabilities\?\.schema\?\.status === "ready"/);
   assert.match(source, /betaReady: endpointReport\.every\(\(item\) => item\.ok\)/);
+  assert.match(source, /envReport\.filter\(\(item\) => item\.launchBlocking\)/);
+  assert.match(source, /coreConnectorLaunch/);
+  assert.match(source, /launchBlocking: false/);
   assert.match(source, /id: "audit-intake-status"/);
   assert.doesNotMatch(source, /name: "Activation Check"/);
   assert.doesNotMatch(source, /id: "monitoring-delivery-test"/);
@@ -174,5 +179,5 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.doesNotMatch(source, /\/api\/connectors\/anthropic-usage\/(?:start|sync)["`]/);
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[200, 401, 501\]/);
-  assert.match(activation, /Feature migrations 0002 through 0021/);
+  assert.match(activation, /Feature migrations 0002 through 0022/);
 });

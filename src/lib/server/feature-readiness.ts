@@ -24,6 +24,7 @@ export const productionFeatureMigrations = [
   "0019_verified_outcome_loop",
   "0020_authorization_evidence",
   "0021_pending_connector_consent",
+  "0022_weekly_digest",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];
@@ -37,7 +38,7 @@ export function getUnconfiguredFeatureReadiness() {
       missing: [...productionFeatureMigrations],
     },
     privacyLifecycle: { status: "database-not-configured" as const, migrationId: "0004_privacy_lifecycle" as const, lastEnforcedAt: null },
-    renewalAlerts: { status: "database-not-configured" as const, migrationId: "0006_renewal_alerts" as const, enabledPreferences: null, lastSentAt: null },
+    renewalAlerts: { status: "database-not-configured" as const, migrationId: "0006_renewal_alerts" as const, weeklyDigestMigrationId: "0022_weekly_digest" as const, enabledPreferences: null, enabledWeeklyDigests: null, lastSentAt: null, lastWeeklyDigestSentAt: null },
     commitmentDecisions: { status: "database-not-configured" as const, migrationId: "0007_commitment_decisions" as const, savedDecisions: null },
     platformApi: { status: "database-not-configured" as const, migrationId: "0008_platform_api" as const, activeTokens: null, lastUsedAt: null },
     billing: { status: "database-not-configured" as const, migrationId: "0016_assisted_audit_orders" as const, paidCheckouts: null, assistedAuditOrders: null, activeEntitlements: null, lastPaidAt: null },
@@ -201,17 +202,25 @@ async function checkPrivacyLifecycle(applied: Set<string>) {
 
 async function checkRenewalAlerts(applied: Set<string>) {
   const migrationId = "0006_renewal_alerts" as const;
-  if (!applied.has(migrationId)) return { status: "migration-pending" as const, migrationId, enabledPreferences: null, lastSentAt: null };
+  const weeklyDigestMigrationId = "0022_weekly_digest" as const;
+  if (!applied.has(migrationId) || !applied.has(weeklyDigestMigrationId)) return { status: "migration-pending" as const, migrationId, weeklyDigestMigrationId, enabledPreferences: null, enabledWeeklyDigests: null, lastSentAt: null, lastWeeklyDigestSentAt: null };
 
   try {
-    const result = await getDatabasePool().query<{ enabled_preferences: number; last_sent_at: Date | null }>(
+    const result = await getDatabasePool().query<{ enabled_preferences: number; enabled_weekly_digests: number; last_sent_at: Date | null; last_weekly_digest_sent_at: Date | null }>(
       `select
-         (select count(*)::int from renewal_alert_preferences where enabled) as enabled_preferences,
-         (select max(sent_at) from renewal_alert_deliveries where status = 'sent' and last_invocation = 'cron') as last_sent_at`,
+         (select count(*)::int from renewal_alert_preferences where enabled or weekly_digest_enabled) as enabled_preferences,
+         (select count(*)::int from renewal_alert_preferences where weekly_digest_enabled) as enabled_weekly_digests,
+         greatest(
+           (select max(sent_at) from renewal_alert_deliveries where status = 'sent' and last_invocation = 'cron'),
+           (select max(sent_at) from weekly_digest_deliveries where status = 'sent' and last_invocation = 'cron')
+         ) as last_sent_at,
+         (select max(sent_at) from weekly_digest_deliveries where status = 'sent' and last_invocation = 'cron') as last_weekly_digest_sent_at`,
     );
     const row = result.rows[0];
     const enabledPreferences = row?.enabled_preferences ?? 0;
+    const enabledWeeklyDigests = row?.enabled_weekly_digests ?? 0;
     const lastSentAt = row?.last_sent_at?.toISOString() ?? null;
+    const lastWeeklyDigestSentAt = row?.last_weekly_digest_sent_at?.toISOString() ?? null;
     return {
       status: lastSentAt
         ? "delivery-observed-schedule-unverified" as const
@@ -219,11 +228,14 @@ async function checkRenewalAlerts(applied: Set<string>) {
           ? "opt-ins-observed-delivery-unproven" as const
           : "schema-ready-default-off" as const,
       migrationId,
+      weeklyDigestMigrationId,
       enabledPreferences,
+      enabledWeeklyDigests,
       lastSentAt,
+      lastWeeklyDigestSentAt,
     };
   } catch {
-    return { status: "schema-query-failed" as const, migrationId, enabledPreferences: null, lastSentAt: null };
+    return { status: "schema-query-failed" as const, migrationId, weeklyDigestMigrationId, enabledPreferences: null, enabledWeeklyDigests: null, lastSentAt: null, lastWeeklyDigestSentAt: null };
   }
 }
 

@@ -51,6 +51,12 @@ test("empty workspace seeds and clears a labelled sample audit", async ({ page }
   // The empty onboarding offers the sample, and no ledger exists yet.
   const seedButton = page.getByRole("button", { name: "See a sample audit" });
   await expect(seedButton).toBeVisible({ timeout: 30_000 });
+  const onboarding = page.getByRole("heading", { name: "How would you like to start?" }).locator("..");
+  await expect(onboarding.getByRole("button", { name: /Connect Gmail/ })).toBeVisible();
+  await expect(onboarding.getByRole("button", { name: /Paste receipts/ })).toBeVisible();
+  await expect(onboarding.getByRole("button", { name: /See a sample audit/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Connect evidence. Choose what to watch." })).toHaveCount(0);
+  await expect(page.locator("#connect").getByText(/Choose statement files|API key|CSV/i)).toHaveCount(0);
 
   // Seed → eight subscriptions populate, the labelled banner appears, it persists.
   const savedSample = page.waitForResponse(isSnapshotSavePost, { timeout: 20_000 });
@@ -68,6 +74,9 @@ test("empty workspace seeds and clears a labelled sample audit", async ({ page }
   const ledger = page.locator("#recurring-ledger");
   await expect(ledger.getByText("Netflix", { exact: true }).first()).toBeVisible();
   await expect(ledger.getByText("Spotify", { exact: true }).first()).toBeVisible();
+  const monthlyMetric = page.locator("#ledger .panel-flat").filter({ hasText: /Monthly recurring/ }).first();
+  await monthlyMetric.getByRole("button", { name: "Proof" }).click();
+  await expect(monthlyMetric.getByText("Netflix", { exact: true })).toBeVisible();
   await expectAxeClean(page, "Sample subscriptions");
   await page.screenshot({ path: `docs/evidence/surface-10/wp-2.2-sample-${surface}.png`, fullPage: false, animations: "disabled" });
 

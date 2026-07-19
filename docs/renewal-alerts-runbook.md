@@ -1,6 +1,6 @@
 # Renewal Alert Activation Runbook
 
-This rail sends email reminders from canonical `recurring_items` dates. It is implemented as an opt-in backend capability; a user must explicitly enable it through the authenticated preferences API before any delivery row can be scheduled. Deploying the code or configuring Resend does not opt anyone in.
+This rail sends individual renewal reminders and a separate weekly recurring-money digest. Both are off by default; a user must explicitly enable each choice through the authenticated preferences API before any delivery row can be scheduled. Deploying the code or configuring Resend does not opt anyone in.
 
 ## Runtime requirements
 
@@ -19,7 +19,7 @@ Never expose Resend or worker secrets to browser code. Apply the database migrat
 DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
 ```
 
-Confirm `0006_renewal_alerts.sql` appears in `schema_migrations`.
+Confirm both `0006_renewal_alerts.sql` and `0022_weekly_digest.sql` appear in `schema_migrations`.
 
 ## Preference API
 
@@ -32,6 +32,7 @@ Both operations require a current `vognary_session` whose user still belongs to 
   "status": "ok",
   "preference": {
     "enabled": false,
+    "weeklyDigestEnabled": false,
     "sevenDayEnabled": true,
     "oneDayEnabled": true,
     "timeZone": "UTC",
@@ -55,6 +56,7 @@ Both operations require a current `vognary_session` whose user still belongs to 
 ```json
 {
   "enabled": true,
+  "weeklyDigestEnabled": true,
   "sevenDayEnabled": true,
   "oneDayEnabled": true,
   "timeZone": "Asia/Kolkata",
@@ -62,7 +64,7 @@ Both operations require a current `vognary_session` whose user still belongs to 
 }
 ```
 
-Set `enabled` to `false` to withdraw the linked consent and cancel unsent work. Withdrawing the linked `renewal-alerts` grant through `/api/privacy/consents` also disables the preference. At least one reminder window must remain selected while alerts are enabled.
+`enabled` controls 7-day/1-day reminders; `weeklyDigestEnabled` independently controls the Monday digest. Consent remains active while either is enabled. Set both to `false` to withdraw the linked consent and cancel unsent work. Withdrawing the linked `renewal-alerts` grant through `/api/privacy/consents` also disables the preference. At least one reminder window must remain selected while reminders are enabled.
 
 ## Scheduling behavior
 
@@ -73,6 +75,8 @@ Set `enabled` to `false` to withdraw the linked consent and cancel unsent work. 
 - A window already in the past is not sent as a catch-up notification. For example, enabling six days before a renewal schedules the 1-day reminder but not the missed 7-day reminder.
 - If a canonical renewal date changes, unsent rows for the old date are cancelled and future rows use the new date.
 - Delivery rows do not duplicate recipient email, merchant, amount, connector payload, evidence text, or credentials. The worker resolves the current email and merchant only while sending.
+- The weekly digest row is created once per preference on local Monday for the selected send hour, even when that hour is later than Monday's worker run. Claiming remains time-gated, so the daily worker sends it on the first invocation at or after that hour. It is skipped for an empty ledger and contains INR monthly burn, foreign currencies separately, the next seven days, and one deterministic INR review suggestion.
+- `weekly_digest_deliveries` stores schedule/state identifiers only. Financial totals and suggestion text are resolved from the current ledger after claim and are never persisted in the delivery queue.
 
 ## Worker activation
 
@@ -91,6 +95,8 @@ The response contains aggregate counts only:
 {
   "status": "completed",
   "selected": 0,
+  "remindersSelected": 0,
+  "weeklyDigestsSelected": 0,
   "sent": 0,
   "failed": 0,
   "cancelled": 0

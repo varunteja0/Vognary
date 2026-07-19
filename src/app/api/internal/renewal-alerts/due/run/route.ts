@@ -2,13 +2,19 @@ import { randomUUID } from "node:crypto";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { isDatabaseConfigured } from "@/lib/server/database";
 import { requireCronSecret, requireInternalSecret } from "@/lib/server/internal-auth";
-import { checkRenewalAlertEmailConfiguration, RenewalAlertDeliveryError, sendRenewalAlertEmail } from "@/lib/server/renewal-alert-mailer";
+import { checkRenewalAlertEmailConfiguration, RenewalAlertDeliveryError, sendRenewalAlertEmail, sendWeeklyDigestEmail } from "@/lib/server/renewal-alert-mailer";
 import {
   claimDueRenewalAlerts,
+  claimDueWeeklyDigests,
   isRenewalAlertStillDeliverable,
+  isWeeklyDigestStillDeliverable,
   markRenewalAlertCancelled,
   markRenewalAlertFailed,
   markRenewalAlertSent,
+  markWeeklyDigestCancelled,
+  markWeeklyDigestFailed,
+  markWeeklyDigestSent,
+  scheduleDueWeeklyDigests,
 } from "@/lib/server/renewal-alert-store";
 
 export const dynamic = "force-dynamic";
@@ -48,8 +54,10 @@ async function deliverDueRenewalAlerts(request: Request, invocation: "internal-a
   const url = new URL(request.url);
   const batchSize = clampNumber(Number.parseInt(url.searchParams.get("limit") ?? "10", 10), 1, 25);
   const workerId = `renewal-alert-${randomUUID()}`;
+  await scheduleDueWeeklyDigests();
   const deliveries = await claimDueRenewalAlerts({ limit: batchSize, workerId, invocation });
-  const outcomes = await mapWithConcurrency(deliveries, 3, async (delivery) => {
+  const weeklyDigests = await claimDueWeeklyDigests({ limit: batchSize, workerId, invocation });
+  const reminderOutcomes = await mapWithConcurrency(deliveries, 3, async (delivery) => {
     if (!await isRenewalAlertStillDeliverable(delivery.deliveryId, workerId)) {
       await markRenewalAlertCancelled(delivery.deliveryId, workerId);
       return "cancelled" as const;
@@ -78,13 +86,39 @@ async function deliverDueRenewalAlerts(request: Request, invocation: "internal-a
       return "failed" as const;
     }
   });
+  const digestOutcomes = await mapWithConcurrency(weeklyDigests, 3, async (delivery) => {
+    if (!await isWeeklyDigestStillDeliverable(delivery.deliveryId, workerId)) {
+      await markWeeklyDigestCancelled(delivery.deliveryId, workerId);
+      return "cancelled" as const;
+    }
 
+    try {
+      await sendWeeklyDigestEmail(delivery);
+      await markWeeklyDigestSent(delivery.deliveryId, workerId);
+      return "sent" as const;
+    } catch (error) {
+      const deliveryError = error instanceof RenewalAlertDeliveryError
+        ? error
+        : new RenewalAlertDeliveryError("unknown", true);
+      await markWeeklyDigestFailed({
+        deliveryId: delivery.deliveryId,
+        workerId,
+        errorCode: deliveryError.code,
+        retryable: deliveryError.retryable,
+      });
+      return "failed" as const;
+    }
+  });
+
+  const outcomes = [...reminderOutcomes, ...digestOutcomes];
   const sent = outcomes.filter((outcome) => outcome === "sent").length;
   const failed = outcomes.filter((outcome) => outcome === "failed").length;
   const cancelled = outcomes.filter((outcome) => outcome === "cancelled").length;
   return Response.json({
     status: failed ? "completed-with-failures" : "completed",
-    selected: deliveries.length,
+    selected: outcomes.length,
+    remindersSelected: deliveries.length,
+    weeklyDigestsSelected: weeklyDigests.length,
     sent,
     failed,
     cancelled,

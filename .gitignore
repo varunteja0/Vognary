@@ -15,6 +15,7 @@
 /test-results
 /playwright-report
 /corpus/statement-fixtures
+/corpus/receipt-fixtures
 /.playwright-cli
 /output
 

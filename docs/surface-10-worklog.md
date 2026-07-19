@@ -2,6 +2,18 @@
 
 Append-only log per [surface-10-orchestration-plan.md](surface-10-orchestration-plan.md) Part VI. Newest first.
 
+## 2026-07-19 — Launch-plan implementation tranche
+
+**Product:** empty signed-in workspaces now route to a strict progressive three-choice onboarding (Connect Gmail, Paste receipts, See a sample audit). The source dashboard and guided capture render only after the matching choice or real evidence exists. Consumer-panel explanations moved behind compact “How this works” disclosures; primary task empty states now use one sentence and one action.
+
+**Proof visibility:** aggregate proof disclosures now cover subscription monthly/yearly/review totals, 10-day counts, radar/timeline windows, verified savings, review deltas, and proof-graph totals. Header/Connect aggregates route directly to Subscriptions, and Review per-item money opens the existing proof detail sheet.
+
+**Weekly digest:** migration `0022_weekly_digest` adds a separate default-off toggle and privacy-minimized one-row-per-week delivery state. The existing worker now schedules local-Monday digests, skips empty ledgers, resolves financial content only after claim, applies bounded retries/idempotency, and sends INR burn + separated foreign totals + next-seven-day exposure + one deterministic INR suggestion. Preferences, consent lifecycle, Profile UI, privacy export, readiness, unit tests, and PostgreSQL integration coverage are in lockstep.
+
+**Quality/launch gates:** added an ignored private 200-real-receipt corpus evaluator (97% precision, 92% recall, p95 <5s) alongside the existing 100-statement gate. Production readiness now has a public core-connector boundary (verified Gmail + production AA), while the AA/UPI/card full-moat check remains separate. PWA metadata now serves five generated iOS startup images.
+
+**Proof:** full `npm run ci` green: lint, typecheck, claims/research/brand checks, 347/347 unit tests, Next 16.2.10 production build, bundle budgets, and Lighthouse medians (landing 1029ms/97 performance/96 accessibility; app 803ms/100/100; verify 752ms/100/100). A fresh PostgreSQL schema applied through 0022 and the complete integration suite passed 26/26, including the weekly digest; the runner now force-exits cleanly and billing provider IDs are unique so the gate also passes on a reused database. `sample-workspace` is green desktop+mobile with onboarding/proof/axe assertions; `signed-in-first-value` is green desktop+mobile. The strict launch boundary currently reports the expected missing production Gmail/Setu approval and credentials, while both private corpora report `collection-required` at 0 real fixtures; those evidence/provider gates remain intentionally red until real evidence exists.
+
 ## 2026-07-19 — WP-2.2 shipped: signed-in sample workspace
 
 **Shipped:** a signed-in user with an empty workspace can now explore the whole product without typing anything. The empty-workspace onboarding (Connect) offers **"See a sample audit"**, which seeds eight realistic INR subscriptions (ChatGPT, Notion, Netflix, Spotify, Google One, Canva, Amazon Prime, Adobe). A persistent **"Sample data — these eight subscriptions are a demo, not your evidence… clear anytime"** banner shows while the sample is loaded, with a one-tap **Clear sample**. Home, the Renewal Radar, Subscriptions, proof chips, budgets, and suggested cuts all populate from the demo exactly as they would from real evidence.

@@ -68,7 +68,7 @@ Goal: a durably stored private-audit lead can create one tracked INR 999 assiste
 Static `PAYMENT_LINK_*` URLs and legacy monitoring plans are not exposed in Vognary 1.0.
 
 1. Complete Razorpay business/KYC activation and create keys for the intended mode. Follow Razorpay's current official key instructions: `https://razorpay.com/docs/payments/dashboard/settings/api-keys/`.
-2. Apply migrations through `0021_pending_connector_consent` to the production database.
+2. Apply migrations through `0022_weekly_digest` to the production database.
 3. Obtain qualified legal review of Terms and Privacy. Only after approval, configure `ASSISTED_AUDIT_LEGAL_TERMS_STATUS=approved` with `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, a live-mode `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET`. The INR 999 amount is server-owned.
 4. In Razorpay, configure `https://www.vognary.com/api/billing/webhooks/razorpay` as the webhook URL using the same independently generated webhook secret. Follow the current official webhook instructions: `https://razorpay.com/docs/webhooks/setup-edit-payments/`.
 5. Subscribe the webhook to `payment_link.paid`, `payment_link.cancelled`, `payment_link.expired`, and `refund.processed`.
@@ -659,7 +659,7 @@ Stop condition:
 - Do not publish a partner/API availability claim until migration `0008` is ready, the unauthenticated checks return `401`, an authorized
   test token returns only its allowed workspace data, revocation is verified, and rate limiting is active.
 
-## 9. Account Aggregator / UPI / Card Mandate Partners
+## 9. Account Aggregator launch rail and follow-on mandate rails
 
 These cannot be completed in code alone. They need business and regulatory access.
 
@@ -692,13 +692,16 @@ Status env rule:
 Run the exact-status validator before changing production envs:
 
 ```bash
+npm run core-connectors:check
 npm run partner-rails:check
 ```
 
 - `outreach-started` means email/contact form sent.
 - `sandbox-requested` means partner acknowledged and requested onboarding material.
 - `sandbox-approved` means sandbox credentials or invitation exists.
-- `production-live` means signed production access, approved consent, production credentials, and at least one production consent test. Strict production only passes when Account Aggregator, UPI, and card mandate statuses are all `production-live`.
+- `production-live` means signed production access, approved consent, production credentials, and at least one production consent test.
+- Public-launch strictness requires verified Gmail plus production-live Account Aggregator (`core-connectors:check`).
+- `partner-rails:check` remains the stricter long-term moat gate and passes only when Account Aggregator, UPI, and card mandate statuses are all `production-live`.
 
 Stop condition:
 

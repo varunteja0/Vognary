@@ -23,6 +23,10 @@ test("assisted-audit settlement is semantic-idempotent and creates one order wit
   const workspaceId = randomUUID();
   const leadId = randomUUID();
   const idempotencyKey = `billing-test-${randomUUID()}`;
+  const providerSuffix = randomUUID().replaceAll("-", "");
+  const providerCheckoutId = `plink_${providerSuffix}`;
+  const providerPaymentId = `pay_${providerSuffix}`;
+  const eventPrefix = `event-${providerSuffix}`;
 
   try {
     await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, `${userId}@billing.test`]);
@@ -68,47 +72,47 @@ test("assisted-audit settlement is semantic-idempotent and creates one order wit
 
     await attachBillingProviderCheckout({
       checkoutId: first.checkout.id,
-      providerCheckoutId: "plink_billing1234",
+      providerCheckoutId,
       paymentUrl: "https://rzp.io/rzp/test1234",
     });
     const paid: RazorpayBillingEvent = {
       kind: "paid",
-      eventId: "event-billing-paid-0001",
+      eventId: `${eventPrefix}-paid-1`,
       eventType: "payment_link.paid",
       checkoutId: first.checkout.id,
-      providerCheckoutId: "plink_billing1234",
-      providerPaymentId: "pay_billing1234",
+      providerCheckoutId,
+      providerPaymentId,
       amountMinor: publicOffer.amountMinor,
       currency: "INR",
     };
     assert.equal((await applyRazorpayBillingEvent(paid, "a".repeat(64))).status, "processed");
     assert.equal((await applyRazorpayBillingEvent(paid, "a".repeat(64))).status, "duplicate");
-    assert.equal((await applyRazorpayBillingEvent({ ...paid, eventId: "event-billing-paid-0002" }, "d".repeat(64))).status, "duplicate");
+    assert.equal((await applyRazorpayBillingEvent({ ...paid, eventId: `${eventPrefix}-paid-2` }, "d".repeat(64))).status, "duplicate");
     assert.equal((await pool.query(`select count(*)::int as count from assisted_audit_orders where checkout_session_id = $1`, [first.checkout.id])).rows[0].count, 1);
     assert.equal((await pool.query(`select count(*)::int as count from workspace_entitlements where source_checkout_session_id = $1`, [first.checkout.id])).rows[0].count, 0);
 
     const partialRefund: RazorpayBillingEvent = {
       kind: "refund-processed",
-      eventId: "event-billing-refund-0001",
+      eventId: `${eventPrefix}-refund-1`,
       eventType: "refund.processed",
-      providerPaymentId: "pay_billing1234",
-      providerRefundId: "rfnd_billing1234",
+      providerPaymentId,
+      providerRefundId: `rfnd_${providerSuffix}_1`,
       amountMinor: 40_000,
       currency: "INR",
     };
     assert.equal((await applyRazorpayBillingEvent(partialRefund, "b".repeat(64))).status, "processed");
-    assert.equal((await applyRazorpayBillingEvent({ ...partialRefund, eventId: "event-billing-refund-duplicate" }, "e".repeat(64))).status, "duplicate");
+    assert.equal((await applyRazorpayBillingEvent({ ...partialRefund, eventId: `${eventPrefix}-refund-duplicate` }, "e".repeat(64))).status, "duplicate");
     assert.equal((await transitionAssistedAuditOrderByCheckout({ checkoutId: first.checkout.id, action: "start" })).status, "updated");
     assert.equal((await transitionAssistedAuditOrderByCheckout({ checkoutId: first.checkout.id, action: "deliver" })).status, "updated");
 
     const finalRefund: RazorpayBillingEvent = {
       ...partialRefund,
-      eventId: "event-billing-refund-0002",
-      providerRefundId: "rfnd_billing5678",
+      eventId: `${eventPrefix}-refund-2`,
+      providerRefundId: `rfnd_${providerSuffix}_2`,
       amountMinor: publicOffer.amountMinor - partialRefund.amountMinor,
     };
     assert.equal((await applyRazorpayBillingEvent(finalRefund, "c".repeat(64))).status, "processed");
-    assert.equal((await applyRazorpayBillingEvent({ ...paid, eventId: "event-billing-paid-after-refund" }, "f".repeat(64))).status, "duplicate");
+    assert.equal((await applyRazorpayBillingEvent({ ...paid, eventId: `${eventPrefix}-paid-after-refund` }, "f".repeat(64))).status, "duplicate");
     const checkout = await pool.query<{ status: string; refunded_amount_minor: string }>(
       `select status, refunded_amount_minor::text from billing_checkout_sessions where id = $1`,
       [first.checkout.id],
@@ -127,6 +131,10 @@ test("a refund delivered before payment is retained and applied after settlement
   const pool = getDatabasePool();
   const leadId = randomUUID();
   const email = `${leadId}@billing-order.test`;
+  const providerSuffix = randomUUID().replaceAll("-", "");
+  const providerCheckoutId = `plink_${providerSuffix}`;
+  const providerPaymentId = `pay_${providerSuffix}`;
+  const eventPrefix = `event-order-${providerSuffix}`;
   let checkoutId: string | null = null;
 
   try {
@@ -150,14 +158,14 @@ test("a refund delivered before payment is retained and applied after settlement
       idempotencyKey: `billing-order-${randomUUID()}`,
     });
     checkoutId = checkout.checkout.id;
-    await attachBillingProviderCheckout({ checkoutId, providerCheckoutId: "plink_order123456", paymentUrl: "https://rzp.io/rzp/order123" });
+    await attachBillingProviderCheckout({ checkoutId, providerCheckoutId, paymentUrl: "https://rzp.io/rzp/order123" });
 
     const refund: RazorpayBillingEvent = {
       kind: "refund-processed",
-      eventId: "event-order-refund-0001",
+      eventId: `${eventPrefix}-refund-1`,
       eventType: "refund.processed",
-      providerPaymentId: "pay_order123456",
-      providerRefundId: "rfnd_order123456",
+      providerPaymentId,
+      providerRefundId: `rfnd_${providerSuffix}`,
       amountMinor: publicOffer.amountMinor,
       currency: "INR",
     };
@@ -166,10 +174,10 @@ test("a refund delivered before payment is retained and applied after settlement
 
     const paid: RazorpayBillingEvent = {
       kind: "paid",
-      eventId: "event-order-paid-0001",
+      eventId: `${eventPrefix}-paid-1`,
       eventType: "payment_link.paid",
       checkoutId,
-      providerCheckoutId: "plink_order123456",
+      providerCheckoutId,
       providerPaymentId: refund.providerPaymentId,
       amountMinor: publicOffer.amountMinor,
       currency: "INR",
@@ -182,7 +190,7 @@ test("a refund delivered before payment is retained and applied after settlement
     assert.equal((await pool.query(`select status from billing_refunds where provider_refund_id = $1`, [refund.providerRefundId])).rows[0].status, "applied");
     assert.equal((await pool.query(`select status from assisted_audit_orders where checkout_session_id = $1`, [checkoutId])).rows[0].status, "refunded");
   } finally {
-    if (checkoutId) await pool.query(`delete from billing_webhook_events where external_event_id like 'event-order-%'`);
+    if (checkoutId) await pool.query(`delete from billing_webhook_events where external_event_id like $1`, [`${eventPrefix}%`]);
     await pool.query(`delete from private_audit_leads where id = $1`, [leadId]);
   }
 });
