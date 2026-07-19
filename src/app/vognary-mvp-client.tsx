@@ -26,6 +26,7 @@ import {
 } from "@/lib/recurring-audit";
 import { findActionableCancelAction, findCancelAction, manageUrlHostname } from "@/lib/cancel-actions";
 import { receiptTextToManualInputs, type ReceiptCandidate } from "@/lib/receipt-parser";
+import { isSampleReceiptText, sampleReceiptText } from "@/lib/sample-audit";
 import { buildRenewalTimeline, type RenewalTimeline } from "@/lib/renewal-timeline";
 import { buildProofGraphSummary, type ProofGraphSummary } from "@/lib/proof-graph";
 import type { CitedProofAnswer } from "@/lib/proof-questions";
@@ -686,6 +687,18 @@ export default function VognaryMvpClient() {
     ? serverActionCases.find((entry) => entry.recurringItemId === selectedServerRecurringItemId && !["withdrawn", "failed"].includes(entry.status)) ?? null
     : null;
   const hasRealData = allStatementSources.length > 0 || allManualItems.length > 0 || receiptText.trim().length > 0;
+  // WP-2.2 — a sample workspace is one whose only evidence is the shared demo
+  // text (no real statements or manual items). Content-derived, so the banner
+  // survives reload without a persisted flag.
+  const sampleWorkspace = allStatementSources.length === 0 && allManualItems.length === 0 && isSampleReceiptText(receiptText);
+  const seedSampleWorkspace = () => {
+    setReceiptText(sampleReceiptText);
+    setNotice("Sample audit loaded — eight example subscriptions. This is demo data, not yours; clear it anytime.");
+  };
+  const clearSampleWorkspace = () => {
+    setReceiptText("");
+    setNotice("Sample audit cleared. Add your own evidence to build a real ledger.");
+  };
   const coverageSignals = useMemo(
     () => getCoverageSignals(allStatementSources, allManualItems, receiptText),
     [allStatementSources, allManualItems, receiptText],
@@ -2358,6 +2371,12 @@ export default function VognaryMvpClient() {
           </div>
         </div>
         {nakulMoment ? <NakulMomentPanel moment={nakulMoment} onDismiss={() => setNakulMoment(null)} /> : null}
+        {sampleWorkspace ? (
+          <div role="status" className="flex flex-col gap-2 rounded-xl border border-(--gold-line) bg-(--gold-tint) p-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm leading-6 text-(--ink)"><span className="font-semibold">Sample data.</span> These eight subscriptions are a demo, not your evidence — explore freely, then clear anytime.</p>
+            <button type="button" onClick={clearSampleWorkspace} className="btn btn-ghost h-9 shrink-0 px-3 text-xs">Clear sample</button>
+          </div>
+        ) : null}
 
         {/* 00 · Overview — the five-second answer */}
         <section id="overview" aria-labelledby="overview-heading" className={`${mobileSection === "overview" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
@@ -2452,6 +2471,7 @@ export default function VognaryMvpClient() {
             onJumpToLedger={() => selectAndReviewItem()}
             onReceiptTextChange={setReceiptText}
             onSaveLocal={enableLocalSave}
+            onSeedSample={seedSampleWorkspace}
           />
           <GuidedCapturePanel
             onAdd={(items) => {
@@ -2957,6 +2977,7 @@ function FirstSuccessPanel({
   onJumpToLedger,
   onReceiptTextChange,
   onSaveLocal,
+  onSeedSample,
 }: {
   audit: AuditResult;
   coverageScore: number;
@@ -2968,6 +2989,7 @@ function FirstSuccessPanel({
   onJumpToLedger: () => void;
   onReceiptTextChange: (value: string) => void;
   onSaveLocal: () => void;
+  onSeedSample: () => void;
 }) {
   const hasLedger = audit.summary.recurringCount > 0;
   const saved = localSaveEnabled || signedIn;
@@ -2985,6 +3007,9 @@ function FirstSuccessPanel({
           <span className="folio" data-folio="1.2">First successful audit</span>
           <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Complete your first recurring-money review.</h3>
           <p className="mt-2 text-sm leading-6 text-(--muted)">Your encrypted workspace is ready. Add the first source, review every detected commitment, and improve evidence coverage over time.</p>
+          {!hasRealData ? (
+            <button type="button" onClick={onSeedSample} className="btn btn-primary mt-4">See a sample audit</button>
+          ) : null}
           <div className="mt-5 grid gap-2 sm:grid-cols-4">
             {steps.map((step, index) => (
               <div key={step.label} className="inset p-3">

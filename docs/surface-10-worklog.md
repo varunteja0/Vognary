@@ -2,6 +2,16 @@
 
 Append-only log per [surface-10-orchestration-plan.md](surface-10-orchestration-plan.md) Part VI. Newest first.
 
+## 2026-07-19 — WP-2.2 shipped: signed-in sample workspace
+
+**Shipped:** a signed-in user with an empty workspace can now explore the whole product without typing anything. The empty-workspace onboarding (Connect) offers **"See a sample audit"**, which seeds eight realistic INR subscriptions (ChatGPT, Notion, Netflix, Spotify, Google One, Canva, Amazon Prime, Adobe). A persistent **"Sample data — these eight subscriptions are a demo, not your evidence… clear anytime"** banner shows while the sample is loaded, with a one-tap **Clear sample**. Home, the Renewal Radar, Subscriptions, proof chips, budgets, and suggested cuts all populate from the demo exactly as they would from real evidence.
+
+**Design — zero new persistence surface:** the eight-subscription dataset moved to a shared `src/lib/sample-audit.ts` so the signed-out guest and the signed-in seed use the *identical* data (guest `guest-audit-client.tsx` now imports it). "Sample mode" is **content-derived** — `sampleWorkspace = no real statements/manual items && receiptText === the shared sample` — so the banner survives reload and clears cleanly through the existing `receiptText` sync path. No change to the encrypted `WorkspaceBackup` schema, its restore path, or the server snapshot; the sample rides machinery that is already tested.
+
+**Proof:** new isolated `tests/e2e/sample-workspace.spec.ts` green on desktop Chromium (7.4s) and mobile Chromium (8.7s) against the live Docker/Postgres stack — signs in to an empty workspace, seeds the sample (asserts the banner + a populated Home + Netflix/Spotify in the ledger, serious/critical axe empty), then clears (asserts Home returns to its empty state and the seed remains reachable from Connect). The self-heal step keeps the two serialized projects isolated on the shared founder workspace. Guest `first-value-path` still 5/5 (including the existing sample-audit labelling test), proving the shared-const refactor is safe. Full `unset DATABASE_URL; npm run ci` green (346 unit tests, typecheck, claims/research/brand, build, perf). Evidence: [sample desktop](evidence/surface-10/wp-2.2-sample-desktop-chromium.png), [sample mobile](evidence/surface-10/wp-2.2-sample-mobile-chromium.png).
+
+**Claims-safe:** the banner and seed copy state plainly that the data is a demo, not the user's evidence, satisfying the honesty taxonomy; nothing in sample mode claims a connected source or proven live data.
+
 ## 2026-07-18 — WP-6.3 (Home slice): proof chips on aggregate ₹ figures
 
 **Shipped:** the Home aggregate figures that previously had **no proof trace** now carry a tappable proof chip. "Due in 30 days" and "Verified savings" are sums with no single detail sheet to open, so a new `ProofDisclosure` chip reveals the exact evidence rows composing each number — projected debits (merchant · amount · date) for the renewal total, and tracked decisions (merchant · status · ₹/yr) for verified savings. This closes the Workspace exit-criterion gap ("every number click-traces to its proof") for Home's aggregates; per-item figures already trace through the WP-1.3 detail sheet, and "Monthly burn" taps through to the full Subscriptions ledger.

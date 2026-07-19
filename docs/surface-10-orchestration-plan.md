@@ -71,7 +71,7 @@ The first implementation tranche is in the working tree and browser-proved. Comp
 ### Phase 2 — Onboarding that converts (Lane A, after WP-1.1)
 
 - **WP-2.1 (M) One-screen onboarding.** Signed-out /app and post-signup: three buttons only — **Connect Gmail** (primary), **Paste receipts**, **See a sample audit**. Nothing else above the fold. DoD: zero mentions of CSV/statement/API on the screen.
-- **WP-2.2 (M) Sample audit mode.** One click seeds a clearly-labelled demo workspace (8–10 realistic INR subscriptions, banner "Sample data — clear anytime", one-click clear). Full product explorable without any input. DoD: sample→clear round-trip in harness; claims-safe labelling.
+- **WP-2.2 ✅ Sample audit mode.** One click seeds a clearly-labelled demo workspace (8–10 realistic INR subscriptions, banner "Sample data — clear anytime", one-click clear). Full product explorable without any input. DoD: sample→clear round-trip in harness; claims-safe labelling. Shipped 2026-07-19: signed-in "See a sample audit" seeds the shared eight-subscription dataset (`src/lib/sample-audit.ts`, identical to guest), content-derived sample banner, one-tap clear; isolated `sample-workspace.spec.ts` green desktop+mobile. See worklog.
 - **WP-2.3 ✅ Demote file import.** Statement/CSV/PDF upload moves to Data → "Advanced import". First-run surfaces never show it.
 - **WP-2.4 ✅ Guest→sign-in continuity hardening.** The existing transfer works; add explicit post-signin toast with counts ("3 commitments carried into your encrypted workspace") and harness assertion.
 
