@@ -37,12 +37,29 @@ async function signIn(page: Page, project: string) {
   await page.waitForTimeout(400);
 }
 
+// Codex's progressive onboarding hides the rail cards behind a three-choice
+// panel until the workspace has evidence. Seed the labelled sample so the real
+// Connect rails render, then hand back the rail panel. Self-heals whether or not
+// a prior test in the shared founder workspace already seeded.
 async function openConnect(page: Page) {
   const nav = page.locator('nav[aria-label="Workspace sections"]:visible');
   await nav.getByText("Connect", { exact: true }).click();
+
   const panel = page.locator("section.dossier", {
     has: page.getByRole("heading", { name: "Connect evidence. Choose what to watch." }),
   });
+  if (!(await panel.isVisible({ timeout: 5_000 }).catch(() => false))) {
+    const seed = page.getByRole("button", { name: "See a sample audit" });
+    if (await seed.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      const saved = page.waitForResponse(
+        (response) => response.url().includes("/api/workspaces/current/audit-snapshot") && response.request().method() === "POST" && response.ok(),
+        { timeout: 20_000 },
+      );
+      await seed.click();
+      await saved;
+      await nav.getByText("Connect", { exact: true }).click();
+    }
+  }
   await expect(panel).toBeVisible({ timeout: 30_000 });
   return panel;
 }
@@ -149,6 +166,9 @@ test("Bank rail validates the handle, then fires the AA consent endpoint", async
 test("no visible control on the workspace screens is a dead affordance", async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   await signIn(page, testInfo.project.name);
+  // Seed the sample so every screen renders real content (and the empty-workspace
+  // auto-route can't fight our navigation).
+  await openConnect(page);
   const nav = page.locator('nav[aria-label="Workspace sections"]:visible');
 
   for (const screen of ["Home", "Subscriptions", "Connect"]) {
