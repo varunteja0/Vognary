@@ -297,6 +297,7 @@ export function useProfileSettings() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           enabled: next.enabled,
+          weeklyDigestEnabled: next.weeklyDigestEnabled,
           sevenDayEnabled: next.sevenDayEnabled,
           oneDayEnabled: next.oneDayEnabled,
           timeZone: next.timeZone,
@@ -309,9 +310,9 @@ export function useProfileSettings() {
         return;
       }
       setRenewalAlerts(payload.preference);
-      setStatus("notifications", next.enabled
-        ? "Renewal reminders enabled for the selected 7-day and 1-day windows."
-        : "Renewal reminders and their active consent are disabled.");
+      setStatus("notifications", next.enabled || next.weeklyDigestEnabled
+        ? `${next.enabled ? "Renewal reminders" : "Renewal reminders remain off"}; weekly digest ${next.weeklyDigestEnabled ? "enabled" : "off"}.`
+        : "Renewal reminders, weekly digest, and their active consent are disabled.");
     } catch {
       setStatus("notifications", "Could not update renewal reminders. Check your connection and retry.");
     } finally {

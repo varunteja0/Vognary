@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { sourceHealthPresentation, sourceNeedsAttention } from "@/lib/source-health-presentation";
 import SourceAccountActions from "./source-account-actions";
 
 type Freshness = "unknown" | "fresh" | "stale" | "error" | null;
@@ -103,7 +104,7 @@ export default function SourceHealthClient() {
   if (state.kind === "error") return <LoadError message={state.message} onRetry={refresh} />;
 
   const active = state.data.accounts.filter((account) => account.status !== "revoked");
-  const attention = active.filter(needsAttention);
+  const attention = active.filter(sourceNeedsAttention);
   return (
     <div className="mt-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -140,7 +141,7 @@ export default function SourceHealthClient() {
 }
 
 function SourceCard({ account }: { account: Account }) {
-  const freshness = freshnessPresentation(account);
+  const freshness = sourceHealthPresentation(account);
   return (
     <article className="inset p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -156,7 +157,7 @@ function SourceCard({ account }: { account: Account }) {
         <Datum label="Coverage" value={formatCoverage(account.coverageStartAt, account.coverageEndAt)} />
         <Datum label="Evidence" value={`${account.evidenceCount} signal${account.evidenceCount === 1 ? "" : "s"}`} />
       </dl>
-      <SourceAccountActions account={{ id: account.id, connectorId: account.connectorId, displayName: account.displayName, status: account.status }} retry={needsAttention(account)} />
+      <SourceAccountActions account={{ id: account.id, connectorId: account.connectorId, displayName: account.displayName, status: account.status }} retry={sourceNeedsAttention(account)} />
     </article>
   );
 }
@@ -184,18 +185,6 @@ function Unavailable() {
 
 function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return <div className="inset mt-6 p-5 sm:p-6" role="alert"><span className="pill pill-blocked">Status could not load</span><h2 className="mt-3 font-display text-lg font-semibold text-(--ink)">We could not read your source ledger</h2><p className="mt-2 text-sm leading-6 text-(--muted)">{message}</p><button type="button" className="btn btn-ghost mt-4" onClick={onRetry}>Try again</button></div>;
-}
-
-function needsAttention(account: Account) {
-  return account.status === "error" || account.status === "needs_reauth" || account.freshnessStatus === "stale" || account.freshnessStatus === "error" || account.latestRunStatus === "failed";
-}
-
-function freshnessPresentation(account: Account) {
-  if (account.status === "needs_reauth") return { label: "Reconnect", className: "pill pill-blocked" };
-  if (account.status === "error" || account.freshnessStatus === "error" || account.latestRunStatus === "failed") return { label: "Sync issue", className: "pill pill-blocked" };
-  if (account.freshnessStatus === "fresh") return { label: "Fresh", className: "pill pill-ready" };
-  if (account.freshnessStatus === "stale") return { label: "Needs refresh", className: "pill pill-partial" };
-  return { label: "Awaiting sync", className: "pill pill-planned" };
 }
 
 function formatCoverage(start: string | null, end: string | null) {

@@ -19,6 +19,7 @@ type PreferenceRow = {
   user_id: string;
   consent_grant_id: string | null;
   enabled: boolean;
+  weekly_digest_enabled: boolean;
   seven_day_enabled: boolean;
   one_day_enabled: boolean;
   time_zone: string;
@@ -38,6 +39,18 @@ export type ClaimedRenewalAlert = {
   alertWindow: RenewalAlertWindow;
 };
 
+export type ClaimedWeeklyDigest = {
+  deliveryId: string;
+  email: string;
+  weekStart: string;
+  monthlyBurn: number;
+  currency: string;
+  foreignMonthlyTotals: Record<string, number>;
+  renewalCountNext7Days: number;
+  renewalTotalNext7Days: number;
+  suggestion: null | { merchant: string; monthlyCost: number };
+};
+
 export async function getRenewalAlertPreference(input: { workspaceId: string; userId: string }) {
   const row = await readPreferenceRow(input.workspaceId, input.userId);
   return mapPreference(row);
@@ -55,13 +68,15 @@ export async function updateRenewalAlertPreference(input: {
     await client.query("begin");
     const existing = await readPreferenceRow(input.workspaceId, input.userId, client, true);
     const settingsChanged = !existing
+      || existing.weekly_digest_enabled !== input.preference.weeklyDigestEnabled
       || existing.seven_day_enabled !== input.preference.sevenDayEnabled
       || existing.one_day_enabled !== input.preference.oneDayEnabled
       || existing.time_zone !== input.preference.timeZone
       || existing.send_hour_local !== input.preference.sendHourLocal;
     let consentGrantId = existing?.consent_grant_id ?? null;
 
-    if (input.preference.enabled) {
+    const deliveryConsentRequired = input.preference.enabled || input.preference.weeklyDigestEnabled;
+    if (deliveryConsentRequired) {
       if (!existing?.consent_active || settingsChanged) {
         if (existing?.consent_active && existing.consent_grant_id) {
           await client.query(
@@ -81,6 +96,7 @@ export async function updateRenewalAlertPreference(input: {
           source: "renewal-alert-preferences",
           scopes: {
             deliveryChannel: "email",
+            weeklyDigest: input.preference.weeklyDigestEnabled,
             sevenDay: input.preference.sevenDayEnabled,
             oneDay: input.preference.oneDayEnabled,
             timeZone: input.preference.timeZone,
@@ -105,21 +121,23 @@ export async function updateRenewalAlertPreference(input: {
          user_id,
          consent_grant_id,
          enabled,
+         weekly_digest_enabled,
          seven_day_enabled,
          one_day_enabled,
          time_zone,
          send_hour_local,
          disabled_at
-       ) values ($1, $2, $3, $4, $5, $6, $7, $8, case when $4 then null else now() end)
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, case when ($4 or $5) then null else now() end)
        on conflict (workspace_id, user_id)
        do update set
          consent_grant_id = excluded.consent_grant_id,
          enabled = excluded.enabled,
+         weekly_digest_enabled = excluded.weekly_digest_enabled,
          seven_day_enabled = excluded.seven_day_enabled,
          one_day_enabled = excluded.one_day_enabled,
          time_zone = excluded.time_zone,
          send_hour_local = excluded.send_hour_local,
-         disabled_at = case when excluded.enabled then null else coalesce(renewal_alert_preferences.disabled_at, now()) end,
+         disabled_at = case when (excluded.enabled or excluded.weekly_digest_enabled) then null else coalesce(renewal_alert_preferences.disabled_at, now()) end,
          updated_at = now()
        returning id`,
       [
@@ -127,6 +145,7 @@ export async function updateRenewalAlertPreference(input: {
         input.userId,
         consentGrantId,
         input.preference.enabled,
+        input.preference.weeklyDigestEnabled,
         input.preference.sevenDayEnabled,
         input.preference.oneDayEnabled,
         input.preference.timeZone,
@@ -139,9 +158,10 @@ export async function updateRenewalAlertPreference(input: {
     await client.query(
       `insert into audit_log (workspace_id, user_id, action, entity_type, entity_id)
        values ($1, $2, $3, 'renewal_alert_preference', $4)`,
-      [input.workspaceId, input.userId, input.preference.enabled ? "renewal_alerts.enabled" : "renewal_alerts.disabled", preferenceId],
+      [input.workspaceId, input.userId, deliveryConsentRequired ? "renewal_alerts.enabled" : "renewal_alerts.disabled", preferenceId],
     );
     await scheduleRenewalAlertsForWorkspace(input.workspaceId, client);
+    await cancelIneligibleWeeklyDigests(input.workspaceId, client);
     const updated = await readPreferenceRow(input.workspaceId, input.userId, client);
     await client.query("commit");
     return mapPreference(updated);
@@ -284,6 +304,193 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
   );
 
   return { touched: scheduled.rowCount ?? 0, cancelled: cancelled.rowCount ?? 0 };
+}
+
+export async function scheduleDueWeeklyDigests(client?: PoolClient) {
+  const queryable = client ?? getDatabasePool();
+  const scheduled = await queryable.query<{ id: string }>(
+    `with local_preferences as (
+       select
+         preference.*,
+         (now() at time zone preference.time_zone) as local_now,
+         date_trunc('week', now() at time zone preference.time_zone)::date as week_start
+       from renewal_alert_preferences preference
+       join consent_grants consent
+         on consent.id = preference.consent_grant_id
+        and consent.purpose = 'renewal-alerts'
+        and consent.withdrawn_at is null
+        and (consent.expires_at is null or consent.expires_at > now())
+       join pg_timezone_names time_zone on time_zone.name = preference.time_zone
+       where preference.weekly_digest_enabled
+     ), candidates as (
+       select
+         preference.*,
+         (preference.week_start::timestamp + make_interval(hours => preference.send_hour_local)) at time zone preference.time_zone as scheduled_for
+       from local_preferences preference
+       where extract(isodow from preference.local_now) = 1
+         and exists (select 1 from recurring_items item where item.workspace_id = preference.workspace_id)
+     )
+     insert into weekly_digest_deliveries (
+       workspace_id,
+       user_id,
+       preference_id,
+       consent_grant_id,
+       week_start,
+       scheduled_for,
+       next_attempt_at
+     )
+     select
+       workspace_id,
+       user_id,
+       id,
+       consent_grant_id,
+       week_start,
+       scheduled_for,
+       scheduled_for
+     from candidates
+     on conflict (preference_id, week_start) do nothing
+     returning id`,
+  );
+  const cancelled = await cancelIneligibleWeeklyDigests(undefined, client);
+  return { touched: scheduled.rowCount ?? 0, cancelled };
+}
+
+async function cancelIneligibleWeeklyDigests(workspaceId?: string, client?: PoolClient) {
+  const queryable = client ?? getDatabasePool();
+  const result = await queryable.query(
+    `update weekly_digest_deliveries delivery
+     set status = 'cancelled',
+         next_attempt_at = null,
+         locked_at = null,
+         locked_by = null,
+         updated_at = now()
+     where delivery.status in ('scheduled', 'failed')
+       and ($1::uuid is null or delivery.workspace_id = $1)
+       and not exists (
+         select 1
+         from renewal_alert_preferences preference
+         join consent_grants consent
+           on consent.id = preference.consent_grant_id
+          and consent.id = delivery.consent_grant_id
+          and consent.purpose = 'renewal-alerts'
+          and consent.withdrawn_at is null
+          and (consent.expires_at is null or consent.expires_at > now())
+         where preference.id = delivery.preference_id
+           and preference.weekly_digest_enabled
+       )`,
+    [workspaceId ?? null],
+  );
+  return result.rowCount ?? 0;
+}
+
+export async function claimDueWeeklyDigests(input: { limit: number; workerId: string; invocation: "internal-api" | "cron" }): Promise<ClaimedWeeklyDigest[]> {
+  const result = await getDatabasePool().query<{
+    delivery_id: string;
+    email: string;
+    week_start: string;
+    monthly_burn: string;
+    foreign_monthly_totals: Record<string, number> | null;
+    renewal_count: string;
+    renewal_total: string;
+    suggestion_merchant: string | null;
+    suggestion_monthly_cost: string | null;
+  }>(
+    `with due as (
+       select delivery.id
+       from weekly_digest_deliveries delivery
+       join renewal_alert_preferences preference
+         on preference.id = delivery.preference_id
+        and preference.weekly_digest_enabled
+        and preference.consent_grant_id = delivery.consent_grant_id
+       join consent_grants consent
+         on consent.id = delivery.consent_grant_id
+        and consent.purpose = 'renewal-alerts'
+        and consent.withdrawn_at is null
+        and (consent.expires_at is null or consent.expires_at > now())
+       join users recipient on recipient.id = delivery.user_id and recipient.deleted_at is null
+       where delivery.attempt_count < $2
+         and exists (select 1 from recurring_items item where item.workspace_id = delivery.workspace_id)
+         and (
+           (delivery.status = 'scheduled' and delivery.scheduled_for <= now())
+           or (delivery.status = 'failed' and delivery.next_attempt_at is not null and delivery.next_attempt_at <= now())
+           or (delivery.status = 'sending' and delivery.locked_at < now() - interval '10 minutes')
+         )
+       order by coalesce(delivery.next_attempt_at, delivery.scheduled_for), delivery.created_at
+       for update of delivery skip locked
+       limit $1
+     ), claimed as (
+       update weekly_digest_deliveries delivery
+       set status = 'sending',
+           attempt_count = delivery.attempt_count + 1,
+           last_invocation = $4,
+           locked_at = now(),
+           locked_by = $3,
+           updated_at = now()
+       from due
+       where delivery.id = due.id
+       returning delivery.*
+     )
+     select
+       claimed.id as delivery_id,
+       recipient.email,
+       claimed.week_start::text,
+       totals.monthly_burn::text,
+       totals.foreign_monthly_totals,
+       totals.renewal_count::text,
+       totals.renewal_total::text,
+       suggestion.merchant as suggestion_merchant,
+       suggestion.monthly_cost::text as suggestion_monthly_cost
+     from claimed
+     join users recipient on recipient.id = claimed.user_id and recipient.deleted_at is null
+     join lateral (
+       select
+         coalesce(sum(item.monthly_cost) filter (where item.currency = 'INR'), 0) as monthly_burn,
+         coalesce((
+           select jsonb_object_agg(foreign_totals.currency, foreign_totals.monthly_total)
+           from (
+             select item_by_currency.currency, sum(item_by_currency.monthly_cost) as monthly_total
+             from recurring_items item_by_currency
+             where item_by_currency.workspace_id = claimed.workspace_id
+               and item_by_currency.currency <> 'INR'
+             group by item_by_currency.currency
+           ) foreign_totals
+         ), '{}'::jsonb) as foreign_monthly_totals,
+         count(*) filter (
+           where item.next_expected_date >= claimed.week_start
+             and item.next_expected_date < claimed.week_start + 7
+         ) as renewal_count,
+         coalesce(sum(item.average_amount) filter (
+           where item.currency = 'INR'
+             and item.next_expected_date >= claimed.week_start
+             and item.next_expected_date < claimed.week_start + 7
+         ), 0) as renewal_total
+       from recurring_items item
+       where item.workspace_id = claimed.workspace_id
+     ) totals on true
+     left join lateral (
+       select item.merchant, item.monthly_cost
+       from recurring_items item
+       where item.workspace_id = claimed.workspace_id
+         and item.currency = 'INR'
+       order by item.monthly_cost desc, item.normalized_merchant, item.id
+       limit 1
+     ) suggestion on true`,
+    [Math.max(1, Math.min(input.limit, 25)), maxDeliveryAttempts, input.workerId, input.invocation],
+  );
+
+  return result.rows.map((row) => ({
+    deliveryId: row.delivery_id,
+    email: row.email,
+    weekStart: row.week_start,
+    monthlyBurn: Number(row.monthly_burn),
+    currency: "INR",
+    foreignMonthlyTotals: Object.fromEntries(Object.entries(row.foreign_monthly_totals ?? {}).map(([currency, total]) => [currency, Number(total)])),
+    renewalCountNext7Days: Number(row.renewal_count),
+    renewalTotalNext7Days: Number(row.renewal_total),
+    suggestion: row.suggestion_merchant && row.suggestion_monthly_cost !== null
+      ? { merchant: row.suggestion_merchant, monthlyCost: Number(row.suggestion_monthly_cost) }
+      : null,
+  }));
 }
 
 export async function claimDueRenewalAlerts(input: { limit: number; workerId: string; invocation: "internal-api" | "cron" }): Promise<ClaimedRenewalAlert[]> {
@@ -455,6 +662,80 @@ export async function markRenewalAlertFailed(input: {
   );
 }
 
+export async function isWeeklyDigestStillDeliverable(deliveryId: string, workerId: string) {
+  const result = await getDatabasePool().query<{ active: boolean }>(
+    `select exists (
+       select 1
+       from weekly_digest_deliveries delivery
+       join renewal_alert_preferences preference
+         on preference.id = delivery.preference_id
+        and preference.weekly_digest_enabled
+        and preference.consent_grant_id = delivery.consent_grant_id
+       join consent_grants consent
+         on consent.id = delivery.consent_grant_id
+        and consent.purpose = 'renewal-alerts'
+        and consent.withdrawn_at is null
+        and (consent.expires_at is null or consent.expires_at > now())
+       join users recipient on recipient.id = delivery.user_id and recipient.deleted_at is null
+       where delivery.id = $1
+         and delivery.status = 'sending'
+         and delivery.locked_by = $2
+         and exists (select 1 from recurring_items item where item.workspace_id = delivery.workspace_id)
+     ) as active`,
+    [deliveryId, workerId],
+  );
+  return Boolean(result.rows[0]?.active);
+}
+
+export async function markWeeklyDigestSent(deliveryId: string, workerId: string) {
+  await getDatabasePool().query(
+    `update weekly_digest_deliveries
+     set status = 'sent', sent_at = now(), next_attempt_at = null,
+         locked_at = null, locked_by = null, last_error_code = null,
+         last_error_at = null, updated_at = now()
+     where id = $1 and status = 'sending' and locked_by = $2`,
+    [deliveryId, workerId],
+  );
+}
+
+export async function markWeeklyDigestCancelled(deliveryId: string, workerId: string) {
+  await getDatabasePool().query(
+    `update weekly_digest_deliveries
+     set status = 'cancelled', next_attempt_at = null,
+         locked_at = null, locked_by = null, updated_at = now()
+     where id = $1 and status = 'sending' and locked_by = $2`,
+    [deliveryId, workerId],
+  );
+}
+
+export async function markWeeklyDigestFailed(input: {
+  deliveryId: string;
+  workerId: string;
+  errorCode: RenewalAlertFailureCode;
+  retryable: boolean;
+}) {
+  await getDatabasePool().query(
+    `update weekly_digest_deliveries
+     set status = 'failed',
+         next_attempt_at = case
+           when not $4 or attempt_count >= $5 then null
+           else now() + case attempt_count
+             when 1 then interval '5 minutes'
+             when 2 then interval '15 minutes'
+             when 3 then interval '1 hour'
+             else interval '6 hours'
+           end
+         end,
+         locked_at = null,
+         locked_by = null,
+         last_error_code = $3,
+         last_error_at = now(),
+         updated_at = now()
+     where id = $1 and status = 'sending' and locked_by = $2`,
+    [input.deliveryId, input.workerId, input.errorCode, input.retryable, maxDeliveryAttempts],
+  );
+}
+
 async function readPreferenceRow(
   workspaceId: string,
   userId: string,
@@ -469,6 +750,7 @@ async function readPreferenceRow(
        preference.user_id,
        preference.consent_grant_id,
        preference.enabled,
+       preference.weekly_digest_enabled,
        preference.seven_day_enabled,
        preference.one_day_enabled,
        preference.time_zone,
@@ -497,6 +779,7 @@ function mapPreference(row: PreferenceRow | null) {
   if (!row) {
     return {
       enabled: false,
+      weeklyDigestEnabled: false,
       sevenDayEnabled: true,
       oneDayEnabled: true,
       timeZone: "UTC",
@@ -517,12 +800,13 @@ function mapPreference(row: PreferenceRow | null) {
   const consentActive = Boolean(row.consent_active);
   return {
     enabled: row.enabled && consentActive,
+    weeklyDigestEnabled: row.weekly_digest_enabled && consentActive,
     sevenDayEnabled: row.seven_day_enabled,
     oneDayEnabled: row.one_day_enabled,
     timeZone: row.time_zone,
     sendHourLocal: row.send_hour_local,
     updatedAt: row.updated_at.toISOString(),
-    disabledReason: row.enabled && !consentActive ? "consent-withdrawn" : null,
+    disabledReason: (row.enabled || row.weekly_digest_enabled) && !consentActive ? "consent-withdrawn" : null,
     consent: {
       purpose: renewalAlertConsentPurpose,
       active: consentActive,

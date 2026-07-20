@@ -71,6 +71,7 @@ export type PlatformTokenSummary = {
 
 export type RenewalAlertPreference = {
   enabled: boolean;
+  weeklyDigestEnabled: boolean;
   sevenDayEnabled: boolean;
   oneDayEnabled: boolean;
   timeZone: string;

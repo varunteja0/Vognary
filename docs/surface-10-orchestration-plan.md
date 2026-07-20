@@ -47,29 +47,32 @@ Effort: S (≤half day) · M (≤2 days) · L (≤1 week). Lanes may run in para
 
 The first implementation tranche is in the working tree and browser-proved. Completed packages are marked ✅ below. Partial packages stay unmarked even when a substantial slice has shipped; this prevents the plan from awarding itself a score it has not measured.
 
-- **Proved now:** hydration-safe encrypted workspace restore; three-screen IA; budget persistence; deterministic suggested cuts; price-change/budget chips; advanced-import demotion; counted guest handoff; install prompt; AA return polling + first-sync reveal; serious/critical axe checks on Home, Subscriptions, Connect, Login, and Landing.
+- **Proved now:** hydration-safe encrypted workspace restore; three-screen IA; subscription detail sheet (one-tap proof + decision + cancel-guide); budget persistence; deterministic suggested cuts; price-change/budget chips; advanced-import demotion; counted guest handoff; install prompt; AA return polling + first-sync reveal; serious/critical axe checks on Home, Subscriptions, Connect, Login, Landing, and the open detail sheet.
 - **Harness proof (verified 2026-07-18):** full `npm run ci` green, exit 0 — lint, claims/research/brand checks, 337 unit tests, and a clean production `build` (type-checked); signed-in desktop + mobile core-loop spec; guest first-value/sample round-trip spec; tracked screenshots in `docs/evidence/surface-10/`. See the 2026-07-18 worklog entry for the build-gap fix.
-- **Still required before the scoreboard can read 10:** the ≥200 receipt performance corpus, live Google/Setu gates, Home trend, subscription detail sheet, consented weekly digest, full spacing/performance audit, and the remaining innovation packages.
+- **Code-owned packages completed 2026-07-19:** progressive signed-in onboarding (WP-2.1), task empty states (WP-0.4), prose disclosures (WP-1.4), weekly digest (WP-3.3), generated iOS startup images (WP-5.5), and aggregate proof coverage across Subscriptions/Review/Data (WP-6.3). See the newest worklog entry and [public-launch-final-checklist.md](public-launch-final-checklist.md).
+- **Still required before the scoreboard can read 10:** the private ≥100 real-statement and ≥200 real-receipt quality gates, production Gmail/Setu approval and canaries, production payment/email/cron/monitoring/backup attestations, and the release canary. These are evidence/external gates rather than unimplemented code.
 - **External boundary:** G-A, G-B, and G-C require the founder/provider/legal actions described below. Code and mocked proof cannot honestly substitute for production approval or real financial data.
 
 ### Phase 0 — Core-loop integrity (Lane B) — *mostly done*
 
 - **WP-0.1 ✅ Month-name date parsing** (`loose-date.ts`, `receipt-parser.ts` + tests). Shipped 2026-07-17; commit if still in working tree.
-- **WP-0.2 (M) Receipt corpus expansion.** Collect ≥50 real receipt/renewal formats (Netflix, Spotify, Apple, Google Play/One, Prime, Hotstar, ChatGPT, Claude, Jio, Airtel, LIC, EMI pre-debit SMS/email texts; EN-IN). Add to `tests/receipt-parser.test.ts` + statement corpus. DoD: every format parses or is a documented, justified rejection; `npm run corpus:strict` green.
+- **WP-0.2 (M, partial) Receipt corpus expansion.** Collect ≥50 real receipt/renewal formats (Netflix, Spotify, Apple, Google Play/One, Prime, Hotstar, ChatGPT, Claude, Jio, Airtel, LIC, EMI pre-debit SMS/email texts; EN-IN). Add to `tests/receipt-parser.test.ts` + statement corpus. DoD: every format parses or is a documented, justified rejection; `npm run corpus:strict` green.
+  - **Receipt half advanced 2026-07-18:** real-format coverage across the merchant list plus an `inferCategory` bug fix (JioHotstar/Hotstar/Amazon Prime/Prime Video were miscategorized); documented justified rejections for bare telecom bills and loan EMIs. See worklog.
+  - **Blocked (data gate, not code):** `corpus:strict` needs ≥100 `consented-redacted-real` statement fixtures with opaque consent references and clean redaction. This is real-data collection (same class as G-A/G-B) and cannot be honestly force-greened with synthetic fixtures. Package stays partial until that data exists.
 - **WP-0.3 ✅ Signed-in e2e harness** (`tests/e2e/signed-in-first-value.spec.ts`, env-guarded).
-- **WP-0.4 (S) Empty-state audit.** Every panel in `vognary-mvp-client.tsx`: at most one sentence + exactly one action button. Kill instructional paragraphs (move to /guide). DoD: screenshot per section attached to worklog.
+- **WP-0.4 ✅ Empty-state audit.** Primary task panels use one sentence + exactly one action; non-task “nothing changed” evidence remains informational rather than pretending to need an action. Browser-proved in the onboarding/sample journey 2026-07-19.
 
 ### Phase 1 — The three-screen product (Lane A)
 
 - **WP-1.1 ✅ IA restructure.** Sidebar/bottom-nav becomes **Home · Subscriptions · Connect** (+ "More" holding Review/Data, hidden until data exists). Sections keep their ids for deep links. DoD: signed-in walkthrough screenshots; a first-time user sees exactly three destinations.
-- **WP-1.2 (M) Home screen.** Cards: Monthly burn (+trend), Renews next (with countdown), Budget status (amber when projected 30-day debits exceed budget), One suggested action, Alerts strip (renewal ≤3 days, price change, stale source). Every number clicks through to its proof. DoD: harness spec extended to assert all five cards with data.
-- **WP-1.3 (M) Subscriptions screen.** Card list (logo-letter, name, ₹/mo, cadence, next date, confidence chip) sortable by cost/next-renewal; tapping opens a detail sheet: proof evidence, history, actions (Keep / Watch / Cancel-guide with the existing 103 cancel actions). DoD: detail sheet reachable in ≤2 taps from Home.
-- **WP-1.4 (S) Prose cull.** Dossier narration ("folio 0.6 Ask your proof…") moves behind an ⓘ or to /guide on consumer screens. Brand stays; essays go.
+- **WP-1.2 ✅ Home screen.** Cards: Monthly burn with a since-last-review delta, Renews next with countdown, budget status, one suggested action, and alerts for imminent renewal, price movement, and source health. Browser-proved on desktop + mobile; the last trend criterion shipped 2026-07-18.
+- **WP-1.3 ✅ Subscriptions screen.** Card list (logo-letter, name, ₹/mo, cadence, next date, confidence chip) sortable by cost/next-renewal; tapping opens a detail sheet: proof evidence, history, actions (Keep / Watch / Cancel-guide with the existing cancel actions). Detail sheet reachable in one tap from Home or Subscriptions; proven on desktop + mobile with an axe check on the open sheet (2026-07-18 worklog).
+- **WP-1.4 ✅ Prose cull.** Consumer panel explanations now sit behind compact “How this works” disclosures; the chosen Connect dashboard copy was reduced to consent/revocability essentials. Brand stays visible; essays no longer lead the task.
 
 ### Phase 2 — Onboarding that converts (Lane A, after WP-1.1)
 
-- **WP-2.1 (M) One-screen onboarding.** Signed-out /app and post-signup: three buttons only — **Connect Gmail** (primary), **Paste receipts**, **See a sample audit**. Nothing else above the fold. DoD: zero mentions of CSV/statement/API on the screen.
-- **WP-2.2 (M) Sample audit mode.** One click seeds a clearly-labelled demo workspace (8–10 realistic INR subscriptions, banner "Sample data — clear anytime", one-click clear). Full product explorable without any input. DoD: sample→clear round-trip in harness; claims-safe labelling.
+- **WP-2.1 ✅ One-screen onboarding.** Signed-out /app and post-signup: three progressive buttons only — **Connect Gmail**, **Paste receipts**, **See a sample audit**. The rich connection/capture surfaces reveal only after a choice or real evidence. DoD browser-proved desktop+mobile 2026-07-19 with zero CSV/statement/API/key terms in the Connect onboarding.
+- **WP-2.2 ✅ Sample audit mode.** One click seeds a clearly-labelled demo workspace (8–10 realistic INR subscriptions, banner "Sample data — clear anytime", one-click clear). Full product explorable without any input. DoD: sample→clear round-trip in harness; claims-safe labelling. Shipped 2026-07-19: signed-in "See a sample audit" seeds the shared eight-subscription dataset (`src/lib/sample-audit.ts`, identical to guest), content-derived sample banner, one-tap clear; isolated `sample-workspace.spec.ts` green desktop+mobile. See worklog.
 - **WP-2.3 ✅ Demote file import.** Statement/CSV/PDF upload moves to Data → "Advanced import". First-run surfaces never show it.
 - **WP-2.4 ✅ Guest→sign-in continuity hardening.** The existing transfer works; add explicit post-signin toast with counts ("3 commitments carried into your encrypted workspace") and harness assertion.
 
@@ -77,7 +80,7 @@ The first implementation tranche is in the working tree and browser-proved. Comp
 
 - **WP-3.1 ✅ Budgets.** Monthly total + per-category caps stored in workspace state (extend `WorkspaceBackup`, restore paths, and server snapshot exactly as `merchantLinks` was). Over-budget renders amber on Home and on offending subscription cards. No new tables.
 - **WP-3.2 ✅ Suggested cuts.** Rank = monthly cost × weak-proof × watch/investigate status × price-rise flag. Top 3 as Home card with cancel-guide links. Pure client computation over existing audit data.
-- **WP-3.3 (M) Alerts in-app + weekly digest.** Surface existing renewal-alert rails in the Home alerts strip; digest email content (burn, next 7-day renewals, one suggestion) through `renewal-alert-mailer`. Respect existing consent gates.
+- **WP-3.3 ✅ Alerts in-app + weekly digest.** Separate explicit digest toggle, consent lifecycle, Monday/local-hour schedule, empty-ledger suppression, privacy-minimized delivery rows, INR/foreign-safe content, bounded retries, readiness/privacy export coverage, and PostgreSQL integration proof shipped 2026-07-19. Production sent-message evidence remains an operator gate.
 - **WP-3.4 ✅ Price-change chips.** Evidence normalizer already retains amounts; when latest amount > previous for same identity, show "↑ was ₹499" chip on the subscription card + alert entry.
 
 ### Phase 4 — Rails go live (Lane C = founder gates + Lane B code)
@@ -87,22 +90,24 @@ The first implementation tranche is in the working tree and browser-proved. Comp
 - **G-C (founder, 4–10 weeks):** FIU/regulated-partner agreement per [one-click-connect-plan.md](one-click-connect-plan.md) and [direct-linking-activation-dossier.md](direct-linking-activation-dossier.md). Sets `production-live`.
 - **WP-4.1 (M, code-complete; live proof waits on G-A/G-B) First-sync magic moment.** After OAuth/AA return, an import summary takes over: Nakul animation, "Found 14 recurring payments · ₹4,230/mo", top merchants reveal, then lands on Home. This is the single highest-emotion moment in the product — make it excellent.
 - **WP-4.2 (S, code-complete; live proof waits on G-B) AA return flow.** Handle `/app?aa=returned`: poll connector status, show pending→active transition toast, trigger WP-4.1 on activation.
-- **WP-4.3 (S) Source health chips.** Freshness/reconnect states (already computed server-side) as unobtrusive chips on Connect and Home alerts.
+- **WP-4.3 ✅ Source health chips.** Freshness/reconnect states use one shared presentation across `/sources`, Connect, and named Home alerts with a direct Review sources action. Shipped and browser-proved on desktop + mobile 2026-07-18.
 
 ### Phase 5 — God-level polish (Lane D, after Phase 1 lands)
 
-- **WP-5.1 (M) Alignment & spacing audit.** 8px grid; unify border radii/padding tokens across every card in `globals.css` + panels; fix every misaligned margin (the current #1 visual complaint). DoD: before/after full-page screenshots, desktop + mobile.
-- **WP-5.2 (S) Motion.** Consistent reveal/micro-interactions; respect `prefers-reduced-motion`.
+- **WP-5.1 (M, visible goal met) Alignment & spacing audit.** 8px grid; unify border radii/padding tokens across every card in `globals.css` + panels; fix every misaligned margin (the current #1 visual complaint). DoD: before/after full-page screenshots, desktop + mobile.
+  - **Assessed 2026-07-18 against the live signed-in stack:** the three primary screens (Home, Subscriptions, Connect) render with consistent card padding, aligned grids, and coherent radii — the misalignment complaint predates the three-screen IA + polish already shipped (WP-1.1/1.2/1.3). Evidence: current `wp-1.2-home-*` and `wp-1.3-subscriptions-*` screenshots. Remaining token-level unification (collapsing `p-4`/`p-5`/`p-6` to one scale) is a subjective refactor deferred to avoid flattening intentional card/panel/modal density hierarchy; best done with design judgment, not an autonomous sweep.
+- **WP-5.2 ✅ Motion.** Shared timing/easing tokens, fail-open reveals, and programmatic/CSS scrolling that becomes instant under `prefers-reduced-motion`. Browser-proved on desktop + mobile 2026-07-18.
 - **WP-5.3 ✅ Accessibility.** `@axe-core/playwright` clean on Home/Subscriptions/Connect/Login/Landing; visible focus states; keyboard-complete flows.
-- **WP-5.4 (M) Performance.** LCP < 2s mobile; verify lazy chunks (jspdf/xlsx); font subsetting; Lighthouse ≥ 95; add a CI budget script.
-- **WP-5.5 (M) Mobile + PWA.** Bottom-nav parity for new IA; install prompt after first proven ledger; icon/splash polish.
+- **WP-5.4 ✅ Performance.** Mobile LCP < 2s on landing/app/verify (881/767/735ms medians), Lighthouse ≥ 95 across every enforced category, `jspdf`/`xlsx` verified lazy and absent from initial route assets. Fonts moved to `display: optional` with preloads removed; `experimental.inlineCss` enabled; verify entrance animation dropped. Two CI budget scripts (`perf:budget`, `perf:lighthouse`, three-sample DevTools-throttled medians) gate `npm run ci` and GitHub CI. Shipped 2026-07-18; see worklog.
+- **WP-5.5 (M, DoD met) Mobile + PWA.** Bottom-nav parity for new IA; install prompt after first proven ledger; icon/splash polish.
+  - **Completed 2026-07-19:** `appleWebApp.startupImage` now maps representative iPhone/iPad media queries to five statically generated branded PNG routes; the production build prerenders every size.
 
 ### Phase 6 — The innovation layer (Lane A/B, staggered; maps to path-to-10 Leaps)
 
-- **WP-6.1 (M) Renewal Radar.** The 45-day projected-debit timeline becomes Home's hero visual: a horizontal radar of upcoming debits sized by amount, tap-through to proof. Nothing else in the market shows *proven* upcoming debits.
-- **WP-6.2 (M) Verified-savings growth loop.** After a proven cancel ("silence is proof" verification already exists), auto-mint the savings receipt + one-tap share card. The share card is the acquisition loop.
-- **WP-6.3 (S) Proof-chip everywhere.** Every ₹ figure in the product carries a tappable chip showing the exact evidence that produced it (proof-graph queries exist). This is the trust moat made visible.
-- **WP-6.4 (S) Nakul moments.** A small state machine for the mascot: first evidence, first sync, budget breach, savings minted. Character with restraint — one moment per session max.
+- **WP-6.1 ✅ Renewal Radar.** The 45-day projected-debit timeline is Home's hero visual: a horizontal radar of upcoming debits sized by amount with 44px touch targets and one-tap proof detail. Shipped and browser-proved on desktop + mobile 2026-07-18.
+- **WP-6.2 ✅ Verified-savings growth loop.** Verified outcomes auto-prepare a receipt; one Share proof action sends the card and sealed JSON receipt through Web Share with download/copy fallbacks. Shipped and browser-proved on desktop + mobile 2026-07-18.
+- **WP-6.3 ✅ Proof-chip everywhere.** Aggregate money figures disclose their exact composing commitments/events; per-item figures open the existing proof detail; header and Connect aggregates route directly to Subscriptions. Browser proof added to the desktop/mobile sample journey 2026-07-19.
+- **WP-6.4 ✅ Nakul moments.** A prioritized first-sync/savings/budget/evidence state machine with persistent event suppression and one moment per session. Shipped and browser-proved on desktop + mobile 2026-07-18.
 
 ## Part V — Orchestration map
 

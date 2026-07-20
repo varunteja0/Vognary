@@ -110,6 +110,7 @@ test("privacy export includes held product data and excludes all credential mate
       email,
       preference: {
         enabled: true,
+        weeklyDigestEnabled: true,
         sevenDayEnabled: true,
         oneDayEnabled: true,
         timeZone: "Asia/Kolkata",
@@ -146,7 +147,9 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.workspaceState.state.statementSources[0].text.includes("NETFLIX"), true);
     assert.equal(document.productEvents.length, 1);
     assert.equal(document.renewalAlertPreferences.length, 1);
+    assert.equal(document.renewalAlertPreferences[0].weeklyDigestEnabled, true);
     assert.ok(document.renewalAlertDeliveries.length >= 1);
+    assert.ok(Array.isArray(document.weeklyDigestDeliveries));
     assert.equal(document.apiTokens.length, 1);
     assert.equal(document.apiTokens[0].tokenPrefix, platformToken.summary.tokenPrefix);
     assert.ok(Array.isArray(document.assistedAuditOrders));

@@ -8,6 +8,12 @@ test("installable workspace starts on the canonical production route", async () 
   assert.match(manifest, /start_url: "\/app"/);
   assert.match(manifest, /icon-maskable-512\.png/);
   assert.doesNotMatch(manifest, /demo/i);
+  const layout = await readFile(new URL("../src/app/layout.tsx", import.meta.url), "utf8");
+  const startupRoute = await readFile(new URL("../src/app/pwa/startup/[size]/route.tsx", import.meta.url), "utf8");
+  assert.match(layout, /appleWebApp/);
+  assert.match(layout, /apple-touch|startup\/1170x2532/);
+  assert.match(startupRoute, /allowedSizes/);
+  assert.match(startupRoute, /cache-control/);
 });
 
 test("service worker never caches financial navigation or APIs", async () => {

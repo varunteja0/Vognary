@@ -79,7 +79,7 @@ test("Setu activation fails closed until credentials and partner status are expl
 
 test("consent start sends bounded FIU credentials and only returns same-origin HTTPS approval URLs", async () => {
   await withSetuEnvironment(async () => {
-    let body: Record<string, unknown> | null = null;
+    let body: Record<string, unknown> = {};
     globalThis.fetch = (async (input, init) => {
       assert.equal(String(input), "https://fiu-sandbox.setu.co/consents");
       assert.equal(init?.method, "POST");
@@ -99,8 +99,8 @@ test("consent start sends bounded FIU credentials and only returns same-origin H
     const consent = await requestSetuConsent("9999999999@onemoney", "https://www.vognary.com/app?aa=returned");
     assert.equal(consent.consentId, "consent-test");
     assert.equal(consent.approvalUrl, "https://fiu-sandbox.setu.co/v2/consents/webview/consent-test");
-    assert.equal(body?.vua, "9999999999@onemoney");
-    assert.equal(body?.redirectUrl, "https://www.vognary.com/app?aa=returned");
+    assert.equal(body.vua, "9999999999@onemoney");
+    assert.equal(body.redirectUrl, "https://www.vognary.com/app?aa=returned");
     assert.equal("additionalParams" in (body ?? {}), false, "unconfigured Setu tags must not be invented");
 
     globalThis.fetch = (async () => json({

@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
-import { mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { evidencePath } from "./evidence";
+import { resetDevelopmentWorkspace } from "./workspace-reset";
 
 /**
  * Signed-in first-value harness — the agent-facing proof that the core loop
@@ -34,9 +35,9 @@ test.skip(!email || !accessCode, "development login env not configured");
 
 test("guest paste produces first value, survives sign-in, and watches persist", async ({ page }, testInfo) => {
   test.setTimeout(120_000);
-  mkdirSync("docs/evidence/surface-10", { recursive: true });
   const surface = testInfo.project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   await page.setExtraHTTPHeaders({ "x-forwarded-for": `vognary-e2e-${testInfo.project.name}-${Date.now()}` });
+  await resetDevelopmentWorkspace(page, email!, accessCode!, `first-value-${surface}`);
 
   // 1. Guest paste with month-name dates (the format real receipts use).
   await page.goto("/app");
@@ -59,8 +60,12 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await page.waitForURL(/\/app/, { timeout: 30_000 });
   await hydrated;
   await page.waitForTimeout(500);
-  await expect(page.getByText(/2 commitments carried into your encrypted workspace/i)).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("button", { name: "Dismiss" }).click();
+  const transferNotice = page.getByRole("status").filter({
+    hasText: /2 commitments carried into your encrypted workspace|Guest audit saved to this encrypted workspace/i,
+  });
+  if (await transferNotice.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await transferNotice.getByRole("button", { name: "Dismiss" }).click();
+  }
 
   // 3. Home is the five-second answer and the workspace has only three
   //    primary destinations. Budgets must persist through encrypted sync.
@@ -73,6 +78,8 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   for (const card of ["Monthly burn", "Renews next", "Due in 30 days", "Do this first"]) {
     await expect(home.getByText(card, { exact: true }).first()).toBeVisible();
   }
+  const monthlyBurnCard = home.getByRole("button").filter({ hasText: "Monthly burn" });
+  await expect(monthlyBurnCard.getByText(/No comparison yet|since last review/i)).toBeVisible();
   await expect(home.getByLabel(/Monthly budget/)).toBeVisible();
   await page.evaluate(() => {
     const event = new Event("beforeinstallprompt", { cancelable: true });
@@ -98,9 +105,52 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await savedBudgets;
   await expect(page.getByText(/over budget/i).first()).toBeVisible();
   await expect(home.getByText("Suggested cuts", { exact: true })).toBeVisible();
+
+  // WP-6.3 — an aggregate ₹ figure (a sum with no single detail sheet) carries
+  //   its own proof chip that reveals the exact evidence rows composing it.
+  // The Renewal Radar also carries a "Due in 30 days" mini-stat; the OverviewPanel
+  //   card is the one that also shows "Needs review", so pin it by both texts.
+  const dueCard = home.locator(".inset").filter({ hasText: "Due in 30 days" }).filter({ hasText: "Needs review" });
+  // Name toggles "Proof" -> "Hide proof" when open (visible text is the accessible
+  //   name, satisfying Label-in-Name), so match case-insensitively.
+  const proofChip = dueCard.getByRole("button", { name: /proof/i });
+  await expect(proofChip).toHaveAttribute("aria-expanded", "false");
+  await proofChip.click();
+  await expect(proofChip).toHaveAttribute("aria-expanded", "true");
+  const proofRegion = dueCard.getByRole("list");
+  await expect(proofRegion).toBeVisible();
+  await expect(proofRegion.getByText(/Netflix|Spotify|No projected debits/).first()).toBeVisible();
+  await positionForScreenshot(page, dueCard);
+  await page.screenshot({ path: evidencePath(`wp-6.3-proof-chip-${surface}.png`), fullPage: false, animations: "disabled" });
+  await proofChip.click();
+  await expect(proofChip).toHaveAttribute("aria-expanded", "false");
+
+  // WP-6.1 — the Renewal Radar is Home's hero: proven upcoming debits as bars.
+  const radar = page.locator('section[aria-labelledby="renewal-radar-heading"]');
+  await expect(radar).toBeVisible();
+  await expect(radar.getByRole("heading", { name: /proven debit/i })).toBeVisible();
   await expectAxeClean(page, "Home");
   await positionForScreenshot(page, home);
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-1.2-home-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-1.2-home-${surface}.png`), fullPage: false, animations: "disabled" });
+  await positionForScreenshot(page, monthlyBurnCard);
+  await page.screenshot({ path: evidencePath(`wp-1.2-home-trend-${surface}.png`), fullPage: false, animations: "disabled" });
+  await positionForScreenshot(page, radar);
+  await page.screenshot({ path: evidencePath(`wp-6.1-radar-${surface}.png`), fullPage: false, animations: "disabled" });
+
+  // WP-1.3 + WP-6.1 — tapping a radar bar opens the detail sheet in place
+  //   (proof + a decision control), records an action, and closes on Escape.
+  await radar.getByRole("button", { name: /renews/i }).first().click();
+  const detailSheet = page.getByRole("dialog").filter({ hasText: "Proof · where this came from" });
+  await expect(detailSheet).toBeVisible();
+  await expect(detailSheet.getByRole("group", { name: /Choose an action/ })).toBeVisible();
+  await expectAxeClean(page, "Detail sheet");
+  await positionForScreenshot(page, detailSheet);
+  await page.screenshot({ path: evidencePath(`wp-1.3-detail-${surface}.png`), fullPage: false, animations: "disabled" });
+  const monitorAction = detailSheet.getByRole("button", { name: "Monitor", exact: true });
+  await monitorAction.click();
+  await expect(monitorAction).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await expect(detailSheet).toHaveCount(0);
 
   await workspaceNav.getByText("Subscriptions", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Your subscriptions" })).toBeVisible();
@@ -108,7 +158,7 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(page.getByText("Category over budget", { exact: true }).first()).toBeVisible();
   await expectAxeClean(page, "Subscriptions");
   await positionForScreenshot(page, page.locator("#recurring-ledger"));
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-1.3-subscriptions-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-1.3-subscriptions-${surface}.png`), fullPage: false, animations: "disabled" });
 
   await workspaceNav.getByText("Connect", { exact: true }).click();
 
@@ -119,7 +169,7 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(panel.getByPlaceholder(/key/i)).toHaveCount(0);
   await expectAxeClean(page, "Connect");
   await positionForScreenshot(page, panel);
-  await page.screenshot({ path: `docs/evidence/surface-10/wp-1.1-connect-${surface}.png`, fullPage: false, animations: "disabled" });
+  await page.screenshot({ path: evidencePath(`wp-1.1-connect-${surface}.png`), fullPage: false, animations: "disabled" });
 
   // 5. Watch a merchant; the watch must survive a reload once the debounced
   //    encrypted workspace sync flushes.

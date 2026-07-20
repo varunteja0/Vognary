@@ -141,3 +141,66 @@ test("parses real-world receipts that write dates with month names", () => {
     ["Google One", 130, "2026-08-01"],
   ]);
 });
+
+test("categorizes real-world Indian streaming receipts without the Jio telecom collision", () => {
+  const candidates = extractReceiptCandidates([
+    "JioHotstar subscription of Rs. 299 charged on 2026-07-10. Renews monthly.",
+    "Hotstar Super plan ₹499 charged on 2026-07-05. Renews yearly.",
+    "Amazon Prime Membership ₹1,499 paid on 2026-07-01. Renews yearly.",
+    "Prime Video Channel ₹299 charged on 2026-07-02. Renews monthly.",
+    "Jio postpaid recharge ₹399 charged on 2026-07-03. Renews monthly.",
+  ]);
+  // JioHotstar contains the "Jio" telecom substring; it must still land in
+  // Streaming, while bare Jio stays a telecom Utility.
+  assert.deepEqual(
+    candidates.map((candidate) => [candidate.merchant, candidate.category]),
+    [
+      ["JioHotstar", "Streaming"],
+      ["Hotstar", "Streaming"],
+      ["Amazon Prime", "Streaming"],
+      ["Prime Video", "Streaming"],
+      ["Jio", "Utilities"],
+    ],
+  );
+});
+
+test("parses a spread of real subscription, telecom, and insurance formats", () => {
+  const candidates = extractReceiptCandidates([
+    "LIC premium of Rs. 12,000 paid on 2026-07-01. Policy renews yearly.",
+    "Apple\nReceipt\niCloud+ 50GB subscription ₹75.00\nRenews monthly on 15 Aug 2026",
+    "Anthropic invoice paid USD 20 on 2026-07-04. Claude Pro renews monthly.",
+    "GitHub receipt: USD 4 charged on 2026-07-05. Copilot renews monthly.",
+    "Adobe Creative Cloud subscription ₹1,675 charged on 2026-07-06. Renews monthly.",
+    "Airtel postpaid bill ₹499 charged on 2026-07-07. Renews monthly.",
+  ]);
+  assert.deepEqual(
+    candidates.map((candidate) => [
+      candidate.merchant,
+      candidate.currency,
+      candidate.amount,
+      candidate.frequency,
+      candidate.category,
+      candidate.nextExpectedDate,
+    ]),
+    [
+      ["LIC", "INR", 12000, "yearly", "Insurance", "2027-07-01"],
+      ["Apple", "INR", 75, "monthly", "App store", "2026-08-15"],
+      ["Anthropic", "USD", 20, "monthly", "AI tools", "2026-08-04"],
+      ["GitHub", "USD", 4, "monthly", "Developer tools", "2026-08-05"],
+      ["Adobe", "INR", 1675, "monthly", "Creative tools", "2026-08-06"],
+      ["Airtel", "INR", 499, "monthly", "Utilities", "2026-08-07"],
+    ],
+  );
+});
+
+test("conservatively rejects receipts without provable recurrence", () => {
+  // A bare telecom bill with no cadence and no recurring semantics is not proof
+  // of a subscription; importing it would fabricate a recurring commitment.
+  assert.deepEqual(extractReceiptCandidates(["Airtel bill ₹499 due on 2026-08-05."]), []);
+  // Loan EMIs are protected commitments; the parser does not mint them from
+  // pre-debit text — no merchant pattern matches a bank-loan descriptor.
+  assert.deepEqual(
+    extractReceiptCandidates(["Your EMI of Rs. 4,500 for HDFC personal loan will be debited on 2026-08-05."]),
+    [],
+  );
+});

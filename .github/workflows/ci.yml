@@ -38,7 +38,10 @@ jobs:
       - run: npm test
       - run: npm run corpus
       - run: npm run build
+      - run: npm run perf:budget
       - run: npx playwright install --with-deps chromium
+      - name: Enforce Lighthouse budgets
+        run: CHROME_PATH="$(node -e "console.log(require('@playwright/test').chromium.executablePath())")" npm run perf:lighthouse
       - run: npm run test:e2e
       - name: Start production server
         run: |

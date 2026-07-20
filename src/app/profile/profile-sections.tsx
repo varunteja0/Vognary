@@ -85,7 +85,12 @@ export function NotificationsSection({ settings }: { settings: Settings }) {
     <ProfileGroup name="Notifications" description="Evidence-based renewal reminders">
       {alerts ? (
         <>
-          <p className="text-sm leading-6 text-(--muted)">Reminders are off by default. Enabling them records purpose-specific consent; disabling them stops future delivery.</p>
+          <p className="text-sm leading-6 text-(--muted)">Reminders and the weekly digest are off by default. Each is an explicit choice under one revocable notification consent.</p>
+          <div className="inset mt-4 p-4">
+            <CheckBox label="Weekly recurring-money digest" checked={alerts.weeklyDigestEnabled} disabled={settings.renewalAlertBusy} onChange={(checked) => settings.setRenewalAlerts({ ...alerts, weeklyDigestEnabled: checked })} />
+            <p className="mt-2 text-xs leading-5 text-(--muted)">Sent on Monday at your local send hour only when the ledger contains commitments: monthly INR burn, foreign currencies kept separate, renewals due in seven days, and one deterministic review suggestion.</p>
+          </div>
+          <p className="mt-4 text-sm font-semibold text-(--ink)">Renewal reminders</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <CheckBox label="7 days before" checked={alerts.sevenDayEnabled} disabled={settings.renewalAlertBusy} onChange={(checked) => settings.setRenewalAlerts({ ...alerts, sevenDayEnabled: checked })} />
             <CheckBox label="1 day before" checked={alerts.oneDayEnabled} disabled={settings.renewalAlertBusy} onChange={(checked) => settings.setRenewalAlerts({ ...alerts, oneDayEnabled: checked })} />
@@ -101,7 +106,7 @@ export function NotificationsSection({ settings }: { settings: Settings }) {
             </label>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className={alerts.enabled ? "pill pill-ready" : "pill pill-planned"}>{alerts.enabled ? "Enabled" : "Off"}</span>
+            <span className={alerts.enabled || alerts.weeklyDigestEnabled ? "pill pill-ready" : "pill pill-planned"}>{alerts.enabled || alerts.weeklyDigestEnabled ? "Notifications on" : "All off"}</span>
             <button
               type="button"
               disabled={settings.renewalAlertBusy || (!alerts.enabled && !alerts.sevenDayEnabled && !alerts.oneDayEnabled)}
@@ -110,7 +115,7 @@ export function NotificationsSection({ settings }: { settings: Settings }) {
             >
               {alerts.enabled ? "Turn off" : "Enable reminders"}
             </button>
-            {alerts.enabled ? <button type="button" disabled={settings.renewalAlertBusy} onClick={() => settings.saveRenewalAlerts(alerts)} className="btn btn-ghost disabled:opacity-50">Save schedule</button> : null}
+            <button type="button" disabled={settings.renewalAlertBusy} onClick={() => settings.saveRenewalAlerts(alerts)} className="btn btn-ghost disabled:opacity-50">Save notification settings</button>
           </div>
         </>
       ) : <p className="text-sm text-(--muted)">Reminder controls are not available until the server confirms this capability.</p>}

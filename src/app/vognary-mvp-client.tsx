@@ -1,6 +1,7 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
+import { scrollIntoViewWithMotion } from "@/lib/client-motion";
 import { encodeCsvCell } from "@/lib/csv";
 import { connectors, type Connector, type ConnectorStatus } from "@/lib/connectors";
 import {
@@ -25,6 +26,7 @@ import {
 } from "@/lib/recurring-audit";
 import { findActionableCancelAction, findCancelAction, manageUrlHostname } from "@/lib/cancel-actions";
 import { receiptTextToManualInputs, type ReceiptCandidate } from "@/lib/receipt-parser";
+import { isSampleReceiptText, sampleReceiptText } from "@/lib/sample-audit";
 import { buildRenewalTimeline, type RenewalTimeline } from "@/lib/renewal-timeline";
 import { buildProofGraphSummary, type ProofGraphSummary } from "@/lib/proof-graph";
 import type { CitedProofAnswer } from "@/lib/proof-questions";
@@ -40,6 +42,8 @@ import { redactText } from "@/lib/redaction";
 import { buildSavingsCardSvg } from "@/lib/savings-card";
 import { buildSavingsReceipt, buildSavingsShareText } from "@/lib/savings-receipt";
 import { rankSuggestedCuts } from "@/lib/suggested-cuts";
+import { nakulMomentSeenPrefix, nakulMomentSessionKey, selectNakulMoment, type NakulMoment, type NakulMomentId } from "@/lib/nakul-moments";
+import { sourceDisplayName, sourceHealthPresentation, sourceNeedsAttention } from "@/lib/source-health-presentation";
 import { getCommitmentPolicy, isCommitmentActionAllowed, type CommitmentAction } from "@/lib/commitment-policy";
 import { resolveCommitmentDecisionIdentityKey } from "@/lib/commitment-decisions";
 import { buildConnectorCoverageWindows, connectorEvidenceSourceName } from "@/lib/connector-source-identity";
@@ -220,6 +224,7 @@ type ServerRecurringItem = {
 type ServerSourceHealth = {
   connectedAccountId: string;
   connectorId: string;
+  displayName?: string | null;
   status: string;
   freshnessStatus: "unknown" | "fresh" | "stale" | "error" | null;
   coverageStartAt: string | null;
@@ -457,6 +462,7 @@ export default function VognaryMvpClient() {
   const [statementSources, setStatementSources] = useState<StatementFile[]>([]);
   const [manualItems, setManualItems] = useState<ManualRecurringInput[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [detailItemId, setDetailItemId] = useState<string | null>(null);
   const [userActions, setUserActions] = useState<Record<string, RecommendationType>>({});
   const [actionsMeta, setActionsMeta] = useState<Record<string, ActionMeta>>({});
   const [mergeDecisions, setMergeDecisions] = useState<Record<string, MergeDecision>>({});
@@ -498,10 +504,12 @@ export default function VognaryMvpClient() {
   const [proofQuestionBusy, setProofQuestionBusy] = useState(false);
   const [disconnectedConnectorIds, setDisconnectedConnectorIds] = useState<string[]>([]);
   const [mobileSection, setMobileSection] = useState<WorkspaceSectionId>("overview");
+  const [emptyOnboardingChoice, setEmptyOnboardingChoice] = useState<"connect" | "paste" | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [installPromptAvailable, setInstallPromptAvailable] = useState(false);
   const [connectorReturn, setConnectorReturn] = useState<{ label: string; connectorId: string } | null>(null);
   const [syncCelebration, setSyncCelebration] = useState<SyncCelebration | null>(null);
+  const [nakulMoment, setNakulMoment] = useState<NakulMoment | null>(null);
   const activationEventSent = useRef(false);
   const ledgerViewEventSent = useRef(false);
   const serverRevisionRef = useRef<number | null>(null);
@@ -511,6 +519,7 @@ export default function VognaryMvpClient() {
   const guestTransferImportedRef = useRef(false);
   const guestTransferPendingSyncRef = useRef(false);
   const guestTransferSnapshotRef = useRef<GuestAuditSnapshot | null>(null);
+  const emptyOnboardingRoutedRef = useRef(false);
   const serverSaveRetryCountRef = useRef(0);
   const serverSaveRetryTimerRef = useRef<number | null>(null);
   const latestWorkspaceStateRef = useRef<HydrationWorkspaceState | null>(null);
@@ -672,12 +681,36 @@ export default function VognaryMvpClient() {
     () => buildVerifiedSavings(audit.recurringItems, actionsMeta, { coverageWindows: verifiedCoverageWindows }),
     [actionsMeta, audit.recurringItems, verifiedCoverageWindows],
   );
+  const savingsReceipt = useMemo(() => buildSavingsReceipt(verifiedSavings), [verifiedSavings]);
   const selectedItem = audit.recurringItems.find((item) => item.identityKey === selectedItemId) ?? audit.recurringItems[0] ?? null;
+  const detailItem = detailItemId ? audit.recurringItems.find((item) => item.identityKey === detailItemId) ?? null : null;
   const selectedServerRecurringItemId = selectedItem ? resolveServerCommitmentId(selectedItem, serverCommitments) : null;
   const selectedActionCase = selectedServerRecurringItemId
     ? serverActionCases.find((entry) => entry.recurringItemId === selectedServerRecurringItemId && !["withdrawn", "failed"].includes(entry.status)) ?? null
     : null;
   const hasRealData = allStatementSources.length > 0 || allManualItems.length > 0 || receiptText.trim().length > 0;
+  useEffect(() => {
+    if (!serverSession?.authenticated || !serverWorkspaceHydrated || hasRealData || emptyOnboardingRoutedRef.current) return;
+    emptyOnboardingRoutedRef.current = true;
+    if (window.location.hash) return;
+    const url = new URL(window.location.href);
+    url.hash = "connect";
+    window.history.replaceState(null, "", url);
+    queueMicrotask(() => setMobileSection("connect"));
+  }, [hasRealData, serverSession?.authenticated, serverWorkspaceHydrated]);
+  // WP-2.2 — a sample workspace is one whose only evidence is the shared demo
+  // text (no real statements or manual items). Content-derived, so the banner
+  // survives reload without a persisted flag.
+  const sampleWorkspace = allStatementSources.length === 0 && allManualItems.length === 0 && isSampleReceiptText(receiptText);
+  const seedSampleWorkspace = () => {
+    setReceiptText(sampleReceiptText);
+    setNotice("Sample audit loaded — eight example subscriptions. This is demo data, not yours; clear it anytime.");
+  };
+  const clearSampleWorkspace = () => {
+    setReceiptText("");
+    setEmptyOnboardingChoice(null);
+    setNotice("Sample audit cleared. Add your own evidence to build a real ledger.");
+  };
   const coverageSignals = useMemo(
     () => getCoverageSignals(allStatementSources, allManualItems, receiptText),
     [allStatementSources, allManualItems, receiptText],
@@ -688,6 +721,22 @@ export default function VognaryMvpClient() {
     if (!lastReview) return null;
     return diffReviews(lastReview, buildReviewSnapshot(audit, userActions, coverageScore));
   }, [lastReview, audit, userActions, coverageScore]);
+  useEffect(() => {
+    if (typeof window === "undefined" || window.sessionStorage.getItem(nakulMomentSessionKey)) return;
+    if (serverSession?.authenticated && !serverConnectors) return;
+    const ids: NakulMomentId[] = ["first-sync", "savings-minted", "budget-breach", "first-evidence"];
+    const seen = new Set(ids.filter((id) => window.localStorage.getItem(`${nakulMomentSeenPrefix}${id}`) === "1"));
+    const moment = selectNakulMoment({
+      firstSync: Boolean(syncCelebration || (connectorReturn && syncedRecurringItems.length)),
+      savingsMinted: verifiedSavings.verifiedAnnual > 0,
+      budgetBreach: monthlyBudget !== null && audit.summary.monthlyRecurringSpend > monthlyBudget,
+      firstEvidence: audit.summary.recurringCount > 0,
+    }, seen);
+    if (!moment) return;
+    window.sessionStorage.setItem(nakulMomentSessionKey, moment.id);
+    window.localStorage.setItem(`${nakulMomentSeenPrefix}${moment.id}`, "1");
+    if (moment.id !== "first-sync") queueMicrotask(() => setNakulMoment(moment));
+  }, [audit.summary.monthlyRecurringSpend, audit.summary.recurringCount, connectorReturn, monthlyBudget, serverConnectors, serverSession?.authenticated, syncCelebration, syncedRecurringItems.length, verifiedSavings.verifiedAnnual]);
   const connectedConnectorIds = useMemo(() => {
     return resolveConnectedConnectorIds(
       connectorStartResults,
@@ -1121,7 +1170,7 @@ export default function VognaryMvpClient() {
     const url = new URL(window.location.href);
     url.hash = id;
     window.history.replaceState(null, "", url);
-    window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    window.setTimeout(() => scrollIntoViewWithMotion(document.getElementById(id), { block: "start" }), 0);
   }
 
   async function requestPwaInstall() {
@@ -1198,7 +1247,16 @@ export default function VognaryMvpClient() {
       ledgerViewEventSent.current = true;
       void trackProductEvent("ledger.viewed", { commitmentsTouched: audit.recurringItems.length });
     }
-    window.setTimeout(() => document.getElementById("recurring-ledger")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    window.setTimeout(() => scrollIntoViewWithMotion(document.getElementById("recurring-ledger"), { block: "start" }), 0);
+  }
+
+  // Tapping any subscription/renewal/priority card opens the detail sheet in
+  // place (proof + history + Keep/Watch/Cancel) without leaving the current
+  // screen. selectedItemId stays in sync so the inline deep-dive and the
+  // assisted-cancel flow reference the same item when the sheet is dismissed.
+  function openDetail(itemId: string) {
+    setSelectedItemId(itemId);
+    setDetailItemId(itemId);
   }
 
   // Record the action AND when it was decided — the Verified Savings engine
@@ -1474,31 +1532,13 @@ export default function VognaryMvpClient() {
 
   // Verified Savings receipts — the shareable, checkable proof artifact.
   async function mintSavingsReceipt() {
-    const receipt = buildSavingsReceipt(verifiedSavings);
+    const receipt = savingsReceipt;
     if (!receipt) {
       setNotice("No verified savings to mint yet. Mark a cancel or downgrade, then let the next expected debits pass clean inside covered evidence.");
       return;
     }
     try {
-      const { sealed, chain } = await sealAuditPack(receipt as unknown as Record<string, unknown>, loadPackChain());
-      let downloadable = sealed;
-      let issuerSigned = false;
-      if (serverSession?.authenticated && serverSession.session?.workspaceId) {
-        try {
-          const response = await fetch("/api/audit-packs/sign", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ integrity: sealed.integrity }),
-          });
-          const payload = await response.json().catch(() => ({})) as { issuerSignature?: unknown };
-          if (response.ok && isPackIssuerSignature(payload.issuerSignature)) {
-            downloadable = attachIssuerSignature(sealed, payload.issuerSignature);
-            issuerSigned = true;
-          }
-        } catch {
-          // Offline checksum receipts remain useful without the issuer signature.
-        }
-      }
+      const { downloadable, chain, issuerSigned } = await prepareSealedSavingsReceipt(receipt);
       savePackChain(chain);
       triggerBlobDownload(
         new Blob([JSON.stringify(downloadable, null, 2)], { type: "application/json" }),
@@ -1514,13 +1554,112 @@ export default function VognaryMvpClient() {
   }
 
   async function downloadSavingsCard() {
-    const receipt = buildSavingsReceipt(verifiedSavings);
+    const receipt = savingsReceipt;
     if (!receipt) {
       setNotice("The share card unlocks with your first verified saving — a cancel proven clean across its expected debits.");
       return;
     }
-    const svg = buildSavingsCardSvg(receipt);
-    const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    try {
+      const card = await renderSavingsCard(receipt);
+      triggerBlobDownload(card.blob, card.fileName);
+      setNotice(`Share card downloaded as ${card.fileName.endsWith(".png") ? "PNG" : "SVG"}. The number on it comes from the verified receipt.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not render the savings share card.");
+    }
+  }
+
+  async function copySavingsShareText() {
+    const receipt = savingsReceipt;
+    if (!receipt) {
+      setNotice("Share text unlocks with your first verified saving.");
+      return;
+    }
+    const text = buildSavingsShareText(receipt);
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice("Share text copied. Post it with the card; the receipt backs the number.");
+    } catch {
+      setNotice(text);
+    }
+  }
+
+  async function shareSavingsProof() {
+    const receipt = savingsReceipt;
+    if (!receipt) {
+      setNotice("Sharing unlocks with your first verified saving.");
+      return;
+    }
+
+    try {
+      const [{ downloadable, chain, issuerSigned }, card] = await Promise.all([
+        prepareSealedSavingsReceipt(receipt),
+        renderSavingsCard(receipt),
+      ]);
+      const receiptFile = new File(
+        [JSON.stringify(downloadable, null, 2)],
+        `vognary-savings-receipt-${chain.chainIndex}.json`,
+        { type: "application/json" },
+      );
+      const cardFile = new File([card.blob], card.fileName, { type: card.blob.type });
+      const text = buildSavingsShareText(receipt);
+      const files = [cardFile, receiptFile];
+      const canShareFiles = typeof navigator.share === "function"
+        && (typeof navigator.canShare !== "function" || navigator.canShare({ files }));
+
+      if (canShareFiles) {
+        try {
+          await navigator.share({ title: "Vognary verified savings", text, files });
+          savePackChain(chain);
+          if (serverSession?.authenticated) void trackProductEvent("export.created", { commitmentsTouched: receipt.verifiedCount });
+          setNotice(`Savings proof shared with the card and ${issuerSigned ? "issuer-signed" : "self-checksummed"} receipt.`);
+          return;
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            setNotice("Sharing cancelled. Your verified savings remain ready.");
+            return;
+          }
+        }
+      }
+
+      savePackChain(chain);
+      triggerBlobDownload(card.blob, card.fileName);
+      triggerBlobDownload(receiptFile, receiptFile.name);
+      try {
+        await navigator.clipboard.writeText(text);
+        setNotice("This browser cannot share files directly, so the card and receipt were downloaded and the verified share text was copied.");
+      } catch {
+        setNotice("This browser cannot share files directly, so the card and receipt were downloaded. Use the receipt to back the number on the card.");
+      }
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not prepare the savings proof for sharing.");
+    }
+  }
+
+  async function prepareSealedSavingsReceipt(receipt: NonNullable<typeof savingsReceipt>) {
+    const { sealed, chain } = await sealAuditPack(receipt as unknown as Record<string, unknown>, loadPackChain());
+    let downloadable = sealed;
+    let issuerSigned = false;
+    if (serverSession?.authenticated && serverSession.session?.workspaceId) {
+      try {
+        const response = await fetch("/api/audit-packs/sign", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ integrity: sealed.integrity }),
+        });
+        const payload = await response.json().catch(() => ({})) as { issuerSignature?: unknown };
+        if (response.ok && isPackIssuerSignature(payload.issuerSignature)) {
+          downloadable = attachIssuerSignature(sealed, payload.issuerSignature);
+          issuerSigned = true;
+        }
+      } catch {
+        // Offline checksum receipts remain useful without the issuer signature.
+      }
+    }
+    return { downloadable, chain, issuerSigned };
+  }
+
+  async function renderSavingsCard(receipt: NonNullable<typeof savingsReceipt>) {
+    const svgBlob = new Blob([buildSavingsCardSvg(receipt)], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(svgBlob);
     try {
       const image = new Image();
@@ -1537,28 +1676,11 @@ export default function VognaryMvpClient() {
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
       const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
       if (!pngBlob) throw new Error("PNG encoding failed");
-      triggerBlobDownload(pngBlob, "vognary-savings-card.png");
-      setNotice("Share card downloaded as PNG. The number on it comes from the sealed receipt, so anyone can check it.");
+      return { blob: pngBlob, fileName: "vognary-savings-card.png" };
     } catch {
-      triggerBlobDownload(svgBlob, "vognary-savings-card.svg");
-      setNotice("Share card downloaded as SVG (this browser could not rasterize a PNG).");
+      return { blob: svgBlob, fileName: "vognary-savings-card.svg" };
     } finally {
       URL.revokeObjectURL(url);
-    }
-  }
-
-  async function copySavingsShareText() {
-    const receipt = buildSavingsReceipt(verifiedSavings);
-    if (!receipt) {
-      setNotice("Share text unlocks with your first verified saving.");
-      return;
-    }
-    const text = buildSavingsShareText(receipt);
-    try {
-      await navigator.clipboard.writeText(text);
-      setNotice("Share text copied. Post it with the card; the receipt backs the number.");
-    } catch {
-      setNotice(text);
     }
   }
 
@@ -2179,6 +2301,19 @@ export default function VognaryMvpClient() {
           </section>
         </div>
       ) : null}
+      {detailItem ? (
+        <SubscriptionDetailSheet
+          item={detailItem}
+          action={userActions[detailItem.identityKey] ?? detailItem.recommendationType}
+          onAction={(action) => recordAction(detailItem.identityKey, action)}
+          onOpenFullReview={() => {
+            const target = detailItem.identityKey;
+            setDetailItemId(null);
+            selectAndReviewItem(target);
+          }}
+          onClose={() => setDetailItemId(null)}
+        />
+      ) : null}
       {confirmState ? (
         <ConfirmDialog
           request={confirmState}
@@ -2202,10 +2337,10 @@ export default function VognaryMvpClient() {
             </a>
             <div className="hidden h-8 w-px bg-(--dossier-line) lg:block" />
             <div className="hidden flex-1 flex-wrap items-center gap-x-6 gap-y-2 lg:flex">
-              <TickerStat label={`Monthly · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)} tone="ember" />
-              <TickerStat label={`Yearly · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.annualRecurringSpend, audit.summary.primaryCurrency)} tone="paper" />
-              <TickerStat label={`Review · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)} tone="ochre" />
-              <TickerStat label="Renewals in 10d" value={`${audit.summary.renewalsNextTenDays}`} tone="paper" />
+              <TickerStat label={`Monthly · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)} tone="ember" onClick={() => navigateToSection("ledger")} />
+              <TickerStat label={`Yearly · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.annualRecurringSpend, audit.summary.primaryCurrency)} tone="paper" onClick={() => navigateToSection("ledger")} />
+              <TickerStat label={`Review · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)} tone="ochre" onClick={() => navigateToSection("ledger")} />
+              <TickerStat label="Renewals in 10d" value={`${audit.summary.renewalsNextTenDays}`} tone="paper" onClick={() => navigateToSection("ledger")} />
             </div>
             <div className="flex items-center gap-2 ml-auto">
               {serverSession?.authenticated ? (
@@ -2247,10 +2382,18 @@ export default function VognaryMvpClient() {
             <WorkspaceNav activeId={workspaceNavSection} onSelect={navigateToSection} showMore={hasRealData} />
           </div>
         </div>
+        {nakulMoment ? <NakulMomentPanel moment={nakulMoment} onDismiss={() => setNakulMoment(null)} /> : null}
+        {sampleWorkspace ? (
+          <div role="status" className="flex flex-col gap-2 rounded-xl border border-(--gold-line) bg-(--gold-tint) p-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm leading-6 text-(--ink)"><span className="font-semibold">Sample data.</span> These eight subscriptions are a demo, not your evidence — explore freely, then clear anytime.</p>
+            <button type="button" onClick={clearSampleWorkspace} className="btn btn-ghost h-9 shrink-0 px-3 text-xs">Clear sample</button>
+          </div>
+        ) : null}
 
         {/* 00 · Overview — the five-second answer */}
         <section id="overview" aria-labelledby="overview-heading" className={`${mobileSection === "overview" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
           <StageHeader id="overview-heading" folio="01" title="Home" note="Monthly burn, next renewal, one action." />
+          {audit.recurringItems.length ? <RenewalRadar timeline={renewalTimeline} onSelect={openDetail} onOpenSubscriptions={() => selectAndReviewItem()} /> : null}
           <OverviewPanel
             audit={audit}
             timeline={renewalTimeline}
@@ -2259,11 +2402,13 @@ export default function VognaryMvpClient() {
             priorityItems={priorityItems}
             userActions={userActions}
             hasRealData={hasRealData}
+            reviewDiff={reviewDiff}
             monthlyBudget={monthlyBudget}
             categoryBudgets={categoryBudgets}
             sourceHealth={serverConnectors?.sourceHealth ?? []}
-            onSelect={(key) => selectAndReviewItem(key)}
+            onSelect={openDetail}
             onOpenSubscriptions={() => selectAndReviewItem()}
+            onOpenConnect={() => navigateToSection("connect")}
             onMonthlyBudgetChange={setMonthlyBudget}
             onCategoryBudgetChange={(category, value) => {
               setCategoryBudgets((current) => {
@@ -2306,7 +2451,18 @@ export default function VognaryMvpClient() {
         {/* 01 · Connect evidence */}
         <section id="connect" aria-labelledby="connect-heading" className={`${mobileSection === "connect" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
           <StageHeader id="connect-heading" folio="03" title="Connect" note="Add fresh evidence with revocable access." />
-          <IntegrationCommandCenter
+          {!hasRealData && emptyOnboardingChoice === null ? (
+            <EmptyWorkspaceOnboarding
+              onConnectGmail={() => {
+                setEmptyOnboardingChoice("connect");
+                const gmail = connectors.find((connector) => connector.id === "gmail-readonly");
+                if (gmail) void startConnector(gmail);
+              }}
+              onPasteReceipts={() => setEmptyOnboardingChoice("paste")}
+              onSeedSample={seedSampleWorkspace}
+            />
+          ) : null}
+          {hasRealData || emptyOnboardingChoice === "connect" ? <IntegrationCommandCenter
             audit={audit}
             connectorStartResults={connectorStartResults}
             connectingConnectorId={connectingConnectorId}
@@ -2326,25 +2482,19 @@ export default function VognaryMvpClient() {
             onJumpToLedger={() => selectAndReviewItem()}
             onExportReport={exportReport}
             onClearWorkspace={requestClearWorkspace}
-          />
-          <FirstSuccessPanel
-            audit={audit}
-            coverageScore={coverageScore}
-            hasRealData={hasRealData}
-            localSaveEnabled={localSaveEnabled}
+          /> : null}
+          {hasRealData || emptyOnboardingChoice === "paste" ? <ReceiptPastePanel
             receiptText={receiptText}
-            signedIn={Boolean(serverSession?.authenticated)}
-            onExportReport={exportReport}
-            onJumpToLedger={() => selectAndReviewItem()}
             onReceiptTextChange={setReceiptText}
-            onSaveLocal={enableLocalSave}
-          />
-          <GuidedCapturePanel
+            autoFocus={!hasRealData && emptyOnboardingChoice === "paste"}
+            onBack={!hasRealData ? () => setEmptyOnboardingChoice(null) : undefined}
+          /> : null}
+          {hasRealData || emptyOnboardingChoice === "paste" ? <GuidedCapturePanel
             onAdd={(items) => {
               setManualItems((current) => [...current, ...items]);
               setNotice(`Added ${items.length} user-confirmed item(s) from the guided capture. They now appear in the ledger and renewal calendar.`);
             }}
-          />
+          /> : null}
         </section>
 
         {/* 02 · Recurring ledger */}
@@ -2357,23 +2507,47 @@ export default function VognaryMvpClient() {
             </section>
           ) : <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-reveal>
-            <Metric label={`Monthly recurring · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)} tone="ink" />
-            <Metric label={`Yearly total · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.annualRecurringSpend, audit.summary.primaryCurrency)} tone="blue" />
-            <Metric label={`Needs review · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)} tone="caution" />
-            <Metric label="Renewing in 10 days" value={`${audit.summary.renewalsNextTenDays}`} tone="accent" />
+            <Metric
+              label={`Monthly recurring · ${audit.summary.primaryCurrency}`}
+              value={formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)}
+              tone="ink"
+              proofEntries={audit.recurringItems.filter((item) => item.currency === audit.summary.primaryCurrency).map((item) => ({ key: item.identityKey, label: item.merchant, detail: `${formatCurrency(item.monthlyCost, item.currency)}/mo` }))}
+              proofEmptyText="No primary-currency commitments compose this total."
+            />
+            <Metric
+              label={`Yearly total · ${audit.summary.primaryCurrency}`}
+              value={formatCurrency(audit.summary.annualRecurringSpend, audit.summary.primaryCurrency)}
+              tone="blue"
+              proofEntries={audit.recurringItems.filter((item) => item.currency === audit.summary.primaryCurrency).map((item) => ({ key: item.identityKey, label: item.merchant, detail: `${formatCurrency(item.annualCost, item.currency)}/yr` }))}
+              proofEmptyText="No primary-currency commitments compose this total."
+            />
+            <Metric
+              label={`Needs review · ${audit.summary.primaryCurrency}`}
+              value={formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)}
+              tone="caution"
+              proofEntries={audit.recurringItems.filter((item) => item.currency === audit.summary.primaryCurrency && ["cancel", "downgrade", "investigate", "watch"].includes(item.recommendationType)).map((item) => ({ key: item.identityKey, label: item.merchant, detail: `${formatCurrency(item.monthlyCost, item.currency)}/mo · ${item.recommendationType}` }))}
+              proofEmptyText="No commitments currently need review."
+            />
+            <Metric
+              label="Renewing in 10 days"
+              value={`${audit.summary.renewalsNextTenDays}`}
+              tone="accent"
+              proofEntries={renewalTimeline.events.filter((event) => event.daysAway <= 10).map((event) => ({ key: `${event.itemId}-${event.date}`, label: event.merchant, detail: `${formatRenewalDay(event.date)} · ${formatCurrency(event.amount, event.currency)}` }))}
+              proofEmptyText="No proven renewal is due in the next 10 days."
+            />
           </div>
-          <RenewalTimelinePanel timeline={renewalTimeline} onSelect={setSelectedItemId} />
+          <RenewalTimelinePanel timeline={renewalTimeline} onSelect={openDetail} onConnect={() => navigateToSection("connect")} />
           <div className="grid gap-5 xl:grid-cols-[1.12fr_0.88fr]" data-reveal>
             <RecurringGraph
               audit={audit}
               selectedItem={selectedItem}
               userActions={userActions}
               categoryBudgets={categoryBudgets}
-              onSelect={setSelectedItemId}
+              onSelect={openDetail}
             />
             <div className="flex flex-col gap-5">
-              <SpendSpectrum audit={audit} userActions={userActions} onSelect={setSelectedItemId} />
-              <PriorityActionPanel priorityItems={priorityItems} userActions={userActions} onSelect={setSelectedItemId} />
+              <SpendSpectrum audit={audit} userActions={userActions} onSelect={openDetail} onConnect={() => navigateToSection("connect")} />
+              {priorityItems.length ? <PriorityActionPanel priorityItems={priorityItems} userActions={userActions} onSelect={openDetail} /> : null}
             </div>
           </div>
           {duplicateCandidates.length ? (
@@ -2417,7 +2591,9 @@ export default function VognaryMvpClient() {
           {reviewDiff ? <SinceLastReviewPanel diff={reviewDiff} onSelectMerchant={() => selectAndReviewItem()} /> : null}
           <VerifiedSavingsPanel
             savings={verifiedSavings}
-            onSelect={setSelectedItemId}
+            onSelect={openDetail}
+            onOpenSubscriptions={() => selectAndReviewItem()}
+            onShareProof={() => void shareSavingsProof()}
             onMintReceipt={() => void mintSavingsReceipt()}
             onDownloadCard={() => void downloadSavingsCard()}
             onCopyShareText={() => void copySavingsShareText()}
@@ -2436,6 +2612,8 @@ export default function VognaryMvpClient() {
             onItemOwner={(itemId, ownerId) => setItemOwners((current) => ({ ...current, [itemId]: ownerId }))}
             onReviewNote={(itemId, note) => setReviewNotes((current) => ({ ...current, [itemId]: note }))}
             onCompleteReview={markMonthlyReviewComplete}
+            onOpenSubscriptions={() => selectAndReviewItem()}
+            onSelect={openDetail}
           />
         </section>
 
@@ -2443,7 +2621,7 @@ export default function VognaryMvpClient() {
         <section id="data" aria-labelledby="data-heading" className={`${mobileSection === "data" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
           <StageHeader id="data-heading" folio="05" title="Data" note="Storage, exports, and readiness." />
           <AdvancedImportPanel onImportFiles={importStatementFiles} />
-          <ProofGraphPanel graph={proofGraph} />
+          <ProofGraphPanel graph={proofGraph} audit={audit} onConnect={() => navigateToSection("connect")} />
           <ReadinessPanel />
           <UserControlPanel
             coverageScore={coverageScore}
@@ -2509,7 +2687,7 @@ function WorkspaceNav({ activeId, onSelect, showMore }: { activeId: string; onSe
               onSelect(section.id);
             }}
             aria-current={active ? "true" : undefined}
-            className={`flex min-h-11 min-w-0 shrink-0 items-center justify-center gap-2 rounded-xl px-1 py-2 text-[0.68rem] font-medium transition sm:justify-start sm:px-3 sm:py-1.5 sm:text-sm ${active ? "bg-(--gold) text-[#17130a]" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"}`}
+            className={`flex min-h-11 min-w-0 shrink-0 items-center justify-center gap-2 rounded-xl px-1 py-2 text-[0.68rem] font-medium transition sm:justify-start sm:px-3 sm:py-1.5 sm:text-sm ${active ? "bg-(--gold) text-[#17130a]" : "text-(--ink) hover:bg-white/5"}`}
           >
             <span className={`hidden font-data text-[0.6rem] tnum sm:inline ${active ? "opacity-70" : "text-(--muted)"}`}>{section.folio}</span>
             <span className="truncate">{section.label}</span>
@@ -2518,7 +2696,7 @@ function WorkspaceNav({ activeId, onSelect, showMore }: { activeId: string; onSe
       })}
       {showMore ? (
         <details className="group relative min-w-0 sm:ml-auto">
-          <summary className={`flex min-h-11 cursor-pointer list-none items-center justify-center rounded-xl px-2 text-[0.68rem] font-medium transition sm:px-3 sm:text-sm ${secondaryWorkspaceSections.some((section) => section.id === activeId) ? "bg-(--gold) text-[#17130a]" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"}`}>More</summary>
+          <summary className={`flex min-h-11 cursor-pointer list-none items-center justify-center rounded-xl px-2 text-[0.68rem] font-medium transition sm:px-3 sm:text-sm ${secondaryWorkspaceSections.some((section) => section.id === activeId) ? "bg-(--gold) text-[#17130a]" : "text-(--ink) hover:bg-white/5"}`}>More</summary>
           <div className="absolute bottom-full right-0 mb-2 grid min-w-40 gap-1 rounded-xl border border-line bg-(--paper-2) p-1.5 shadow-2xl sm:bottom-auto sm:top-full sm:mt-2">
             {secondaryWorkspaceSections.map((section) => (
               <button key={section.id} type="button" onClick={() => onSelect(section.id)} className="min-h-11 rounded-lg px-3 text-left text-sm text-(--ink-soft) transition hover:bg-white/5 hover:text-(--ink)">
@@ -2540,6 +2718,20 @@ function StageHeader({ id, folio, title, note }: { id: string; folio: string; ti
       <span className="hidden h-px flex-1 bg-line sm:block" aria-hidden />
       {note ? <p className="text-xs leading-5 text-(--muted) sm:max-w-sm sm:text-right">{note}</p> : null}
     </div>
+  );
+}
+
+function NakulMomentPanel({ moment, onDismiss }: { moment: NakulMoment; onDismiss: () => void }) {
+  return (
+    <section className="panel flex flex-col gap-4 border-(--gold-line) p-4 sm:flex-row sm:items-center" role="status" aria-label="Nakul moment" data-reveal>
+      <Nakul pose={moment.pose} size={64} className="shrink-0 text-(--ink)" title={`Nakul: ${moment.title}`} />
+      <div className="min-w-0 flex-1">
+        <p className="eyebrow" style={{ fontSize: "0.6rem" }}>{moment.kicker}</p>
+        <h3 className="mt-1 font-display text-lg font-semibold text-(--ink)">{moment.title}</h3>
+        <p className="mt-1 text-sm leading-6 text-(--muted)">{moment.detail}</p>
+      </div>
+      <button type="button" onClick={onDismiss} className="btn btn-ghost h-9 shrink-0 px-3 text-xs">Dismiss</button>
+    </section>
   );
 }
 
@@ -2597,13 +2789,13 @@ function IntegrationCommandCenter({
         <div>
           <span className="folio" data-folio="1.1" style={{ color: "var(--dossier-muted)" }}>Connections</span>
           <h3 className="mt-3 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-4xl">Connect evidence. Choose what to watch.</h3>
-          <p className="mt-2 max-w-xl text-sm leading-6 muted-on-dark">Email and bank consent rails can supply evidence. Merchant watches organize matching evidence from those rails; their coverage always depends on the sources you connect.</p>
+          <p className="mt-2 max-w-xl text-sm leading-6 muted-on-dark">Approve read-only email or bank evidence; merchant watches never connect merchant accounts.</p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <DossierStat label="Items" value={`${audit.summary.recurringCount}`} />
-          <DossierStat label={`Monthly · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)} />
-          <DossierStat label={`Yearly · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.annualRecurringSpend, audit.summary.primaryCurrency)} />
-          <DossierStat label={`Review · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)} />
+          <DossierStat label="Items" value={`${audit.summary.recurringCount}`} onClick={onJumpToLedger} />
+          <DossierStat label={`Monthly · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)} onClick={onJumpToLedger} />
+          <DossierStat label={`Yearly · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.annualRecurringSpend, audit.summary.primaryCurrency)} onClick={onJumpToLedger} />
+          <DossierStat label={`Review · ${audit.summary.primaryCurrency}`} value={formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)} onClick={onJumpToLedger} />
         </div>
       </div>
 
@@ -2612,7 +2804,7 @@ function IntegrationCommandCenter({
           title="Bank transactions"
           eyebrow="Rail 01 · Primary automatic account feed"
           connectorId="account-aggregator"
-          description="A regulated partner handles account access. You approve a scoped, revocable request; supported bank-debit evidence can refresh while that consent remains active."
+          description="Approve a scoped, revocable bank-data request with the regulated provider."
           connectorStartResults={connectorStartResults}
           connectingConnectorId={connectingConnectorId}
           syncingConnectorId={syncingConnectorId}
@@ -2627,7 +2819,7 @@ function IntegrationCommandCenter({
           title="Email receipts"
           eyebrow="Rail 02 · Optional coverage"
           connectorId="gmail-readonly"
-          description="Optional coverage for receipts that a bank feed cannot identify. Vognary manages the integration; Google still requires one secure, revocable approval."
+          description="Approve read-only Gmail access for receipts a bank feed cannot identify."
           connectorStartResults={connectorStartResults}
           connectingConnectorId={connectingConnectorId}
           syncingConnectorId={syncingConnectorId}
@@ -2690,7 +2882,7 @@ function IntegrationCommandCenter({
 
       <div className="mt-4 flex flex-col gap-3 rounded-[11px] border p-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
         <p className="text-xs leading-5 muted-on-dark">
-          Vognary owns the provider setup and keeps company credentials away from this workspace. You only grant revocable access to your own data. Merchant watches are local preferences; they do not connect to merchant accounts.
+          Access is revocable; merchant watches are workspace preferences, not merchant-account connections.
         </p>
         <div className="flex shrink-0 flex-wrap gap-2">
           <button type="button" onClick={onJumpToLedger} className="btn btn-ondark h-9 px-3 text-xs">Open ledger</button>
@@ -2747,14 +2939,10 @@ function RailCard({
   const pendingApproval = serverAccount?.status === "pending";
   const needsReauth = serverAccount?.status === "needs_reauth";
   const isConnected = connected && !pendingApproval && !needsReauth;
-  const syncNeedsAttention = !pendingApproval && !needsReauth && (
-    serverAccount?.freshnessStatus === "stale"
-    || serverAccount?.freshnessStatus === "error"
-    || serverAccount?.latestRunStatus === "failed"
-    || serverAccount?.latestRunStatus === "blocked"
-  );
-  const statusLabel = pendingApproval ? "Awaiting approval" : needsReauth ? "Reconnect required" : isConnected ? "Connected" : activationPending ? "Company activation pending" : "Review access";
-  const statusClass = needsReauth ? "pill pill-blocked" : isConnected ? "pill pill-ready" : "pill pill-partial";
+  const health = serverAccount ? sourceHealthPresentation(serverAccount) : null;
+  const syncNeedsAttention = Boolean(serverAccount && !pendingApproval && !needsReauth && sourceNeedsAttention(serverAccount));
+  const statusLabel = pendingApproval ? "Awaiting approval" : needsReauth ? "Reconnect" : isConnected ? health?.label ?? "Awaiting sync" : activationPending ? "Company activation pending" : "Review access";
+  const statusClass = needsReauth ? "pill pill-blocked" : isConnected ? health?.className ?? "pill pill-planned" : "pill pill-partial";
 
   return (
     <div className="rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.05)" }}>
@@ -2766,6 +2954,11 @@ function RailCard({
         <span className={statusClass}>{statusLabel}</span>
       </div>
       <p className="mt-2 text-xs leading-5 muted-on-dark">{description}</p>
+      {bankRail ? (
+        <p className="mt-2 text-xs leading-5 muted-on-dark">
+          A regulated partner handles account access. No credentials or technical setup are required from you.
+        </p>
+      ) : null}
 
       {bankRail && !isConnected && !pendingApproval ? (
         <label className="mt-3 block">
@@ -2821,81 +3014,75 @@ function RailCard({
   );
 }
 
-function FirstSuccessPanel({
-  audit,
-  coverageScore,
-  hasRealData,
-  localSaveEnabled,
-  receiptText,
-  signedIn,
-  onExportReport,
-  onJumpToLedger,
-  onReceiptTextChange,
-  onSaveLocal,
+function EmptyWorkspaceOnboarding({
+  onConnectGmail,
+  onPasteReceipts,
+  onSeedSample,
 }: {
-  audit: AuditResult;
-  coverageScore: number;
-  hasRealData: boolean;
-  localSaveEnabled: boolean;
-  receiptText: string;
-  signedIn: boolean;
-  onExportReport: () => void;
-  onJumpToLedger: () => void;
-  onReceiptTextChange: (value: string) => void;
-  onSaveLocal: () => void;
+  onConnectGmail: () => void;
+  onPasteReceipts: () => void;
+  onSeedSample: () => void;
 }) {
-  const hasLedger = audit.summary.recurringCount > 0;
-  const saved = localSaveEnabled || signedIn;
-  const steps = [
-    { label: "Add evidence", done: hasRealData, detail: "Paste receipt text, use guided capture, or connect a source." },
-    { label: "Review ledger", done: hasLedger, detail: "Check amount, cadence, next debit, confidence, and proof." },
-    { label: "Fill gaps", done: coverageScore >= 70, detail: "Add missing Gmail, UPI, card, app-store, SaaS, cloud, EMI, SIP, insurance, or utility sources." },
-    { label: "Keep control", done: saved, detail: "Export, enable an on-device backup, and let encrypted workspace sync run automatically." },
-  ];
-
   return (
-    <section id="first-success" className="panel p-5 sm:p-6" data-reveal>
-      <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-        <div>
-          <span className="folio" data-folio="1.2">First successful audit</span>
-          <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Complete your first recurring-money review.</h3>
-          <p className="mt-2 text-sm leading-6 text-(--muted)">Your encrypted workspace is ready. Add the first source, review every detected commitment, and improve evidence coverage over time.</p>
-          <div className="mt-5 grid gap-2 sm:grid-cols-4">
-            {steps.map((step, index) => (
-              <div key={step.label} className="inset p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-display text-xl font-semibold text-ember">{index + 1}</span>
-                  <span className={step.done ? "pill pill-ready" : "pill pill-planned"}>{step.done ? "Done" : "Next"}</span>
-                </div>
-                <p className="mt-2 text-sm font-semibold text-(--ink)">{step.label}</p>
-                <p className="mt-1 text-xs leading-5 text-(--muted)">{step.detail}</p>
-              </div>
-            ))}
-          </div>
+    <section className="panel p-6 sm:p-8" aria-labelledby="empty-workspace-title" data-reveal>
+      <div className="mx-auto max-w-3xl text-center">
+        <span className="folio" data-folio="1.1">First evidence</span>
+        <h3 id="empty-workspace-title" className="mt-3 font-display text-3xl font-semibold text-(--ink)">How would you like to start?</h3>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-(--muted)">Your data stays private to your workspace, and every connection can be revoked.</p>
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <button type="button" onClick={onConnectGmail} className="inset lift p-5 text-left transition hover:border-ember">
+            <span className="font-data text-[0.62rem] uppercase tracking-[0.14em] text-verdict">Automatic</span>
+            <span className="mt-2 block font-display text-lg font-semibold text-(--ink)">Connect Gmail</span>
+            <span className="mt-1 block text-xs leading-5 text-(--muted)">Find recurring receipts with read-only access.</span>
+          </button>
+          <button type="button" onClick={onPasteReceipts} className="inset lift p-5 text-left transition hover:border-ember">
+            <span className="font-data text-[0.62rem] uppercase tracking-[0.14em] text-verdict">Private and quick</span>
+            <span className="mt-2 block font-display text-lg font-semibold text-(--ink)">Paste receipts</span>
+            <span className="mt-1 block text-xs leading-5 text-(--muted)">Paste invoice or renewal text directly.</span>
+          </button>
+          <button type="button" onClick={onSeedSample} className="inset lift p-5 text-left transition hover:border-ember">
+            <span className="font-data text-[0.62rem] uppercase tracking-[0.14em] text-verdict">No setup</span>
+            <span className="mt-2 block font-display text-lg font-semibold text-(--ink)">See a sample audit</span>
+            <span className="mt-1 block text-xs leading-5 text-(--muted)">Explore eight clearly labelled demo subscriptions.</span>
+          </button>
         </div>
+      </div>
+    </section>
+  );
+}
 
-        <div className="rounded-xl border border-line bg-(--card-2) p-4">
-          <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Add your first evidence</p>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <button type="button" onClick={onJumpToLedger} className="btn btn-ghost" disabled={!hasLedger}>Open ledger</button>
-            <button type="button" onClick={onExportReport} className="btn btn-ghost" disabled={!hasRealData}>Download report</button>
-            <button type="button" onClick={onSaveLocal} className="btn btn-ghost" disabled={!hasRealData || localSaveEnabled}>{localSaveEnabled ? "Saved on device" : "Save on this device"}</button>
-            <a href="/sources" className="btn btn-ghost">Manage connected sources</a>
-          </div>
-          <details className="mt-4 rounded-[11px] border border-line bg-card p-3" open={!hasRealData}>
-            <summary className="cursor-pointer select-none font-display text-sm font-semibold text-(--ink)">Paste receipt snippets</summary>
-            <label className="mt-3 block">
-              <span className="field-label">Receipt, invoice, renewal, or payment-success text</span>
-              <textarea
-                value={receiptText}
-                onChange={(event) => onReceiptTextChange(event.target.value)}
-                className="field min-h-28"
-                placeholder="Paste one or more receipt snippets. Keep merchant, amount, date, and renewal text visible; remove account numbers and private identifiers."
-              />
-            </label>
-            <p className="mt-2 text-xs leading-5 text-(--muted)">Pasted receipts become ledger candidates immediately and merge with matching connected evidence. Approved Gmail connections refresh receipt evidence on their displayed schedule.</p>
-          </details>
-        </div>
+function ReceiptPastePanel({
+  receiptText,
+  onReceiptTextChange,
+  autoFocus = false,
+  onBack,
+}: {
+  receiptText: string;
+  onReceiptTextChange: (value: string) => void;
+  autoFocus?: boolean;
+  onBack?: () => void;
+}) {
+  return (
+    <section id="receipt-paste" className="panel p-5 sm:p-6" aria-labelledby="receipt-paste-title" data-reveal>
+      <SectionHead
+        folio="1.2"
+        kicker="Receipt paste"
+        title="Add receipt evidence"
+        desc="Paste one or more receipts; merchant, amount, date, and renewal language are enough. Remove account numbers and private identifiers."
+      />
+      <label className="mt-4 block">
+        <span id="receipt-paste-title" className="field-label">Receipt, invoice, renewal, or payment-success text</span>
+        <textarea
+          autoFocus={autoFocus}
+          value={receiptText}
+          onChange={(event) => onReceiptTextChange(event.target.value)}
+          className="field min-h-32"
+          placeholder="Example: Acme invoice paid INR 999 on 2026-07-01. Renews monthly."
+        />
+      </label>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-xl text-xs leading-5 text-(--muted)">Candidates appear in the ledger immediately and merge with matching connected evidence.</p>
+        {onBack ? <button type="button" onClick={onBack} className="btn btn-ghost h-9 px-3 text-xs">Choose another way</button> : null}
       </div>
     </section>
   );
@@ -3116,6 +3303,48 @@ function ConfirmDialog({ request, onCancel, onConfirm }: { request: ConfirmReque
 }
 
 // Overview — the five-second answer. Every tile deep-links into its chapter.
+// WP-6.3 — a ₹ figure that is an aggregate (a sum of several commitments) has
+// no single detail sheet to open, so it carries its own proof chip: tapping it
+// reveals the exact evidence rows that compose the number. Per-item figures keep
+// tracing through the detail sheet; this closes the gap on Home's aggregates.
+function ProofDisclosure({
+  entries,
+  emptyText,
+}: {
+  entries: { key: string; label: string; detail: string }[];
+  emptyText: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const regionId = useId();
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-controls={regionId}
+        className="inline-flex items-center gap-1 rounded-full border border-line bg-(--card-2) px-2 py-0.5 font-data text-[0.58rem] uppercase tracking-[0.12em] text-(--muted) transition hover:border-(--line-strong) hover:text-(--ink)"
+      >
+        <span aria-hidden>◆</span> {open ? "Hide proof" : "Proof"}
+      </button>
+      {open ? (
+        <ul id={regionId} className="mt-2 grid gap-1 rounded-lg border border-line bg-(--card-2) p-2 font-data text-[0.66rem] leading-5 text-(--ink-soft)">
+          {entries.length ? (
+            entries.map((entry) => (
+              <li key={entry.key} className="flex items-center justify-between gap-3">
+                <span className="truncate">{entry.label}</span>
+                <span className="tnum shrink-0 text-(--muted)">{entry.detail}</span>
+              </li>
+            ))
+          ) : (
+            <li className="text-(--muted)">{emptyText}</li>
+          )}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function OverviewPanel({
   audit,
   timeline,
@@ -3124,11 +3353,13 @@ function OverviewPanel({
   priorityItems,
   userActions,
   hasRealData,
+  reviewDiff,
   monthlyBudget,
   categoryBudgets,
   sourceHealth,
   onSelect,
   onOpenSubscriptions,
+  onOpenConnect,
   onMonthlyBudgetChange,
   onCategoryBudgetChange,
   onExportPack,
@@ -3142,11 +3373,13 @@ function OverviewPanel({
   priorityItems: RecurringItem[];
   userActions: Record<string, RecommendationType>;
   hasRealData: boolean;
+  reviewDiff: ReviewDiff | null;
   monthlyBudget: number | null;
   categoryBudgets: Record<string, number>;
   sourceHealth: ServerSourceHealth[];
   onSelect: (identityKey: string) => void;
   onOpenSubscriptions: () => void;
+  onOpenConnect: () => void;
   onMonthlyBudgetChange: (value: number | null) => void;
   onCategoryBudgetChange: (category: string, value: number | null) => void;
   onExportPack: () => void;
@@ -3155,6 +3388,10 @@ function OverviewPanel({
 }) {
   const nextEvent = timeline.events[0] ?? null;
   const topAction = priorityItems[0] ?? null;
+  const attentionSources = sourceHealth.filter(sourceNeedsAttention);
+  const burnDeltaTone = reviewDiff?.monthlyDelta
+    ? reviewDiff.monthlyDelta > 0 ? "text-ember" : "text-verdict"
+    : "text-(--muted)";
   const proofStrength = proofGraph.totalMonthly > 0 ? Math.round((1 - proofGraph.singleSourceShare) * 100) : 0;
   const foreignEntries = Object.entries(audit.summary.foreignMonthlyTotals);
   const categorySpend = audit.recurringItems.reduce<Record<string, number>>((totals, item) => {
@@ -3176,8 +3413,8 @@ function OverviewPanel({
     timeline.events.some((event) => event.daysAway <= 3)
       ? `${timeline.events.filter((event) => event.daysAway <= 3).length} renewal${timeline.events.filter((event) => event.daysAway <= 3).length === 1 ? "" : "s"} due within 3 days`
       : null,
-    sourceHealth.some((source) => source.freshnessStatus === "stale" || source.freshnessStatus === "error")
-      ? "One or more evidence sources needs attention"
+    attentionSources.length
+      ? `${attentionSources.length === 1 ? "Evidence source needs" : "Evidence sources need"} attention: ${attentionSources.map(sourceDisplayName).join(", ")}`
       : null,
   ].filter((alert): alert is string => Boolean(alert));
   const suggestedCuts = rankSuggestedCuts(audit.recurringItems, userActions);
@@ -3204,6 +3441,11 @@ function OverviewPanel({
               <span key={code} className="ml-2 text-ochre">+ {formatCurrency(total, code)}/mo</span>
             ))}
           </p>
+          <p className={`mt-1.5 font-data text-[0.66rem] ${burnDeltaTone}`}>
+            {reviewDiff
+              ? `${reviewDiff.monthlyDelta > 0 ? "+" : ""}${formatCurrency(reviewDiff.monthlyDelta, audit.summary.primaryCurrency)} since last review`
+              : "No comparison yet · complete a review to set the baseline"}
+          </p>
         </button>
         {nextEvent ? (
           <button type="button" onClick={() => onSelect(nextEvent.itemId)} className="inset p-4 text-left transition hover:border-ember">
@@ -3223,6 +3465,12 @@ function OverviewPanel({
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Due in 30 days</p>
           <p className="font-data mt-2 text-2xl font-semibold tnum text-ochre">{formatCurrency(timeline.dueNext30Days)}</p>
           <p className="mt-1 font-data text-[0.66rem] text-(--muted)">Needs review ({audit.summary.primaryCurrency}): {formatCurrency(audit.summary.reviewableMonthlySpend, audit.summary.primaryCurrency)}/mo</p>
+          <ProofDisclosure
+            entries={timeline.events
+              .filter((event) => event.daysAway <= 30)
+              .map((event) => ({ key: `${event.itemId}-${event.date}`, label: event.merchant, detail: `${formatCurrency(event.amount, event.currency)} · ${event.date}` }))}
+            emptyText="No projected debits inside 30 days."
+          />
         </div>
         <div className="inset p-4">
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Verified savings</p>
@@ -3236,6 +3484,10 @@ function OverviewPanel({
                 ? `${savings.entries.length} decision(s) tracked`
                 : "Mark a cancel to start proving savings"}
           </p>
+          <ProofDisclosure
+            entries={savings.entries.map((entry) => ({ key: entry.itemId, label: `${entry.merchant} · ${entry.status}`, detail: `${formatCurrency(entry.annualSaving, entry.currency)}/yr` }))}
+            emptyText="Mark a cancel to start proving savings."
+          />
         </div>
         <div className={`inset p-4 ${monthlyBudget !== null && audit.summary.monthlyRecurringSpend > monthlyBudget ? "border-ochre" : ""}`}>
           <label htmlFor="monthly-budget" className="eyebrow" style={{ fontSize: "0.6rem" }}>Monthly budget · {audit.summary.primaryCurrency}</label>
@@ -3274,11 +3526,14 @@ function OverviewPanel({
         ) : null}
       </div>
       {alerts.length ? (
-        <div className="mt-4 rounded-xl border border-ochre/50 bg-(--gold-tint) p-3" role="status" aria-label="Workspace alerts">
-          <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Needs attention</p>
-          <ul className="mt-2 grid gap-1 text-xs leading-5 text-(--ink-soft) sm:grid-cols-2">
-            {alerts.map((alert) => <li key={alert}>• {alert}</li>)}
-          </ul>
+        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-ochre/50 bg-(--gold-tint) p-3 sm:flex-row sm:items-end sm:justify-between" role="status" aria-label="Workspace alerts">
+          <div>
+            <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Needs attention</p>
+            <ul className="mt-2 grid gap-1 text-xs leading-5 text-(--ink-soft) sm:grid-cols-2">
+              {alerts.map((alert) => <li key={alert}>• {alert}</li>)}
+            </ul>
+          </div>
+          {attentionSources.length ? <button type="button" onClick={onOpenConnect} className="btn btn-ghost h-9 shrink-0 px-3 text-xs">Review sources</button> : null}
         </div>
       ) : null}
       {suggestedCuts.length ? (
@@ -3694,7 +3949,92 @@ function RecurringGraph({
 
 // Renewal calendar — projects every proven cadence into the next debits, so the
 // workspace answers "what renews next and what will it cost" before anything else.
-function RenewalTimelinePanel({ timeline, onSelect }: { timeline: RenewalTimeline; onSelect: (id: string) => void }) {
+function RenewalRadar({ timeline, onSelect, onOpenSubscriptions }: { timeline: RenewalTimeline; onSelect: (id: string) => void; onOpenSubscriptions: () => void }) {
+  const { events, horizonDays } = timeline;
+  const maxAmount = Math.max(1, ...events.map((event) => event.amount));
+  const ticks = Array.from(new Set([0, 7, 15, 30, horizonDays]))
+    .filter((tick) => tick <= horizonDays)
+    .sort((left, right) => left - right);
+  const nextEvent = events[0] ?? null;
+  const trackHeight = 128;
+
+  return (
+    <section className="panel overflow-hidden p-5 sm:p-6" data-reveal aria-labelledby="renewal-radar-heading">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Renewal Radar · next {horizonDays} days</p>
+          <h3 id="renewal-radar-heading" className="mt-1 font-display text-xl font-semibold text-(--ink)">
+            {events.length ? `${formatCurrency(timeline.totalDue)} across ${events.length} proven debit${events.length === 1 ? "" : "s"}` : "No projected debits yet"}
+          </h3>
+        </div>
+        {nextEvent ? (
+          <button type="button" onClick={() => onSelect(nextEvent.itemId)} className="inset px-3 py-2 text-left transition hover:border-ember">
+            <span className="eyebrow block" style={{ fontSize: "0.54rem" }}>Next up</span>
+            <span className="mt-0.5 block text-sm font-semibold text-(--ink)">{nextEvent.merchant} · {formatCurrency(nextEvent.amount, nextEvent.currency)}</span>
+            <span className="block font-data text-[0.62rem] text-(--muted)">{nextEvent.daysAway === 0 ? "today" : `in ${nextEvent.daysAway}d`} · {nextEvent.date}</span>
+          </button>
+        ) : null}
+      </div>
+
+      {events.length ? (
+        <>
+          <div className="relative mt-7 w-full" style={{ height: `${trackHeight}px` }}>
+            {ticks.map((tick) => (
+              <div key={`grid-${tick}`} className="absolute top-0 border-l border-line" style={{ left: `${(tick / horizonDays) * 100}%`, height: `${trackHeight}px`, opacity: 0.5 }} aria-hidden />
+            ))}
+            <div className="absolute inset-x-0 bottom-0 h-px bg-(--line-strong)" aria-hidden />
+            {events.map((event) => {
+              const leftPercent = Math.min(97.5, Math.max(2.5, (event.daysAway / horizonDays) * 100));
+              const barHeight = Math.round(20 + (event.amount / maxAmount) * (trackHeight - 34));
+              const dueSoon = event.daysAway <= 7;
+
+              return (
+                <button
+                  key={`${event.itemId}-${event.date}`}
+                  type="button"
+                  onClick={() => onSelect(event.itemId)}
+                  aria-label={`${event.merchant}, ${formatCurrency(event.amount, event.currency)}, renews ${event.daysAway === 0 ? "today" : `in ${event.daysAway} days`} (${event.date})`}
+                  className="group absolute bottom-0 z-10 w-11 -translate-x-1/2 focus-visible:z-20"
+                  style={{ left: `${leftPercent}%`, height: `${Math.max(44, barHeight)}px` }}
+                >
+                  <span
+                    className="pointer-events-none absolute bottom-0 left-1/2 w-3 -translate-x-1/2 rounded-t-md transition group-hover:brightness-110"
+                    style={{ height: `${barHeight}px`, background: dueSoon ? "var(--gold)" : "var(--muted)" }}
+                    aria-hidden
+                  />
+                  <span
+                    className="pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap font-data text-[0.54rem] text-(--ink-soft) opacity-0 transition group-hover:opacity-100 group-focus:opacity-100"
+                    style={{ bottom: `${barHeight + 4}px` }}
+                  >
+                    {event.merchant.split(" ")[0]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="relative mt-1.5 h-4 w-full">
+            {ticks.map((tick) => (
+              <span
+                key={`tick-${tick}`}
+                className="absolute font-data text-[0.56rem] text-(--muted)"
+                style={{ left: `${(tick / horizonDays) * 100}%`, transform: tick === 0 ? "translateX(0)" : tick === horizonDays ? "translateX(-100%)" : "translateX(-50%)" }}
+              >
+                {tick === 0 ? "today" : `+${tick}d`}
+              </span>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
+            <MiniStat label="Due in 7 days" value={formatCurrency(timeline.dueNext7Days)} proofEntries={events.filter((event) => event.daysAway <= 7).map(renewalEventProofEntry)} proofEmptyText="No proven debit is due in seven days." />
+            <MiniStat label="Due in 30 days" value={formatCurrency(timeline.dueNext30Days)} proofEntries={events.filter((event) => event.daysAway <= 30).map(renewalEventProofEntry)} proofEmptyText="No proven debit is due in 30 days." />
+            <MiniStat label={`Total in ${horizonDays} days`} value={formatCurrency(timeline.totalDue)} proofEntries={events.map(renewalEventProofEntry)} proofEmptyText="No proven debit is due in this window." />
+          </div>
+        </>
+      ) : <TaskEmptyState sentence={`No projected debit is proven in the next ${horizonDays} days.`} actionLabel="Review subscriptions" onAction={onOpenSubscriptions} />}
+    </section>
+  );
+}
+
+function RenewalTimelinePanel({ timeline, onSelect, onConnect }: { timeline: RenewalTimeline; onSelect: (id: string) => void; onConnect: () => void }) {
   const visibleEvents = 12;
 
   return (
@@ -3710,9 +4050,9 @@ function RenewalTimelinePanel({ timeline, onSelect }: { timeline: RenewalTimelin
       {timeline.events.length ? (
         <>
           <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
-            <MiniStat label="Due in 7 days" value={formatCurrency(timeline.dueNext7Days)} />
-            <MiniStat label="Due in 30 days" value={formatCurrency(timeline.dueNext30Days)} />
-            <MiniStat label={`Total in ${timeline.horizonDays} days`} value={formatCurrency(timeline.totalDue)} />
+            <MiniStat label="Due in 7 days" value={formatCurrency(timeline.dueNext7Days)} proofEntries={timeline.events.filter((event) => event.daysAway <= 7).map(renewalEventProofEntry)} proofEmptyText="No proven debit is due in seven days." />
+            <MiniStat label="Due in 30 days" value={formatCurrency(timeline.dueNext30Days)} proofEntries={timeline.events.filter((event) => event.daysAway <= 30).map(renewalEventProofEntry)} proofEmptyText="No proven debit is due in 30 days." />
+            <MiniStat label={`Total in ${timeline.horizonDays} days`} value={formatCurrency(timeline.totalDue)} proofEntries={timeline.events.map(renewalEventProofEntry)} proofEmptyText="No proven debit is due in this window." />
           </div>
           {Object.keys(timeline.foreignTotals).length ? (
             <p className="mt-2 font-data text-[0.66rem] text-(--muted)">
@@ -3758,13 +4098,17 @@ function RenewalTimelinePanel({ timeline, onSelect }: { timeline: RenewalTimelin
             ))}
           </div>
         </>
-      ) : (
-        <p className="inset mt-4 px-3 py-6 text-center text-sm text-(--muted)">
-          No projected renewals yet. Connect a source or add evidence, and the calendar fills in as soon as one recurring item is proven.
-        </p>
-      )}
+      ) : <TaskEmptyState sentence="No projected renewals are proven in this window yet." actionLabel="Connect evidence" onAction={onConnect} />}
     </section>
   );
+}
+
+function renewalEventProofEntry(event: RenewalTimeline["events"][number]) {
+  return {
+    key: `${event.itemId}-${event.date}`,
+    label: event.merchant,
+    detail: `${formatRenewalDay(event.date)} · ${formatCurrency(event.amount, event.currency)}`,
+  };
 }
 
 function formatRenewalDay(date: string): string {
@@ -3802,6 +4146,176 @@ function PriorityActionPanel({
         }) : <p className="inset px-3 py-3 text-sm text-(--muted)">Connect a proof source to generate an action plan.</p>}
       </div>
     </section>
+  );
+}
+
+// Relative countdown for a YYYY-MM-DD renewal date, computed against local
+// midnight so "in 3d" stays stable regardless of the current time of day.
+function renewalCountdown(dateStr: string): string | null {
+  if (!dateStr) return null;
+  const target = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return null;
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((target.getTime() - startToday.getTime()) / 86_400_000);
+  if (days === 0) return "today";
+  return days > 0 ? `in ${days}d` : `${Math.abs(days)}d ago`;
+}
+
+function DetailStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="inset p-3">
+      <p className="eyebrow" style={{ fontSize: "0.58rem" }}>{label}</p>
+      <p className="font-data mt-1.5 text-base font-semibold tnum text-(--ink)">{value}</p>
+      {sub ? <p className="mt-0.5 font-data text-[0.6rem] text-(--muted)">{sub}</p> : null}
+    </div>
+  );
+}
+
+// WP-1.3 — the subscription detail sheet. Opens in place on any card tap so
+// the proof, history, and Keep/Watch/Cancel-guide are reachable in one tap from
+// Home or Subscriptions. Reuses recordAction, the commitment policy, and the
+// existing cancel-action registry; "Open full review" hands off to the inline
+// deep-dive + assisted-cancel flow.
+function SubscriptionDetailSheet({
+  item,
+  action,
+  onAction,
+  onOpenFullReview,
+  onClose,
+}: {
+  item: RecurringItem;
+  action: RecommendationType;
+  onAction: (action: RecommendationType) => void;
+  onOpenFullReview: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const policy = getCommitmentPolicy(item.category);
+  const cancelGuide = findCancelAction(item.merchant, item.category);
+  const allowedActions = recommendationActions.filter((candidate) => isReviewActionAllowed(item.category, candidate.value));
+  const countdown = renewalCountdown(item.nextExpectedDate);
+  // identityKey carries spaces/colons ("google one::INR::…"); a raw id would be
+  // read by aria-labelledby as several missing references, so slugify it.
+  const headingId = `subscription-detail-${item.identityKey.replace(/[^a-z0-9]+/gi, "-")}`;
+
+  return (
+    <div
+      className="fixed inset-0 z-70 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={headingId}
+      onClick={onClose}
+    >
+      <section
+        className="panel flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-b-none rounded-t-2xl sm:rounded-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start gap-4 border-b border-line bg-(--card-2) p-5 sm:p-6">
+          <span className="grid size-12 shrink-0 place-items-center rounded-xl border border-line bg-card font-display text-xl font-semibold text-(--ink)" aria-hidden>{item.merchant.slice(0, 1).toUpperCase()}</span>
+          <div className="min-w-0 flex-1">
+            <h2 id={headingId} className="truncate font-display text-2xl font-semibold text-(--ink)">{item.merchant}</h2>
+            <p className="mt-1 text-sm text-(--muted)">{item.category} · <span className="capitalize">{item.frequency}</span></p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="pill pill-partial">{item.confidenceScore}% proof</span>
+              <span className={statusStyles[action]}>{action}</span>
+              {item.priceChange?.direction === "increase" ? <span className="pill pill-blocked">↑ was {formatCurrency(item.priceChange.previousAmount, item.currency)}</span> : null}
+            </div>
+          </div>
+          <button type="button" autoFocus onClick={onClose} aria-label="Close subscription details" className="btn btn-ghost grid size-9 shrink-0 place-items-center p-0 text-lg leading-none">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <DetailStat label={`Monthly · ${item.currency}`} value={`${formatCurrency(item.monthlyCost, item.currency)}`} />
+            <DetailStat label="Annual" value={formatCurrency(item.annualCost, item.currency)} />
+            <DetailStat label="Renews" value={countdown ?? item.nextExpectedDate} sub={countdown ? item.nextExpectedDate : undefined} />
+            <DetailStat label="Amount range" value={`${formatCurrency(item.amountMin, item.currency)} – ${formatCurrency(item.amountMax, item.currency)}`} />
+            <DetailStat label="Proof rows" value={`${item.evidence.length}`} />
+            {item.priceChange ? (
+              <DetailStat label={`Price ${item.priceChange.direction === "increase" ? "up" : "down"} ${item.priceChange.changePercent}%`} value={`${formatCurrency(item.priceChange.previousAmount, item.currency)} → ${formatCurrency(item.priceChange.latestAmount, item.currency)}`} />
+            ) : item.missedCycles >= 2 ? (
+              <DetailStat label="Evidence gap" value={`${item.missedCycles} cycles`} />
+            ) : null}
+          </div>
+
+          <div className="mt-5">
+            <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Your decision</p>
+            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Choose an action for this subscription">
+              {allowedActions.map((candidate) => {
+                const active = candidate.value === action;
+                return (
+                  <button
+                    key={candidate.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => onAction(candidate.value)}
+                    className={`min-h-11 rounded-xl border px-4 text-sm font-semibold transition ${active ? "border-(--gold-line) bg-(--gold-tint) text-(--ink)" : "border-line bg-(--card-2) text-(--ink-soft) hover:border-(--line-strong)"}`}
+                  >
+                    {candidate.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs leading-5 text-ochre">{policy.consequenceWarning}</p>
+          </div>
+
+          {cancelGuide ? (
+            <div className="mt-5 rounded-xl border border-line bg-(--card-2) p-4">
+              <p className="font-display text-base font-semibold text-(--ink)">{cancelGuide.kind === "rail-guide" ? "How to stop this payment" : "Manage at the official account"}</p>
+              <ol className="mt-3 grid gap-1 text-xs leading-5 text-(--ink-soft)">
+                {cancelGuide.steps.map((step, index) => <li key={step}>{index + 1}. {step}</li>)}
+              </ol>
+              {cancelGuide.caveat ? <p className="mt-2 text-xs leading-5 text-ochre">{cancelGuide.caveat}</p> : null}
+              {cancelGuide.manageUrl ? <a href={cancelGuide.manageUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost mt-3 h-9 px-3 text-xs">Open {manageUrlHostname(cancelGuide)} ↗</a> : null}
+            </div>
+          ) : null}
+
+          <div className="mt-5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Proof · where this came from</p>
+              <span className="truncate font-data text-[0.62rem] text-(--muted)">{item.sourceNames.join(", ")}</span>
+            </div>
+            {item.evidence.length ? (
+              <div className="mt-2 overflow-hidden rounded-xl border border-line">
+                <table className="w-full border-separate border-spacing-0 text-left text-sm">
+                  <thead>
+                    <tr>
+                      <th className="border-b border-line bg-(--card-2) px-3 py-2 font-data text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-(--muted)">Date</th>
+                      <th className="border-b border-line bg-(--card-2) px-3 py-2 font-data text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-(--muted)">Amount</th>
+                      <th className="border-b border-line bg-(--card-2) px-3 py-2 font-data text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-(--muted)">Statement text</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {item.evidence.map((evidence) => (
+                      <tr key={`${evidence.source}-${evidence.rowNumber}-${evidence.date}`}>
+                        <td className="border-t border-line px-3 py-2 font-data text-xs text-(--muted)">{evidence.date}</td>
+                        <td className="border-t border-line px-3 py-2 font-data font-semibold tnum text-(--ink)">{formatCurrency(evidence.amount, item.currency)}</td>
+                        <td className="border-t border-line px-3 py-2 text-(--ink-soft)">{evidence.description}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-(--muted)">No individual proof rows yet — this pattern is inferred from summary evidence.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-line p-4">
+          <button type="button" onClick={onOpenFullReview} className="btn btn-ghost h-10 px-3 text-sm">Open full review →</button>
+          <button type="button" onClick={onClose} className="btn btn-primary h-10 px-4 text-sm">Done</button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -4064,11 +4578,12 @@ function getCommitmentManagementTarget(item: RecurringItem) {
   return connectorId ? connectorLaunchTargets[connectorId] ?? null : null;
 }
 
-function DossierStat({ label, value }: { label: string; value: string }) {
+function DossierStat({ label, value, onClick }: { label: string; value: string; onClick?: () => void }) {
+  const content = <><p className="font-data text-[0.54rem] uppercase tracking-[0.18em]" style={{ color: "var(--dossier-muted)" }}>{label}</p><p className="font-data mt-1.5 text-sm font-semibold tnum text-(--dossier-ink)">{value}</p></>;
+  if (onClick) return <button type="button" onClick={onClick} className="rounded-[9px] border px-3 py-2.5 text-left transition hover:border-(--gold)" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }} aria-label={`${label}: ${value}. Open subscriptions`}>{content}</button>;
   return (
     <div className="rounded-[9px] border px-3 py-2.5" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
-      <p className="font-data text-[0.54rem] uppercase tracking-[0.18em]" style={{ color: "var(--dossier-muted)" }}>{label}</p>
-      <p className="font-data mt-1.5 text-sm font-semibold tnum text-(--dossier-ink)">{value}</p>
+      {content}
     </div>
   );
 }
@@ -4087,6 +4602,8 @@ function TeamReviewPanel({
   onItemOwner,
   onReviewNote,
   onCompleteReview,
+  onOpenSubscriptions,
+  onSelect,
 }: {
   audit: AuditResult;
   collaborative: boolean;
@@ -4101,9 +4618,20 @@ function TeamReviewPanel({
   onItemOwner: (itemId: string, ownerId: string) => void;
   onReviewNote: (itemId: string, note: string) => void;
   onCompleteReview: () => void;
+  onOpenSubscriptions: () => void;
+  onSelect: (id: string) => void;
 }) {
   const assignedCount = audit.recurringItems.filter((item) => itemOwners[item.identityKey]).length;
   const actionedCount = audit.recurringItems.filter((item) => ["cancel", "downgrade", "investigate", "watch"].includes(item.recommendationType)).length;
+
+  if (!audit.recurringItems.length) {
+    return (
+      <section className="panel p-5 sm:p-6" data-reveal>
+        <SectionHead folio="3.3" kicker="Review" title="Monthly review" />
+        <TaskEmptyState sentence="No proven commitment is ready for review yet." actionLabel="Open subscriptions" onAction={onOpenSubscriptions} />
+      </section>
+    );
+  }
 
   return (
     <section className="panel p-5 sm:p-6" data-reveal>
@@ -4153,7 +4681,7 @@ function TeamReviewPanel({
             {audit.recurringItems.map((item) => (
               <tr key={item.identityKey}>
                 <td className="border-t border-line px-4 py-3 font-semibold text-(--ink)">{item.merchant}</td>
-                <td className="border-t border-line px-4 py-3 font-data tnum text-(--ink-soft)">{formatCurrency(item.monthlyCost, item.currency)}</td>
+                <td className="border-t border-line px-4 py-3"><button type="button" onClick={() => onSelect(item.identityKey)} className="font-data tnum text-(--ink-soft) underline decoration-line underline-offset-4 transition hover:text-(--ink)" aria-label={`Open proof for ${item.merchant}, ${formatCurrency(item.monthlyCost, item.currency)} monthly`}>{formatCurrency(item.monthlyCost, item.currency)}</button></td>
                 <td className="border-t border-line px-4 py-3"><span className={statusStyles[item.recommendationType]}>{item.recommendationType}</span></td>
                 <td className="border-t border-line px-4 py-3">
                   <select value={itemOwners[item.identityKey] ?? ""} onChange={(event) => onItemOwner(item.identityKey, event.target.value)} className="field" style={{ height: "2.3rem", fontSize: "0.78rem" }} aria-label={`Owner for ${item.merchant}`}>
@@ -4253,12 +4781,16 @@ const savingStatusPill: Record<string, string> = {
 function VerifiedSavingsPanel({
   savings,
   onSelect,
+  onOpenSubscriptions,
+  onShareProof,
   onMintReceipt,
   onDownloadCard,
   onCopyShareText,
 }: {
   savings: VerifiedSavingsSummary;
   onSelect: (id: string) => void;
+  onOpenSubscriptions: () => void;
+  onShareProof: () => void;
   onMintReceipt: () => void;
   onDownloadCard: () => void;
   onCopyShareText: () => void;
@@ -4276,9 +4808,9 @@ function VerifiedSavingsPanel({
       {savings.entries.length ? (
         <>
           <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
-            <MiniStat label="Verified savings" value={`${formatCurrency(savings.verifiedMonthly)}/mo`} />
-            <MiniStat label="Verified annual" value={formatCurrency(savings.verifiedAnnual)} />
-            <MiniStat label="Pending proof" value={`${formatCurrency(savings.pendingMonthly)}/mo`} />
+            <MiniStat label="Verified savings" value={`${formatCurrency(savings.verifiedMonthly)}/mo`} proofEntries={savings.entries.filter((entry) => entry.status === "verified").map((entry) => ({ key: entry.itemId, label: entry.merchant, detail: `${formatCurrency(entry.monthlySaving, entry.currency)}/mo` }))} proofEmptyText="No saving has been verified yet." />
+            <MiniStat label="Verified annual" value={formatCurrency(savings.verifiedAnnual)} proofEntries={savings.entries.filter((entry) => entry.status === "verified").map((entry) => ({ key: entry.itemId, label: entry.merchant, detail: `${formatCurrency(entry.annualSaving, entry.currency)}/yr` }))} proofEmptyText="No annual saving has been verified yet." />
+            <MiniStat label="Pending proof" value={`${formatCurrency(savings.pendingMonthly)}/mo`} proofEntries={savings.entries.filter((entry) => entry.status !== "verified").map((entry) => ({ key: entry.itemId, label: entry.merchant, detail: `${formatCurrency(entry.monthlySaving, entry.currency)}/mo · ${entry.status}` }))} proofEmptyText="No saving is waiting for proof." />
           </div>
           {hasVerified ? (
             <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-(--gold-line) bg-(--card-2) p-4">
@@ -4290,6 +4822,7 @@ function VerifiedSavingsPanel({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={onShareProof} className="btn btn-primary btn-sm">Share proof</button>
                 <button type="button" onClick={onMintReceipt} className="btn btn-primary btn-sm">Mint sealed receipt</button>
                 <button type="button" onClick={onDownloadCard} className="btn btn-ghost btn-sm">Download share card</button>
                 <button type="button" onClick={onCopyShareText} className="btn btn-ghost btn-sm">Copy share text</button>
@@ -4313,11 +4846,7 @@ function VerifiedSavingsPanel({
             ))}
           </div>
         </>
-      ) : (
-        <p className="inset mt-4 px-3 py-5 text-center text-sm text-(--muted)">
-          No cancel or downgrade decisions recorded yet. Choose an action on any ledger item; when newer evidence shows the charge stopped, the saving is minted here — proven, not promised.
-        </p>
-      )}
+      ) : <TaskEmptyState sentence="No cancel or downgrade decision is waiting for savings proof." actionLabel="Review subscriptions" onAction={onOpenSubscriptions} />}
     </section>
   );
 }
@@ -4334,6 +4863,14 @@ function SinceLastReviewPanel({ diff, onSelectMerchant }: { diff: ReviewDiff; on
         title={`What changed in ${diff.daysSincePrevious} day(s)`}
         desc={`Compared against the review completed on ${diff.previousTakenAt.slice(0, 10)}.`}
         right={<span className={`font-data text-xs tnum ${deltaTone}`}>{diff.monthlyDelta >= 0 ? "+" : ""}{formatCurrency(diff.monthlyDelta)}/mo</span>}
+      />
+      <ProofDisclosure
+        entries={[
+          ...diff.added.map((item) => ({ key: `added-${item.key}`, label: `${item.merchant} · added`, detail: `+${formatCurrency(item.monthlyCost, item.currency)}/mo` })),
+          ...diff.removed.map((item) => ({ key: `removed-${item.key}`, label: `${item.merchant} · removed`, detail: `−${formatCurrency(item.monthlyCost, item.currency)}/mo` })),
+          ...diff.priceChanges.map((change, index) => ({ key: `price-${change.merchant}-${index}`, label: `${change.merchant} · price ${change.direction}`, detail: `${formatCurrency(change.fromAmount, change.currency)} → ${formatCurrency(change.toAmount, change.currency)}` })),
+        ]}
+        emptyText="No added, removed, or price-changed commitment composes this delta."
       />
       {diff.hasChanges ? (
         <div className="mt-4 grid gap-3 lg:grid-cols-3">
@@ -4374,7 +4911,7 @@ function SinceLastReviewPanel({ diff, onSelectMerchant }: { diff: ReviewDiff; on
 
 // Proof Graph — which rupees rest on one source, which have gone stale, and
 // which single connection would strengthen the most spend.
-function ProofGraphPanel({ graph }: { graph: ProofGraphSummary }) {
+function ProofGraphPanel({ graph, audit, onConnect }: { graph: ProofGraphSummary; audit: AuditResult; onConnect: () => void }) {
   const singleShare = Math.round(graph.singleSourceShare * 100);
 
   return (
@@ -4389,10 +4926,10 @@ function ProofGraphPanel({ graph }: { graph: ProofGraphSummary }) {
       {graph.itemCount ? (
         <>
           <div className="mt-4 grid gap-2.5 sm:grid-cols-4">
-            <MiniStat label="Single-source spend" value={`${formatCurrency(graph.singleSourceMonthly)}/mo (${singleShare}%)`} />
-            <MiniStat label="Multi-source spend" value={`${formatCurrency(graph.multiSourceMonthly)}/mo`} />
-            <MiniStat label="Stale evidence" value={`${formatCurrency(graph.staleMonthly)}/mo`} />
-            <MiniStat label="Avg proof rows" value={graph.averageProofRows.toFixed(1)} />
+            <MiniStat label="Single-source spend" value={`${formatCurrency(graph.singleSourceMonthly)}/mo (${singleShare}%)`} proofEntries={audit.recurringItems.filter((item) => item.currency === audit.summary.primaryCurrency && new Set(item.sourceNames.map((name) => name.toLowerCase())).size <= 1).map((item) => ({ key: item.identityKey, label: item.merchant, detail: `${formatCurrency(item.monthlyCost, item.currency)}/mo · ${item.sourceNames.length || 0} source` }))} proofEmptyText="No primary-currency spend rests on one source." />
+            <MiniStat label="Multi-source spend" value={`${formatCurrency(graph.multiSourceMonthly)}/mo`} proofEntries={audit.recurringItems.filter((item) => item.currency === audit.summary.primaryCurrency && new Set(item.sourceNames.map((name) => name.toLowerCase())).size > 1).map((item) => ({ key: item.identityKey, label: item.merchant, detail: `${formatCurrency(item.monthlyCost, item.currency)}/mo · ${new Set(item.sourceNames.map((name) => name.toLowerCase())).size} sources` }))} proofEmptyText="No commitment is corroborated by multiple sources yet." />
+            <MiniStat label="Stale evidence" value={`${formatCurrency(graph.staleMonthly)}/mo`} proofEntries={audit.recurringItems.filter((item) => item.currency === audit.summary.primaryCurrency && item.missedCycles >= 2).map((item) => ({ key: item.identityKey, label: item.merchant, detail: `${formatCurrency(item.monthlyCost, item.currency)}/mo · ${item.missedCycles} missed cycles` }))} proofEmptyText="No primary-currency evidence is stale." />
+            <MiniStat label="Avg proof rows" value={graph.averageProofRows.toFixed(1)} proofEntries={audit.recurringItems.map((item) => ({ key: item.identityKey, label: item.merchant, detail: `${item.evidence.length} proof row${item.evidence.length === 1 ? "" : "s"}` }))} proofEmptyText="No proof rows are available." />
           </div>
           {graph.nextBestSources.length ? (
             <div className="mt-4 grid gap-2 lg:grid-cols-3">
@@ -4413,9 +4950,7 @@ function ProofGraphPanel({ graph }: { graph: ProofGraphSummary }) {
             <p className="mt-4 rounded-md border border-verdict bg-(--verdict-tint) px-3 py-2 text-sm text-verdict">Every commitment is corroborated by more than one source. This is the strongest proof state the ledger can reach.</p>
           )}
         </>
-      ) : (
-        <p className="inset mt-4 px-3 py-5 text-center text-sm text-(--muted)">Add evidence to see the proof structure behind your recurring money.</p>
-      )}
+      ) : <TaskEmptyState sentence="No proof structure is available until evidence forms a recurring commitment." actionLabel="Connect evidence" onAction={onConnect} />}
     </section>
   );
 }
@@ -4447,7 +4982,7 @@ function verdictColor(action: RecommendationType): string {
   }[action];
 }
 
-function SpendSpectrum({ audit, userActions, onSelect }: { audit: AuditResult; userActions: Record<string, RecommendationType>; onSelect: (id: string) => void }) {
+function SpendSpectrum({ audit, userActions, onSelect, onConnect }: { audit: AuditResult; userActions: Record<string, RecommendationType>; onSelect: (id: string) => void; onConnect: () => void }) {
   const items = audit.recurringItems
     .filter((item) => item.currency === audit.summary.primaryCurrency)
     .sort((left, right) => right.monthlyCost - left.monthlyCost);
@@ -4499,20 +5034,26 @@ function SpendSpectrum({ audit, userActions, onSelect }: { audit: AuditResult; u
             })}
           </div>
         </>
-      ) : (
-        <p className="inset mt-5 px-3 py-6 text-center text-sm text-(--muted)">{hasForeignItems ? `No ${audit.summary.primaryCurrency} commitments yet; foreign commitments remain visible in the ledger.` : "Add sources to see spend by merchant."}</p>
-      )}
+      ) : <TaskEmptyState
+        sentence={hasForeignItems ? `No ${audit.summary.primaryCurrency} commitments are available for this chart.` : "No merchant spend is proven yet."}
+        actionLabel={hasForeignItems ? "Open a commitment" : "Connect evidence"}
+        onAction={() => {
+          const firstItem = audit.recurringItems[0];
+          if (firstItem) onSelect(firstItem.identityKey);
+          else onConnect();
+        }}
+      />}
     </section>
   );
 }
 
-function TickerStat({ label, value, tone }: { label: string; value: string; tone: "ember" | "ochre" | "paper" }) {
+function TickerStat({ label, value, tone, onClick }: { label: string; value: string; tone: "ember" | "ochre" | "paper"; onClick?: () => void }) {
   const color = tone === "ember" ? "var(--ember)" : tone === "ochre" ? "var(--ochre)" : "var(--dossier-ink)";
   return (
-    <div className="flex items-baseline gap-2">
+    <button type="button" onClick={onClick} className="flex items-baseline gap-2 text-left" aria-label={`${label}: ${value}. Open subscriptions`}>
       <span className="eyebrow muted-on-dark" style={{ fontSize: "0.58rem" }}>{label}</span>
       <span className="font-data text-sm font-medium tnum" style={{ color }}>{value}</span>
-    </div>
+    </button>
   );
 }
 
@@ -4522,14 +5063,21 @@ function SectionHead({ folio, kicker, title, desc, right }: { folio: string; kic
       <div>
         <span className="folio" data-folio={folio}>{kicker}</span>
         <h3 className="mt-2 font-display text-[1.22rem] font-semibold text-(--ink)">{title}</h3>
-        {desc ? <p className="mt-1 max-w-xl text-sm leading-6 text-(--muted)">{desc}</p> : null}
+        {desc ? (
+          <details className="mt-1 max-w-xl">
+            <summary className="cursor-pointer select-none font-data text-[0.64rem] uppercase tracking-[0.12em] text-(--muted) transition hover:text-(--ink)">How this works</summary>
+            <p className="mt-1 text-sm leading-6 text-(--muted)">{desc}</p>
+          </details>
+        ) : null}
       </div>
       {right ? <div className="shrink-0">{right}</div> : null}
     </div>
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone: "ink" | "blue" | "caution" | "accent" }) {
+type AggregateProofEntry = { key: string; label: string; detail: string };
+
+function Metric({ label, value, tone, proofEntries, proofEmptyText }: { label: string; value: string; tone: "ink" | "blue" | "caution" | "accent"; proofEntries?: AggregateProofEntry[]; proofEmptyText?: string }) {
   const color = {
     ink: "var(--glow)",
     blue: "var(--indigo)",
@@ -4544,16 +5092,27 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: "i
         <span className="size-1.5 rounded-full" style={{ background: color }} />
       </div>
       <p className="font-data mt-3 text-[1.7rem] font-medium leading-none tnum" style={{ color }}>{value}</p>
+      {proofEntries ? <ProofDisclosure entries={proofEntries} emptyText={proofEmptyText ?? "No evidence composes this value."} /> : null}
       <span className="mt-3 block h-px w-full" style={{ background: `color-mix(in srgb, ${color} 40%, var(--line))` }} />
     </div>
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
+function MiniStat({ label, value, proofEntries, proofEmptyText }: { label: string; value: string; proofEntries?: AggregateProofEntry[]; proofEmptyText?: string }) {
   return (
     <div className="inset px-3 py-2.5">
       <p className="eyebrow" style={{ fontSize: "0.62rem" }}>{label}</p>
       <p className="font-data mt-1.5 text-sm font-semibold tnum text-(--ink)">{value}</p>
+      {proofEntries ? <ProofDisclosure entries={proofEntries} emptyText={proofEmptyText ?? "No evidence composes this value."} /> : null}
+    </div>
+  );
+}
+
+function TaskEmptyState({ sentence, actionLabel, onAction }: { sentence: string; actionLabel: string; onAction: () => void }) {
+  return (
+    <div className="inset mt-4 flex flex-col items-center gap-4 px-4 py-6 text-center">
+      <p className="text-sm leading-6 text-(--muted)">{sentence}</p>
+      <button type="button" onClick={onAction} className="btn btn-primary h-9 px-3 text-xs">{actionLabel}</button>
     </div>
   );
 }

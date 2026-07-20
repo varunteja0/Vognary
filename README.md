@@ -71,8 +71,10 @@ npm run build
 npm run lint
 npm test
 npm run smoke
+npm run load:gate -- http://127.0.0.1:3000
 npm run production:check -- https://www.vognary.com
 npm run ops:preflight -- --report-only https://www.vognary.com
+npm run release:gate -- --plan https://www.vognary.com
 npm run monitoring:test -- https://www.vognary.com
 npm run partner-rails:check
 ```

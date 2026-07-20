@@ -10,6 +10,8 @@ Run this after every setup change:
 npm run production:check -- https://www.vognary.com
 ```
 
+The command loads `.env.production.local` when it exists. `/api/readiness` is intentionally internal-only: keep its guard in place and set the operator-only `PRODUCTION_INTERNAL_SYNC_SECRET` to the deployed `INTERNAL_SYNC_SECRET`. A `401` is configuration drift between the operator copy and the deployed secret, not a reason to make readiness public.
+
 Run strict mode only when you expect every external service to be configured:
 
 ```bash
@@ -17,6 +19,8 @@ npm run production:check -- https://www.vognary.com --strict
 ```
 
 Stop if endpoint health fails. Continue if only external activation is incomplete.
+
+Before a release candidate, preview the complete non-mutating gate plan with `npm run release:gate -- --plan https://www.vognary.com`. The real gate additionally requires a disposable `RELEASE_DATABASE_URL`, `RELEASE_CONFIRM_DISPOSABLE=true`, and the two `VOGNARY_E2E_DEV_LOGIN_*` values. It rejects the same normalized database identity even when credentials/query parameters differ, clears only disposable rate-limit buckets before browser tests, shadows production provider credentials with blank values in local child processes (including keys found in Next-loaded env files), writes browser evidence under ignored `output/release-evidence/`, and runs the audit/PDF load budget only against its loopback production-build server. `npm run load:gate` itself permanently rejects non-loopback targets.
 
 ## 1. Persist Private Audit Leads
 
@@ -68,7 +72,7 @@ Goal: a durably stored private-audit lead can create one tracked INR 999 assiste
 Static `PAYMENT_LINK_*` URLs and legacy monitoring plans are not exposed in Vognary 1.0.
 
 1. Complete Razorpay business/KYC activation and create keys for the intended mode. Follow Razorpay's current official key instructions: `https://razorpay.com/docs/payments/dashboard/settings/api-keys/`.
-2. Apply migrations through `0021_pending_connector_consent` to the production database.
+2. Apply migrations through `0022_weekly_digest` to the production database.
 3. Obtain qualified legal review of Terms and Privacy. Only after approval, configure `ASSISTED_AUDIT_LEGAL_TERMS_STATUS=approved` with `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, a live-mode `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET`. The INR 999 amount is server-owned.
 4. In Razorpay, configure `https://www.vognary.com/api/billing/webhooks/razorpay` as the webhook URL using the same independently generated webhook secret. Follow the current official webhook instructions: `https://razorpay.com/docs/webhooks/setup-edit-payments/`.
 5. Subscribe the webhook to `payment_link.paid`, `payment_link.cancelled`, `payment_link.expired`, and `refund.processed`.
@@ -659,7 +663,7 @@ Stop condition:
 - Do not publish a partner/API availability claim until migration `0008` is ready, the unauthenticated checks return `401`, an authorized
   test token returns only its allowed workspace data, revocation is verified, and rate limiting is active.
 
-## 9. Account Aggregator / UPI / Card Mandate Partners
+## 9. Account Aggregator launch rail and follow-on mandate rails
 
 These cannot be completed in code alone. They need business and regulatory access.
 
@@ -692,13 +696,16 @@ Status env rule:
 Run the exact-status validator before changing production envs:
 
 ```bash
+npm run core-connectors:check
 npm run partner-rails:check
 ```
 
 - `outreach-started` means email/contact form sent.
 - `sandbox-requested` means partner acknowledged and requested onboarding material.
 - `sandbox-approved` means sandbox credentials or invitation exists.
-- `production-live` means signed production access, approved consent, production credentials, and at least one production consent test. Strict production only passes when Account Aggregator, UPI, and card mandate statuses are all `production-live`.
+- `production-live` means signed production access, approved consent, production credentials, and at least one production consent test.
+- Public-launch strictness requires verified Gmail plus production-live Account Aggregator (`core-connectors:check`).
+- `partner-rails:check` remains the stricter long-term moat gate and passes only when Account Aggregator, UPI, and card mandate statuses are all `production-live`.
 
 Stop condition:
 

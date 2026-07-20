@@ -82,11 +82,23 @@ function checkBackupKey() {
 
 async function readProductionReadiness(baseUrl) {
   try {
+    const targetInternalSecret = process.env.PRODUCTION_INTERNAL_SYNC_SECRET?.trim()
+      || process.env.INTERNAL_SYNC_SECRET?.trim()
+      || "";
     const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/readiness`, {
-      headers: { authorization: `Bearer ${process.env.INTERNAL_SYNC_SECRET ?? ""}` },
+      headers: { authorization: `Bearer ${targetInternalSecret}` },
       signal: AbortSignal.timeout(8000),
     });
     const payload = await response.json();
+    if (response.status === 401) {
+      return {
+        baseUrl,
+        httpStatus: response.status,
+        ready: false,
+        error: "Production readiness authentication failed. The operator secret does not match the deployed INTERNAL_SYNC_SECRET.",
+        blocked: ["readinessAuthentication"],
+      };
+    }
     const hardening = payload.hardening ?? {};
     const capabilityQueriesReady = [
       payload.capabilities?.privacyLifecycle,

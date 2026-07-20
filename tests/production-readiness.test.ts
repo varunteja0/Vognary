@@ -31,6 +31,7 @@ test("feature readiness checks every persistent capability migration with bounde
     "0019_verified_outcome_loop",
     "0020_authorization_evidence",
     "0021_pending_connector_consent",
+    "0022_weekly_digest",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -87,6 +88,12 @@ test("CI browser journeys exercise the built Next.js production artifact", () =>
   assert.match(server, /cpSync[\s\S]*public/);
 });
 
+test("standalone PDF ingestion preserves the dynamically loaded pdf.js worker", () => {
+  const config = read("next.config.ts");
+  assert.match(config, /serverExternalPackages: \["pdf-parse"\]/);
+  assert.match(config, /"\/api\/ingest": \["\.\/node_modules\/pdfjs-dist\/legacy\/build\/pdf\.worker\.mjs"\]/);
+});
+
 test("internal readiness distinguishes schema, observed evidence, and operator attestation", () => {
   const source = read("src/app/api/readiness/route.ts");
   assert.match(source, /capabilities: features/);
@@ -109,10 +116,13 @@ test("internal readiness distinguishes schema, observed evidence, and operator a
 test("activation probes are bounded and cover private lifecycle, renewal, decisions, and platform guards", () => {
   const source = read("scripts/check-production-activation.mjs");
   assert.match(source, /AbortSignal\.timeout\(8_000\)/);
+  assert.match(source, /PRODUCTION_INTERNAL_SYNC_SECRET/);
+  assert.match(source, /Set PRODUCTION_INTERNAL_SYNC_SECRET to the deployed INTERNAL_SYNC_SECRET/);
   for (const id of [
     "feature-migrations",
     "privacy-lifecycle",
     "renewal-alerts",
+    "core-connectors",
     "platform-api",
     "workspace-decisions-auth-guard",
     "workspace-proof-graph-auth-guard",
@@ -137,6 +147,9 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.match(source, /target activation evidence/);
   assert.match(source, /capabilities\?\.schema\?\.status === "ready"/);
   assert.match(source, /betaReady: endpointReport\.every\(\(item\) => item\.ok\)/);
+  assert.match(source, /envReport\.filter\(\(item\) => item\.launchBlocking\)/);
+  assert.match(source, /coreConnectorLaunch/);
+  assert.match(source, /launchBlocking: false/);
   assert.match(source, /id: "audit-intake-status"/);
   assert.doesNotMatch(source, /name: "Activation Check"/);
   assert.doesNotMatch(source, /id: "monitoring-delivery-test"/);
@@ -145,6 +158,7 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
 test("operator evidence flags default blank and the runbook forbids secret-only activation claims", () => {
   const env = read(".env.example");
   const runbook = read("docs/production-activation-runbook.md");
+  const preflight = read("scripts/check-ops-preflight.mjs");
   for (const name of ["SYNC_SCHEDULER_STATUS", "RENEWAL_ALERT_DELIVERY_STATUS", "RETENTION_SCHEDULER_STATUS"]) {
     assert.match(env, new RegExp(`^${name}=$`, "m"));
     assert.match(runbook, new RegExp(`${name}=production-live`));
@@ -152,6 +166,10 @@ test("operator evidence flags default blank and the runbook forbids secret-only 
   assert.match(runbook, /CRON_SECRET[\s\S]*does not prove the schedule is deployed or firing/);
   assert.match(runbook, /operator attestation rather than independent scheduler telemetry/);
   assert.match(runbook, /does not label the API as adopted by a partner/);
+  assert.match(env, /^PRODUCTION_INTERNAL_SYNC_SECRET=$/m);
+  assert.match(runbook, /401.*configuration drift between the operator copy and the deployed secret/);
+  assert.match(preflight, /PRODUCTION_INTERNAL_SYNC_SECRET/);
+  assert.match(preflight, /readinessAuthentication/);
 });
 
 test("public health remains a minimal liveness surface", () => {
@@ -174,5 +192,5 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.doesNotMatch(source, /\/api\/connectors\/anthropic-usage\/(?:start|sync)["`]/);
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[200, 401, 501\]/);
-  assert.match(activation, /Feature migrations 0002 through 0021/);
+  assert.match(activation, /Feature migrations 0002 through 0022/);
 });
