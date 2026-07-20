@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
+import OfflineBanner from "./offline-banner";
 import { scrollIntoViewWithMotion } from "@/lib/client-motion";
 import { encodeCsvCell } from "@/lib/csv";
 import { connectors, type Connector, type ConnectorStatus } from "@/lib/connectors";
@@ -2270,6 +2271,7 @@ export default function VognaryMvpClient() {
         onDismiss={() => setNotice(null)}
         action={undoAvailable ? { label: "Undo", onClick: undoLastDestructiveAction } : undefined}
       />
+      <OfflineBanner />
       {syncCelebration ? (
         <div className="fixed inset-0 z-70 grid place-items-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="sync-celebration-heading">
           <section className="panel w-full max-w-xl overflow-hidden">

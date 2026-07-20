@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { VognaryMark } from "../brand";
+
+export const metadata: Metadata = {
+  title: "Integration model",
+  description:
+    "One ledger, many official rails: how Vognary brings in evidence through OAuth consent, scoped tokens, webhooks, and regulated partner APIs — each labeled with its honest state.",
+};
 
 const integrationPatterns = [
   ["OAuth consent", "Google, Microsoft, GitHub, Slack, Notion, Zoom, PayPal", "Redirect user to the official provider, receive code, store encrypted token reference, sync evidence."],
