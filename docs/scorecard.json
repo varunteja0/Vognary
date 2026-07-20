@@ -1,0 +1,21 @@
+{
+  "$comment": "Founder-maintained ledger for the human rows. The mentor script NEVER invents these values - update them with real numbers only, then run `npm run mentor`. Dates are ISO. null means not yet recorded.",
+  "updatedAt": "2026-07-20",
+  "validation": {
+    "score": 2,
+    "revenueInr": 0,
+    "paidAudits": 0,
+    "note": "No real revenue yet; 999 INR intake live, checkout gated on legal + Razorpay proofs."
+  },
+  "distribution": {
+    "score": 2.5,
+    "activeUsers": 0,
+    "outreachLast7d": 0,
+    "note": "No users yet; outreach cadence not started."
+  },
+  "activation": {
+    "blockAComplete": false,
+    "googleVerificationSubmitted": false,
+    "note": "Founder chain not started; see docs/founder-activation-checklist.md."
+  }
+}
