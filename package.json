@@ -42,6 +42,7 @@
     "secrets:generate-token-key": "node scripts/generate-token-encryption-key.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.3",
     "jose": "^6.2.3",
     "jspdf": "^4.2.1",
     "next": "16.2.10",
