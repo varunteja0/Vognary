@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { formatMoney, formatShortDate } from "@/lib/format";
 import type { InstantAuditResult } from "./instant-audit-engine";
 
 type Engine = typeof import("./instant-audit-engine");
@@ -107,13 +108,4 @@ function InstantMetric({ label, value, detail }: { label: string; value: string;
       {detail ? <p className="mt-0.5 text-xs muted-on-dark">{detail}</p> : null}
     </div>
   );
-}
-
-function formatMoney(value: number, currency: string) {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
-}
-
-function formatShortDate(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(new Date(year, month - 1, day));
 }
