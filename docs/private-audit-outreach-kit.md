@@ -58,7 +58,7 @@ You can redact sensitive details. No passwords, OTPs, CVV, or bank credentials.
 
 I am taking a small assisted-audit batch this week.
 The current one-time assisted audit is INR 999 for one request; it does not auto-renew or include monitoring.
-Online payment is offered only when tracked checkout is activated. If I find nothing useful, request a refund before evidence review closes.
+Online payment is offered only when tracked checkout is activated. You can request a full refund any time before evidence review begins; after review begins, eligibility follows the Terms.
 
 Intake link (no login needed): https://www.vognary.com/private-audit?src=li-post
 ```

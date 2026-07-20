@@ -262,8 +262,8 @@ export default function PrivateAuditClient() {
                 onChange={(next) => setForm({ ...form, sourceTypes: next })}
               />
               <div className="mt-5 grid gap-2">
-                <label className="text-sm font-semibold text-(--ink)">Anything specific to audit?</label>
-                <textarea value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="field min-h-28" placeholder="Example: AI tools, AWS, domains, card mandates, SIPs, EMIs, app-store subscriptions..." />
+                <label htmlFor="private-audit-message" className="text-sm font-semibold text-(--ink)">Anything specific to audit?</label>
+                <textarea id="private-audit-message" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="field min-h-28" placeholder="Example: AI tools, AWS, domains, card mandates, SIPs, EMIs, app-store subscriptions..." />
               </div>
             </details>
 

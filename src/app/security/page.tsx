@@ -1,13 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { VognaryMark } from "../brand";
+import { getPublicTrustSignals, type TrustSignalState } from "@/lib/server/trust-signals";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Security",
   description: "How Vognary protects submitted evidence, account data, connected sources, and recurring-spend audit results.",
 };
 
+const stateLabels: Record<TrustSignalState, string> = {
+  proven: "Proven",
+  configured: "Configured",
+  "not-yet-proven": "Not yet proven",
+};
+
+const statePills: Record<TrustSignalState, string> = {
+  proven: "pill-ready",
+  configured: "pill-partial",
+  "not-yet-proven": "pill-planned",
+};
+
 export default function SecurityPage() {
+  const signals = getPublicTrustSignals();
   return (
     <main className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
@@ -29,6 +45,21 @@ export default function SecurityPage() {
                 <p className="mt-2 text-sm leading-6 text-(--muted)">{item.body}</p>
               </div>
             ))}
+          </div>
+          <div className="mt-10">
+            <h2 className="font-display text-xl font-semibold text-(--ink)">Live status - measured, not promised</h2>
+            <p className="mt-2 text-sm leading-6 text-(--muted)">These states are read from this deployment&apos;s configuration each time the page loads. Anything unproven is labeled that way.</p>
+            <div className="mt-4 grid gap-3">
+              {signals.map((signal) => (
+                <div key={signal.id} className="inset p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-display text-base font-semibold text-(--ink)">{signal.label}</h3>
+                    <span className={`pill ${statePills[signal.state]}`}>{stateLabels[signal.state]}</span>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-(--muted)">{signal.detail}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </article>
       </div>

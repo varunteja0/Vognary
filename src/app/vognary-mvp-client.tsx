@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
+import OfflineBanner from "./offline-banner";
 import { scrollIntoViewWithMotion } from "@/lib/client-motion";
 import { encodeCsvCell } from "@/lib/csv";
 import { connectors, type Connector, type ConnectorStatus } from "@/lib/connectors";
@@ -2270,6 +2271,7 @@ export default function VognaryMvpClient() {
         onDismiss={() => setNotice(null)}
         action={undoAvailable ? { label: "Undo", onClick: undoLastDestructiveAction } : undefined}
       />
+      <OfflineBanner />
       {syncCelebration ? (
         <div className="fixed inset-0 z-70 grid place-items-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="sync-celebration-heading">
           <section className="panel w-full max-w-xl overflow-hidden">
@@ -4207,6 +4209,7 @@ function SubscriptionDetailSheet({
   const headingId = `subscription-detail-${item.identityKey.replace(/[^a-z0-9]+/gi, "-")}`;
 
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- Escape (window keydown above) is the keyboard close path; backdrop click is a pointer-only convenience.
     <div
       className="fixed inset-0 z-70 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
       role="dialog"
@@ -4214,6 +4217,7 @@ function SubscriptionDetailSheet({
       aria-labelledby={headingId}
       onClick={onClose}
     >
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- only stops backdrop-close propagation for pointer clicks; keyboard flow is unaffected. */}
       <section
         className="panel flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-b-none rounded-t-2xl sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}

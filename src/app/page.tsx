@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { VognaryMark } from "./brand";
 import { Nakul } from "./character";
+import InstantAudit from "./instant-audit";
 
 const checks = [
   {
@@ -33,12 +34,6 @@ const steps = [
 ];
 
 const trust = ["Proof over guesses", "No bank passwords", "Missing sources named", "Delete anytime"];
-
-const firstResult = [
-  "Your recurring monthly total",
-  "The next renewal date",
-  "One ranked action with its source proof",
-];
 
 const proofRows = [
   { source: "Gmail receipts", proves: "Invoices, renewals, trial reminders, payment-success emails", status: "First connector" },
@@ -102,14 +97,10 @@ export default function Home() {
             </div>
             <div className="relative border-t border-(--dossier-line) p-7 sm:p-10 lg:border-l lg:border-t-0">
               <p className="eyebrow muted-on-dark">Your first result</p>
-              <div className="mt-4 flex flex-col gap-3">
-                {firstResult.map((item) => (
-                  <div key={item} className="rounded-[10px] border p-3 text-sm leading-6 muted-on-dark" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
-                    {item}
-                  </div>
-                ))}
+              <div className="mt-4">
+                <InstantAudit />
               </div>
-              <Link href="/app" prefetch={false} className="btn btn-primary btn-block mt-6">Start with receipt paste</Link>
+              <Link href="/app" prefetch={false} className="btn btn-ondark btn-block mt-4">Open the full audit</Link>
               <div className="mt-6 flex items-end justify-between gap-3 border-t border-(--dossier-line) pt-5">
                 <p className="max-w-[15rem] text-xs leading-5 muted-on-dark">
                   Nakul, the ledger mongoose, watches every commitment you prove — and flags the renewal before it charges.

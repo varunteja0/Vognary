@@ -31,6 +31,9 @@ const nextConfig: NextConfig = {
     inlineCss: true,
   },
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  // Keep the dev-tools indicator away from the bottom-left, where it paints
+  // over the detail-sheet footer and the workspace sidebar's watch summary.
+  devIndicators: { position: "top-right" },
   poweredByHeader: false,
   async redirects() {
     return [

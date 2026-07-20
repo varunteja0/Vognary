@@ -5,6 +5,7 @@ const root = process.cwd();
 const publicSurfaces = [
   "README.md",
   "src/app/page.tsx",
+  "src/app/instant-audit.tsx",
   "src/app/guest-audit-client.tsx",
   "src/app/vognary-mvp-client.tsx",
   "src/app/sources/page.tsx",
@@ -23,10 +24,12 @@ const publicSurfaces = [
   "src/app/terms/page.tsx",
   "src/app/beta-readiness/page.tsx",
   "src/app/integration-model/page.tsx",
+  "src/app/guide/page.tsx",
   "src/app/manifest.ts",
   "public/brand/vognary-social-card.svg",
   "src/lib/connectors.ts",
   "src/lib/connect-rails.ts",
+  "src/lib/server/trust-signals.ts",
   "docs/platform-api.md",
 ];
 
@@ -42,6 +45,8 @@ const prohibitedClaims = [
   { pattern: /guaranteed savings/i, reason: "savings require source-scoped outcome verification" },
   { pattern: /100% secure/i, reason: "no internet service can claim absolute security" },
   { pattern: /fully automated across all/i, reason: "automation and coverage remain source-specific" },
+  { pattern: /\blink(?:ed|ing|s)?[^.\n]{0,30}\bmerchants?\b/i, reason: "merchants are watched, never linked" },
+  { pattern: /\bmerchants?[^.\n]{0,30}\blink(?:ed|ing|s)?\b/i, reason: "merchants are watched, never linked" },
 ];
 
 const violations = [];

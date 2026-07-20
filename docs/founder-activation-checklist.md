@@ -4,6 +4,25 @@ Everything code-side is shipped and verified. This file is the complete list of
 steps only the founder can perform (accounts, secrets, paperwork, sends).
 Do them in order; each block ends with a verification step — do not skip it.
 
+## The ordered chain — what to do, in what order, and the command that proves it
+
+Composite readiness is scored on the **minimum row** (`docs/path-to-10.md`), so
+the fastest path up is always the lowest unproven row below. Blocks B, D, F,
+and G have external lead times — start them early and run them in parallel;
+everything else is sequential.
+
+| # | Block | Owner | Expected duration | What it unlocks | Proof |
+| --- | --- | --- | --- | --- | --- |
+| 1 | A — Production env, Resend, cron | Founder | ~45 min + overnight cron check | Persistence, alerts, intake, signed packs | `npm run ops:preflight` (all P0 rows pass) |
+| 2 | B — Google restricted-scope verification (G-A) | Founder + Google review | ~1 h to submit; 2–8 weeks review + CASA assessment | Public Gmail read-only rail | `npm run core-connectors:check` |
+| 3 | D — Partner-rail outreach → AA sandbox (G-B) | Founder + partner | 30 min first send; days–weeks to sandbox | Bank-rail sandbox; first-sync moment | `npm run partner-rails:check` |
+| 4 | F — Consented evidence corpora | Founder + consenting users | Rolling until ≥100 statements, ≥200 receipts | Parser-quality strict gates | `npm run corpus:strict && npm run receipt-corpus:strict` |
+| 5 | G — Razorpay KYC + legal sign-off | Founder + counsel + Razorpay | 1–3 weeks | ₹999 assisted-audit checkout | `npm run production:check -- https://www.vognary.com --strict` |
+| 6 | C — AWS Cost Explorer demo asset | Founder | 15 min (+24 h for data) | Live connector demo | Workspace shows AWS evidence |
+| 7 | E — Standing business steps | Founder | Daily | Revenue validation (the scoring floor) | `npm run research:check` + tracker log |
+| 8 | H — FIU/TSP production agreement (G-C) | Founder + partner + compliance | 4–10 weeks (needs Block D) | Production regulated bank rail | Authenticated `/api/readiness` → `hardening.coreConnectorLaunch` = `production-live` |
+| 9 | I — Release canary | Founder | 24–48 h (after 1–8) | Public launch | `docs/public-launch-final-checklist.md` Phase 6 evidence |
+
 ---
 
 ## Block A — Vercel environment variables (one sitting, ~45 min)
@@ -70,6 +89,8 @@ only apply to new deployments).
    opted-in renewal alert email sends, also set
    `RENEWAL_ALERT_DELIVERY_STATUS` = `production-live`.
 5. Delete the temporary key file from A1.
+6. Machine proof: `npm run ops:preflight` against the production target — every
+   P0 row must pass. Email delivery proof: `npm run monitoring:test`.
 
 ---
 
@@ -99,8 +120,12 @@ includes you, the operator — enough for delivering paid audits today).
 9. When ready for the public: OAuth consent screen → **Publish app** → follow the
    verification prompts. `gmail.readonly` is a restricted scope: Google will
    require app verification and a CASA security assessment (third-party lab,
-   annual, budget for it). Set `GOOGLE_OAUTH_VERIFICATION_COMPLETE=true` only
-   when Google confirms approval.
+   annual, budget for it). Expect 2–8 weeks end to end, and prepare a short
+   screen-recorded demo video of the full consent → sync → disconnect → delete
+   flow — Google's reviewers ask for it. Set
+   `GOOGLE_OAUTH_VERIFICATION_COMPLETE=true` only when Google confirms approval.
+10. Machine proof: `npm run core-connectors:check` — the Gmail rail row must
+    report launch-ready with verification complete.
 
 ---
 
@@ -134,6 +159,13 @@ includes you, the operator — enough for delivering paid audits today).
 4. Only after the first send: Vercel env
    `ACCOUNT_AGGREGATOR_PARTNER_STATUS` = `outreach-started` (exact value; the
    playbook forbids anything not literally true).
+5. When a partner grants sandbox access (G-B): set the `SETU_AA_CLIENT_ID`,
+   `SETU_AA_CLIENT_SECRET`, `SETU_AA_PRODUCT_INSTANCE_ID`, and sandbox
+   `SETU_AA_BASE_URL` env values, and advance the status env through
+   `sandbox-requested` → `sandbox-approved` — each value only after it is
+   literally true.
+6. Machine proof: `npm run partner-rails:check` — the reported stage must match
+   the paperwork you actually hold, nothing further.
 
 ---
 
@@ -147,3 +179,58 @@ includes you, the operator — enough for delivering paid audits today).
 3. Send **20 personalized messages a day**, logged in the tracker. The paid
    audits are what make Google, AWS partners, and AA TSPs say yes to
    everything above.
+
+---
+
+## Block F — Consented evidence corpora (rolling; gates parser quality)
+
+The statement and receipt parsers are gated on real, consented, redacted
+fixtures — force-greening with synthetic data is deliberately rejected, and the
+fixtures stay out of Git.
+
+1. Follow `docs/receipt-corpus-runbook.md` for collection, consent language,
+   redaction, and storage location.
+2. Targets: at least **100 redacted statement ranges** and **200 receipts**,
+   spread across the banks and merchants real users actually have.
+3. Machine proof: `npm run corpus:strict && npm run receipt-corpus:strict` —
+   both must pass on real fixture counts, not report `collection-required`.
+
+---
+
+## Block G — Razorpay activation and legal sign-off (1–3 weeks; unlocks the ₹999 SKU)
+
+1. Complete Razorpay KYC for the operating entity and create live keys; add
+   `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` in Vercel.
+2. Qualified legal review of the Terms, including the refund boundary (Terms
+   §12: full refund before evidence review begins). Set
+   `ASSISTED_AUDIT_LEGAL_TERMS_STATUS` only after counsel approves.
+3. Prove each payment control against the live account — signed webhook
+   delivery, replay rejection, a real refund, and reconciliation — and set the
+   matching `RAZORPAY_*_STATUS` attestation only after each observed proof.
+4. Machine proof: `npm run production:check -- https://www.vognary.com --strict`
+   — the payments row must clear, with no attestation set ahead of its evidence.
+
+---
+
+## Block H — FIU/TSP production agreement (4–10 weeks; the regulated bank rail, G-C)
+
+Prerequisite: Block D has reached a working sandbox.
+
+1. Convert the winning AA/TSP sandbox relationship into a production agreement:
+   FIU onboarding, compliance review, and consent-artifact audit per the
+   partner's process.
+2. Only when the partner confirms production access: set production
+   `SETU_AA_*` values and `ACCOUNT_AGGREGATOR_PARTNER_STATUS=production-live`.
+3. Machine proof: authenticated `/api/readiness` must report
+   `hardening.coreConnectorLaunch` = `production-live`, and
+   `npm run partner-rails:check` must agree.
+
+---
+
+## Block I — Release canary (24–48 h; the last gate before public)
+
+1. Run one fresh desktop and one fresh mobile journey through the canonical
+   paths, then hold a 24–48 hour invite-only canary before announcing.
+2. The journey list, evidence format, and sign-off ledger are owned by
+   `docs/public-launch-final-checklist.md` (Phase 6) — record the canary there,
+   not here.

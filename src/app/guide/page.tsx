@@ -16,7 +16,7 @@ const chapters = [
     lead: "Three ways in — use any one, add the rest later.",
     pose: "guide" as const,
     points: [
-      ["Link live sources", "Sign in and connect Gmail receipts (read-only) or provider billing APIs. Linked sources refresh on their own and are labeled with their true state — live, needs setup, or needs a partner. Vognary never asks for a bank password."],
+      ["Connect live sources", "Sign in and connect Gmail receipts (read-only) or provider billing APIs. Connected sources refresh on their own and are labeled with their true state — live, needs setup, or needs a partner. Vognary never asks for a bank password."],
       ["Paste receipts", "Copy any renewal email or invoice into the paste box. Two receipts are enough for a first result, and in guest mode they never leave your tab."],
       ["Import a statement", "Drop a bank CSV or PDF export. The original file is processed for that request and not intentionally retained; only the converted evidence rows stay with you."],
     ],

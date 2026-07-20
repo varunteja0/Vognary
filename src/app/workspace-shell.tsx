@@ -127,7 +127,7 @@ export function WorkspaceSidebar({
                 {watching > 0 ? `Watching ${watching} commitment${watching === 1 ? "" : "s"}` : "Nothing to watch yet"}
               </p>
               <p className="mt-1 text-[0.68rem] leading-3.5 text-(--muted)">
-                {watching > 0 ? "Nakul flags every renewal before it charges." : "Link a source and Nakul starts the watch."}
+                {watching > 0 ? "Nakul flags every renewal before it charges." : "Connect a source and Nakul starts the watch."}
               </p>
             </div>
           </div>

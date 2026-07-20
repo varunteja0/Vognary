@@ -1,12 +1,16 @@
 # Vognary Market Entry Research
 
+> Status (2026-07): historical research. Monthly monitoring is not a current SKU; the live
+> revenue ladder is `docs/path-to-10.md` Part IV. Monitoring framings below are retained for
+> research context and are marked "not a current offer" where they read as offers.
+
 ## Working Thesis
 
 Vognary should not enter as another budgeting app, expense tracker, or generic SaaS procurement platform. The strongest entry point is an evidence-first recurring-money audit for founders, freelancers, lean teams, and modern households that have payments scattered across cards, UPI AutoPay, bank debits, email receipts, app stores, cloud APIs, SaaS seats, domains, insurance, EMIs, and SIPs.
 
 The market is real because recurring commitments are increasing, but visibility is fragmented. The opening is not simply "track subscriptions." Many products already say that. The opening is: "prove every recurring commitment, show what source proved it, show what source is missing, and turn that into an action workflow."
 
-Falsifiable hypothesis: if Vognary runs 30 private founder audits, at least 60% should find one avoidable recurring cost or unmanaged renewal, and at least 10 users should pay or prepay for monthly monitoring. If this fails, the wedge is too weak or the audience is wrong.
+Falsifiable hypothesis: if Vognary runs 30 private founder audits, at least 60% should find one avoidable recurring cost or unmanaged renewal, and at least 10 users should pay or prepay for monthly monitoring (superseded framing: monitoring is not a current offer; the hypothesis is retained for historical context). If this fails, the wedge is too weak or the audience is wrong.
 
 ## What We Already Have
 
@@ -248,7 +252,7 @@ Ship:
 
 Conversion trigger:
 
-- "You found Rs X/month. Keep monitoring so it does not come back."
+- "You found Rs X/month. Keep monitoring so it does not come back." (superseded conversion line: monitoring is not a current offer)
 - "Next 7 debits are coming. Review before they hit."
 
 ### Stage 4: India Consent/AA Path
@@ -320,7 +324,7 @@ Stop condition:
 
 ### Next 90 Days
 
-1. Convert paid audit users into monthly monitoring beta.
+1. Convert paid audit users into monthly monitoring beta (superseded: monitoring is not a current offer).
 2. Ship accounts, persistence, deletion, and audit logs.
 3. Promote Gmail from preview to persisted receipt intelligence only after auth/storage is ready.
 4. Add the highest-value SaaS/cloud connectors based on real audit evidence.
@@ -338,7 +342,7 @@ Track these weekly:
 - Number of recurring commitments found per audit.
 - Source coverage score distribution.
 - Paid conversion.
-- Monthly monitoring prepayments.
+- Monthly monitoring prepayments (superseded metric: monitoring is not a current offer).
 - Top missing source types.
 - Top requested connectors.
 - Time to first value.
