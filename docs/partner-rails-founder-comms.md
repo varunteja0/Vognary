@@ -272,7 +272,7 @@ Understood. Do you have a TSP/partner route where Vognary can validate the produ
 Reply:
 
 ```text
-We are in private beta. The goal is sandbox validation first, then paid audits and recurring monitoring. If sandbox confirms the data surface, we can route qualified early users or merchants into the approved production path.
+We are in private beta. The goal is sandbox validation first, then paid audits. If sandbox confirms the data surface, we can route qualified early users or merchants into the approved production path.
 ```
 
 ### "Are you trying to cancel mandates?"
