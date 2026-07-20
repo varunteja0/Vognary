@@ -99,11 +99,14 @@ function tokenVaultSignal(): PublicTrustSignal {
 function backupSignal(): PublicTrustSignal {
   const backups = checkBackupConfiguration();
   if (backups.status === "configured") {
+    const drillDate = parseAttestationDate(process.env.BACKUP_RESTORE_DRILL_AT);
     return {
       id: "backups",
       label: "Encrypted backups and restore drill",
       state: "proven",
-      detail: "Backup storage, an encryption-key proof, and a successful restore drill are recorded for this deployment.",
+      detail: drillDate
+        ? `Backup storage, an encryption-key proof, and a successful restore drill (${drillDate}) are recorded for this deployment.`
+        : "Backup storage, an encryption-key proof, and a successful restore drill are recorded for this deployment.",
     };
   }
   if (backups.storage === "configured") {
@@ -183,6 +186,12 @@ function bankRailSignal(): PublicTrustSignal {
     state: "not-yet-proven",
     detail: "No regulated partner rail is engaged; Vognary offers no direct bank, UPI, or card-mandate access.",
   };
+}
+
+function parseAttestationDate(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed || !/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+  return Number.isNaN(new Date(`${trimmed}T00:00:00Z`).getTime()) ? null : trimmed;
 }
 
 function attestationSignal(

@@ -4209,6 +4209,7 @@ function SubscriptionDetailSheet({
   const headingId = `subscription-detail-${item.identityKey.replace(/[^a-z0-9]+/gi, "-")}`;
 
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- Escape (window keydown above) is the keyboard close path; backdrop click is a pointer-only convenience.
     <div
       className="fixed inset-0 z-70 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
       role="dialog"
@@ -4216,6 +4217,7 @@ function SubscriptionDetailSheet({
       aria-labelledby={headingId}
       onClick={onClose}
     >
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- only stops backdrop-close propagation for pointer clicks; keyboard flow is unaffected. */}
       <section
         className="panel flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-b-none rounded-t-2xl sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}

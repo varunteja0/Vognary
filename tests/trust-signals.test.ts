@@ -10,6 +10,7 @@ const names = [
   "S3_BUCKET",
   "R2_BUCKET",
   "BACKUP_RESTORE_DRILL_STATUS",
+  "BACKUP_RESTORE_DRILL_AT",
   "BACKUP_KEY_FINGERPRINT",
   "BACKUP_ENCRYPTION_KEY",
   "GOOGLE_OAUTH_VERIFICATION_COMPLETE",
@@ -90,6 +91,32 @@ test("partial backup configuration stays below proven", () => {
     const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
     assert.equal(byId.get("backups")?.state, "configured");
     assert.match(byId.get("backups")?.detail ?? "", /restore drill has not been recorded/i);
+  });
+});
+
+test("a dated restore-drill attestation appears in the proven backup detail", () => {
+  withEnvironment({
+    BACKUP_STORAGE_BUCKET: "vognary-backups",
+    BACKUP_RESTORE_DRILL_STATUS: "passed",
+    BACKUP_RESTORE_DRILL_AT: "2026-07-19",
+    BACKUP_KEY_FINGERPRINT: "test-fingerprint",
+  }, () => {
+    const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
+    assert.equal(byId.get("backups")?.state, "proven");
+    assert.match(byId.get("backups")?.detail ?? "", /2026-07-19/);
+  });
+});
+
+test("a malformed restore-drill date is ignored, never rendered", () => {
+  withEnvironment({
+    BACKUP_STORAGE_BUCKET: "vognary-backups",
+    BACKUP_RESTORE_DRILL_STATUS: "passed",
+    BACKUP_RESTORE_DRILL_AT: "not-a-date",
+    BACKUP_KEY_FINGERPRINT: "test-fingerprint",
+  }, () => {
+    const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
+    assert.equal(byId.get("backups")?.state, "proven");
+    assert.ok(!(byId.get("backups")?.detail ?? "").includes("not-a-date"));
   });
 });
 
