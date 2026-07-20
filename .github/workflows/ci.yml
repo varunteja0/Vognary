@@ -34,7 +34,10 @@ jobs:
       - run: npm ci
       - run: npm run ci:database
       - run: npm run lint
+      - run: npm run typecheck
       - run: npm run claims:check
+      - run: npm run research:check
+      - run: npm run brand:check
       - run: npm test
       - run: npm run corpus
       - run: npm run build
@@ -43,6 +46,46 @@ jobs:
       - name: Enforce Lighthouse budgets
         run: CHROME_PATH="$(node -e "console.log(require('@playwright/test').chromium.executablePath())")" npm run perf:lighthouse
       - run: npm run test:e2e
+      - name: Start dev server for signed-in e2e (development login)
+        env:
+          ENABLE_DEVELOPMENT_LOGIN: "true"
+          DEVELOPMENT_LOGIN_EMAIL: founder@vognary.test
+          DEVELOPMENT_LOGIN_ACCESS_CODE: ci-dev-login-code
+          SESSION_SECRET: ci-only-session-secret-0123456789abcdef0123456789abcdef01234567
+          TOKEN_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          ALLOW_IN_MEMORY_RATE_LIMITS: "true"
+        run: |
+          npm run dev -- --hostname 127.0.0.1 --port 3005 > /tmp/vognary-dev.log 2>&1 &
+          echo $! > /tmp/vognary-dev.pid
+          for i in {1..60}; do
+            curl -fsS http://127.0.0.1:3005/api/health > /dev/null && break
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:3005/api/health > /dev/null || { cat /tmp/vognary-dev.log; exit 1; }
+          curl -fsS http://127.0.0.1:3005/login > /dev/null
+          curl -fsS http://127.0.0.1:3005/app > /dev/null
+          curl -fsS http://127.0.0.1:3005/sources > /dev/null
+      - name: Signed-in e2e journeys (development login)
+        env:
+          VOGNARY_E2E_DEV_LOGIN_EMAIL: founder@vognary.test
+          VOGNARY_E2E_DEV_LOGIN_CODE: ci-dev-login-code
+          PLAYWRIGHT_EXTERNAL_SERVER: "1"
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3005
+        # The four specs share one development-login user. Three of them need a
+        # workspace that already holds data (signed-in-first-value seeds it for
+        # the two that follow), while sample-workspace asserts the empty state —
+        # so the groups run against separate fresh databases.
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+          npm run db:apply-schema
+          npm run test:e2e -- signed-in-first-value verified-savings-share workspace-source-health
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+          npm run db:apply-schema
+          npm run test:e2e -- sample-workspace
+      - name: Stop dev server
+        if: always()
+        run: |
+          if [ -f /tmp/vognary-dev.pid ]; then kill "$(cat /tmp/vognary-dev.pid)" || true; fi
       - name: Start production server
         run: |
           ALLOW_IN_MEMORY_RATE_LIMITS=true INTERNAL_SYNC_SECRET=ci-internal-sync-secret PORT=3000 npm run start > /tmp/vognary.log 2>&1 &

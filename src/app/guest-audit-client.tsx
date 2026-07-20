@@ -190,14 +190,14 @@ export default function GuestAuditClient() {
               <p className="font-data text-[0.66rem] uppercase tracking-[0.16em] text-verdict">Private by default · no login</p>
               <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-(--ink) sm:text-4xl">Know what renews before it charges</h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-(--muted) sm:text-base">
-                Start with linked sources or evidence you already have. Pasted receipts work immediately in this private tab.
+                Start with connected sources or evidence you already have. Pasted receipts work immediately in this private tab.
               </p>
             </div>
             <Nakul pose="guide" size={92} className="hidden shrink-0 text-(--ink) sm:block" title="Nakul, the ledger mongoose, showing the way in" />
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <a href="/login?next=/app" className="group rounded-xl border border-(--gold-line) bg-(--card-2) p-4 transition hover:border-(--gold)">
-              <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--gold)">Link · read-only</p>
+              <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--gold)">Connect · read-only</p>
               <p className="mt-2 font-display text-lg font-semibold text-(--ink)">Connect Gmail</p>
               <p className="mt-1 text-xs leading-5 text-(--muted)">Sign in, grant revocable receipt access, and see freshness beside the connection.</p>
               <p className="mt-3 text-xs font-semibold text-(--gold) transition group-hover:translate-x-0.5">Sign in to connect →</p>
