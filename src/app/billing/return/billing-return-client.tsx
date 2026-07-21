@@ -129,7 +129,7 @@ export default function BillingReturnClient({ checkoutId }: { checkoutId: string
 }
 
 function StatusPanel({ tone, heading, children }: { tone: "good" | "warn" | "neutral"; heading: string; children: React.ReactNode }) {
-  const borderColor = tone === "good" ? "var(--green, #2e7d32)" : tone === "warn" ? "var(--gold)" : "var(--line)";
+  const borderColor = tone === "good" ? "var(--verdict)" : tone === "warn" ? "var(--gold)" : "var(--line)";
   return (
     <section className="mt-6 rounded-[11px] border p-5" style={{ borderColor }} aria-live="polite">
       <h2 className="font-display text-xl font-semibold text-(--ink)">{heading}</h2>

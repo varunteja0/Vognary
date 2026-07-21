@@ -20,7 +20,7 @@ test("the landing page makes the real audit the single primary path", async ({ p
   const primary = page.getByRole("link", { name: "Audit my recurring spend" });
   await expect(primary).toBeVisible();
   await expect(primary).toHaveAttribute("href", "/app");
-  await expect(page.getByRole("link", { name: "See product output" })).toHaveAttribute("href", "#product-ledger");
+  await expect(page.getByRole("link", { name: "See a sample audit" })).toHaveAttribute("href", "#product-ledger");
   await expect(page.locator('a[href*="demo="], a[href*="guest="]')).toHaveCount(0);
   expect(failures).toEqual([]);
 });

@@ -35,7 +35,7 @@ export default async function BillingReturnPage({ searchParams }: { searchParams
           <BillingReturnClient checkoutId={checkoutParam ?? null} />
 
           <div className="mt-6 inset p-4">
-            <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Good to know</p>
+            <p className="eyebrow eyebrow-xs">Good to know</p>
             <ul className="mt-2 grid gap-1.5 text-sm leading-6 text-(--muted)">
               <li>— Keep the payment confirmation shown by Razorpay. Vognary does not claim settlement until the signed webhook is processed.</li>
               <li>— A paid private audit is delivered by reply to the email you used in the audit request.</li>

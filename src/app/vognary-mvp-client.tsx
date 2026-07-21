@@ -55,6 +55,7 @@ import GuidedCapturePanel from "./guided-capture-panel";
 import { VognaryMark } from "./brand";
 import { Nakul } from "./character";
 import { CommandPalette, type PaletteItem } from "./command-palette";
+import { RunwayStrip } from "./runway-strip";
 import { NextDebitTicker, WorkspaceSidebar } from "./workspace-shell";
 
 const statusStyles: Record<RecommendationType, string> = {
@@ -2508,7 +2509,7 @@ export default function VognaryMvpClient() {
               <button type="button" onClick={() => navigateToSection("connect")} className="btn btn-primary mt-5">Connect evidence</button>
             </section>
           ) : <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-reveal>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric
               label={`Monthly recurring · ${audit.summary.primaryCurrency}`}
               value={formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)}
@@ -2539,7 +2540,7 @@ export default function VognaryMvpClient() {
             />
           </div>
           <RenewalTimelinePanel timeline={renewalTimeline} onSelect={openDetail} onConnect={() => navigateToSection("connect")} />
-          <div className="grid gap-5 xl:grid-cols-[1.12fr_0.88fr]" data-reveal>
+          <div className="grid gap-5 xl:grid-cols-[1.12fr_0.88fr]">
             <RecurringGraph
               audit={audit}
               selectedItem={selectedItem}
@@ -2641,7 +2642,7 @@ export default function VognaryMvpClient() {
             onDeleteServerWorkspace={requestDeleteServerWorkspace}
           />
         </section>
-        <footer className="panel flex flex-col items-center gap-3 px-5 py-5 text-center" data-reveal>
+        <footer className="panel flex flex-col items-center gap-3 px-5 py-5 text-center">
           <div className="flex items-center gap-2.5">
             <VognaryMark size={22} className="text-(--ink)" />
             <span className="font-display text-base font-semibold text-(--ink)">Vognary <span className="font-normal text-(--muted)">· Recurring payments, reviewed</span></span>
@@ -2715,7 +2716,7 @@ function WorkspaceNav({ activeId, onSelect, showMore }: { activeId: string; onSe
 // Chapter divider — the folio marker + intent that opens each workspace section.
 function StageHeader({ id, folio, title, note }: { id: string; folio: string; title: string; note?: string }) {
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4" data-reveal>
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
       <h2 id={id} className="folio shrink-0" data-folio={folio}>{title}</h2>
       <span className="hidden h-px flex-1 bg-line sm:block" aria-hidden />
       {note ? <p className="text-xs leading-5 text-(--muted) sm:max-w-sm sm:text-right">{note}</p> : null}
@@ -2725,7 +2726,7 @@ function StageHeader({ id, folio, title, note }: { id: string; folio: string; ti
 
 function NakulMomentPanel({ moment, onDismiss }: { moment: NakulMoment; onDismiss: () => void }) {
   return (
-    <section className="panel flex flex-col gap-4 border-(--gold-line) p-4 sm:flex-row sm:items-center" role="status" aria-label="Nakul moment" data-reveal>
+    <section className="panel flex flex-col gap-4 border-(--gold-line) p-4 sm:flex-row sm:items-center" role="status" aria-label="Nakul moment">
       <Nakul pose={moment.pose} size={64} className="shrink-0 text-(--ink)" title={`Nakul: ${moment.title}`} />
       <div className="min-w-0 flex-1">
         <p className="eyebrow" style={{ fontSize: "0.6rem" }}>{moment.kicker}</p>
@@ -2786,7 +2787,7 @@ function IntegrationCommandCenter({
   const linked = new Set(merchantLinks);
 
   return (
-    <section className="dossier spotlight scan p-5 sm:p-6" data-reveal onMouseMove={trackSpotlightPointer}>
+    <section className="dossier spotlight scan p-5 sm:p-6" onMouseMove={trackSpotlightPointer}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <span className="folio" data-folio="1.1" style={{ color: "var(--dossier-muted)" }}>Connections</span>
@@ -3026,7 +3027,7 @@ function EmptyWorkspaceOnboarding({
   onSeedSample: () => void;
 }) {
   return (
-    <section className="panel p-6 sm:p-8" aria-labelledby="empty-workspace-title" data-reveal>
+    <section className="panel p-6 sm:p-8" aria-labelledby="empty-workspace-title">
       <div className="mx-auto max-w-3xl text-center">
         <span className="folio" data-folio="1.1">First evidence</span>
         <h3 id="empty-workspace-title" className="mt-3 font-display text-3xl font-semibold text-(--ink)">How would you like to start?</h3>
@@ -3065,7 +3066,7 @@ function ReceiptPastePanel({
   onBack?: () => void;
 }) {
   return (
-    <section id="receipt-paste" className="panel p-5 sm:p-6" aria-labelledby="receipt-paste-title" data-reveal>
+    <section id="receipt-paste" className="panel p-5 sm:p-6" aria-labelledby="receipt-paste-title">
       <SectionHead
         folio="1.2"
         kicker="Receipt paste"
@@ -3092,7 +3093,7 @@ function ReceiptPastePanel({
 
 function AdvancedImportPanel({ onImportFiles }: { onImportFiles: (files: File[]) => void }) {
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead folio="5.1" kicker="Advanced import" title="Bring an existing export" desc="Use this only when a connected source or receipt paste is not available. The original file is processed request-time and is not intentionally retained." />
       <label className="btn btn-ghost mt-4 cursor-pointer text-center">
         Choose statement files
@@ -3423,7 +3424,7 @@ function OverviewPanel({
 
   if (!audit.summary.recurringCount) {
     return (
-      <section className="panel p-6 text-center sm:p-8" data-reveal>
+      <section className="panel p-6 text-center sm:p-8">
         <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Your recurring money, answered in five seconds.</h3>
         <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">{hasRealData ? "Add one more evidence source to prove a recurring pattern." : "Connect one source to reveal your burn, next renewal, and first action."}</p>
         <a href="#connect" className="btn btn-primary mt-5">Connect evidence</a>
@@ -3432,7 +3433,7 @@ function OverviewPanel({
   }
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <button type="button" onClick={onOpenSubscriptions} className="inset p-4 text-left transition hover:border-ember">
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Monthly burn</p>
@@ -3538,6 +3539,7 @@ function OverviewPanel({
           {attentionSources.length ? <button type="button" onClick={onOpenConnect} className="btn btn-ghost h-9 shrink-0 px-3 text-xs">Review sources</button> : null}
         </div>
       ) : null}
+      <RunwayStrip items={audit.recurringItems} />
       {suggestedCuts.length ? (
         <section className="mt-4 rounded-xl border border-line bg-(--card-2) p-3" aria-labelledby="suggested-cuts-heading">
           <div className="flex items-end justify-between gap-3">
@@ -3644,7 +3646,7 @@ function AskProofPanel({
   onOpenCitation: (entityId: string | null) => void;
 }) {
   return (
-    <section className="panel overflow-hidden" data-reveal aria-labelledby="ask-proof-heading">
+    <section className="panel overflow-hidden" aria-labelledby="ask-proof-heading">
       <div className="grid lg:grid-cols-[0.78fr_1.22fr]">
         <div className="dossier p-5 sm:p-6">
           <span className="folio" data-folio="0.6" style={{ color: "var(--dossier-muted)" }}>Cited answers</span>
@@ -3782,7 +3784,7 @@ function UserControlPanel({
   const missingSignals = coverageSignals.filter((signal) => !signal.done).slice(0, 4);
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
+    <section className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr]">
       <div className="panel p-5 sm:p-6">
         <p className="eyebrow">Source check</p>
         <div className="mt-3 flex items-end gap-3">
@@ -3961,7 +3963,7 @@ function RenewalRadar({ timeline, onSelect, onOpenSubscriptions }: { timeline: R
   const trackHeight = 128;
 
   return (
-    <section className="panel overflow-hidden p-5 sm:p-6" data-reveal aria-labelledby="renewal-radar-heading">
+    <section className="panel overflow-hidden p-5 sm:p-6" aria-labelledby="renewal-radar-heading">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Renewal Radar · next {horizonDays} days</p>
@@ -4040,7 +4042,7 @@ function RenewalTimelinePanel({ timeline, onSelect, onConnect }: { timeline: Ren
   const visibleEvents = 12;
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="2.2"
         kicker="Calendar"
@@ -4332,7 +4334,7 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
   const cancelGuide = findCancelAction(item.merchant, item.category);
 
   return (
-    <section className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
+    <section className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr]">
       <div className="dossier p-6">
         <span className="folio" data-folio="2.5" style={{ color: "var(--dossier-muted)" }}>Selected item</span>
         <h3 className="mt-4 font-display text-2xl font-semibold text-(--dossier-ink)">{item.merchant}</h3>
@@ -4456,7 +4458,7 @@ function ConciergeOutcomePanel({
   const disputable = actionCase && ["executed", "verifying", "verified"].includes(actionCase.status);
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal aria-labelledby="concierge-outcome-heading">
+    <section className="panel p-5 sm:p-6" aria-labelledby="concierge-outcome-heading">
       <SectionHead
         folio="2.8"
         kicker="Permissioned outcome"
@@ -4630,7 +4632,7 @@ function TeamReviewPanel({
 
   if (!audit.recurringItems.length) {
     return (
-      <section className="panel p-5 sm:p-6" data-reveal>
+      <section className="panel p-5 sm:p-6">
         <SectionHead folio="3.3" kicker="Review" title="Monthly review" />
         <TaskEmptyState sentence="No proven commitment is ready for review yet." actionLabel="Open subscriptions" onAction={onOpenSubscriptions} />
       </section>
@@ -4638,7 +4640,7 @@ function TeamReviewPanel({
   }
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="3.3"
         kicker="Review"
@@ -4709,7 +4711,7 @@ function TeamReviewPanel({
 // Ambiguity becomes a user question, never a silent guess.
 function DuplicateCandidatesPanel({ candidates, onDecide }: { candidates: DuplicateCandidate[]; onDecide: (pairKey: string, decision: MergeDecision) => void }) {
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="2.6"
         kicker="Resolve"
@@ -4746,7 +4748,7 @@ function ResolvedDuplicateDecisionsPanel({
 }) {
   const itemByKey = new Map(items.map((item) => [item.identityKey, item]));
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="2.7"
         kicker="Resolved"
@@ -4801,7 +4803,7 @@ function VerifiedSavingsPanel({
 }) {
   const hasVerified = savings.verifiedAnnual > 0;
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="3.2"
         kicker="Outcomes"
@@ -4860,7 +4862,7 @@ function SinceLastReviewPanel({ diff, onSelectMerchant }: { diff: ReviewDiff; on
   const deltaTone = diff.monthlyDelta > 0 ? "text-ember" : diff.monthlyDelta < 0 ? "text-verdict" : "text-(--muted)";
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="3.1"
         kicker="Since last review"
@@ -4919,7 +4921,7 @@ function ProofGraphPanel({ graph, audit, onConnect }: { graph: ProofGraphSummary
   const singleShare = Math.round(graph.singleSourceShare * 100);
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="4.0"
         kicker="Proof graph"
@@ -4961,7 +4963,7 @@ function ProofGraphPanel({ graph, audit, onConnect }: { graph: ProofGraphSummary
 
 function ReadinessPanel() {
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="4.1"
         kicker="Readiness"

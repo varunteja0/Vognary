@@ -44,12 +44,16 @@ test("the source task surface keeps real lifecycle operations behind disclosure"
   }
 });
 
-test("Gmail authorization returns source management to the canonical source route", () => {
+test("Gmail authorization lands success on the workspace and failures on source health", () => {
   const start = source("src/app/api/integrations/gmail/start/route.ts");
   const callback = source("src/app/api/integrations/gmail/callback/route.ts");
-  assert.doesNotMatch(`${start}\n${callback}`, /next=\/connect|`\/app\?gmail=/);
+  // The legacy /connect route stays dead everywhere.
+  assert.doesNotMatch(`${start}\n${callback}`, /next=\/connect/);
   assert.match(start, /next=\/sources/);
-  assert.match(callback, /`\/sources\?gmail=/);
+  // Success redirects to /app so the first-sync moment can show what was found…
+  assert.match(callback, /`\/app\?gmail=\$\{outcome\}/);
+  // …while persistence failures still land on /sources, which explains them.
+  assert.match(callback, /`\/sources\?gmail=\$\{encodeURIComponent\(persistence\.status\)\}/);
 });
 
 function source(path: string) {

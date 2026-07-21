@@ -142,7 +142,7 @@ export function CommandPalette({
                       onMouseEnter={() => setCursor(index)}
                       onClick={() => runItem(item)}
                       className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${
-                        active ? "bg-(--gold) text-[#17130a]" : "text-(--ink-soft) hover:bg-white/5"
+                        active ? "bg-(--gold) text-(--ink-on-gold)" : "text-(--ink-soft) hover:bg-white/5"
                       }`}
                     >
                       <span className="truncate">{item.label}</span>

@@ -6,7 +6,7 @@ import type { InstantAuditResult } from "./instant-audit-engine";
 
 type Engine = typeof import("./instant-audit-engine");
 
-const rowStyle = { borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" } as const;
+const rowStyle = { borderColor: "var(--dossier-line)", background: "var(--dossier-fill)" } as const;
 
 export default function InstantAudit() {
   const [text, setText] = useState("");

@@ -35,6 +35,8 @@
   --gold-soft: #e7ce9b;
   --gold-deep: #bd9c5f;
   --gold-line: rgba(216, 184, 122, 0.34);
+  --ink-on-gold: #17130a; /* dark ink readable on the gold accent */
+  --dossier-fill: rgba(243, 234, 214, 0.04); /* warm parchment wash on dossier panels */
   --glow: var(--gold);
   --glow-soft: var(--gold-soft);
   --glow-deep: var(--gold-deep);
@@ -190,6 +192,10 @@ select {
   color: var(--muted);
 }
 
+.eyebrow-xs {
+  font-size: 0.58rem;
+}
+
 /* § folio index eyebrow */
 .folio {
   display: inline-flex;
@@ -301,7 +307,7 @@ select {
 }
 .btn-primary {
   background: var(--gold);
-  color: #17130a;
+  color: var(--ink-on-gold);
   border-color: color-mix(in srgb, var(--gold-deep) 60%, var(--gold));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 10px 24px -14px rgba(216, 184, 122, 0.55);
 }
@@ -456,7 +462,7 @@ select {
 .step-chip[data-active="true"] .step-num {
   background: var(--gold);
   border-color: var(--gold);
-  color: #17130a;
+  color: var(--ink-on-gold);
 }
 
 /* ------------------------------------------------------------------ *
@@ -805,19 +811,6 @@ select.field option {
   letter-spacing: 0;
 }
 
-/* Scroll reveal — progressive; without JS everything stays visible */
-.reveal-ready [data-reveal] {
-  opacity: 0;
-  transform: translateY(22px);
-  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-  transition-delay: var(--reveal-delay, 0ms);
-  will-change: opacity, transform;
-}
-.reveal-ready [data-reveal].is-visible {
-  opacity: 1;
-  transform: none;
-}
-
 /* Spend spectrum — a glowing heat bar of recurring money */
 .spectrum-track {
   display: flex;
@@ -878,11 +871,6 @@ select.field option {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
-  }
-  .reveal-ready [data-reveal] {
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
   }
   *,
   *::before,

@@ -56,7 +56,7 @@ export default function BrandPage() {
           </div>
         </article>
 
-        <section className="panel mt-6 p-5 sm:p-6" data-reveal>
+        <section className="panel mt-6 p-5 sm:p-6">
           <span className="folio" data-folio="Use">The mark in use</span>
           <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">One mark for every surface</h2>
           <p className="mt-1 text-sm leading-6 text-(--muted)">Two evidence tiers resolve into the gold V. The silhouette stays recognizable on dark, gold, light, and one-color production.</p>
@@ -68,7 +68,7 @@ export default function BrandPage() {
           </div>
         </section>
 
-        <section className="panel mt-6 p-5 sm:p-6" data-reveal>
+        <section className="panel mt-6 p-5 sm:p-6">
           <span className="folio" data-folio="Nakul">The keeper</span>
           <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Nakul, the ledger mongoose</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-(--muted)">
@@ -102,7 +102,7 @@ export default function BrandPage() {
           </div>
         </section>
 
-        <section className="panel mt-6 p-5 sm:p-6" data-reveal>
+        <section className="panel mt-6 p-5 sm:p-6">
           <span className="folio" data-folio="Social">Platform-fit exports</span>
           <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">One system, three correct aspect ratios</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-(--muted)">
@@ -131,7 +131,7 @@ export default function BrandPage() {
           </div>
         </section>
 
-        <section className="panel mt-6 p-5 sm:p-6" data-reveal>
+        <section className="panel mt-6 p-5 sm:p-6">
           <span className="folio" data-folio="01">Palette</span>
           <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Graphite and gold</h2>
           <p className="mt-1 text-sm leading-6 text-(--muted)">Gold is for money, primary actions, and focus states. The other colors label review actions.</p>
@@ -148,7 +148,7 @@ export default function BrandPage() {
           </div>
         </section>
 
-        <section className="panel mt-6 p-5 sm:p-6" data-reveal>
+        <section className="panel mt-6 p-5 sm:p-6">
           <span className="folio" data-folio="02">Typography</span>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="inset p-5">
@@ -166,7 +166,7 @@ export default function BrandPage() {
           </div>
         </section>
 
-        <section className="panel mt-6 p-5 sm:p-6" data-reveal>
+        <section className="panel mt-6 p-5 sm:p-6">
           <span className="folio" data-folio="03">Assets &amp; usage</span>
           <div className="mt-4 grid gap-5 md:grid-cols-2">
             <div>

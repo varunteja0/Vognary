@@ -61,7 +61,7 @@ export default function Home() {
           </Link>
           <div className="hidden items-center gap-1 md:flex">
             <a href="#solves" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">What it solves</a>
-            <a href="#product-ledger" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Product output</a>
+            <a href="#product-ledger" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Sample audit</a>
             <a href="#how" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">How it works</a>
             <Link href="/guide" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Guide</Link>
             <Link href="/security" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Security</Link>
@@ -84,7 +84,7 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link href="/app" prefetch={false} className="btn btn-primary btn-lg">Audit my recurring spend</Link>
-                <a href="#product-ledger" className="btn btn-ondark btn-lg">See product output</a>
+                <a href="#product-ledger" className="btn btn-ondark btn-lg">See a sample audit</a>
               </div>
               <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2">
                 {trust.map((item) => (
@@ -135,21 +135,22 @@ export default function Home() {
         <section id="product-ledger" className="panel scroll-mt-24 overflow-hidden">
           <div className="flex flex-col gap-4 border-b border-line px-5 py-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <span className="folio" data-folio="Product">Recurring audit output</span>
+              <span className="folio" data-folio="Sample">Sample audit output</span>
               <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">What a useful review should show in five minutes.</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">A ledger row is useful only when it carries amount, renewal timing, proof, missing source, and a decision label.</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-ochre">The rows below are an illustrative sample, not live output. Paste your receipts in the box above for your real numbers.</p>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="inset px-3 py-2">
-                <p className="eyebrow" style={{ fontSize: "0.58rem" }}>Monthly</p>
+                <p className="eyebrow eyebrow-xs">Monthly · sample</p>
                 <p className="font-data mt-1 text-sm font-semibold tnum text-(--ink)">INR 4,698</p>
               </div>
               <div className="inset px-3 py-2">
-                <p className="eyebrow" style={{ fontSize: "0.58rem" }}>Review</p>
+                <p className="eyebrow eyebrow-xs">Review · sample</p>
                 <p className="font-data mt-1 text-sm font-semibold tnum text-(--ink)">INR 4,598</p>
               </div>
               <div className="inset px-3 py-2">
-                <p className="eyebrow" style={{ fontSize: "0.58rem" }}>Missing</p>
+                <p className="eyebrow eyebrow-xs">Missing · sample</p>
                 <p className="font-data mt-1 text-sm font-semibold tnum text-(--ink)">1 source</p>
               </div>
             </div>
@@ -270,8 +271,8 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center justify-center border-t border-(--dossier-line) p-7 sm:p-10 lg:border-l lg:border-t-0">
-              <div className="w-full max-w-sm rounded-2xl border border-(--gold-line) bg-[#0e1013] p-6" aria-hidden>
-                <p className="font-data text-[0.62rem] uppercase tracking-[0.2em] text-(--gold)">Verified savings receipt</p>
+              <div className="w-full max-w-sm rounded-2xl border border-(--gold-line) bg-(--paper-2) p-6" aria-hidden>
+                <p className="font-data text-[0.62rem] uppercase tracking-[0.2em] text-(--gold)">Verified savings receipt · illustrative example</p>
                 <p className="mt-3 font-display text-4xl font-bold text-(--gold)">₹43,164<span className="text-xl">/yr</span></p>
                 <p className="mt-1 text-sm text-(--dossier-ink)">verifiably stopped leaving this account</p>
                 <p className="mt-3 font-data text-[0.66rem] text-(--dossier-muted)">3 recurring charges · proven by evidence of absence</p>
@@ -340,7 +341,7 @@ export default function Home() {
             <span className="text-(--line-strong)">·</span>
             <Link className="transition hover:text-(--ink)" href="/sources">Sources</Link>
             <span className="text-(--line-strong)">·</span>
-            <Link className="transition hover:text-(--ink)" href="/sources">Sources</Link>
+            <Link className="transition hover:text-(--ink)" href="/verify">Verify</Link>
             <span className="text-(--line-strong)">·</span>
             <Link className="transition hover:text-(--ink)" href="/terms">Terms</Link>
             <span className="text-(--line-strong)">·</span>

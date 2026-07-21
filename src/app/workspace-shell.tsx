@@ -66,7 +66,7 @@ export function WorkspaceSidebar({
                 onNavigate(section.id);
               }}
               className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                active ? "bg-(--gold) text-[#17130a]" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"
+                active ? "bg-(--gold) text-(--ink-on-gold)" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"
               }`}
             >
               <span className={`font-data text-[0.6rem] tnum ${active ? "opacity-70" : "text-(--muted)"}`}>{section.folio}</span>
@@ -104,7 +104,7 @@ export function WorkspaceSidebar({
                       onNavigate(section.id);
                     }}
                     className={`flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                      active ? "bg-(--gold) text-[#17130a]" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"
+                      active ? "bg-(--gold) text-(--ink-on-gold)" : "text-(--ink-soft) hover:bg-white/5 hover:text-(--ink)"
                     }`}
                   >
                     <span className={`font-data text-[0.6rem] tnum ${active ? "opacity-70" : "text-(--muted)"}`}>{section.folio}</span>
@@ -162,7 +162,7 @@ export function NextDebitTicker({ timeline }: { timeline: RenewalTimeline }) {
 
   return (
     <p className="flex min-w-0 items-baseline gap-2" aria-live="off">
-      <span className="eyebrow shrink-0" style={{ fontSize: "0.58rem" }}>Next debit</span>
+      <span className="eyebrow eyebrow-xs shrink-0">Next debit</span>
       <span className="truncate text-sm font-medium text-(--ink)">{next.merchant}</span>
       <span className="shrink-0 font-data text-sm tnum text-(--gold)">
         {new Intl.NumberFormat("en-IN", { style: "currency", currency: next.currency, maximumFractionDigits: 0 }).format(next.amount)}

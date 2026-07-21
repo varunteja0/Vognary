@@ -95,7 +95,7 @@ export default function GuidePage() {
         </section>
 
         {chapters.map((chapter) => (
-          <section key={chapter.folio} className="panel mt-6 p-5 sm:p-7" data-reveal>
+          <section key={chapter.folio} className="panel mt-6 p-5 sm:p-7">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <span className="folio" data-folio={chapter.folio}>{chapter.title}</span>
@@ -114,7 +114,7 @@ export default function GuidePage() {
           </section>
         ))}
 
-        <section className="panel mt-6 p-5 sm:p-7" data-reveal>
+        <section className="panel mt-6 p-5 sm:p-7">
           <span className="folio" data-folio="Never">The other half of trust</span>
           <h2 className="mt-3 font-display text-xl font-semibold text-(--ink)">What Vognary will not do</h2>
           <ul className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -132,7 +132,7 @@ export default function GuidePage() {
           </p>
         </section>
 
-        <section className="mt-6 flex flex-col items-start justify-between gap-4 rounded-2xl border border-(--gold-line) bg-card p-6 sm:flex-row sm:items-center" data-reveal>
+        <section className="mt-6 flex flex-col items-start justify-between gap-4 rounded-2xl border border-(--gold-line) bg-card p-6 sm:flex-row sm:items-center">
           <div>
             <h2 className="font-display text-xl font-semibold text-(--ink)">Start with what you have</h2>
             <p className="mt-1 text-sm text-(--muted)">Two pasted receipts are enough for your first proven result.</p>

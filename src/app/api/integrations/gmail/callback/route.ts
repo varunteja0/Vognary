@@ -126,7 +126,9 @@ export async function GET(request: NextRequest) {
 
     const syncResult = await runConnectorSyncJob(persistence.syncJobId, "initial-setup");
     const outcome = syncResult.status === "succeeded" ? "connected" : "sync-pending";
-    return clearOAuthState(NextResponse.redirect(new URL(`/sources?gmail=${outcome}`, request.nextUrl.origin)));
+    // Land the user on the workspace, where the first-sync moment renders what
+    // was found; /sources stays the destination only for failure states.
+    return clearOAuthState(NextResponse.redirect(new URL(`/app?gmail=${outcome}`, request.nextUrl.origin)));
   } catch {
     await revokeGoogleTokenBestEffort(tokenPayload.refresh_token ?? tokenPayload.access_token);
     return clearOAuthState(NextResponse.json({ error: "Gmail identity or scope could not be verified. No connection was stored." }, { status: 502 }));

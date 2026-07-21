@@ -1,5 +1,7 @@
 import { headers } from "next/headers";
 import { permanentRedirect } from "next/navigation";
+import { getConnectorById } from "@/lib/connectors";
+import { getConnectorHonesty } from "@/lib/connector-runtime";
 import { readCurrentSession } from "@/lib/server/session";
 import ExperienceClient from "./experience-client";
 
@@ -16,7 +18,20 @@ export default async function AppPage({ searchParams }: AppPageProps) {
   }
 
   const session = await readRequestSession();
-  return <ExperienceClient signedIn={Boolean(session)} />;
+  return <ExperienceClient signedIn={Boolean(session)} gmailConnect={readGmailConnectAvailability()} />;
+}
+
+// Honesty state for the guest "Connect Gmail" card, resolved server-side so the
+// card can never promise a connection this deployment cannot deliver.
+function readGmailConnectAvailability() {
+  const connector = getConnectorById("gmail-readonly");
+  if (!connector) return { available: false, label: "Unavailable", meaning: "Gmail sync is not registered in this deployment." };
+  const honesty = getConnectorHonesty(connector);
+  return {
+    available: honesty.state === "live" || honesty.state === "setup-ready",
+    label: honesty.label,
+    meaning: honesty.meaning,
+  };
 }
 
 function buildCanonicalAppUrl(params: Record<string, string | string[] | undefined>) {

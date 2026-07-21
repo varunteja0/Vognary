@@ -33,7 +33,7 @@ export default function VerifyPage() {
           <VerifyClient />
 
           <div className="mt-6 inset p-4">
-            <p className="eyebrow" style={{ fontSize: "0.6rem" }}>How the seal works</p>
+            <p className="eyebrow eyebrow-xs">How the seal works</p>
             <ul className="mt-2 grid gap-1.5 text-sm leading-6 text-(--muted)">
               <li>— The pack&apos;s content is serialized canonically (keys sorted at every depth), so the same content always produces the same hash.</li>
               <li>— The SHA-256 hash is stored in the pack&apos;s <span className="font-data text-xs">integrity</span> block. Changing report content breaks that checksum.</li>

@@ -69,7 +69,7 @@ export default function GuidedCapturePanel({ onAdd }: { onAdd: (items: ManualRec
   }
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <span className="folio" data-folio="1.3">Guided capture</span>

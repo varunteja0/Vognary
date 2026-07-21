@@ -25,7 +25,10 @@ import { VognaryMark } from "./brand";
 import { Nakul } from "./character";
 import { RunwayStrip } from "./runway-strip";
 
-export default function GuestAuditClient() {
+import type { GmailConnectAvailability } from "./app/experience-client";
+
+export default function GuestAuditClient({ gmailConnect }: { gmailConnect?: GmailConnectAvailability }) {
+  const gmailAvailable = gmailConnect?.available ?? false;
   const [receiptText, setReceiptText] = useState("");
   const [statementSources, setStatementSources] = useState<TransferStatementSource[]>([]);
   const [manualItems, setManualItems] = useState<ManualRecurringInput[]>([]);
@@ -198,14 +201,23 @@ export default function GuestAuditClient() {
             <Nakul pose="guide" size={92} className="hidden shrink-0 text-(--ink) sm:block" title="Nakul, the ledger mongoose, showing the way in" />
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <a href="/login?next=/app" className="group rounded-xl border border-(--gold-line) bg-(--card-2) p-4 transition hover:border-(--gold)">
-              <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--gold)">Connect · read-only</p>
-              <p className="mt-2 font-display text-lg font-semibold text-(--ink)">Connect Gmail</p>
-              <p className="mt-1 text-xs leading-5 text-(--muted)">Sign in, grant revocable receipt access, and see freshness beside the connection.</p>
-              <p className="mt-3 text-xs font-semibold text-(--gold) transition group-hover:translate-x-0.5">Sign in to connect →</p>
-            </a>
-            <a href="#paste" className="group rounded-xl border border-line bg-(--card-2) p-4 transition hover:border-(--line-strong)">
-              <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--muted)">Paste · instant</p>
+            {gmailAvailable ? (
+              <a href="/login?next=/app" className="group rounded-xl border border-(--gold-line) bg-(--card-2) p-4 transition hover:border-(--gold)">
+                <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--gold)">Connect · read-only</p>
+                <p className="mt-2 font-display text-lg font-semibold text-(--ink)">Connect Gmail</p>
+                <p className="mt-1 text-xs leading-5 text-(--muted)">Sign in, grant revocable receipt access, and see freshness beside the connection.</p>
+                <p className="mt-3 text-xs font-semibold text-(--gold) transition group-hover:translate-x-0.5">Sign in to connect →</p>
+              </a>
+            ) : (
+              <div className="rounded-xl border border-line bg-(--card-2) p-4">
+                <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--muted)">Gmail · {gmailConnect?.label ?? "Not available yet"}</p>
+                <p className="mt-2 font-display text-lg font-semibold text-(--ink-soft)">Gmail sync is coming</p>
+                <p className="mt-1 text-xs leading-5 text-(--muted)">{gmailConnect?.meaning ?? "Provider approval for this deployment is still in progress."}</p>
+                <p className="mt-3 text-xs font-semibold text-(--muted)">Paste works today →</p>
+              </div>
+            )}
+            <a href="#paste" className={`group rounded-xl border ${gmailAvailable ? "border-line" : "border-(--gold-line)"} bg-(--card-2) p-4 transition hover:border-(--gold)`}>
+              <p className={`font-data text-[0.6rem] uppercase tracking-[0.16em] ${gmailAvailable ? "text-(--muted)" : "text-(--gold)"}`}>Paste · instant</p>
               <p className="mt-2 font-display text-lg font-semibold text-(--ink)">Paste a receipt</p>
               <p className="mt-1 text-xs leading-5 text-(--muted)">Two receipts are enough for your first result — monthly burn, next renewal, one action. Nothing leaves this tab.</p>
               <p className="mt-3 text-xs font-semibold text-(--ink-soft) transition group-hover:translate-x-0.5">Start below →</p>

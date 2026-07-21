@@ -178,7 +178,7 @@ export default function PrivateAuditClient() {
             <div className="mt-8 grid gap-2.5">
               <Proof label="Assisted audit" value={`${publicOffer.currency} ${(publicOffer.amountMinor / 100).toLocaleString("en-IN")}`} />
             </div>
-            <div className="mt-8 rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
+            <div className="mt-8 rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "var(--dossier-fill)" }}>
               <h2 className="font-display text-lg font-semibold text-(--dossier-ink)">What you get</h2>
               <ul className="mt-3 space-y-2 text-sm leading-6 muted-on-dark">
                 {auditOutcomes.map((outcome) => <li key={outcome}>{outcome}</li>)}
@@ -186,13 +186,13 @@ export default function PrivateAuditClient() {
             </div>
             <div className="mt-4 grid gap-2.5">
               {sourceTiers.map((tier) => (
-                <div key={tier.label} className="rounded-[9px] border px-3 py-2.5" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
+                <div key={tier.label} className="rounded-[9px] border px-3 py-2.5" style={{ borderColor: "var(--dossier-line)", background: "var(--dossier-fill)" }}>
                   <p className="font-data text-[0.54rem] uppercase tracking-[0.18em]" style={{ color: "var(--dossier-muted)" }}>{tier.label}</p>
                   <p className="mt-1.5 text-sm leading-6 text-(--dossier-ink)">{tier.value}</p>
                 </div>
               ))}
             </div>
-            <div className="mt-4 rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
+            <div className="mt-4 rounded-[11px] border p-4" style={{ borderColor: "var(--dossier-line)", background: "var(--dossier-fill)" }}>
               <h2 className="font-display text-lg font-semibold text-(--dossier-ink)">Do not send</h2>
               <ul className="mt-3 space-y-2 text-sm leading-6 muted-on-dark">
                 {safetyRules.map((rule) => <li key={rule}>{rule}</li>)}
@@ -414,7 +414,7 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
 
 function Proof({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[9px] border px-3 py-2.5" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
+    <div className="rounded-[9px] border px-3 py-2.5" style={{ borderColor: "var(--dossier-line)", background: "var(--dossier-fill)" }}>
       <p className="font-data text-[0.54rem] uppercase tracking-[0.18em]" style={{ color: "var(--dossier-muted)" }}>{label}</p>
       <p className="font-data mt-1.5 text-lg font-semibold tnum text-(--dossier-ink)">{value}</p>
     </div>
