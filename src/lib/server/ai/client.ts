@@ -21,12 +21,8 @@ export function isAiEnabled(): boolean {
   return getAiClient() !== null;
 }
 
-// Model tiers per master-build-plan Part 3.2: a cheap high-volume tier for
-// structured extraction and query compilation, a reasoning tier reserved for
-// narration and recommendations where quality is user-visible.
-export const AI_MODELS = {
-  /** Extraction assist + query compilation — structured, high-volume. */
-  extraction: "claude-haiku-4-5",
-  /** Narration + action drafting — reasoning-sensitive, low-volume. */
-  reasoning: "claude-opus-4-8",
-} as const;
+// Model tiers per master-build-plan Part 3.2 live in ./models (no server-only,
+// so pure orchestration code can import them). Re-exported here for callers that
+// already reach for them through the client gateway.
+export { AI_MODELS } from "./models";
+export type { AiModelTier, AiModelId } from "./models";
