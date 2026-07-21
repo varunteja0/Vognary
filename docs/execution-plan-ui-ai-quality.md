@@ -1,11 +1,12 @@
 # Vognary — UI/UX Quality + AI Live-Path Execution Plan
 
-> **This is the single execution reference for the "huge product-quality leap"
-> work.** It is written so a fresh agent with no prior context can execute it.
-> Work the Work Packages (WP-0 … WP-6) in order; WPs marked *parallel-safe* can
-> run in separate chats/worktrees concurrently. Companion to
-> [master-build-plan.md](master-build-plan.md) (Parts 3 and 5 are the law this
-> plan executes).
+> **Agents: read [THE-LAW.md](THE-LAW.md) first**, then
+> [execution/phase-b-loop-shipping.md](execution/phase-b-loop-shipping.md) for
+> company-ordered loop WPs. This file is the detailed WP-0…WP-6 UI/AI execution
+> reference — not a competing company roadmap.
+>
+> Work packages (WP-0 … WP-6) in order; *parallel-safe* WPs can run in separate
+> worktrees. Companion: [master-build-plan.md](master-build-plan.md) Parts 3 & 5.
 
 ---
 

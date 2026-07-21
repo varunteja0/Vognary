@@ -136,11 +136,20 @@ export default function GuestAuditClient({ gmailConnect }: { gmailConnect?: Gmai
     return () => window.clearTimeout(timer);
   }, [transferReady]);
 
+  // Auto-scroll to the five-second answer the first time a result appears.
+  const sawResultRef = useRef(false);
+  useEffect(() => {
+    if (!hasResult || sawResultRef.current) return;
+    sawResultRef.current = true;
+    window.setTimeout(() => scrollIntoViewWithMotion(document.getElementById("guest-result"), { block: "start" }), 0);
+  }, [hasResult]);
+
   function clearGuestAudit() {
     setReceiptText("");
     setStatementSources([]);
     setManualItems([]);
     setSampleMode(false);
+    sawResultRef.current = false;
     window.sessionStorage.removeItem(guestAuditTransferKey);
     transferExportedAtRef.current = null;
     setTransferReady(false);
@@ -279,14 +288,10 @@ export default function GuestAuditClient({ gmailConnect }: { gmailConnect?: Gmai
 
         {hasResult && firstAction && nextRenewal ? (
           <>
-          <div className="mt-5">
-            <AssistantBriefPanel items={audit.recurringItems} />
-          </div>
-          <div className="mt-5">
-            <MandateKillListPanel items={audit.recurringItems} />
-          </div>
+          {/* Five-second answer first — brief and kill-list drill down after. */}
           <section id="guest-result" aria-label="Your first audit result" aria-live="polite" className="mt-5 scroll-mt-4 rounded-2xl border border-(--gold-line) bg-card p-5 sm:p-7">
-            <div className={`grid gap-3 ${monthlyTotals.length === 1 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+            <p className="font-data text-[0.64rem] uppercase tracking-[0.16em] text-verdict">Your first result · evidence-backed</p>
+            <div className={`mt-3 grid gap-3 ${monthlyTotals.length === 1 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
               {monthlyTotals.map(([currency, amount]) => (
                 <ResultMetric key={currency} label={monthlyTotals.length === 1 ? "Monthly burn" : `Monthly total · ${currency}`} value={formatMoney(amount, currency)} />
               ))}
@@ -326,6 +331,12 @@ export default function GuestAuditClient({ gmailConnect }: { gmailConnect?: Gmai
             </div>
             <p className="mt-3 text-xs leading-5 text-(--muted)">{sampleMode ? "Sample evidence is never staged for sign-in." : "Your exact evidence is staged only in this tab for the sign-in handoff and clears after encrypted workspace sync succeeds."}</p>
           </section>
+          <div className="mt-5">
+            <AssistantBriefPanel items={audit.recurringItems} />
+          </div>
+          <div className="mt-5">
+            <MandateKillListPanel items={audit.recurringItems} />
+          </div>
           <RunwayStrip items={audit.recurringItems} />
           </>
         ) : hasEvidence ? (

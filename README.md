@@ -24,7 +24,14 @@ Vognary 1.0 is an evidence-first recurring-spend audit for founders, builders, f
 - Adaptive personal/family/founder/team workspaces and an installable PWA shell whose service worker never caches financial pages or API responses.
 - Guided Proof Capture wizard for UPI AutoPay, app-store, and bank e-mandate screens; RBI pre-debit notification parsing (day-first dates) through the receipt path.
 - Month-over-month review diffs, explainable duplicate resolution with user merge decisions, PII redaction on exports, and Indian bank statement format detection (HDFC/ICICI/SBI/Axis/Kotak).
-- The canonical plan chain lives in [docs/CONTINUE-HERE.md](docs/CONTINUE-HERE.md) → [docs/execution-plan-ui-ai-quality.md](docs/execution-plan-ui-ai-quality.md) → [docs/master-build-plan.md](docs/master-build-plan.md). Prior-generation plans are preserved in [docs/archive/](docs/archive/).
+- The **canonical plan chain** for every human and agent:
+1. [docs/THE-LAW.md](docs/THE-LAW.md) — **supreme directive** (company scoreboard, phases A–F, hard stops)
+2. [docs/CONTINUE-HERE.md](docs/CONTINUE-HERE.md) — live handoff
+3. [docs/execution/phase-a-market-contact.md](docs/execution/phase-a-market-contact.md) — 21-day market proof (CRM, scripts, reports)
+4. [docs/execution/phase-b-loop-shipping.md](docs/execution/phase-b-loop-shipping.md) — product loop architecture + agent WPs
+5. [docs/execution-plan-ui-ai-quality.md](docs/execution-plan-ui-ai-quality.md) → [docs/master-build-plan.md](docs/master-build-plan.md) — UI/AI implementation detail
+
+Also: [AGENTS.md](AGENTS.md) (mandatory agent entry), [docs/execution/scoreboard.md](docs/execution/scoreboard.md), [docs/templates/](docs/templates/). Prior-generation plans only in [docs/archive/](docs/archive/).
 - JSON export for audit reports.
 - PDF report export, CSV export, and private workspace backup/import.
 - Source guide, completeness score, receipt snippet parsing, and priority actions.
@@ -210,12 +217,15 @@ The integration strategy is documented in [docs/archive/universal-integration-op
 
 See:
 
-- [docs/CONTINUE-HERE.md](docs/CONTINUE-HERE.md) — live handoff + the approved turnaround phase plan
+- [docs/THE-LAW.md](docs/THE-LAW.md) — **read first** — company + agent law
+- [docs/CONTINUE-HERE.md](docs/CONTINUE-HERE.md) — live handoff
+- [docs/execution/phase-a-market-contact.md](docs/execution/phase-a-market-contact.md) — market contact kit
+- [docs/execution/phase-b-loop-shipping.md](docs/execution/phase-b-loop-shipping.md) — loop shipping for agents
 - [docs/execution-plan-ui-ai-quality.md](docs/execution-plan-ui-ai-quality.md) — WP-0…WP-6 execution spec
-- [docs/master-build-plan.md](docs/master-build-plan.md) — the law (Parts 3 & 5)
+- [docs/master-build-plan.md](docs/master-build-plan.md) — AI/Twin/UI implementation law (Parts 3 & 5)
 - [docs/production-activation-runbook.md](docs/production-activation-runbook.md)
 - [docs/renewal-alerts-runbook.md](docs/renewal-alerts-runbook.md)
 - [docs/billing-activation-runbook.md](docs/billing-activation-runbook.md)
 - [docs/receipt-corpus-runbook.md](docs/receipt-corpus-runbook.md)
 - [docs/platform-api.md](docs/platform-api.md)
-- [docs/archive/](docs/archive/) — prior-generation plans, reports, and GTM material (historical reference only)
+- [docs/archive/](docs/archive/) — historical reference only

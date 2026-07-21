@@ -1,10 +1,14 @@
-# CONTINUE HERE — live handoff (2026-07-21, post-turnaround-review)
+# CONTINUE HERE — live handoff (2026-07-21, post-THE-LAW)
 
-> **New chat: read this first**, then `docs/execution-plan-ui-ai-quality.md`
-> (WP-0…WP-6 spec) and `docs/master-build-plan.md` (Parts 3 & 5, the law).
-> A full founder-approved turnaround review happened on 2026-07-21. This file is
-> the live state + the phase list that now sequences all remaining work.
-> Prior-generation plans live in `docs/archive/` — do not resurrect them.
+> **New chat — mandatory order:**
+> 1. [`docs/THE-LAW.md`](THE-LAW.md) — **supreme company + agent directive** (read first)
+> 2. **This file** — live branch/env/state only
+> 3. [`docs/execution/phase-a-market-contact.md`](execution/phase-a-market-contact.md) — market proof kit
+> 4. [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md) — loop product WPs
+> 5. Then `docs/execution-plan-ui-ai-quality.md` / `docs/master-build-plan.md` as needed
+>
+> A founder assessment (2026-07-21) is codified as THE-LAW. This file is **live state**,
+> not a competing strategy. Prior-generation plans live in `docs/archive/` — do not resurrect them.
 
 ---
 
@@ -40,25 +44,34 @@ money first-class before anything else, and the world must work too.**
   committed to providing it — see founder-ops).
 - **Never stack PRs**; branch every work item from fresh `main`, PR against `main`.
 
-## 2. THE PLAN — founder-approved turnaround (2026-07-21)
+## 2. THE PLAN — company phases (THE-LAW) + product phases (engineering)
 
-Full plan with file-level detail was approved in the review session. The one loop
-to make undeniable: **evidence in (paste/upload/Gmail) → audit finds every
-recurring charge → assistant brief (what renews / what's anomalous / what to
-kill) → user decides → decision + outcome logged with proof.**
+**Company sequence (THE-LAW):** Phase **A** market proof + Phase **B** loop shipping run **in parallel** now.
+Live CRM: `docs/execution/private-audit-crm.csv` · Scoreboard: `docs/execution/scoreboard.md`
+
+The one product loop: **evidence in (paste/upload/Gmail) → audit finds every
+recurring charge → assistant brief → user decides → decision + outcome logged with proof.**
+
+### 2a. Company phases (from THE-LAW)
 
 | Phase | What | Status |
 |---|---|---|
-| **0** | Repo hygiene: worktree corpses deleted, junk cleared, 14 branches pruned, docs collapsed to this canonical chain + `docs/archive/`, eslint hardened | **DONE 2026-07-21** |
-| **1** | Make the loop undeniable (no new features): Gmail callback → `/app?connected=gmail` "here's what we found" moment; landing honesty (no unlabeled hardcoded numbers); honest guest connect card via `getConnectorHonesty`; RunwayStrip in signed-in overview; delete dead code (`reveal-controller.tsx`, `twin/whatif.ts`); land the §3 token gate; one onboarding path | next |
-| **2** | Wire the brain (WP-5 + assistant home): `ANTHROPIC_API_KEY` + `AI_MONTHLY_BUDGET_INR` in env contract; `/api/ingest` AI fallback + persistence via `materializeWorkspaceState`; `/ask` intent-compile + `narrateAudit` with `validateCited`; **assistant brief** as default `/app` view (`GET /api/workspaces/current/brief` from `recurring_items` renewals + `transactions` anomalies + `recommendations` savings); decompose `vognary-mvp-client.tsx` → `src/app/workspace/*` (<300-line shell) | blocked on key (this week) |
-| **3** | India-first data-in: **UPI mandate kill-list** (engine already detects UPI/AUTOPAY/MANDATE/EMI/SIP/NACH/ECS/SI) with per-PSP cancellation instructions, works from statement upload TODAY; corpus population; founder-ops in parallel | after 1 |
-| **4** | Verification + "no demo" release gate: full-loop e2e, corpus gates, no-demo checklist in `check-release-gate.mjs` | last |
+| **0** | Repo hygiene | **DONE 2026-07-21** |
+| **A** | Market contact: 10 audits, CRM, outreach, report template | **ACTIVE** — `docs/execution/phase-a-market-contact.md` |
+| **B** | Loop shipping: WP-B0…B8 architecture for agents | **ACTIVE** — `docs/execution/phase-b-loop-shipping.md` |
+| **C–F** | Production min → moat → distribution → platform | PENDING / blocked until A–B signal |
 
-**What NOT to do:** no new plan documents; no new features before Phase 2
-completes; no design-system rewrite (enforce `globals.css`, don't restyle); no
-un-cited AI output ever; no Setu/Razorpay code ahead of provisioning; no `/app`
-route restructuring during decomposition; nothing outside this repo.
+### 2b. Product engineering phases (code loop)
+
+| Phase | What | Status |
+|---|---|---|
+| **0** | Repo hygiene: worktree corpses deleted, junk cleared, 14 branches pruned, docs collapsed, eslint hardened | **DONE 2026-07-21** |
+| **1** | Loop undeniable: Gmail → `/app?gmail=` + celebration; landing sample labelled; guest first-result first; token gate; honest Gmail card | **largely DONE 2026-07-21** · WP-B1…B3 |
+| **2** | Wire the brain: AI key + budget env; ingest AI PDF assist (fail-closed); `/api/ai/status`; **assistant brief** default home; kill-list on home; monolith still large | **code DONE; live AI blocked on founder key** · WP-B4,B6 |
+| **3** | India-first: UPI mandate kill-list from statements (panel + engine); corpus still founder-ops | **engine+UI DONE; corpus pending** · WP-B5 |
+| **4** | Full-loop e2e (`loop-brief-killlist` + first-value) + no-demo release gate | **e2e added; release:gate still ops** · WP-B8 |
+
+**What NOT to do:** no new plan documents (THE-LAW is the plan); no features outside the loop before B exit; no design-system rewrite; no uncited AI; no Setu/Razorpay code ahead of provisioning; no `/app` route restructure during decomposition; nothing outside this repo.
 
 **Founder-ops (only Varun):** ①~~delete orphaned dirs~~ done ② `ANTHROPIC_API_KEY`
 + ₹ cap — committed this week ③ Google restricted-scope verification for

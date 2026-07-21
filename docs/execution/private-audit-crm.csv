@@ -1,0 +1,11 @@
+id,name,company,segment,contact,channel,source,asked_at,status,audit_booked_at,files_received,audit_completed_at,monthly_recurring_found_inr,avoidable_monthly_found_inr,surprise_quote,paid,objection,next_follow_up,corpus_consent,notes
+C01,Tanay Lohia,Mandrake Bio,funded-startup,https://www.linkedin.com/in/…,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,From archive pipeline; message this week
+C02,Yatish Talvadia,Anmasa,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
+C03,Ananya Pritam,Sortmyprep,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
+C04,Vedant Lamba,BUILT,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
+C05,Varun Khare,thumpN,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
+C06,Tanmay Kanmahale,BAAS Technologies,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
+C07,Monil Jayeshkumar Khatri,Milo Drive,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
+C08,Puru Rastogi,Mowito,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
+C09,Radhika Agarwal,Neothera,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
+C10,Nakul Khanna,Onpoint,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,

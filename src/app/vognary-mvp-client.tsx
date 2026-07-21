@@ -1110,11 +1110,14 @@ export default function VognaryMvpClient() {
       if (!gmailOutcome) return;
 
       queueMicrotask(() => {
-        if (gmailOutcome === "connected" || gmailOutcome === "sync-pending") setConnectorReturn({ label: "Gmail connection", connectorId: "gmail-readonly" });
+        if (gmailOutcome === "connected" || gmailOutcome === "sync-pending") {
+          setConnectorReturn({ label: "Gmail connection", connectorId: "gmail-readonly" });
+          setMobileSection("overview");
+        }
         setNotice(gmailOutcome === "connected"
-          ? "Gmail connected and its first receipt-history sync completed. The ledger now refreshes automatically."
+          ? "Gmail connected. First receipt-history sync completed — Home will show what we found as soon as evidence lands."
           : gmailOutcome === "sync-pending"
-            ? "Gmail connected. Its first sync needs attention; the source-health view will show the retry state."
+            ? "Gmail connected. Its first sync needs attention; open Connect for the retry state, or paste a receipt to get value now."
             : `Gmail authorization returned ${gmailOutcome.replaceAll("-", " ")}. Check the connection status before retrying.`);
       });
       url.searchParams.delete("gmail");
@@ -1130,12 +1133,18 @@ export default function VognaryMvpClient() {
         queueMicrotask(() => {
           setConnectorStartResults((current) => ({ ...current, "gmail-readonly": { status: "connected-preview", message: "Gmail connected; no recurring candidates found yet." } }));
           setDisconnectedConnectorIds((current) => current.filter((id) => id !== "gmail-readonly"));
-          setNotice(`Gmail connected. Scanned ${payload.messageCount ?? 0} receipt-like message(s), but no recurring candidates were found yet.`);
+          setMobileSection("overview");
+          setNotice(`Gmail connected. Scanned ${payload.messageCount ?? 0} receipt-like message(s), but no recurring candidates were found yet. Paste a receipt or upload a statement to prove more.`);
         });
         return;
       }
 
       const importedAt = Date.now();
+      const monthlyTotals = candidates.reduce<Record<string, number>>((totals, candidate) => {
+        const currency = candidate.currency?.trim() || "INR";
+        totals[currency] = (totals[currency] ?? 0) + candidate.amount;
+        return totals;
+      }, {});
       queueMicrotask(() => {
         setManualItems((current) => {
           const existing = new Set(current.map((item) => recurringIdentity(item)));
@@ -1150,13 +1159,22 @@ export default function VognaryMvpClient() {
               nextExpectedDate: candidate.nextExpectedDate,
               category: candidate.category,
               sourceName: "Gmail receipt sync",
+              evidenceDescription: candidate.evidenceText,
             }));
           return [...current, ...nextItems];
         });
         setReceiptText((current) => current || candidates.map((candidate) => candidate.evidenceText).join("\n\n"));
         setConnectorStartResults((current) => ({ ...current, "gmail-readonly": { status: "connected-preview", message: `Imported ${candidates.length} recurring candidate(s) from Gmail.` } }));
         setDisconnectedConnectorIds((current) => current.filter((id) => id !== "gmail-readonly"));
-        setNotice(`Gmail connected. Imported ${candidates.length} recurring candidate(s) from receipt history.`);
+        setMobileSection("overview");
+        // "Here's what we found" — same celebration surface as server-side first sync.
+        setSyncCelebration({
+          rail: "Gmail receipts",
+          count: candidates.length,
+          monthlyTotals: Object.entries(monthlyTotals).sort(([left], [right]) => left.localeCompare(right)),
+          merchants: candidates.slice().sort((left, right) => right.amount - left.amount).slice(0, 4).map((c) => c.merchant),
+        });
+        setNotice(`Gmail connected. Here's what we found: ${candidates.length} recurring candidate(s) from receipt history.`);
       });
     } catch {
       queueMicrotask(() => {
@@ -2302,7 +2320,18 @@ export default function VognaryMvpClient() {
                   <p className="mt-2 text-sm leading-6 text-(--ink)">{syncCelebration.merchants.join(" · ")}</p>
                 </div>
               </div>
-              <button type="button" autoFocus onClick={() => setSyncCelebration(null)} className="btn btn-primary mt-5 w-full">Continue to Home</button>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => {
+                  setSyncCelebration(null);
+                  setMobileSection("overview");
+                  window.setTimeout(() => document.getElementById("overview")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+                }}
+                className="btn btn-primary mt-5 w-full"
+              >
+                Continue to your brief
+              </button>
             </div>
           </section>
         </div>
@@ -2398,7 +2427,7 @@ export default function VognaryMvpClient() {
 
         {/* 00 · Overview — the five-second answer */}
         <section id="overview" aria-labelledby="overview-heading" className={`${mobileSection === "overview" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
-          <StageHeader id="overview-heading" folio="01" title="Home" note="Monthly burn, next renewal, one action." />
+          <StageHeader id="overview-heading" folio="01" title="Home" note="Your brief: what renews, what changed, what to kill." />
           {audit.recurringItems.length ? <RenewalRadar timeline={renewalTimeline} onSelect={openDetail} onOpenSubscriptions={() => selectAndReviewItem()} /> : null}
           <OverviewPanel
             audit={audit}

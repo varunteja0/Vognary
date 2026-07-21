@@ -116,6 +116,8 @@ export type ManualRecurringInput = {
   nextExpectedDate: string;
   category: string;
   sourceName?: string;
+  /** Raw proof text (e.g. pasted receipt) — used for mandate rails + evidence display. */
+  evidenceDescription?: string;
 };
 
 export type AnalyzeOptions = {
@@ -472,7 +474,7 @@ function buildManualRecurringItem(input: ManualRecurringInput, today: Date): Rec
       {
         date: input.nextExpectedDate,
         amount: input.amount,
-        description: input.merchant,
+        description: (input.evidenceDescription?.trim() || input.merchant).slice(0, 500),
         source: sourceName,
         rowNumber: 1,
         kind: "scheduled",
