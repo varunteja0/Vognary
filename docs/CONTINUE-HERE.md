@@ -42,6 +42,16 @@ money first-class before anything else, and the world must work too.**
   = `{ extraction: "claude-haiku-4-5", reasoning: "claude-sonnet-5" }`.
   Dependency-injected, **inert until `ANTHROPIC_API_KEY` is set** (founder has
   committed to providing it — see founder-ops).
+- **Monolith decomposition (WP-B7) underway, measured:** `vognary-mvp-client.tsx`
+  is **5305 lines** (was 5442). Shared foundation now lives under
+  `src/app/workspace/*`: `format.ts` (`formatCurrency`/`formatMinorCurrency`,
+  India-first, now unit-tested in `tests/workspace-format.test.ts`),
+  `statusStyles` in `primitives.tsx`, and `ledger-panels.tsx`
+  (`RecurringGraph` + `PriorityActionPanel`). Extraction was byte-identical JSX
+  re-imported into the shell — zero visual change; all gates green. Next clean
+  targets are token-clean pure panels (`ConfirmDialog`, `ProofDisclosure`,
+  duplicate/review panels); the renewal panels need their inline `eyebrow`
+  `fontSize` literals tokenised first (they trip the token gate once un-deferred).
 - **Never stack PRs**; branch every work item from fresh `main`, PR against `main`.
 
 ## 2. THE PLAN — company phases (THE-LAW) + product phases (engineering)
@@ -67,7 +77,7 @@ recurring charge → assistant brief → user decides → decision + outcome log
 |---|---|---|
 | **0** | Repo hygiene: worktree corpses deleted, junk cleared, 14 branches pruned, docs collapsed, eslint hardened | **DONE 2026-07-21** |
 | **1** | Loop undeniable: Gmail → `/app?gmail=` + celebration; landing sample labelled; guest first-result first; token gate; honest Gmail card | **largely DONE 2026-07-21** · WP-B1…B3 |
-| **2** | Wire the brain: AI key + budget env; ingest AI PDF assist (fail-closed); `/api/ai/status`; **assistant brief** default home; kill-list on home; monolith still large | **code DONE; live AI blocked on founder key** · WP-B4,B6 |
+| **2** | Wire the brain: AI key + budget env; ingest AI PDF assist (fail-closed); `/api/ai/status`; **assistant brief** default home; kill-list on home; monolith decomposition underway (5442→5305) | **code DONE; live AI blocked on founder key** · WP-B4,B6,B7 |
 | **3** | India-first: UPI mandate kill-list from statements (panel + engine); corpus still founder-ops | **engine+UI DONE; corpus pending** · WP-B5 |
 | **4** | Full-loop e2e (`loop-brief-killlist` + first-value) + no-demo release gate | **e2e added; release:gate still ops** · WP-B8 |
 

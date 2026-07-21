@@ -1,6 +1,18 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { RecommendationType } from "@/lib/recurring-audit";
+
+// The verdict "stamp" class for each recommendation type. Shared by every panel
+// that renders an item's keep / watch / cancel state, so it lives with the other
+// presentational primitives rather than in the monolith it was extracted from.
+export const statusStyles: Record<RecommendationType, string> = {
+  keep: "stamp stamp-keep",
+  watch: "stamp stamp-watch",
+  downgrade: "stamp stamp-downgrade",
+  cancel: "stamp stamp-cancel",
+  investigate: "stamp stamp-investigate",
+};
 
 // Shared presentational primitives extracted from vognary-mvp-client.tsx as the
 // first slice of the src/app/workspace/* decomposition. These are pure props →
