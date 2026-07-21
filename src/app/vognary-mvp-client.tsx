@@ -56,6 +56,7 @@ import { VognaryMark } from "./brand";
 import { Nakul } from "./character";
 import { CommandPalette, type PaletteItem } from "./command-palette";
 import { RunwayStrip } from "./runway-strip";
+import { AssistantBriefPanel } from "./workspace/assistant-brief-panel";
 import { NextDebitTicker, WorkspaceSidebar } from "./workspace-shell";
 
 const statusStyles: Record<RecommendationType, string> = {
@@ -3434,6 +3435,9 @@ function OverviewPanel({
 
   return (
     <section className="panel p-5 sm:p-6">
+      <div className="mb-5">
+        <AssistantBriefPanel items={audit.recurringItems} actions={userActions} onSelect={onSelect} />
+      </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <button type="button" onClick={onOpenSubscriptions} className="inset p-4 text-left transition hover:border-ember">
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Monthly burn</p>

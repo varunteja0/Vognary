@@ -25,6 +25,24 @@
       }
     },
     {
+      "name": "vognary-guest",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3006"
+      ],
+      "port": 3006,
+      "env": {
+        "SESSION_SECRET": "local-dev-session-secret-at-least-32-bytes-long",
+        "TOKEN_ENCRYPTION_KEY": "1111111111111111111111111111111111111111111111111111111111111111",
+        "ALLOW_IN_MEMORY_RATE_LIMITS": "true",
+        "APP_URL": "http://localhost:3006"
+      }
+    },
+    {
       "name": "vognary-prod",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

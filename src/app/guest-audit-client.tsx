@@ -24,6 +24,7 @@ import { sampleReceiptText } from "@/lib/sample-audit";
 import { VognaryMark } from "./brand";
 import { Nakul } from "./character";
 import { RunwayStrip } from "./runway-strip";
+import { AssistantBriefPanel } from "./workspace/assistant-brief-panel";
 
 import type { GmailConnectAvailability } from "./app/experience-client";
 
@@ -277,6 +278,9 @@ export default function GuestAuditClient({ gmailConnect }: { gmailConnect?: Gmai
 
         {hasResult && firstAction && nextRenewal ? (
           <>
+          <div className="mt-5">
+            <AssistantBriefPanel items={audit.recurringItems} />
+          </div>
           <section id="guest-result" aria-label="Your first audit result" aria-live="polite" className="mt-5 scroll-mt-4 rounded-2xl border border-(--gold-line) bg-card p-5 sm:p-7">
             <div className={`grid gap-3 ${monthlyTotals.length === 1 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
               {monthlyTotals.map(([currency, amount]) => (
