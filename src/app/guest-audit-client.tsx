@@ -20,6 +20,7 @@ import {
   type RecurringItem,
 } from "@/lib/recurring-audit";
 import { receiptTextToManualInputs, splitReceiptSnippets } from "@/lib/receipt-parser";
+import { buildAuditReport, renderAuditReportText } from "@/lib/audit-report";
 import { sampleReceiptText } from "@/lib/sample-audit";
 import { VognaryMark } from "./brand";
 import { Nakul } from "./character";
@@ -55,6 +56,7 @@ export default function GuestAuditClient({ gmailConnect }: { gmailConnect?: Gmai
     [firstAction],
   );
   const monthlyTotals = useMemo(() => buildMonthlyTotals(audit.recurringItems), [audit.recurringItems]);
+  const reportText = useMemo(() => renderAuditReportText(buildAuditReport(audit, { sample: sampleMode })), [audit, sampleMode]);
   const hasEvidence = Boolean(receiptText.trim() || statementSources.length || manualItems.length);
   const hasResult = audit.recurringItems.length > 0;
 
@@ -332,6 +334,9 @@ export default function GuestAuditClient({ gmailConnect }: { gmailConnect?: Gmai
             <p className="mt-3 text-xs leading-5 text-(--muted)">{sampleMode ? "Sample evidence is never staged for sign-in." : "Your exact evidence is staged only in this tab for the sign-in handoff and clears after encrypted workspace sync succeeds."}</p>
           </section>
           <div className="mt-5">
+            <ReportHandoff reportText={reportText} sample={sampleMode} onNotice={setNotice} />
+          </div>
+          <div className="mt-5">
             <AssistantBriefPanel items={audit.recurringItems} />
           </div>
           <div className="mt-5">
@@ -344,6 +349,54 @@ export default function GuestAuditClient({ gmailConnect }: { gmailConnect?: Gmai
         ) : null}
       </div>
     </main>
+  );
+}
+
+// The founder's delivery surface: paste a prospect's receipts, then copy or
+// download one plain-text report to send in WhatsApp or email. The text is the
+// deterministic audit-report (cite-or-shut-up), so nothing here can overclaim.
+function ReportHandoff({ reportText, sample, onNotice }: { reportText: string; sample: boolean; onNotice: (message: string) => void }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyReport() {
+    try {
+      await navigator.clipboard.writeText(reportText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2500);
+      onNotice("Audit report copied — paste it into WhatsApp or email to deliver it.");
+    } catch {
+      onNotice("Copy was blocked by the browser. Use Download instead, or open Preview and copy manually.");
+    }
+  }
+
+  function downloadReport() {
+    const stamp = new Date().toISOString().slice(0, 10);
+    const blob = new Blob([reportText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `vognary-audit-${stamp}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    onNotice("Audit report downloaded as a text file.");
+  }
+
+  return (
+    <section aria-label="Deliver this audit" className="rounded-2xl border border-line bg-card p-5 sm:p-6">
+      <p className="font-data text-[0.64rem] uppercase tracking-[0.16em] text-verdict">Deliver this audit</p>
+      <h2 className="mt-2 font-display text-xl font-semibold text-(--ink)">Send a plain-text summary</h2>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
+        Monthly burn, what renews next, what to do first, and the UPI/NACH mandates to stop at the source — evidence-backed, ready to paste into WhatsApp or email.{sample ? " This sample report is clearly labelled as an example." : ""}
+      </p>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={copyReport} className="btn btn-primary">{copied ? "Copied ✓" : "Copy report"}</button>
+        <button type="button" onClick={downloadReport} className="btn btn-ondark">Download .txt</button>
+      </div>
+      <details className="mt-4 border-t border-line pt-4">
+        <summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">Preview report</summary>
+        <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-(--card-2) p-4 font-data text-[0.72rem] leading-5 text-(--ink-soft)">{reportText}</pre>
+      </details>
+    </section>
   );
 }
 

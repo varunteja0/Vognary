@@ -10,7 +10,7 @@
 | Wedge sharpness | 8 | 2026-07-21 | Strategy review |
 | Intelligence engine | 6 | 2026-07-21 | Engines strong; corpus empty |
 | Trust & honesty | 9 | 2026-07-21 | Claims CI + fail-closed design |
-| Product UX | 6.0 | 2026-07-21 | First-result → brief → kill-list; Gmail celebration |
+| Product UX | 6.0 | 2026-07-21 | First-result → brief → kill-list; Gmail celebration; copy/download audit report for delivery (guest) |
 | Backend readiness | 8 | 2026-07-21 | Migrations + tests |
 | Production activation | 3.5 | 2026-07-21 | production:check gaps |
 | Live connector depth | 4 | 2026-07-21 | Registry ≠ live |

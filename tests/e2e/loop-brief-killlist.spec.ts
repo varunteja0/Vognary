@@ -22,6 +22,15 @@ test("guest paste surfaces first result, brief, and mandate kill-list", async ({
   await expect(firstResult.getByText("Do this first", { exact: true })).toBeVisible();
   await expect(firstResult.getByText("Proof", { exact: true })).toBeVisible();
 
+  // Founder delivery: a copy-ready report is offered, and its preview carries the
+  // deliverable content (burn, actions, mandates) so a free audit can be sent on.
+  const report = page.getByRole("region", { name: "Deliver this audit" });
+  await expect(report).toBeVisible();
+  await expect(report.getByRole("button", { name: "Copy report" })).toBeVisible();
+  await report.getByText("Preview report").click();
+  await expect(report.getByText(/Monthly burn:/)).toBeVisible();
+  await expect(report.getByText(/Recurring mandates to stop at the source/i)).toBeVisible();
+
   const brief = page.getByRole("region", { name: "Your brief" });
   await expect(brief).toBeVisible();
   await expect(brief.locator("h2")).not.toBeEmpty();

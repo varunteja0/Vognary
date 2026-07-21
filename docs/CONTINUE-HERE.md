@@ -52,6 +52,19 @@ money first-class before anything else, and the world must work too.**
   targets are token-clean pure panels (`ConfirmDialog`, `ProofDisclosure`,
   duplicate/review panels); the renewal panels need their inline `eyebrow`
   `fontSize` literals tokenised first (they trip the token gate once un-deferred).
+- **Audit delivery path shipped (guest), measured:** new deterministic engine
+  `src/lib/audit-report.ts` (`buildAuditReport` + `renderAuditReportText`) composes
+  the existing brief + kill-list + summary engines into ONE copy-ready plain-text
+  report — monthly burn (₹, foreign kept separate), next renewals, top actions,
+  UPI/NACH mandates to stop at the source, and an honest "floor, not ceiling"
+  coverage note. Wired into `guest-audit-client.tsx` as a **"Deliver this audit"**
+  card (Copy report / Download .txt / Preview). This is the founder's Phase-A
+  hand-off: paste a prospect's receipts → copy the report → send in WhatsApp/email.
+  Cite-or-shut-up: every figure traces to the deterministic audit; no invented
+  amounts. Tests: `tests/audit-report.test.ts` (5) + extended
+  `tests/e2e/loop-brief-killlist.spec.ts` (report region asserted, desktop+mobile,
+  4/4 green). Not yet wired into the signed-in monolith surface (needs DB to
+  verify; the pure engine is ready to adopt there).
 - **Never stack PRs**; branch every work item from fresh `main`, PR against `main`.
 
 ## 2. THE PLAN — company phases (THE-LAW) + product phases (engineering)
