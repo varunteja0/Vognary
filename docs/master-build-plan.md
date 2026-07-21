@@ -1,5 +1,10 @@
 # Vognary — Master Build Plan (the one file every agent opens first)
 
+> **Executing the UI/UX quality + AI live-path leap?** The step-by-step work
+> packages (WP-0 … WP-6) live in
+> [execution-plan-ui-ai-quality.md](execution-plan-ui-ai-quality.md). This file
+> is the law (Parts 3 and 5); that file is the ordered execution of it.
+
 Date: 2026-07-20
 Status: **canonical index + new-work spec.** This is the single entry point. It
 does two things: (1) it points every topic at the one doc that already owns it,
