@@ -23,6 +23,7 @@ import { receiptTextToManualInputs, splitReceiptSnippets } from "@/lib/receipt-p
 import { sampleReceiptText } from "@/lib/sample-audit";
 import { VognaryMark } from "./brand";
 import { Nakul } from "./character";
+import { RunwayStrip } from "./runway-strip";
 
 export default function GuestAuditClient() {
   const [receiptText, setReceiptText] = useState("");
@@ -263,6 +264,7 @@ export default function GuestAuditClient() {
         </section>
 
         {hasResult && firstAction && nextRenewal ? (
+          <>
           <section id="guest-result" aria-label="Your first audit result" aria-live="polite" className="mt-5 scroll-mt-4 rounded-2xl border border-(--gold-line) bg-card p-5 sm:p-7">
             <div className={`grid gap-3 ${monthlyTotals.length === 1 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
               {monthlyTotals.map(([currency, amount]) => (
@@ -304,6 +306,8 @@ export default function GuestAuditClient() {
             </div>
             <p className="mt-3 text-xs leading-5 text-(--muted)">{sampleMode ? "Sample evidence is never staged for sign-in." : "Your exact evidence is staged only in this tab for the sign-in handoff and clears after encrypted workspace sync succeeds."}</p>
           </section>
+          <RunwayStrip items={audit.recurringItems} />
+          </>
         ) : hasEvidence ? (
           <p role="status" className="mt-4 rounded-xl border border-line bg-(--card-2) px-4 py-3 text-sm leading-6 text-(--muted)">No recurring result yet. Add another receipt with a merchant, amount, and renewal or subscription cue.</p>
         ) : null}
