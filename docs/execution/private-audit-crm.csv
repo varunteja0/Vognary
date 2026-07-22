@@ -1,11 +1,11 @@
 id,name,company,segment,contact,channel,source,asked_at,status,audit_booked_at,files_received,audit_completed_at,monthly_recurring_found_inr,avoidable_monthly_found_inr,surprise_quote,paid,objection,next_follow_up,corpus_consent,notes
-C01,Tanay Lohia,Mandrake Bio,funded-startup,https://www.linkedin.com/in/…,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,From archive pipeline; message this week
-C02,Yatish Talvadia,Anmasa,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
-C03,Ananya Pritam,Sortmyprep,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
-C04,Vedant Lamba,BUILT,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
-C05,Varun Khare,thumpN,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
-C06,Tanmay Kanmahale,BAAS Technologies,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
-C07,Monil Jayeshkumar Khatri,Milo Drive,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
-C08,Puru Rastogi,Mowito,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
-C09,Radhika Agarwal,Neothera,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
-C10,Nakul Khanna,Onpoint,funded-startup,,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,
+C01,Tanay Lohia,Mandrake Bio,funded-startup,https://www.linkedin.com/in/tanaylohia,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,AI biotech; profile from public LinkedIn
+C02,Yatish Talvadia,Anmasa,funded-startup,https://www.linkedin.com/in/yatishtalvadia,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,D2C food
+C03,Ananya Pritam,Sortmyprep,funded-startup,https://www.linkedin.com/in/ananya-pritam,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,AI edtech
+C04,Vedant Lamba,BUILT,funded-startup,https://www.linkedin.com/in/vedulamba,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,D2C footwear
+C05,Varun Khare,thumpN,funded-startup,https://www.linkedin.com/in/varun-khare-9548088,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,AI ticketing/events
+C06,Tanmay Kanmahale,BAAS Technologies,funded-startup,https://www.linkedin.com/in/tanmaykanmahale,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,Spacetech
+C07,Monil Jayeshkumar Khatri,Milo Drive,funded-startup,https://www.linkedin.com/in/monil-jayeshkumar-khatri-527279101,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,EV mobility
+C08,Puru Rastogi,Mowito,funded-startup,https://www.linkedin.com/in/pururastogi,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,Physical AI / robotics
+C09,Radhika Agarwal,Neothera,funded-startup,https://www.linkedin.com/in/radhikaagar,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,Skin health
+C10,Nakul Khanna,Onpoint,funded-startup,https://www.linkedin.com/in/khannanakul,linkedin-dm,funding-news,,not-asked,,,,,,,no,,,no,Rewards fintech
