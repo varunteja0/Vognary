@@ -799,6 +799,16 @@ const railGuides: Record<string, CancelAction> = {
     ],
     caveat: "Also cancel with the merchant directly, or they may request a fresh mandate.",
   },
+  nach: {
+    merchantLabel: "NACH / ECS auto-debit",
+    kind: "rail-guide",
+    steps: [
+      "A NACH/ECS mandate is a bank auto-debit — it is revoked at your bank, not (only) at the biller",
+      "Open net-banking → Mandates / e-NACH / registered mandates and cancel the one for this biller",
+      "Tell the biller you are stopping too, so they do not re-present or register a fresh mandate",
+    ],
+    caveat: "If this debit is a loan EMI or insurance premium, do not simply cancel — foreclosing or lapsing has consequences; review first.",
+  },
   emi: {
     merchantLabel: "EMI",
     kind: "rail-guide",
@@ -837,6 +847,13 @@ const railGuides: Record<string, CancelAction> = {
     ],
   },
 };
+
+export type RailGuideKey = keyof typeof railGuides;
+
+/** The revoke guide for a specific rail/purpose (e.g. the mandate kill-list). */
+export function getRailGuide(key: RailGuideKey): CancelAction {
+  return railGuides[key];
+}
 
 const categoryFallbacks: Record<string, keyof typeof railGuides> = {
   "Mandates": "upiAutopay",

@@ -51,6 +51,8 @@ export function receiptTextToManualInputs(text: string, sourceName = "Pasted rec
     nextExpectedDate: candidate.nextExpectedDate,
     category: candidate.category,
     sourceName,
+    // Carry the raw snippet so mandate kill-list and proof can match UPI/AUTOPAY tokens.
+    evidenceDescription: candidate.evidenceText,
   }));
 }
 

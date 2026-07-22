@@ -53,3 +53,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Live outreach pipeline contains PII — never commit
+docs/archive/private-audit-pipeline.csv
+docs/private-audit-pipeline.csv

@@ -20,12 +20,18 @@ import {
   type RecurringItem,
 } from "@/lib/recurring-audit";
 import { receiptTextToManualInputs, splitReceiptSnippets } from "@/lib/receipt-parser";
+import { buildAuditReport, renderAuditReportShareText, renderAuditReportText } from "@/lib/audit-report";
 import { sampleReceiptText } from "@/lib/sample-audit";
 import { VognaryMark } from "./brand";
 import { Nakul } from "./character";
 import { RunwayStrip } from "./runway-strip";
+import { AssistantBriefPanel } from "./workspace/assistant-brief-panel";
+import { MandateKillListPanel } from "./workspace/mandate-killlist-panel";
 
-export default function GuestAuditClient() {
+import type { GmailConnectAvailability } from "./app/experience-client";
+
+export default function GuestAuditClient({ gmailConnect }: { gmailConnect?: GmailConnectAvailability }) {
+  const gmailAvailable = gmailConnect?.available ?? false;
   const [receiptText, setReceiptText] = useState("");
   const [statementSources, setStatementSources] = useState<TransferStatementSource[]>([]);
   const [manualItems, setManualItems] = useState<ManualRecurringInput[]>([]);
@@ -50,6 +56,9 @@ export default function GuestAuditClient() {
     [firstAction],
   );
   const monthlyTotals = useMemo(() => buildMonthlyTotals(audit.recurringItems), [audit.recurringItems]);
+  const report = useMemo(() => buildAuditReport(audit, { sample: sampleMode }), [audit, sampleMode]);
+  const reportText = useMemo(() => renderAuditReportText(report), [report]);
+  const shareText = useMemo(() => renderAuditReportShareText(report), [report]);
   const hasEvidence = Boolean(receiptText.trim() || statementSources.length || manualItems.length);
   const hasResult = audit.recurringItems.length > 0;
 
@@ -131,11 +140,20 @@ export default function GuestAuditClient() {
     return () => window.clearTimeout(timer);
   }, [transferReady]);
 
+  // Auto-scroll to the five-second answer the first time a result appears.
+  const sawResultRef = useRef(false);
+  useEffect(() => {
+    if (!hasResult || sawResultRef.current) return;
+    sawResultRef.current = true;
+    window.setTimeout(() => scrollIntoViewWithMotion(document.getElementById("guest-result"), { block: "start" }), 0);
+  }, [hasResult]);
+
   function clearGuestAudit() {
     setReceiptText("");
     setStatementSources([]);
     setManualItems([]);
     setSampleMode(false);
+    sawResultRef.current = false;
     window.sessionStorage.removeItem(guestAuditTransferKey);
     transferExportedAtRef.current = null;
     setTransferReady(false);
@@ -198,14 +216,23 @@ export default function GuestAuditClient() {
             <Nakul pose="guide" size={92} className="hidden shrink-0 text-(--ink) sm:block" title="Nakul, the ledger mongoose, showing the way in" />
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <a href="/login?next=/app" className="group rounded-xl border border-(--gold-line) bg-(--card-2) p-4 transition hover:border-(--gold)">
-              <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--gold)">Connect · read-only</p>
-              <p className="mt-2 font-display text-lg font-semibold text-(--ink)">Connect Gmail</p>
-              <p className="mt-1 text-xs leading-5 text-(--muted)">Sign in, grant revocable receipt access, and see freshness beside the connection.</p>
-              <p className="mt-3 text-xs font-semibold text-(--gold) transition group-hover:translate-x-0.5">Sign in to connect →</p>
-            </a>
-            <a href="#paste" className="group rounded-xl border border-line bg-(--card-2) p-4 transition hover:border-(--line-strong)">
-              <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--muted)">Paste · instant</p>
+            {gmailAvailable ? (
+              <a href="/login?next=/app" className="group rounded-xl border border-(--gold-line) bg-(--card-2) p-4 transition hover:border-(--gold)">
+                <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--gold)">Connect · read-only</p>
+                <p className="mt-2 font-display text-lg font-semibold text-(--ink)">Connect Gmail</p>
+                <p className="mt-1 text-xs leading-5 text-(--muted)">Sign in, grant revocable receipt access, and see freshness beside the connection.</p>
+                <p className="mt-3 text-xs font-semibold text-(--gold) transition group-hover:translate-x-0.5">Sign in to connect →</p>
+              </a>
+            ) : (
+              <div className="rounded-xl border border-line bg-(--card-2) p-4">
+                <p className="font-data text-[0.6rem] uppercase tracking-[0.16em] text-(--muted)">Gmail · {gmailConnect?.label ?? "Not available yet"}</p>
+                <p className="mt-2 font-display text-lg font-semibold text-(--ink-soft)">Gmail sync is coming</p>
+                <p className="mt-1 text-xs leading-5 text-(--muted)">{gmailConnect?.meaning ?? "Provider approval for this deployment is still in progress."}</p>
+                <p className="mt-3 text-xs font-semibold text-(--muted)">Paste works today →</p>
+              </div>
+            )}
+            <a href="#paste" className={`group rounded-xl border ${gmailAvailable ? "border-line" : "border-(--gold-line)"} bg-(--card-2) p-4 transition hover:border-(--gold)`}>
+              <p className={`font-data text-[0.6rem] uppercase tracking-[0.16em] ${gmailAvailable ? "text-(--muted)" : "text-(--gold)"}`}>Paste · instant</p>
               <p className="mt-2 font-display text-lg font-semibold text-(--ink)">Paste a receipt</p>
               <p className="mt-1 text-xs leading-5 text-(--muted)">Two receipts are enough for your first result — monthly burn, next renewal, one action. Nothing leaves this tab.</p>
               <p className="mt-3 text-xs font-semibold text-(--ink-soft) transition group-hover:translate-x-0.5">Start below →</p>
@@ -265,8 +292,10 @@ export default function GuestAuditClient() {
 
         {hasResult && firstAction && nextRenewal ? (
           <>
+          {/* Five-second answer first — brief and kill-list drill down after. */}
           <section id="guest-result" aria-label="Your first audit result" aria-live="polite" className="mt-5 scroll-mt-4 rounded-2xl border border-(--gold-line) bg-card p-5 sm:p-7">
-            <div className={`grid gap-3 ${monthlyTotals.length === 1 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+            <p className="font-data text-[0.64rem] uppercase tracking-[0.16em] text-verdict">Your first result · evidence-backed</p>
+            <div className={`mt-3 grid gap-3 ${monthlyTotals.length === 1 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
               {monthlyTotals.map(([currency, amount]) => (
                 <ResultMetric key={currency} label={monthlyTotals.length === 1 ? "Monthly burn" : `Monthly total · ${currency}`} value={formatMoney(amount, currency)} />
               ))}
@@ -306,6 +335,15 @@ export default function GuestAuditClient() {
             </div>
             <p className="mt-3 text-xs leading-5 text-(--muted)">{sampleMode ? "Sample evidence is never staged for sign-in." : "Your exact evidence is staged only in this tab for the sign-in handoff and clears after encrypted workspace sync succeeds."}</p>
           </section>
+          <div className="mt-5">
+            <ReportHandoff reportText={reportText} shareText={shareText} sample={sampleMode} onNotice={setNotice} />
+          </div>
+          <div className="mt-5">
+            <AssistantBriefPanel items={audit.recurringItems} />
+          </div>
+          <div className="mt-5">
+            <MandateKillListPanel items={audit.recurringItems} />
+          </div>
           <RunwayStrip items={audit.recurringItems} />
           </>
         ) : hasEvidence ? (
@@ -313,6 +351,66 @@ export default function GuestAuditClient() {
         ) : null}
       </div>
     </main>
+  );
+}
+
+// The founder's delivery surface: paste a prospect's receipts, then copy or
+// download one plain-text report to send in WhatsApp or email. The text is the
+// deterministic audit-report (cite-or-shut-up), so nothing here can overclaim.
+function ReportHandoff({ reportText, shareText, sample, onNotice }: { reportText: string; shareText: string; sample: boolean; onNotice: (message: string) => void }) {
+  const [copied, setCopied] = useState<"full" | "short" | null>(null);
+
+  async function copyReport() {
+    try {
+      await navigator.clipboard.writeText(reportText);
+      setCopied("full");
+      window.setTimeout(() => setCopied(null), 2500);
+      onNotice("Audit report copied — paste it into WhatsApp or email to deliver it.");
+    } catch {
+      onNotice("Copy was blocked by the browser. Use Download instead, or open Preview and copy manually.");
+    }
+  }
+
+  async function copyShort() {
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setCopied("short");
+      window.setTimeout(() => setCopied(null), 2500);
+      onNotice("Short WhatsApp-ready summary copied.");
+    } catch {
+      onNotice("Copy was blocked by the browser. Use Download instead, or open Preview and copy manually.");
+    }
+  }
+
+  function downloadReport() {
+    const stamp = new Date().toISOString().slice(0, 10);
+    const blob = new Blob([reportText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `vognary-audit-${stamp}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    onNotice("Audit report downloaded as a text file.");
+  }
+
+  return (
+    <section aria-label="Deliver this audit" className="rounded-2xl border border-line bg-card p-5 sm:p-6">
+      <p className="font-data text-[0.64rem] uppercase tracking-[0.16em] text-verdict">Deliver this audit</p>
+      <h2 className="mt-2 font-display text-xl font-semibold text-(--ink)">Send a plain-text summary</h2>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
+        Monthly burn, what renews next, what to do first, and the UPI/NACH mandates to stop at the source — evidence-backed, ready to paste into WhatsApp or email.{sample ? " This sample report is clearly labelled as an example." : ""}
+      </p>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={copyReport} className="btn btn-primary">{copied === "full" ? "Copied ✓" : "Copy report"}</button>
+        <button type="button" onClick={copyShort} className="btn btn-ondark">{copied === "short" ? "Copied ✓" : "Copy for WhatsApp"}</button>
+        <button type="button" onClick={downloadReport} className="btn btn-ondark">Download .txt</button>
+      </div>
+      <details className="mt-4 border-t border-line pt-4">
+        <summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">Preview report</summary>
+        <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-(--card-2) p-4 font-data text-[0.72rem] leading-5 text-(--ink-soft)">{reportText}</pre>
+      </details>
+    </section>
   );
 }
 

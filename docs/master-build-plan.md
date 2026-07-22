@@ -1,22 +1,19 @@
-# Vognary — Master Build Plan (the one file every agent opens first)
+# Vognary — Master Build Plan (AI / Twin / UI implementation law)
 
-> **Executing the UI/UX quality + AI live-path leap?** The step-by-step work
-> packages (WP-0 … WP-6) live in
-> [execution-plan-ui-ai-quality.md](execution-plan-ui-ai-quality.md). This file
-> is the law (Parts 3 and 5); that file is the ordered execution of it.
+> **STOP — agents open [`docs/THE-LAW.md`](THE-LAW.md) first.**  
+> THE-LAW is the company + product + agent supreme directive.  
+> This file remains the **implementation law** for the AI layer (Part 3), Twin
+> engine (Part 4), and UI quality system (Part 5). It is **not** the company
+> roadmap (that is THE-LAW Phases A–F).
+>
+> **Executing UI/AI work packages?**  
+> Company loop shipping: [execution/phase-b-loop-shipping.md](execution/phase-b-loop-shipping.md)  
+> WP-0…WP-6 detail: [execution-plan-ui-ai-quality.md](execution-plan-ui-ai-quality.md)  
+> Live handoff: [CONTINUE-HERE.md](CONTINUE-HERE.md)
 
-Date: 2026-07-20
-Status: **canonical index + new-work spec.** This is the single entry point. It
-does two things: (1) it points every topic at the one doc that already owns it,
-so we never fork the truth; (2) it adds — in full depth — the four things no
-existing doc yet specifies: the **AI layer**, the **Financial Twin engine**, the
-**UI/UX quality system**, and the **one consolidated execution sequence with
-costs**. Read Part 0, then jump to your part.
-
-> **Why this file exists.** We have excellent scattered plans. An agent picking
-> up work cold needs one map that says "here is the whole thing, here is your
-> slice, here is the doc that is law for it." That is this file. It is an index
-> plus the missing specs — not a replacement for the docs it points to.
+Date: 2026-07-20 · Amended 2026-07-21 (subordinate to THE-LAW)
+Status: **canonical implementation index + AI/Twin/UI specs.**  
+(1) Points each topic at the doc that owns it; (2) owns AI, Twin, UI quality, cost model.
 
 ---
 
@@ -27,11 +24,15 @@ Do **not** restate these here; edit them at their home and link back:
 
 | Topic | The doc that is law |
 | --- | --- |
-| The scoreboard, the 5 Leaps, the chassis (C1–C6), phases G8–G12, anti-goals | [path-to-10.md](path-to-10.md) |
-| The wow ladder (WOW-1..5), architecture as-it-stands, execution protocol | [leap-plan-2026-07-20.md](leap-plan-2026-07-20.md) |
-| The 10 external activation gates (exact env vars + one verify command each) | [founder-gate-runbook.md](founder-gate-runbook.md) |
-| The 18 durable surfaces + module map + intelligence rules | [product-architecture.md](product-architecture.md) |
-| Current state vs market, competitor teardown, stop/go criteria | [current-state-and-market-gap-analysis.md](current-state-and-market-gap-analysis.md) |
+| **Company strategy, scoreboard, agent hard stops, phases A–F** | **[THE-LAW.md](THE-LAW.md)** (supreme) |
+| Live handoff / branch state | [CONTINUE-HERE.md](CONTINUE-HERE.md) |
+| Phase A market contact (CRM, scripts, 21-day) | [execution/phase-a-market-contact.md](execution/phase-a-market-contact.md) |
+| Phase B loop shipping (agent WPs) | [execution/phase-b-loop-shipping.md](execution/phase-b-loop-shipping.md) |
+| Historical: 5 Leaps, chassis, G8–G12 (archive) | [archive/path-to-10.md](archive/path-to-10.md) |
+| Historical: wow ladder (archive) | [archive/leap-plan-2026-07-20.md](archive/leap-plan-2026-07-20.md) |
+| External activation gates | [production-activation-runbook.md](production-activation-runbook.md) + [archive/founder-gate-runbook.md](archive/founder-gate-runbook.md) |
+| Surfaces / module map (archive) | [archive/product-architecture.md](archive/product-architecture.md) |
+| Market gap (archive) | [archive/current-state-and-market-gap-analysis.md](archive/current-state-and-market-gap-analysis.md) |
 
 New material this file **owns** (edit it here): the AI layer (Part 3), the Twin
 engine (Part 4), the UI quality system (Part 5), the consolidated sequence and

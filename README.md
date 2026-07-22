@@ -24,12 +24,19 @@ Vognary 1.0 is an evidence-first recurring-spend audit for founders, builders, f
 - Adaptive personal/family/founder/team workspaces and an installable PWA shell whose service worker never caches financial pages or API responses.
 - Guided Proof Capture wizard for UPI AutoPay, app-store, and bank e-mandate screens; RBI pre-debit notification parsing (day-first dates) through the receipt path.
 - Month-over-month review diffs, explainable duplicate resolution with user merge decisions, PII redaction on exports, and Indian bank statement format detection (HDFC/ICICI/SBI/Axis/Kotak).
-- The 10/10 master plan with measurable exit criteria lives in [docs/path-to-10.md](docs/path-to-10.md).
+- The **canonical plan chain** for every human and agent:
+1. [docs/THE-LAW.md](docs/THE-LAW.md) — **supreme directive** (company scoreboard, phases A–F, hard stops)
+2. [docs/CONTINUE-HERE.md](docs/CONTINUE-HERE.md) — live handoff
+3. [docs/execution/phase-a-market-contact.md](docs/execution/phase-a-market-contact.md) — 21-day market proof (CRM, scripts, reports)
+4. [docs/execution/phase-b-loop-shipping.md](docs/execution/phase-b-loop-shipping.md) — product loop architecture + agent WPs
+5. [docs/execution-plan-ui-ai-quality.md](docs/execution-plan-ui-ai-quality.md) → [docs/master-build-plan.md](docs/master-build-plan.md) — UI/AI implementation detail
+
+Also: [AGENTS.md](AGENTS.md) (mandatory agent entry), [docs/execution/scoreboard.md](docs/execution/scoreboard.md), [docs/templates/](docs/templates/). Prior-generation plans only in [docs/archive/](docs/archive/).
 - JSON export for audit reports.
 - PDF report export, CSV export, and private workspace backup/import.
 - Source guide, completeness score, receipt snippet parsing, and priority actions.
 - Connector registry and readiness APIs for 42 provider targets.
-- Sandbox-ready Setu Account Aggregator adapter (consent → approval URL → data session → transaction evidence) registered behind the `partner-gated` honesty state; it activates when `SETU_AA_*` credentials exist and changes no public claim until then. Activation map: [docs/direct-linking-activation-dossier.md](docs/direct-linking-activation-dossier.md).
+- Sandbox-ready Setu Account Aggregator adapter (consent → approval URL → data session → transaction evidence) registered behind the `partner-gated` honesty state; it activates when `SETU_AA_*` credentials exist and changes no public claim until then. Activation map: [docs/archive/direct-linking-activation-dossier.md](docs/archive/direct-linking-activation-dossier.md).
 - Brand character (Nakul, the ledger mongoose) with a reusable pose system on `/brand`, a four-chapter user guide at `/guide`, universal ⌘K search across sections/ledger/actions/sources/pages, a desktop workspace sidebar with live counts, and a real-time next-debit countdown in the workspace header.
 - Connector start/sync planning APIs with honest states for live, planned, and partner-required sources.
 - Direct provider adapters for OpenAI costs, Gmail receipt evidence, GitHub Copilot metrics reports, Vercel domains, Render services, and Cloudflare accounts.
@@ -200,35 +207,25 @@ Production rate-limited endpoints use atomic Postgres buckets whenever a migrate
 
 ## Deployment
 
-See [docs/deployment-plan.md](docs/deployment-plan.md). The current app supports self-serve audits plus automatic encrypted signed-in workspace state and normalized upload/manual ledger rows. Production persistence, connected-account token references, scheduled sync/alerts/retention, and privacy exports require a migrated `DATABASE_URL`, `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY`, `INTERNAL_SYNC_SECRET`, `CRON_SECRET`, monitoring, backup/restore proof, and relevant provider credentials. Upstash is an optional high-scale rate-limit backend. Original financial files are processed request-time and should not be retained until encrypted object storage, field-level retention, and restore/deletion operations are proven.
+See [docs/archive/deployment-plan.md](docs/archive/deployment-plan.md). The current app supports self-serve audits plus automatic encrypted signed-in workspace state and normalized upload/manual ledger rows. Production persistence, connected-account token references, scheduled sync/alerts/retention, and privacy exports require a migrated `DATABASE_URL`, `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY`, `INTERNAL_SYNC_SECRET`, `CRON_SECRET`, monitoring, backup/restore proof, and relevant provider credentials. Upstash is an optional high-scale rate-limit backend. Original financial files are processed request-time and should not be retained until encrypted object storage, field-level retention, and restore/deletion operations are proven.
 
 ## Product Direction
 
 Vognary should not become a generic budget app. The wedge is recurring financial commitments: subscriptions, card e-mandates, UPI AutoPay, EMIs, SIPs, insurance, SaaS, cloud bills, domains, app-store subscriptions, and utilities.
 
-The integration strategy is documented in [docs/universal-integration-operating-model.md](docs/universal-integration-operating-model.md). It defines how Vognary moves each source from launchpad target to real connector using OAuth, API keys, IAM roles, webhooks, or regulated partner APIs.
-
-The current legal integration execution report is documented in [docs/legal-platform-integration-action-report.md](docs/legal-platform-integration-action-report.md). It separates what is complete in production from what requires external credentials, payment setup, monitoring, storage, or regulated partner approval.
+The integration strategy is documented in [docs/archive/universal-integration-operating-model.md](docs/archive/universal-integration-operating-model.md). It defines how Vognary moves each source from launchpad target to real connector using OAuth, API keys, IAM roles, webhooks, or regulated partner APIs.
 
 See:
 
-- [docs/universal-integration-operating-model.md](docs/universal-integration-operating-model.md)
-- [docs/legal-platform-integration-action-report.md](docs/legal-platform-integration-action-report.md)
-- [docs/product-architecture.md](docs/product-architecture.md)
+- [docs/THE-LAW.md](docs/THE-LAW.md) — **read first** — company + agent law
+- [docs/CONTINUE-HERE.md](docs/CONTINUE-HERE.md) — live handoff
+- [docs/execution/phase-a-market-contact.md](docs/execution/phase-a-market-contact.md) — market contact kit
+- [docs/execution/phase-b-loop-shipping.md](docs/execution/phase-b-loop-shipping.md) — loop shipping for agents
+- [docs/execution-plan-ui-ai-quality.md](docs/execution-plan-ui-ai-quality.md) — WP-0…WP-6 execution spec
+- [docs/master-build-plan.md](docs/master-build-plan.md) — AI/Twin/UI implementation law (Parts 3 & 5)
 - [docs/production-activation-runbook.md](docs/production-activation-runbook.md)
 - [docs/renewal-alerts-runbook.md](docs/renewal-alerts-runbook.md)
-- [docs/validation-playbook.md](docs/validation-playbook.md)
-- [docs/market-entry-research.md](docs/market-entry-research.md)
-- [docs/current-state-and-market-gap-analysis.md](docs/current-state-and-market-gap-analysis.md)
-- [docs/production-beta-setup.md](docs/production-beta-setup.md)
-- [docs/private-audit-outreach-kit.md](docs/private-audit-outreach-kit.md)
-- [docs/private-audit-pipeline-template.csv](docs/private-audit-pipeline-template.csv)
-- [docs/deployment-plan.md](docs/deployment-plan.md)
-- [docs/path-to-10.md](docs/path-to-10.md)
-- [docs/product-perfection-plan.md](docs/product-perfection-plan.md)
-- [docs/7-day-execution-plan.md](docs/7-day-execution-plan.md)
-- [docs/phase-roadmap.md](docs/phase-roadmap.md)
-- [docs/integration-checklist.md](docs/integration-checklist.md)
-- [docs/investor-demo-script.md](docs/investor-demo-script.md)
-- [docs/day-90-completion-report.md](docs/day-90-completion-report.md)
-- [docs/production-standard-report.md](docs/production-standard-report.md)
+- [docs/billing-activation-runbook.md](docs/billing-activation-runbook.md)
+- [docs/receipt-corpus-runbook.md](docs/receipt-corpus-runbook.md)
+- [docs/platform-api.md](docs/platform-api.md)
+- [docs/archive/](docs/archive/) — historical reference only

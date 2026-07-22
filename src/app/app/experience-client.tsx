@@ -10,8 +10,10 @@ const VognaryMvpClient = dynamic(() => import("../vognary-mvp-client"), {
   loading: () => <ExperienceLoading label="Opening the workspace…" />,
 });
 
-export default function ExperienceClient({ signedIn }: { signedIn: boolean }) {
-  return signedIn ? <VognaryMvpClient /> : <GuestAuditClient />;
+export type GmailConnectAvailability = { available: boolean; label: string; meaning: string };
+
+export default function ExperienceClient({ signedIn, gmailConnect }: { signedIn: boolean; gmailConnect: GmailConnectAvailability }) {
+  return signedIn ? <VognaryMvpClient /> : <GuestAuditClient gmailConnect={gmailConnect} />;
 }
 
 function ExperienceLoading({ label }: { label: string }) {

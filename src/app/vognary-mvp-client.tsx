@@ -43,6 +43,7 @@ import { redactText } from "@/lib/redaction";
 import { buildSavingsCardSvg } from "@/lib/savings-card";
 import { buildSavingsReceipt, buildSavingsShareText } from "@/lib/savings-receipt";
 import { rankSuggestedCuts } from "@/lib/suggested-cuts";
+import { buildAuditReport, renderAuditReportShareText, renderAuditReportText } from "@/lib/audit-report";
 import { nakulMomentSeenPrefix, nakulMomentSessionKey, selectNakulMoment, type NakulMoment, type NakulMomentId } from "@/lib/nakul-moments";
 import { sourceDisplayName, sourceHealthPresentation, sourceNeedsAttention } from "@/lib/source-health-presentation";
 import { getCommitmentPolicy, isCommitmentActionAllowed, type CommitmentAction } from "@/lib/commitment-policy";
@@ -55,15 +56,13 @@ import GuidedCapturePanel from "./guided-capture-panel";
 import { VognaryMark } from "./brand";
 import { Nakul } from "./character";
 import { CommandPalette, type PaletteItem } from "./command-palette";
+import { RunwayStrip } from "./runway-strip";
+import { AssistantBriefPanel } from "./workspace/assistant-brief-panel";
+import { MandateKillListPanel } from "./workspace/mandate-killlist-panel";
+import { DetailStat, DossierStat, SectionHead, StageHeader, statusStyles, StatusRow, TaskEmptyState, TickerStat } from "./workspace/primitives";
+import { formatCurrency, formatMinorCurrency } from "./workspace/format";
+import { PriorityActionPanel, RecurringGraph } from "./workspace/ledger-panels";
 import { NextDebitTicker, WorkspaceSidebar } from "./workspace-shell";
-
-const statusStyles: Record<RecommendationType, string> = {
-  keep: "stamp stamp-keep",
-  watch: "stamp stamp-watch",
-  downgrade: "stamp stamp-downgrade",
-  cancel: "stamp stamp-cancel",
-  investigate: "stamp stamp-investigate",
-};
 
 type StatementFile = StatementSource & {
   id: string;
@@ -1106,11 +1105,14 @@ export default function VognaryMvpClient() {
       if (!gmailOutcome) return;
 
       queueMicrotask(() => {
-        if (gmailOutcome === "connected" || gmailOutcome === "sync-pending") setConnectorReturn({ label: "Gmail connection", connectorId: "gmail-readonly" });
+        if (gmailOutcome === "connected" || gmailOutcome === "sync-pending") {
+          setConnectorReturn({ label: "Gmail connection", connectorId: "gmail-readonly" });
+          setMobileSection("overview");
+        }
         setNotice(gmailOutcome === "connected"
-          ? "Gmail connected and its first receipt-history sync completed. The ledger now refreshes automatically."
+          ? "Gmail connected. First receipt-history sync completed — Home will show what we found as soon as evidence lands."
           : gmailOutcome === "sync-pending"
-            ? "Gmail connected. Its first sync needs attention; the source-health view will show the retry state."
+            ? "Gmail connected. Its first sync needs attention; open Connect for the retry state, or paste a receipt to get value now."
             : `Gmail authorization returned ${gmailOutcome.replaceAll("-", " ")}. Check the connection status before retrying.`);
       });
       url.searchParams.delete("gmail");
@@ -1126,12 +1128,18 @@ export default function VognaryMvpClient() {
         queueMicrotask(() => {
           setConnectorStartResults((current) => ({ ...current, "gmail-readonly": { status: "connected-preview", message: "Gmail connected; no recurring candidates found yet." } }));
           setDisconnectedConnectorIds((current) => current.filter((id) => id !== "gmail-readonly"));
-          setNotice(`Gmail connected. Scanned ${payload.messageCount ?? 0} receipt-like message(s), but no recurring candidates were found yet.`);
+          setMobileSection("overview");
+          setNotice(`Gmail connected. Scanned ${payload.messageCount ?? 0} receipt-like message(s), but no recurring candidates were found yet. Paste a receipt or upload a statement to prove more.`);
         });
         return;
       }
 
       const importedAt = Date.now();
+      const monthlyTotals = candidates.reduce<Record<string, number>>((totals, candidate) => {
+        const currency = candidate.currency?.trim() || "INR";
+        totals[currency] = (totals[currency] ?? 0) + candidate.amount;
+        return totals;
+      }, {});
       queueMicrotask(() => {
         setManualItems((current) => {
           const existing = new Set(current.map((item) => recurringIdentity(item)));
@@ -1146,13 +1154,22 @@ export default function VognaryMvpClient() {
               nextExpectedDate: candidate.nextExpectedDate,
               category: candidate.category,
               sourceName: "Gmail receipt sync",
+              evidenceDescription: candidate.evidenceText,
             }));
           return [...current, ...nextItems];
         });
         setReceiptText((current) => current || candidates.map((candidate) => candidate.evidenceText).join("\n\n"));
         setConnectorStartResults((current) => ({ ...current, "gmail-readonly": { status: "connected-preview", message: `Imported ${candidates.length} recurring candidate(s) from Gmail.` } }));
         setDisconnectedConnectorIds((current) => current.filter((id) => id !== "gmail-readonly"));
-        setNotice(`Gmail connected. Imported ${candidates.length} recurring candidate(s) from receipt history.`);
+        setMobileSection("overview");
+        // "Here's what we found" — same celebration surface as server-side first sync.
+        setSyncCelebration({
+          rail: "Gmail receipts",
+          count: candidates.length,
+          monthlyTotals: Object.entries(monthlyTotals).sort(([left], [right]) => left.localeCompare(right)),
+          merchants: candidates.slice().sort((left, right) => right.amount - left.amount).slice(0, 4).map((c) => c.merchant),
+        });
+        setNotice(`Gmail connected. Here's what we found: ${candidates.length} recurring candidate(s) from receipt history.`);
       });
     } catch {
       queueMicrotask(() => {
@@ -1211,6 +1228,9 @@ export default function VognaryMvpClient() {
       });
     }
     items.push(
+      { id: "action-copy-report", group: "Actions", label: "Copy report (send to a human)", keywords: "share whatsapp email plain text deliver hand off", run: () => void copyAuditReport() },
+      { id: "action-copy-share", group: "Actions", label: "Copy WhatsApp-ready summary", keywords: "share short chat sms deliver", run: () => void copyShareReport() },
+      { id: "action-download-report", group: "Actions", label: "Download report (.txt)", keywords: "download text plain deliver save", run: () => downloadAuditReport() },
       { id: "action-export-pack", group: "Actions", label: "Export audit pack (JSON)", keywords: "download proof report", run: () => void exportReport() },
       { id: "action-export-csv", group: "Actions", label: "Export ledger CSV", keywords: "download spreadsheet", run: () => exportCsv() },
       { id: "action-export-pdf", group: "Actions", label: "Export PDF report", keywords: "download print", run: () => void exportPdf() },
@@ -1529,6 +1549,41 @@ export default function VognaryMvpClient() {
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not render the PDF in this browser.");
     }
+  }
+
+  // Plain-text deliverable — the same cite-or-shut-up report the guest surface
+  // produces, but built with this workspace's actual keep/cancel decisions so the
+  // top moves reflect what the user has chosen. The founder copies it and sends
+  // it to a human. No new money math: pure projection of the deterministic audit.
+  function currentAuditReport() {
+    return buildAuditReport(audit, { actions: userActions });
+  }
+
+  async function copyAuditReport() {
+    try {
+      await navigator.clipboard.writeText(renderAuditReportText(currentAuditReport()));
+      if (serverSession?.authenticated) void trackProductEvent("export.created", { commitmentsTouched: audit.recurringItems.length });
+      setNotice("Full audit report copied — paste it into WhatsApp or email to deliver it.");
+    } catch {
+      setNotice("Copy was blocked by the browser. Use Export PDF or the CSV instead, or download the report as text.");
+    }
+  }
+
+  async function copyShareReport() {
+    try {
+      await navigator.clipboard.writeText(renderAuditReportShareText(currentAuditReport()));
+      if (serverSession?.authenticated) void trackProductEvent("export.created", { commitmentsTouched: audit.recurringItems.length });
+      setNotice("Short WhatsApp-ready summary copied.");
+    } catch {
+      setNotice("Copy was blocked by the browser. Use Export PDF or the CSV instead, or download the report as text.");
+    }
+  }
+
+  function downloadAuditReport() {
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadBlob(renderAuditReportText(currentAuditReport()), "text/plain;charset=utf-8", `vognary-audit-${stamp}.txt`);
+    if (serverSession?.authenticated) void trackProductEvent("export.created", { commitmentsTouched: audit.recurringItems.length });
+    setNotice("Audit report downloaded as a text file.");
   }
 
   // Verified Savings receipts — the shareable, checkable proof artifact.
@@ -2298,7 +2353,18 @@ export default function VognaryMvpClient() {
                   <p className="mt-2 text-sm leading-6 text-(--ink)">{syncCelebration.merchants.join(" · ")}</p>
                 </div>
               </div>
-              <button type="button" autoFocus onClick={() => setSyncCelebration(null)} className="btn btn-primary mt-5 w-full">Continue to Home</button>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => {
+                  setSyncCelebration(null);
+                  setMobileSection("overview");
+                  window.setTimeout(() => document.getElementById("overview")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+                }}
+                className="btn btn-primary mt-5 w-full"
+              >
+                Continue to your brief
+              </button>
             </div>
           </section>
         </div>
@@ -2394,7 +2460,7 @@ export default function VognaryMvpClient() {
 
         {/* 00 · Overview — the five-second answer */}
         <section id="overview" aria-labelledby="overview-heading" className={`${mobileSection === "overview" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
-          <StageHeader id="overview-heading" folio="01" title="Home" note="Monthly burn, next renewal, one action." />
+          <StageHeader id="overview-heading" folio="01" title="Home" note="Your brief: what renews, what changed, what to kill." />
           {audit.recurringItems.length ? <RenewalRadar timeline={renewalTimeline} onSelect={openDetail} onOpenSubscriptions={() => selectAndReviewItem()} /> : null}
           <OverviewPanel
             audit={audit}
@@ -2423,6 +2489,8 @@ export default function VognaryMvpClient() {
             onExportPack={exportReport}
             onExportCsv={exportCsv}
             onExportPdf={exportPdf}
+            onCopyReport={copyAuditReport}
+            onCopyShare={copyShareReport}
           />
           {hasRealData && installPromptAvailable ? (
             <section className="panel flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="Install Vognary">
@@ -2508,7 +2576,7 @@ export default function VognaryMvpClient() {
               <button type="button" onClick={() => navigateToSection("connect")} className="btn btn-primary mt-5">Connect evidence</button>
             </section>
           ) : <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-reveal>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Metric
               label={`Monthly recurring · ${audit.summary.primaryCurrency}`}
               value={formatCurrency(audit.summary.monthlyRecurringSpend, audit.summary.primaryCurrency)}
@@ -2539,7 +2607,7 @@ export default function VognaryMvpClient() {
             />
           </div>
           <RenewalTimelinePanel timeline={renewalTimeline} onSelect={openDetail} onConnect={() => navigateToSection("connect")} />
-          <div className="grid gap-5 xl:grid-cols-[1.12fr_0.88fr]" data-reveal>
+          <div className="grid gap-5 xl:grid-cols-[1.12fr_0.88fr]">
             <RecurringGraph
               audit={audit}
               selectedItem={selectedItem}
@@ -2641,7 +2709,7 @@ export default function VognaryMvpClient() {
             onDeleteServerWorkspace={requestDeleteServerWorkspace}
           />
         </section>
-        <footer className="panel flex flex-col items-center gap-3 px-5 py-5 text-center" data-reveal>
+        <footer className="panel flex flex-col items-center gap-3 px-5 py-5 text-center">
           <div className="flex items-center gap-2.5">
             <VognaryMark size={22} className="text-(--ink)" />
             <span className="font-display text-base font-semibold text-(--ink)">Vognary <span className="font-normal text-(--muted)">· Recurring payments, reviewed</span></span>
@@ -2713,19 +2781,9 @@ function WorkspaceNav({ activeId, onSelect, showMore }: { activeId: string; onSe
 }
 
 // Chapter divider — the folio marker + intent that opens each workspace section.
-function StageHeader({ id, folio, title, note }: { id: string; folio: string; title: string; note?: string }) {
-  return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4" data-reveal>
-      <h2 id={id} className="folio shrink-0" data-folio={folio}>{title}</h2>
-      <span className="hidden h-px flex-1 bg-line sm:block" aria-hidden />
-      {note ? <p className="text-xs leading-5 text-(--muted) sm:max-w-sm sm:text-right">{note}</p> : null}
-    </div>
-  );
-}
-
 function NakulMomentPanel({ moment, onDismiss }: { moment: NakulMoment; onDismiss: () => void }) {
   return (
-    <section className="panel flex flex-col gap-4 border-(--gold-line) p-4 sm:flex-row sm:items-center" role="status" aria-label="Nakul moment" data-reveal>
+    <section className="panel flex flex-col gap-4 border-(--gold-line) p-4 sm:flex-row sm:items-center" role="status" aria-label="Nakul moment">
       <Nakul pose={moment.pose} size={64} className="shrink-0 text-(--ink)" title={`Nakul: ${moment.title}`} />
       <div className="min-w-0 flex-1">
         <p className="eyebrow" style={{ fontSize: "0.6rem" }}>{moment.kicker}</p>
@@ -2786,7 +2844,7 @@ function IntegrationCommandCenter({
   const linked = new Set(merchantLinks);
 
   return (
-    <section className="dossier spotlight scan p-5 sm:p-6" data-reveal onMouseMove={trackSpotlightPointer}>
+    <section className="dossier spotlight scan p-5 sm:p-6" onMouseMove={trackSpotlightPointer}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <span className="folio" data-folio="1.1" style={{ color: "var(--dossier-muted)" }}>Connections</span>
@@ -3026,7 +3084,7 @@ function EmptyWorkspaceOnboarding({
   onSeedSample: () => void;
 }) {
   return (
-    <section className="panel p-6 sm:p-8" aria-labelledby="empty-workspace-title" data-reveal>
+    <section className="panel p-6 sm:p-8" aria-labelledby="empty-workspace-title">
       <div className="mx-auto max-w-3xl text-center">
         <span className="folio" data-folio="1.1">First evidence</span>
         <h3 id="empty-workspace-title" className="mt-3 font-display text-3xl font-semibold text-(--ink)">How would you like to start?</h3>
@@ -3065,7 +3123,7 @@ function ReceiptPastePanel({
   onBack?: () => void;
 }) {
   return (
-    <section id="receipt-paste" className="panel p-5 sm:p-6" aria-labelledby="receipt-paste-title" data-reveal>
+    <section id="receipt-paste" className="panel p-5 sm:p-6" aria-labelledby="receipt-paste-title">
       <SectionHead
         folio="1.2"
         kicker="Receipt paste"
@@ -3092,7 +3150,7 @@ function ReceiptPastePanel({
 
 function AdvancedImportPanel({ onImportFiles }: { onImportFiles: (files: File[]) => void }) {
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead folio="5.1" kicker="Advanced import" title="Bring an existing export" desc="Use this only when a connected source or receipt paste is not available. The original file is processed request-time and is not intentionally retained." />
       <label className="btn btn-ghost mt-4 cursor-pointer text-center">
         Choose statement files
@@ -3367,6 +3425,8 @@ function OverviewPanel({
   onExportPack,
   onExportCsv,
   onExportPdf,
+  onCopyReport,
+  onCopyShare,
 }: {
   audit: AuditResult;
   timeline: RenewalTimeline;
@@ -3387,6 +3447,8 @@ function OverviewPanel({
   onExportPack: () => void;
   onExportCsv: () => void;
   onExportPdf: () => void;
+  onCopyReport: () => void;
+  onCopyShare: () => void;
 }) {
   const nextEvent = timeline.events[0] ?? null;
   const topAction = priorityItems[0] ?? null;
@@ -3423,7 +3485,7 @@ function OverviewPanel({
 
   if (!audit.summary.recurringCount) {
     return (
-      <section className="panel p-6 text-center sm:p-8" data-reveal>
+      <section className="panel p-6 text-center sm:p-8">
         <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Your recurring money, answered in five seconds.</h3>
         <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">{hasRealData ? "Add one more evidence source to prove a recurring pattern." : "Connect one source to reveal your burn, next renewal, and first action."}</p>
         <a href="#connect" className="btn btn-primary mt-5">Connect evidence</a>
@@ -3432,7 +3494,13 @@ function OverviewPanel({
   }
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
+      <div className="mb-5">
+        <AssistantBriefPanel items={audit.recurringItems} actions={userActions} onSelect={onSelect} />
+      </div>
+      <div className="mb-5">
+        <MandateKillListPanel items={audit.recurringItems} onSelect={onSelect} />
+      </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <button type="button" onClick={onOpenSubscriptions} className="inset p-4 text-left transition hover:border-ember">
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Monthly burn</p>
@@ -3538,6 +3606,7 @@ function OverviewPanel({
           {attentionSources.length ? <button type="button" onClick={onOpenConnect} className="btn btn-ghost h-9 shrink-0 px-3 text-xs">Review sources</button> : null}
         </div>
       ) : null}
+      <RunwayStrip items={audit.recurringItems} />
       {suggestedCuts.length ? (
         <section className="mt-4 rounded-xl border border-line bg-(--card-2) p-3" aria-labelledby="suggested-cuts-heading">
           <div className="flex items-end justify-between gap-3">
@@ -3609,6 +3678,8 @@ function OverviewPanel({
         </details>
       ) : null}
       <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={onCopyReport} className="btn btn-ghost h-9 px-3 text-xs">Copy report</button>
+        <button type="button" onClick={onCopyShare} className="btn btn-ghost h-9 px-3 text-xs">Copy for WhatsApp</button>
         <button type="button" onClick={onExportPack} className="btn btn-ghost h-9 px-3 text-xs">Sealed pack (JSON)</button>
         <button type="button" onClick={onExportCsv} className="btn btn-ghost h-9 px-3 text-xs">Export CSV</button>
         <button type="button" onClick={() => { void onExportPdf(); }} className="btn btn-ghost h-9 px-3 text-xs">Export PDF</button>
@@ -3644,7 +3715,7 @@ function AskProofPanel({
   onOpenCitation: (entityId: string | null) => void;
 }) {
   return (
-    <section className="panel overflow-hidden" data-reveal aria-labelledby="ask-proof-heading">
+    <section className="panel overflow-hidden" aria-labelledby="ask-proof-heading">
       <div className="grid lg:grid-cols-[0.78fr_1.22fr]">
         <div className="dossier p-5 sm:p-6">
           <span className="folio" data-folio="0.6" style={{ color: "var(--dossier-muted)" }}>Cited answers</span>
@@ -3782,7 +3853,7 @@ function UserControlPanel({
   const missingSignals = coverageSignals.filter((signal) => !signal.done).slice(0, 4);
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
+    <section className="grid gap-4 lg:grid-cols-[0.78fr_1.22fr]">
       <div className="panel p-5 sm:p-6">
         <p className="eyebrow">Source check</p>
         <div className="mt-3 flex items-end gap-3">
@@ -3866,89 +3937,6 @@ function UserControlPanel({
   );
 }
 
-function RecurringGraph({
-  audit,
-  selectedItem,
-  userActions,
-  categoryBudgets,
-  onSelect,
-}: {
-  audit: AuditResult;
-  selectedItem: RecurringItem | null;
-  userActions: Record<string, RecommendationType>;
-  categoryBudgets: Record<string, number>;
-  onSelect: (id: string) => void;
-}) {
-  const [sortBy, setSortBy] = useState<"cost" | "renewal">("cost");
-  const sortedItems = [...audit.recurringItems].sort((left, right) => {
-    if (sortBy === "renewal") return left.nextExpectedDate.localeCompare(right.nextExpectedDate) || right.monthlyCost - left.monthlyCost;
-    return right.monthlyCost - left.monthlyCost || left.nextExpectedDate.localeCompare(right.nextExpectedDate);
-  });
-  const categorySpend = audit.recurringItems.reduce<Record<string, number>>((totals, item) => {
-    if (item.currency === audit.summary.primaryCurrency) totals[item.category] = (totals[item.category] ?? 0) + item.monthlyCost;
-    return totals;
-  }, {});
-
-  return (
-    <section id="recurring-ledger" className="panel scroll-mt-36 p-5 sm:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <span className="folio" data-folio="2.1">Results</span>
-          <h3 className="mt-2 font-display text-xl font-semibold text-(--ink)">Your subscriptions</h3>
-          <p className="mt-1 text-sm text-(--muted)">{audit.summary.recurringCount} recurring payment{audit.summary.recurringCount === 1 ? "" : "s"}, each linked to proof.</p>
-        </div>
-        <label className="flex items-center gap-2 text-xs text-(--muted)">
-          Sort
-          <select value={sortBy} onChange={(event) => setSortBy(event.target.value as "cost" | "renewal")} className="field h-10 w-auto py-0 text-xs" aria-label="Sort subscriptions">
-            <option value="cost">Highest cost</option>
-            <option value="renewal">Renews next</option>
-          </select>
-        </label>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2" aria-label="Subscriptions list">
-        {sortedItems.map((item) => {
-          const action = userActions[item.identityKey] ?? item.recommendationType;
-          const selected = selectedItem?.identityKey === item.identityKey;
-          const categoryOverBudget = Boolean(categoryBudgets[item.category]) && categorySpend[item.category] > categoryBudgets[item.category];
-          return (
-            <button
-              key={item.identityKey}
-              type="button"
-              onClick={() => onSelect(item.identityKey)}
-              aria-pressed={selected}
-              className={`group min-h-36 rounded-2xl border p-4 text-left transition ${selected ? "border-(--gold-line) bg-(--gold-tint)" : categoryOverBudget ? "border-ochre bg-(--gold-tint)" : "border-line bg-(--card-2) hover:border-(--line-strong)"}`}
-            >
-              <span className="flex items-start gap-3">
-                <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card font-display text-lg font-semibold text-(--ink)" aria-hidden>{item.merchant.slice(0, 1).toUpperCase()}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-start justify-between gap-2">
-                    <span className="min-w-0">
-                      <span className="block truncate font-display text-lg font-semibold text-(--ink)">{item.merchant}</span>
-                      <span className="mt-0.5 block truncate text-xs text-(--muted)">{item.category} · <span className="capitalize">{item.frequency}</span></span>
-                    </span>
-                    <span className="font-data text-lg font-semibold tnum text-(--ink)">{formatCurrency(item.monthlyCost, item.currency)}<span className="text-[0.62rem] font-normal text-(--muted)">/mo</span></span>
-                  </span>
-                  <span className="mt-4 flex flex-wrap items-center gap-2">
-                    <span className="pill pill-partial">{item.confidenceScore}% proof</span>
-                    <span className={statusStyles[action]}>{action}</span>
-                    {categoryOverBudget ? <span className="pill pill-blocked">Category over budget</span> : null}
-                    {item.priceChange?.direction === "increase" ? <span className="pill pill-blocked">↑ was {formatCurrency(item.priceChange.previousAmount, item.currency)}</span> : null}
-                  </span>
-                  <span className="mt-3 flex items-center justify-between gap-2 font-data text-[0.68rem] text-(--muted)">
-                    <span>Renews {item.nextExpectedDate}</span>
-                    <span className="text-(--ink-soft) transition group-hover:translate-x-0.5">View proof →</span>
-                  </span>
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 // Renewal calendar — projects every proven cadence into the next debits, so the
 // workspace answers "what renews next and what will it cost" before anything else.
 function RenewalRadar({ timeline, onSelect, onOpenSubscriptions }: { timeline: RenewalTimeline; onSelect: (id: string) => void; onOpenSubscriptions: () => void }) {
@@ -3961,7 +3949,7 @@ function RenewalRadar({ timeline, onSelect, onOpenSubscriptions }: { timeline: R
   const trackHeight = 128;
 
   return (
-    <section className="panel overflow-hidden p-5 sm:p-6" data-reveal aria-labelledby="renewal-radar-heading">
+    <section className="panel overflow-hidden p-5 sm:p-6" aria-labelledby="renewal-radar-heading">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="eyebrow" style={{ fontSize: "0.6rem" }}>Renewal Radar · next {horizonDays} days</p>
@@ -4040,7 +4028,7 @@ function RenewalTimelinePanel({ timeline, onSelect, onConnect }: { timeline: Ren
   const visibleEvents = 12;
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="2.2"
         kicker="Calendar"
@@ -4119,38 +4107,6 @@ function formatRenewalDay(date: string): string {
   return parsed.toLocaleDateString("en-IN", { month: "short", day: "numeric" });
 }
 
-function PriorityActionPanel({
-  priorityItems,
-  userActions,
-  onSelect,
-}: {
-  priorityItems: RecurringItem[];
-  userActions: Record<string, RecommendationType>;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <section className="panel p-5 sm:p-6">
-      <SectionHead folio="2.4" kicker="Priority" title="What to review first" desc="Start with these before the next billing cycle." />
-      <div className="mt-4 grid gap-2">
-        {priorityItems.length ? priorityItems.map((item) => {
-          const action = userActions[item.identityKey] ?? item.recommendationType;
-          return (
-            <button key={item.identityKey} type="button" onClick={() => onSelect(item.identityKey)} className="inset w-full p-3 text-left transition hover:border-ember">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-(--ink)">{item.merchant}</p>
-                  <p className="mt-0.5 font-data text-xs leading-5 text-(--muted)">{formatCurrency(item.monthlyCost, item.currency)}/mo · renews {item.nextExpectedDate} · {item.confidenceScore}%</p>
-                </div>
-                <span className={statusStyles[action]}>{action}</span>
-              </div>
-            </button>
-          );
-        }) : <p className="inset px-3 py-3 text-sm text-(--muted)">Connect a proof source to generate an action plan.</p>}
-      </div>
-    </section>
-  );
-}
-
 // Relative countdown for a YYYY-MM-DD renewal date, computed against local
 // midnight so "in 3d" stays stable regardless of the current time of day.
 function renewalCountdown(dateStr: string): string | null {
@@ -4162,16 +4118,6 @@ function renewalCountdown(dateStr: string): string | null {
   const days = Math.round((target.getTime() - startToday.getTime()) / 86_400_000);
   if (days === 0) return "today";
   return days > 0 ? `in ${days}d` : `${Math.abs(days)}d ago`;
-}
-
-function DetailStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="inset p-3">
-      <p className="eyebrow" style={{ fontSize: "0.58rem" }}>{label}</p>
-      <p className="font-data mt-1.5 text-base font-semibold tnum text-(--ink)">{value}</p>
-      {sub ? <p className="mt-0.5 font-data text-[0.6rem] text-(--muted)">{sub}</p> : null}
-    </div>
-  );
 }
 
 // WP-1.3 — the subscription detail sheet. Opens in place on any card tap so
@@ -4332,7 +4278,7 @@ function SelectedItemPanel({ item, action, onAction }: { item: RecurringItem; ac
   const cancelGuide = findCancelAction(item.merchant, item.category);
 
   return (
-    <section className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr]" data-reveal>
+    <section className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr]">
       <div className="dossier p-6">
         <span className="folio" data-folio="2.5" style={{ color: "var(--dossier-muted)" }}>Selected item</span>
         <h3 className="mt-4 font-display text-2xl font-semibold text-(--dossier-ink)">{item.merchant}</h3>
@@ -4456,7 +4402,7 @@ function ConciergeOutcomePanel({
   const disputable = actionCase && ["executed", "verifying", "verified"].includes(actionCase.status);
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal aria-labelledby="concierge-outcome-heading">
+    <section className="panel p-5 sm:p-6" aria-labelledby="concierge-outcome-heading">
       <SectionHead
         folio="2.8"
         kicker="Permissioned outcome"
@@ -4582,16 +4528,6 @@ function getCommitmentManagementTarget(item: RecurringItem) {
   return connectorId ? connectorLaunchTargets[connectorId] ?? null : null;
 }
 
-function DossierStat({ label, value, onClick }: { label: string; value: string; onClick?: () => void }) {
-  const content = <><p className="font-data text-[0.54rem] uppercase tracking-[0.18em]" style={{ color: "var(--dossier-muted)" }}>{label}</p><p className="font-data mt-1.5 text-sm font-semibold tnum text-(--dossier-ink)">{value}</p></>;
-  if (onClick) return <button type="button" onClick={onClick} className="rounded-[9px] border px-3 py-2.5 text-left transition hover:border-(--gold)" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }} aria-label={`${label}: ${value}. Open subscriptions`}>{content}</button>;
-  return (
-    <div className="rounded-[9px] border px-3 py-2.5" style={{ borderColor: "var(--dossier-line)", background: "rgba(243,234,214,0.04)" }}>
-      {content}
-    </div>
-  );
-}
-
 function TeamReviewPanel({
   audit,
   collaborative,
@@ -4630,7 +4566,7 @@ function TeamReviewPanel({
 
   if (!audit.recurringItems.length) {
     return (
-      <section className="panel p-5 sm:p-6" data-reveal>
+      <section className="panel p-5 sm:p-6">
         <SectionHead folio="3.3" kicker="Review" title="Monthly review" />
         <TaskEmptyState sentence="No proven commitment is ready for review yet." actionLabel="Open subscriptions" onAction={onOpenSubscriptions} />
       </section>
@@ -4638,7 +4574,7 @@ function TeamReviewPanel({
   }
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="3.3"
         kicker="Review"
@@ -4709,7 +4645,7 @@ function TeamReviewPanel({
 // Ambiguity becomes a user question, never a silent guess.
 function DuplicateCandidatesPanel({ candidates, onDecide }: { candidates: DuplicateCandidate[]; onDecide: (pairKey: string, decision: MergeDecision) => void }) {
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="2.6"
         kicker="Resolve"
@@ -4746,7 +4682,7 @@ function ResolvedDuplicateDecisionsPanel({
 }) {
   const itemByKey = new Map(items.map((item) => [item.identityKey, item]));
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="2.7"
         kicker="Resolved"
@@ -4801,7 +4737,7 @@ function VerifiedSavingsPanel({
 }) {
   const hasVerified = savings.verifiedAnnual > 0;
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="3.2"
         kicker="Outcomes"
@@ -4860,7 +4796,7 @@ function SinceLastReviewPanel({ diff, onSelectMerchant }: { diff: ReviewDiff; on
   const deltaTone = diff.monthlyDelta > 0 ? "text-ember" : diff.monthlyDelta < 0 ? "text-verdict" : "text-(--muted)";
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="3.1"
         kicker="Since last review"
@@ -4919,7 +4855,7 @@ function ProofGraphPanel({ graph, audit, onConnect }: { graph: ProofGraphSummary
   const singleShare = Math.round(graph.singleSourceShare * 100);
 
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="4.0"
         kicker="Proof graph"
@@ -4961,7 +4897,7 @@ function ProofGraphPanel({ graph, audit, onConnect }: { graph: ProofGraphSummary
 
 function ReadinessPanel() {
   return (
-    <section className="panel p-5 sm:p-6" data-reveal>
+    <section className="panel p-5 sm:p-6">
       <SectionHead
         folio="4.1"
         kicker="Readiness"
@@ -5051,34 +4987,6 @@ function SpendSpectrum({ audit, userActions, onSelect, onConnect }: { audit: Aud
   );
 }
 
-function TickerStat({ label, value, tone, onClick }: { label: string; value: string; tone: "ember" | "ochre" | "paper"; onClick?: () => void }) {
-  const color = tone === "ember" ? "var(--ember)" : tone === "ochre" ? "var(--ochre)" : "var(--dossier-ink)";
-  return (
-    <button type="button" onClick={onClick} className="flex items-baseline gap-2 text-left" aria-label={`${label}: ${value}. Open subscriptions`}>
-      <span className="eyebrow muted-on-dark" style={{ fontSize: "0.58rem" }}>{label}</span>
-      <span className="font-data text-sm font-medium tnum" style={{ color }}>{value}</span>
-    </button>
-  );
-}
-
-function SectionHead({ folio, kicker, title, desc, right }: { folio: string; kicker: string; title: string; desc?: string; right?: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <span className="folio" data-folio={folio}>{kicker}</span>
-        <h3 className="mt-2 font-display text-[1.22rem] font-semibold text-(--ink)">{title}</h3>
-        {desc ? (
-          <details className="mt-1 max-w-xl">
-            <summary className="cursor-pointer select-none font-data text-[0.64rem] uppercase tracking-[0.12em] text-(--muted) transition hover:text-(--ink)">How this works</summary>
-            <p className="mt-1 text-sm leading-6 text-(--muted)">{desc}</p>
-          </details>
-        ) : null}
-      </div>
-      {right ? <div className="shrink-0">{right}</div> : null}
-    </div>
-  );
-}
-
 type AggregateProofEntry = { key: string; label: string; detail: string };
 
 function Metric({ label, value, tone, proofEntries, proofEmptyText }: { label: string; value: string; tone: "ink" | "blue" | "caution" | "accent"; proofEntries?: AggregateProofEntry[]; proofEmptyText?: string }) {
@@ -5108,34 +5016,6 @@ function MiniStat({ label, value, proofEntries, proofEmptyText }: { label: strin
       <p className="eyebrow" style={{ fontSize: "0.62rem" }}>{label}</p>
       <p className="font-data mt-1.5 text-sm font-semibold tnum text-(--ink)">{value}</p>
       {proofEntries ? <ProofDisclosure entries={proofEntries} emptyText={proofEmptyText ?? "No evidence composes this value."} /> : null}
-    </div>
-  );
-}
-
-function TaskEmptyState({ sentence, actionLabel, onAction }: { sentence: string; actionLabel: string; onAction: () => void }) {
-  return (
-    <div className="inset mt-4 flex flex-col items-center gap-4 px-4 py-6 text-center">
-      <p className="text-sm leading-6 text-(--muted)">{sentence}</p>
-      <button type="button" onClick={onAction} className="btn btn-primary h-9 px-3 text-xs">{actionLabel}</button>
-    </div>
-  );
-}
-
-function StatusRow({ label, value, state }: { label: string; value: string; state: "ready" | "partial" | "blocked" | "planned" }) {
-  const pillClass = {
-    ready: "pill pill-ready",
-    partial: "pill pill-partial",
-    blocked: "pill pill-blocked",
-    planned: "pill pill-planned",
-  }[state];
-
-  return (
-    <div className="inset flex items-center justify-between gap-3 px-3 py-2.5">
-      <div>
-        <p className="text-sm font-semibold text-(--ink)">{label}</p>
-        <p className="text-xs leading-5 text-(--muted)">{value}</p>
-      </div>
-      <span className={`${pillClass} shrink-0`}>{state}</span>
     </div>
   );
 }
@@ -5455,22 +5335,6 @@ function formatCaseStatus(status: string): string {
     .filter(Boolean)
     .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
     .join(" ");
-}
-
-function formatMinorCurrency(valueMinor: number, currency = "INR"): string {
-  return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(valueMinor / 100);
-}
-
-function formatCurrency(value: number, currency = "INR"): string {
-  return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 function csvCell(value: unknown): string {
