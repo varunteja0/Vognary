@@ -27,6 +27,8 @@ test("guest paste surfaces first result, brief, and mandate kill-list", async ({
   const report = page.getByRole("region", { name: "Deliver this audit" });
   await expect(report).toBeVisible();
   await expect(report.getByRole("button", { name: "Copy report" })).toBeVisible();
+  // Both delivery lengths are offered: full report and a WhatsApp-short version.
+  await expect(report.getByRole("button", { name: "Copy for WhatsApp" })).toBeVisible();
   await report.getByText("Preview report").click();
   await expect(report.getByText(/Monthly burn:/)).toBeVisible();
   await expect(report.getByText(/Recurring mandates to stop at the source/i)).toBeVisible();

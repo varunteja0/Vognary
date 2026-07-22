@@ -106,6 +106,11 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(page.getByText(/over budget/i).first()).toBeVisible();
   await expect(home.getByText("Suggested cuts", { exact: true })).toBeVisible();
 
+  // P0.1 — the signed-in workspace hands off the same cite-or-shut-up report the
+  // guest surface produces, built with this workspace's own keep/cancel actions.
+  await expect(home.getByRole("button", { name: "Copy report" })).toBeVisible();
+  await expect(home.getByRole("button", { name: "Copy for WhatsApp" })).toBeVisible();
+
   // WP-6.3 — an aggregate ₹ figure (a sum with no single detail sheet) carries
   //   its own proof chip that reveals the exact evidence rows composing it.
   // The Renewal Radar also carries a "Due in 30 days" mini-stat; the OverviewPanel

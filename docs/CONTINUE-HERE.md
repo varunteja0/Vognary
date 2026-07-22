@@ -61,10 +61,28 @@ money first-class before anything else, and the world must work too.**
   card (Copy report / Download .txt / Preview). This is the founder's Phase-A
   hand-off: paste a prospect's receipts → copy the report → send in WhatsApp/email.
   Cite-or-shut-up: every figure traces to the deterministic audit; no invented
-  amounts. Tests: `tests/audit-report.test.ts` (5) + extended
-  `tests/e2e/loop-brief-killlist.spec.ts` (report region asserted, desktop+mobile,
-  4/4 green). Not yet wired into the signed-in monolith surface (needs DB to
-  verify; the pure engine is ready to adopt there).
+  amounts. Tests: `tests/audit-report.test.ts` + extended
+  `tests/e2e/loop-brief-killlist.spec.ts` (report region asserted, desktop+mobile).
+- **Signed-in delivery + WhatsApp-short version shipped, measured:** the SAME
+  engine now backs the signed-in workspace. `renderAuditReportShareText` adds a
+  chat-length projection (burn + next debit + top move + mandate count + honest
+  cite line) — pure projection, no new money math. Monolith
+  `vognary-mvp-client.tsx` exposes `copyAuditReport` / `copyShareReport` /
+  `downloadAuditReport` (built with the workspace's real `userActions`, so top
+  moves reflect the user's keep/cancel decisions) via the command palette and the
+  Home overview export row (**"Copy report"** / **"Copy for WhatsApp"**). Guest
+  surface gained the matching "Copy for WhatsApp" button. Tests:
+  `tests/audit-report.test.ts` (7, incl. share-text + honest-degrade); guest
+  e2e asserts both buttons (desktop+mobile). **Signed-in UI is NOT
+  browser-verifiable here** (needs Postgres; no Docker) — it is verified by
+  typecheck + `next build` bundling the chunk + a `signed-in-first-value.spec.ts`
+  assertion (`Copy report` / `Copy for WhatsApp` on Home) that **skips** without
+  dev-login env. **Founder to confirm the signed-in path**, run:
+  `ENABLE_DEVELOPMENT_LOGIN=1 DEVELOPMENT_LOGIN_EMAIL=founder@vognary.test`
+  `DEVELOPMENT_LOGIN_ACCESS_CODE=local-dev-code-123 DATABASE_URL=<pg> npm run dev`
+  then `PLAYWRIGHT_EXTERNAL_SERVER=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000`
+  `VOGNARY_E2E_DEV_LOGIN_EMAIL=founder@vognary.test`
+  `VOGNARY_E2E_DEV_LOGIN_CODE=local-dev-code-123 npm run test:e2e -- signed-in-first-value`.
 - **Never stack PRs**; branch every work item from fresh `main`, PR against `main`.
 
 ## 2. THE PLAN — company phases (THE-LAW) + product phases (engineering)

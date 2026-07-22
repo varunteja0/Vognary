@@ -196,3 +196,38 @@ export function renderAuditReportText(report: AuditReport): string {
 
   return lines.join("\n");
 }
+
+// A chat-length version of the same facts, for pasting into WhatsApp/SMS where
+// the full report is too long. It is a strict projection of `report` — no new
+// numbers — and keeps the honesty line so brevity never becomes overclaiming.
+export function renderAuditReportShareText(report: AuditReport): string {
+  const lines: string[] = [];
+  const foreign = Object.entries(report.foreignMonthlyTotals)
+    .map(([currency, total]) => `${formatMoney(total, currency)}/mo in ${currency}`)
+    .join(", ");
+
+  lines.push(`Vognary audit: ${formatMoney(report.monthlyBurn, report.currency)}/mo (${formatMoney(report.annualBurn, report.currency)}/yr) across ${report.commitmentCount} recurring commitment${report.commitmentCount === 1 ? "" : "s"}.${foreign ? ` Plus ${foreign}, kept separate.` : ""}`);
+
+  const nextRenewal = report.renewals.next[0];
+  if (nextRenewal) {
+    const away = nextRenewal.daysAway <= 0 ? "today" : `in ${nextRenewal.daysAway}d`;
+    lines.push(`Next debit: ${nextRenewal.merchant} ${formatMoney(nextRenewal.amount, nextRenewal.currency)} ${away} (${formatShortDate(nextRenewal.date)}).`);
+  }
+
+  const topMove = report.topActions[0];
+  if (topMove && topMove.kind === "save") {
+    lines.push(`Top move: ${topMove.action} ${topMove.merchant} → frees ${formatMoney(topMove.monthlyCost, topMove.currency)}/mo.`);
+  } else if (topMove) {
+    lines.push(`Watch: ${topMove.merchant} — ${topMove.detail}.`);
+  } else {
+    lines.push("Nothing to cut — every commitment looks intentional in this evidence.");
+  }
+
+  if (report.mandateKills.length) {
+    lines.push(`${report.mandateKills.length} auto-debit mandate${report.mandateKills.length === 1 ? "" : "s"} (UPI AutoPay/NACH/e-mandate) to stop at the source, not just the merchant.`);
+  }
+
+  lines.push("Every figure is evidence-backed — nothing invented. Full report + proof on request.");
+
+  return lines.join("\n");
+}

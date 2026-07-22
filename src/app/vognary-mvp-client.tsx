@@ -43,6 +43,7 @@ import { redactText } from "@/lib/redaction";
 import { buildSavingsCardSvg } from "@/lib/savings-card";
 import { buildSavingsReceipt, buildSavingsShareText } from "@/lib/savings-receipt";
 import { rankSuggestedCuts } from "@/lib/suggested-cuts";
+import { buildAuditReport, renderAuditReportShareText, renderAuditReportText } from "@/lib/audit-report";
 import { nakulMomentSeenPrefix, nakulMomentSessionKey, selectNakulMoment, type NakulMoment, type NakulMomentId } from "@/lib/nakul-moments";
 import { sourceDisplayName, sourceHealthPresentation, sourceNeedsAttention } from "@/lib/source-health-presentation";
 import { getCommitmentPolicy, isCommitmentActionAllowed, type CommitmentAction } from "@/lib/commitment-policy";
@@ -1227,6 +1228,9 @@ export default function VognaryMvpClient() {
       });
     }
     items.push(
+      { id: "action-copy-report", group: "Actions", label: "Copy report (send to a human)", keywords: "share whatsapp email plain text deliver hand off", run: () => void copyAuditReport() },
+      { id: "action-copy-share", group: "Actions", label: "Copy WhatsApp-ready summary", keywords: "share short chat sms deliver", run: () => void copyShareReport() },
+      { id: "action-download-report", group: "Actions", label: "Download report (.txt)", keywords: "download text plain deliver save", run: () => downloadAuditReport() },
       { id: "action-export-pack", group: "Actions", label: "Export audit pack (JSON)", keywords: "download proof report", run: () => void exportReport() },
       { id: "action-export-csv", group: "Actions", label: "Export ledger CSV", keywords: "download spreadsheet", run: () => exportCsv() },
       { id: "action-export-pdf", group: "Actions", label: "Export PDF report", keywords: "download print", run: () => void exportPdf() },
@@ -1545,6 +1549,41 @@ export default function VognaryMvpClient() {
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not render the PDF in this browser.");
     }
+  }
+
+  // Plain-text deliverable — the same cite-or-shut-up report the guest surface
+  // produces, but built with this workspace's actual keep/cancel decisions so the
+  // top moves reflect what the user has chosen. The founder copies it and sends
+  // it to a human. No new money math: pure projection of the deterministic audit.
+  function currentAuditReport() {
+    return buildAuditReport(audit, { actions: userActions });
+  }
+
+  async function copyAuditReport() {
+    try {
+      await navigator.clipboard.writeText(renderAuditReportText(currentAuditReport()));
+      if (serverSession?.authenticated) void trackProductEvent("export.created", { commitmentsTouched: audit.recurringItems.length });
+      setNotice("Full audit report copied — paste it into WhatsApp or email to deliver it.");
+    } catch {
+      setNotice("Copy was blocked by the browser. Use Export PDF or the CSV instead, or download the report as text.");
+    }
+  }
+
+  async function copyShareReport() {
+    try {
+      await navigator.clipboard.writeText(renderAuditReportShareText(currentAuditReport()));
+      if (serverSession?.authenticated) void trackProductEvent("export.created", { commitmentsTouched: audit.recurringItems.length });
+      setNotice("Short WhatsApp-ready summary copied.");
+    } catch {
+      setNotice("Copy was blocked by the browser. Use Export PDF or the CSV instead, or download the report as text.");
+    }
+  }
+
+  function downloadAuditReport() {
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadBlob(renderAuditReportText(currentAuditReport()), "text/plain;charset=utf-8", `vognary-audit-${stamp}.txt`);
+    if (serverSession?.authenticated) void trackProductEvent("export.created", { commitmentsTouched: audit.recurringItems.length });
+    setNotice("Audit report downloaded as a text file.");
   }
 
   // Verified Savings receipts — the shareable, checkable proof artifact.
@@ -2450,6 +2489,8 @@ export default function VognaryMvpClient() {
             onExportPack={exportReport}
             onExportCsv={exportCsv}
             onExportPdf={exportPdf}
+            onCopyReport={copyAuditReport}
+            onCopyShare={copyShareReport}
           />
           {hasRealData && installPromptAvailable ? (
             <section className="panel flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="Install Vognary">
@@ -3384,6 +3425,8 @@ function OverviewPanel({
   onExportPack,
   onExportCsv,
   onExportPdf,
+  onCopyReport,
+  onCopyShare,
 }: {
   audit: AuditResult;
   timeline: RenewalTimeline;
@@ -3404,6 +3447,8 @@ function OverviewPanel({
   onExportPack: () => void;
   onExportCsv: () => void;
   onExportPdf: () => void;
+  onCopyReport: () => void;
+  onCopyShare: () => void;
 }) {
   const nextEvent = timeline.events[0] ?? null;
   const topAction = priorityItems[0] ?? null;
@@ -3633,6 +3678,8 @@ function OverviewPanel({
         </details>
       ) : null}
       <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={onCopyReport} className="btn btn-ghost h-9 px-3 text-xs">Copy report</button>
+        <button type="button" onClick={onCopyShare} className="btn btn-ghost h-9 px-3 text-xs">Copy for WhatsApp</button>
         <button type="button" onClick={onExportPack} className="btn btn-ghost h-9 px-3 text-xs">Sealed pack (JSON)</button>
         <button type="button" onClick={onExportCsv} className="btn btn-ghost h-9 px-3 text-xs">Export CSV</button>
         <button type="button" onClick={() => { void onExportPdf(); }} className="btn btn-ghost h-9 px-3 text-xs">Export PDF</button>

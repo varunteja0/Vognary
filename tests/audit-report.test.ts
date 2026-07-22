@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { analyzeStatements, type ManualRecurringInput } from "../src/lib/recurring-audit";
-import { buildAuditReport, renderAuditReportText } from "../src/lib/audit-report";
+import { buildAuditReport, renderAuditReportShareText, renderAuditReportText } from "../src/lib/audit-report";
 
 const today = new Date(2026, 6, 10); // 2026-07-10
 
@@ -85,4 +85,27 @@ test("renderAuditReportText produces a copy-ready India-first report", () => {
   assert.match(text, /Vognary/, "attributable to the tool that produced it");
   // Cite-or-shut-up: the report must state its numbers are evidence-backed.
   assert.match(text, /evidence|proof/i);
+});
+
+test("renderAuditReportShareText is a short WhatsApp-ready projection of the same facts", () => {
+  const audit = indiaAudit();
+  const netflix = audit.recurringItems.find((item) => item.merchant.includes("Netflix"));
+  const report = buildAuditReport(audit, { today, actions: { [netflix!.identityKey]: "cancel" } });
+  const short = renderAuditReportShareText(report);
+  const full = renderAuditReportText(report);
+
+  assert.match(short, /₹/, "still rupee-denominated");
+  assert.match(short, /Netflix/, "names the top move's merchant");
+  assert.ok(short.length < full.length, "the share version is shorter than the full report");
+  assert.ok(short.split("\n").length <= 8, "stays chat-short (<= 8 lines)");
+  // Never dropped: the honesty line survives even in the compact version.
+  assert.match(short, /evidence|proof|invent/i, "compact version is still cite-or-shut-up");
+  // Foreign spend is never silently folded into the ₹ headline.
+  assert.ok(!short.includes("$20 into"), "no invented FX in the short version");
+});
+
+test("renderAuditReportShareText degrades honestly when nothing is flagged", () => {
+  const report = buildAuditReport(indiaAudit(), { today }); // no cancel actions → all "keep"
+  const short = renderAuditReportShareText(report);
+  assert.match(short, /intentional|no cancel|nothing to cut/i, "says so plainly instead of inventing a cut");
 });
