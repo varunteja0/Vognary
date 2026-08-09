@@ -37,28 +37,19 @@ async function signIn(page: Page, project: string) {
   await page.waitForTimeout(400);
 }
 
-// Codex's progressive onboarding hides the rail cards behind a three-choice
-// panel until the workspace has evidence. Seed the labelled sample so the real
-// Connect rails render, then hand back the rail panel. Self-heals whether or not
-// a prior test in the shared founder workspace already seeded.
+// Receipt paste is the primary path. Provider rails remain behind an explicit
+// optional disclosure until the workspace already has evidence.
 async function openConnect(page: Page) {
   const nav = page.locator('nav[aria-label="Workspace sections"]:visible');
   await nav.getByText("Connect", { exact: true }).click();
 
   const panel = page.locator("section.dossier", {
-    has: page.getByRole("heading", { name: "Connect evidence. Choose what to watch." }),
+    has: page.getByRole("heading", { name: /^(Automatic sources \(optional\)|Connected sources and watches)$/ }),
   });
   if (!(await panel.isVisible({ timeout: 5_000 }).catch(() => false))) {
-    const seed = page.getByRole("button", { name: "See a sample audit" });
-    if (await seed.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      const saved = page.waitForResponse(
-        (response) => response.url().includes("/api/workspaces/current/audit-snapshot") && response.request().method() === "POST" && response.ok(),
-        { timeout: 20_000 },
-      );
-      await seed.click();
-      await saved;
-      await nav.getByText("Connect", { exact: true }).click();
-    }
+    const reveal = page.getByRole("button", { name: "Show email / bank options" });
+    await expect(reveal).toBeVisible({ timeout: 5_000 });
+    await reveal.click();
   }
   await expect(panel).toBeVisible({ timeout: 30_000 });
   return panel;
@@ -152,7 +143,7 @@ test("Bank rail validates the handle, then fires the AA consent endpoint", async
   expect(aaCalls).toBe(0);
 
   // With a handle, the button fires the real consent endpoint.
-  await card.getByPlaceholder("9999999999@onemoney").fill("9999999999@onemoney");
+  await card.getByPlaceholder("your-mobile@okhdfcbank").fill("9999999999@onemoney");
   const started = page.waitForRequest(
     (request) => request.url().includes("/api/integrations/aa/start") && request.method() === "POST",
     { timeout: 15_000 },

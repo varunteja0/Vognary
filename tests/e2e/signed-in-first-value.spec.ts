@@ -167,8 +167,8 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
 
   await workspaceNav.getByText("Connect", { exact: true }).click();
 
-  // 4. The connections panel is click-only: no credential inputs anywhere.
-  const panel = page.locator("section.dossier", { has: page.getByRole("heading", { name: "Connect evidence. Choose what to watch." }) });
+  // 4. The optional-rails panel is click-only: no credential inputs anywhere.
+  const panel = page.locator("section.dossier", { has: page.getByRole("heading", { name: "Connected sources and watches" }) });
   await expect(panel).toBeVisible({ timeout: 30_000 });
   await expect(panel.locator('input[type="password"]')).toHaveCount(0);
   await expect(panel.getByPlaceholder(/key/i)).toHaveCount(0);
@@ -204,7 +204,7 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   //    persist, and survive a second reload.
   const earlyMerchant = testInfo.project.name.startsWith("mobile") ? "Amazon Prime" : "Spotify";
   const earlyMerchantId = testInfo.project.name.startsWith("mobile") ? "prime-video" : "spotify";
-  const earlyPanel = page.locator("section.dossier", { has: page.getByRole("heading", { name: "Connect evidence. Choose what to watch." }) });
+  const earlyPanel = page.locator("section.dossier", { has: page.getByRole("heading", { name: "Connected sources and watches" }) });
   const earlyTile = earlyPanel
     .locator("div")
     .filter({ has: page.getByText(earlyMerchant, { exact: true }) })
@@ -265,9 +265,9 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(syncReveal).toBeVisible({ timeout: 20_000 });
   await expect(syncReveal.getByText("₹649/mo")).toBeVisible();
   await expect(syncReveal.getByText("Netflix", { exact: true })).toBeVisible();
-  await syncReveal.getByRole("button", { name: "Continue to Home" }).click();
+  await syncReveal.getByRole("button", { name: "Continue to your brief" }).click();
   await expect(syncReveal).toHaveCount(0);
-  await expect(page).toHaveURL(/#overview$/);
+  await expect(page.locator("#overview")).toBeVisible();
   await page.unroute("**/api/workspaces/current/connectors");
 });
 

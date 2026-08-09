@@ -42,14 +42,14 @@ test("empty workspace seeds and clears a labelled sample audit", async ({ page }
   const banner = page.getByRole("status").filter({ hasText: /Sample data/ });
 
   // The empty onboarding offers the sample, and no ledger exists yet.
-  const seedButton = page.getByRole("button", { name: "See a sample audit" });
+  const seedButton = page.getByRole("button", { name: /Sample audit/ });
   await expect(seedButton).toBeVisible({ timeout: 30_000 });
-  const onboarding = page.getByRole("heading", { name: "How would you like to start?" }).locator("..");
-  await expect(onboarding.getByRole("button", { name: /Connect Gmail/ })).toBeVisible();
+  const onboarding = page.getByRole("heading", { name: "Paste receipts. Get your burn in seconds." }).locator("..");
   await expect(onboarding.getByRole("button", { name: /Paste receipts/ })).toBeVisible();
-  await expect(onboarding.getByRole("button", { name: /See a sample audit/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Connect evidence. Choose what to watch." })).toHaveCount(0);
-  await expect(page.locator("#connect").getByText(/Choose statement files|API key|CSV/i)).toHaveCount(0);
+  await expect(onboarding.getByRole("button", { name: /Sample audit/ })).toBeVisible();
+  await expect(onboarding.getByRole("button", { name: /Email \/ bank rails/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^(Automatic sources \(optional\)|Connected sources and watches)$/ })).toHaveCount(0);
+  await expect(page.locator("#connect").getByText("Choose statement files", { exact: true })).toBeVisible();
 
   // Seed → eight subscriptions populate, the labelled banner appears, it persists.
   const savedSample = page.waitForResponse(isSnapshotSavePost, { timeout: 20_000 });
@@ -82,7 +82,7 @@ test("empty workspace seeds and clears a labelled sample audit", async ({ page }
   await clearedSample;
   // The seed remains reachable from the empty-workspace onboarding (Connect).
   await workspaceNav.getByText("Connect", { exact: true }).click();
-  await expect(page.getByRole("button", { name: "See a sample audit" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Sample audit/ })).toBeVisible();
 });
 
 function isSnapshotSavePost(response: import("@playwright/test").Response) {

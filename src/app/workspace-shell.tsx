@@ -124,10 +124,10 @@ export function WorkspaceSidebar({
             <Nakul pose={watching > 0 ? "sentinel" : "rest"} size={52} className="shrink-0 text-(--ink)" title="Nakul, the ledger mongoose" />
             <div className="min-w-0 pb-1">
               <p className="text-[0.8rem] font-medium leading-4 text-(--ink)">
-                {watching > 0 ? `Watching ${watching} commitment${watching === 1 ? "" : "s"}` : "Nothing to watch yet"}
+                {watching > 0 ? `Watching ${watching} commitment${watching === 1 ? "" : "s"}` : "No ledger yet"}
               </p>
               <p className="mt-1 text-[0.68rem] leading-3.5 text-(--muted)">
-                {watching > 0 ? "Nakul flags every renewal before it charges." : "Connect a source and Nakul starts the watch."}
+                {watching > 0 ? "Nakul flags every renewal before it charges." : "Paste receipts to prove what renews — rails are optional."}
               </p>
             </div>
           </div>
