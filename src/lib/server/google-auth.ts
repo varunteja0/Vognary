@@ -3,6 +3,7 @@ import { isDatabaseConfigured } from "@/lib/server/database";
 import { checkSessionConfiguration } from "@/lib/server/session";
 
 const googleJwks = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
+export const canonicalGoogleIssuer = "https://accounts.google.com";
 
 export type GoogleAuthConfiguration = {
   status: "not-configured" | "ready";
@@ -27,13 +28,17 @@ export async function verifyGoogleIdToken(idToken: string, clientId: string, key
   });
   return {
     aud: typeof payload.aud === "string" ? payload.aud : undefined,
-    iss: typeof payload.iss === "string" ? payload.iss : undefined,
+    iss: typeof payload.iss === "string" ? normalizeGoogleIssuer(payload.iss) : undefined,
     email: typeof payload.email === "string" ? payload.email : undefined,
     email_verified: typeof payload.email_verified === "boolean" ? payload.email_verified : undefined,
     name: typeof payload.name === "string" ? payload.name : undefined,
     picture: typeof payload.picture === "string" ? payload.picture : undefined,
     sub: typeof payload.sub === "string" ? payload.sub : undefined,
   };
+}
+
+export function normalizeGoogleIssuer(value: string) {
+  return value === "accounts.google.com" ? canonicalGoogleIssuer : value;
 }
 
 export function checkGoogleAuthConfiguration(): GoogleAuthConfiguration {

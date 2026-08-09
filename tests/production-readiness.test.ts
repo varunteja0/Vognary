@@ -109,7 +109,18 @@ test("runtime and PostgreSQL tooling are pinned to one reproducible foundation",
   assert.match(backupWorkflow, new RegExp(`uses: ${setupNodeAction}`));
   assert.match(backupWorkflow, new RegExp(`uses: ${uploadArtifactAction}`));
   assert.match(backupWorkflow, new RegExp(`node-version: ["']?${nodeVersion}["']?`));
+  assert.doesNotMatch(backupWorkflow, /apt-get install -y postgresql-client/);
+  assert.equal((backupWorkflow.match(/POSTGRES_CLIENT_MODE: docker/g) ?? []).length, 2);
   assert.doesNotMatch(backupWorkflow, /uses: actions\/(?:checkout|setup-node|upload-artifact)@v\d+/);
+
+  const backupUtils = read("scripts/lib/postgres-backup-utils.mjs");
+  assert.match(backupUtils, /POSTGRES_CLIENT_MODE === "docker"/);
+  assert.match(backupUtils, /if \(!forceDocker && commandExists\(command\)\)/);
+  assert.match(backupUtils, /export function postgresConnectionEnv/);
+  assert.match(backupUtils, /export function postgresDockerEnvironment/);
+  assert.match(read("scripts/backup-postgres.mjs"), /postgresConnectionEnv\(databaseUrl\)/);
+  assert.match(read("scripts/restore-postgres-drill.mjs"), /postgresConnectionEnv\(restoreDatabaseUrl\)/);
+  assert.match(read("scripts/restore-postgres-drill.mjs"), /"--dbname",[\s\S]*restoreConnectionEnv\.PGDATABASE/);
 });
 
 test("Vercel production builds apply checksummed migrations before compiling the deployment", () => {

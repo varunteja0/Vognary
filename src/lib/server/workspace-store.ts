@@ -1,4 +1,5 @@
 import { getDatabasePool, isDatabaseConfigured } from "@/lib/server/database";
+import { canonicalGoogleIssuer, normalizeGoogleIssuer } from "@/lib/server/google-auth";
 import { appendLedgerEvent } from "@/lib/server/ledger-event-store";
 
 export const workspaceTypes = ["personal", "family", "founder", "team"] as const;
@@ -74,15 +75,19 @@ export async function getOrCreateUserByGoogleIdentity(input: {
   const client = await getDatabasePool().connect();
   try {
     await client.query("begin");
-    const identityKey = `google:${input.issuer}:${input.subject}`;
+    const issuer = normalizeGoogleIssuer(input.issuer);
+    const issuerAliases = issuer === canonicalGoogleIssuer ? [canonicalGoogleIssuer, "accounts.google.com"] : [issuer];
+    const identityKey = `google:${issuer}:${input.subject}`;
     await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [identityKey]);
 
-    const existingIdentity = await client.query<WorkspaceUserRow>(
-      `select users.id, users.email, users.display_name
+    const existingIdentity = await client.query<WorkspaceUserRow & { identity_id: string }>(
+      `select users.id, users.email, users.display_name, identity.id as identity_id
        from auth_identities identity
        join users on users.id = identity.user_id
-       where identity.provider = 'google' and identity.issuer = $1 and identity.subject = $2`,
-      [input.issuer, input.subject],
+       where identity.provider = 'google' and identity.issuer = any($1::text[]) and identity.subject = $2
+       order by (identity.issuer = $3) desc
+       limit 1`,
+      [issuerAliases, input.subject, issuer],
     );
     if (existingIdentity.rows[0]) {
       const updated = await client.query<WorkspaceUserRow>(
@@ -93,9 +98,9 @@ export async function getOrCreateUserByGoogleIdentity(input: {
         [existingIdentity.rows[0].id, input.displayName?.trim() ?? ""],
       );
       await client.query(
-        `update auth_identities set email_at_link = $3, updated_at = now()
-         where provider = 'google' and issuer = $1 and subject = $2`,
-        [input.issuer, input.subject, input.email],
+        `update auth_identities set issuer = $2, email_at_link = $3, updated_at = now()
+         where id = $1`,
+        [existingIdentity.rows[0].identity_id, issuer, input.email],
       );
       await client.query("commit");
       return mapWorkspaceUser(updated.rows[0]);
@@ -143,7 +148,7 @@ export async function getOrCreateUserByGoogleIdentity(input: {
     await client.query(
       `insert into auth_identities (provider, issuer, subject, user_id, email_at_link)
        values ('google', $1, $2, $3, $4)`,
-      [input.issuer, input.subject, user.id, input.email],
+      [issuer, input.subject, user.id, input.email],
     );
     await client.query("commit");
     return mapWorkspaceUser(user);

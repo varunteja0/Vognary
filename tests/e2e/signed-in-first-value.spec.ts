@@ -44,14 +44,26 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   const paste = page.locator("textarea").first();
   await paste.waitFor({ timeout: 30_000 });
   await paste.fill(realFormatReceipts);
-  await expect(page.getByText("Monthly burn", { exact: false }).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(/Netflix/).first()).toBeVisible();
+  const guestResult = page.getByRole("region", { name: "Your first audit result" });
+  await expect(guestResult).toBeVisible({ timeout: 15_000 });
+  await expect(guestResult.getByText("₹768")).toBeVisible();
+  await expect(guestResult.getByText("Netflix", { exact: true })).toBeVisible();
+  const spotifyBriefItem = page.getByRole("region", { name: "Your brief" }).getByRole("listitem").filter({ hasText: "Spotify" }).filter({ hasText: "₹119" });
+  await expect(spotifyBriefItem).toBeVisible();
 
   // 2. Sign in through the development login.
   await page.goto("/login");
   await page.getByText("Other ways to sign in").click();
   await page.getByPlaceholder("developer@example.com").fill(email!);
   await page.getByPlaceholder("Access code").fill(accessCode!);
+  const guestPersisted = page.waitForResponse(
+    (response) => response.url().includes("/api/workspaces/current/audit-snapshot")
+      && response.request().method() === "POST"
+      && response.ok()
+      && (response.request().postData() ?? "").includes("Netflix")
+      && (response.request().postData() ?? "").includes("Spotify Premium"),
+    { timeout: 30_000 },
+  );
   await page.getByRole("button", { name: "Sign in as developer" }).click();
   const hydrated = page.waitForResponse(
     (response) => response.url().includes("/api/workspaces/current/audit-snapshot") && response.request().method() === "GET",
@@ -59,13 +71,13 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   );
   await page.waitForURL(/\/app/, { timeout: 30_000 });
   await hydrated;
+  await guestPersisted;
   await page.waitForTimeout(500);
   const transferNotice = page.getByRole("status").filter({
     hasText: /2 commitments carried into your encrypted workspace|Guest audit saved to this encrypted workspace/i,
   });
-  if (await transferNotice.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await transferNotice.getByRole("button", { name: "Dismiss" }).click();
-  }
+  await expect(transferNotice).toBeVisible({ timeout: 15_000 });
+  await transferNotice.getByRole("button", { name: "Dismiss" }).click();
 
   // 3. Home is the five-second answer and the workspace has only three
   //    primary destinations. Budgets must persist through encrypted sync.
@@ -79,6 +91,8 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
     await expect(home.getByText(card, { exact: true }).first()).toBeVisible();
   }
   const monthlyBurnCard = home.getByRole("button").filter({ hasText: "Monthly burn" });
+  await expect(monthlyBurnCard.getByText("₹768", { exact: true })).toBeVisible();
+  await expect(monthlyBurnCard.getByText(/2 commitments/)).toBeVisible();
   await expect(monthlyBurnCard.getByText(/No comparison yet|since last review/i)).toBeVisible();
   await expect(home.getByLabel(/Monthly budget/)).toBeVisible();
   await page.evaluate(() => {
@@ -124,7 +138,8 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(proofChip).toHaveAttribute("aria-expanded", "true");
   const proofRegion = dueCard.getByRole("list");
   await expect(proofRegion).toBeVisible();
-  await expect(proofRegion.getByText(/Netflix|Spotify|No projected debits/).first()).toBeVisible();
+  await expect(proofRegion.getByText("Netflix", { exact: true })).toBeVisible();
+  await expect(proofRegion.getByText("Spotify", { exact: true })).toBeVisible();
   await positionForScreenshot(page, dueCard);
   await page.screenshot({ path: evidencePath(`wp-6.3-proof-chip-${surface}.png`), fullPage: false, animations: "disabled" });
   await proofChip.click();

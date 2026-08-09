@@ -50,6 +50,16 @@ test("Google ID tokens are verified locally for signature, issuer, audience, and
   assert.equal(claims.email_verified, true);
   await assert.rejects(verifyGoogleIdToken(token, "other-client-id", keySet));
 
+  const aliasToken = await new SignJWT({ email: "owner@example.com", email_verified: true, name: "Owner" })
+    .setProtectedHeader({ alg: "RS256", kid: publicJwk.kid })
+    .setIssuer("accounts.google.com")
+    .setAudience("google-client-id")
+    .setSubject("google-user-1")
+    .setIssuedAt(now)
+    .setExpirationTime(now + 300)
+    .sign(privateKey);
+  assert.equal((await verifyGoogleIdToken(aliasToken, "google-client-id", keySet)).iss, "https://accounts.google.com");
+
   const callback = readFileSync("src/app/api/auth/google/callback/route.ts", "utf8");
   assert.doesNotMatch(callback, /tokeninfo\?id_token/);
 });

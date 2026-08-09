@@ -51,6 +51,9 @@ export const recoveryErrorCodes = [
   "CONFLICT",
   "STALE_STATE",
   "SAVE_FAILED",
+  "REQUEST_TOO_LARGE",
+  "UNSUPPORTED_MEDIA_TYPE",
+  "RATE_LIMITED",
   "UNKNOWN",
 ] as const;
 export type RecoveryErrorCode = (typeof recoveryErrorCodes)[number];
@@ -76,6 +79,9 @@ export const recoveryErrorStatusByCode = {
   CONFLICT: 409,
   STALE_STATE: 412,
   SAVE_FAILED: 502,
+  REQUEST_TOO_LARGE: 413,
+  UNSUPPORTED_MEDIA_TYPE: 415,
+  RATE_LIMITED: 429,
   UNKNOWN: 500,
 } as const satisfies Record<RecoveryErrorCode, number>;
 
@@ -358,7 +364,8 @@ type RecoveryErrorBase = {
 
 export type RecoveryError =
   | RecoveryErrorBase & { code: "STALE_STATE"; currentVersion: number }
-  | RecoveryErrorBase & { code: Exclude<RecoveryErrorCode, "STALE_STATE">; currentVersion?: never };
+  | RecoveryErrorBase & { code: "RATE_LIMITED"; retryAfterSeconds: number; currentVersion?: never }
+  | RecoveryErrorBase & { code: Exclude<RecoveryErrorCode, "STALE_STATE" | "RATE_LIMITED">; currentVersion?: never; retryAfterSeconds?: never };
 
 export type ApiSuccess<T> = {
   data: T;
@@ -401,7 +408,7 @@ export type PutDecisionResponse = ApiSuccess<{
   home: HomeProjectionDto;
 }>;
 
-export type WorkspaceVersionTag = `workspace:${number}`;
+export type WorkspaceVersionTag = `"workspace:${number}"`;
 
 export type RecoveryMutationHeaders = {
   "Content-Type": "application/json";
@@ -411,17 +418,17 @@ export type RecoveryMutationHeaders = {
 
 export type RecoveryEndpointContracts = {
   guestAudit: { ownership: "LEGACY_PATH_ONLY"; request: never; response: never; headers: never };
-  prepareImport: { ownership: "RECOVERY_V1"; request: FormData; response: PrepareImportResponse; headers: never };
-  session: { ownership: "RECOVERY_V1"; request: never; response: RecoverySessionResponse; headers: never };
+  prepareImport: { ownership: "RECOVERY_V1"; request: FormData; response: PrepareImportResponse | ApiFailure; headers: never };
+  session: { ownership: "RECOVERY_V1"; request: never; response: RecoverySessionResponse | ApiFailure; headers: never };
   googleStart: { ownership: "RECOVERY_V1"; request: { next: string }; response: GoogleStartResponse; headers: never };
-  logout: { ownership: "RECOVERY_V1"; request: never; response: LogoutResponse; headers: never };
-  submitEvidence: { ownership: "RECOVERY_V1"; request: EvidenceIngestRequest; response: SubmitEvidenceResponse; headers: RecoveryMutationHeaders };
-  home: { ownership: "RECOVERY_V1"; request: never; response: GetHomeResponse; headers: never };
-  commitments: { ownership: "RECOVERY_V1"; request: ListCommitmentsQuery; response: ListCommitmentsResponse; headers: never };
-  commitment: { ownership: "RECOVERY_V1"; request: GetCommitmentQuery; response: GetCommitmentResponse; headers: never };
-  createCorrection: { ownership: "RECOVERY_V1"; request: CreateCorrectionRequest; response: CreateCorrectionResponse; headers: RecoveryMutationHeaders };
-  reverseCorrection: { ownership: "RECOVERY_V1"; request: never; response: ReverseCorrectionResponse; headers: RecoveryMutationHeaders };
-  decision: { ownership: "RECOVERY_V1"; request: PutDecisionRequest; response: PutDecisionResponse; headers: RecoveryMutationHeaders };
+  logout: { ownership: "RECOVERY_V1"; request: never; response: LogoutResponse | ApiFailure; headers: never };
+  submitEvidence: { ownership: "RECOVERY_V1"; request: EvidenceIngestRequest; response: SubmitEvidenceResponse | ApiFailure; headers: RecoveryMutationHeaders };
+  home: { ownership: "RECOVERY_V1"; request: never; response: GetHomeResponse | ApiFailure; headers: never };
+  commitments: { ownership: "RECOVERY_V1"; request: ListCommitmentsQuery; response: ListCommitmentsResponse | ApiFailure; headers: never };
+  commitment: { ownership: "RECOVERY_V1"; request: GetCommitmentQuery; response: GetCommitmentResponse | ApiFailure; headers: never };
+  createCorrection: { ownership: "RECOVERY_V1"; request: CreateCorrectionRequest; response: CreateCorrectionResponse | ApiFailure; headers: RecoveryMutationHeaders };
+  reverseCorrection: { ownership: "RECOVERY_V1"; request: never; response: ReverseCorrectionResponse | ApiFailure; headers: RecoveryMutationHeaders };
+  decision: { ownership: "RECOVERY_V1"; request: PutDecisionRequest; response: PutDecisionResponse | ApiFailure; headers: RecoveryMutationHeaders };
 };
 
 const encodePathSegment = (value: string) => encodeURIComponent(value);
@@ -430,9 +437,9 @@ export const recoveryEndpoints = {
   guestAudit: { method: "POST", path: "/api/audit" },
   prepareImport: { method: "POST", path: "/api/ingest" },
   session: { method: "GET", path: "/api/auth/session" },
-  googleStart: { method: "GET", path: "/api/auth/google/start" },
+  googleStart: (next: string) => ({ method: "GET" as const, path: `/api/auth/google/start?mode=json&next=${encodePathSegment(next)}` }),
   logout: { method: "POST", path: "/api/auth/logout" },
-  submitEvidence: { method: "POST", path: "/api/workspaces/current/audit-snapshot" },
+  submitEvidence: { method: "POST", path: "/api/workspaces/current/evidence" },
   home: { method: "GET", path: "/api/workspaces/current/brief" },
   commitments: { method: "GET", path: "/api/workspaces/current/commitments" },
   commitment: (commitmentId: string) => ({

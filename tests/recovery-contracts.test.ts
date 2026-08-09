@@ -45,6 +45,7 @@ import {
   type RecoveryErrorCode,
   type RecoveryEndpointContracts,
   type RecoverySessionResponse,
+  type RecoveryMutationHeaders,
   type ReverseCorrectionResponse,
   type SourceType,
   type SubmitEvidenceResponse,
@@ -236,7 +237,7 @@ test("Recovery v1 freezes every product enum exhaustively", () => {
   assert.deepEqual(attentionReasons, ["DECISION_REQUIRED", "RENEWS_SOON", "LOW_CONFIDENCE", "PRICE_INCREASE", "EVIDENCE_CONFLICT"]);
   assert.deepEqual(coverageStates, ["NO_EVIDENCE", "BASELINE_ONLY", "PARTIAL", "CURRENT", "STALE"]);
   assert.deepEqual(evidenceProvenanceKinds, ["USER_SUBMITTED"]);
-  assert.deepEqual(recoveryErrorCodes, ["AUTH_REQUIRED", "FORBIDDEN", "NOT_FOUND", "INVALID_EVIDENCE", "PARSE_FAILED", "DUPLICATE_EVIDENCE", "DATABASE_UNAVAILABLE", "CONFLICT", "STALE_STATE", "SAVE_FAILED", "UNKNOWN"]);
+  assert.deepEqual(recoveryErrorCodes, ["AUTH_REQUIRED", "FORBIDDEN", "NOT_FOUND", "INVALID_EVIDENCE", "PARSE_FAILED", "DUPLICATE_EVIDENCE", "DATABASE_UNAVAILABLE", "CONFLICT", "STALE_STATE", "SAVE_FAILED", "REQUEST_TOO_LARGE", "UNSUPPORTED_MEDIA_TYPE", "RATE_LIMITED", "UNKNOWN"]);
   assert.equal(Object.keys(decisionLabels).length, decisions.length);
   assert.equal(Object.keys(cadenceLabels).length, cadences.length);
   assert.equal(Object.keys(sourceLabels).length, sourceTypes.length);
@@ -258,9 +259,9 @@ test("Recovery v1 freezes endpoint methods and paths without database vocabulary
   assert.deepEqual(recoveryEndpoints.guestAudit, { method: "POST", path: "/api/audit" });
   assert.deepEqual(recoveryEndpoints.prepareImport, { method: "POST", path: "/api/ingest" });
   assert.deepEqual(recoveryEndpoints.session, { method: "GET", path: "/api/auth/session" });
-  assert.deepEqual(recoveryEndpoints.googleStart, { method: "GET", path: "/api/auth/google/start" });
+  assert.deepEqual(recoveryEndpoints.googleStart("/app"), { method: "GET", path: "/api/auth/google/start?mode=json&next=%2Fapp" });
   assert.deepEqual(recoveryEndpoints.logout, { method: "POST", path: "/api/auth/logout" });
-  assert.deepEqual(recoveryEndpoints.submitEvidence, { method: "POST", path: "/api/workspaces/current/audit-snapshot" });
+  assert.deepEqual(recoveryEndpoints.submitEvidence, { method: "POST", path: "/api/workspaces/current/evidence" });
   assert.deepEqual(recoveryEndpoints.home, { method: "GET", path: "/api/workspaces/current/brief" });
   assert.deepEqual(recoveryEndpoints.commitments, { method: "GET", path: "/api/workspaces/current/commitments" });
   assert.deepEqual(recoveryEndpoints.commitment("commitment 1"), { method: "GET", path: "/api/workspaces/current/commitments/commitment%201" });
@@ -305,6 +306,13 @@ test("Recovery v1 freezes bounded immutable evidence and typed endpoint payload 
     decision: true,
   } satisfies Record<keyof typeof recoveryEndpoints & keyof RecoveryEndpointContracts, true>;
   assert.deepEqual(Object.keys(endpointWitness), Object.keys(recoveryEndpoints));
+
+  const mutationHeaders = {
+    "Content-Type": "application/json",
+    "Idempotency-Key": "recovery-request-0001",
+    "If-Match": "\"workspace:1\"",
+  } as const satisfies RecoveryMutationHeaders;
+  assert.equal(mutationHeaders["If-Match"], "\"workspace:1\"");
 
   const evidencePageQuery = { evidenceLimit: 50, evidenceCursor: "evidence-cursor-2" } satisfies GetCommitmentQuery;
   const typedEvidencePageQuery: RecoveryEndpointContracts["commitment"]["request"] = evidencePageQuery;
@@ -408,6 +416,9 @@ test("frontend-safe errors have exhaustive primary HTTP statuses and no raw exce
     CONFLICT: 409,
     STALE_STATE: 412,
     SAVE_FAILED: 502,
+    REQUEST_TOO_LARGE: 413,
+    UNSUPPORTED_MEDIA_TYPE: 415,
+    RATE_LIMITED: 429,
     UNKNOWN: 500,
   } satisfies Record<RecoveryErrorCode, number>);
 
@@ -421,4 +432,15 @@ test("frontend-safe errors have exhaustive primary HTTP statuses and no raw exce
     },
   } as const satisfies ApiFailure;
   assert.deepEqual(Object.keys(failure.error).sort(), ["code", "currentVersion", "message", "requestId", "retryable"]);
+
+  const rateLimited = {
+    error: {
+      code: "RATE_LIMITED",
+      message: "Too many requests. Retry later.",
+      retryable: true,
+      requestId: "request-rate-limited",
+      retryAfterSeconds: 60,
+    },
+  } as const satisfies ApiFailure;
+  assert.equal(rateLimited.error.retryAfterSeconds, 60);
 });
