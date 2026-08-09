@@ -40,8 +40,8 @@ export function checkGoogleAuthConfiguration(): GoogleAuthConfiguration {
   const missing = [
     isDatabaseConfigured() ? null : "DATABASE_URL",
     checkSessionConfiguration().status === "ready" ? null : "SESSION_SECRET",
-    getGoogleAuthClientId() ? null : "GOOGLE_AUTH_CLIENT_ID or GOOGLE_CLIENT_ID",
-    getGoogleAuthClientSecret() ? null : "GOOGLE_AUTH_CLIENT_SECRET or GOOGLE_CLIENT_SECRET",
+    getGoogleAuthClientId() ? null : "GOOGLE_AUTH_CLIENT_ID",
+    getGoogleAuthClientSecret() ? null : "GOOGLE_AUTH_CLIENT_SECRET",
     process.env.NODE_ENV !== "production" || getGoogleAuthOrigin() ? null : "NEXT_PUBLIC_APP_URL or APP_URL",
   ].filter((value): value is string => Boolean(value));
 
@@ -49,11 +49,11 @@ export function checkGoogleAuthConfiguration(): GoogleAuthConfiguration {
 }
 
 export function getGoogleAuthClientId() {
-  return process.env.GOOGLE_AUTH_CLIENT_ID?.trim() || process.env.GOOGLE_CLIENT_ID?.trim() || "";
+  return process.env.GOOGLE_AUTH_CLIENT_ID?.trim() || "";
 }
 
 export function getGoogleAuthClientSecret() {
-  return process.env.GOOGLE_AUTH_CLIENT_SECRET?.trim() || process.env.GOOGLE_CLIENT_SECRET?.trim() || "";
+  return process.env.GOOGLE_AUTH_CLIENT_SECRET?.trim() || "";
 }
 
 export function getGoogleAuthRedirectUri(origin: string) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { googleAuthNextCookie, googleAuthStateCookie, oauthStateCookieOptions, sanitizeOAuthReturnPath } from "@/lib/oauth-state";
-import { getGoogleAuthClientId, getGoogleAuthOrigin, getGoogleAuthRedirectUri } from "@/lib/server/google-auth";
+import { checkGoogleAuthConfiguration, getGoogleAuthClientId, getGoogleAuthOrigin, getGoogleAuthRedirectUri } from "@/lib/server/google-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -10,16 +10,18 @@ const googleAuthScope = "openid email profile";
 export function GET(request: NextRequest) {
   const wantsJson = request.nextUrl.searchParams.get("mode") === "json";
   const nextPath = sanitizeOAuthReturnPath(request.nextUrl.searchParams.get("next"));
+  const configuration = checkGoogleAuthConfiguration();
   const origin = getGoogleAuthOrigin(request.nextUrl.origin);
   const clientId = getGoogleAuthClientId();
   const redirectUri = getGoogleAuthRedirectUri(origin);
 
-  if (!clientId || !origin || !redirectUri) {
+  if (configuration.status !== "ready" || !origin || !redirectUri) {
     const payload = {
       status: "not-available",
       provider: "google-auth",
       availability: "company-activation-pending",
       message: "Google sign-in is not available yet. Vognary is completing the company setup.",
+      requiredEnv: configuration.missing,
     };
     return NextResponse.json(payload, { status: wantsJson ? 200 : 501 });
   }
