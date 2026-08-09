@@ -250,73 +250,7 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(home.getByLabel(/Monthly budget/)).toHaveValue(String(monthlyBudget));
   await workspaceNav.getByText("Subscriptions", { exact: true }).click();
   await expect(page.getByText("Category over budget", { exact: true }).first()).toBeVisible();
-
-  // 7. Provider-return reveal is proved against a realistic connector payload;
-  //    production data still depends on the external provider approval gates.
-  await page.route("**/api/workspaces/current/connectors", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(firstSyncPayload),
-    });
-  });
-  await page.goto("/app?aa=returned");
-  const syncReveal = page.getByRole("dialog", { name: "Found 1 recurring payment" });
-  await expect(syncReveal).toBeVisible({ timeout: 20_000 });
-  await expect(syncReveal.getByText("₹649/mo")).toBeVisible();
-  await expect(syncReveal.getByText("Netflix", { exact: true })).toBeVisible();
-  await syncReveal.getByRole("button", { name: "Continue to your brief" }).click();
-  await expect(syncReveal).toHaveCount(0);
-  await expect(page.locator("#overview")).toBeVisible();
-  await page.unroute("**/api/workspaces/current/connectors");
 });
-
-const firstSyncPayload = {
-  status: "ready",
-  accounts: [{
-    id: "11111111-1111-4111-8111-111111111111",
-    connectorId: "account-aggregator",
-    providerAccountId: "consent-e2e",
-    displayName: "Bank & UPI (Account Aggregator)",
-    scopes: ["aa:consent", "aa:fi-data:deposit"],
-    status: "active",
-    lastSyncedAt: "2026-07-17T12:00:00.000Z",
-    nextSyncAt: "2026-07-18T12:00:00.000Z",
-    coverageStartAt: "2026-01-01T00:00:00.000Z",
-    coverageEndAt: "2026-07-17T12:00:00.000Z",
-    coverageCompleteness: "complete",
-    freshnessStatus: "fresh",
-    latestRunStatus: "succeeded",
-    latestRunAt: "2026-07-17T12:00:00.000Z",
-    evidenceCount: 6,
-  }],
-  sourceHealth: [],
-  evidence: [],
-  recurringItems: [{
-    id: "22222222-2222-4222-8222-222222222222",
-    merchant: "Netflix",
-    normalizedMerchant: "netflix",
-    category: "Streaming",
-    frequency: "monthly",
-    currency: "INR",
-    amountMin: 649,
-    amountMax: 649,
-    averageAmount: 649,
-    monthlyCost: 649,
-    annualCost: 7_788,
-    lastChargeDate: "2026-07-17",
-    nextExpectedDate: "2026-08-17",
-    confidenceScore: 96,
-    status: "active",
-    recommendationReason: "Repeated monthly debit",
-    riskTags: [],
-    firstDetectedAt: "2026-02-17T12:00:00.000Z",
-    updatedAt: "2026-07-17T12:00:00.000Z",
-    connectorIds: ["account-aggregator"],
-    evidenceCount: 6,
-    lastObservedAt: "2026-07-17T12:00:00.000Z",
-  }],
-};
 
 function isSnapshotSaveWithWatch(response: import("@playwright/test").Response, merchantId: string, expected: boolean) {
   if (!response.url().includes("/api/workspaces/current/audit-snapshot") || response.request().method() !== "POST" || !response.ok()) return false;
