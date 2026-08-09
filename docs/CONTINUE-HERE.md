@@ -239,7 +239,18 @@ if (import.meta.url === `file://${process.argv[1]}`) await main();
 
 ## 4. Worktree rule
 
-**One isolated git worktree per work item.** For each:
+### Recovery v1 same-checkout exception — founder-authorized 2026-08-09
+
+- `recovery/v1` uses the original repository only.
+- Two sibling Copilot chats may edit the same checked-out branch concurrently.
+- They obey the frozen SOL/OPUS ownership map.
+- No child creates a clone, worktree, branch, stash, merge, rebase, checkout, or copied repository.
+- No file has simultaneous writers.
+- SOL is Git owner.
+- OPUS performs no Git-state mutations.
+- This exception ends when Recovery v1 reaches `main`.
+
+For all other work, use **one isolated git worktree per work item**:
 
 ```sh
 cd "/Users/varunteja/Desktop/CVT Group/Vognary"
