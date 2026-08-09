@@ -313,7 +313,6 @@ export type GoogleStartResponse =
       provider: "google-auth";
       availability: "company-activation-pending";
       message: string;
-      requiredEnv: readonly string[];
     };
 
 export type LogoutResponse =

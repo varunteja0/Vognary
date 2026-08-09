@@ -21,7 +21,6 @@ export function GET(request: NextRequest) {
       provider: "google-auth",
       availability: "company-activation-pending",
       message: "Google sign-in is not available yet. Vognary is completing the company setup.",
-      requiredEnv: configuration.missing,
     };
     return NextResponse.json(payload, { status: wantsJson ? 200 : 501 });
   }
