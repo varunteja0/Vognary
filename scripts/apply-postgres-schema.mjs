@@ -3,6 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import pg from "pg";
+import { assertInitialSchemaBaseline } from "./lib/postgres-schema-baseline.mjs";
 
 const { Pool } = pg;
 const databaseUrl = process.env.DATABASE_URL;
@@ -66,10 +67,14 @@ async function applyInitialSchema(client) {
   // The consolidated schema is intentionally mutable for fresh databases, so
   // its baseline checksum is recorded but not compared on later runs. Forward
   // migration files are immutable and are verified below.
-  if (await getMigrationChecksum(client, migrationId)) return;
+  if (await getMigrationChecksum(client, migrationId)) {
+    await assertInitialSchemaBaseline(client);
+    return;
+  }
 
   const existingUsers = await client.query("select to_regclass('public.users') as table_name");
   if (existingUsers.rows[0]?.table_name) {
+    await assertInitialSchemaBaseline(client);
     await recordMigration(client, migrationId, schema);
     applied.push({ id: migrationId, mode: "baseline-existing-schema" });
     return;
@@ -78,6 +83,7 @@ async function applyInitialSchema(client) {
   await client.query("begin");
   try {
     await client.query(schema);
+    await assertInitialSchemaBaseline(client);
     await recordMigration(client, migrationId, schema);
     await client.query("commit");
     applied.push({ id: migrationId, mode: "applied-schema" });

@@ -8,6 +8,14 @@ import { parse } from "yaml";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const read = (file: string) => readFileSync(path.join(root, file), "utf8");
 
+const nodeVersion = "22.23.2";
+const npmVersion = "10.9.8";
+const nodeImage = "node:22.23.2-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32";
+const postgresImage = "postgres:16.14@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b";
+const checkoutAction = "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803";
+const setupNodeAction = "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38";
+const uploadArtifactAction = "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02";
+
 test("feature readiness checks every persistent capability migration with bounded aggregate evidence", () => {
   const source = read("src/lib/server/feature-readiness.ts");
   for (const migration of [
@@ -48,19 +56,58 @@ test("feature readiness checks every persistent capability migration with bounde
 test("CI executes the production schema against PostgreSQL before application checks", () => {
   const workflowSource = read(".github/workflows/ci.yml");
   const workflow = parse(workflowSource) as {
-    jobs?: { validate?: { services?: { postgres?: { image?: string } }; env?: { DATABASE_URL?: string }; steps?: Array<{ run?: string }> } };
+    permissions?: { contents?: string };
+    jobs?: { validate?: { services?: { postgres?: { image?: string } }; env?: { DATABASE_URL?: string }; steps?: Array<{ run?: string; uses?: string; with?: { "node-version"?: string; "persist-credentials"?: boolean } }> } };
   };
-  assert.match(workflowSource, /uses: actions\/checkout@v6/);
-  assert.match(workflowSource, /uses: actions\/setup-node@v6/);
+  assert.equal(workflow.permissions?.contents, "read");
+  assert.match(workflowSource, new RegExp(`uses: ${checkoutAction}`));
+  assert.match(workflowSource, new RegExp(`uses: ${setupNodeAction}`));
+  assert.doesNotMatch(workflowSource, /uses: actions\/(?:checkout|setup-node)@v\d+/);
   const validate = workflow.jobs?.validate;
-  assert.equal(validate?.services?.postgres?.image, "postgres:16");
+  assert.equal(validate?.services?.postgres?.image, postgresImage);
   assert.equal(validate?.env?.DATABASE_URL, "postgresql://postgres:vognary_ci@127.0.0.1:5432/vognary_ci");
+  const checkout = (validate?.steps ?? []).find((step) => step.uses === checkoutAction);
+  const setupNode = (validate?.steps ?? []).find((step) => step.uses === setupNodeAction);
+  assert.equal(checkout?.with?.["persist-credentials"], false);
+  assert.equal(setupNode?.with?.["node-version"], nodeVersion);
   const commands = (validate?.steps ?? []).flatMap((step) => step.run ? [step.run] : []);
+  assert.ok(commands.some((command) => command.includes(`node --version`) && command.includes(nodeVersion)));
+  assert.ok(commands.includes("npm run tokens:check"));
+  assert.ok(commands.includes("npm audit --omit=dev --audit-level=high"));
+  assert.ok(commands.includes("npm audit --audit-level=high"));
   assert.ok(commands.includes("npm run ci:database"));
   assert.ok(
     commands.indexOf("npm run ci:database") < commands.indexOf("npm run lint"),
     "schema migrations must run before application validation",
   );
+  assert.match(workflowSource, /npm run test:e2e -- control-wiring-inventory/);
+});
+
+test("runtime and PostgreSQL tooling are pinned to one reproducible foundation", () => {
+  const packageJson = JSON.parse(read("package.json")) as {
+    engines?: { node?: string; npm?: string };
+    packageManager?: string;
+  };
+  assert.equal(packageJson.engines?.node, nodeVersion);
+  assert.equal(packageJson.engines?.npm, npmVersion);
+  assert.equal(packageJson.packageManager, `npm@${npmVersion}`);
+  assert.equal(read(".nvmrc").trim(), nodeVersion);
+  assert.match(read(".npmrc"), /^engine-strict=true$/m);
+
+  const dockerfile = read("Dockerfile");
+  assert.equal(dockerfile.match(new RegExp(`FROM ${nodeImage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "g"))?.length, 3);
+  assert.doesNotMatch(dockerfile, /FROM node:20/);
+
+  const compose = parse(read("docker-compose.yml")) as { services?: { postgres?: { image?: string } } };
+  assert.equal(compose.services?.postgres?.image, postgresImage);
+  assert.match(read("scripts/lib/postgres-backup-utils.mjs"), new RegExp(postgresImage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+
+  const backupWorkflow = read(".github/workflows/ops-backup-drill.yml");
+  assert.match(backupWorkflow, new RegExp(`uses: ${checkoutAction}`));
+  assert.match(backupWorkflow, new RegExp(`uses: ${setupNodeAction}`));
+  assert.match(backupWorkflow, new RegExp(`uses: ${uploadArtifactAction}`));
+  assert.match(backupWorkflow, new RegExp(`node-version: ["']?${nodeVersion}["']?`));
+  assert.doesNotMatch(backupWorkflow, /uses: actions\/(?:checkout|setup-node|upload-artifact)@v\d+/);
 });
 
 test("Vercel production builds apply checksummed migrations before compiling the deployment", () => {

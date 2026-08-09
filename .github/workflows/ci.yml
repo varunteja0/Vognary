@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -14,7 +17,7 @@ jobs:
       POSTGRES_SSL: "false"
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16.14@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
         env:
           POSTGRES_PASSWORD: vognary_ci
           POSTGRES_DB: vognary_ci
@@ -26,18 +29,25 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          node-version: 20
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22.23.2"
           cache: npm
+      - name: Verify runtime contract
+        run: test "$(node --version)" = "v22.23.2" && test "$(npm --version)" = "10.9.8"
       - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm audit --audit-level=high
       - run: npm run ci:database
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run claims:check
       - run: npm run research:check
       - run: npm run brand:check
+      - run: npm run tokens:check
       - run: npm test
       - run: npm run corpus
       - run: npm run build
@@ -79,6 +89,9 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
           npm run db:apply-schema
           npm run test:e2e -- signed-in-first-value verified-savings-share workspace-source-health
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+          npm run db:apply-schema
+          npm run test:e2e -- control-wiring-inventory
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
           npm run db:apply-schema
           npm run test:e2e -- sample-workspace

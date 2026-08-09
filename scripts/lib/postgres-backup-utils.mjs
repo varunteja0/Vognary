@@ -170,7 +170,7 @@ export async function runPostgresCommand(command, args, options = {}) {
     "--rm",
     ...volumes.flatMap((volume) => ["-v", `${volume.hostPath}:${volume.containerPath}`]),
     ...dockerEnvNames(options.env ?? process.env).flatMap((name) => ["-e", name]),
-    "postgres:16",
+    "postgres:16.14@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b",
     command,
     ...args.map((arg) => rewriteDockerPath(arg, volumes)),
   ];
