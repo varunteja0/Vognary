@@ -504,7 +504,7 @@ export default function VognaryMvpClient() {
   const [proofQuestionBusy, setProofQuestionBusy] = useState(false);
   const [disconnectedConnectorIds, setDisconnectedConnectorIds] = useState<string[]>([]);
   const [mobileSection, setMobileSection] = useState<WorkspaceSectionId>("overview");
-  const [emptyOnboardingChoice, setEmptyOnboardingChoice] = useState<"connect" | "paste" | null>(null);
+  const [emptyOnboardingChoice, setEmptyOnboardingChoice] = useState<"connect" | "paste" | "rails" | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [installPromptAvailable, setInstallPromptAvailable] = useState(false);
   const [connectorReturn, setConnectorReturn] = useState<{ label: string; connectorId: string } | null>(null);
@@ -692,11 +692,16 @@ export default function VognaryMvpClient() {
   useEffect(() => {
     if (!serverSession?.authenticated || !serverWorkspaceHydrated || hasRealData || emptyOnboardingRoutedRef.current) return;
     emptyOnboardingRoutedRef.current = true;
-    if (window.location.hash) return;
+    // Paste works today; Gmail/AA often do not. Never land an empty workspace on
+    // a dead-end "connect rails" wall — open the path that can produce a ledger.
+    queueMicrotask(() => {
+      setEmptyOnboardingChoice("paste");
+      setMobileSection("connect");
+    });
+    if (window.location.hash && window.location.hash !== "#connect" && window.location.hash !== "#overview") return;
     const url = new URL(window.location.href);
     url.hash = "connect";
     window.history.replaceState(null, "", url);
-    queueMicrotask(() => setMobileSection("connect"));
   }, [hasRealData, serverSession?.authenticated, serverWorkspaceHydrated]);
   // WP-2.2 — a sample workspace is one whose only evidence is the shared demo
   // text (no real statements or manual items). Content-derived, so the banner
@@ -2063,7 +2068,7 @@ export default function VognaryMvpClient() {
       }
       const vua = aaVuaDraft.trim();
       if (!vua) {
-        setNotice("Add your Account Aggregator handle first (for example 9999999999@onemoney). It identifies your account — it is not a password.");
+        setNotice("Add your Account Aggregator handle first (for example your-mobile@okhdfcbank). It identifies you in consent — it is not a password.");
         return;
       }
       const response = await fetch("/api/integrations/aa/start", {
@@ -2518,53 +2523,89 @@ export default function VognaryMvpClient() {
           /> : null}
         </section>
 
-        {/* 01 · Connect evidence */}
+        {/* 01 · Connect evidence — paste works now; rails are optional extras */}
         <section id="connect" aria-labelledby="connect-heading" className={`${mobileSection === "connect" ? "flex" : "hidden"} scroll-mt-36 flex-col gap-5`}>
-          <StageHeader id="connect-heading" folio="03" title="Connect" note="Add fresh evidence with revocable access." />
-          {!hasRealData && emptyOnboardingChoice === null ? (
+          <StageHeader
+            id="connect-heading"
+            folio="03"
+            title="Add evidence"
+            note={hasRealData ? "Paste more, or use optional automatic rails when they are ready." : "Paste works today. Email and bank rails are optional and only appear when Vognary has completed company setup."}
+          />
+          {!hasRealData ? (
             <EmptyWorkspaceOnboarding
               onConnectGmail={() => {
-                setEmptyOnboardingChoice("connect");
+                setEmptyOnboardingChoice("rails");
                 const gmail = connectors.find((connector) => connector.id === "gmail-readonly");
                 if (gmail) void startConnector(gmail);
               }}
-              onPasteReceipts={() => setEmptyOnboardingChoice("paste")}
+              onPasteReceipts={() => {
+                setEmptyOnboardingChoice("paste");
+                window.setTimeout(() => document.getElementById("receipt-paste")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+              }}
               onSeedSample={seedSampleWorkspace}
+              onShowRails={() => setEmptyOnboardingChoice("rails")}
             />
           ) : null}
-          {hasRealData || emptyOnboardingChoice === "connect" ? <IntegrationCommandCenter
-            audit={audit}
-            connectorStartResults={connectorStartResults}
-            connectingConnectorId={connectingConnectorId}
-            syncingConnectorId={syncingConnectorId}
-            connectedConnectorIds={connectedConnectorIds}
-            serverSession={serverSession}
-            serverConnectors={serverConnectors}
-            merchantLinks={merchantLinks}
-            aaVuaDraft={aaVuaDraft}
-            onAaVuaDraftChange={setAaVuaDraft}
-            onStartConnector={startConnector}
-            onDisconnectConnector={disconnectConnector}
-            onRunConnectorSync={runConnectorSyncNow}
-            onStartBankRail={() => void startBankRail()}
-            onLinkMerchant={linkMerchantTile}
-            onUnlinkMerchant={unlinkMerchantTile}
-            onJumpToLedger={() => selectAndReviewItem()}
-            onExportReport={exportReport}
-            onClearWorkspace={requestClearWorkspace}
-          /> : null}
-          {hasRealData || emptyOnboardingChoice === "paste" ? <ReceiptPastePanel
+          {/* Always show the working path — never hide paste behind a failed OAuth wall */}
+          <ReceiptPastePanel
             receiptText={receiptText}
-            onReceiptTextChange={setReceiptText}
-            autoFocus={!hasRealData && emptyOnboardingChoice === "paste"}
-            onBack={!hasRealData ? () => setEmptyOnboardingChoice(null) : undefined}
-          /> : null}
-          {hasRealData || emptyOnboardingChoice === "paste" ? <GuidedCapturePanel
+            onReceiptTextChange={(value) => {
+              setReceiptText(value);
+              if (value.trim()) setEmptyOnboardingChoice("paste");
+            }}
+            autoFocus={!hasRealData && (emptyOnboardingChoice === "paste" || emptyOnboardingChoice === null)}
+          />
+          <GuidedCapturePanel
             onAdd={(items) => {
               setManualItems((current) => [...current, ...items]);
               setNotice(`Added ${items.length} user-confirmed item(s) from the guided capture. They now appear in the ledger and renewal calendar.`);
             }}
-          /> : null}
+          />
+          {!hasRealData ? (
+            <div className="panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm leading-6 text-(--muted)">
+                Prefer a demo first? Load eight labelled sample subscriptions (not your data).
+              </p>
+              <button type="button" onClick={seedSampleWorkspace} className="btn btn-ghost h-10 shrink-0 px-4 text-xs">
+                Load sample audit
+              </button>
+            </div>
+          ) : null}
+          <AdvancedImportPanel onImportFiles={(files) => void importStatementFiles(files)} />
+          {(hasRealData || emptyOnboardingChoice === "rails" || emptyOnboardingChoice === "connect") ? (
+            <IntegrationCommandCenter
+              audit={audit}
+              connectorStartResults={connectorStartResults}
+              connectingConnectorId={connectingConnectorId}
+              syncingConnectorId={syncingConnectorId}
+              connectedConnectorIds={connectedConnectorIds}
+              serverSession={serverSession}
+              serverConnectors={serverConnectors}
+              merchantLinks={merchantLinks}
+              aaVuaDraft={aaVuaDraft}
+              onAaVuaDraftChange={setAaVuaDraft}
+              onStartConnector={startConnector}
+              onDisconnectConnector={disconnectConnector}
+              onRunConnectorSync={runConnectorSyncNow}
+              onStartBankRail={() => void startBankRail()}
+              onLinkMerchant={linkMerchantTile}
+              onUnlinkMerchant={unlinkMerchantTile}
+              onJumpToLedger={() => selectAndReviewItem()}
+              onExportReport={exportReport}
+              onClearWorkspace={requestClearWorkspace}
+              evidenceEmpty={!hasRealData}
+            />
+          ) : (
+            <div className="panel p-4">
+              <p className="text-sm font-semibold text-(--ink)">Optional automatic rails</p>
+              <p className="mt-1 text-sm leading-6 text-(--muted)">
+                Gmail and bank (Account Aggregator) only work after company activation. Paste or sample above works without them.
+              </p>
+              <button type="button" onClick={() => setEmptyOnboardingChoice("rails")} className="btn btn-ghost mt-3 h-10 px-4 text-xs">
+                Show email / bank options
+              </button>
+            </div>
+          )}
         </section>
 
         {/* 02 · Recurring ledger */}
@@ -2572,8 +2613,18 @@ export default function VognaryMvpClient() {
           <StageHeader id="ledger-heading" folio="02" title="Subscriptions" note="Every recurring payment and its proof." />
           {!audit.recurringItems.length ? (
             <section className="panel p-7 text-center sm:p-9" aria-label="No subscriptions yet">
-              <p className="text-sm text-(--muted)">No subscriptions are proven yet; connect one evidence source to build this list.</p>
-              <button type="button" onClick={() => navigateToSection("connect")} className="btn btn-primary mt-5">Connect evidence</button>
+              <p className="text-sm text-(--muted)">No subscriptions are proven yet. Paste two receipts — that works today without email or bank setup.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmptyOnboardingChoice("paste");
+                  navigateToSection("connect");
+                  window.setTimeout(() => document.getElementById("receipt-paste")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+                }}
+                className="btn btn-primary mt-5"
+              >
+                Paste receipts
+              </button>
             </section>
           ) : <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -2815,6 +2866,7 @@ function IntegrationCommandCenter({
   onJumpToLedger,
   onExportReport,
   onClearWorkspace,
+  evidenceEmpty = false,
 }: {
   audit: AuditResult;
   connectorStartResults: Record<string, ConnectorStartPayload>;
@@ -2835,6 +2887,7 @@ function IntegrationCommandCenter({
   onJumpToLedger: () => void;
   onExportReport: () => void;
   onClearWorkspace: () => void;
+  evidenceEmpty?: boolean;
 }) {
   const signedIn = Boolean(serverSession?.authenticated && serverSession.session?.workspaceId);
   const rails = {
@@ -2847,9 +2900,15 @@ function IntegrationCommandCenter({
     <section className="dossier spotlight scan p-5 sm:p-6" onMouseMove={trackSpotlightPointer}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <span className="folio" data-folio="1.1" style={{ color: "var(--dossier-muted)" }}>Connections</span>
-          <h3 className="mt-3 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-4xl">Connect evidence. Choose what to watch.</h3>
-          <p className="mt-2 max-w-xl text-sm leading-6 muted-on-dark">Approve read-only email or bank evidence; merchant watches never connect merchant accounts.</p>
+          <span className="folio" data-folio="1.1" style={{ color: "var(--dossier-muted)" }}>Optional rails</span>
+          <h3 className="mt-3 font-display text-3xl font-semibold leading-tight text-(--dossier-ink) sm:text-4xl">
+            {evidenceEmpty ? "Automatic sources (optional)" : "Connected sources and watches"}
+          </h3>
+          <p className="mt-2 max-w-xl text-sm leading-6 muted-on-dark">
+            {evidenceEmpty
+              ? "Paste above works without these. Email and bank only activate after Vognary completes company setup — unavailable is honest, not a product failure."
+              : "Approve read-only email or bank evidence when available. Merchant watches are preferences, not merchant-account logins."}
+          </p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <DossierStat label="Items" value={`${audit.summary.recurringCount}`} onClick={onJumpToLedger} />
@@ -2861,10 +2920,24 @@ function IntegrationCommandCenter({
 
       <div className="mt-5 grid gap-3 lg:grid-cols-2">
         <RailCard
+          title="Email receipts"
+          eyebrow="Optional · when company-activated"
+          connectorId="gmail-readonly"
+          description="Read-only Gmail for receipts. Unavailable until Vognary finishes Google OAuth setup — use paste until then."
+          connectorStartResults={connectorStartResults}
+          connectingConnectorId={connectingConnectorId}
+          syncingConnectorId={syncingConnectorId}
+          connected={rails.gmailConnected}
+          serverConnectors={serverConnectors}
+          onStartConnector={onStartConnector}
+          onDisconnectConnector={onDisconnectConnector}
+          onRunConnectorSync={onRunConnectorSync}
+        />
+        <RailCard
           title="Bank transactions"
-          eyebrow="Rail 01 · Primary automatic account feed"
+          eyebrow="Optional · regulated partner"
           connectorId="account-aggregator"
-          description="Approve a scoped, revocable bank-data request with the regulated provider."
+          description="Scoped Account Aggregator consent with a regulated partner. Not required to run your first audit."
           connectorStartResults={connectorStartResults}
           connectingConnectorId={connectingConnectorId}
           syncingConnectorId={syncingConnectorId}
@@ -2875,27 +2948,22 @@ function IntegrationCommandCenter({
           onRunConnectorSync={onRunConnectorSync}
           bankRail={{ signedIn, vuaDraft: aaVuaDraft, onVuaDraftChange: onAaVuaDraftChange, onStart: onStartBankRail }}
         />
-        <RailCard
-          title="Email receipts"
-          eyebrow="Rail 02 · Optional coverage"
-          connectorId="gmail-readonly"
-          description="Approve read-only Gmail access for receipts a bank feed cannot identify."
-          connectorStartResults={connectorStartResults}
-          connectingConnectorId={connectingConnectorId}
-          syncingConnectorId={syncingConnectorId}
-          connected={rails.gmailConnected}
-          serverConnectors={serverConnectors}
-          onStartConnector={onStartConnector}
-          onDisconnectConnector={onDisconnectConnector}
-          onRunConnectorSync={onRunConnectorSync}
-        />
       </div>
 
       <div className="mt-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <span className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>Merchant watches · local workspace preferences</span>
-          <span className="font-data text-[0.66rem] muted-on-dark">{merchantLinks.length ? `${merchantLinks.length} watched` : "Watch the merchants you pay"}</span>
+          <span className="eyebrow muted-on-dark" style={{ fontSize: "0.62rem" }}>
+            Merchant watches · after you have evidence
+          </span>
+          <span className="font-data text-[0.66rem] muted-on-dark">
+            {merchantLinks.length ? `${merchantLinks.length} watched` : "Optional preferences — not required to start"}
+          </span>
         </div>
+        {evidenceEmpty ? (
+          <p className="mt-3 text-xs leading-5 muted-on-dark">
+            Watching Netflix or ChatGPT does nothing until paste, email, or bank evidence exists. Paste receipts above first — then watches can match real charges.
+          </p>
+        ) : null}
         <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {merchantTiles.map((tile) => {
             const isLinked = linked.has(tile.id);
@@ -3030,7 +3098,7 @@ function RailCard({
             inputMode="text"
             autoComplete="off"
             disabled={!bankRail.signedIn || busy}
-            placeholder={bankRail.signedIn ? "9999999999@onemoney" : "Sign in to link bank data"}
+            placeholder={bankRail.signedIn ? "your-mobile@okhdfcbank" : "Sign in to link bank data"}
             className="mt-2 h-11 w-full rounded-[10px] border px-3 font-data text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
             style={{ background: "rgba(10,12,16,0.28)", borderColor: "var(--dossier-line)", color: "var(--dossier-ink)" }}
           />
@@ -3078,34 +3146,47 @@ function EmptyWorkspaceOnboarding({
   onConnectGmail,
   onPasteReceipts,
   onSeedSample,
+  onShowRails,
 }: {
   onConnectGmail: () => void;
   onPasteReceipts: () => void;
   onSeedSample: () => void;
+  onShowRails: () => void;
 }) {
   return (
     <section className="panel p-6 sm:p-8" aria-labelledby="empty-workspace-title">
-      <div className="mx-auto max-w-3xl text-center">
-        <span className="folio" data-folio="1.1">First evidence</span>
-        <h3 id="empty-workspace-title" className="mt-3 font-display text-3xl font-semibold text-(--ink)">How would you like to start?</h3>
-        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-(--muted)">Your data stays private to your workspace, and every connection can be revoked.</p>
+      <div className="mx-auto max-w-3xl">
+        <span className="folio" data-folio="1.1">Works today</span>
+        <h3 id="empty-workspace-title" className="mt-3 font-display text-3xl font-semibold text-(--ink)">
+          Paste receipts. Get your burn in seconds.
+        </h3>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
+          Email and bank auto-connect are company-activated rails — they may show as not available yet. That is honest status, not a broken product. Paste, sample, or statement import works without them.
+        </p>
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          <button type="button" onClick={onConnectGmail} className="inset lift p-5 text-left transition hover:border-ember">
-            <span className="font-data text-[0.62rem] uppercase tracking-[0.14em] text-verdict">Automatic</span>
-            <span className="mt-2 block font-display text-lg font-semibold text-(--ink)">Connect Gmail</span>
-            <span className="mt-1 block text-xs leading-5 text-(--muted)">Find recurring receipts with read-only access.</span>
-          </button>
-          <button type="button" onClick={onPasteReceipts} className="inset lift p-5 text-left transition hover:border-ember">
-            <span className="font-data text-[0.62rem] uppercase tracking-[0.14em] text-verdict">Private and quick</span>
+          <button type="button" onClick={onPasteReceipts} className="inset lift border-(--gold-line) p-5 text-left transition hover:border-(--gold)">
+            <span className="font-data text-[0.62rem] uppercase tracking-[0.14em] text-gold">Primary · works now</span>
             <span className="mt-2 block font-display text-lg font-semibold text-(--ink)">Paste receipts</span>
-            <span className="mt-1 block text-xs leading-5 text-(--muted)">Paste invoice or renewal text directly.</span>
+            <span className="mt-1 block text-xs leading-5 text-(--muted)">Two invoices with merchant, amount, and date are enough for monthly burn + next renewal.</span>
           </button>
           <button type="button" onClick={onSeedSample} className="inset lift p-5 text-left transition hover:border-ember">
-            <span className="font-data text-[0.62rem] uppercase tracking-[0.14em] text-verdict">No setup</span>
-            <span className="mt-2 block font-display text-lg font-semibold text-(--ink)">See a sample audit</span>
-            <span className="mt-1 block text-xs leading-5 text-(--muted)">Explore eight clearly labelled demo subscriptions.</span>
+            <span className="font-data text-[0.62rem] uppercase tracking-[0.14em] text-verdict">Explore</span>
+            <span className="mt-2 block font-display text-lg font-semibold text-(--ink)">Sample audit</span>
+            <span className="mt-1 block text-xs leading-5 text-(--muted)">Eight labelled demo subscriptions — not your money.</span>
+          </button>
+          <button type="button" onClick={onShowRails} className="inset lift p-5 text-left transition hover:border-ember">
+            <span className="font-data text-[0.62rem] uppercase tracking-[0.14em] text-(--muted)">Optional later</span>
+            <span className="mt-2 block font-display text-lg font-semibold text-(--ink)">Email / bank rails</span>
+            <span className="mt-1 block text-xs leading-5 text-(--muted)">Gmail and Account Aggregator only when Vognary has finished company setup.</span>
           </button>
         </div>
+        <p className="mt-4 text-xs leading-5 text-(--muted)">
+          Prefer Gmail when it is live?{" "}
+          <button type="button" onClick={onConnectGmail} className="font-semibold text-(--ink) underline underline-offset-2">
+            Try email connect
+          </button>
+          {" "}— if it is not activated yet, you will see an honest “not available” notice, not a fake linked mailbox.
+        </p>
       </div>
     </section>
   );
@@ -3487,8 +3568,12 @@ function OverviewPanel({
     return (
       <section className="panel p-6 text-center sm:p-8">
         <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Your recurring money, answered in five seconds.</h3>
-        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">{hasRealData ? "Add one more evidence source to prove a recurring pattern." : "Connect one source to reveal your burn, next renewal, and first action."}</p>
-        <a href="#connect" className="btn btn-primary mt-5">Connect evidence</a>
+        <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-(--muted)">
+          {hasRealData
+            ? "Add one more receipt with merchant, amount, and a renewal cue so a pattern can prove out."
+            : "Paste two receipts to see monthly burn, next renewal, and one action. Email/bank rails are optional when company-activated."}
+        </p>
+        <a href="#connect" className="btn btn-primary mt-5">Paste receipts</a>
       </section>
     );
   }
