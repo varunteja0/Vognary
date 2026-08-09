@@ -14,5 +14,10 @@ test("migration runner serializes the full pass and rejects forward checksum dri
   assert.match(source, /recordedChecksum !== expectedChecksum/);
   assert.match(source, /set local lock_timeout = '10s'/);
   assert.match(source, /set local statement_timeout = '120s'/);
+  assert.match(source, /assertInitialSchemaBaseline/);
+  assert.ok(
+    source.indexOf("assertInitialSchemaBaseline") < source.indexOf("recordMigration(client, migrationId, schema)"),
+    "an existing database must pass baseline validation before 0001 is recorded",
+  );
   assert.doesNotMatch(source, /on conflict \(id\) do nothing/);
 });

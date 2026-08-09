@@ -6,6 +6,7 @@ import { backupObjectKey, getBackupStorageConfig, uploadBackupObject } from "./l
 import {
   encryptFile,
   parseBackupEncryptionKey,
+  postgresConnectionEnv,
   redactDatabaseUrl,
   relativeFromRoot,
   requireEnv,
@@ -40,7 +41,7 @@ try {
   ], {
     env: {
       ...process.env,
-      PGDATABASE: databaseUrl,
+      ...postgresConnectionEnv(databaseUrl),
       PGSSLMODE: process.env.POSTGRES_SSL === "true" ? "require" : process.env.PGSSLMODE,
     },
     volumes: [{ hostPath: tempDir, containerPath: "/backup" }],

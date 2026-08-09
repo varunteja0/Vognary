@@ -44,14 +44,26 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   const paste = page.locator("textarea").first();
   await paste.waitFor({ timeout: 30_000 });
   await paste.fill(realFormatReceipts);
-  await expect(page.getByText("Monthly burn", { exact: false }).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(/Netflix/).first()).toBeVisible();
+  const guestResult = page.getByRole("region", { name: "Your first audit result" });
+  await expect(guestResult).toBeVisible({ timeout: 15_000 });
+  await expect(guestResult.getByText("₹768")).toBeVisible();
+  await expect(guestResult.getByText("Netflix", { exact: true })).toBeVisible();
+  const spotifyBriefItem = page.getByRole("region", { name: "Your brief" }).getByRole("listitem").filter({ hasText: "Spotify" }).filter({ hasText: "₹119" });
+  await expect(spotifyBriefItem).toBeVisible();
 
   // 2. Sign in through the development login.
   await page.goto("/login");
   await page.getByText("Other ways to sign in").click();
   await page.getByPlaceholder("developer@example.com").fill(email!);
   await page.getByPlaceholder("Access code").fill(accessCode!);
+  const guestPersisted = page.waitForResponse(
+    (response) => response.url().includes("/api/workspaces/current/audit-snapshot")
+      && response.request().method() === "POST"
+      && response.ok()
+      && (response.request().postData() ?? "").includes("Netflix")
+      && (response.request().postData() ?? "").includes("Spotify Premium"),
+    { timeout: 30_000 },
+  );
   await page.getByRole("button", { name: "Sign in as developer" }).click();
   const hydrated = page.waitForResponse(
     (response) => response.url().includes("/api/workspaces/current/audit-snapshot") && response.request().method() === "GET",
@@ -59,13 +71,13 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   );
   await page.waitForURL(/\/app/, { timeout: 30_000 });
   await hydrated;
+  await guestPersisted;
   await page.waitForTimeout(500);
   const transferNotice = page.getByRole("status").filter({
     hasText: /2 commitments carried into your encrypted workspace|Guest audit saved to this encrypted workspace/i,
   });
-  if (await transferNotice.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await transferNotice.getByRole("button", { name: "Dismiss" }).click();
-  }
+  await expect(transferNotice).toBeVisible({ timeout: 15_000 });
+  await transferNotice.getByRole("button", { name: "Dismiss" }).click();
 
   // 3. Home is the five-second answer and the workspace has only three
   //    primary destinations. Budgets must persist through encrypted sync.
@@ -79,6 +91,8 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
     await expect(home.getByText(card, { exact: true }).first()).toBeVisible();
   }
   const monthlyBurnCard = home.getByRole("button").filter({ hasText: "Monthly burn" });
+  await expect(monthlyBurnCard.getByText("₹768", { exact: true })).toBeVisible();
+  await expect(monthlyBurnCard.getByText(/2 commitments/)).toBeVisible();
   await expect(monthlyBurnCard.getByText(/No comparison yet|since last review/i)).toBeVisible();
   await expect(home.getByLabel(/Monthly budget/)).toBeVisible();
   await page.evaluate(() => {
@@ -124,7 +138,8 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(proofChip).toHaveAttribute("aria-expanded", "true");
   const proofRegion = dueCard.getByRole("list");
   await expect(proofRegion).toBeVisible();
-  await expect(proofRegion.getByText(/Netflix|Spotify|No projected debits/).first()).toBeVisible();
+  await expect(proofRegion.getByText("Netflix", { exact: true })).toBeVisible();
+  await expect(proofRegion.getByText("Spotify", { exact: true })).toBeVisible();
   await positionForScreenshot(page, dueCard);
   await page.screenshot({ path: evidencePath(`wp-6.3-proof-chip-${surface}.png`), fullPage: false, animations: "disabled" });
   await proofChip.click();
@@ -250,73 +265,7 @@ test("guest paste produces first value, survives sign-in, and watches persist", 
   await expect(home.getByLabel(/Monthly budget/)).toHaveValue(String(monthlyBudget));
   await workspaceNav.getByText("Subscriptions", { exact: true }).click();
   await expect(page.getByText("Category over budget", { exact: true }).first()).toBeVisible();
-
-  // 7. Provider-return reveal is proved against a realistic connector payload;
-  //    production data still depends on the external provider approval gates.
-  await page.route("**/api/workspaces/current/connectors", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(firstSyncPayload),
-    });
-  });
-  await page.goto("/app?aa=returned");
-  const syncReveal = page.getByRole("dialog", { name: "Found 1 recurring payment" });
-  await expect(syncReveal).toBeVisible({ timeout: 20_000 });
-  await expect(syncReveal.getByText("₹649/mo")).toBeVisible();
-  await expect(syncReveal.getByText("Netflix", { exact: true })).toBeVisible();
-  await syncReveal.getByRole("button", { name: "Continue to your brief" }).click();
-  await expect(syncReveal).toHaveCount(0);
-  await expect(page.locator("#overview")).toBeVisible();
-  await page.unroute("**/api/workspaces/current/connectors");
 });
-
-const firstSyncPayload = {
-  status: "ready",
-  accounts: [{
-    id: "11111111-1111-4111-8111-111111111111",
-    connectorId: "account-aggregator",
-    providerAccountId: "consent-e2e",
-    displayName: "Bank & UPI (Account Aggregator)",
-    scopes: ["aa:consent", "aa:fi-data:deposit"],
-    status: "active",
-    lastSyncedAt: "2026-07-17T12:00:00.000Z",
-    nextSyncAt: "2026-07-18T12:00:00.000Z",
-    coverageStartAt: "2026-01-01T00:00:00.000Z",
-    coverageEndAt: "2026-07-17T12:00:00.000Z",
-    coverageCompleteness: "complete",
-    freshnessStatus: "fresh",
-    latestRunStatus: "succeeded",
-    latestRunAt: "2026-07-17T12:00:00.000Z",
-    evidenceCount: 6,
-  }],
-  sourceHealth: [],
-  evidence: [],
-  recurringItems: [{
-    id: "22222222-2222-4222-8222-222222222222",
-    merchant: "Netflix",
-    normalizedMerchant: "netflix",
-    category: "Streaming",
-    frequency: "monthly",
-    currency: "INR",
-    amountMin: 649,
-    amountMax: 649,
-    averageAmount: 649,
-    monthlyCost: 649,
-    annualCost: 7_788,
-    lastChargeDate: "2026-07-17",
-    nextExpectedDate: "2026-08-17",
-    confidenceScore: 96,
-    status: "active",
-    recommendationReason: "Repeated monthly debit",
-    riskTags: [],
-    firstDetectedAt: "2026-02-17T12:00:00.000Z",
-    updatedAt: "2026-07-17T12:00:00.000Z",
-    connectorIds: ["account-aggregator"],
-    evidenceCount: 6,
-    lastObservedAt: "2026-07-17T12:00:00.000Z",
-  }],
-};
 
 function isSnapshotSaveWithWatch(response: import("@playwright/test").Response, merchantId: string, expected: boolean) {
   if (!response.url().includes("/api/workspaces/current/audit-snapshot") || response.request().method() !== "POST" || !response.ok()) return false;

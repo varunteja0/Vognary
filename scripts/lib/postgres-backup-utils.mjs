@@ -158,24 +158,47 @@ export function runCommand(command, args, options = {}) {
 }
 
 export async function runPostgresCommand(command, args, options = {}) {
-  if (commandExists(command)) return runCommand(command, args, options);
+  const forceDocker = options.env?.POSTGRES_CLIENT_MODE === "docker";
+  if (!forceDocker && commandExists(command)) return runCommand(command, args, options);
 
   if (!commandExists("docker")) {
     throw new Error(`${command} is not installed and Docker fallback is unavailable.`);
   }
 
   const volumes = options.volumes ?? [];
+  const dockerEnvironment = postgresDockerEnvironment(options.env ?? process.env);
   const dockerArgs = [
     "run",
     "--rm",
     ...volumes.flatMap((volume) => ["-v", `${volume.hostPath}:${volume.containerPath}`]),
-    ...dockerEnvNames(options.env ?? process.env).flatMap((name) => ["-e", name]),
-    "postgres:16",
+    ...dockerEnvNames(dockerEnvironment).flatMap((name) => ["-e", name]),
+    "postgres:16.14@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b",
     command,
     ...args.map((arg) => rewriteDockerPath(arg, volumes)),
   ];
 
-  return runCommand("docker", dockerArgs, options);
+  return runCommand("docker", dockerArgs, { ...options, env: dockerEnvironment });
+}
+
+export function postgresConnectionEnv(connectionString) {
+  const url = new URL(connectionString);
+  if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname) {
+    throw new Error("PostgreSQL connection URL is invalid.");
+  }
+  const database = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+  if (!database) throw new Error("PostgreSQL connection URL must name a database.");
+  return {
+    PGHOST: url.hostname,
+    PGPORT: url.port || "5432",
+    PGUSER: decodeURIComponent(url.username),
+    PGPASSWORD: decodeURIComponent(url.password),
+    PGDATABASE: database,
+  };
+}
+
+export function postgresDockerEnvironment(environment) {
+  if (!["localhost", "127.0.0.1", "::1"].includes(environment.PGHOST)) return environment;
+  return { ...environment, PGHOST: "host.docker.internal" };
 }
 
 export function relativeFromRoot(root, filePath) {

@@ -1,4 +1,5 @@
 import { getDatabasePool, isDatabaseConfigured } from "@/lib/server/database";
+import { canonicalGoogleIssuer, normalizeGoogleIssuer } from "@/lib/server/google-auth";
 import { appendLedgerEvent } from "@/lib/server/ledger-event-store";
 
 export const workspaceTypes = ["personal", "family", "founder", "team"] as const;
@@ -74,15 +75,19 @@ export async function getOrCreateUserByGoogleIdentity(input: {
   const client = await getDatabasePool().connect();
   try {
     await client.query("begin");
-    const identityKey = `google:${input.issuer}:${input.subject}`;
+    const issuer = normalizeGoogleIssuer(input.issuer);
+    const issuerAliases = issuer === canonicalGoogleIssuer ? [canonicalGoogleIssuer, "accounts.google.com"] : [issuer];
+    const identityKey = `google:${issuer}:${input.subject}`;
     await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [identityKey]);
 
-    const existingIdentity = await client.query<WorkspaceUserRow>(
-      `select users.id, users.email, users.display_name
+    const existingIdentity = await client.query<WorkspaceUserRow & { identity_id: string }>(
+      `select users.id, users.email, users.display_name, identity.id as identity_id
        from auth_identities identity
        join users on users.id = identity.user_id
-       where identity.provider = 'google' and identity.issuer = $1 and identity.subject = $2`,
-      [input.issuer, input.subject],
+       where identity.provider = 'google' and identity.issuer = any($1::text[]) and identity.subject = $2
+       order by (identity.issuer = $3) desc
+       limit 1`,
+      [issuerAliases, input.subject, issuer],
     );
     if (existingIdentity.rows[0]) {
       const updated = await client.query<WorkspaceUserRow>(
@@ -93,9 +98,9 @@ export async function getOrCreateUserByGoogleIdentity(input: {
         [existingIdentity.rows[0].id, input.displayName?.trim() ?? ""],
       );
       await client.query(
-        `update auth_identities set email_at_link = $3, updated_at = now()
-         where provider = 'google' and issuer = $1 and subject = $2`,
-        [input.issuer, input.subject, input.email],
+        `update auth_identities set issuer = $2, email_at_link = $3, updated_at = now()
+         where id = $1`,
+        [existingIdentity.rows[0].identity_id, issuer, input.email],
       );
       await client.query("commit");
       return mapWorkspaceUser(updated.rows[0]);
@@ -143,7 +148,7 @@ export async function getOrCreateUserByGoogleIdentity(input: {
     await client.query(
       `insert into auth_identities (provider, issuer, subject, user_id, email_at_link)
        values ('google', $1, $2, $3, $4)`,
-      [input.issuer, input.subject, user.id, input.email],
+      [issuer, input.subject, user.id, input.email],
     );
     await client.query("commit");
     return mapWorkspaceUser(user);
@@ -156,14 +161,58 @@ export async function getOrCreateUserByGoogleIdentity(input: {
 }
 
 export async function getOrCreateDefaultWorkspaceForUser(input: { userId: string; workspaceName?: string }) {
-  const existing = await listWorkspacesForUser(input.userId);
-  if (existing[0]) return existing[0];
+  assertDatabaseReadyForWorkspaces();
+  const client = await getDatabasePool().connect();
+  try {
+    await client.query("begin");
+    const user = await client.query<{ id: string }>(
+      `select id from users where id = $1 and deleted_at is null for update`,
+      [input.userId],
+    );
+    if (!user.rows[0]) throw new Error("Workspace user was not found.");
 
-  return createWorkspaceForUser({
-    userId: input.userId,
-    name: input.workspaceName?.trim() || "Vognary Workspace",
-    plan: "private_beta",
-  });
+    const existing = await client.query<WorkspaceMembershipRow>(
+      `select w.id as workspace_id, w.name as workspace_name, w.plan, w.workspace_type, wm.role
+       from workspace_members wm
+       join workspaces w on w.id = wm.workspace_id
+       where wm.user_id = $1
+       order by w.created_at asc
+       limit 1`,
+      [input.userId],
+    );
+    if (existing.rows[0]) {
+      await client.query("commit");
+      return mapWorkspaceMembership(existing.rows[0]);
+    }
+
+    const name = input.workspaceName?.trim() || "Vognary Workspace";
+    const workspace = await client.query<{ id: string; name: string; plan: string; workspace_type: WorkspaceType }>(
+      `insert into workspaces (owner_user_id, name, plan, workspace_type)
+       values ($1, $2, 'private_beta', 'personal')
+       returning id, name, plan, workspace_type`,
+      [input.userId, name],
+    );
+    const row = workspace.rows[0];
+    if (!row) throw new Error("Default workspace insert did not return a row.");
+    await client.query(
+      `insert into workspace_members (workspace_id, user_id, role)
+       values ($1, $2, 'owner')`,
+      [row.id, input.userId],
+    );
+    await client.query("commit");
+    return {
+      workspaceId: row.id,
+      workspaceName: row.name,
+      plan: row.plan,
+      workspaceType: row.workspace_type,
+      role: "owner" as const,
+    };
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getWorkspaceMembership(userId: string, workspaceId: string) {

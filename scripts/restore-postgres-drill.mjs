@@ -6,6 +6,7 @@ import pg from "pg";
 import {
   decryptFile,
   parseBackupEncryptionKey,
+  postgresConnectionEnv,
   redactDatabaseUrl,
   requireEnv,
   runPostgresCommand,
@@ -31,6 +32,7 @@ if (process.env.DATABASE_URL?.trim() && process.env.DATABASE_URL.trim() === rest
 }
 
 const backupKey = parseBackupEncryptionKey(process.env.BACKUP_ENCRYPTION_KEY);
+const restoreConnectionEnv = postgresConnectionEnv(restoreDatabaseUrl);
 const { manifestPath, encryptedDumpPath, manifest } = await resolveBackupInput(input);
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "vognary-pg-restore-"));
 const plainDumpPath = path.join(tempDir, path.basename(encryptedDumpPath, ".enc"));
@@ -48,6 +50,8 @@ try {
   }
 
   await runPostgresCommand("pg_restore", [
+    "--dbname",
+    restoreConnectionEnv.PGDATABASE,
     "--clean",
     "--if-exists",
     "--no-owner",
@@ -57,7 +61,7 @@ try {
   ], {
     env: {
       ...process.env,
-      PGDATABASE: restoreDatabaseUrl,
+      ...restoreConnectionEnv,
       PGSSLMODE: process.env.RESTORE_POSTGRES_SSL === "true" || process.env.POSTGRES_SSL === "true" ? "require" : process.env.PGSSLMODE,
     },
     volumes: [{ hostPath: tempDir, containerPath: "/backup" }],

@@ -161,7 +161,7 @@ function getMonitoringStatus(monitoringBackend: ReturnType<typeof getMonitoringB
 function getIdentityProviderStatus(magicLink: ReturnType<typeof checkMagicLinkConfiguration>, googleAuth: ReturnType<typeof checkGoogleAuthConfiguration>) {
   if (googleAuth.status === "ready") return "google-ready";
   if (magicLink.status === "ready") return "magic-link-ready";
-  if (process.env.GOOGLE_AUTH_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_AUTH_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET) return `google-missing-${googleAuth.missing.join("-")}`;
+  if (process.env.GOOGLE_AUTH_CLIENT_ID || process.env.GOOGLE_AUTH_CLIENT_SECRET) return `google-missing-${googleAuth.missing.join("-")}`;
   if (process.env.RESEND_API_KEY || process.env.RESEND_FROM_EMAIL) return `magic-link-missing-${magicLink.missing.join("-")}`;
   if (process.env.CLERK_SECRET_KEY) return "clerk-configured-needs-adapter";
   if (process.env.AUTH_PROVIDER) return "provider-configured-needs-adapter";
