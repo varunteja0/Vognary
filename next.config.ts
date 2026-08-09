@@ -19,6 +19,7 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  agentRules: false,
   output: "standalone",
   // pdf.js resolves its worker relative to its own module at runtime. Keep the
   // parser external so standalone output preserves that module boundary, then
