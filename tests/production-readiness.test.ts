@@ -10,6 +10,8 @@ const read = (file: string) => readFileSync(path.join(root, file), "utf8");
 
 const nodeVersion = "22.23.2";
 const npmVersion = "10.9.8";
+const nodeEngine = ">=22.22.2 <23";
+const npmEngine = ">=10.9.7 <11";
 const nodeImage = "node:22.23.2-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32";
 const postgresImage = "postgres:16.14@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b";
 const checkoutAction = "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803";
@@ -88,8 +90,8 @@ test("runtime and PostgreSQL tooling are pinned to one reproducible foundation",
     engines?: { node?: string; npm?: string };
     packageManager?: string;
   };
-  assert.equal(packageJson.engines?.node, nodeVersion);
-  assert.equal(packageJson.engines?.npm, npmVersion);
+  assert.equal(packageJson.engines?.node, nodeEngine);
+  assert.equal(packageJson.engines?.npm, npmEngine);
   assert.equal(packageJson.packageManager, `npm@${npmVersion}`);
   assert.equal(read(".nvmrc").trim(), nodeVersion);
   assert.match(read(".npmrc"), /^engine-strict=true$/m);
