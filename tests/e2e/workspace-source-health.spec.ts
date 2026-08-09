@@ -27,8 +27,11 @@ test("workspace names stale sources and routes to their health chip", async ({ p
   await freshLoaded;
 
   const workspaceNav = page.locator('nav[aria-label="Workspace sections"]:visible');
-  const panel = page.locator("section.dossier", { has: page.getByRole("heading", { name: "Connect evidence. Choose what to watch." }) });
+  const panel = page.locator("section.dossier", {
+    has: page.getByRole("heading", { name: /^(Automatic sources \(optional\)|Connected sources and watches)$/ }),
+  });
   await workspaceNav.getByText("Connect", { exact: true }).click();
+  await revealOptionalRails(page);
   await expect(panel.getByText("Fresh", { exact: true })).toBeVisible();
 
   payload = connectorPayload("stale");
@@ -40,6 +43,7 @@ test("workspace names stale sources and routes to their health chip", async ({ p
   const home = page.locator("#overview");
   await expect(home.getByText(/Evidence source needs attention: Bank & UPI \(Account Aggregator\)/i)).toBeVisible();
   await home.getByRole("button", { name: "Review sources" }).click();
+  await revealOptionalRails(page);
   await expect(panel.getByText("Needs refresh", { exact: true })).toBeVisible();
 
   const accessibility = await new AxeBuilder({ page }).analyze();
@@ -47,6 +51,11 @@ test("workspace names stale sources and routes to their health chip", async ({ p
   await positionForScreenshot(page, panel);
   await page.screenshot({ path: evidencePath(`wp-4.3-source-health-${surface}.png`), fullPage: false, animations: "disabled" });
 });
+
+async function revealOptionalRails(page: Page) {
+  const reveal = page.getByRole("button", { name: "Show email / bank options" });
+  if (await reveal.isVisible().catch(() => false)) await reveal.click();
+}
 
 function connectorPayload(freshnessStatus: "fresh" | "stale") {
   const account = {
