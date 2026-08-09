@@ -127,8 +127,10 @@ test("Vercel production builds apply checksummed migrations before compiling the
 
 test("CI browser journeys exercise the built Next.js production artifact", () => {
   const config = read("playwright.config.ts");
+  const nextConfig = read("next.config.ts");
   const packageJson = JSON.parse(read("package.json")) as { scripts?: Record<string, string> };
   const server = read("scripts/start-standalone.mjs");
+  assert.match(nextConfig, /output: process\.env\.VERCEL \? undefined : "standalone"/);
   assert.match(config, /process\.env\.CI[\s\S]*npm run start/);
   assert.match(config, /npm run dev/);
   assert.equal(packageJson.scripts?.start, "node scripts/start-standalone.mjs");
