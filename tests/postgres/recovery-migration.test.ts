@@ -126,7 +126,7 @@ async function withDisposableDatabase(
     await adminPool.query(`create database ${quoteIdentifier(databaseName)}`);
     await run(databaseConnectionString(databaseUrl, databaseName));
   } finally {
-    await adminPool.query(`drop database if exists ${quoteIdentifier(databaseName)} with (force)`);
+    await adminPool.query(`drop database if exists ${quoteIdentifier(databaseName)}`);
     await adminPool.end();
   }
 }
