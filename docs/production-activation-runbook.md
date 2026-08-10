@@ -419,39 +419,31 @@ Stop conditions:
 - Keep the concierge hidden if any of the three approval gates is absent, the exact authorization text is not stored, an operator can mint verification, same-source coverage is missing, a receipt duplicates, a fee exceeds its authorization cap, or withdrawal/dispute fails.
 - Never use this flow for debt/EMI, insurance, SIP/investment, utility, or another protected class. Those remain guidance-only.
 
-## 6. Identity Provider Or Magic Link
+## 6. Recovery Identity Provider — Google OIDC
 
-The app can now mint real sessions through Resend magic links. Magic links create a short-lived one-time challenge in PostgreSQL, send the user an email, verify the token, create the user/workspace envelope, and set the existing signed session cookie.
+Recovery launch uses the dedicated Google OIDC client only. Configure
+`GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`, and the production callback
+`GOOGLE_AUTH_REDIRECT_URI=https://www.vognary.com/api/auth/google/callback`.
+The Gmail connector OAuth client is separate and is never an auth fallback.
 
-Recommended fastest path: Resend magic links.
+Verify in this order:
 
-Resend click-by-click:
+1. Add the exact production callback URI to the dedicated Google OAuth web client.
+2. Add the three `GOOGLE_AUTH_*` values plus `SESSION_SECRET` and `DATABASE_URL` to the production environment.
+3. Redeploy the exact accepted `main` SHA.
+4. Open `https://www.vognary.com/login` and click the Google save path.
+5. Complete real Google consent and verify `/api/auth/session` reports the intended user and workspace.
+6. Run `npm run production:check -- https://www.vognary.com --strict` and require `Recovery identity provider / Google` to be `READY`.
 
-1. Open `https://resend.com/`.
-2. Click `Add domain`.
-3. Add `vognary.com` or a sending subdomain such as `mail.vognary.com`.
-4. Copy the DNS records Resend shows.
-5. Open your DNS host.
-6. Add the SPF/DKIM/verification records exactly as shown.
-7. Return to Resend and wait until the domain shows verified.
-8. Click `API Keys`.
-9. Click `Create API Key`.
-10. Name it `Vognary production magic links`.
-11. Copy the key once.
-12. Open Vercel Dashboard > Vognary > Settings > Environment Variables.
-13. Add `RESEND_API_KEY` with the copied key.
-14. Add `RESEND_FROM_EMAIL` with a verified sender, for example `Vognary <login@vognary.com>`.
-15. Confirm `DATABASE_URL` and `SESSION_SECRET` are already configured.
-16. Redeploy production.
-17. Visit `https://www.vognary.com/login`.
-18. Enter your email in `Email sign-in link`.
-19. Click `Send sign-in link`.
-20. Open the email and click the link.
-21. Confirm `/api/auth/session` returns `authenticated: true`.
+Magic link is deferred for Recovery v1. Its bearer token is not bound to a
+browser intent/challenge, so the login UI does not expose it and
+`ENABLE_MAGIC_LINK_LOGIN` defaults to `false`. Do not set it for Recovery launch
+or describe a Resend email as Google proof. Re-enable only in a separate reviewed
+work package after browser-intent binding and session-replacement tests exist.
 
 Stop condition:
 
-- Do not market saved workspaces until `npm run production:check -- https://www.vognary.com --strict` reports `Identity provider / magic link` as `READY` and `/api/workspaces` returns workspaces for a signed-in user.
+- Do not market saved Recovery workspaces until real Google OIDC succeeds on the deployed accepted SHA. Development login and magic-link compatibility endpoints do not count.
 
 ## 7. Shared Multi-Instance Rate Limiting
 

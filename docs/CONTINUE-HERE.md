@@ -29,6 +29,24 @@ money first-class before anything else, and the world must work too.**
 
 ## 1. Where things stand (verified 2026-07-21, after Phase 0 cleanup)
 
+- **Recovery v1 launch implementation is locally green (verified 2026-08-10):**
+  branch `recovery/v1` has one canonical signed path under
+  `src/app/workspace/recovery/**` + `src/lib/recovery/**` + Recovery APIs +
+  migration `0023`. Guest evidence survives authentication; Changed provenance,
+  repeatable-read version coherence, decimal-safe bigint money, exact evidence
+  addressing, canonical export/delete, deterministic-only file provenance, PII
+  redaction, resource ceilings, and hot-query indexes are enforced. Evidence:
+  **486/486 unit/source-contract tests**, **39/39 PostgreSQL tests**, **28/28
+  canonical signed browser tests**, and Customer #0 **30/30 desktop + 30/30
+  mobile** with real Recovery APIs, disposable PostgreSQL, and no serious/critical
+  axe violations. Full local CI, build, performance, Lighthouse, smoke, load,
+  dependency audit, fresh/upgrade migration, and encrypted restore drill pass.
+  Remote PR/CI/main ancestry and exact-SHA production deployment remain to prove.
+- **Recovery launch identity is Google OIDC only (2026-08-10):** the bearer
+  magic-link UI is removed from the Recovery login path and server readiness is
+  opt-in disabled unless `ENABLE_MAGIC_LINK_LOGIN=true`. Magic link is deferred
+  until verification is bound to browser intent/challenge; it is not launch
+  proof and production activation now requires `google-ready`.
 - **Working directory:** `/Users/varunteja/Desktop/CVT Group/Vognary` — the space
   in "CVT Group" means paths must always be quoted. This is now the **only**
   worktree; the orphaned `Vognary-gate-trust/` + `Vognary-program/` dirs (dead
@@ -99,7 +117,7 @@ recurring charge → assistant brief → user decides → decision + outcome log
 |---|---|---|
 | **0** | Repo hygiene | **DONE 2026-07-21** |
 | **A** | Market contact: 10 audits, CRM, outreach, report template | **ACTIVE** — `docs/execution/phase-a-market-contact.md` |
-| **B** | Loop shipping: WP-B0…B8 architecture for agents | **ACTIVE** — `docs/execution/phase-b-loop-shipping.md` |
+| **B** | Loop shipping: WP-B0…B8 architecture for agents | **TECHNICAL GATE GREEN** — automated Customer #0 passes; real-human <3 min evidence still pending |
 | **C–F** | Production min → moat → distribution → platform | PENDING / blocked until A–B signal |
 
 ### 2b. Product engineering phases (code loop)
