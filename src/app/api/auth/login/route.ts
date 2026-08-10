@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   if (developmentLogin.status === "disabled") {
     return NextResponse.json({
       status: "disabled",
-      message: "Code login is disabled. Use a verified email link or Google sign-in.",
+      message: "Code login is disabled. Use Google sign-in.",
     }, { status: 404 });
   }
 

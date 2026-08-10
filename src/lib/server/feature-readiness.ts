@@ -25,6 +25,7 @@ export const productionFeatureMigrations = [
   "0020_authorization_evidence",
   "0021_pending_connector_consent",
   "0022_weekly_digest",
+  "0023_recovery_v1",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];
@@ -45,6 +46,12 @@ export function getUnconfiguredFeatureReadiness() {
     syncWorkers: { status: "database-not-configured" as const, migrationId: "0014_sync_run_invocation" as const, successfulCronRuns: null, lastCronEvidenceAt: null },
     proofGraph: { status: "database-not-configured" as const, migrationId: "0018_living_proof_graph" as const, workspacesWithBaseline: null, latestSequence: null },
     verifiedOutcomes: { status: "database-not-configured" as const, migrationId: "0019_verified_outcome_loop" as const, activeCases: null, verifiedReceipts: null, lastVerifiedAt: null },
+    recoveryV1: {
+      status: "database-not-configured" as const,
+      migrationId: "0023_recovery_v1" as const,
+      legacyRows: null,
+      recoveryWorkspaces: null,
+    },
   };
 }
 
@@ -78,12 +85,13 @@ export async function checkFeatureReadiness() {
       syncWorkers: { ...unavailable.syncWorkers, status: "migration-ledger-unavailable" as const },
       proofGraph: { ...unavailable.proofGraph, status: "migration-ledger-unavailable" as const },
       verifiedOutcomes: { ...unavailable.verifiedOutcomes, status: "migration-ledger-unavailable" as const },
+      recoveryV1: { ...unavailable.recoveryV1, status: "migration-ledger-unavailable" as const },
     };
   }
 
   const appliedMigrations = productionFeatureMigrations.filter((id) => applied.has(id));
   const missingMigrations = productionFeatureMigrations.filter((id) => !applied.has(id));
-  const [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes] = await Promise.all([
+  const [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes, recoveryV1] = await Promise.all([
     checkPrivacyLifecycle(applied),
     checkRenewalAlerts(applied),
     checkCommitmentDecisions(applied),
@@ -92,8 +100,9 @@ export async function checkFeatureReadiness() {
     checkSyncWorkers(applied),
     checkProofGraph(applied),
     checkVerifiedOutcomes(applied),
+    checkRecoveryV1(applied),
   ]);
-  const capabilityQueryFailed = [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes]
+  const capabilityQueryFailed = [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes, recoveryV1]
     .some((feature) => feature.status === "schema-query-failed");
 
   return {
@@ -115,7 +124,42 @@ export async function checkFeatureReadiness() {
     syncWorkers,
     proofGraph,
     verifiedOutcomes,
+    recoveryV1,
   };
+}
+
+async function checkRecoveryV1(applied: Set<string>) {
+  const migrationId = "0023_recovery_v1" as const;
+  if (!applied.has(migrationId)) {
+    return { status: "migration-pending" as const, migrationId, legacyRows: null, recoveryWorkspaces: null };
+  }
+  try {
+    const result = await getDatabasePool().query<{
+      legacy_rows: number;
+      recovery_workspaces: number;
+    }>(
+      `select
+         ((select count(*) from workspace_states)
+          + (select count(*) from recurring_items)
+          + (select count(*) from evidence_links)
+          + (select count(*) from commitment_decisions)
+          + (select count(*) from transactions)
+          + (select count(*) from data_sources)
+          + (select count(*) from connector_evidence)
+          + (select count(*) from connected_accounts))::int as legacy_rows,
+         (select count(*)::int from recovery_workspace_states) as recovery_workspaces`,
+    );
+    const legacyRows = result.rows[0]?.legacy_rows ?? 0;
+    const recoveryWorkspaces = result.rows[0]?.recovery_workspaces ?? 0;
+    return {
+      status: legacyRows > 0 ? "legacy-data-migration-required" as const : "schema-ready-clean-cutover" as const,
+      migrationId,
+      legacyRows,
+      recoveryWorkspaces,
+    };
+  } catch {
+    return { status: "schema-query-failed" as const, migrationId, legacyRows: null, recoveryWorkspaces: null };
+  }
 }
 
 async function checkVerifiedOutcomes(applied: Set<string>) {

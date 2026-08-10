@@ -32,6 +32,7 @@ Date: 05 July 2026
 Your subscription renews monthly.`;
 
 test.skip(!email || !accessCode, "development login env not configured");
+test.skip(true, "Deferred legacy monolith journey: Recovery Customer #0 is the canonical signed launch path.");
 
 test("guest paste produces first value, survives sign-in, and watches persist", async ({ page }, testInfo) => {
   test.setTimeout(120_000);

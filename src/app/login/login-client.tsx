@@ -31,7 +31,6 @@ const isDevEnv = process.env.NODE_ENV !== "production";
 
 type LoginClientProps = {
   initialGoogleReason?: string;
-  initialMagicReason?: string;
   initialNextPath?: string;
 };
 
@@ -53,25 +52,22 @@ function safeNextPath(raw: string | null): string {
   return raw;
 }
 
-export default function LoginClient({ initialGoogleReason, initialMagicReason, initialNextPath }: LoginClientProps) {
+export default function LoginClient({ initialGoogleReason, initialNextPath }: LoginClientProps) {
   const [form, setForm] = useState({ name: "", email: "", workspaceName: "", accessCode: "" });
-  const [magicForm, setMagicForm] = useState({ name: "", email: "", workspaceName: "" });
   const [session, setSession] = useState<SessionPayload | null>(null);
   const [status, setStatus] = useState<Banner>(null);
-  const [magicStatus, setMagicStatus] = useState<Banner>(null);
   const [googleStatus, setGoogleStatus] = useState<Banner>(() => initialGoogleReason
     ? { tone: "error", text: getGoogleFailureMessage(initialGoogleReason) }
     : null);
   const [submitting, setSubmitting] = useState(false);
-  const [magicSubmitting, setMagicSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [showCode, setShowCode] = useState(false);
-  const [magicSent, setMagicSent] = useState(false);
-  const [magicLinkHasGuestTransfer, setMagicLinkHasGuestTransfer] = useState(false);
-  const [resendIn, setResendIn] = useState(0);
   const nextPath = safeNextPath(initialNextPath ?? null);
-  const returnToOriginalTab = initialMagicReason === "same-tab-transfer";
-  const [verificationTabHasTransfer, setVerificationTabHasTransfer] = useState(false);
+  const [guestAuditWaiting, setGuestAuditWaiting] = useState(false);
+
+  useEffect(() => {
+    queueMicrotask(() => setGuestAuditWaiting(Boolean(window.sessionStorage.getItem(guestAuditTransferKey))));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,21 +96,10 @@ export default function LoginClient({ initialGoogleReason, initialMagicReason, i
   }, []);
 
   useEffect(() => {
-    if (!session?.authenticated || (returnToOriginalTab && !verificationTabHasTransfer)) return;
+    if (!session?.authenticated) return;
     const timer = setTimeout(() => window.location.assign(nextPath), 500);
     return () => clearTimeout(timer);
-  }, [session, nextPath, returnToOriginalTab, verificationTabHasTransfer]);
-
-  useEffect(() => {
-    if (!returnToOriginalTab) return;
-    queueMicrotask(() => setVerificationTabHasTransfer(Boolean(window.sessionStorage.getItem(guestAuditTransferKey))));
-  }, [returnToOriginalTab]);
-
-  useEffect(() => {
-    if (resendIn <= 0) return;
-    const timer = setTimeout(() => setResendIn((value) => value - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [resendIn]);
+  }, [session, nextPath]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -145,48 +130,6 @@ export default function LoginClient({ initialGoogleReason, initialMagicReason, i
     }
   }
 
-  async function sendMagicLink() {
-    if (!isValidEmail(magicForm.email)) {
-      setMagicStatus({ tone: "error", text: "Enter a valid email address to get a link." });
-      return;
-    }
-    setMagicSubmitting(true);
-    setMagicStatus({ tone: "info", text: "Sending sign-in link…" });
-    const guestTransferPresent = Boolean(window.sessionStorage.getItem(guestAuditTransferKey));
-    setMagicLinkHasGuestTransfer(guestTransferPresent);
-
-    try {
-      const response = await fetch("/api/auth/magic-link/request", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          ...magicForm,
-          redirectPath: guestTransferPresent
-            ? `/login?magic=same-tab-transfer&next=${encodeURIComponent(nextPath)}`
-            : nextPath,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        setMagicStatus({ tone: "error", text: payload.message ?? payload.error ?? "Could not send the sign-in link." });
-        setMagicSubmitting(false);
-        return;
-      }
-      setMagicSent(true);
-      setResendIn(30);
-      setMagicStatus({ tone: "success", text: `Sign-in link sent to ${payload.email ?? magicForm.email}.` });
-      setMagicSubmitting(false);
-    } catch {
-      setMagicStatus({ tone: "error", text: "Could not send the sign-in link. Please try again." });
-      setMagicSubmitting(false);
-    }
-  }
-
-  async function requestMagicLink(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await sendMagicLink();
-  }
-
   async function startGoogleSignIn() {
     setGoogleSubmitting(true);
     setGoogleStatus({ tone: "info", text: "Opening Google sign-in…" });
@@ -214,6 +157,12 @@ export default function LoginClient({ initialGoogleReason, initialMagicReason, i
   }
 
   const loadingSession = session === null;
+  const googleButton = (
+    <button disabled={googleSubmitting} type="button" onClick={startGoogleSignIn} className="btn btn-google btn-block">
+      <GoogleGlyph />
+      {googleSubmitting ? "Opening Google…" : guestAuditWaiting ? "Save this audit with Google" : "Save and sync with Google"}
+    </button>
+  );
 
   return (
     <main id="ledger-main" className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
@@ -240,73 +189,52 @@ export default function LoginClient({ initialGoogleReason, initialMagicReason, i
             <div className="mt-6 rounded-xl border border-line bg-(--card-2) p-4" role="status" aria-live="polite">
               <p className="font-data text-xs uppercase tracking-[0.16em] text-verdict">Signed in</p>
               <p className="mt-2 font-semibold text-(--ink)">{session.session?.email}</p>
-              <p className="mt-1 text-sm leading-6 text-(--muted)">
-                {returnToOriginalTab && !verificationTabHasTransfer
-                  ? "Return to the original Vognary tab. It holds your guest evidence and will detect this sign-in, save the audit, and clear the transfer copy only after encrypted sync succeeds."
-                  : "Taking you to your workspace…"}
-              </p>
+              <p className="mt-1 text-sm leading-6 text-(--muted)">Taking you to your workspace…</p>
               <div className="mt-4 flex flex-wrap gap-2">
-                {returnToOriginalTab && !verificationTabHasTransfer
-                  ? <button type="button" onClick={() => window.close()} className="btn btn-primary">Close this tab</button>
-                  : <Link href={nextPath} className="btn btn-primary">Continue to app</Link>}
+                <Link href={nextPath} className="btn btn-primary">Continue to app</Link>
                 <button type="button" onClick={signOut} className="btn btn-ghost">Sign out</button>
               </div>
             </div>
           ) : (
             <div className="mt-5 grid gap-5">
               <div className="rounded-xl border border-line bg-(--card-2) p-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="pill pill-ready">Recommended</span>
-                  <span className="text-sm font-medium text-(--ink-soft)">Fastest and most secure</span>
-                </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  <Link href="/app" className="btn btn-primary btn-lg">Continue privately</Link>
-                  <Link href="/private-audit" className="btn btn-ghost btn-lg">Request private audit</Link>
-                </div>
-                <button disabled={googleSubmitting} type="button" onClick={startGoogleSignIn} className="btn btn-google btn-block mt-3">
-                  <GoogleGlyph />
-                  {googleSubmitting ? "Opening Google…" : "Save and sync with Google"}
-                </button>
-                <p className="mt-3 text-xs leading-5 text-(--muted)">Browser-only mode lets you see the ledger before trusting Vognary with real evidence. Google creates a workspace when OAuth is configured.</p>
-                <Notice banner={googleStatus} />
+                {guestAuditWaiting ? (
+                  <>
+                    <p className="eyebrow eyebrow-xs">Your audit is waiting</p>
+                    <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
+                      The tab you came from still holds the receipts you pasted. Sign in with Google to save that audit into a workspace you can
+                      reopen later on any device.
+                    </p>
+                    <div className="mt-4">{googleButton}</div>
+                    <Notice banner={googleStatus} />
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <Link href="/app" className="btn btn-ghost btn-lg">Keep working without saving</Link>
+                      <Link href="/private-audit" className="btn btn-ghost btn-lg">Request private audit</Link>
+                    </div>
+                    <p className="mt-3 text-xs leading-5 text-(--muted)">Your pasted evidence stays in the original tab until an encrypted save succeeds.</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="pill pill-ready">Recommended</span>
+                      <span className="text-sm font-medium text-(--ink-soft)">Fastest and most secure</span>
+                    </div>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <Link href="/app" className="btn btn-primary btn-lg">Continue privately</Link>
+                      <Link href="/private-audit" className="btn btn-ghost btn-lg">Request private audit</Link>
+                    </div>
+                    <div className="mt-3">{googleButton}</div>
+                    <p className="mt-3 text-xs leading-5 text-(--muted)">Browser-only mode lets you see the ledger before trusting Vognary with real evidence. Google creates a workspace when OAuth is configured.</p>
+                    <Notice banner={googleStatus} />
+                  </>
+                )}
                 <Link href="/#product-ledger" className="btn btn-ghost btn-block mt-3">See product output</Link>
               </div>
 
-              <details className="rounded-xl border border-line bg-(--card-2) p-4">
+              {isDevEnv ? <details className="rounded-xl border border-line bg-(--card-2) p-4">
                 <summary className="cursor-pointer select-none font-display text-base font-semibold text-(--ink)">Other ways to sign in</summary>
-                <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                  <div className="flex flex-col gap-3">
-                    <h2 className="font-display text-base font-semibold text-(--ink)">Email link</h2>
-                    {magicSent ? (
-                      <div className="rounded-lg border border-line bg-card p-3">
-                        <p className="text-sm leading-6 text-(--ink-soft)">
-                          {magicLinkHasGuestTransfer
-                            ? "Check your inbox and open the link in this same browser. This tab holds your unsaved audit; if your mail app opens another browser or device, return here and open the link here instead."
-                            : "Check your inbox and open the link in this browser to finish signing in. It expires shortly."}
-                        </p>
-                        <button type="button" disabled={resendIn > 0 || magicSubmitting} onClick={sendMagicLink} className="btn btn-ghost btn-sm mt-3 disabled:cursor-not-allowed disabled:opacity-60">
-                          {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend link"}
-                        </button>
-                        <Notice banner={magicStatus} />
-                      </div>
-                    ) : (
-                      <form onSubmit={requestMagicLink} className="flex flex-col gap-3">
-                        <div>
-                          <label htmlFor="magic-name" className="field-label">Name <span className="font-normal text-(--muted)">(optional)</span></label>
-                          <input id="magic-name" autoComplete="name" value={magicForm.name} onChange={(event) => setMagicForm({ ...magicForm, name: event.target.value })} className="field" placeholder="Your name" />
-                        </div>
-                        <div>
-                          <label htmlFor="magic-email" className="field-label">Email</label>
-                          <input id="magic-email" required type="email" autoComplete="email" value={magicForm.email} onChange={(event) => setMagicForm({ ...magicForm, email: event.target.value })} className="field" placeholder="you@example.com" />
-                        </div>
-                        <button disabled={magicSubmitting} type="submit" className="btn btn-ghost btn-block mt-auto disabled:cursor-not-allowed disabled:opacity-60">{magicSubmitting ? "Sending…" : "Send sign-in link"}</button>
-                        <Notice banner={magicStatus} />
-                      </form>
-                    )}
-                  </div>
-
-                  {isDevEnv ? (
-                    <form onSubmit={submit} className="flex flex-col gap-3">
+                <div className="mt-4">
+                  <form onSubmit={submit} className="flex flex-col gap-3">
                       <h2 className="font-display text-base font-semibold text-(--ink)">Development login</h2>
                       <div>
                         <label htmlFor="code-email" className="field-label">Configured developer email</label>
@@ -320,10 +248,9 @@ export default function LoginClient({ initialGoogleReason, initialMagicReason, i
                         </div>
                       </div>
                       <button disabled={submitting} type="submit" className="btn btn-ghost btn-block mt-auto disabled:cursor-not-allowed disabled:opacity-60">{submitting ? "Signing in…" : "Sign in as developer"}</button>
-                    </form>
-                  ) : null}
+                  </form>
                 </div>
-              </details>
+              </details> : null}
 
               <ul className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 {trustPoints.map((point) => (
@@ -397,7 +324,7 @@ function getGoogleFailureMessage(reason: string) {
     "email-not-verified": "Google email is not verified.",
     "missing-email": "Google did not return an email address.",
     "missing-subject": "Google did not return a stable account identity.",
-    "identity-conflict": "This email is already linked to a different Google account. Use the originally linked account or email sign-in.",
+    "identity-conflict": "This email is already linked to a different Google account. Use the originally linked account or contact support.",
     "not-allowed": "Google sign-in is not available for this account.",
   };
   return messages[reason] ?? "Google sign-in failed. Try again.";

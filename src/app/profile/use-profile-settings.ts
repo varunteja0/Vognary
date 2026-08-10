@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { guestAuditTransferBindingKey, guestAuditTransferKey } from "@/lib/guest-audit-transfer";
 import {
   fetchConsentRecords,
   fetchPlatformTokens,
@@ -169,6 +170,8 @@ export function useProfileSettings() {
         return;
       }
       window.localStorage.removeItem(localWorkspaceStorageKey);
+      window.sessionStorage.removeItem(guestAuditTransferKey);
+      window.sessionStorage.removeItem(guestAuditTransferBindingKey);
       const providerFollowUp = Array.isArray(payload.providerRevocations)
         ? payload.providerRevocations
           .filter((outcome: { remoteCredentialMayRemainActive?: boolean }) => outcome.remoteCredentialMayRemainActive)

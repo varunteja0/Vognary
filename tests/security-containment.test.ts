@@ -74,6 +74,30 @@ test("production magic links require and use a canonical HTTPS app origin", () =
   }
 });
 
+test("magic-link login stays deferred unless an explicit non-launch opt-in is set", () => {
+  const names = ["DATABASE_URL", "SESSION_SECRET", "RESEND_API_KEY", "RESEND_FROM_EMAIL", "NEXT_PUBLIC_APP_URL", "ENABLE_MAGIC_LINK_LOGIN"] as const;
+  const previous = new Map(names.map((name) => [name, process.env[name]]));
+  try {
+    process.env.DATABASE_URL = "postgresql://example.invalid/vognary";
+    process.env.SESSION_SECRET = "magic-link-deferred-test-session-secret-0123456789";
+    process.env.RESEND_API_KEY = "resend-test";
+    process.env.RESEND_FROM_EMAIL = "login@vognary.test";
+    process.env.NEXT_PUBLIC_APP_URL = "https://www.vognary.com";
+    delete process.env.ENABLE_MAGIC_LINK_LOGIN;
+    assert.equal(checkMagicLinkConfiguration().status, "not-configured");
+    assert.ok(checkMagicLinkConfiguration().missing.includes("ENABLE_MAGIC_LINK_LOGIN=true (deferred)"));
+
+    process.env.ENABLE_MAGIC_LINK_LOGIN = "true";
+    assert.equal(checkMagicLinkConfiguration().status, "ready");
+  } finally {
+    for (const name of names) {
+      const value = previous.get(name);
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});
+
 test("environment-backed connector previews can never be enabled in production", () => {
   assert.equal(isEnvironmentConnectorPreviewEnabled({ NODE_ENV: "production", ENABLE_ENV_CONNECTOR_PREVIEW: "true" }), false);
   assert.equal(isEnvironmentConnectorPreviewEnabled({ NODE_ENV: "development", ENABLE_ENV_CONNECTOR_PREVIEW: "false" }), false);
@@ -159,6 +183,8 @@ test("logout always expires the browser cookie when no current session exists", 
   assert.match(cookies, /vognary_gmail_oauth_binding=;/);
   assert.match(cookies, /vognary_google_auth_state=;/);
   assert.match(cookies, /vognary_google_auth_next=;/);
+  assert.match(cookies, /vognary_google_auth_nonce=;/);
+  assert.match(cookies, /vognary_google_auth_pkce=;/);
   assert.match(cookies, /Max-Age=0/i);
 });
 

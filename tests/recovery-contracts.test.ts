@@ -67,7 +67,7 @@ const coverageLabels = exhaustive(coverageStates) satisfies Record<CoverageState
 const provenanceLabels = exhaustive(evidenceProvenanceKinds) satisfies Record<EvidenceProvenanceKind, string>;
 const errorLabels = exhaustive(recoveryErrorCodes) satisfies Record<RecoveryErrorCode, string>;
 
-const money = { currency: "INR", minor: 199_900, display: "₹1,999" } as const;
+const money = { currency: "INR", minor: "199900", exponent: 2, display: "₹1,999.00" } as const;
 const confidence = { state: "MEDIUM", score: 72, scale: "PERCENT_0_100", reasons: ["One user-submitted receipt"] } as const;
 const source = {
   id: "source-1",
@@ -169,15 +169,15 @@ const compared = {
     merchant: commitment.merchant,
     kind: "AMOUNT",
     before: money,
-    after: { currency: "INR", minor: 209_900, display: "₹2,099" },
+    after: { currency: "INR", minor: "209900", exponent: 2, display: "₹2,099.00" },
     detectedAt: "2026-08-09T10:05:00.000Z",
-    evidenceIds: ["evidence-2"],
+    provenance: { kind: "EVIDENCE", submissionId: "submission-2", evidenceIds: ["evidence-2"] },
   }],
 } as const satisfies HomeChangedDto;
 
 const correctionPatches = [
   { field: "MERCHANT", value: { merchant: "OpenAI" } },
-  { field: "AMOUNT", value: { amountMinor: 199_900 } },
+  { field: "AMOUNT", value: { amountMinor: "199900" } },
   { field: "NEXT_EXPECTED_DATE", value: { date: "2026-08-06" } },
   { field: "CADENCE", value: { cadence: "MONTHLY" } },
   { field: "IS_RECURRING", value: { isRecurring: false } },
@@ -188,6 +188,7 @@ const correctionHistory = [
     id: "correction-active",
     commitmentId: commitment.id,
     patch: correctionPatches[0],
+    authoritativeAmount: null,
     reason: "Merchant name on the invoice.",
     status: "ACTIVE",
     createdAt: "2026-08-09T10:00:00.000Z",
@@ -198,6 +199,7 @@ const correctionHistory = [
     id: "correction-reversed",
     commitmentId: commitment.id,
     patch: correctionPatches[3],
+    authoritativeAmount: null,
     reason: "The invoice states monthly billing.",
     status: "REVERSED",
     createdAt: "2026-08-09T10:00:00.000Z",
@@ -208,6 +210,7 @@ const correctionHistory = [
     id: "correction-superseded",
     commitmentId: commitment.id,
     patch: correctionPatches[1],
+    authoritativeAmount: money,
     reason: null,
     status: "SUPERSEDED",
     createdAt: "2026-08-09T10:00:00.000Z",
@@ -217,12 +220,12 @@ const correctionHistory = [
 ] as const satisfies readonly CorrectionDto[];
 
 const allChangeVariants = [
-  { id: "added", commitmentId: commitment.id, merchant: "OpenAI", kind: "ADDED", before: null, after: { merchant: "OpenAI", amount: money, date: "2026-08-06", cadence: "MONTHLY" }, detectedAt: "2026-08-09T10:00:00.000Z", evidenceIds: [evidence.id] },
-  { id: "merchant", commitmentId: commitment.id, merchant: "OpenAI", kind: "MERCHANT", before: "Open AI", after: "OpenAI", detectedAt: "2026-08-09T10:00:00.000Z", evidenceIds: [evidence.id] },
-  { id: "amount", commitmentId: commitment.id, merchant: "OpenAI", kind: "AMOUNT", before: money, after: { currency: "INR", minor: 209_900, display: "₹2,099" }, detectedAt: "2026-08-09T10:00:00.000Z", evidenceIds: [evidence.id] },
-  { id: "date", commitmentId: commitment.id, merchant: "OpenAI", kind: "DATE", before: "2026-08-06", after: "2026-08-07", detectedAt: "2026-08-09T10:00:00.000Z", evidenceIds: [evidence.id] },
-  { id: "cadence", commitmentId: commitment.id, merchant: "OpenAI", kind: "CADENCE", before: "MONTHLY", after: "YEARLY", detectedAt: "2026-08-09T10:00:00.000Z", evidenceIds: [evidence.id] },
-  { id: "classification", commitmentId: commitment.id, merchant: "OpenAI", kind: "RECURRING_CLASSIFICATION", before: "ACTIVE", after: "NOT_RECURRING", detectedAt: "2026-08-09T10:00:00.000Z", evidenceIds: [evidence.id] },
+  { id: "added", commitmentId: commitment.id, merchant: "OpenAI", kind: "ADDED", before: null, after: { merchant: "OpenAI", amount: money, date: "2026-08-06", cadence: "MONTHLY" }, detectedAt: "2026-08-09T10:00:00.000Z", provenance: { kind: "EVIDENCE", submissionId: "submission-1", evidenceIds: [evidence.id] } },
+  { id: "merchant", commitmentId: commitment.id, merchant: "OpenAI", kind: "MERCHANT", before: "Open AI", after: "OpenAI", detectedAt: "2026-08-09T10:00:00.000Z", provenance: { kind: "CORRECTION", correctionId: "correction-1", evidenceIds: [] } },
+  { id: "amount", commitmentId: commitment.id, merchant: "OpenAI", kind: "AMOUNT", before: money, after: { currency: "INR", minor: "209900", exponent: 2, display: "₹2,099.00" }, detectedAt: "2026-08-09T10:00:00.000Z", provenance: { kind: "CORRECTION_REVERSAL", correctionId: "correction-1", evidenceIds: [] } },
+  { id: "date", commitmentId: commitment.id, merchant: "OpenAI", kind: "DATE", before: "2026-08-06", after: "2026-08-07", detectedAt: "2026-08-09T10:00:00.000Z", provenance: { kind: "EVIDENCE", submissionId: "submission-1", evidenceIds: [evidence.id] } },
+  { id: "cadence", commitmentId: commitment.id, merchant: "OpenAI", kind: "CADENCE", before: "MONTHLY", after: "YEARLY", detectedAt: "2026-08-09T10:00:00.000Z", provenance: { kind: "EVIDENCE", submissionId: "submission-1", evidenceIds: [evidence.id] } },
+  { id: "classification", commitmentId: commitment.id, merchant: "OpenAI", kind: "RECURRING_CLASSIFICATION", before: "ACTIVE", after: "NOT_RECURRING", detectedAt: "2026-08-09T10:00:00.000Z", provenance: { kind: "EVIDENCE", submissionId: "submission-1", evidenceIds: [evidence.id] } },
 ] as const satisfies readonly ChangeItemDto[];
 
 test("Recovery v1 freezes every product enum exhaustively", () => {
@@ -263,10 +266,12 @@ test("Recovery v1 freezes endpoint methods and paths without database vocabulary
   assert.deepEqual(recoveryEndpoints.logout, { method: "POST", path: "/api/auth/logout" });
   assert.deepEqual(recoveryEndpoints.submitEvidence, { method: "POST", path: "/api/workspaces/current/evidence" });
   assert.deepEqual(recoveryEndpoints.home, { method: "GET", path: "/api/workspaces/current/brief" });
+  assert.deepEqual(recoveryEndpoints.evidence("evidence 1"), { method: "GET", path: "/api/workspaces/current/evidence/evidence%201" });
   assert.deepEqual(recoveryEndpoints.commitments, { method: "GET", path: "/api/workspaces/current/commitments" });
   assert.deepEqual(recoveryEndpoints.commitment("commitment 1"), { method: "GET", path: "/api/workspaces/current/commitments/commitment%201" });
   assert.deepEqual(recoveryEndpoints.createCorrection("commitment 1"), { method: "POST", path: "/api/workspaces/current/commitments/commitment%201/corrections" });
   assert.deepEqual(recoveryEndpoints.reverseCorrection("commitment 1", "correction 1"), { method: "DELETE", path: "/api/workspaces/current/commitments/commitment%201/corrections/correction%201" });
+  assert.deepEqual(recoveryEndpoints.decisions, { method: "GET", path: "/api/workspaces/current/decisions" });
   assert.deepEqual(recoveryEndpoints.decision, { method: "PUT", path: "/api/workspaces/current/decisions" });
 
   const sourceText = readFileSync(new URL("../src/lib/recovery/contracts.ts", import.meta.url), "utf8");
@@ -284,12 +289,13 @@ test("Recovery v1 freezes bounded immutable evidence and typed endpoint payload 
     maxRequestBytes: 12 * 1024 * 1024,
     maxEvidenceExcerptCharacters: 500,
     maxCommitmentEvidencePageSize: 50,
+    maxWorkspaceEvidenceRecords: 20_000,
   });
   assert.equal(evidence.immutable, true);
   assert.equal(evidence.excerpt.length <= recoveryLimits.maxEvidenceExcerptCharacters, true);
   assert.equal(detail.evidence.total, 1);
   assert.equal(detail.evidence.nextCursor, null);
-  assert.deepEqual(Object.keys(recoveryEndpoints).filter((key) => /evidence/i.test(key)), ["submitEvidence"]);
+  assert.deepEqual(Object.keys(recoveryEndpoints).filter((key) => /evidence/i.test(key)), ["submitEvidence", "evidence"]);
 
   const endpointWitness = {
     guestAudit: true,
@@ -299,10 +305,12 @@ test("Recovery v1 freezes bounded immutable evidence and typed endpoint payload 
     logout: true,
     submitEvidence: true,
     home: true,
+    evidence: true,
     commitments: true,
     commitment: true,
     createCorrection: true,
     reverseCorrection: true,
+    decisions: true,
     decision: true,
   } satisfies Record<keyof typeof recoveryEndpoints & keyof RecoveryEndpointContracts, true>;
   assert.deepEqual(Object.keys(endpointWitness), Object.keys(recoveryEndpoints));
@@ -351,11 +359,12 @@ test("first ingestion is an honest baseline and all payloads round-trip as produ
       },
       home,
       commitments: [commitment],
+      commitmentTotal: 1,
     },
     meta: { requestId: "request-1", workspaceVersion: 1 },
   } as const satisfies SubmitEvidenceResponse;
   const homeResponse = { data: home, meta: { requestId: "request-2", workspaceVersion: 1 } } as const satisfies GetHomeResponse;
-  const listResponse = { data: { items: [commitment], nextCursor: null }, meta: { requestId: "request-3", workspaceVersion: 1 } } as const satisfies ListCommitmentsResponse;
+  const listResponse = { data: { items: [commitment], total: 1, nextCursor: null }, meta: { requestId: "request-3", workspaceVersion: 1 } } as const satisfies ListCommitmentsResponse;
   const detailResponse = { data: detail, meta: { requestId: "request-4", workspaceVersion: 1 } } as const satisfies GetCommitmentResponse;
   const decisionRequest = { commitmentId: commitment.id, decision: "MONITOR" } as const satisfies PutDecisionRequest;
   const decisionResponse = {
@@ -372,6 +381,7 @@ test("first ingestion is an honest baseline and all payloads round-trip as produ
         id: "correction-1",
         commitmentId: commitment.id,
         patch: correctionPatches[3],
+        authoritativeAmount: null,
         reason: "The invoice states monthly billing.",
         status: "REVERSED",
         createdAt: "2026-08-09T10:00:00.000Z",

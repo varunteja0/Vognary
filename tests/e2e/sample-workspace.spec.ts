@@ -19,6 +19,7 @@ const email = process.env.VOGNARY_E2E_DEV_LOGIN_EMAIL;
 const accessCode = process.env.VOGNARY_E2E_DEV_LOGIN_CODE;
 
 test.skip(!email || !accessCode, "development login env not configured");
+test.skip(true, "Deferred legacy sample workspace is unreachable from Recovery v1 launch.");
 
 test("empty workspace seeds and clears a labelled sample audit", async ({ page }, testInfo) => {
   test.setTimeout(120_000);

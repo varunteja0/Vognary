@@ -33,3 +33,10 @@ test("masks Aadhaar-style numbers", () => {
   const result = redactText("Aadhaar 1234 5678 9012 on file");
   assert.match(result.text, /AADHAAR-REDACTED/);
 });
+
+test("masks explicitly labelled customer names and postal addresses", () => {
+  const result = redactText("Customer: Alice Example. Billing address: 12 Lake Road Hyderabad 500001. OpenAI invoice INR 1,999.");
+  assert.doesNotMatch(result.text, /Alice Example|12 Lake Road|Hyderabad/i);
+  assert.match(result.text, /NAME-REDACTED/);
+  assert.match(result.text, /ADDRESS-REDACTED/);
+});

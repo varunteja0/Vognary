@@ -3,6 +3,8 @@ import {
   gmailOAuthBindingCookie,
   gmailOAuthStateCookie,
   googleAuthNextCookie,
+  googleAuthNonceCookie,
+  googleAuthPkceCookie,
   googleAuthStateCookie,
   oauthStateCookieOptions,
 } from "@/lib/oauth-state";
@@ -42,7 +44,14 @@ function clearSessionCookie(response: NextResponse) {
 }
 
 function clearOAuthCookies(response: NextResponse) {
-  for (const name of [gmailOAuthStateCookie, gmailOAuthBindingCookie, googleAuthStateCookie, googleAuthNextCookie]) {
+  for (const name of [
+    gmailOAuthStateCookie,
+    gmailOAuthBindingCookie,
+    googleAuthStateCookie,
+    googleAuthNextCookie,
+    googleAuthNonceCookie,
+    googleAuthPkceCookie,
+  ]) {
     response.cookies.set(name, "", { ...oauthStateCookieOptions(), maxAge: 0 });
   }
 }

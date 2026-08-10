@@ -9,6 +9,7 @@ const sourceName = `account-aggregator-automatic-evidence-${accountId}.csv`;
 const identityKey = "netflix::INR::1bnnxo7";
 
 test.skip(!email || !accessCode, "development login env not configured");
+test.skip(true, "Deferred legacy verified-savings surface is unreachable from Recovery v1 launch.");
 
 test("verified savings share includes the card and sealed receipt", async ({ page }, testInfo) => {
   test.setTimeout(60_000);

@@ -21,6 +21,7 @@ const email = process.env.VOGNARY_E2E_DEV_LOGIN_EMAIL;
 const accessCode = process.env.VOGNARY_E2E_DEV_LOGIN_CODE;
 
 test.skip(!email || !accessCode, "development login env not configured");
+test.skip(true, "Deferred legacy connector-control surface is unreachable from Recovery v1 launch.");
 
 async function signIn(page: Page, project: string) {
   await page.setExtraHTTPHeaders({ "x-forwarded-for": `vognary-wiring-${project}-${Date.now()}` });

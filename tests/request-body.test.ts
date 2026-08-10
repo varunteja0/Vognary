@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertContentLength, readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "../src/lib/server/request-body";
+import { assertContentLength, readLimitedBytes, readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "../src/lib/server/request-body";
 
 test("readLimitedJson parses a bounded JSON request", async () => {
   const request = new Request("https://vognary.test/api", {
@@ -30,4 +30,11 @@ test("body limits reject declared and streamed oversized requests", async () => 
     body: JSON.stringify({ value: "x".repeat(100) }),
   });
   await assert.rejects(() => readLimitedJson(streamed, 16), RequestBodyTooLargeError);
+
+  const undeclaredMultipart = new Request("https://vognary.test/api/ingest", {
+    method: "POST",
+    headers: { "content-type": "multipart/form-data; boundary=test" },
+    body: "x".repeat(100),
+  });
+  await assert.rejects(() => readLimitedBytes(undeclaredMultipart, 16), RequestBodyTooLargeError);
 });

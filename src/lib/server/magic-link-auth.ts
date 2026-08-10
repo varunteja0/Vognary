@@ -29,6 +29,7 @@ type ConsumedMagicLinkChallenge = {
 
 export function checkMagicLinkConfiguration(): MagicLinkConfiguration {
   const missing = [
+    process.env.ENABLE_MAGIC_LINK_LOGIN === "true" ? null : "ENABLE_MAGIC_LINK_LOGIN=true (deferred)",
     isDatabaseConfigured() ? null : "DATABASE_URL",
     checkSessionConfiguration().status === "ready" ? null : "SESSION_SECRET",
     process.env.RESEND_API_KEY?.trim() ? null : "RESEND_API_KEY",

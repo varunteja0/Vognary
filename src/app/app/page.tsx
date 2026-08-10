@@ -3,6 +3,7 @@ import { permanentRedirect } from "next/navigation";
 import { getConnectorById } from "@/lib/connectors";
 import { getConnectorHonesty } from "@/lib/connector-runtime";
 import { readCurrentSession } from "@/lib/server/session";
+import { getRecoveryCutoverStatus } from "@/lib/server/recovery-store";
 import ExperienceClient from "./experience-client";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,10 @@ export default async function AppPage({ searchParams }: AppPageProps) {
   }
 
   const session = await readRequestSession();
-  return <ExperienceClient signedIn={Boolean(session)} gmailConnect={readGmailConnectAvailability()} />;
+  const recoveryCutover = session?.workspaceId
+    ? await getRecoveryCutoverStatus({ workspaceId: session.workspaceId, actorUserId: session.userId })
+    : null;
+  return <ExperienceClient signedIn={Boolean(session)} recoveryCutover={recoveryCutover} gmailConnect={readGmailConnectAvailability()} />;
 }
 
 // Honesty state for the guest "Connect Gmail" card, resolved server-side so the

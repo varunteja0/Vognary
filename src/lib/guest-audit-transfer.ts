@@ -1,9 +1,11 @@
 import type { ManualRecurringInput, RecommendationType } from "./recurring-audit";
 import { parseIsoDateOnly } from "./date-only";
+import { recoveryLimits, type EvidenceIngestRequest } from "./recovery/contracts";
 
 const transferFrequencies = new Set(["weekly", "biweekly", "semimonthly", "monthly", "bimonthly", "quarterly", "yearly", "irregular"]);
 
 export const guestAuditTransferKey = "vognary.guest-audit-transfer.v1";
+export const guestAuditTransferBindingKey = "vognary.guest-audit-transfer-binding.v1";
 export const guestAuditTransferTtlMs = 2 * 60 * 60 * 1_000;
 export const guestAuditTransferMaxBytes = 4 * 1024 * 1024;
 
@@ -36,6 +38,44 @@ export type GuestAuditSnapshot = {
   reviewCompletedAt: null;
 };
 
+export type GuestRecoveryEvidenceTransfer = {
+  requests: EvidenceIngestRequest[];
+  unsupportedSourceNames: string[];
+  unsupportedManualItemCount: number;
+};
+
+type GuestAuditTransferBinding = {
+  version: 1;
+  exportedAt: string;
+  userId: string;
+  workspaceId: string;
+};
+
+export type GuestRecoveryEvidenceSubmitResult =
+  | {
+      ok: true;
+      workspaceVersion: number;
+      acceptedEvidenceCount: number;
+      results: readonly { status: "ACCEPTED" | "REJECTED" }[];
+    }
+  | { ok: false };
+
+export type GuestRecoveryEvidencePersistenceResult =
+  | {
+      ok: true;
+      workspaceVersion: number;
+      completedRequests: number;
+      acceptedEvidenceCount: number;
+      unsupportedSourceNames: string[];
+      unsupportedManualItemCount: number;
+    }
+  | {
+      ok: false;
+      reason: "INVALID_TRANSFER" | "NO_SUPPORTED_EVIDENCE" | "SUBMISSION_FAILED" | "PERSISTENCE_UNCONFIRMED";
+      workspaceVersion: number;
+      completedRequests: number;
+    };
+
 export function buildGuestAuditSnapshot(input: {
   receiptText: string;
   statementSources: TransferStatementSource[];
@@ -56,6 +96,30 @@ export function buildGuestAuditSnapshot(input: {
     lastReview: null,
     reviewCompletedAt: null,
   };
+}
+
+export function buildGuestAuditTransferBinding(
+  snapshot: GuestAuditSnapshot,
+  session: { userId: string; workspaceId: string },
+) {
+  return JSON.stringify({
+    version: 1,
+    exportedAt: snapshot.exportedAt,
+    userId: session.userId,
+    workspaceId: session.workspaceId,
+  } satisfies GuestAuditTransferBinding);
+}
+
+export function parseGuestAuditTransferBinding(raw: string | null, snapshot: GuestAuditSnapshot) {
+  if (!raw || raw.length > 1_024) return null;
+  try {
+    const value = JSON.parse(raw) as Partial<GuestAuditTransferBinding>;
+    if (value.version !== 1 || value.exportedAt !== snapshot.exportedAt) return null;
+    if (typeof value.userId !== "string" || !value.userId || typeof value.workspaceId !== "string" || !value.workspaceId) return null;
+    return { userId: value.userId, workspaceId: value.workspaceId };
+  } catch {
+    return null;
+  }
 }
 
 export function parseGuestAuditSnapshot(raw: string | null, now: Date = new Date()): GuestAuditSnapshot | null {
@@ -98,8 +162,111 @@ export function mergeGuestAuditSnapshot(base: GuestAuditSnapshot, guest: GuestAu
   return buildGuestAuditSnapshot({ receiptText, statementSources, manualItems });
 }
 
+/**
+ * Convert same-tab guest state into the existing authenticated Recovery ingest
+ * contract. Manual recurring claims are deliberately not promoted to canonical
+ * truth: the server must receive evidence it can parse and persist.
+ */
+export function buildGuestRecoveryEvidenceTransfer(snapshot: GuestAuditSnapshot): GuestRecoveryEvidenceTransfer | null {
+  const requests: EvidenceIngestRequest[] = [];
+  const receipts = splitSnippets(snapshot.receiptText);
+  const receiptCharacters = receipts.reduce((total, snippet) => total + snippet.length, 0);
+  if (receipts.length > recoveryLimits.maxReceiptSnippets || receiptCharacters > recoveryLimits.maxReceiptCharacters) return null;
+  if (receipts.length) {
+    requests.push({
+      kind: "RECEIPT_PASTE",
+      receipts: receipts.map((text, index) => ({ clientRef: `guest-receipt-${index + 1}`, text })),
+    });
+  }
+
+  const csvSources = snapshot.statementSources.filter(isRecoveryCsvSource);
+  if (csvSources.some((source) => source.text.length > recoveryLimits.maxCsvCharactersPerSource)) return null;
+  for (let index = 0; index < csvSources.length; index += recoveryLimits.maxCsvSources) {
+    requests.push({
+      kind: "CSV_IMPORT",
+      sources: csvSources.slice(index, index + recoveryLimits.maxCsvSources).map((source) => ({
+        clientRef: source.id,
+        name: source.name,
+        text: source.text,
+      })),
+    });
+  }
+
+  return {
+    requests,
+    unsupportedSourceNames: snapshot.statementSources.filter((source) => !isRecoveryCsvSource(source)).map((source) => source.name),
+    unsupportedManualItemCount: snapshot.manualItems.length,
+  };
+}
+
+export async function persistGuestRecoveryEvidenceTransfer(input: {
+  snapshot: GuestAuditSnapshot;
+  initialWorkspaceVersion: number;
+  submit: (
+    request: EvidenceIngestRequest,
+    context: { workspaceVersion: number; idempotencyKey: string },
+  ) => Promise<GuestRecoveryEvidenceSubmitResult>;
+}): Promise<GuestRecoveryEvidencePersistenceResult> {
+  const transfer = buildGuestRecoveryEvidenceTransfer(input.snapshot);
+  if (!transfer) {
+    return {
+      ok: false,
+      reason: "INVALID_TRANSFER",
+      workspaceVersion: input.initialWorkspaceVersion,
+      completedRequests: 0,
+    };
+  }
+  if (!transfer.requests.length) {
+    return {
+      ok: false,
+      reason: "NO_SUPPORTED_EVIDENCE",
+      workspaceVersion: input.initialWorkspaceVersion,
+      completedRequests: 0,
+    };
+  }
+
+  let workspaceVersion = input.initialWorkspaceVersion;
+  let completedRequests = 0;
+  let acceptedEvidenceCount = 0;
+  for (let index = 0; index < transfer.requests.length; index += 1) {
+    const result = await input.submit(transfer.requests[index], {
+      workspaceVersion,
+      idempotencyKey: guestTransferIdempotencyKey(input.snapshot.exportedAt, index),
+    });
+    if (!result.ok) {
+      return { ok: false, reason: "SUBMISSION_FAILED", workspaceVersion, completedRequests };
+    }
+    workspaceVersion = result.workspaceVersion;
+    const fullyPersisted = result.acceptedEvidenceCount > 0
+      && result.results.length > 0
+      && result.results.every((item) => item.status === "ACCEPTED");
+    if (!fullyPersisted) {
+      return { ok: false, reason: "PERSISTENCE_UNCONFIRMED", workspaceVersion, completedRequests };
+    }
+    completedRequests += 1;
+    acceptedEvidenceCount += result.acceptedEvidenceCount;
+  }
+
+  return {
+    ok: true,
+    workspaceVersion,
+    completedRequests,
+    acceptedEvidenceCount,
+    unsupportedSourceNames: transfer.unsupportedSourceNames,
+    unsupportedManualItemCount: transfer.unsupportedManualItemCount,
+  };
+}
+
+function guestTransferIdempotencyKey(exportedAt: string, requestIndex: number) {
+  return `guest-transfer-v1-${exportedAt.replace(/[-:.]/g, "")}-${requestIndex + 1}`;
+}
+
 function splitSnippets(value: string) {
   return value.split(/\n\s*\n/).map((snippet) => snippet.trim()).filter(Boolean);
+}
+
+function isRecoveryCsvSource(source: TransferStatementSource) {
+  return source.kind === "csv" || (source.kind === undefined && source.name.toLowerCase().endsWith(".csv"));
 }
 
 function utf8Length(value: string) {

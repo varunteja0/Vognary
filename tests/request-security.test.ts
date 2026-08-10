@@ -38,7 +38,10 @@ const guardedMutationRoutes: Array<[string, number]> = [
   ["src/app/api/workspaces/current/actions/[caseId]/authorize/route.ts", 1],
   ["src/app/api/workspaces/current/actions/[caseId]/route.ts", 1],
   ["src/app/api/workspaces/current/ask/route.ts", 1],
-  ["src/app/api/workspaces/current/decisions/route.ts", 1],
+  ["src/app/api/workspaces/current/commitments/[commitmentId]/corrections/[correctionId]/route.ts", 1],
+  ["src/app/api/workspaces/current/commitments/[commitmentId]/corrections/route.ts", 1],
+  ["src/app/api/workspaces/current/decisions/route.ts", 2],
+  ["src/app/api/workspaces/current/evidence/route.ts", 1],
   ["src/app/api/workspaces/current/connectors/[accountId]/route.ts", 1],
   ["src/app/api/workspaces/current/connectors/[accountId]/sync/route.ts", 1],
   ["src/app/api/workspaces/route.ts", 1],
@@ -159,19 +162,20 @@ test("all guarded JSON handlers use bounded parsing", () => {
     "src/app/api/platform/tokens/route.ts",
     "src/app/api/renewal-alerts/preferences/route.ts",
     "src/app/api/waitlist/route.ts",
-    "src/app/api/workspaces/current/audit-snapshot/route.ts",
     "src/app/api/workspaces/current/route.ts",
     "src/app/api/workspaces/current/actions/route.ts",
     "src/app/api/workspaces/current/actions/[caseId]/authorize/route.ts",
     "src/app/api/workspaces/current/actions/[caseId]/route.ts",
     "src/app/api/workspaces/current/ask/route.ts",
+    "src/app/api/workspaces/current/commitments/[commitmentId]/corrections/route.ts",
     "src/app/api/workspaces/current/decisions/route.ts",
+    "src/app/api/workspaces/current/evidence/route.ts",
     "src/app/api/workspaces/route.ts",
   ];
 
   for (const route of boundedJsonRoutes) {
     const source = readRoute(route);
-    assert.match(source, /readLimitedJson/, `${route} must bound JSON bytes`);
+    assert.match(source, /read(?:Limited|Recovery)Json/, `${route} must bound JSON bytes`);
     assert.doesNotMatch(source, /request\.json\s*\(/, `${route} must not bypass bounded parsing`);
   }
 });

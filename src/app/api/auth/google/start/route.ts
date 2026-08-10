@@ -1,5 +1,13 @@
+import { createHash, randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { googleAuthNextCookie, googleAuthStateCookie, oauthStateCookieOptions, sanitizeOAuthReturnPath } from "@/lib/oauth-state";
+import {
+  googleAuthNextCookie,
+  googleAuthNonceCookie,
+  googleAuthPkceCookie,
+  googleAuthStateCookie,
+  oauthStateCookieOptions,
+  sanitizeOAuthReturnPath,
+} from "@/lib/oauth-state";
 import { checkGoogleAuthConfiguration, getGoogleAuthClientId, getGoogleAuthOrigin, getGoogleAuthRedirectUri } from "@/lib/server/google-auth";
 
 export const dynamic = "force-dynamic";
@@ -25,13 +33,19 @@ export function GET(request: NextRequest) {
     return NextResponse.json(payload, { status: wantsJson ? 200 : 501 });
   }
 
-  const state = crypto.randomUUID();
+  const state = randomBytes(32).toString("base64url");
+  const nonce = randomBytes(32).toString("base64url");
+  const pkceVerifier = randomBytes(32).toString("base64url");
+  const pkceChallenge = createHash("sha256").update(pkceVerifier).digest("base64url");
   const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   authUrl.searchParams.set("client_id", clientId);
   authUrl.searchParams.set("redirect_uri", redirectUri);
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("scope", googleAuthScope);
   authUrl.searchParams.set("state", state);
+  authUrl.searchParams.set("nonce", nonce);
+  authUrl.searchParams.set("code_challenge", pkceChallenge);
+  authUrl.searchParams.set("code_challenge_method", "S256");
   authUrl.searchParams.set("prompt", "select_account");
 
   if (wantsJson) {
@@ -42,11 +56,15 @@ export function GET(request: NextRequest) {
     });
     response.cookies.set(googleAuthStateCookie, state, oauthStateCookieOptions());
     response.cookies.set(googleAuthNextCookie, nextPath, oauthStateCookieOptions());
+    response.cookies.set(googleAuthNonceCookie, nonce, oauthStateCookieOptions());
+    response.cookies.set(googleAuthPkceCookie, pkceVerifier, oauthStateCookieOptions());
     return response;
   }
 
   const response = NextResponse.redirect(authUrl);
   response.cookies.set(googleAuthStateCookie, state, oauthStateCookieOptions());
   response.cookies.set(googleAuthNextCookie, nextPath, oauthStateCookieOptions());
+  response.cookies.set(googleAuthNonceCookie, nonce, oauthStateCookieOptions());
+  response.cookies.set(googleAuthPkceCookie, pkceVerifier, oauthStateCookieOptions());
   return response;
 }

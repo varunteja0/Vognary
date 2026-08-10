@@ -26,6 +26,8 @@ test("retention predicates preserve manual rows and dead-letter stale verified w
   assert.match(source, /webhookErrorsMinimized/);
   assert.match(source, /workspace_id is null and payload_minimized_at is null/);
   assert.match(source, /where workspace_id is null and occurred_at < \$1/);
+  assert.match(source, /recoveryRawEvidenceMinimized/);
+  assert.match(source, /update recovery_sources item\s+set raw_evidence = '\{\}'::jsonb, raw_minimized_at = now\(\)/);
 });
 
 test("connector upserts cannot repopulate payloads after minimization", () => {
@@ -61,6 +63,16 @@ test("privacy export SQL excludes raw rows, secret material, and arbitrary conne
   );
   assert.match(consentSection, /workspace_id = \$3 or workspace_id is null/);
   assert.match(exportSection, /workspaceId: row\.workspace_id/);
+  assert.match(exportSection, /from recovery_workspace_versions/);
+  assert.match(exportSection, /from recovery_submissions/);
+  assert.match(exportSection, /from recovery_sources/);
+  assert.match(exportSection, /from recovery_commitments/);
+  assert.match(exportSection, /from recovery_evidence/);
+  assert.match(exportSection, /from recovery_corrections/);
+  assert.match(exportSection, /from recovery_decisions/);
+  assert.match(exportSection, /from recovery_changes/);
+  assert.doesNotMatch(exportSection, /select[^;]*raw_evidence/);
+  assert.doesNotMatch(exportSection, /from recovery_idempotency_keys/);
 });
 
 test("privacy migration carries bounded policy, coherent request, and allowlisted run constraints", () => {
@@ -73,6 +85,10 @@ test("privacy migration carries bounded policy, coherent request, and allowliste
   assert.match(migration, /counts - array/);
   assert.match(migration, /webhookErrorsMinimized/);
   assert.match(migration, /connector_evidence_retention_idx/);
+
+  const recoveryMigration = read("infra/postgres/migrations/0023_recovery_v1.sql");
+  assert.match(recoveryMigration, /recoveryRawEvidenceMinimized/);
+  assert.match(recoveryMigration, /recovery_sources_retention_idx/);
 });
 
 test("retention cron executes a fixed bounded enforcement batch", () => {

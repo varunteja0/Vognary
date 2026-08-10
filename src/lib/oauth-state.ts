@@ -2,6 +2,8 @@ export const gmailOAuthStateCookie = "vognary_gmail_oauth_state";
 export const gmailOAuthBindingCookie = "vognary_gmail_oauth_binding";
 export const googleAuthStateCookie = "vognary_google_auth_state";
 export const googleAuthNextCookie = "vognary_google_auth_next";
+export const googleAuthNonceCookie = "vognary_google_auth_nonce";
+export const googleAuthPkceCookie = "vognary_google_auth_pkce";
 
 export function oauthStateCookieOptions() {
   return {

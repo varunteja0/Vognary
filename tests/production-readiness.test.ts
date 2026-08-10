@@ -42,6 +42,7 @@ test("feature readiness checks every persistent capability migration with bounde
     "0020_authorization_evidence",
     "0021_pending_connector_consent",
     "0022_weekly_digest",
+    "0023_recovery_v1",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -82,7 +83,8 @@ test("CI executes the production schema against PostgreSQL before application ch
     commands.indexOf("npm run ci:database") < commands.indexOf("npm run lint"),
     "schema migrations must run before application validation",
   );
-  assert.match(workflowSource, /npm run test:e2e -- control-wiring-inventory/);
+  assert.match(workflowSource, /npm run test:e2e -- recovery-customer-zero recovery-ui-home recovery-ui-states/);
+  assert.doesNotMatch(workflowSource, /signed-in-first-value|verified-savings-share|workspace-source-health|control-wiring-inventory|sample-workspace/);
 });
 
 test("runtime and PostgreSQL tooling are pinned to one reproducible foundation", () => {
@@ -123,6 +125,35 @@ test("runtime and PostgreSQL tooling are pinned to one reproducible foundation",
   assert.match(read("scripts/restore-postgres-drill.mjs"), /"--dbname",[\s\S]*restoreConnectionEnv\.PGDATABASE/);
 });
 
+test("restore drills require Recovery v1 and report restored Recovery state", () => {
+  const backup = read("scripts/backup-postgres.mjs");
+  const restore = read("scripts/restore-postgres-drill.mjs");
+  const recoveryVerification = read("scripts/lib/recovery-backup-verification.mjs");
+  for (const relation of [
+    "recovery_workspace_states",
+    "recovery_workspace_versions",
+    "recovery_submissions",
+    "recovery_sources",
+    "recovery_commitments",
+    "recovery_evidence",
+    "recovery_commitment_evidence",
+    "recovery_corrections",
+    "recovery_decisions",
+    "recovery_changes",
+    "recovery_idempotency_keys",
+  ]) {
+    assert.match(restore, new RegExp(`"${relation}"`));
+  }
+  assert.match(backup, /readRecoveryBackupVerification/);
+  assert.match(recoveryVerification, /requiredRecoveryMigration = "0023_recovery_v1"/);
+  assert.match(recoveryVerification, /from schema_migrations/);
+  assert.match(recoveryVerification, /recoveryWorkspaceCounts/);
+  assert.match(restore, /manifest\.verification\?\.recoveryWorkspaceCounts/);
+  assert.match(restore, /Recovery restore counts do not match the backup manifest/);
+  assert.match(restore, /commitment_evidence/);
+  assert.match(restore, /idempotency_keys/);
+});
+
 test("Vercel production builds apply checksummed migrations before compiling the deployment", () => {
   const config = JSON.parse(read("vercel.json")) as { buildCommand?: string };
   const packageJson = JSON.parse(read("package.json")) as { scripts?: Record<string, string> };
@@ -160,6 +191,7 @@ test("standalone PDF ingestion preserves the dynamically loaded pdf.js worker", 
 test("internal readiness distinguishes schema, observed evidence, and operator attestation", () => {
   const source = read("src/app/api/readiness/route.ts");
   assert.match(source, /capabilities: features/);
+  assert.match(source, /recoveryV1/);
   assert.match(source, /schemaDegraded/);
   assert.match(source, /cron-secret-configured-deployment-schedule-unverified/);
   assert.match(source, /last-run-observed-deployment-schedule-unverified/);
@@ -209,9 +241,15 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.match(source, /sources\.status === 401/);
   assert.match(source, /target activation evidence/);
   assert.match(source, /capabilities\?\.schema\?\.status === "ready"/);
+  assert.match(source, /capabilities\.recoveryV1\?\.status === "schema-ready-clean-cutover"/);
+  assert.match(source, /Feature migrations 0002 through 0023/);
+  assert.match(source, /required\?\.includes\("0023_recovery_v1"\)/);
+  assert.match(source, /applied\?\.includes\("0023_recovery_v1"\)/);
   assert.match(source, /betaReady: endpointReport\.every\(\(item\) => item\.ok\)/);
   assert.match(source, /envReport\.filter\(\(item\) => item\.launchBlocking\)/);
   assert.match(source, /coreConnectorLaunch/);
+  assert.match(source, /return status === "google-ready"/);
+  assert.doesNotMatch(source, /status === "magic-link-ready" \|\| status === "google-ready"/);
   assert.match(source, /launchBlocking: false/);
   assert.match(source, /id: "audit-intake-status"/);
   assert.doesNotMatch(source, /name: "Activation Check"/);
@@ -255,5 +293,5 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.doesNotMatch(source, /\/api\/connectors\/anthropic-usage\/(?:start|sync)["`]/);
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[200, 401, 501\]/);
-  assert.match(activation, /Feature migrations 0002 through 0022/);
+  assert.match(activation, /Feature migrations 0002 through 0023/);
 });

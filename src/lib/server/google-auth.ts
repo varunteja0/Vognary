@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
 import { isDatabaseConfigured } from "@/lib/server/database";
 import { checkSessionConfiguration } from "@/lib/server/session";
@@ -18,14 +19,24 @@ export type GoogleTokenInfo = {
   name?: string;
   picture?: string;
   sub?: string;
+  nonce?: string;
 };
 
-export async function verifyGoogleIdToken(idToken: string, clientId: string, key: JWTVerifyGetKey = googleJwks): Promise<GoogleTokenInfo> {
+export async function verifyGoogleIdToken(
+  idToken: string,
+  clientId: string,
+  key: JWTVerifyGetKey = googleJwks,
+  expectedNonce?: string,
+): Promise<GoogleTokenInfo> {
   const { payload } = await jwtVerify(idToken, key, {
     algorithms: ["RS256"],
     audience: clientId,
     issuer: ["https://accounts.google.com", "accounts.google.com"],
   });
+  const nonce = typeof payload.nonce === "string" ? payload.nonce : undefined;
+  if (expectedNonce !== undefined && !safeEqualOpaque(expectedNonce, nonce ?? "")) {
+    throw new Error("Google ID token nonce does not match the sign-in request.");
+  }
   return {
     aud: typeof payload.aud === "string" ? payload.aud : undefined,
     iss: typeof payload.iss === "string" ? normalizeGoogleIssuer(payload.iss) : undefined,
@@ -34,7 +45,14 @@ export async function verifyGoogleIdToken(idToken: string, clientId: string, key
     name: typeof payload.name === "string" ? payload.name : undefined,
     picture: typeof payload.picture === "string" ? payload.picture : undefined,
     sub: typeof payload.sub === "string" ? payload.sub : undefined,
+    nonce,
   };
+}
+
+function safeEqualOpaque(expected: string, supplied: string) {
+  const expectedBytes = Buffer.from(expected);
+  const suppliedBytes = Buffer.from(supplied);
+  return expectedBytes.length === suppliedBytes.length && timingSafeEqual(expectedBytes, suppliedBytes);
 }
 
 export function normalizeGoogleIssuer(value: string) {

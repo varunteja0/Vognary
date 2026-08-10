@@ -18,6 +18,9 @@ test("profile remains an authenticated route", () => {
 
 test("profile actions preserve their established server contracts", () => {
   assert.match(client, /fetch\("\/api\/profile", \{\s*method: "DELETE"/);
+  assert.match(sections, /id="privacy-export"/);
+  assert.match(sections, /id="delete-account"/);
+  assert.match(client, /sessionStorage\.removeItem\(guestAuditTransferKey\)/);
   assert.match(client, /JSON\.stringify\(\{ confirm: deleteText \}\)/);
   assert.match(client, /localStorage\.removeItem\(localWorkspaceStorageKey\)/);
 

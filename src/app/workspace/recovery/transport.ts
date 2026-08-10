@@ -1,0 +1,213 @@
+import {
+  recoveryEndpoints,
+  recoveryErrorCodes,
+  type ApiFailure,
+  type ApiSuccess,
+  type CommitmentDetailDto,
+  type CommitmentSummaryDto,
+  type CorrectionDto,
+  type CreateCorrectionRequest,
+  type DecisionDto,
+  type EvidenceDto,
+  type EvidenceIngestRequest,
+  type EvidenceSubmissionDto,
+  type GetCommitmentQuery,
+  type HomeProjectionDto,
+  type ListCommitmentsQuery,
+  type LogoutResponse,
+  type PrepareImportResponse,
+  type PutDecisionRequest,
+  type RecoveryError,
+  type RecoveryMutationHeaders,
+  type RecoverySessionResponse,
+  type WorkspaceVersionTag,
+} from "@/lib/recovery/contracts";
+
+// The only place the Recovery frontend talks to the server. It never derives a
+// financial fact: it either returns the server payload verbatim or an honest
+// failure that says the browser could not obtain one.
+
+export type FailureOrigin = "SERVER" | "CLIENT";
+export type ResponseMeta = ApiSuccess<unknown>["meta"];
+
+export type TransportFailure = { ok: false; origin: FailureOrigin; error: RecoveryError };
+export type TransportResult<T> = { ok: true; data: T; meta: ResponseMeta } | TransportFailure;
+export type TransportPayload<T> = { ok: true; data: T } | TransportFailure;
+
+export type MutationContext = { workspaceVersion: number; idempotencyKey: string };
+
+export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
+// A failure raised inside the browser carries this reference instead of a server
+// request id, so the UI can never present a device-side failure as server truth.
+export const clientFailureReference = "client-device";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+function clientFailure(message: string, retryable: boolean): TransportFailure {
+  return { ok: false, origin: "CLIENT", error: { code: "UNKNOWN", message, retryable, requestId: clientFailureReference } };
+}
+
+function serverFailure(error: RecoveryError): TransportFailure {
+  return { ok: false, origin: "SERVER", error };
+}
+
+export function readContractFailure(payload: unknown): RecoveryError | null {
+  if (!isRecord(payload) || !isRecord(payload.error)) return null;
+  const candidate = payload.error;
+  const code = candidate.code;
+  if (typeof code !== "string" || !(recoveryErrorCodes as readonly string[]).includes(code)) return null;
+  if (typeof candidate.message !== "string" || typeof candidate.retryable !== "boolean" || typeof candidate.requestId !== "string") return null;
+  if (code === "STALE_STATE" && typeof candidate.currentVersion !== "number") return null;
+  if (code === "RATE_LIMITED" && typeof candidate.retryAfterSeconds !== "number") return null;
+  return (payload as ApiFailure).error;
+}
+
+function readSuccess<T>(payload: unknown): { data: T; meta: ResponseMeta } | null {
+  if (!isRecord(payload) || !("data" in payload) || !isRecord(payload.meta)) return null;
+  const { requestId, workspaceVersion } = payload.meta;
+  if (typeof requestId !== "string" || typeof workspaceVersion !== "number") return null;
+  return { data: payload.data as T, meta: { requestId, workspaceVersion } };
+}
+
+// Some pre-Recovery routes still answer with a bare `{ error: "…" }`. The message
+// is genuinely the server's, so it is shown, but the code stays UNKNOWN.
+function readLegacyMessage(payload: unknown): string | null {
+  return isRecord(payload) && typeof payload.error === "string" ? payload.error : null;
+}
+
+type RequestJsonResult = { failure: TransportFailure } | { payload: unknown };
+
+async function requestJson(doFetch: FetchLike, path: string, init?: RequestInit): Promise<RequestJsonResult> {
+  let response: Response;
+  try {
+    response = await doFetch(path, { cache: "no-store", ...init });
+  } catch {
+    return { failure: clientFailure("This device could not reach the workspace. Nothing was sent.", true) };
+  }
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    return { failure: clientFailure(`The workspace replied without a readable body (HTTP ${response.status}).`, response.status >= 500) };
+  }
+  const contractFailure = readContractFailure(payload);
+  if (contractFailure) return { failure: serverFailure(contractFailure) };
+  const legacyMessage = readLegacyMessage(payload);
+  if (legacyMessage) return { failure: { ok: false, origin: "SERVER", error: { code: "UNKNOWN", message: legacyMessage, retryable: response.status >= 500, requestId: clientFailureReference } } };
+  if (!response.ok) return { failure: clientFailure(`The workspace refused this request (HTTP ${response.status}) without an explained reason.`, response.status >= 500) };
+  return { payload };
+}
+
+async function call<T>(doFetch: FetchLike, path: string, init?: RequestInit): Promise<TransportResult<T>> {
+  const outcome = await requestJson(doFetch, path, init);
+  if ("failure" in outcome) return outcome.failure;
+  const success = readSuccess<T>(outcome.payload);
+  if (!success) return clientFailure("The workspace replied in a shape this app does not recognise. Nothing is assumed about your money.", false);
+  return { ok: true, data: success.data, meta: success.meta };
+}
+
+async function callUnwrapped<T>(doFetch: FetchLike, path: string, accept: (payload: unknown) => payload is T, init?: RequestInit): Promise<TransportPayload<T>> {
+  const outcome = await requestJson(doFetch, path, init);
+  if ("failure" in outcome) return outcome.failure;
+  if (!accept(outcome.payload)) return clientFailure("The workspace replied in a shape this app does not recognise.", false);
+  return { ok: true, data: outcome.payload };
+}
+
+export function workspaceVersionTag(version: number): WorkspaceVersionTag {
+  return `"workspace:${version}"`;
+}
+
+function mutationHeaders({ workspaceVersion, idempotencyKey }: MutationContext): RecoveryMutationHeaders {
+  return {
+    "Content-Type": "application/json",
+    "Idempotency-Key": idempotencyKey,
+    "If-Match": workspaceVersionTag(workspaceVersion),
+  };
+}
+
+function withQuery(path: string, query: Record<string, string | number | undefined>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined) search.set(key, String(value));
+  }
+  const serialized = search.toString();
+  return serialized ? `${path}?${serialized}` : path;
+}
+
+const isSessionResponse = (payload: unknown): payload is RecoverySessionResponse =>
+  isRecord(payload) && typeof payload.authenticated === "boolean";
+
+const isLogoutResponse = (payload: unknown): payload is LogoutResponse =>
+  isRecord(payload) && (payload.status === "signed-out" || payload.status === "revocation-pending");
+
+const isPrepareImportResponse = (payload: unknown): payload is PrepareImportResponse =>
+  isRecord(payload) && Array.isArray(payload.sources);
+
+export function createRecoveryTransport(fetchImpl?: FetchLike) {
+  const doFetch: FetchLike = fetchImpl ?? ((input, init) => fetch(input, init));
+
+  return {
+    session: () => callUnwrapped(doFetch, recoveryEndpoints.session.path, isSessionResponse),
+
+    logout: () => callUnwrapped(doFetch, recoveryEndpoints.logout.path, isLogoutResponse, { method: recoveryEndpoints.logout.method }),
+
+    home: () => call<HomeProjectionDto>(doFetch, recoveryEndpoints.home.path),
+
+    evidence: (evidenceId: string) =>
+      call<EvidenceDto>(doFetch, recoveryEndpoints.evidence(evidenceId).path),
+
+    commitments: (query: ListCommitmentsQuery = {}) =>
+      call<{ items: readonly CommitmentSummaryDto[]; total: number; nextCursor: string | null }>(
+        doFetch,
+        withQuery(recoveryEndpoints.commitments.path, { limit: query.limit, cursor: query.cursor }),
+      ),
+
+    commitment: (commitmentId: string, query: GetCommitmentQuery = {}) =>
+      call<CommitmentDetailDto>(
+        doFetch,
+        withQuery(recoveryEndpoints.commitment(commitmentId).path, { evidenceLimit: query.evidenceLimit, evidenceCursor: query.evidenceCursor }),
+      ),
+
+    submitEvidence: (request: EvidenceIngestRequest, context: MutationContext) =>
+      call<{ submission: EvidenceSubmissionDto; home: HomeProjectionDto; commitments: readonly CommitmentSummaryDto[]; commitmentTotal: number }>(
+        doFetch,
+        recoveryEndpoints.submitEvidence.path,
+        { method: recoveryEndpoints.submitEvidence.method, headers: mutationHeaders(context), body: JSON.stringify(request) },
+      ),
+
+    putDecision: (request: PutDecisionRequest, context: MutationContext) =>
+      call<{ decision: DecisionDto; commitment: CommitmentSummaryDto; home: HomeProjectionDto }>(
+        doFetch,
+        recoveryEndpoints.decision.path,
+        { method: recoveryEndpoints.decision.method, headers: mutationHeaders(context), body: JSON.stringify(request) },
+      ),
+
+    createCorrection: (commitmentId: string, request: CreateCorrectionRequest, context: MutationContext) =>
+      call<{ correction: CorrectionDto; commitment: CommitmentDetailDto; home: HomeProjectionDto }>(
+        doFetch,
+        recoveryEndpoints.createCorrection(commitmentId).path,
+        { method: recoveryEndpoints.createCorrection(commitmentId).method, headers: mutationHeaders(context), body: JSON.stringify(request) },
+      ),
+
+    reverseCorrection: (commitmentId: string, correctionId: string, context: MutationContext) =>
+      call<{ correction: CorrectionDto; commitment: CommitmentDetailDto; home: HomeProjectionDto }>(
+        doFetch,
+        recoveryEndpoints.reverseCorrection(commitmentId, correctionId).path,
+        { method: recoveryEndpoints.reverseCorrection(commitmentId, correctionId).method, headers: mutationHeaders(context) },
+      ),
+
+    prepareImport: (files: readonly File[]) => {
+      const body = new FormData();
+      body.append("mode", "recovery-v1");
+      for (const file of files) body.append("files", file);
+      return callUnwrapped(doFetch, recoveryEndpoints.prepareImport.path, isPrepareImportResponse, {
+        method: recoveryEndpoints.prepareImport.method,
+        body,
+      });
+    },
+  };
+}
+
+export type RecoveryTransport = ReturnType<typeof createRecoveryTransport>;

@@ -22,10 +22,12 @@ test("extracts merchant, amount, and cadence from receipt snippets", () => {
   assert.ok(openai);
   assert.equal(openai?.amount, 1999);
   assert.equal(openai?.frequency, "monthly");
+  assert.equal(openai?.observedDate, "2026-07-06");
   assert.equal(openai?.nextExpectedDate, "2026-08-06");
 
   const cloudflare = candidates.find((candidate) => /cloudflare/i.test(candidate.merchant));
   assert.ok(cloudflare);
+  assert.equal(cloudflare?.observedDate, null);
   assert.equal(cloudflare?.frequency, "yearly");
   assert.equal(cloudflare?.nextExpectedDate, "2026-09-10");
 });

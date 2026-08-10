@@ -91,6 +91,7 @@ export async function GET(request: Request) {
       renewalAlertEmail: renewalAlertEmail.status === "ready" ? "configured" : `missing-${renewalAlertEmail.missing.join("-")}`,
       commitmentDecisions: features.commitmentDecisions.status,
       platformApi: getPlatformApiStatus(features.platformApi, rateLimitBackend),
+      recoveryV1: features.recoveryV1.status,
       webhookIngestion: process.env.CONNECTOR_WEBHOOK_SECRET ? "configured" : "ready-needs-secret",
     },
   }, { headers: { "cache-control": "no-store" } });

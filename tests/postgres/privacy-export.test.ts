@@ -13,6 +13,7 @@ import { upsertWorkspaceCommitmentDecision } from "../../src/lib/server/commitme
 import { getDatabasePool } from "../../src/lib/server/database";
 import { authorizeWorkspaceActionCase, createWorkspaceActionCase } from "../../src/lib/server/outcome-case-store";
 import { outcomeOffer } from "../../src/lib/outcome-cases";
+import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
 
@@ -132,6 +133,21 @@ test("privacy export includes held product data and excludes all credential mate
       scopes: ["ledger:read"],
       expiresInDays: 30,
     });
+    const rawEvidenceTail = "RAW-EVIDENCE-PRIVATE-TAIL-MUST-NOT-EXPORT";
+    await submitRecoveryEvidence({
+      workspaceId,
+      actorUserId: userId,
+      expectedVersion: 0,
+      idempotencyKey: `privacy-recovery:${randomUUID()}`,
+      request: {
+        kind: "RECEIPT_PASTE",
+        receipts: [{
+          clientRef: "privacy-openai",
+          text: `OpenAI subscription charged INR 1,999 on 6 July 2026. Renews monthly on 6 August 2026. ${"context ".repeat(80)}${rawEvidenceTail}`,
+        }],
+      },
+      now: new Date("2026-08-10T08:00:00.000Z"),
+    });
 
     const request = await createAccessExportRequest({ workspaceId, actorUserId: userId });
     const downloaded = await downloadAccessExport({ requestId: request.id, workspaceId, actorUserId: userId });
@@ -145,6 +161,19 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.workspaceState.revision, 1);
     assert.equal(document.workspaceState.state.reviewCompletedAt, "2026-07-11T01:00:00.000Z");
     assert.equal(document.workspaceState.state.statementSources[0].text.includes("NETFLIX"), true);
+    assert.equal(document.recovery.workspaceState.version, "1");
+    assert.equal(document.recovery.versions.length, 1);
+    assert.equal(document.recovery.submissions.length, 1);
+    assert.equal(document.recovery.sources.length, 1);
+    assert.equal(document.recovery.sources[0].rawEvidenceRetained, true);
+    assert.equal("rawEvidence" in document.recovery.sources[0], false);
+    assert.equal(document.recovery.commitments.length, 1);
+    assert.equal(document.recovery.evidence.length, 1);
+    assert.equal(document.recovery.evidence[0].excerpt.length <= 500, true);
+    assert.equal(document.recovery.evidence[0].excerptTruncated, true);
+    assert.doesNotMatch(JSON.stringify(document.recovery), /contentHash|fingerprint/i);
+    assert.equal(document.recovery.commitmentEvidence.length, 1);
+    assert.equal(document.recovery.decisions.length, 0);
     assert.equal(document.productEvents.length, 1);
     assert.equal(document.renewalAlertPreferences.length, 1);
     assert.equal(document.renewalAlertPreferences[0].weeklyDigestEnabled, true);
@@ -162,6 +191,24 @@ test("privacy export includes held product data and excludes all credential mate
     assert.ok(document.verifiedOutcomes.caseEvents.length >= 2);
     assert.ok(document.auditHistory.length >= 4);
 
+    const recoveryCommitmentId = document.recovery.commitments[0].id as string;
+    await pool.query(
+      `update recovery_commitments
+       set base_amount_minor = 9007199254740993,
+           base_monthly_minor = 9007199254740993,
+           effective_amount_minor = 9007199254740993,
+           effective_monthly_minor = 9007199254740993
+       where workspace_id = $1 and id = $2`,
+      [workspaceId, recoveryCommitmentId],
+    );
+    const exactRequest = await createAccessExportRequest({ workspaceId, actorUserId: userId });
+    const exactDownload = await downloadAccessExport({ requestId: exactRequest.id, workspaceId, actorUserId: userId });
+    assert.equal(exactDownload.status, "ok");
+    if (exactDownload.status === "ok") {
+      const exactDocument = JSON.parse(exactDownload.serialized);
+      assert.equal(exactDocument.recovery.commitments[0].effectiveAmountMinor, "9007199254740993");
+    }
+
     for (const forbidden of [
       platformToken.token,
       "token_hash",
@@ -169,6 +216,7 @@ test("privacy export includes held product data and excludes all credential mate
       "secret_ref",
       "raw_row",
       "payload_hash",
+      rawEvidenceTail,
     ]) {
       assert.equal(downloaded.serialized.includes(forbidden), false, `${forbidden} must not enter the export`);
     }

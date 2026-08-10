@@ -2,8 +2,11 @@ import type { ManualRecurringInput } from "./recurring-audit";
 import { parseLooseCalendarDate } from "./loose-date";
 
 export type ReceiptCandidate = ManualRecurringInput & {
+  amountDecimal: string;
   confidenceScore: number;
   evidenceText: string;
+  /** Date a charge/payment was actually observed; scheduled debit dates stay null. */
+  observedDate: string | null;
 };
 
 const merchantPatterns = [
@@ -20,7 +23,7 @@ const merchantPatterns = [
 
 const mandateLikePattern = /pre-?debit|e-?mandate|\bmandate\b|standing instruction|autopay|auto-?debit/i;
 
-const amountPattern = /(?:₹|Rs\.?|INR|USD|EUR|GBP|CAD|AUD|US\$|CA\$|AU\$|€|£|\$)\s*([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)/i;
+const amountPattern = /(?:₹|Rs\.?|INR|USD|EUR|GBP|CAD|AUD|KWD|JPY|US\$|CA\$|AU\$|€|£|\$)\s*([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{1,3})?|[0-9]+(?:\.[0-9]{1,3})?)/i;
 
 export function extractReceiptCandidates(messages: string[]): ReceiptCandidate[] {
   return messages
@@ -46,6 +49,7 @@ export function receiptTextToManualInputs(text: string, sourceName = "Pasted rec
     id: `receipt-paste-${candidate.id}`,
     merchant: candidate.merchant,
     amount: candidate.amount,
+    amountDecimal: candidate.amountDecimal,
     currency: candidate.currency,
     frequency: candidate.frequency,
     nextExpectedDate: candidate.nextExpectedDate,
@@ -69,8 +73,9 @@ function extractReceiptCandidate(message: string): ReceiptCandidate | null {
   if (!subscriptionLike || !amountMatch || !merchantMatch) return null;
 
   const merchant = (merchantMatch[1] || merchantMatch[0]).replace(/[:\s]+$/g, "").trim();
-  const amount = Number.parseFloat(amountMatch[1].replace(/,/g, ""));
-  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const amountDecimal = normalizeAmountDecimal(amountMatch[1]);
+  const amount = Number(amountDecimal);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > Number.MAX_SAFE_INTEGER) return null;
 
   const baseCategory = inferCategory(merchant);
   // RBI pre-debit notifications are the strongest mandate-freshness signal we
@@ -82,11 +87,13 @@ function extractReceiptCandidate(message: string): ReceiptCandidate | null {
   if (!frequency) return null;
   const nextDate = inferNextDate(normalized, frequency);
   if (!nextDate) return null;
+  const observedDate = inferObservedDate(normalized);
 
   return {
     id: `receipt-${slugify(merchant)}-${stableReceiptFingerprint(normalized)}`,
     merchant,
     amount,
+    amountDecimal,
     currency,
     frequency,
     nextExpectedDate: nextDate,
@@ -94,7 +101,15 @@ function extractReceiptCandidate(message: string): ReceiptCandidate | null {
     sourceName: "gmail receipt preview",
     confidenceScore: mandateLike ? 78 : /renewal|recurring|subscription/i.test(normalized) ? 76 : 62,
     evidenceText: normalized.slice(0, 500),
+    observedDate,
   };
+}
+
+function normalizeAmountDecimal(value: string) {
+  const normalized = value.replace(/,/g, "");
+  const [whole, fraction] = normalized.split(".");
+  const canonicalWhole = BigInt(whole).toString();
+  return fraction === undefined ? canonicalWhole : `${canonicalWhole}.${fraction}`;
 }
 
 function stableReceiptFingerprint(value: string) {
@@ -146,6 +161,14 @@ function inferReceiptFrequency(message: string, mandateLike: boolean): ManualRec
 const receiptDateForms = "\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}|\\d{1,2}[-/]\\d{1,2}[-/]\\d{2,4}|\\d{1,2}(?:st|nd|rd|th)?\\s+[A-Za-z]{3,9}\\.?,?\\s+\\d{4}|[A-Za-z]{3,9}\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4}";
 const explicitNextDatePattern = new RegExp(`(?:renews?\\b|next billing|next charge|due|will be debited|pre-?debit|scheduled (?:for|on)|next debit(?: date)?)[^.\\n]{0,120}?(${receiptDateForms})`, "i");
 const chargeDatePattern = new RegExp(`(?:paid|payment date|charged|billed|debited)[\\s\\S]{0,80}?(${receiptDateForms})`, "i");
+
+function inferObservedDate(message: string) {
+  const chargeDate = message.match(chargeDatePattern);
+  if (!chargeDate || chargeDate.index === undefined) return null;
+  const leadingContext = message.slice(Math.max(0, chargeDate.index - 30), chargeDate.index + 16);
+  if (/will\s+be\s+debited|pre-?debit|scheduled\s+(?:for|on)/i.test(leadingContext)) return null;
+  return parseLooseCalendarDate(chargeDate[1]);
+}
 
 function inferNextDate(message: string, frequency: ManualRecurringInput["frequency"]): string | null {
   const explicitDate = message.match(explicitNextDatePattern);

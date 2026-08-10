@@ -20,6 +20,16 @@ type RedactionRule = {
 // 10-digit mobile number is not half-eaten as an account number.
 const rules: RedactionRule[] = [
   {
+    kind: "name",
+    pattern: /\b(?:customer|account holder|cardholder|customer name|name)\s*[:\-]\s*[A-Z][A-Za-z .'-]{1,80}?(?=\s+(?:billing|shipping|address|invoice|receipt|merchant|amount|payment|charged|renews?|subscription)\b|[.;]|$)/gi,
+    replace: (match) => `${match.slice(0, match.search(/[:\-]/) + 1)} NAME-REDACTED`,
+  },
+  {
+    kind: "address",
+    pattern: /\b(?:(?:billing|shipping|residential|postal)\s+)?address\s*[:\-]\s*.{3,160}?(?=\s+(?:invoice|receipt|merchant|amount|payment|charged|renews?|subscription)\b|[.;]|$)/gi,
+    replace: (match) => `${match.slice(0, match.search(/[:\-]/) + 1)} ADDRESS-REDACTED`,
+  },
+  {
     kind: "card",
     pattern: /\b\d{4}[ -]\d{4}[ -]\d{4}[ -]\d{1,7}\b/g,
     replace: (match) => `CARD-XX${match.replace(/\D/g, "").slice(-4)}`,

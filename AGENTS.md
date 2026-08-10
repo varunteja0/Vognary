@@ -19,12 +19,23 @@ AI must **cite or shut up**. Never invent amounts, merchants, or connector liven
 
 ## 2. Working rules
 
-- Isolated **git worktree** per work package from fresh `main`; PR against `main`; no stacked PRs  
+- Isolated **git worktree** per work package from fresh `main`; PR against `main`; no stacked PRs, except for the founder-authorized Recovery v1 exception below
 - Path with spaces: quote `"/Users/varunteja/Desktop/CVT Group/Vognary"`  
 - Before merge: `lint` · `typecheck` · `claims:check` · `tokens:check` · `test` · then `build` · `perf:budget`  
 - Engine changes: **failing test first**  
 - Prefer `src/app/workspace/*` over growing `vognary-mvp-client.tsx`  
 - Founder-only ops: API keys, Google verification, Razorpay, legal, Setu — agents prepare, never fake READY  
+
+### Recovery v1 same-checkout exception — founder-authorized 2026-08-09
+
+- `recovery/v1` uses the original repository only.
+- Two sibling Copilot chats may edit the same checked-out branch concurrently.
+- They obey the frozen SOL/OPUS ownership map.
+- No child creates a clone, worktree, branch, stash, merge, rebase, checkout, or copied repository.
+- No file has simultaneous writers.
+- SOL is Git owner.
+- OPUS performs no Git-state mutations.
+- This exception ends when Recovery v1 reaches `main`.
 
 ## 3. Hard stops
 
@@ -44,7 +55,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 [ ] Read docs/THE-LAW.md
 [ ] Read docs/CONTINUE-HERE.md
 [ ] State scoreboard row + loop step this task raises
-[ ] List files; open worktree from main
+[ ] List files; open worktree from main unless the Recovery v1 same-checkout exception applies
 [ ] Implement; tests; gate chain
 [ ] Update CONTINUE-HERE / docs/execution/scoreboard.md if phase evidence changed
 ```

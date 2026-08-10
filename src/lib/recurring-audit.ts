@@ -21,6 +21,7 @@ export type ParsedTransaction = {
   date: string;
   description: string;
   amount: number;
+  amountDecimal: string;
   currency: string;
   direction: Direction;
   normalizedMerchant: string;
@@ -30,6 +31,7 @@ export type ParsedTransaction = {
 export type EvidenceLink = {
   date: string;
   amount: number;
+  amountDecimal?: string;
   description: string;
   source: string;
   rowNumber: number;
@@ -111,6 +113,7 @@ export type ManualRecurringInput = {
   canonicalRecurringItemId?: string;
   merchant: string;
   amount: number;
+  amountDecimal?: string;
   currency?: string;
   frequency: Frequency;
   nextExpectedDate: string;
@@ -474,6 +477,7 @@ function buildManualRecurringItem(input: ManualRecurringInput, today: Date): Rec
       {
         date: input.nextExpectedDate,
         amount: input.amount,
+        amountDecimal: input.amountDecimal,
         description: (input.evidenceDescription?.trim() || input.merchant).slice(0, 500),
         source: sourceName,
         rowNumber: 1,
@@ -819,6 +823,7 @@ function parseCsvStatement(input: string, source: string, warnings: string[]): P
       date: formatDate(parsedDate),
       description,
       amount: amount.value,
+      amountDecimal: amount.decimal,
       currency,
       direction: amount.direction,
       normalizedMerchant: normalized.merchant,
@@ -914,23 +919,23 @@ function extractOutflowAmount(
   debitIndex: number,
   creditIndex: number,
   description: string,
-): { value: number; direction: Direction } | null {
+): { value: number; decimal: string; direction: Direction } | null {
   const debitValue = debitIndex >= 0 ? parseMoney(cells[debitIndex] ?? "") : null;
   const creditValue = creditIndex >= 0 ? parseMoney(cells[creditIndex] ?? "") : null;
 
-  if (debitValue && Math.abs(debitValue) > 0) return { value: Math.abs(debitValue), direction: "debit" };
-  if (creditValue && Math.abs(creditValue) > 0) return { value: Math.abs(creditValue), direction: "credit" };
+  if (debitValue && Math.abs(debitValue.value) > 0) return { value: Math.abs(debitValue.value), decimal: debitValue.decimal, direction: "debit" };
+  if (creditValue && Math.abs(creditValue.value) > 0) return { value: Math.abs(creditValue.value), decimal: creditValue.decimal, direction: "credit" };
 
   if (amountIndex >= 0) {
     const rawAmount = cells[amountIndex] ?? "";
     const amount = parseMoney(rawAmount);
-    if (!amount || Math.abs(amount) === 0) return null;
+    if (!amount || Math.abs(amount.value) === 0) return null;
 
     const creditLike = /salary|refund|cashback|interest|dividend|reversal|deposit|credit/i.test(description) || /\bcr\b/i.test(rawAmount);
-    const debitLike = amount < 0 || /\bdr\b|debit|paid|purchase|mandate|autopay|upi/i.test(`${rawAmount} ${description}`);
+    const debitLike = amount.value < 0 || /\bdr\b|debit|paid|purchase|mandate|autopay|upi/i.test(`${rawAmount} ${description}`);
 
-    if (creditLike && !debitLike) return { value: Math.abs(amount), direction: "credit" };
-    return { value: Math.abs(amount), direction: "debit" };
+    if (creditLike && !debitLike) return { value: Math.abs(amount.value), decimal: amount.decimal, direction: "credit" };
+    return { value: Math.abs(amount.value), decimal: amount.decimal, direction: "debit" };
   }
 
   return null;
@@ -1020,6 +1025,7 @@ function buildSingleOccurrenceItem(merchant: string, transaction: ParsedTransact
       {
         date: transaction.date,
         amount: transaction.amount,
+        amountDecimal: transaction.amountDecimal,
         description: transaction.description,
         source: transaction.source,
         rowNumber: transaction.rowNumber,
@@ -1112,6 +1118,7 @@ function buildRecurringItem(merchant: string, group: ParsedTransaction[], today:
     evidence: transactions.map((transaction) => ({
       date: transaction.date,
       amount: transaction.amount,
+      amountDecimal: transaction.amountDecimal,
       description: transaction.description,
       source: transaction.source,
       rowNumber: transaction.rowNumber,
@@ -1387,7 +1394,7 @@ function normalizedAnchorDay(date: Date) {
   return date.getDate() === daysInMonth(date) ? 31 : date.getDate();
 }
 
-function parseMoney(value: string): number | null {
+function parseMoney(value: string): { value: number; decimal: string } | null {
   const raw = value.trim();
   if (!raw) return null;
 
@@ -1396,9 +1403,13 @@ function parseMoney(value: string): number | null {
     .replace(/,/g, "")
     .replace(/[()]/g, "")
     .replace(/[^0-9.-]/g, "");
-  const number = Number.parseFloat(cleaned);
-  if (!Number.isFinite(number)) return null;
-  return negative ? -Math.abs(number) : number;
+  if (!/^-?\d+(?:\.\d+)?$/.test(cleaned)) return null;
+  const unsigned = cleaned.replace(/^-/, "");
+  const [whole, fraction] = unsigned.split(".");
+  const decimal = fraction === undefined ? BigInt(whole).toString() : `${BigInt(whole)}.${fraction}`;
+  const number = Number(decimal);
+  if (!Number.isFinite(number) || number > Number.MAX_SAFE_INTEGER) return null;
+  return { value: negative ? -number : number, decimal };
 }
 
 function parseDate(value: string | Date, preferMonthFirst = false): Date | null {
