@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFParse } from "pdf-parse";
-import { hasReadablePdfTextLayer } from "@/lib/pdf-ingest";
+import { assertPdfTextWithinLimits, hasReadablePdfTextLayer, maxPdfPages } from "@/lib/pdf-ingest";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { redactText } from "@/lib/redaction";
 import { describeStatementFormat, detectStatementFormat } from "@/lib/statement-formats";
 import { convertPdfStatementTextToCsv } from "@/lib/pdf-statement-text";
-import { assertContentLength, assertContentType, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
+import { assertContentType, readLimitedBytes, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 import { convertSpreadsheetToCsv } from "@/lib/server/spreadsheet-ingest";
 import { getAiClient } from "@/lib/server/ai/client";
@@ -38,8 +38,12 @@ export async function POST(request: NextRequest) {
   let formData: FormData;
   try {
     assertContentType(request, "multipart/form-data");
-    assertContentLength(request, maxMultipartBytes);
-    formData = await request.formData();
+    const body = await readLimitedBytes(request, maxMultipartBytes);
+    formData = await new Request(request.url, {
+      method: "POST",
+      headers: request.headers,
+      body: Buffer.from(body),
+    }).formData();
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) {
       return NextResponse.json({ error: "Ingestion request is too large." }, { status: 413 });
@@ -50,6 +54,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Could not read the multipart upload." }, { status: 400 });
   }
   const files = formData.getAll("files").filter((value): value is File => value instanceof File);
+  const ingestMode = formData.get("mode");
 
   if (!files.length) {
     return NextResponse.json({ error: "Attach at least one statement export or PDF file as files." }, { status: 400 });
@@ -109,7 +114,14 @@ export async function POST(request: NextRequest) {
       const parser = new PDFParse({ data: buffer });
       let parsed;
       try {
-        parsed = await parser.getText();
+        parsed = await parser.getText({ first: maxPdfPages });
+        assertPdfTextWithinLimits(parsed);
+      } catch (error) {
+        return NextResponse.json({
+          error: `${file.name} exceeds the bounded PDF parser limits or could not be read safely.`,
+          code: "pdf_resource_limit",
+          message: error instanceof Error ? error.message : "Export this statement as CSV and retry.",
+        }, { status: 422 });
       } finally {
         await parser.destroy();
       }
@@ -129,13 +141,20 @@ export async function POST(request: NextRequest) {
       // document has a readable text layer, optionally ask the AI extractor.
       // Results are confidence-capped via warnings; reconcile fails closed on
       // totals. Without a key or open budget this path is a no-op.
-      if (rowCount === 0) {
+      if (rowCount === 0 && allowsAiPdfAssist(ingestMode)) {
         const aiAssist = await tryAiPdfAssist(parsed.text);
         if (aiAssist) {
           csv = aiAssist.csv;
           rowCount = aiAssist.rowCount;
           warnings.push(...aiAssist.warnings);
         }
+      }
+      if (rowCount === 0 && !allowsAiPdfAssist(ingestMode)) {
+        return NextResponse.json({
+          error: `${file.name} did not contain deterministic statement rows Recovery can persist.`,
+          code: "recovery_deterministic_rows_required",
+          message: "Export CSV/XLSX from the source, or paste a receipt. Recovery v1 never promotes AI-extracted rows into deterministic evidence.",
+        }, { status: 422 });
       }
 
       sources.push({
@@ -157,6 +176,10 @@ export async function POST(request: NextRequest) {
     storage: "none",
     sources,
   });
+}
+
+export function allowsAiPdfAssist(mode: FormDataEntryValue | null) {
+  return mode !== "recovery-v1";
 }
 
 function countRows(text: string): number {

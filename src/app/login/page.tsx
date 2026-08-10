@@ -10,7 +10,6 @@ export const metadata: Metadata = {
 type LoginPageProps = {
   searchParams: Promise<{
     google?: string | string[];
-    magic?: string | string[];
     next?: string | string[];
   }>;
 };
@@ -20,7 +19,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <LoginClient
       initialGoogleReason={firstQueryValue(params.google)}
-      initialMagicReason={firstQueryValue(params.magic)}
       initialNextPath={firstQueryValue(params.next)}
     />
   );

@@ -66,6 +66,7 @@ export const recoveryLimits = {
   maxRequestBytes: 12 * 1024 * 1024,
   maxEvidenceExcerptCharacters: 500,
   maxCommitmentEvidencePageSize: 50,
+  maxWorkspaceEvidenceRecords: 20_000,
 } as const;
 
 export const recoveryErrorStatusByCode = {
@@ -87,7 +88,8 @@ export const recoveryErrorStatusByCode = {
 
 export type MoneyDto = {
   currency: string;
-  minor: number;
+  minor: string;
+  exponent: number;
   display: string;
 };
 
@@ -148,13 +150,14 @@ type CorrectionBaseDto = {
   id: string;
   commitmentId: string;
   patch: CorrectionPatch;
+  authoritativeAmount: MoneyDto | null;
   reason: string | null;
   createdAt: string;
 };
 
 export type CorrectionPatch =
   | { field: "MERCHANT"; value: { merchant: string } }
-  | { field: "AMOUNT"; value: { amountMinor: number } }
+  | { field: "AMOUNT"; value: { amountMinor: string } }
   | { field: "NEXT_EXPECTED_DATE"; value: { date: string } }
   | { field: "CADENCE"; value: { cadence: Cadence } }
   | { field: "IS_RECURRING"; value: { isRecurring: boolean } };
@@ -209,7 +212,10 @@ type ChangeItemBaseDto = {
   commitmentId: string;
   merchant: string;
   detectedAt: string;
-  evidenceIds: NonEmptyIds;
+  provenance:
+    | { kind: "EVIDENCE"; submissionId: string; evidenceIds: NonEmptyIds }
+    | { kind: "CORRECTION"; correctionId: string; evidenceIds: readonly [] }
+    | { kind: "CORRECTION_REVERSAL"; correctionId: string; evidenceIds: readonly [] };
 };
 
 export type ChangeItemDto =
@@ -286,6 +292,20 @@ export type RecoverySessionResponse =
         expiresAt: string;
       };
     };
+
+export type RecoveryCutoverStatus = {
+  status: "CLEAR" | "LEGACY_DATA_REQUIRES_MIGRATION";
+  counts: {
+    workspaceSnapshots: number;
+    recurringItems: number;
+    evidenceLinks: number;
+    decisions: number;
+    transactions: number;
+    dataSources: number;
+    connectorEvidence: number;
+    connectedAccounts: number;
+  };
+};
 
 export type EvidenceIngestRequest =
   | {
@@ -383,16 +403,20 @@ export type SubmitEvidenceResponse = ApiSuccess<{
   submission: EvidenceSubmissionDto;
   home: HomeProjectionDto;
   commitments: readonly CommitmentSummaryDto[];
+  commitmentTotal: number;
 }>;
 
 export type GetHomeResponse = ApiSuccess<HomeProjectionDto>;
 
 export type ListCommitmentsResponse = ApiSuccess<{
   items: readonly CommitmentSummaryDto[];
+  total: number;
   nextCursor: string | null;
 }>;
 
 export type GetCommitmentResponse = ApiSuccess<CommitmentDetailDto>;
+
+export type GetEvidenceResponse = ApiSuccess<EvidenceDto>;
 
 export type CreateCorrectionResponse = ApiSuccess<{
   correction: CorrectionDto;
@@ -406,6 +430,10 @@ export type PutDecisionResponse = ApiSuccess<{
   decision: DecisionDto;
   commitment: CommitmentSummaryDto;
   home: HomeProjectionDto;
+}>;
+
+export type ListDecisionsResponse = ApiSuccess<{
+  decisions: readonly (DecisionDto & { commitmentId: string })[];
 }>;
 
 export type WorkspaceVersionTag = `"workspace:${number}"`;
@@ -424,10 +452,12 @@ export type RecoveryEndpointContracts = {
   logout: { ownership: "RECOVERY_V1"; request: never; response: LogoutResponse | ApiFailure; headers: never };
   submitEvidence: { ownership: "RECOVERY_V1"; request: EvidenceIngestRequest; response: SubmitEvidenceResponse | ApiFailure; headers: RecoveryMutationHeaders };
   home: { ownership: "RECOVERY_V1"; request: never; response: GetHomeResponse | ApiFailure; headers: never };
+  evidence: { ownership: "RECOVERY_V1"; request: never; response: GetEvidenceResponse | ApiFailure; headers: never };
   commitments: { ownership: "RECOVERY_V1"; request: ListCommitmentsQuery; response: ListCommitmentsResponse | ApiFailure; headers: never };
   commitment: { ownership: "RECOVERY_V1"; request: GetCommitmentQuery; response: GetCommitmentResponse | ApiFailure; headers: never };
   createCorrection: { ownership: "RECOVERY_V1"; request: CreateCorrectionRequest; response: CreateCorrectionResponse | ApiFailure; headers: RecoveryMutationHeaders };
   reverseCorrection: { ownership: "RECOVERY_V1"; request: never; response: ReverseCorrectionResponse | ApiFailure; headers: RecoveryMutationHeaders };
+  decisions: { ownership: "RECOVERY_V1"; request: never; response: ListDecisionsResponse | ApiFailure; headers: never };
   decision: { ownership: "RECOVERY_V1"; request: PutDecisionRequest; response: PutDecisionResponse | ApiFailure; headers: RecoveryMutationHeaders };
 };
 
@@ -441,6 +471,10 @@ export const recoveryEndpoints = {
   logout: { method: "POST", path: "/api/auth/logout" },
   submitEvidence: { method: "POST", path: "/api/workspaces/current/evidence" },
   home: { method: "GET", path: "/api/workspaces/current/brief" },
+  evidence: (evidenceId: string) => ({
+    method: "GET" as const,
+    path: `/api/workspaces/current/evidence/${encodePathSegment(evidenceId)}`,
+  }),
   commitments: { method: "GET", path: "/api/workspaces/current/commitments" },
   commitment: (commitmentId: string) => ({
     method: "GET" as const,
@@ -454,5 +488,6 @@ export const recoveryEndpoints = {
     method: "DELETE" as const,
     path: `/api/workspaces/current/commitments/${encodePathSegment(commitmentId)}/corrections/${encodePathSegment(correctionId)}`,
   }),
+  decisions: { method: "GET", path: "/api/workspaces/current/decisions" },
   decision: { method: "PUT", path: "/api/workspaces/current/decisions" },
 } as const;

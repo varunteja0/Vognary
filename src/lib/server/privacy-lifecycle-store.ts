@@ -24,6 +24,7 @@ const exportRowLimits = {
   evidence: 10_000,
   decisions: 5_000,
   recommendations: 5_000,
+  recoveryRecords: 20_000,
   productEvents: 5_000,
   renewalAlertPreferences: 500,
   renewalAlertDeliveries: 10_000,
@@ -45,7 +46,7 @@ const exportRowLimits = {
   successFeeInvoices: 5_000,
   auditHistory: 10_000,
 };
-const maxSerializedExportBytes = 16 * 1024 * 1024;
+const maxSerializedExportBytes = 64 * 1024 * 1024;
 
 const roleRank = { viewer: 1, member: 2, admin: 3, owner: 4 } as const;
 type WorkspaceRole = keyof typeof roleRank;
@@ -397,6 +398,7 @@ async function buildAccessExport(client: PoolClient, input: {
     decisionResult,
     recommendationResult,
     workspaceStateResult,
+    recoveryResult,
     productEventResult,
     renewalPreferenceResult,
     renewalDeliveryResult,
@@ -579,6 +581,99 @@ async function buildAccessExport(client: PoolClient, input: {
        from workspace_states
        where workspace_id = $1`,
       [input.workspaceId],
+    ),
+    query<RecoveryExportRow>(
+      `select
+        (select to_jsonb(record) from (
+             select version::text, baseline_version::text as "baselineVersion",
+                 latest_changed_state as "latestChangedState",
+               latest_from_version::text as "latestFromVersion",
+               latest_changed_version::text as "latestChangedVersion",
+                 created_at as "createdAt", updated_at as "updatedAt"
+          from recovery_workspace_states where workspace_id = $1
+        ) record) as workspace_state,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+             select version::text, actor_user_id as "actorUserId", mutation_kind as "mutationKind",
+               changed_state as "changedState", from_version::text as "fromVersion",
+                 snapshot, created_at as "createdAt"
+          from recovery_workspace_versions where workspace_id = $1
+          order by version asc limit $2
+        ) record) as versions,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, submitted_by_user_id as "submittedByUserId", source_type as "sourceType",
+                 accepted_evidence_count as "acceptedEvidenceCount", results,
+                 ingested_at as "ingestedAt"
+          from recovery_submissions where workspace_id = $1
+          order by ingested_at asc, id asc limit $2
+        ) record) as submissions,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, submission_id as "submissionId", source_type as "sourceType",
+               client_ref as "clientRef", label,
+                 (raw_minimized_at is null) as "rawEvidenceRetained",
+                 raw_minimized_at as "rawMinimizedAt", coverage_start as "coverageStart",
+                 coverage_end as "coverageEnd", ingested_at as "ingestedAt"
+          from recovery_sources where workspace_id = $1
+          order by ingested_at asc, id asc limit $2
+        ) record) as sources,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, identity_key as "identityKey", version,
+                 base_status as "baseStatus", base_merchant as "baseMerchant",
+                 base_category as "baseCategory", base_cadence as "baseCadence",
+                 base_currency as "baseCurrency", base_amount_minor::text as "baseAmountMinor",
+                 base_monthly_minor::text as "baseMonthlyMinor",
+                 base_next_expected_date as "baseNextExpectedDate",
+                 effective_status as "effectiveStatus", effective_merchant as "effectiveMerchant",
+                 effective_cadence as "effectiveCadence", effective_amount_minor::text as "effectiveAmountMinor",
+                 effective_monthly_minor::text as "effectiveMonthlyMinor",
+                 effective_next_expected_date as "effectiveNextExpectedDate",
+                 confidence_score as "confidenceScore", confidence_reasons as "confidenceReasons",
+                 recommended_decision as "recommendedDecision",
+                 recommendation_reason as "recommendationReason", risk_tags as "riskTags",
+                 first_detected_at as "firstDetectedAt", updated_at as "updatedAt"
+          from recovery_commitments where workspace_id = $1
+          order by first_detected_at asc, id asc limit $2
+        ) record) as commitments,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, source_id as "sourceId", immutable,
+                 evidence_kind as "evidenceKind", row_number as "rowNumber",
+                 observed_at as "observedAt", excerpt, excerpt_truncated as "excerptTruncated",
+                 merchant, normalized_merchant as "normalizedMerchant", category,
+                 amount_minor::text as "amountMinor", currency, evidence_date as "evidenceDate",
+                 direction, cadence_hint as "cadenceHint", next_expected_date as "nextExpectedDate",
+                 provenance_kind as "provenanceKind", provenance_reference as "provenanceReference",
+                 confidence_state as "confidenceState", confidence_score as "confidenceScore",
+                 confidence_reasons as "confidenceReasons", created_at as "createdAt"
+          from recovery_evidence where workspace_id = $1
+          order by created_at asc, id asc limit $2
+        ) record) as evidence,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select commitment_id as "commitmentId", evidence_id as "evidenceId", linked_at as "linkedAt"
+          from recovery_commitment_evidence where workspace_id = $1
+          order by linked_at asc, commitment_id asc, evidence_id asc limit $2
+        ) record) as commitment_evidence,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, commitment_id as "commitmentId", created_by_user_id as "createdByUserId",
+                 field, patch, reason, status, created_at as "createdAt",
+                 reversed_at as "reversedAt", superseded_at as "supersededAt"
+          from recovery_corrections where workspace_id = $1
+          order by created_at asc, id asc limit $2
+        ) record) as corrections,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select commitment_id as "commitmentId", decided_by_user_id as "decidedByUserId",
+                 decision, decided_at as "decidedAt", updated_at as "updatedAt"
+          from recovery_decisions where workspace_id = $1
+          order by decided_at asc, commitment_id asc limit $2
+        ) record) as decisions,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+             select id, commitment_id as "commitmentId", from_version::text as "fromVersion",
+               to_version::text as "toVersion", kind, merchant, before_value as "before",
+               after_value as "after", provenance_kind as "provenanceKind",
+               evidence_submission_id as "evidenceSubmissionId", correction_id as "correctionId",
+               evidence_ids as "evidenceIds", detected_at as "detectedAt"
+          from recovery_changes where workspace_id = $1
+          order by to_version asc, detected_at asc, id asc limit $2
+        ) record) as changes`,
+      [input.workspaceId, exportRowLimits.recoveryRecords + 1],
     ),
     query<{
       id: string;
@@ -1053,6 +1148,21 @@ async function buildAccessExport(client: PoolClient, input: {
   assertWithinExportLimit("evidence", evidenceResult.rows.length);
   assertWithinExportLimit("decisions", decisionResult.rows.length);
   assertWithinExportLimit("recommendations", recommendationResult.rows.length);
+  const recovery = recoveryResult.rows[0];
+  if (!recovery) throw new Error("Recovery privacy export query returned no row.");
+  for (const records of [
+    recovery.versions,
+    recovery.submissions,
+    recovery.sources,
+    recovery.commitments,
+    recovery.evidence,
+    recovery.commitment_evidence,
+    recovery.corrections,
+    recovery.decisions,
+    recovery.changes,
+  ]) {
+    assertWithinExportLimit("recoveryRecords", records.length);
+  }
   assertWithinExportLimit("productEvents", productEventResult.rows.length);
   assertWithinExportLimit("renewalAlertPreferences", renewalPreferenceResult.rows.length);
   assertWithinExportLimit("renewalAlertDeliveries", renewalDeliveryResult.rows.length);
@@ -1175,6 +1285,18 @@ async function buildAccessExport(client: PoolClient, input: {
       createdAt: row.created_at.toISOString(),
     })),
     workspaceState: mapWorkspaceState(workspaceStateResult.rows[0], input.workspaceId),
+    recovery: {
+      workspaceState: recovery.workspace_state,
+      versions: recovery.versions,
+      submissions: recovery.submissions,
+      sources: recovery.sources,
+      commitments: recovery.commitments,
+      evidence: recovery.evidence,
+      commitmentEvidence: recovery.commitment_evidence,
+      corrections: recovery.corrections,
+      decisions: recovery.decisions,
+      changes: recovery.changes,
+    },
     productEvents: productEventResult.rows.map((row) => ({
       id: row.id,
       userId: row.user_id,
@@ -1730,6 +1852,19 @@ type AccountWorkspaceRow = {
   workspace_type: string;
   workspace_created_at: Date;
   workspace_updated_at: Date;
+};
+
+type RecoveryExportRow = {
+  workspace_state: Record<string, unknown> | null;
+  versions: Array<Record<string, unknown>>;
+  submissions: Array<Record<string, unknown>>;
+  sources: Array<Record<string, unknown>>;
+  commitments: Array<Record<string, unknown>>;
+  evidence: Array<Record<string, unknown>>;
+  commitment_evidence: Array<Record<string, unknown>>;
+  corrections: Array<Record<string, unknown>>;
+  decisions: Array<Record<string, unknown>>;
+  changes: Array<Record<string, unknown>>;
 };
 
 type ConsentExportRow = {

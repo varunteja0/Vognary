@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 
+import { POST as logout } from "../../src/app/api/auth/logout/route";
+import { GET as getSession } from "../../src/app/api/auth/session/route";
 import { getDatabasePool } from "../../src/lib/server/database";
 import {
   createSessionCookie,
   readCurrentSession,
-  revokeCurrentSession,
 } from "../../src/lib/server/session";
 import { getOrCreateDefaultWorkspaceForUser } from "../../src/lib/server/workspace-store";
 import { getOrCreateUserByGoogleIdentity } from "../../src/lib/server/workspace-store";
@@ -60,12 +61,34 @@ test("logout revokes the current session while a later sign-in mints a valid new
     const firstCookie = await createSessionCookie({ userId, workspaceId });
     const firstRequest = requestWithCookie(firstCookie);
     assert.equal((await readCurrentSession(firstRequest))?.workspaceId, workspaceId);
-    assert.equal(await revokeCurrentSession(firstRequest), true);
+    const restored = await getSession(firstRequest);
+    assert.equal(restored.headers.get("cache-control"), "private, no-store");
+    assert.deepEqual(await restored.json(), {
+      authenticated: true,
+      configuration: { status: "ready", cookieName: "vognary_session" },
+      session: {
+        userId,
+        email: `${userId}@auth-session.test`,
+        workspaceId,
+        expiresAt: new Date((await readCurrentSession(firstRequest))!.expiresAt).toISOString(),
+      },
+    });
+
+    const loggedOut = await logout(new Request("https://vognary.test/api/auth/logout", {
+      method: "POST",
+      headers: { cookie: firstRequest.headers.get("cookie")!, origin: "https://vognary.test" },
+    }));
+    assert.equal(loggedOut.status, 200);
+    assert.equal((await loggedOut.json()).status, "signed-out");
+    assert.match(loggedOut.headers.get("set-cookie") ?? "", /vognary_session=;/);
     assert.equal(await readCurrentSession(firstRequest), null);
+    assert.equal((await getSession(firstRequest)).status, 200);
+    assert.equal((await (await getSession(firstRequest)).json()).authenticated, false);
 
     const secondCookie = await createSessionCookie({ userId, workspaceId });
     const secondRequest = requestWithCookie(secondCookie);
     assert.equal((await readCurrentSession(secondRequest))?.workspaceId, workspaceId);
+    assert.equal((await (await getSession(secondRequest)).json()).authenticated, true);
     assert.equal(await readCurrentSession(firstRequest), null);
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);

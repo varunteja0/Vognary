@@ -2,7 +2,9 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
+import pg from "pg";
 import { backupObjectKey, getBackupStorageConfig, uploadBackupObject } from "./lib/backup-storage.mjs";
+import { readRecoveryBackupVerification } from "./lib/recovery-backup-verification.mjs";
 import {
   encryptFile,
   parseBackupEncryptionKey,
@@ -30,6 +32,21 @@ const tempDir = await mkdtemp(path.join(os.tmpdir(), "vognary-pg-backup-"));
 const plainDumpPath = path.join(tempDir, `${label}.dump`);
 const encryptedDumpPath = path.join(backupDir, `${label}.dump.enc`);
 const manifestPath = path.join(backupDir, `${label}.manifest.json`);
+const { Pool } = pg;
+
+const verificationPool = new Pool({
+  connectionString: databaseUrl,
+  ssl: process.env.POSTGRES_SSL === "true" ? {
+    ca: process.env.POSTGRES_CA_CERT || undefined,
+    rejectUnauthorized: process.env.POSTGRES_SSL_REJECT_UNAUTHORIZED !== "false",
+  } : undefined,
+});
+let verification;
+try {
+  verification = await readRecoveryBackupVerification(verificationPool);
+} finally {
+  await verificationPool.end();
+}
 
 try {
   await runPostgresCommand("pg_dump", [
@@ -95,6 +112,7 @@ try {
         manifest: manifestObjectKey,
       } : undefined,
     },
+    verification,
   };
 
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });

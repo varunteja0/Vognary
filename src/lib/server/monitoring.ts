@@ -1,3 +1,4 @@
+import { redactText } from "@/lib/redaction";
 type MonitoringErrorRequest = {
   path: string;
   method: string;
@@ -272,7 +273,7 @@ export function sanitizeMonitoringValue(value: unknown, depth = 0): unknown {
 }
 
 export function redactMonitoringText(value: string) {
-  return value
+  return redactText(value).text
     .replace(/\b(?:postgres(?:ql)?|redis|https?):\/\/[^\s]+/gi, "[REDACTED_URL]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, "Bearer [REDACTED]")
     .replace(/\b(?:sk|rk|pk|sess|token)[-_][A-Za-z0-9_-]{12,}\b/gi, "[REDACTED_SECRET]")

@@ -11,6 +11,10 @@ import {
   requireEnv,
   runPostgresCommand,
 } from "./lib/postgres-backup-utils.mjs";
+import {
+  readRecoveryBackupVerification,
+  recoveryBackupVerificationMatches,
+} from "./lib/recovery-backup-verification.mjs";
 
 const { Pool } = pg;
 
@@ -68,6 +72,12 @@ try {
   });
 
   const verification = await verifyRestoredSchema(restoreDatabaseUrl);
+  if (!manifest.verification?.recoveryWorkspaceCounts) {
+    throw new Error("Backup manifest is missing Recovery source counts.");
+  }
+  if (!recoveryBackupVerificationMatches(manifest.verification, verification)) {
+    throw new Error("Recovery restore counts do not match the backup manifest.");
+  }
   console.log(JSON.stringify({
     status: "restore-drill-passed",
     manifest: path.relative(root, manifestPath).split(path.sep).join("/"),
@@ -117,6 +127,17 @@ async function verifyRestoredSchema(connectionString) {
       "connector_token_refs",
       "private_audit_leads",
       "connector_evidence",
+      "recovery_workspace_states",
+      "recovery_workspace_versions",
+      "recovery_submissions",
+      "recovery_sources",
+      "recovery_commitments",
+      "recovery_evidence",
+      "recovery_commitment_evidence",
+      "recovery_corrections",
+      "recovery_decisions",
+      "recovery_changes",
+      "recovery_idempotency_keys",
     ];
     const result = await pool.query(
       `select table_name
@@ -129,8 +150,11 @@ async function verifyRestoredSchema(connectionString) {
     const missingTables = requiredTables.filter((tableName) => !restoredTables.has(tableName));
     if (missingTables.length) throw new Error(`Restore drill missing core tables: ${missingTables.join(", ")}`);
 
+    const recoveryVerification = await readRecoveryBackupVerification(pool);
+
     return {
       coreTablesPresent: requiredTables,
+      ...recoveryVerification,
     };
   } finally {
     await pool.end();

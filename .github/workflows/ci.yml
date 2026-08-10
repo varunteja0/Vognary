@@ -81,20 +81,13 @@ jobs:
           VOGNARY_E2E_DEV_LOGIN_CODE: ci-dev-login-code
           PLAYWRIGHT_EXTERNAL_SERVER: "1"
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3005
-        # The four specs share one development-login user. Three of them need a
-        # workspace that already holds data (signed-in-first-value seeds it for
-        # the two that follow), while sample-workspace asserts the empty state —
-        # so the groups run against separate fresh databases.
+        # Recovery v1 is the canonical signed launch path. Customer #0 performs
+        # the real database-backed desktop/mobile lifecycle; the two UI suites
+        # retain focused presentation/state coverage around that core proof.
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
           npm run db:apply-schema
-          npm run test:e2e -- signed-in-first-value verified-savings-share workspace-source-health
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
-          npm run db:apply-schema
-          npm run test:e2e -- control-wiring-inventory
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
-          npm run db:apply-schema
-          npm run test:e2e -- sample-workspace
+          npm run test:e2e -- recovery-customer-zero recovery-ui-home recovery-ui-states
       - name: Stop dev server
         if: always()
         run: |

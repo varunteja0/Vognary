@@ -168,11 +168,11 @@ test("workspace primary totals use and name the audit primary currency", () => {
   assert.match(client, /Yearly · \$\{audit\.summary\.primaryCurrency\}/);
 });
 
-test("magic-link save guidance keeps guest evidence in the same browser", () => {
+test("Recovery save guidance uses Google and keeps magic link deferred", () => {
   const client = source("src/app/login/login-client.tsx");
-  assert.match(client, /guestTransferPresent = Boolean\(window\.sessionStorage\.getItem\(guestAuditTransferKey\)\)/);
-  assert.match(client, /open the link in this same browser/);
-  assert.match(client, /return here and open the link here instead/);
+  assert.match(client, /Save this audit with Google/);
+  assert.doesNotMatch(client, /\/api\/auth\/magic-link\/request|Send sign-in link|Email link/);
+  assert.match(source("src/lib/server/magic-link-auth.ts"), /ENABLE_MAGIC_LINK_LOGIN === "true"/);
 });
 
 test("public checkout status exposes settlement state without payment credentials or identity", () => {

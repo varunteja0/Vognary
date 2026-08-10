@@ -1,22 +1,23 @@
-import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
-import { listWorkspaceRecurringItems } from "@/lib/server/connected-account-store";
-import { isDatabaseConfigured } from "@/lib/server/database";
-import { requireSession, requireWorkspaceRole } from "@/lib/server/workspace-auth";
+import { recoverySuccessResponse } from "@/lib/server/recovery-api";
+import { readRecoveryPageSize, runRecoveryRoute } from "@/lib/server/recovery-route";
+import { listRecoveryCommitments } from "@/lib/server/recovery-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const limit = await rateLimit(request, { namespace: "workspace-commitments-read", limit: 60, windowMs: 60_000 });
-  if (!limit.allowed) return rateLimitExceeded(limit);
-  const session = await requireSession(request);
-  if (session instanceof Response) return session;
-  if (!session.workspaceId) return Response.json({ error: "Session has no workspace." }, { status: 400 });
-  if (!isDatabaseConfigured()) return Response.json({ status: "not-configured" }, { status: 501 });
-  const authorization = await requireWorkspaceRole(request, session.workspaceId, "viewer");
-  if (authorization instanceof Response) return authorization;
-  return Response.json({
-    status: "ok",
-    commitments: await listWorkspaceRecurringItems(session.workspaceId, 500, false, null, true),
-  }, { headers: { "cache-control": "private, no-store" } });
+  return runRecoveryRoute(request, {
+    namespace: "recovery-commitments-read",
+    limit: 60,
+    windowMs: 60_000,
+  }, async ({ requestId, session }) => {
+    const url = new URL(request.url);
+    const result = await listRecoveryCommitments({
+      workspaceId: session.workspaceId,
+      actorUserId: session.userId,
+      limit: readRecoveryPageSize(url.searchParams.get("limit"), "limit", 50),
+      cursor: url.searchParams.get("cursor") || undefined,
+    });
+    return recoverySuccessResponse({ items: result.items, nextCursor: result.nextCursor }, requestId, result.workspaceVersion);
+  });
 }

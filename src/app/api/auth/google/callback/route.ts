@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { googleAuthNextCookie, googleAuthStateCookie, oauthStateCookieOptions, sanitizeOAuthReturnPath } from "@/lib/oauth-state";
+import { timingSafeEqual } from "node:crypto";
+import {
+  googleAuthNextCookie,
+  googleAuthNonceCookie,
+  googleAuthPkceCookie,
+  googleAuthStateCookie,
+  oauthStateCookieOptions,
+  sanitizeOAuthReturnPath,
+} from "@/lib/oauth-state";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import {
   checkGoogleAuthConfiguration,
@@ -33,31 +41,41 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code")?.trim() ?? "";
   const state = request.nextUrl.searchParams.get("state")?.trim() ?? "";
   const expectedState = request.cookies.get(googleAuthStateCookie)?.value;
+  const expectedNonce = request.cookies.get(googleAuthNonceCookie)?.value;
+  const pkceVerifier = request.cookies.get(googleAuthPkceCookie)?.value;
   if (!code) return redirectToLogin(request, "missing-code");
-  if (!state || !expectedState || state !== expectedState) return redirectToLogin(request, "invalid-state");
+  if (!state || !expectedState || !safeEqualOpaque(expectedState, state)) return redirectToLogin(request, "invalid-state");
+  if (!expectedNonce) return redirectToLogin(request, "missing-nonce");
+  if (!pkceVerifier || !/^[A-Za-z0-9_-]{43,128}$/.test(pkceVerifier)) return redirectToLogin(request, "invalid-pkce");
 
   const origin = getGoogleAuthOrigin(request.nextUrl.origin);
   const clientId = getGoogleAuthClientId();
   const clientSecret = getGoogleAuthClientSecret();
   const redirectUri = getGoogleAuthRedirectUri(origin);
 
-  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    }),
-  });
+  let tokenResponse: Response;
+  try {
+    tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+        code_verifier: pkceVerifier,
+      }),
+    });
+  } catch {
+    return redirectToLogin(request, "token-exchange-failed");
+  }
 
   if (!tokenResponse.ok) return redirectToLogin(request, "token-exchange-failed");
-  const tokenPayload = await tokenResponse.json() as { id_token?: string };
+  const tokenPayload = await tokenResponse.json().catch(() => ({})) as { id_token?: string };
   if (!tokenPayload.id_token) return redirectToLogin(request, "missing-id-token");
 
-  const tokenInfo = await verifyGoogleIdToken(tokenPayload.id_token, clientId).catch(() => null);
+  const tokenInfo = await verifyGoogleIdToken(tokenPayload.id_token, clientId, undefined, expectedNonce).catch(() => null);
   if (!tokenInfo) return redirectToLogin(request, "token-validation-failed");
 
   if (tokenInfo.aud !== clientId) return redirectToLogin(request, "audience-mismatch");
@@ -98,5 +116,13 @@ function redirectToLogin(request: NextRequest, reason: string) {
 function clearGoogleState(response: NextResponse) {
   response.cookies.set(googleAuthStateCookie, "", { ...oauthStateCookieOptions(), maxAge: 0 });
   response.cookies.set(googleAuthNextCookie, "", { ...oauthStateCookieOptions(), maxAge: 0 });
+  response.cookies.set(googleAuthNonceCookie, "", { ...oauthStateCookieOptions(), maxAge: 0 });
+  response.cookies.set(googleAuthPkceCookie, "", { ...oauthStateCookieOptions(), maxAge: 0 });
   return response;
+}
+
+function safeEqualOpaque(expected: string, supplied: string) {
+  const expectedBytes = Buffer.from(expected);
+  const suppliedBytes = Buffer.from(supplied);
+  return expectedBytes.length === suppliedBytes.length && timingSafeEqual(expectedBytes, suppliedBytes);
 }

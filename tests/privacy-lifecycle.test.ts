@@ -129,6 +129,18 @@ test("privacy export builder emits an allowlisted metadata-only document", () =>
     decisions: [],
     recommendations: [],
     workspaceState: null,
+    recovery: {
+      workspaceState: null,
+      versions: [],
+      submissions: [],
+      sources: [],
+      commitments: [],
+      evidence: [],
+      commitmentEvidence: [],
+      corrections: [],
+      decisions: [],
+      changes: [],
+    },
     productEvents: [],
     renewalAlertPreferences: [],
     renewalAlertDeliveries: [],
@@ -152,6 +164,7 @@ test("privacy export builder emits an allowlisted metadata-only document", () =>
 
   assert.equal(document.exportVersion, 2);
   assert.equal(document.generatedAt, "2026-07-11T00:00:00.000Z");
+  assert.deepEqual(document.recovery.commitments, []);
   assert.ok(document.exclusions.some((entry) => entry.includes("Connector secrets")));
   assert.equal(assertPrivacyExportIsMetadataOnly(document), document);
 });

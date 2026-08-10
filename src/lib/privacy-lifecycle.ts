@@ -79,6 +79,18 @@ export type PrivacyExportDocument = {
     updatedAt: string;
     state: unknown;
   } | null;
+  recovery: {
+    workspaceState: Record<string, unknown> | null;
+    versions: Array<Record<string, unknown>>;
+    submissions: Array<Record<string, unknown>>;
+    sources: Array<Record<string, unknown>>;
+    commitments: Array<Record<string, unknown>>;
+    evidence: Array<Record<string, unknown>>;
+    commitmentEvidence: Array<Record<string, unknown>>;
+    corrections: Array<Record<string, unknown>>;
+    decisions: Array<Record<string, unknown>>;
+    changes: Array<Record<string, unknown>>;
+  };
   productEvents: Array<Record<string, unknown>>;
   renewalAlertPreferences: Array<Record<string, unknown>>;
   renewalAlertDeliveries: Array<Record<string, unknown>>;
@@ -184,6 +196,8 @@ const forbiddenExportKeys = new Set([
   "encryptedpayload",
   "payload",
   "payloadhash",
+  "contenthash",
+  "fingerprint",
   "rawpayload",
   "rawrow",
   "storagekey",
@@ -277,6 +291,7 @@ export function buildPrivacyExportDocument(input: Omit<PrivacyExportDocument, "e
       "Authentication sessions and token hashes",
       "Connector secrets and encrypted token material",
       "Raw connector and webhook payload bodies",
+      "Raw Recovery evidence bodies, idempotency keys, and replay payloads",
       "Internal payload hashes, storage keys, and monitoring delivery details",
       "Data belonging only to other workspaces or users",
     ],

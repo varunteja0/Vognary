@@ -62,10 +62,10 @@ const groups = [
   },
   {
     id: "feature-migrations",
-    label: "Feature migrations 0002 through 0022",
+    label: "Feature migrations 0002 through 0023",
     required: ["DATABASE_URL"],
     probe: isFeatureMigrationsReady,
-    why: "Confirms the target database recorded every forward migration and can query persistent capability schema.",
+    why: "Confirms the target database recorded every forward migration through Recovery v1 and can query persistent capability schema.",
   },
   {
     id: "verified-outcomes",
@@ -112,10 +112,10 @@ const groups = [
   },
   {
     id: "identity-provider",
-    label: "Identity provider / Google or magic link",
-    requiredAny: ["GOOGLE_AUTH_CLIENT_ID", "GOOGLE_CLIENT_ID", "RESEND_API_KEY", "AUTH_PROVIDER"],
+    label: "Recovery identity provider / Google",
+    required: ["GOOGLE_AUTH_CLIENT_ID", "GOOGLE_AUTH_CLIENT_SECRET"],
     probe: isIdentityProviderReady,
-    why: "Required to mint real user sessions through Google OAuth or Resend magic links.",
+    why: "Recovery launch requires the dedicated Google OIDC path. Bearer magic links are deferred until browser intent is bound.",
   },
   {
     id: "redis-rate-limit",
@@ -457,11 +457,14 @@ function isFeatureMigrationsReady({ endpointPayloads }) {
   const capabilities = endpointPayloads.readiness?.capabilities;
   if (!capabilities) return undefined;
   return capabilities.schema?.status === "ready"
+    && capabilities.schema.required?.includes("0023_recovery_v1") === true
+    && capabilities.schema.applied?.includes("0023_recovery_v1") === true
     && capabilities.privacyLifecycle?.status !== "schema-query-failed"
     && capabilities.renewalAlerts?.status !== "schema-query-failed"
     && capabilities.commitmentDecisions?.status !== "schema-query-failed"
     && capabilities.platformApi?.status !== "schema-query-failed"
-    && capabilities.billing?.status !== "schema-query-failed";
+    && capabilities.billing?.status !== "schema-query-failed"
+    && capabilities.recoveryV1?.status === "schema-ready-clean-cutover";
 }
 
 function isVerifiedOutcomesReady({ endpointPayloads }) {
@@ -509,7 +512,7 @@ function isEncryptedSnapshotsReady(context) {
 function isIdentityProviderReady({ endpointPayloads }) {
   const status = endpointPayloads.readiness?.hardening?.identityProvider;
   if (typeof status !== "string") return undefined;
-  return status === "magic-link-ready" || status === "google-ready";
+  return status === "google-ready";
 }
 
 function isSharedRateLimitReady({ endpointPayloads }) {

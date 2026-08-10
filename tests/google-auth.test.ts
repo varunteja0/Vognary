@@ -34,7 +34,7 @@ test("Google ID tokens are verified locally for signature, issuer, audience, and
   publicJwk.alg = "RS256";
   const keySet = createLocalJWKSet({ keys: [publicJwk] });
   const now = Math.floor(Date.now() / 1_000);
-  const token = await new SignJWT({ email: "owner@example.com", email_verified: true, name: "Owner" })
+  const token = await new SignJWT({ email: "owner@example.com", email_verified: true, name: "Owner", nonce: "nonce-1" })
     .setProtectedHeader({ alg: "RS256", kid: publicJwk.kid })
     .setIssuer("https://accounts.google.com")
     .setAudience("google-client-id")
@@ -43,12 +43,14 @@ test("Google ID tokens are verified locally for signature, issuer, audience, and
     .setExpirationTime(now + 300)
     .sign(privateKey);
 
-  const claims = await verifyGoogleIdToken(token, "google-client-id", keySet);
+  const claims = await verifyGoogleIdToken(token, "google-client-id", keySet, "nonce-1");
   assert.equal(claims.iss, "https://accounts.google.com");
   assert.equal(claims.sub, "google-user-1");
   assert.equal(claims.email, "owner@example.com");
   assert.equal(claims.email_verified, true);
+  assert.equal(claims.nonce, "nonce-1");
   await assert.rejects(verifyGoogleIdToken(token, "other-client-id", keySet));
+  await assert.rejects(verifyGoogleIdToken(token, "google-client-id", keySet, "wrong-nonce"));
 
   const aliasToken = await new SignJWT({ email: "owner@example.com", email_verified: true, name: "Owner" })
     .setProtectedHeader({ alg: "RS256", kid: publicJwk.kid })
@@ -112,7 +114,19 @@ test("Google sign-in advertises only a fully configured OIDC flow", async () => 
     assert.equal(authUrl.searchParams.get("client_id"), "dedicated-auth-client-id");
     assert.equal(authUrl.searchParams.get("scope"), "openid email profile");
     assert.equal(authUrl.searchParams.get("redirect_uri"), "http://localhost:3000/api/auth/google/callback");
+    assert.ok(authUrl.searchParams.get("nonce"));
+    assert.equal(authUrl.searchParams.get("code_challenge_method"), "S256");
+    assert.match(authUrl.searchParams.get("code_challenge") ?? "", /^[A-Za-z0-9_-]{43}$/);
+    const cookies = response.headers.get("set-cookie") ?? "";
+    assert.match(cookies, /vognary_google_auth_nonce=/);
+    assert.match(cookies, /vognary_google_auth_pkce=/);
   });
+});
+
+test("Recovery login exposes Google as the only production save path", () => {
+  const source = readFileSync("src/app/login/login-client.tsx", "utf8");
+  assert.match(source, /Save this audit with Google/);
+  assert.doesNotMatch(source, /\/api\/auth\/magic-link\/request|Send sign-in link|Email link/);
 });
 
 async function withGoogleEnvironment(values: Partial<Record<(typeof googleEnvironmentKeys)[number], string | undefined>>, run: () => Promise<void>) {

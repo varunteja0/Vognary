@@ -156,7 +156,7 @@ export function PrivacySection({ settings }: { settings: Settings }) {
       <StatusMessage message={settings.statuses.privacyConsent} />
 
       {settings.privacyLifecycleAvailable && settings.retentionPolicy ? (
-        <div className="mt-6 border-t border-line pt-5">
+        <div id="privacy-export" className="mt-6 scroll-mt-6 border-t border-line pt-5">
           <h3 className="font-display text-lg font-semibold text-(--ink)">Export and retention</h3>
           <p className="mt-2 text-sm leading-6 text-(--muted)">Exports exclude connector tokens and raw payload bodies. Retention settings minimize temporary inputs while preserving canonical ledger facts and auditability.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -219,7 +219,8 @@ export function DeveloperSection({ settings }: { settings: Settings }) {
 
 export function DangerZoneSection({ settings }: { settings: Settings }) {
   return (
-    <ProfileGroup name="Danger Zone" description="Permanent account and workspace deletion">
+    <div id="delete-account" className="scroll-mt-6">
+      <ProfileGroup name="Danger Zone" description="Permanent account and workspace deletion">
       <h3 className="font-display text-lg font-semibold text-(--ink)">Delete my Vognary data</h3>
       <p className="mt-2 text-sm leading-6 text-(--muted)">This deletes your server-side user row, solo-owned workspaces and synchronized state, connected accounts, transactions, recurring items, evidence, matching intake leads, and pending magic links. Shared-workspace data remains for other members. Recent authentication is required.</p>
       <label className="mt-4 block">
@@ -236,7 +237,8 @@ export function DangerZoneSection({ settings }: { settings: Settings }) {
         {settings.deleting ? "Deleting…" : "Delete server data"}
       </button>
       <StatusMessage message={settings.statuses.danger} />
-    </ProfileGroup>
+      </ProfileGroup>
+    </div>
   );
 }
 
