@@ -126,6 +126,28 @@ jobs:
                 (select count(*)::int from connected_accounts
                   where coalesce(metadata ->> 'ledgerAuthority', 'LEGACY') <> 'RECOVERY_V1') as legacy_connected_accounts,
                 (select count(*)::int from recovery_workspace_states) as recovery_workspaces,
+                (select count(distinct state.workspace_id)::int from workspace_states state) as legacy_workspaces,
+                (select count(distinct state.workspace_id)::int
+                  from workspace_states state
+                  join workspaces workspace on workspace.id = state.workspace_id
+                  join auth_identities identity on identity.user_id = workspace.owner_user_id
+                  where identity.provider = 'google') as google_linked_legacy_workspaces,
+                (select count(distinct state.workspace_id)::int
+                  from workspace_states state
+                  join workspaces workspace on workspace.id = state.workspace_id
+                  join auth_sessions session on session.user_id = workspace.owner_user_id
+                  where session.revoked_at is null and session.expires_at > now()) as active_session_legacy_workspaces,
+                (select count(distinct state.workspace_id)::int
+                  from workspace_states state
+                  join workspaces workspace on workspace.id = state.workspace_id
+                  join users owner on owner.id = workspace.owner_user_id
+                  where owner.deleted_at is not null) as deleted_owner_legacy_workspaces,
+                (select coalesce(jsonb_object_agg(summary.frequency, summary.row_count), '{}'::jsonb)
+                  from (select frequency, count(*)::int as row_count from recurring_items group by frequency) summary) as legacy_item_frequencies,
+                (select coalesce(jsonb_object_agg(summary.kind, summary.row_count), '{}'::jsonb)
+                  from (select kind::text, count(*)::int as row_count from data_sources group by kind) summary) as legacy_source_kinds,
+                (select count(*)::int from evidence_links
+                  where amount is not null and evidence_date is not null and source_id is not null) as complete_legacy_evidence,
                 (select count(*)::int from connector_sync_jobs
                   where status in ('queued', 'running', 'failed', 'paused')) as nonterminal_connector_jobs,
                 (select count(*)::int from connector_sync_runs where status = 'running') as running_connector_runs,
