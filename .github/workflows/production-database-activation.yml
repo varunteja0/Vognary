@@ -1,0 +1,182 @@
+name: Production database activation
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Inspect production or apply the final Recovery cutover migration
+        required: true
+        default: inspect
+        type: choice
+        options:
+          - inspect
+          - apply-0026
+      confirmation:
+        description: Enter INSPECT_PRODUCTION or APPLY_0026_PRODUCTION
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-database-activation
+  cancel-in-progress: false
+
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+      POSTGRES_SSL: "true"
+      POSTGRES_SSL_REJECT_UNAUTHORIZED: "false"
+    steps:
+      - name: Validate operator confirmation
+        env:
+          OPERATION: ${{ inputs.operation }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          expected=INSPECT_PRODUCTION
+          if [ "$OPERATION" = "apply-0026" ]; then
+            expected=APPLY_0026_PRODUCTION
+          fi
+          if [ "$CONFIRMATION" != "$expected" ]; then
+            echo "Confirmation does not match the selected operation." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.22.2
+          cache: npm
+
+      - run: npm ci
+
+      - name: Resolve the production database without exposing credentials
+        run: |
+          node <<'NODE'
+          const { appendFileSync } = require("node:fs");
+
+          const apiKey = process.env.NEON_API_KEY;
+          const projectId = process.env.NEON_PROJECT_ID;
+          if (!apiKey || !projectId) throw new Error("NEON_API_KEY and NEON_PROJECT_ID must be configured in GitHub.");
+
+          const base = `https://console.neon.tech/api/v2/projects/${encodeURIComponent(projectId)}`;
+          async function request(path) {
+            const response = await fetch(`${base}${path}`, {
+              headers: { accept: "application/json", authorization: `Bearer ${apiKey}` },
+            });
+            if (!response.ok) throw new Error(`Neon API request failed with HTTP ${response.status}.`);
+            return response.json();
+          }
+
+          const projectResponse = await request("");
+          const branchId = projectResponse.project?.default_branch_id;
+          if (!branchId) throw new Error("The Neon project has no default branch.");
+
+          const databaseResponse = await request(`/branches/${encodeURIComponent(branchId)}/databases`);
+          const databases = databaseResponse.databases ?? [];
+          if (databases.length !== 1) throw new Error(`Expected exactly one production database; found ${databases.length}.`);
+          const database = databases[0];
+          if (!database.name || !database.owner_name) throw new Error("The production database or owner could not be resolved.");
+
+          const query = new URLSearchParams({
+            branch_id: branchId,
+            database_name: database.name,
+            role_name: database.owner_name,
+            pooled: "false",
+          });
+          const connectionResponse = await request(`/connection_uri?${query}`);
+          const databaseUrl = connectionResponse.uri ?? connectionResponse.connection_uri;
+          if (!databaseUrl) throw new Error("Neon did not return a production connection URI.");
+
+          console.log(`::add-mask::${databaseUrl}`);
+          appendFileSync(process.env.GITHUB_ENV, `DATABASE_URL<<VOGNARY_DATABASE_URL\n${databaseUrl}\nVOGNARY_DATABASE_URL\n`);
+          console.log("Resolved the default Neon branch and its single production database.");
+          NODE
+
+      - name: Inspect the Recovery cutover state
+        run: |
+          node <<'NODE'
+          const pg = require("pg");
+          const pool = new pg.Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false },
+          });
+
+          try {
+            const migrations = await pool.query("select id from schema_migrations order by id");
+            const state = await pool.query(`
+              select
+                (select count(*)::int from workspace_states) as workspace_states,
+                (select count(*)::int from recurring_items) as recurring_items,
+                (select count(*)::int from evidence_links) as evidence_links,
+                (select count(*)::int from commitment_decisions) as commitment_decisions,
+                (select count(*)::int from transactions) as transactions,
+                (select count(*)::int from data_sources) as data_sources,
+                (select count(*)::int from connector_evidence) as connector_evidence,
+                (select count(*)::int from connected_accounts
+                  where coalesce(metadata ->> 'ledgerAuthority', 'LEGACY') <> 'RECOVERY_V1') as legacy_connected_accounts,
+                (select count(*)::int from recovery_workspace_states) as recovery_workspaces,
+                (select count(*)::int from connector_sync_jobs
+                  where status in ('queued', 'running', 'failed', 'paused')) as nonterminal_connector_jobs,
+                (select count(*)::int from connector_sync_runs where status = 'running') as running_connector_runs,
+                (select count(*)::int from renewal_alert_deliveries
+                  where recurring_item_id is not null and status in ('scheduled', 'sending', 'failed')) as nonterminal_legacy_reminders
+            `);
+            console.log(JSON.stringify({
+              appliedMigrations: migrations.rows.map((row) => row.id),
+              cutoverState: state.rows[0],
+            }, null, 2));
+          } finally {
+            await pool.end();
+          }
+          NODE
+
+      - name: Apply the final Recovery cutover migration
+        if: inputs.operation == 'apply-0026'
+        run: npm run db:apply-schema
+
+      - name: Verify the final Recovery cutover migration
+        if: inputs.operation == 'apply-0026'
+        run: |
+          node <<'NODE'
+          const pg = require("pg");
+          const pool = new pg.Pool({
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false },
+          });
+
+          try {
+            const result = await pool.query(`
+              select
+                exists(select 1 from schema_migrations where id = '0026_recovery_inbound_retention') as migration_applied,
+                exists(select 1 from pg_trigger where tgname = 'connector_sync_jobs_recovery_cutover_guard') as connector_job_guard,
+                exists(select 1 from pg_trigger where tgname = 'connector_evidence_running_job_guard') as connector_evidence_guard,
+                exists(select 1 from pg_trigger where tgname = 'renewal_alert_deliveries_recovery_cutover_guard') as renewal_delivery_guard,
+                (select count(*)::int from connector_sync_jobs
+                  where status in ('queued', 'running', 'failed', 'paused')) as nonterminal_connector_jobs,
+                (select count(*)::int from connector_sync_runs where status = 'running') as running_connector_runs,
+                (select count(*)::int from renewal_alert_deliveries
+                  where recurring_item_id is not null and status in ('scheduled', 'sending', 'failed')) as nonterminal_legacy_reminders
+            `);
+            const verification = result.rows[0];
+            console.log(JSON.stringify(verification, null, 2));
+            if (!verification.migration_applied
+              || !verification.connector_job_guard
+              || !verification.connector_evidence_guard
+              || !verification.renewal_delivery_guard
+              || verification.nonterminal_connector_jobs !== 0
+              || verification.running_connector_runs !== 0
+              || verification.nonterminal_legacy_reminders !== 0) {
+              throw new Error("The final Recovery cutover verification failed.");
+            }
+          } finally {
+            await pool.end();
+          }
+          NODE
