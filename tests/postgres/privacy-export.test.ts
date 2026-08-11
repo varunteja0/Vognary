@@ -134,8 +134,20 @@ test("privacy export includes held product data and excludes all credential mate
       expiresInDays: 30,
     });
     const rawEvidenceTail = "RAW-EVIDENCE-PRIVATE-TAIL-MUST-NOT-EXPORT";
-    const recoveryDates = (await pool.query<{ charged_on: string; renews_on: string }>(
-      `select (current_date - 1)::text as charged_on, (current_date + 30)::text as renews_on`,
+    const recoveryDates = (await pool.query<{
+      charged_on_1: string;
+      charged_on_2: string;
+      charged_on_3: string;
+      renews_on_1: string;
+      renews_on_2: string;
+      renews_on_3: string;
+    }>(
+      `select (current_date - 61)::text as charged_on_1,
+              (current_date - 31)::text as charged_on_2,
+              (current_date - 1)::text as charged_on_3,
+              (current_date - 31)::text as renews_on_1,
+              (current_date - 1)::text as renews_on_2,
+              (current_date + 30)::text as renews_on_3`,
     )).rows[0]!;
     await submitRecoveryEvidence({
       workspaceId,
@@ -144,10 +156,20 @@ test("privacy export includes held product data and excludes all credential mate
       idempotencyKey: `privacy-recovery:${randomUUID()}`,
       request: {
         kind: "RECEIPT_PASTE",
-        receipts: [{
-          clientRef: "privacy-openai",
-          text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on}. Renews monthly on ${recoveryDates.renews_on}. ${"context ".repeat(80)}${rawEvidenceTail}`,
-        }],
+        receipts: [
+          {
+            clientRef: "privacy-openai-1",
+            text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on_1}. Renews monthly on ${recoveryDates.renews_on_1}. ${"context ".repeat(80)}${rawEvidenceTail}`,
+          },
+          {
+            clientRef: "privacy-openai-2",
+            text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on_2}. Renews monthly on ${recoveryDates.renews_on_2}.`,
+          },
+          {
+            clientRef: "privacy-openai-3",
+            text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on_3}. Renews monthly on ${recoveryDates.renews_on_3}.`,
+          },
+        ],
       },
       now: new Date(),
     });
@@ -167,15 +189,15 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.recovery.workspaceState.version, "1");
     assert.equal(document.recovery.versions.length, 1);
     assert.equal(document.recovery.submissions.length, 1);
-    assert.equal(document.recovery.sources.length, 1);
-    assert.equal(document.recovery.sources[0].rawEvidenceRetained, true);
-    assert.equal("rawEvidence" in document.recovery.sources[0], false);
+    assert.equal(document.recovery.sources.length, 3);
+    assert.equal(document.recovery.sources.every((source: { rawEvidenceRetained: boolean }) => source.rawEvidenceRetained), true);
+    assert.equal(document.recovery.sources.some((source: Record<string, unknown>) => "rawEvidence" in source), false);
     assert.equal(document.recovery.commitments.length, 1);
-    assert.equal(document.recovery.evidence.length, 1);
-    assert.equal(document.recovery.evidence[0].excerpt.length <= 500, true);
-    assert.equal(document.recovery.evidence[0].excerptTruncated, true);
+    assert.equal(document.recovery.evidence.length, 3);
+    assert.equal(document.recovery.evidence.every((evidence: { excerpt: string }) => evidence.excerpt.length <= 500), true);
+    assert.equal(document.recovery.evidence.some((evidence: { excerptTruncated: boolean }) => evidence.excerptTruncated), true);
     assert.doesNotMatch(JSON.stringify(document.recovery), /contentHash|fingerprint/i);
-    assert.equal(document.recovery.commitmentEvidence.length, 1);
+    assert.equal(document.recovery.commitmentEvidence.length, 3);
     assert.equal(document.recovery.decisions.length, 0);
     assert.equal(document.productEvents.length, 1);
     assert.equal(document.renewalAlertPreferences.length, 1);

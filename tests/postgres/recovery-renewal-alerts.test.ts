@@ -40,8 +40,20 @@ test("Recovery date corrections and decisions reconcile reminder deliveries atom
         sendHourLocal: 9,
       },
     });
-    const dates = (await pool.query<{ charged_on: string; old_date: string; new_date: string }>(
-      `select (current_date - 1)::text as charged_on,
+    const dates = (await pool.query<{
+      charged_on_1: string;
+      charged_on_2: string;
+      charged_on_3: string;
+      renews_on_1: string;
+      renews_on_2: string;
+      old_date: string;
+      new_date: string;
+    }>(
+      `select (current_date - 61)::text as charged_on_1,
+              (current_date - 31)::text as charged_on_2,
+              (current_date - 1)::text as charged_on_3,
+              (current_date - 31)::text as renews_on_1,
+              (current_date - 1)::text as renews_on_2,
               (current_date + 30)::text as old_date,
               (current_date + 45)::text as new_date`,
     )).rows[0]!;
@@ -52,10 +64,20 @@ test("Recovery date corrections and decisions reconcile reminder deliveries atom
       idempotencyKey: `reminder-evidence-${randomUUID()}`,
       request: {
         kind: "RECEIPT_PASTE",
-        receipts: [{
-          clientRef: "reminder-plan",
-          text: `OpenAI subscription charged INR 1,000 on ${dates.charged_on}. Renews monthly on ${dates.old_date}.`,
-        }],
+        receipts: [
+          {
+            clientRef: "reminder-plan-1",
+            text: `OpenAI subscription charged INR 1,000 on ${dates.charged_on_1}. Renews monthly on ${dates.renews_on_1}.`,
+          },
+          {
+            clientRef: "reminder-plan-2",
+            text: `OpenAI subscription charged INR 1,000 on ${dates.charged_on_2}. Renews monthly on ${dates.renews_on_2}.`,
+          },
+          {
+            clientRef: "reminder-plan-3",
+            text: `OpenAI subscription charged INR 1,000 on ${dates.charged_on_3}. Renews monthly on ${dates.old_date}.`,
+          },
+        ],
       },
       now: new Date(),
     });
