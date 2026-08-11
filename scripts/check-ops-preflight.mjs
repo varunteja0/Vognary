@@ -20,14 +20,26 @@ const checks = [
   postgresToolCheck("pg_dump"),
   postgresToolCheck("pg_restore"),
   envCheck("DATABASE_URL"),
+  envCheck("TOKEN_ENCRYPTION_KEY"),
+  envCheck("SESSION_SECRET"),
+  envCheck("GOOGLE_AUTH_CLIENT_ID"),
+  envCheck("GOOGLE_AUTH_CLIENT_SECRET"),
+  envCheck("ENABLE_RECEIPT_INBOX", (value) => value.trim() === "true", "ENABLE_RECEIPT_INBOX=true"),
+  envCheck("RESEND_RECEIVING_API_KEY"),
+  envCheck("RESEND_INBOUND_WEBHOOK_SECRET"),
+  envCheck("RESEND_RECEIVING_DOMAIN"),
+  envCheck("RECEIPT_INBOX_ALIAS_HMAC_SECRET"),
+  envCheck("RECEIPT_INBOX_ALIAS_HMAC_KEY_ID"),
+  envCheck("RECEIPT_INBOX_PROVIDER_STATUS", (value) => value.trim() === "production-live", "RECEIPT_INBOX_PROVIDER_STATUS=production-live"),
+  envCheck("RECEIPT_INBOX_WEBHOOK_PROOF_STATUS", (value) => value.trim() === "passed", "RECEIPT_INBOX_WEBHOOK_PROOF_STATUS=passed"),
+  envCheck("RECEIPT_INBOX_REPLAY_PROOF_STATUS", (value) => value.trim() === "passed", "RECEIPT_INBOX_REPLAY_PROOF_STATUS=passed"),
+  envCheck("RECEIPT_INBOX_RETENTION_REVIEW_STATUS", (value) => value.trim() === "approved", "RECEIPT_INBOX_RETENTION_REVIEW_STATUS=approved"),
   { id: "backup-key", label: "Backup encryption key", ready: backupKey.ready, missing: backupKey.ready ? [] : ["BACKUP_ENCRYPTION_KEY"], detail: backupKey.detail },
   { id: "backup-storage-upload", label: "Encrypted backup object storage upload", ready: storage.ready, missing: storage.missing },
   envCheck("BACKUP_RESTORE_DRILL_STATUS", (value) => value.trim().toLowerCase() === "passed", "BACKUP_RESTORE_DRILL_STATUS=passed"),
   anyEnvCheck("monitoring", "Monitoring delivery backend", ["SENTRY_DSN", "BETTER_STACK_SOURCE_TOKEN"]),
   envCheck("INTERNAL_SYNC_SECRET"),
   envCheck("CRON_SECRET"),
-  envCheck("SYNC_SCHEDULER_STATUS", (value) => value.trim() === "production-live", "SYNC_SCHEDULER_STATUS=production-live"),
-  envCheck("RENEWAL_ALERT_DELIVERY_STATUS", (value) => value.trim() === "production-live", "RENEWAL_ALERT_DELIVERY_STATUS=production-live"),
   envCheck("RETENTION_SCHEDULER_STATUS", (value) => value.trim() === "production-live", "RETENTION_SCHEDULER_STATUS=production-live"),
 ];
 
@@ -102,9 +114,7 @@ async function readProductionReadiness(baseUrl) {
     const hardening = payload.hardening ?? {};
     const capabilityQueriesReady = [
       payload.capabilities?.privacyLifecycle,
-      payload.capabilities?.renewalAlerts,
-      payload.capabilities?.commitmentDecisions,
-      payload.capabilities?.platformApi,
+      payload.capabilities?.recoveryV1,
     ].every((capability) => capability?.status && capability.status !== "schema-query-failed");
     const sharedRateLimitingReady = typeof hardening.sharedRateLimiting === "string"
       ? hardening.sharedRateLimiting.startsWith("configured-")
@@ -113,12 +123,12 @@ async function readProductionReadiness(baseUrl) {
       sharedRateLimitingReady ? null : "sharedRateLimiting",
       typeof hardening.monitoring === "string" && hardening.monitoring.startsWith("configured-") ? null : "monitoring",
       hardening.backups === "configured" ? null : "backups",
-      hardening.syncWorkers === "operator-attested-production-live" ? null : "syncWorkers",
+      hardening.identityProvider === "google-ready" ? null : "identityProvider",
+      hardening.receiptInbox === "operator-attested-production-live" ? null : "receiptInbox",
       payload.capabilities?.schema?.status === "ready" ? null : "featureMigrations",
+      payload.capabilities?.recoveryV1?.status === "schema-ready-clean-cutover" ? null : "recoveryCutover",
       capabilityQueriesReady ? null : "featureCapabilityQueries",
       hardening.retentionScheduler === "operator-attested-production-live" ? null : "retentionScheduler",
-      hardening.renewalAlerts === "operator-attested-production-live" ? null : "renewalAlerts",
-      hardening.platformApi === "schema-ready-shared-rate-limit-required" ? "platformApi" : null,
     ].filter(Boolean);
 
     return {
@@ -130,10 +140,9 @@ async function readProductionReadiness(baseUrl) {
         redisRateLimiting: hardening.redisRateLimiting,
         monitoring: hardening.monitoring,
         backups: hardening.backups,
-        syncWorkers: hardening.syncWorkers,
+        identityProvider: hardening.identityProvider,
+        receiptInbox: hardening.receiptInbox,
         retentionScheduler: hardening.retentionScheduler,
-        renewalAlerts: hardening.renewalAlerts,
-        platformApi: hardening.platformApi,
       },
       capabilities: payload.capabilities,
       blocked,

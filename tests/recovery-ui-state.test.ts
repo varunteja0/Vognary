@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { CommitmentDetailDto, CommitmentSummaryDto, HomeProjectionDto } from "../src/lib/recovery/contracts";
+import type { CommitmentDetailDto, CommitmentSummaryDto, HomeProjectionDto, ReceiptInboxStatusDto } from "../src/lib/recovery/contracts";
 import {
   correctionPatchFromDraft,
   evidenceRequestFromDraft,
@@ -53,6 +53,20 @@ const detail: CommitmentDetailDto = {
 };
 
 const meta = { requestId: "request-1", workspaceVersion: 4 };
+const receiptInbox = {
+  state: "PROCESSING",
+  alias: {
+    id: "11111111-1111-4111-8111-111111111111",
+    status: "ACTIVE",
+    address: "rcpt_example@receipts.vognary.test",
+    createdAt: "2026-08-10T10:00:00.000Z",
+    rotatedAt: null,
+    revokedAt: null,
+  },
+  lastReceivedAt: "2026-08-10T10:05:00.000Z",
+  lastProcessedAt: null,
+  lastFailureCode: null,
+} as const satisfies ReceiptInboxStatusDto;
 
 const failure = (error: TransportFailure["error"], origin: TransportFailure["origin"] = "SERVER"): TransportFailure => ({ ok: false, origin, error });
 
@@ -69,6 +83,53 @@ test("a loaded snapshot stores server payloads verbatim in server order", () => 
   assert.equal(state.commitments[0].amount.display, "₹1,999.00");
 });
 
+test("source state stores provider status verbatim and keeps action progress separate", () => {
+  const requested = recoveryReducer(loaded(), { type: "SOURCES_REQUESTED" });
+  assert.equal(requested.sourceStatus.kind, "LOADING");
+  assert.equal(requested.receiptInbox, null);
+
+  const received = recoveryReducer(requested, { type: "SOURCES_LOADED", receiptInbox, meta });
+  assert.equal(received.sourceStatus.kind, "READY");
+  assert.deepEqual(received.receiptInbox, receiptInbox);
+  assert.equal(received.receiptInbox?.state, "PROCESSING");
+
+  const action = recoveryReducer(received, { type: "SOURCE_ACTION_STARTED", action: "ROTATE" });
+  assert.equal(action.pendingSourceAction, "ROTATE");
+  const saved = recoveryReducer(action, { type: "SOURCE_ACTION_SAVED", receiptInbox: { ...receiptInbox, state: "WAITING" }, meta });
+  assert.equal(saved.pendingSourceAction, null);
+  assert.equal(saved.receiptInbox?.state, "WAITING");
+
+  const newer = recoveryReducer(received, {
+    type: "SOURCES_LOADED",
+    receiptInbox: { ...receiptInbox, state: "READY" },
+    meta: { requestId: "request-newer-source", workspaceVersion: 5 },
+  });
+  assert.equal(newer.sourceStatus.kind, "READY");
+  assert.equal(newer.receiptInbox?.state, "READY");
+  assert.equal(newer.workspaceVersion, 4, "source status must not impersonate a canonical snapshot");
+  assert.equal(newer.refreshRequired, true);
+});
+
+test("source authentication failures move the whole workspace to sign-in-required", () => {
+  const authFailure = failure({
+    code: "AUTH_REQUIRED",
+    message: "Sign in to continue.",
+    retryable: false,
+    requestId: "request-source-auth",
+  });
+  const readFailed = recoveryReducer(loaded(), { type: "SOURCES_FAILED", failure: authFailure });
+  assert.equal(readFailed.status.kind, "AUTH_REQUIRED");
+  assert.equal(readFailed.sourceStatus.kind, "AUTH_REQUIRED");
+
+  const actionFailed = recoveryReducer(
+    recoveryReducer(loaded(), { type: "SOURCE_ACTION_STARTED", action: "ROTATE" }),
+    { type: "SOURCE_ACTION_FAILED", failure: authFailure },
+  );
+  assert.equal(actionFailed.status.kind, "AUTH_REQUIRED");
+  assert.equal(actionFailed.sourceStatus.kind, "AUTH_REQUIRED");
+  assert.equal(actionFailed.pendingSourceAction, null);
+});
+
 test("a decision shows the reader's intent immediately and keeps the server decision underneath", () => {
   const pending = recoveryReducer(loaded(), {
     type: "DECISION_STARTED",
@@ -81,7 +142,7 @@ test("a decision shows the reader's intent immediately and keeps the server deci
   assert.deepEqual(displayedDecision(pending, "commitment-1", null), { value: "CANCEL", pending: true });
   assert.deepEqual(displayedDecision(pending, "commitment-2", null), { value: null, pending: false });
   assert.equal(pending.commitments[0].decision, null, "the stored server row must not be rewritten optimistically");
-  assert.equal(pending.announcement, "Saving Cancel…");
+  assert.equal(pending.announcement, "Saving Plan to cancel…");
 });
 
 test("a failed decision rolls back visibly and names what the workspace still holds", () => {

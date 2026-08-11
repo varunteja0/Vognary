@@ -5,6 +5,7 @@ export const consentPurposes = [
   "launch-audit-contact",
   "private-audit-contact",
   "gmail-readonly-sync",
+  "receipt-inbox-ingest",
   "provider-connector-sync",
   "merchant-intelligence-opt-in",
   "product-analytics-opt-in",

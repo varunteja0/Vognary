@@ -1,4 +1,5 @@
 import { currentPrivacyNoticeVersion } from "./privacy-notice";
+import type { MoneyDto } from "./recovery/contracts";
 
 export const renewalAlertConsentPurpose = "renewal-alerts" as const;
 export const renewalAlertNoticeVersion = currentPrivacyNoticeVersion;
@@ -28,12 +29,10 @@ export type RenewalAlertPreferenceInput = {
 
 export type WeeklyDigestEmailInput = {
   weekStart: string;
-  monthlyBurn: number;
-  currency: string;
-  foreignMonthlyTotals: Record<string, number>;
+  monthlyTotals: readonly MoneyDto[];
   renewalCountNext7Days: number;
-  renewalTotalNext7Days: number;
-  suggestion: null | { merchant: string; monthlyCost: number };
+  renewalTotalsNext7Days: readonly MoneyDto[];
+  suggestion: null | { merchant: string; monthlyCost: MoneyDto };
   appBaseUrl: string;
 };
 
@@ -77,21 +76,23 @@ export function buildWeeklyDigestEmail(input: WeeklyDigestEmailInput) {
   const appBaseUrl = normalizeAppBaseUrl(input.appBaseUrl);
   const reviewUrl = new URL("/app", appBaseUrl).toString();
   const preferencesUrl = new URL("/profile", appBaseUrl).toString();
-  const burn = formatMoney(input.monthlyBurn, input.currency);
-  const due = formatMoney(input.renewalTotalNext7Days, input.currency);
-  const foreign = Object.entries(input.foreignMonthlyTotals)
-    .filter(([, total]) => Number.isFinite(total) && total > 0)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([currency, total]) => formatMoney(total, currency));
+  const monthly = [...input.monthlyTotals].sort((left, right) => left.currency.localeCompare(right.currency));
+  const primaryMonthly = monthly.find((total) => total.currency === "INR") ?? monthly[0] ?? null;
+  const otherMonthly = monthly.filter((total) => total !== primaryMonthly);
+  const burn = primaryMonthly?.display ?? "No supported total";
+  const due = [...input.renewalTotalsNext7Days]
+    .sort((left, right) => left.currency.localeCompare(right.currency))
+    .map((total) => total.display)
+    .join(" · ") || "No amount published";
   const suggestion = input.suggestion
-    ? `Review ${normalizeMessageText(input.suggestion.merchant, 160) || "your largest commitment"} (${formatMoney(input.suggestion.monthlyCost, input.currency)}/month).`
+    ? `Review ${normalizeMessageText(input.suggestion.merchant, 160) || "your largest commitment"} (${input.suggestion.monthlyCost.display}/month).`
     : "No primary-currency commitment needs a suggested review this week.";
   const subject = "Your weekly recurring-money review from Vognary";
   const text = [
     `Week of ${weekStart}`,
     "",
     `Monthly recurring burn: ${burn}`,
-    ...(foreign.length ? [`Other currencies, kept separate: ${foreign.join(" · ")}`] : []),
+    ...(otherMonthly.length ? [`Other currencies, kept separate: ${otherMonthly.map((total) => total.display).join(" · ")}`] : []),
     `Next 7 days: ${input.renewalCountNext7Days} expected renewal(s), ${due}`,
     `One action: ${suggestion}`,
     "",
@@ -102,7 +103,7 @@ export function buildWeeklyDigestEmail(input: WeeklyDigestEmailInput) {
   const html = [
     `<p><strong>Week of ${escapeHtml(weekStart)}</strong></p>`,
     `<p><strong>Monthly recurring burn:</strong> ${escapeHtml(burn)}</p>`,
-    ...(foreign.length ? [`<p><strong>Other currencies, kept separate:</strong> ${escapeHtml(foreign.join(" · "))}</p>`] : []),
+    ...(otherMonthly.length ? [`<p><strong>Other currencies, kept separate:</strong> ${escapeHtml(otherMonthly.map((total) => total.display).join(" · "))}</p>`] : []),
     `<p><strong>Next 7 days:</strong> ${input.renewalCountNext7Days} expected renewal(s), ${escapeHtml(due)}</p>`,
     `<p><strong>One action:</strong> ${escapeHtml(suggestion)}</p>`,
     "<p>These figures come from the evidence currently synchronized to your workspace and may change when sources refresh.</p>",
@@ -187,12 +188,6 @@ function normalizeSendHour(value: unknown) {
 
 function normalizeMessageText(value: string, maxLength: number) {
   return value.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
-}
-
-function formatMoney(value: number, currency: string) {
-  const safeCurrency = /^[A-Z]{3}$/.test(currency) ? currency : "INR";
-  const safeValue = Number.isFinite(value) ? value : 0;
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: safeCurrency, maximumFractionDigits: 2 }).format(safeValue);
 }
 
 function normalizeDateOnly(value: string) {

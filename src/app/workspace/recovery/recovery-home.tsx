@@ -1,13 +1,11 @@
 "use client";
 
-import type { AttentionItemDto, ChangeItemDto, HomeProjectionDto, ProjectionTotalDto, UpcomingItemDto } from "@/lib/recovery/contracts";
+import type { AttentionItemDto, ChangeItemDto, HomeProjectionDto, UpcomingItemDto } from "@/lib/recovery/contracts";
 import {
   attentionReasonLabels,
   cadenceLabels,
   changeKindLabels,
   commitmentStatusLabels,
-  coverageLabels,
-  coverageMeanings,
   decisionLabels,
   formatDay,
   formatMoment,
@@ -33,146 +31,68 @@ export function RecoveryHome({
 }) {
   return (
     <div className="grid gap-5">
-      <TotalsStrip monthly={home.monthlyTotals} next30={home.next30DayTotals} generatedAt={home.generatedAt} />
-
       <section aria-labelledby="recovery-needs-me" className="panel p-4 sm:p-5">
-        <h3 id="recovery-needs-me" className="folio" data-folio="01">WHAT NEEDS ME?</h3>
+        <h3 id="recovery-needs-me" className="font-display text-xl font-semibold text-(--ink)">Needs attention</h3>
         <div className="mt-4 grid gap-3">
           {home.needsMe.length ? (
             home.needsMe.map((item) => <AttentionRow key={item.id} item={item} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />)
           ) : (
             <StateBlock
-              eyebrow="Nothing waiting"
-              title="Nothing is waiting on a decision from you"
-              detail="This is true only for the evidence you have submitted. It is not a statement about money the workspace has never seen."
+              eyebrow={home.coverage.evidenceCount ? "Up to date" : "No receipts yet"}
+              title={home.coverage.evidenceCount ? "Nothing needs attention right now" : "No software renewals yet"}
+              detail={home.coverage.evidenceCount
+                ? "Based on the receipts Vognary has checked, there is no decision waiting for you."
+                : "Add recent software receipts and Vognary will show only the renewals it can support."}
             >
-              <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-ghost">Add more evidence</button>
+              <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-primary">Add receipts</button>
             </StateBlock>
           )}
         </div>
       </section>
 
-      <section aria-labelledby="recovery-changed" className="panel p-4 sm:p-5">
-        <h3 id="recovery-changed" className="folio" data-folio="02">WHAT CHANGED?</h3>
-        <div className="mt-4 grid gap-3">
-          {home.changed.state === "NO_PRIOR_BASELINE" ? (
-            <StateBlock
-              eyebrow="No prior baseline"
-              title="There is nothing earlier to compare this against"
-              detail={`This is the first saved version of your workspace (version ${home.changed.toVersion}). Vognary will not invent a "before", so nothing is reported as changed. Submit evidence again later and the difference will be shown here.`}
-            />
-          ) : home.changed.items.length ? (
-            <>
-              <p className="font-data text-xs text-(--muted)">
-                Compared version {home.changed.fromVersion} against version {home.changed.toVersion}.
-              </p>
-              {home.changed.items.map((item) => <ChangeRow key={item.id} item={item} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />)}
-            </>
-          ) : (
-            <StateBlock
-              eyebrow="Compared"
-              title="Nothing changed between these two versions"
-              detail={`Version ${home.changed.fromVersion} and version ${home.changed.toVersion} describe the same commitments.`}
-            />
-          )}
-        </div>
-      </section>
+      {home.changed.state === "COMPARED" ? (
+        <section aria-labelledby="recovery-changed" className="panel p-4 sm:p-5">
+          <h3 id="recovery-changed" className="font-display text-xl font-semibold text-(--ink)">Since your last visit</h3>
+          <div className="mt-4 grid gap-3">
+            {home.changed.items.length ? (
+              home.changed.items.map((item) => <ChangeRow key={item.id} item={item} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />)
+            ) : (
+              <StateBlock
+                eyebrow="No changes"
+                title="Your subscriptions look the same"
+                detail="No amount, date, frequency, or recurring status changed in the latest receipts."
+              />
+            )}
+          </div>
+        </section>
+      ) : null}
 
       <section aria-labelledby="recovery-next" className="panel p-4 sm:p-5">
-        <h3 id="recovery-next" className="folio" data-folio="03">WHAT HAPPENS NEXT?</h3>
+        <h3 id="recovery-next" className="font-display text-xl font-semibold text-(--ink)">Coming up</h3>
         <div className="mt-4 grid gap-3">
           {home.next.length ? (
             home.next.map((item) => <UpcomingRow key={`${item.commitmentId}-${item.date}`} item={item} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />)
           ) : (
             <StateBlock
-              eyebrow="Nothing dated"
-              title="No dated event is expected from your evidence"
-              detail="The workspace publishes an upcoming event only when the evidence you submitted carries a date it can stand behind."
+              eyebrow="No expected dates"
+              title="Nothing is scheduled from your receipts"
+              detail="Vognary shows an expected charge only when a receipt supports a date."
             />
           )}
         </div>
       </section>
 
-      <section aria-labelledby="recovery-coverage" className="panel p-4 sm:p-5">
-        <h3 id="recovery-coverage" className="folio" data-folio="04">COVERAGE</h3>
-        <div className="mt-4 grid gap-3">
-          <div className="inset p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className={home.coverage.state === "CURRENT" ? "pill pill-ready" : home.coverage.state === "NO_EVIDENCE" ? "pill pill-blocked" : "pill pill-partial"}>
-                {coverageLabels[home.coverage.state]}
-              </span>
-              <span className="font-data text-xs text-(--muted)">
-                {home.coverage.sourceCount} source{home.coverage.sourceCount === 1 ? "" : "s"} · {home.coverage.evidenceCount} evidence item{home.coverage.evidenceCount === 1 ? "" : "s"}
-              </span>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-(--ink-soft)">{coverageMeanings[home.coverage.state]}</p>
-            <dl className="mt-4 grid gap-3 sm:grid-cols-3">
-              <CoverageFact label="Covers from" value={home.coverage.coverageStart ? formatDay(home.coverage.coverageStart) : "Not published"} />
-              <CoverageFact label="Covers to" value={home.coverage.coverageEnd ? formatDay(home.coverage.coverageEnd) : "Not published"} />
-              <CoverageFact label="Newest evidence" value={home.coverage.lastEvidenceAt ? formatMoment(home.coverage.lastEvidenceAt) : "None yet"} />
-            </dl>
-          </div>
-          <div className="inset p-4">
-            <p className="eyebrow eyebrow-xs">What this does not cover</p>
-            {home.coverage.limitations.length ? (
-              <ul className="mt-2 grid gap-1.5">
-                {home.coverage.limitations.map((limitation) => (
-                  <li key={limitation} className="text-sm leading-6 text-(--ink-soft)">· {limitation}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-2 text-sm leading-6 text-(--muted)">The workspace published no limitations for this coverage.</p>
-            )}
-            <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-primary mt-4">Widen coverage with more evidence</button>
-          </div>
+      <section aria-labelledby="recovery-receipts" className="flex flex-wrap items-center justify-between gap-4 border-t border-line px-1 pt-5">
+        <div>
+          <h3 id="recovery-receipts" className="font-display text-base font-semibold text-(--ink)">Receipts checked</h3>
+          <p className="mt-1 font-data text-xs text-(--muted)">
+            {home.coverage.evidenceCount
+              ? `${home.coverage.evidenceCount} item${home.coverage.evidenceCount === 1 ? "" : "s"} from ${home.coverage.sourceCount} source${home.coverage.sourceCount === 1 ? "" : "s"} · latest ${home.coverage.lastEvidenceAt ? formatMoment(home.coverage.lastEvidenceAt) : "date unavailable"}`
+              : "No receipts have been checked yet."}
+          </p>
         </div>
+        <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-ghost">Add receipts</button>
       </section>
-    </div>
-  );
-}
-
-function TotalsStrip({ monthly, next30, generatedAt }: { monthly: readonly ProjectionTotalDto[]; next30: readonly ProjectionTotalDto[]; generatedAt: string }) {
-  return (
-    <section aria-label="Recurring money the workspace can prove" className="panel p-4 sm:p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <p className="eyebrow eyebrow-xs">Server totals · rendered exactly as published</p>
-        <p className="font-data text-xs text-(--muted)">Generated {formatMoment(generatedAt)}</p>
-      </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <TotalsGroup label="Monthly" totals={monthly} />
-        <TotalsGroup label="Next 30 days" totals={next30} />
-      </div>
-    </section>
-  );
-}
-
-function TotalsGroup({ label, totals }: { label: string; totals: readonly ProjectionTotalDto[] }) {
-  return (
-    <div className="inset p-4">
-      <p className="eyebrow eyebrow-xs">{label}</p>
-      {totals.length ? (
-        <ul className="mt-2 grid gap-2">
-          {totals.map((total) => (
-            <li key={`${label}-${total.amount.currency}`}>
-              <MoneyValue amount={total.amount} className="text-xl font-semibold text-(--ink)" />
-              <p className="mt-1 font-data text-xs text-(--muted)">
-                {total.amount.currency} · backed by {total.commitmentIds.length} commitment{total.commitmentIds.length === 1 ? "" : "s"} and {total.evidenceIds.length} evidence item{total.evidenceIds.length === 1 ? "" : "s"}
-              </p>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-2 text-sm leading-6 text-(--muted)">No total was published. Currencies are never combined into one number.</p>
-      )}
-    </div>
-  );
-}
-
-function CoverageFact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="eyebrow eyebrow-xs">{label}</dt>
-      <dd className="font-data mt-1 text-sm text-(--ink)">{value}</dd>
     </div>
   );
 }

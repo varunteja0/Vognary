@@ -43,6 +43,9 @@ test("feature readiness checks every persistent capability migration with bounde
     "0021_pending_connector_consent",
     "0022_weekly_digest",
     "0023_recovery_v1",
+    "0024_recovery_inbound_receipts",
+    "0025_recovery_renewal_alerts",
+    "0026_recovery_inbound_retention",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -53,6 +56,7 @@ test("feature readiness checks every persistent capability migration with bounde
   assert.match(source, /max\(sent_at\)/);
   assert.match(source, /count\(\*\)::int as saved_decisions/);
   assert.match(source, /max\(last_used_at\)/);
+  assert.match(source, /metadata ->> 'ledgerAuthority'[\s\S]*<> 'RECOVERY_V1'/);
   assert.doesNotMatch(source, /select[^;]*(merchant|email|amount|token_hash|scopes)/i);
 });
 
@@ -154,17 +158,20 @@ test("restore drills require Recovery v1 and report restored Recovery state", ()
   assert.match(restore, /idempotency_keys/);
 });
 
-test("Vercel production builds apply checksummed migrations before compiling the deployment", () => {
+test("Vercel builds never race Recovery cutover migrations ahead of worker retirement", () => {
   const config = JSON.parse(read("vercel.json")) as { buildCommand?: string };
   const packageJson = JSON.parse(read("package.json")) as { scripts?: Record<string, string> };
   const build = read("scripts/vercel-build.mjs");
+  const runbook = read("docs/production-activation-runbook.md");
   assert.equal(config.buildCommand, "npm run vercel-build");
   assert.equal(packageJson.scripts?.["vercel-build"], "node scripts/vercel-build.mjs");
-  assert.match(build, /VERCEL_ENV === "production"/);
-  assert.ok(
-    build.indexOf("scripts/apply-postgres-schema.mjs") < build.indexOf('["run", "build"]'),
-    "production migrations must complete before the Next.js build",
-  );
+  assert.doesNotMatch(build, /apply-postgres-schema|db:apply-schema/);
+  assert.match(build, /\["run", "build"\]/);
+  assert.match(runbook, /db:apply-schema -- --through=0025_recovery_renewal_alerts/);
+  assert.match(runbook, /Verify `schema_migrations` ends at `0025_recovery_renewal_alerts`/);
+  assert.match(runbook, /Deploy the exact candidate SHA/);
+  assert.match(runbook, /Wait at least five minutes after the last old sync, reminder, or savings-verification invocation finishes/);
+  assert.match(runbook, /DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema/);
 });
 
 test("CI browser journeys exercise the built Next.js production artifact", () => {
@@ -181,6 +188,19 @@ test("CI browser journeys exercise the built Next.js production artifact", () =>
   assert.match(server, /cpSync[\s\S]*public/);
 });
 
+test("Lighthouse measures the signed-out app without hydration delay and respects noindex utilities", () => {
+  const lighthouse = read("scripts/check-lighthouse.mjs");
+  const loginPage = read("src/app/login/page.tsx");
+  const loginClient = read("src/app/login/login-client.tsx");
+  assert.match(lighthouse, /path: "\/login\?next=\/app", categories: \["performance", "accessibility", "best-practices"\]/);
+  assert.doesNotMatch(lighthouse, /path: "\/app", categories:/);
+  assert.match(lighthouse, /path: "\/verify", categories: \["performance", "accessibility", "best-practices"\]/);
+  assert.match(loginPage, /initialSession=/);
+  assert.match(loginPage, /readCurrentSession/);
+  assert.match(loginClient, /initialSession: SessionPayload/);
+  assert.match(loginClient, /useState<SessionPayload>\(initialSession\)/);
+});
+
 test("standalone PDF ingestion preserves the dynamically loaded pdf.js worker", () => {
   const config = read("next.config.ts");
   assert.match(config, /agentRules: false/);
@@ -190,8 +210,9 @@ test("standalone PDF ingestion preserves the dynamically loaded pdf.js worker", 
 
 test("internal readiness distinguishes schema, observed evidence, and operator attestation", () => {
   const source = read("src/app/api/readiness/route.ts");
-  assert.match(source, /capabilities: features/);
+  assert.match(source, /capabilities: \{[\s\S]*schema: features\.schema/);
   assert.match(source, /recoveryV1/);
+  assert.doesNotMatch(source, /getConnectorSummary|listConnectorAdapters|partnerRails|syncWorkers|internalSyncJobApi|webhookIngestion/);
   assert.match(source, /schemaDegraded/);
   assert.match(source, /cron-secret-configured-deployment-schedule-unverified/);
   assert.match(source, /last-run-observed-deployment-schedule-unverified/);
@@ -200,12 +221,17 @@ test("internal readiness distinguishes schema, observed evidence, and operator a
   assert.match(source, /operator-attested-production-live/);
   assert.match(source, /invalid-attestation-no-enforced-run-observed/);
   assert.match(source, /invalid-attestation-no-delivery-observed/);
-  assert.match(source, /invalid-attestation-no-cron-evidence/);
   assert.match(source, /schema-ready-shared-rate-limit-required/);
   assert.match(source, /sharedRateLimiting/);
   assert.match(source, /configured-postgres/);
   assert.match(source, /settlement-observed/);
   assert.match(read("src/lib/server/feature-readiness.ts"), /checkout\.plan = \$1[\s\S]*checkout\.offer_id = \$2[\s\S]*orders\.status in \('pending', 'in_progress', 'delivered'\)/);
+});
+
+test("the public landing checks receipt availability at request time", () => {
+  const source = read("src/app/page.tsx");
+  assert.match(source, /export const dynamic = "force-dynamic"/);
+  assert.match(source, /await isReceiptInboxPubliclyAvailable\(\)/);
 });
 
 test("activation probes are bounded and cover private lifecycle, renewal, decisions, and platform guards", () => {
@@ -217,15 +243,17 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
     "feature-migrations",
     "privacy-lifecycle",
     "renewal-alerts",
-    "core-connectors",
+    "receipt-inbox",
     "platform-api",
     "workspace-decisions-auth-guard",
     "workspace-proof-graph-auth-guard",
     "workspace-current-auth-guard",
-    "workspace-actions-auth-guard",
+    "workspace-actions-retired",
     "workspace-ask-auth-guard",
     "workspace-commitments-auth-guard",
-    "savings-verification-due-run-cron-guard",
+    "workspace-sources-auth-guard",
+    "sync-due-run-retired",
+    "savings-verification-retired",
     "renewal-alert-preferences-auth-guard",
     "privacy-retention-worker-secret-guard",
     "platform-ledger-token-guard",
@@ -234,23 +262,29 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   ]) {
     assert.match(source, new RegExp(`"${id}"`));
   }
-  assert.match(source, /SYNC_SCHEDULER_STATUS: "production-live"/);
   assert.match(source, /RETENTION_SCHEDULER_STATUS: "production-live"/);
   assert.match(source, /RENEWAL_ALERT_DELIVERY_STATUS: "production-live"/);
+  assert.match(source, /RECEIPT_INBOX_PROVIDER_STATUS: "production-live"/);
+  assert.match(source, /RECEIPT_INBOX_WEBHOOK_PROOF_STATUS: "passed"/);
+  assert.match(source, /RECEIPT_INBOX_REPLAY_PROOF_STATUS: "passed"/);
+  assert.match(source, /RECEIPT_INBOX_RETENTION_REVIEW_STATUS: "approved"/);
   assert.match(source, /ledger\.status === 401/);
   assert.match(source, /sources\.status === 401/);
   assert.match(source, /target activation evidence/);
   assert.match(source, /capabilities\?\.schema\?\.status === "ready"/);
   assert.match(source, /capabilities\.recoveryV1\?\.status === "schema-ready-clean-cutover"/);
-  assert.match(source, /Feature migrations 0002 through 0023/);
-  assert.match(source, /required\?\.includes\("0023_recovery_v1"\)/);
-  assert.match(source, /applied\?\.includes\("0023_recovery_v1"\)/);
+  assert.match(source, /Feature migrations 0002 through 0026/);
+  assert.match(source, /required\?\.includes\("0026_recovery_inbound_retention"\)/);
+  assert.match(source, /applied\?\.includes\("0026_recovery_inbound_retention"\)/);
   assert.match(source, /betaReady: endpointReport\.every\(\(item\) => item\.ok\)/);
   assert.match(source, /envReport\.filter\(\(item\) => item\.launchBlocking\)/);
-  assert.match(source, /coreConnectorLaunch/);
+  assert.match(source, /activationProfile = "receipt-forwarding"/);
+  for (const optionalId of ["lead-persistence", "payments", "renewal-alerts", "encrypted-snapshots", "platform-api"]) {
+    assert.match(source, new RegExp(`id: "${optionalId}"[\\s\\S]*?launchBlocking: false`));
+  }
+  assert.match(source, /hardening\?\.receiptInbox/);
   assert.match(source, /return status === "google-ready"/);
   assert.doesNotMatch(source, /status === "magic-link-ready" \|\| status === "google-ready"/);
-  assert.match(source, /launchBlocking: false/);
   assert.match(source, /id: "audit-intake-status"/);
   assert.doesNotMatch(source, /name: "Activation Check"/);
   assert.doesNotMatch(source, /id: "monitoring-delivery-test"/);
@@ -260,9 +294,17 @@ test("operator evidence flags default blank and the runbook forbids secret-only 
   const env = read(".env.example");
   const runbook = read("docs/production-activation-runbook.md");
   const preflight = read("scripts/check-ops-preflight.mjs");
-  for (const name of ["SYNC_SCHEDULER_STATUS", "RENEWAL_ALERT_DELIVERY_STATUS", "RETENTION_SCHEDULER_STATUS"]) {
+  const operatorEvidence = {
+    RENEWAL_ALERT_DELIVERY_STATUS: "production-live",
+    RETENTION_SCHEDULER_STATUS: "production-live",
+    RECEIPT_INBOX_PROVIDER_STATUS: "production-live",
+    RECEIPT_INBOX_WEBHOOK_PROOF_STATUS: "passed",
+    RECEIPT_INBOX_REPLAY_PROOF_STATUS: "passed",
+    RECEIPT_INBOX_RETENTION_REVIEW_STATUS: "approved",
+  };
+  for (const [name, expected] of Object.entries(operatorEvidence)) {
     assert.match(env, new RegExp(`^${name}=$`, "m"));
-    assert.match(runbook, new RegExp(`${name}=production-live`));
+    assert.match(runbook, new RegExp(`${name}=${expected}`));
   }
   assert.match(runbook, /CRON_SECRET[\s\S]*does not prove the schedule is deployed or firing/);
   assert.match(runbook, /operator attestation rather than independent scheduler telemetry/);
@@ -281,17 +323,19 @@ test("public health remains a minimal liveness surface", () => {
 
 test("production smoke accepts disabled code login and materialization-aware connector states", () => {
   const source = read("scripts/smoke-test.mjs");
-  assert.match(source, /\[401, 404, 501\]\.includes\(loginWithoutSetup\.status\)/);
-  assert.match(source, /"usage-only"/);
-  assert.match(source, /"source-health-only"/);
-  assert.match(source, /\[200, 401, 501\]\.includes\(gmailProductStartResponse\.status\)/);
+  assert.match(source, /SMOKE_ALLOW_UNCONFIGURED/);
+  assert.match(source, /allowUnconfigured && !targetIsLocal/);
+  assert.match(source, /Production smoke requires a ready database/);
+  assert.match(source, /Production smoke requires all feature migrations/);
+  assert.match(source, /Production smoke requires operator-attested receipt forwarding/);
+  assert.match(source, /allowUnconfigured \? \[401, 404, 501, 503\] : \[401, 404, 501\]/);
+  assert.match(source, /payload\.status !== "retired"/);
+  assert.match(source, /payload\.ledgerAuthority !== "RECOVERY_V1"/);
   assert.match(source, /fetch\(`\$\{baseUrl\}\/api\/audit-intake`\)/);
   assert.match(source, /\['ready', 'not-configured'\]\.includes\(auditIntake\.status\)/);
   assert.doesNotMatch(source, /fetch\(`\$\{baseUrl\}\/api\/audit-intake`,\s*\{[\s\S]*?method:\s*"POST"/);
-  assert.match(source, /connectors\.adapters\?\.includes\("anthropic-usage"\)/);
-  assert.match(source, /connector\.status === "planned"/);
-  assert.doesNotMatch(source, /\/api\/connectors\/anthropic-usage\/(?:start|sync)["`]/);
+  assert.match(source, /Recovery Sources without session/);
   const activation = read("scripts/check-production-activation.mjs");
-  assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[200, 401, 501\]/);
-  assert.match(activation, /Feature migrations 0002 through 0023/);
+  assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[410\]/);
+  assert.match(activation, /Feature migrations 0002 through 0026/);
 });

@@ -42,38 +42,30 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
   const runtimeFailures = collectRuntimeFailures(page);
   await resetCustomerZeroThroughUi(page);
 
-  // 1. Open landing and enter the real guest audit with the keyboard.
+  // 1-3. Open landing and establish a saved identity independently of provider activation.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Find what renews next");
-  await tabToAndActivate(page, "Audit my recurring spend");
-  await expect(page).toHaveURL(/\/app$/);
-
-  // 2-5. Start guest evidence, paste two real-format receipts, get deterministic truth.
-  const guestInput = page.getByLabel("Paste receipts or invoices");
-  await expect(guestInput).toBeVisible();
-  await guestInput.fill(firstReceipt);
-  const guestResult = page.getByRole("region", { name: "Your first audit result" });
-  await expect(guestResult).toBeVisible();
-  await guestInput.fill(`${firstReceipt}\n\n${secondReceipt}`);
-  await expect(guestResult).toContainText("OpenAI");
-  await expect(guestResult.getByText("Proof", { exact: true })).toBeVisible();
-  await expect(guestResult.getByText("Next renewal", { exact: true })).toBeVisible();
-
-  // 6-8. Choose the save path, use legitimate test auth, and persist guest evidence.
-  await guestResult.getByRole("link", { name: "Save this audit" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Know what’s renewing before you pay for it");
+  await tabToAndActivate(page, "Sign in");
   await expect(page).toHaveURL(/\/login\?next=/);
-  await expect(page.getByRole("button", { name: "Save this audit with Google" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await loginAsDevelopmentUser(page);
-  await expect(page.getByRole("heading", { level: 1, name: "Your recurring money" })).toBeVisible();
-  await expect(page.getByText("Your evidence survived sign-in")).toBeVisible();
-  await expect(page.getByText(/evidence items? saved into Recovery/)).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your subscriptions" })).toBeVisible();
 
-  // 9-13. Home, honest baseline, Needs Me, Next, and Coverage.
-  await expect(page.getByRole("heading", { name: "WHAT NEEDS ME?" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "WHAT CHANGED?" })).toBeVisible();
-  await expect(page.getByText("There is nothing earlier to compare this against")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "WHAT HAPPENS NEXT?" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "COVERAGE" })).toBeVisible();
+  // 4-7. Use the explicit manual fallback once and persist real-format receipts.
+  await selectRecoveryView(page, "Sources");
+  await page.getByText("Manual fallback", { exact: true }).click();
+  const receiptInput = page.getByLabel("Receipt or invoice text");
+  await receiptInput.fill(`${firstReceipt}\n\n${secondReceipt}`);
+  await page.getByRole("button", { name: "Save this receipt as evidence" }).click();
+  await expect(page.getByRole("heading", { name: "What the workspace did with it" })).toBeVisible();
+  await expect(page.getByText("Accepted", { exact: true }).first()).toBeVisible();
+  await selectRecoveryView(page, "Home");
+
+  // 8-11. Home shows attention, upcoming charges, and source freshness without a fake comparison.
+  await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Receipts checked" })).toBeVisible();
   await expect(page.getByText("OpenAI").first()).toBeVisible();
   await expectNoSeriousAxeViolations(page, "Recovery Home baseline");
   await expectNoHorizontalOverflow(page);
@@ -126,45 +118,45 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
   await amountHistory.getByRole("button", { name: "Reverse this correction" }).click();
   await expect(amountHistory.getByText("Reversed", { exact: true })).toBeVisible();
 
-  // 22-26. Exercise every decision and observe each saved server row.
-  for (const decision of ["Keep", "Monitor", "Downgrade", "Cancel", "Investigate"]) {
-    const group = page.getByRole("group", { name: "Decision" });
-    const button = group.getByRole("button", { name: new RegExp(`^${decision}`) });
+  // 22-26. Exercise every stored decision through three primary and two secondary user choices.
+  await page.getByText("More choices").click();
+  for (const decision of ["Keep", "Review later", "Consider a cheaper plan", "Plan to cancel", "I don’t recognize this"]) {
+    const button = page.getByRole("button", { name: decision, exact: true });
     await button.click();
     await expect(button).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByText(new RegExp(`Recorded ${decision} on`))).toBeVisible();
+    await expect(page.getByText(new RegExp(`Saved ${escapeRegExp(decision)} on`))).toBeVisible();
   }
   await expectNoSeriousAxeViolations(page, "corrected commitment detail");
 
   // 27. Reload and verify the saved correction and final decision remain visible.
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1, name: "Your recurring money" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your subscriptions" })).toBeVisible();
   await openCommitment(page, "OpenAI India");
-  await expect(page.getByText(/Recorded Investigate on/)).toBeVisible();
+  await expect(page.getByText(/Saved I don’t recognize this on/)).toBeVisible();
   await expect(page.getByText("Merchant set to “OpenAI India”")).toBeVisible();
 
   // 28. Logout/relogin through visible controls and verify the same saved truth.
-  await selectRecoveryView(page, "Profile");
+  await page.getByRole("link", { name: new RegExp(`Account for ${email}`) }).click();
+  await page.getByText("Account", { exact: true }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);
   await loginAsDevelopmentUser(page);
   await expect(page.getByText("OpenAI India").first()).toBeVisible();
 
   // 29. Add later evidence and verify a real Changed event replaces the baseline.
-  await selectRecoveryView(page, "Add evidence");
+  await selectRecoveryView(page, "Sources");
+  await page.getByText("Manual fallback", { exact: true }).click();
   await page.getByLabel("Receipt or invoice text").fill(laterReceipt);
   await page.getByRole("button", { name: "Save this receipt as evidence" }).click();
   await expect(page.getByRole("heading", { name: "What the workspace did with it" })).toBeVisible();
   await expect(page.getByText("Accepted", { exact: true })).toBeVisible();
   await selectRecoveryView(page, "Home");
-  await expect(page.getByText(/Compared version \d+ against version \d+/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Since your last visit" })).toBeVisible();
   await expect(page.getByText("Amount changed").first()).toBeVisible();
-  await expect(page.getByText("There is nothing earlier to compare this against")).toHaveCount(0);
 
   // 30. Exercise canonical export and canonical deletion through Account settings.
-  await selectRecoveryView(page, "Profile");
-  await page.getByRole("link", { name: "Open canonical privacy export" }).click();
-  await expect(page).toHaveURL(/\/profile#privacy-export$/);
+  await page.getByRole("link", { name: new RegExp(`Account for ${email}`) }).click();
+  await expect(page).toHaveURL(/\/profile$/);
   await page.getByText("Privacy", { exact: true }).click();
   const exportButton = page.getByRole("button", { name: "Download my data" });
   await expect(exportButton).toBeEnabled();
@@ -178,7 +170,10 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
   const deleteButton = page.getByRole("button", { name: "Delete server data" });
   await expect(deleteButton).toBeEnabled();
   await deleteButton.click();
-  await expect(page.getByText(/Deleted 1 workspace\(s\) and signed out/)).toBeVisible();
+  await expect(page).toHaveURL(/\/profile$/);
+  await expect(page.getByRole("heading", { name: "Your Vognary account was deleted" })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText(/Deleted 1 workspace\(s\) and signed out/);
+  await expect(page.getByRole("status")).toContainText(/Provider-held copies and backups/);
 
   expect(runtimeFailures).toEqual([]);
 });
@@ -195,7 +190,9 @@ async function resetCustomerZeroThroughUi(page: Page) {
   const deleteButton = page.getByRole("button", { name: "Delete server data" });
   await expect(deleteButton).toBeEnabled();
   await deleteButton.click();
-  await expect(page.getByText(/Deleted 1 workspace\(s\) and signed out/)).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/profile");
+  await expect(page.getByRole("heading", { name: "Your Vognary account was deleted" })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText(/Deleted 1 workspace\(s\) and signed out/);
   await page.context().clearCookies();
 }
 
@@ -207,15 +204,15 @@ async function loginAsDevelopmentUser(page: Page) {
   await page.getByRole("button", { name: "Sign in as developer" }).click();
   await page.waitForURL(/\/app$/);
   await page.waitForLoadState("domcontentloaded");
-  await expect(page.getByRole("heading", { level: 1, name: "Your recurring money" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your subscriptions" })).toBeVisible();
 }
 
-async function selectRecoveryView(page: Page, name: "Home" | "Commitments" | "Add evidence" | "Profile") {
+async function selectRecoveryView(page: Page, name: "Home" | "Subscriptions" | "Sources") {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name }).click();
 }
 
 async function openCommitment(page: Page, merchant: string) {
-  await selectRecoveryView(page, "Commitments");
+  await selectRecoveryView(page, "Subscriptions");
   await page.getByRole("button", { name: new RegExp(merchant) }).first().click();
   await expect(page.getByRole("heading", { name: merchant })).toBeVisible();
 }
@@ -255,6 +252,10 @@ async function expectNoSeriousAxeViolations(page: Page, label: string) {
 
 async function expectNoHorizontalOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function collectRuntimeFailures(page: Page) {

@@ -1,15 +1,14 @@
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { guestAuditTransferBindingKey, guestAuditTransferKey } from "@/lib/guest-audit-transfer";
 import {
   fetchConsentRecords,
-  fetchPlatformTokens,
   fetchPrivacyRequests,
   fetchRenewalAlertPreference,
   fetchRetentionPolicy,
 } from "./profile-api";
 import type {
   ConsentRecord,
-  PlatformTokenSummary,
   PrivacyRequest,
   ProfilePayload,
   ProfileStatuses,
@@ -24,22 +23,18 @@ const initialStatuses: ProfileStatuses = {
   notifications: "Loading reminder settings…",
   privacyConsent: "Loading privacy choices…",
   privacyData: "Loading export and retention controls…",
-  developer: "Loading developer access…",
   danger: "",
 };
 export function useProfileSettings() {
+  const router = useRouter();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [statuses, setStatuses] = useState<ProfileStatuses>(initialStatuses);
   const [deleteText, setDeleteText] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [deletionComplete, setDeletionComplete] = useState(false);
   const [consents, setConsents] = useState<ConsentRecord[]>([]);
   const [consentsAvailable, setConsentsAvailable] = useState<boolean | null>(null);
   const [consentBusy, setConsentBusy] = useState(false);
-  const [platformTokens, setPlatformTokens] = useState<PlatformTokenSummary[]>([]);
-  const [developerAvailable, setDeveloperAvailable] = useState<boolean | null>(null);
-  const [tokenName, setTokenName] = useState("Finance automation");
-  const [createdToken, setCreatedToken] = useState<string | null>(null);
-  const [tokenBusy, setTokenBusy] = useState(false);
   const [renewalAlerts, setRenewalAlerts] = useState<RenewalAlertPreference | null>(null);
   const [renewalAlertBusy, setRenewalAlertBusy] = useState(false);
   const [retentionPolicy, setRetentionPolicy] = useState<RetentionPolicy | null>(null);
@@ -103,23 +98,6 @@ export function useProfileSettings() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchPlatformTokens()
-      .then((tokens) => {
-        if (cancelled) return;
-        setPlatformTokens(tokens);
-        setDeveloperAvailable(true);
-        setStatus("developer", "Developer access loaded.");
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        setDeveloperAvailable(false);
-        setStatus("developer", errorMessage(error, "Developer access is unavailable for this account."));
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
     fetchConsentRecords()
       .then((records) => {
         if (cancelled) return;
@@ -146,7 +124,8 @@ export function useProfileSettings() {
         setStatus("account", "Could not sign out. Please retry.");
         return;
       }
-      window.location.href = "/login";
+      router.replace("/login");
+      router.refresh();
     } catch {
       setStatus("account", "Could not sign out. Check your connection and retry.");
     }
@@ -175,9 +154,12 @@ export function useProfileSettings() {
       const providerFollowUp = Array.isArray(payload.providerRevocations)
         ? payload.providerRevocations
           .filter((outcome: { remoteCredentialMayRemainActive?: boolean }) => outcome.remoteCredentialMayRemainActive)
-          .map((outcome: { connectorId?: string; message?: string }) => `${outcome.connectorId ?? "Provider"}: ${outcome.message ?? "Revoke the credential at the provider."}`)
+          .map((outcome: { connectorId?: string; message?: string }) => (
+            `${outcome.connectorId ?? "Provider"}: ${outcome.message ?? "Revoke or rotate the credential in the provider account."}`
+          ))
         : [];
       setProfile(null);
+      setDeletionComplete(true);
       setStatus("danger", [
         `Deleted ${payload.deletedOwnedWorkspaces ?? 0} workspace(s) and signed out.`,
         ...providerFollowUp,
@@ -233,64 +215,6 @@ export function useProfileSettings() {
     enabledMessage: "Anonymous category benchmarks enabled. Direct identifiers and source evidence remain excluded.",
     disabledMessage: "Anonymous benchmark consent withdrawn; this workspace is excluded from future cohorts.",
   });
-  async function createReadOnlyApiToken() {
-    setTokenBusy(true);
-    setCreatedToken(null);
-    setStatus("developer", "Creating a read-only platform token…");
-    try {
-      const response = await fetch("/api/platform/tokens", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: tokenName, scopes: ["ledger:read", "sources:read"], expiresInDays: 90 }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setStatus("developer", payload.error ?? "Could not create API token.");
-        return;
-      }
-      setCreatedToken(payload.token ?? null);
-      setPlatformTokens(await fetchPlatformTokens());
-      setStatus("developer", "Read-only API token created. Copy it now; only its hash is stored.");
-    } catch {
-      setStatus("developer", "Could not create API token. Check your connection and retry.");
-    } finally {
-      setTokenBusy(false);
-    }
-  }
-
-  async function revokeReadOnlyApiToken(id: string) {
-    setTokenBusy(true);
-    setStatus("developer", "Revoking platform token…");
-    try {
-      const response = await fetch("/api/platform/tokens", {
-        method: "DELETE",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setStatus("developer", payload.error ?? "Could not revoke API token.");
-        return;
-      }
-      setPlatformTokens(await fetchPlatformTokens());
-      setStatus("developer", "Platform token revoked immediately.");
-    } catch {
-      setStatus("developer", "Could not revoke API token. Check your connection and retry.");
-    } finally {
-      setTokenBusy(false);
-    }
-  }
-
-  async function copyCreatedToken() {
-    if (!createdToken) return;
-    try {
-      await navigator.clipboard.writeText(createdToken);
-      setStatus("developer", "API token copied to clipboard.");
-    } catch {
-      setStatus("developer", "Could not copy automatically. Select and copy the token manually.");
-    }
-  }
-
   async function saveRenewalAlerts(next: RenewalAlertPreference) {
     setRenewalAlertBusy(true);
     setStatus("notifications", next.enabled ? "Saving renewal reminders…" : "Turning renewal reminders off…");
@@ -388,11 +312,9 @@ export function useProfileSettings() {
   }
 
   return {
-    profile, statuses, deleteText, deleting, setDeleteText, deleteMyData, signOut,
+    profile, statuses, deleteText, deleting, deletionComplete, setDeleteText, deleteMyData, signOut,
     consentsAvailable, analyticsConsent, benchmarkConsent, consentBusy, toggleAnalyticsConsent, toggleBenchmarkConsent,
     renewalAlerts, renewalAlertBusy, setRenewalAlerts, saveRenewalAlerts,
-    developerAvailable, platformTokens, tokenName, createdToken, tokenBusy, setTokenName,
-    createReadOnlyApiToken, revokeReadOnlyApiToken, copyCreatedToken,
     privacyLifecycleAvailable, retentionPolicy, privacyRequests, privacyBusy, setRetentionPolicy,
     saveRetentionPolicy, createAndDownloadPrivacyExport,
   };

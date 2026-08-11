@@ -1,7 +1,5 @@
 import { headers } from "next/headers";
-import { permanentRedirect } from "next/navigation";
-import { getConnectorById } from "@/lib/connectors";
-import { getConnectorHonesty } from "@/lib/connector-runtime";
+import { permanentRedirect, redirect } from "next/navigation";
 import { readCurrentSession } from "@/lib/server/session";
 import { getRecoveryCutoverStatus } from "@/lib/server/recovery-store";
 import ExperienceClient from "./experience-client";
@@ -19,23 +17,11 @@ export default async function AppPage({ searchParams }: AppPageProps) {
   }
 
   const session = await readRequestSession();
+  if (!session) redirect("/login?next=/app");
   const recoveryCutover = session?.workspaceId
     ? await getRecoveryCutoverStatus({ workspaceId: session.workspaceId, actorUserId: session.userId })
     : null;
-  return <ExperienceClient signedIn={Boolean(session)} recoveryCutover={recoveryCutover} gmailConnect={readGmailConnectAvailability()} />;
-}
-
-// Honesty state for the guest "Connect Gmail" card, resolved server-side so the
-// card can never promise a connection this deployment cannot deliver.
-function readGmailConnectAvailability() {
-  const connector = getConnectorById("gmail-readonly");
-  if (!connector) return { available: false, label: "Unavailable", meaning: "Gmail sync is not registered in this deployment." };
-  const honesty = getConnectorHonesty(connector);
-  return {
-    available: honesty.state === "live" || honesty.state === "setup-ready",
-    label: honesty.label,
-    meaning: honesty.meaning,
-  };
+  return <ExperienceClient recoveryCutover={recoveryCutover} />;
 }
 
 function buildCanonicalAppUrl(params: Record<string, string | string[] | undefined>) {

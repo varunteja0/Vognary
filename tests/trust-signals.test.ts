@@ -13,11 +13,16 @@ const names = [
   "BACKUP_RESTORE_DRILL_AT",
   "BACKUP_KEY_FINGERPRINT",
   "BACKUP_ENCRYPTION_KEY",
-  "GOOGLE_OAUTH_VERIFICATION_COMPLETE",
-  "ACCOUNT_AGGREGATOR_PARTNER_STATUS",
-  "UPI_MANDATE_PARTNER_STATUS",
-  "CARD_MANDATE_PARTNER_STATUS",
-  "SYNC_SCHEDULER_STATUS",
+  "ENABLE_RECEIPT_INBOX",
+  "RESEND_RECEIVING_API_KEY",
+  "RESEND_INBOUND_WEBHOOK_SECRET",
+  "RESEND_RECEIVING_DOMAIN",
+  "RECEIPT_INBOX_ALIAS_HMAC_SECRET",
+  "RECEIPT_INBOX_ALIAS_HMAC_KEY_ID",
+  "RECEIPT_INBOX_PROVIDER_STATUS",
+  "RECEIPT_INBOX_WEBHOOK_PROOF_STATUS",
+  "RECEIPT_INBOX_REPLAY_PROOF_STATUS",
+  "RECEIPT_INBOX_RETENTION_REVIEW_STATUS",
   "RETENTION_SCHEDULER_STATUS",
   "RENEWAL_ALERT_DELIVERY_STATUS",
   "DATABASE_URL",
@@ -50,7 +55,7 @@ function withEnvironment(overrides: Partial<Record<(typeof names)[number], strin
 test("a blank environment proves nothing", () => {
   withEnvironment({}, () => {
     const signals = getPublicTrustSignals();
-    assert.equal(signals.length, 9);
+    assert.equal(signals.length, 7);
     for (const signal of signals) {
       assert.equal(signal.state, "not-yet-proven", `${signal.id} must not claim readiness on blank env`);
     }
@@ -64,11 +69,19 @@ test("configuration and operator attestations flip the matching signals", () => 
     BACKUP_STORAGE_BUCKET: "vognary-backups",
     BACKUP_RESTORE_DRILL_STATUS: "passed",
     BACKUP_KEY_FINGERPRINT: "test-fingerprint",
-    GOOGLE_OAUTH_VERIFICATION_COMPLETE: "true",
-    ACCOUNT_AGGREGATOR_PARTNER_STATUS: "production-live",
-    UPI_MANDATE_PARTNER_STATUS: "production-live",
-    CARD_MANDATE_PARTNER_STATUS: "production-live",
-    SYNC_SCHEDULER_STATUS: "production-live",
+    DATABASE_URL: "postgresql://vognary.test/vognary",
+    GOOGLE_AUTH_CLIENT_ID: "trust-signal-google-client-id",
+    GOOGLE_AUTH_CLIENT_SECRET: "trust-signal-google-client-secret",
+    ENABLE_RECEIPT_INBOX: "true",
+    RESEND_RECEIVING_API_KEY: "re_receiving_test",
+    RESEND_INBOUND_WEBHOOK_SECRET: "whsec_receiving_test",
+    RESEND_RECEIVING_DOMAIN: "receipts.vognary.test",
+    RECEIPT_INBOX_ALIAS_HMAC_SECRET: "22".repeat(32),
+    RECEIPT_INBOX_ALIAS_HMAC_KEY_ID: "receipt-alias-v1",
+    RECEIPT_INBOX_PROVIDER_STATUS: "production-live",
+    RECEIPT_INBOX_WEBHOOK_PROOF_STATUS: "passed",
+    RECEIPT_INBOX_REPLAY_PROOF_STATUS: "passed",
+    RECEIPT_INBOX_RETENTION_REVIEW_STATUS: "approved",
     RETENTION_SCHEDULER_STATUS: "production-live",
     RENEWAL_ALERT_DELIVERY_STATUS: "production-live",
   }, () => {
@@ -76,9 +89,7 @@ test("configuration and operator attestations flip the matching signals", () => 
     assert.equal(byId.get("session-signing")?.state, "configured");
     assert.equal(byId.get("token-vault")?.state, "configured");
     assert.equal(byId.get("backups")?.state, "proven");
-    assert.equal(byId.get("gmail-verification")?.state, "proven");
-    assert.equal(byId.get("bank-rails")?.state, "proven");
-    assert.equal(byId.get("sync-scheduler")?.state, "proven");
+    assert.equal(byId.get("receipt-inbox")?.state, "configured");
     assert.equal(byId.get("retention-scheduler")?.state, "proven");
     assert.equal(byId.get("renewal-alert-delivery")?.state, "proven");
   });

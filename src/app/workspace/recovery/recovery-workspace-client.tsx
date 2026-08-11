@@ -1,7 +1,7 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   buildGuestAuditTransferBinding,
   guestAuditTransferBindingKey,
@@ -26,7 +26,7 @@ import { RecoveryCommitments, type CommitmentsHandlers } from "./recovery-commit
 import { RecoveryDialog } from "./recovery-dialog";
 import { CorrectionForm, EvidenceInspector } from "./recovery-evidence-panels";
 import { RecoveryHome } from "./recovery-home";
-import { RecoveryProfile } from "./recovery-profile";
+import { RecoverySources } from "./recovery-sources";
 import { AuthRequiredBlock, FailureBlock, LoadingBlock, OfflineBlock, StateBlock } from "./recovery-states";
 import {
   correctionPatchFromDraft,
@@ -92,10 +92,7 @@ async function readRecoverySnapshot(transport: RecoveryTransport): Promise<Recov
 export default function RecoveryWorkspaceClient() {
   const [state, dispatch] = useReducer(recoveryReducer, initialRecoveryState);
   const transport = useMemo(() => createRecoveryTransport(), []);
-  const router = useRouter();
   const [correctionError, setCorrectionError] = useState<string | null>(null);
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
-  const [signingOut, setSigningOut] = useState(false);
   const [loadingMoreCommitments, setLoadingMoreCommitments] = useState(false);
   const [guestTransferStatus, setGuestTransferStatus] = useState<GuestTransferStatus>({ kind: "IDLE" });
   const [guestTransferAttempt, setGuestTransferAttempt] = useState(0);
@@ -121,6 +118,13 @@ export default function RecoveryWorkspaceClient() {
       meta: snapshot.home.meta,
     });
     return true;
+  }, [transport]);
+
+  const loadSources = useCallback(async () => {
+    dispatch({ type: "SOURCES_REQUESTED" });
+    const result = await transport.sources();
+    if (result.ok) dispatch({ type: "SOURCES_LOADED", receiptInbox: result.data, meta: result.meta });
+    else dispatch({ type: "SOURCES_FAILED", failure: result });
   }, [transport]);
 
   useEffect(() => {
@@ -161,7 +165,7 @@ export default function RecoveryWorkspaceClient() {
         });
         setGuestTransferStatus({
           kind: "RETAINED",
-          detail: "This browser would not allow the workspace to read the staged guest audit. Nothing was cleared. Allow session storage, then retry.",
+          detail: "This browser would not allow the workspace to read earlier staged evidence. Nothing was cleared. Allow session storage, then retry.",
           retryable: true,
         });
         return;
@@ -197,7 +201,7 @@ export default function RecoveryWorkspaceClient() {
         });
         setGuestTransferStatus({
           kind: "RETAINED",
-          detail: "The staged guest audit is expired or unreadable. It remains in this tab and was not treated as saved evidence.",
+          detail: "The earlier staged evidence is expired or unreadable. It remains in this tab and was not treated as saved evidence.",
           retryable: false,
         });
         return;
@@ -226,7 +230,7 @@ export default function RecoveryWorkspaceClient() {
           });
           setGuestTransferStatus({
             kind: "RETAINED",
-            detail: "This staged guest audit belongs to a different signed account in this tab. It was not imported or cleared.",
+            detail: "This staged evidence belongs to a different signed account in this tab. It was not imported or cleared.",
             retryable: false,
           });
           return;
@@ -279,7 +283,7 @@ export default function RecoveryWorkspaceClient() {
       if (!finalSnapshot.ok) {
         setGuestTransferStatus({
           kind: "RETAINED",
-          detail: "The workspace could not verify the final saved view. The staged guest audit remains in this tab.",
+          detail: "The workspace could not verify the final saved view. The staged evidence remains in this tab.",
           retryable: true,
         });
         return dispatch({ type: "SNAPSHOT_FAILED", failure: finalSnapshot.failure });
@@ -295,10 +299,10 @@ export default function RecoveryWorkspaceClient() {
 
       if (!persisted.ok) {
         const detail = persisted.reason === "SUBMISSION_FAILED"
-          ? `Saving stopped before every staged item was confirmed. The guest audit remains in this tab.${transferFailure.current ? ` Reference ${transferFailure.current.error.requestId}.` : ""}`
+          ? `Saving stopped before every staged item was confirmed. The staged evidence remains in this tab.${transferFailure.current ? ` Reference ${transferFailure.current.error.requestId}.` : ""}`
           : persisted.reason === "PERSISTENCE_UNCONFIRMED"
-            ? "The workspace did not accept every staged item. The guest audit remains in this tab and was not labelled fully saved."
-            : "The staged guest audit contains no supported evidence that Recovery can save. It remains in this tab.";
+            ? "The workspace did not accept every staged item. The staged evidence remains in this tab and was not labelled fully saved."
+            : "The staged copy contains no supported evidence that Recovery can save. It remains in this tab.";
         setGuestTransferStatus({ kind: "RETAINED", detail, retryable: persisted.reason === "SUBMISSION_FAILED" });
         return;
       }
@@ -309,7 +313,7 @@ export default function RecoveryWorkspaceClient() {
       if (!reflectedInWorkspace) {
         setGuestTransferStatus({
           kind: "RETAINED",
-          detail: "The workspace accepted evidence but did not yet confirm a canonical commitment in Home. The staged guest audit remains in this tab.",
+          detail: "The workspace accepted evidence but did not yet confirm a canonical commitment in Home. The staged evidence remains in this tab.",
           retryable: true,
         });
         return;
@@ -317,7 +321,7 @@ export default function RecoveryWorkspaceClient() {
       if (persisted.unsupportedSourceNames.length || persisted.unsupportedManualItemCount) {
         setGuestTransferStatus({
           kind: "RETAINED",
-          detail: "Supported guest evidence is saved, but some staged file or manual-only claims were not promoted to canonical truth. The complete guest audit remains in this tab.",
+          detail: "Supported staged evidence is saved, but some file or manual-only claims were not promoted to canonical truth. The complete staged copy remains in this tab.",
           retryable: false,
         });
         return;
@@ -327,7 +331,7 @@ export default function RecoveryWorkspaceClient() {
         if (window.sessionStorage.getItem(guestAuditTransferKey) !== rawTransfer) {
           setGuestTransferStatus({
             kind: "RETAINED",
-            detail: "The staged guest audit changed while saving. The newer copy remains in this tab and was not cleared.",
+            detail: "The staged evidence changed while saving. The newer copy remains in this tab and was not cleared.",
             retryable: true,
           });
           return;
@@ -336,7 +340,7 @@ export default function RecoveryWorkspaceClient() {
         window.sessionStorage.removeItem(guestAuditTransferBindingKey);
         setGuestTransferStatus({
           kind: "SAVED",
-          detail: `${persisted.acceptedEvidenceCount} evidence item${persisted.acceptedEvidenceCount === 1 ? "" : "s"} saved into Recovery. The staged guest copy was cleared only after Home confirmed it.`,
+          detail: `${persisted.acceptedEvidenceCount} evidence item${persisted.acceptedEvidenceCount === 1 ? "" : "s"} saved into Recovery. The staged copy was cleared only after Home confirmed it.`,
         });
       } catch {
         setGuestTransferStatus({
@@ -350,6 +354,23 @@ export default function RecoveryWorkspaceClient() {
       cancelled = true;
     };
   }, [guestTransferAttempt, transport]);
+
+  useEffect(() => {
+    if (state.view !== "ADD_EVIDENCE") return;
+    void loadSources();
+  }, [loadSources, state.view]);
+
+  useEffect(() => {
+    if (state.view === "ADD_EVIDENCE" && state.sourceStatus.kind === "READY" && state.refreshRequired) {
+      void loadSnapshot();
+    }
+  }, [loadSnapshot, state.refreshRequired, state.sourceStatus.kind, state.view]);
+
+  useEffect(() => {
+    if (state.view !== "ADD_EVIDENCE" || !state.receiptInbox?.alias) return;
+    const interval = window.setInterval(() => void loadSources(), 10_000);
+    return () => window.clearInterval(interval);
+  }, [loadSources, state.receiptInbox, state.view]);
 
   const { selectedCommitmentId, detailEvidenceCursor, detailRefreshToken } = state;
   useEffect(() => {
@@ -512,11 +533,17 @@ export default function RecoveryWorkspaceClient() {
     });
   }
 
-  async function signOut() {
-    setSigningOut(true);
-    await transport.logout();
-    router.push("/login?next=/app");
-    router.refresh();
+  async function updateReceiptInbox(action: "PROVISION" | "ROTATE" | "REVOKE") {
+    const activeAliasId = state.receiptInbox?.alias?.id ?? null;
+    if (action === "ROTATE" && !activeAliasId) return;
+    dispatch({ type: "SOURCE_ACTION_STARTED", action });
+    const result = action === "PROVISION"
+      ? await transport.provisionReceiptInbox()
+      : action === "ROTATE"
+        ? await transport.rotateReceiptInbox(activeAliasId!, newIdempotencyKey())
+        : await transport.revokeReceiptInbox();
+    if (result.ok) dispatch({ type: "SOURCE_ACTION_SAVED", receiptInbox: result.data, meta: result.meta });
+    else dispatch({ type: "SOURCE_ACTION_FAILED", failure: result });
   }
 
   async function loadMoreCommitments() {
@@ -550,21 +577,34 @@ export default function RecoveryWorkspaceClient() {
   };
 
   const workspaceEmpty = state.home !== null && state.commitments.length === 0 && state.home.coverage.evidenceCount === 0;
+  const accountEmail = state.session?.authenticated ? state.session.session.email : null;
   return (
     <main id="recovery-workspace" className="relative px-4 pb-28 pt-5 text-foreground sm:px-6 sm:pb-10 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2.5">
             <VognaryMark size={24} />
-            <h1 className="font-display text-lg font-semibold text-(--ink)">Your recurring money</h1>
+            <h1 className="font-display text-lg font-semibold text-(--ink)">Your subscriptions</h1>
           </div>
-          <p className="font-data text-xs text-(--muted)">
-            {state.workspaceVersion === null ? "Loading your saved workspace…" : `Saved workspace · version ${state.workspaceVersion}`}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="hidden font-data text-xs text-(--muted) sm:block">
+              {state.workspaceVersion === null ? "Loading your workspace…" : "Saved to Vognary"}
+            </p>
+            <Link
+              href="/profile"
+              aria-label={accountEmail ? `Account for ${accountEmail}` : "Account"}
+              className="btn btn-sm btn-ghost"
+            >
+              <span aria-hidden className="grid size-6 place-items-center rounded-full bg-(--card-2) font-data text-xs text-(--ink)">
+                {accountEmail?.charAt(0).toUpperCase() ?? "A"}
+              </span>
+              <span className="hidden sm:inline">Account</span>
+            </Link>
+          </div>
         </header>
 
         <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 py-2 sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
-          <ul className="grid grid-cols-4 gap-1 sm:flex sm:gap-2">
+          <ul className="grid grid-cols-3 gap-1 sm:flex sm:gap-2">
             {recoveryViews.map((view) => (
               <li key={view} className="min-w-0">
                 <button
@@ -661,89 +701,37 @@ export default function RecoveryWorkspaceClient() {
           />
         </RecoveryDialog>
       ) : null}
-
-      {state.dialog?.kind === "DELETE_WORKSPACE_DATA" ? (
-        <RecoveryDialog
-          title="Delete saved workspace data"
-          description="This removes the saved evidence, commitments, corrections, and decisions behind everything you have seen. It cannot be undone."
-          onClose={() => dispatch({ type: "DIALOG_CLOSED" })}
-          returnFocusId={state.returnFocusId}
-          tone="destructive"
-          footer={
-            <>
-              <button type="button" onClick={() => dispatch({ type: "DIALOG_CLOSED" })} className="btn btn-ghost">Keep my data</button>
-              <a
-                href="/profile#delete-account"
-                aria-disabled={deleteConfirmation !== "DELETE"}
-                onClick={(event) => {
-                  if (deleteConfirmation !== "DELETE") event.preventDefault();
-                }}
-                className={`btn btn-ember ${deleteConfirmation === "DELETE" ? "" : "pointer-events-none opacity-50"}`}
-              >
-                Continue to permanent deletion
-              </a>
-            </>
-          }
-        >
-          <div className="grid gap-3">
-            <p className="text-sm leading-6 text-(--ink-soft)">
-              Deletion is executed by account settings, which owns the permanent erase of every Vognary record for this account — not only this
-              workspace view. This step exists so it can never happen by accident.
-            </p>
-            <label className="grid gap-1.5">
-              <span className="field-label">Type DELETE to confirm you understand this is permanent</span>
-              <input
-                className="field field-mono"
-                value={deleteConfirmation}
-                onChange={(event) => setDeleteConfirmation(event.target.value)}
-                autoComplete="off"
-                aria-describedby="recovery-delete-hint"
-              />
-              <span id="recovery-delete-hint" className="field-hint">
-                Nothing is deleted by this dialog. Confirming takes you to account settings, where the deletion is performed and confirmed again.
-              </span>
-            </label>
-          </div>
-        </RecoveryDialog>
-      ) : null}
     </main>
   );
 
   function renderView() {
-    if (state.view === "PROFILE") {
+    if (state.view === "ADD_EVIDENCE") {
       return (
-        <RecoveryProfile
-          session={state.session}
-          workspaceVersion={state.workspaceVersion}
-          generatedAt={state.home?.generatedAt ?? null}
-          commitmentCount={state.commitmentTotal}
-          evidenceCount={state.home?.coverage.evidenceCount ?? 0}
-          signingOut={signingOut}
-          onRequestDelete={(returnFocusId) => {
-            setDeleteConfirmation("");
-            dispatch({ type: "DIALOG_OPENED", dialog: { kind: "DELETE_WORKSPACE_DATA" }, returnFocusId });
-          }}
-          onSignOut={() => void signOut()}
-        />
-      );
-    }
-
-    if (state.view === "ADD_EVIDENCE" || (workspaceEmpty && state.view === "HOME")) {
-      return (
-        <RecoveryAddEvidence
-          draft={state.evidenceDraft}
-          submission={state.submission}
-          failure={state.evidenceFailure}
-          pending={state.pending?.kind === "EVIDENCE"}
-          online={state.online}
-          variant={workspaceEmpty ? "EMPTY_WORKSPACE" : "FULL"}
-          handlers={{
-            onModeChange: (mode) => dispatch({ type: "EVIDENCE_MODE_SELECTED", mode }),
-            onReceiptChange: (text) => dispatch({ type: "RECEIPT_DRAFT_CHANGED", text }),
-            onFilesChosen: (files) => void prepareFiles(files),
-            onRemoveSource: (clientRef) => dispatch({ type: "CSV_SOURCE_REMOVED", clientRef }),
-            onSubmit: (mode) => void submitEvidence(mode),
-          }}
+        <RecoverySources
+          receiptInbox={state.receiptInbox}
+          sourceStatus={state.sourceStatus}
+          pendingAction={state.pendingSourceAction}
+          onProvision={() => void updateReceiptInbox("PROVISION")}
+          onRotate={() => void updateReceiptInbox("ROTATE")}
+          onRevoke={() => void updateReceiptInbox("REVOKE")}
+          onRetry={() => void loadSources()}
+          manualFallback={
+            <RecoveryAddEvidence
+              draft={state.evidenceDraft}
+              submission={state.submission}
+              failure={state.evidenceFailure}
+              pending={state.pending?.kind === "EVIDENCE"}
+              online={state.online}
+              variant={workspaceEmpty ? "EMPTY_WORKSPACE" : "FULL"}
+              handlers={{
+                onModeChange: (mode) => dispatch({ type: "EVIDENCE_MODE_SELECTED", mode }),
+                onReceiptChange: (text) => dispatch({ type: "RECEIPT_DRAFT_CHANGED", text }),
+                onFilesChosen: (files) => void prepareFiles(files),
+                onRemoveSource: (clientRef) => dispatch({ type: "CSV_SOURCE_REMOVED", clientRef }),
+                onSubmit: (mode) => void submitEvidence(mode),
+              }}
+            />
+          }
         />
       );
     }
@@ -771,9 +759,9 @@ function GuestTransferBlock({ status, onRetry }: { status: GuestTransferStatus; 
     return (
       <div role="status" aria-live="polite">
         <StateBlock
-          eyebrow="Saving guest evidence"
-          title="Moving this audit into your Recovery workspace"
-          detail="Recovery is saving each staged receipt and file through the canonical evidence path. The guest copy stays in this tab until Home confirms the persisted commitment."
+          eyebrow="Saving staged evidence"
+          title="Moving earlier evidence into your Recovery workspace"
+          detail="Recovery is saving each staged receipt and file through the canonical evidence path. The staged copy stays in this tab until Home confirms the persisted commitment."
         />
       </div>
     );
@@ -781,14 +769,14 @@ function GuestTransferBlock({ status, onRetry }: { status: GuestTransferStatus; 
   if (status.kind === "SAVED") {
     return (
       <div role="status" aria-live="polite">
-        <StateBlock eyebrow="Guest audit saved" title="Your evidence survived sign-in" detail={status.detail} />
+        <StateBlock eyebrow="Evidence imported" title="Earlier evidence was saved" detail={status.detail} />
       </div>
     );
   }
   return (
     <div role="alert">
-      <StateBlock eyebrow="Guest audit retained" title="The staged copy was not cleared" detail={status.detail} tone="caution">
-        {status.retryable ? <button type="button" onClick={onRetry} className="btn btn-sm btn-primary">Retry saving guest evidence</button> : null}
+      <StateBlock eyebrow="Staged evidence retained" title="The staged copy was not cleared" detail={status.detail} tone="caution">
+        {status.retryable ? <button type="button" onClick={onRetry} className="btn btn-sm btn-primary">Retry saving staged evidence</button> : null}
       </StateBlock>
     </div>
   );

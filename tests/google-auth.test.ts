@@ -125,7 +125,8 @@ test("Google sign-in advertises only a fully configured OIDC flow", async () => 
 
 test("Recovery login exposes Google as the only production save path", () => {
   const source = readFileSync("src/app/login/login-client.tsx", "utf8");
-  assert.match(source, /Save this audit with Google/);
+  assert.match(source, /Continue with Google/);
+  assert.match(source, /Google is only for sign-in\. Vognary does not access Gmail\./);
   assert.doesNotMatch(source, /\/api\/auth\/magic-link\/request|Send sign-in link|Email link/);
 });
 

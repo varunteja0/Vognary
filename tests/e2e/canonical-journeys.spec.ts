@@ -1,51 +1,41 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-const receiptEvidence = [
-  "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly.",
-  "Notion invoice paid INR 830 on 2026-07-01. Notion Plus renews monthly.",
-].join("\n\n");
-
-test("canonical product entry opens a real private audit without seeded data", async ({ page }) => {
+test("canonical product entry names unavailable forwarding without seeded data", async ({ page }) => {
   const failures = collectRuntimeFailures(page);
-  await page.goto("/app");
-  await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Know what renews before it charges" })).toBeVisible();
-  await expect(page.getByLabel("Paste receipts or invoices")).toHaveValue("");
-  await expect(page.getByRole("region", { name: "Your first audit result" })).toHaveCount(0);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "Know what’s renewing before you pay for it." })).toBeVisible();
+  await expect(page.getByText(/Receipt forwarding is not active in this deployment/i)).toBeVisible();
+  await expect(page.getByText(/does not access your inbox/i)).toBeVisible();
+  await expect(page.getByText(/sample audit/i)).toHaveCount(0);
   await expect(page.locator('a[href*="demo="], a[href*="guest="]')).toHaveCount(0);
   await expectNoSeriousAxeViolations(page);
   expect(failures).toEqual([]);
 });
 
-test("legacy mode URLs canonicalize to the production app without loading records", async ({ page }) => {
+test("legacy mode URLs canonicalize to the saved-workspace sign-in without loading demo records", async ({ page }) => {
   for (const legacyUrl of ["/app?demo=1", "/app?guest=1"]) {
     await page.goto(legacyUrl);
-    await expect(page).toHaveURL(/\/app$/);
-    await expect(page.getByLabel("Paste receipts or invoices")).toHaveValue("");
-    await expect(page.getByRole("region", { name: "Your first audit result" })).toHaveCount(0);
+    await expect(page).toHaveURL(/\/login\?next=(?:%2F|\/)app$/);
+    await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+    await expect(page.getByLabel("Paste receipts or invoices")).toHaveCount(0);
   }
 });
 
-test("mobile production entry keeps the first screen focused and bounded", async ({ page }) => {
+test("mobile production entry keeps the forwarding action focused and bounded", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto("/app");
+  await page.goto("/");
   const initial = await pageMetrics(page);
-  expect(initial.visibleControls).toBeLessThanOrEqual(10);
-  expect(initial.scrollHeight).toBeLessThanOrEqual(812 * 2.5);
+  expect(initial.visibleControls).toBeLessThanOrEqual(8);
+  expect(initial.scrollHeight).toBeLessThanOrEqual(812 * 3);
   expect(initial.horizontalOverflow).toBe(false);
 });
 
-test("real receipt evidence builds a proof-backed result and can be cleared", async ({ page }) => {
+test("signed-out app entry cannot expose manual or sample financial data", async ({ page }) => {
   await page.goto("/app");
-  await page.getByLabel("Paste receipts or invoices").fill(receiptEvidence);
-  const result = page.getByRole("region", { name: "Your first audit result" });
-  await expect(result).toBeVisible();
-  await expect(result.getByText("₹2,829")).toBeVisible();
-  await expect(result.getByText("Proof", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Clear this tab" }).click();
-  await expect(page.getByLabel("Paste receipts or invoices")).toHaveValue("");
-  await expect(result).toHaveCount(0);
+  await expect(page).toHaveURL(/\/login\?next=(?:%2F|\/)app$/);
+  await expect(page.getByLabel("Paste receipts or invoices")).toHaveCount(0);
+  await expect(page.getByText(/sample audit/i)).toHaveCount(0);
 });
 
 async function expectNoSeriousAxeViolations(page: Page) {
@@ -96,6 +86,11 @@ function collectRuntimeFailures(page: Page) {
   page.on("console", (message) => {
     if (message.type() === "error") failures.push(`console: ${message.text()}`);
   });
-  page.on("requestfailed", (request) => failures.push(`request: ${request.url()} ${request.failure()?.errorText ?? "failed"}`));
+  page.on("requestfailed", (request) => {
+    const error = request.failure()?.errorText ?? "failed";
+    const url = new URL(request.url());
+    if (error === "net::ERR_ABORTED" && request.method() === "GET" && url.searchParams.has("_rsc")) return;
+    failures.push(`request: ${request.url()} ${error}`);
+  });
   return failures;
 }

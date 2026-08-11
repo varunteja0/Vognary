@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: "Brand",
   description:
     "The Vognary brand basics: mark, colors, type, and downloadable assets.",
+  robots: { index: false, follow: false },
 };
 
 const grays: Array<[string, string]> = [

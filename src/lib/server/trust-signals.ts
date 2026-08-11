@@ -1,9 +1,8 @@
-import { getPartnerRailsStatus } from "@/lib/partner-rails";
 import { checkBackupConfiguration } from "./backup-readiness";
 import { checkGoogleAuthConfiguration } from "./google-auth";
-import { checkMagicLinkConfiguration } from "./magic-link-auth";
 import { checkSessionConfiguration } from "./session";
 import { checkTokenVaultConfiguration } from "./token-vault";
+import { getReceiptInboxLaunchReadiness } from "./recovery-inbound-store";
 
 export type TrustSignalState = "proven" | "configured" | "not-yet-proven";
 
@@ -12,9 +11,7 @@ export type TrustSignalId =
   | "token-vault"
   | "backups"
   | "identity-provider"
-  | "gmail-verification"
-  | "bank-rails"
-  | "sync-scheduler"
+  | "receipt-inbox"
   | "retention-scheduler"
   | "renewal-alert-delivery";
 
@@ -38,15 +35,7 @@ export function getPublicTrustSignals(): PublicTrustSignal[] {
     tokenVaultSignal(),
     backupSignal(),
     identitySignal(),
-    gmailVerificationSignal(),
-    bankRailSignal(),
-    attestationSignal(
-      "sync-scheduler",
-      "Background sync schedule",
-      process.env.SYNC_SCHEDULER_STATUS,
-      "An operator recorded the production sync schedule after observing it run.",
-      "No production sync schedule has been attested yet.",
-    ),
+    receiptInboxSignal(),
     attestationSignal(
       "retention-scheduler",
       "Retention enforcement schedule",
@@ -62,6 +51,18 @@ export function getPublicTrustSignals(): PublicTrustSignal[] {
       "Production renewal-alert delivery has not been attested yet.",
     ),
   ];
+}
+
+function receiptInboxSignal(): PublicTrustSignal {
+  const readiness = getReceiptInboxLaunchReadiness();
+  return {
+    id: "receipt-inbox",
+    label: "Receipt forwarding configuration",
+    state: readiness.status === "ready" ? "configured" : "not-yet-proven",
+    detail: readiness.status === "ready"
+      ? "Receiving configuration and operator evidence are present. The public entry still verifies required database migrations before offering forwarding."
+      : "Receipt forwarding is not offered until receiving, webhook, replay, retention, encryption, and database requirements are complete.",
+  };
 }
 
 function sessionSignal(): PublicTrustSignal {
@@ -129,17 +130,12 @@ function backupSignal(): PublicTrustSignal {
 
 function identitySignal(): PublicTrustSignal {
   const google = checkGoogleAuthConfiguration().status === "ready";
-  const magicLink = checkMagicLinkConfiguration().status === "ready";
-  if (google || magicLink) {
+  if (google) {
     return {
       id: "identity-provider",
       label: "Identity provider",
       state: "configured",
-      detail: google && magicLink
-        ? "Google sign-in and email magic-link sign-in are both active."
-        : google
-          ? "Google sign-in is active; the provider's issuer and subject are verified on every callback."
-          : "Email magic-link sign-in is active.",
+      detail: "Google sign-in is active; the provider's issuer and subject are verified on every callback.",
     };
   }
   return {
@@ -147,44 +143,6 @@ function identitySignal(): PublicTrustSignal {
     label: "Identity provider",
     state: "not-yet-proven",
     detail: "No identity provider is active in this deployment, so sign-in is unavailable.",
-  };
-}
-
-function gmailVerificationSignal(): PublicTrustSignal {
-  const complete = process.env.GOOGLE_OAUTH_VERIFICATION_COMPLETE === "true";
-  return {
-    id: "gmail-verification",
-    label: "Gmail read-only rail verification",
-    state: complete ? "proven" : "not-yet-proven",
-    detail: complete
-      ? "Google's restricted-scope review of read-only Gmail receipt access is complete."
-      : "Google's restricted-scope review is not complete, so the Gmail rail stays gated.",
-  };
-}
-
-function bankRailSignal(): PublicTrustSignal {
-  const status = getPartnerRailsStatus();
-  if (status === "production-live") {
-    return {
-      id: "bank-rails",
-      label: "Regulated bank rails",
-      state: "proven",
-      detail: "An approved regulated partner rail is live for consented bank data.",
-    };
-  }
-  if (status === "sandbox-approved" || status === "in-progress" || status === "outreach-started") {
-    return {
-      id: "bank-rails",
-      label: "Regulated bank rails",
-      state: "configured",
-      detail: "Partner onboarding is underway; no direct bank, UPI, or card-mandate access is offered in the meantime.",
-    };
-  }
-  return {
-    id: "bank-rails",
-    label: "Regulated bank rails",
-    state: "not-yet-proven",
-    detail: "No regulated partner rail is engaged; Vognary offers no direct bank, UPI, or card-mandate access.",
   };
 }
 

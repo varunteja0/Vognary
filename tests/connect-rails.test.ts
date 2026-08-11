@@ -134,14 +134,14 @@ test("consumer connection copy hides company infrastructure details", () => {
   assert.match(source, /No credentials or technical setup are required from you/);
 });
 
-test("consumer connector endpoints expose availability without infrastructure names", () => {
+test("consumer connector endpoints are retired without infrastructure names", () => {
   for (const path of [
     "../src/app/api/integrations/gmail/start/route.ts",
     "../src/app/api/integrations/gmail/callback/route.ts",
     "../src/app/api/integrations/aa/start/route.ts",
   ]) {
     const source = readFileSync(new URL(path, import.meta.url), "utf8");
-    assert.match(source, /company-activation-pending/);
+    assert.match(source, /legacyConnectorRetiredResponse|legacyConnectorRetirementPayload/);
     assert.doesNotMatch(source, /requiredEnv:\s*missingEnv/);
     assert.doesNotMatch(source, /requiredEnv,\s*\n/);
     assert.doesNotMatch(source, /partnerStatus:/);

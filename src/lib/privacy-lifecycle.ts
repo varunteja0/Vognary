@@ -90,6 +90,8 @@ export type PrivacyExportDocument = {
     corrections: Array<Record<string, unknown>>;
     decisions: Array<Record<string, unknown>>;
     changes: Array<Record<string, unknown>>;
+    inboundAliases: Array<Record<string, unknown>>;
+    inboundEvents: Array<Record<string, unknown>>;
   };
   productEvents: Array<Record<string, unknown>>;
   renewalAlertPreferences: Array<Record<string, unknown>>;
@@ -292,6 +294,7 @@ export function buildPrivacyExportDocument(input: Omit<PrivacyExportDocument, "e
       "Connector secrets and encrypted token material",
       "Raw connector and webhook payload bodies",
       "Raw Recovery evidence bodies, idempotency keys, and replay payloads",
+      "Receipt inbox addresses, alias HMACs, encrypted alias material, and provider replay identifiers",
       "Internal payload hashes, storage keys, and monitoring delivery details",
       "Data belonging only to other workspaces or users",
     ],

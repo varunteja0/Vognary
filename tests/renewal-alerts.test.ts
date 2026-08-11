@@ -39,18 +39,21 @@ test("weekly digest stays a separate opt-in and keeps currencies separate", () =
 
   const message = buildWeeklyDigestEmail({
     weekStart: "2026-07-20",
-    monthlyBurn: 2_829,
-    currency: "INR",
-    foreignMonthlyTotals: { USD: 20 },
+    monthlyTotals: [
+      { currency: "INR", minor: "282900", exponent: 2, display: "₹2,829.00" },
+      { currency: "USD", minor: "2000", exponent: 2, display: "$20.00" },
+      { currency: "JPY", minor: "9007199254740991", exponent: 0, display: "JP¥9,007,199,254,740,991" },
+    ],
     renewalCountNext7Days: 2,
-    renewalTotalNext7Days: 1_999,
-    suggestion: { merchant: "Cloud <script>", monthlyCost: 1_999 },
+    renewalTotalsNext7Days: [{ currency: "INR", minor: "199900", exponent: 2, display: "₹1,999.00" }],
+    suggestion: { merchant: "Cloud <script>", monthlyCost: { currency: "INR", minor: "199900", exponent: 2, display: "₹1,999.00" } },
     appBaseUrl: "https://vognary.example",
   });
   assert.equal(message.subject, "Your weekly recurring-money review from Vognary");
   assert.doesNotMatch(message.subject, /2829|Cloud|USD/i);
   assert.match(message.text, /Monthly recurring burn/);
   assert.match(message.text, /Other currencies, kept separate/);
+  assert.match(message.text, /JP¥9,007,199,254,740,991/);
   assert.doesNotMatch(message.html, /<script>/i);
 });
 
@@ -96,7 +99,7 @@ test("renewal scheduling and delivery source enforce opt-in, idempotency, bounde
   assert.doesNotMatch(deliveryTable, /\b(email|merchant|amount|payload|token)\b/i);
   assert.match(store, /\('7_day', 7, p\.seven_day_enabled\)/);
   assert.match(store, /\('1_day', 1, p\.one_day_enabled\)/);
-  assert.match(store, /on conflict \(preference_id, recurring_item_id, alert_window, renewal_date\)/);
+  assert.match(store, /on conflict \(preference_id, recovery_commitment_id, alert_window, renewal_date\)/);
   assert.match(store, /for update of delivery skip locked/);
   assert.match(store, /attempt_count < \$2/);
   assert.match(store, /consent\.purpose = 'renewal-alerts'/);
@@ -109,7 +112,17 @@ test("renewal scheduling and delivery source enforce opt-in, idempotency, bounde
   assert.match(store, /for update of delivery skip locked/);
   assert.match(store, /extract\(isodow from preference\.local_now\) = 1/);
   assert.doesNotMatch(store, /from candidates\s+where scheduled_for <= now\(\)/, "Monday rows must survive a worker run before the chosen local hour");
-  assert.match(store, /exists \(select 1 from recurring_items item where item\.workspace_id = preference\.workspace_id\)/);
+  assert.match(store, /const weeklyDigestItemsSql = `[\s\S]*from recovery_commitments commitment/);
+  const digestProjection = store.match(/const weeklyDigestItemsSql = `([\s\S]*?)`;/)?.[1] ?? "";
+  assert.match(digestProjection, /effective_status = 'ACTIVE'/);
+  assert.doesNotMatch(digestProjection, /confidence_score >= 80/);
+  assert.match(store, /commitment\.effective_monthly_minor as monthly_minor/);
+  assert.doesNotMatch(store, /effective_(?:amount|monthly)_minor::numeric \/ 100/);
+  assert.doesNotMatch(store, /Number\(row\.(?:monthly_burn|renewal_total|suggestion_monthly_cost)/);
+  assert.match(store, /commitment\.confidence_score >= 80/);
+  assert.match(store, /item\.user_decision is distinct from 'KEEP'/);
+  assert.match(store, /item\.confidence_score >= 80/);
+  assert.doesNotMatch(store, /exists \(select 1 from recurring_items item where item\.workspace_id = (?:preference|delivery)\.workspace_id\)/);
   assert.doesNotMatch(mailer, /console\./);
   assert.doesNotMatch(worker, /console\./);
   assert.doesNotMatch(worker.slice(worker.indexOf("const sent =")), /delivery\.(email|merchant)/);
@@ -118,10 +131,9 @@ test("renewal scheduling and delivery source enforce opt-in, idempotency, bounde
 test("Vercel keeps Hobby-compatible daily worker schedules", () => {
   const config = JSON.parse(source("vercel.json")) as { crons: Array<{ path: string; schedule: string }> };
   const paths = config.crons.map((cron) => cron.path);
-  assert.ok(paths.includes("/api/internal/sync-jobs/due/run"));
+  assert.ok(!paths.includes("/api/internal/sync-jobs/due/run"));
   assert.ok(paths.includes("/api/internal/renewal-alerts/due/run"));
   assert.ok(paths.includes("/api/internal/privacy/retention/run"));
-  assert.equal(config.crons.find((cron) => cron.path === "/api/internal/sync-jobs/due/run")?.schedule, "0 0 * * *");
   assert.equal(config.crons.find((cron) => cron.path === "/api/internal/renewal-alerts/due/run")?.schedule, "30 3 * * *");
   assert.equal(config.crons.find((cron) => cron.path === "/api/internal/privacy/retention/run")?.schedule, "30 21 * * *");
 });

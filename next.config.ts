@@ -38,8 +38,13 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   async redirects() {
     return [
-      { source: "/connect", destination: "/sources", permanent: true },
-      { source: "/integrations", destination: "/sources", permanent: true },
+      { source: "/connect", destination: "/app", permanent: true },
+      { source: "/integrations", destination: "/app", permanent: true },
+      { source: "/sources", destination: "/app", permanent: true },
+      { source: "/guide", destination: "/", permanent: true },
+      { source: "/partners", destination: "/", permanent: true },
+      { source: "/beta-readiness", destination: "/", permanent: true },
+      { source: "/integration-model", destination: "/", permanent: true },
       { source: "/launch", destination: "/private-audit", permanent: true },
     ];
   },

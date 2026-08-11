@@ -20,6 +20,10 @@ test("weekly digest claims one privacy-safe aggregate per week and remains conse
   const workspaceId = randomUUID();
   const email = `${userId}@weekly-digest.test`;
   const workerId = `digest-test-${randomUUID()}`;
+  const keptCommitmentId = randomUUID();
+  const reviewCommitmentId = randomUUID();
+  const foreignCommitmentId = randomUUID();
+  const lowConfidenceCommitmentId = randomUUID();
 
   try {
     await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, email]);
@@ -39,14 +43,27 @@ test("weekly digest claims one privacy-safe aggregate per week and remains conse
       },
     });
     await pool.query(
-      `insert into recurring_items (
-         workspace_id, merchant, normalized_merchant, category, frequency,
-         currency, amount_min, amount_max, average_amount, monthly_cost,
-         annual_cost, next_expected_date, confidence_score
+      `insert into recovery_commitments (
+         id, workspace_id, identity_key, base_status, base_merchant, base_category,
+         base_cadence, base_currency, base_amount_minor, base_monthly_minor,
+         base_next_expected_date, effective_status, effective_merchant, effective_cadence,
+         effective_amount_minor, effective_monthly_minor, effective_next_expected_date,
+         confidence_score, recommended_decision, recommendation_reason
        ) values
-         ($1, 'Primary Plan', 'primary plan', 'Productivity', 'monthly', 'INR', 1000, 1000, 1000, 1000, 12000, current_date + 1, 90),
-         ($1, 'Foreign Plan', 'foreign plan', 'Cloud hosting', 'monthly', 'USD', 20, 20, 20, 20, 240, current_date + 2, 90)`,
-      [workspaceId],
+         ($2, $1, 'primary-plan', 'ACTIVE', 'Primary Plan', 'Productivity', 'MONTHLY', 'INR', 100000, 100000,
+          current_date + 1, 'ACTIVE', 'Primary Plan', 'MONTHLY', 100000, 100000, current_date + 1, 90, 'MONITOR', 'Review the commitment.'),
+         ($3, $1, 'review-plan', 'ACTIVE', 'Review Plan', 'Productivity', 'MONTHLY', 'INR', 50000, 50000,
+          current_date + 2, 'ACTIVE', 'Review Plan', 'MONTHLY', 50000, 50000, current_date + 2, 90, 'MONITOR', 'Review the commitment.'),
+         ($4, $1, 'foreign-plan', 'ACTIVE', 'Foreign Plan', 'Cloud hosting', 'MONTHLY', 'USD', 2000, 2000,
+          current_date + 2, 'ACTIVE', 'Foreign Plan', 'MONTHLY', 2000, 2000, current_date + 2, 90, 'MONITOR', 'Review the commitment.'),
+         ($5, $1, 'low-confidence-plan', 'ACTIVE', 'Low Confidence Plan', 'Productivity', 'MONTHLY', 'INR', 25000, 25000,
+          current_date + 3, 'ACTIVE', 'Low Confidence Plan', 'MONTHLY', 25000, 25000, current_date + 3, 60, 'INVESTIGATE', 'Needs more proof.')`,
+      [workspaceId, keptCommitmentId, reviewCommitmentId, foreignCommitmentId, lowConfidenceCommitmentId],
+    );
+    await pool.query(
+      `insert into recovery_decisions (workspace_id, commitment_id, decided_by_user_id, decision)
+       values ($1, $2, $3, 'KEEP')`,
+      [workspaceId, keptCommitmentId, userId],
     );
     await pool.query(
       `insert into weekly_digest_deliveries (
@@ -63,11 +80,14 @@ test("weekly digest claims one privacy-safe aggregate per week and remains conse
     const claims = await claimDueWeeklyDigests({ limit: 5, workerId, invocation: "internal-api" });
     assert.equal(claims.length, 1);
     assert.equal(claims[0]?.email, email);
-    assert.equal(claims[0]?.monthlyBurn, 1000);
-    assert.equal(claims[0]?.foreignMonthlyTotals.USD, 20);
-    assert.equal(claims[0]?.renewalCountNext7Days, 2);
-    assert.equal(claims[0]?.renewalTotalNext7Days, 1000);
-    assert.deepEqual(claims[0]?.suggestion, { merchant: "Primary Plan", monthlyCost: 1000 });
+    assert.deepEqual(claims[0]?.monthlyTotals.map((total) => [total.currency, total.minor]), [["INR", "175000"], ["USD", "2000"]]);
+    assert.equal(claims[0]?.renewalCountNext7Days, 4);
+    assert.deepEqual(claims[0]?.renewalTotalsNext7Days.map((total) => [total.currency, total.minor]), [["INR", "175000"], ["USD", "2000"]]);
+    assert.deepEqual(claims[0]?.suggestion && {
+      merchant: claims[0].suggestion.merchant,
+      currency: claims[0].suggestion.monthlyCost.currency,
+      minor: claims[0].suggestion.monthlyCost.minor,
+    }, { merchant: "Review Plan", currency: "INR", minor: "50000" });
     assert.equal(await isWeeklyDigestStillDeliverable(claims[0]!.deliveryId, workerId), true);
     await markWeeklyDigestSent(claims[0]!.deliveryId, workerId);
     assert.equal((await claimDueWeeklyDigests({ limit: 5, workerId, invocation: "internal-api" })).length, 0);

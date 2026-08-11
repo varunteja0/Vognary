@@ -3,16 +3,8 @@
   "buildCommand": "npm run vercel-build",
   "crons": [
     {
-      "path": "/api/internal/sync-jobs/due/run",
-      "schedule": "0 0 * * *"
-    },
-    {
       "path": "/api/internal/renewal-alerts/due/run",
       "schedule": "30 3 * * *"
-    },
-    {
-      "path": "/api/internal/savings-verification/due/run",
-      "schedule": "0 4 * * *"
     },
     {
       "path": "/api/internal/privacy/retention/run",

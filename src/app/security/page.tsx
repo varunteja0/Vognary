@@ -37,7 +37,7 @@ export default function SecurityPage() {
         <article className="panel p-6 sm:p-8 rise">
           <span className="folio" data-folio="Trust">Security</span>
           <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">How Vognary handles data</h1>
-          <p className="mt-3 text-sm leading-7 text-(--muted)">The review runs without retaining original uploaded files by default. Signed-in workspace state is stored only when database, session, and token-vault configuration are active.</p>
+          <p className="mt-3 text-sm leading-7 text-(--muted)">Google is used for sign-in only. Receipt mail enters through a signed provider webhook, is bounded before parsing, and is saved only through the canonical Recovery workspace.</p>
           <div className="mt-8 grid gap-3">
             {items.map((item) => (
               <div key={item.title} className="inset p-4">
@@ -69,8 +69,9 @@ export default function SecurityPage() {
 
 const items = [
   { title: "No passwords or PINs", body: "Vognary never asks for bank passwords, card PINs, UPI PINs, or netbanking credentials." },
-  { title: "No backend file storage by default", body: "The current audit and file-import APIs process request data and return results without storing uploaded financial files." },
-  { title: "Proof before action", body: "Each suggestion links back to transaction or receipt text so users can verify before acting." },
-  { title: "Encrypted workspace storage", body: "Signed-in workspace snapshots and connector secrets use authenticated application-layer encryption; protected routes recheck session and workspace membership." },
-  { title: "Approved integrations only", body: "Gmail, Account Aggregator, UPI, and card-mandate integrations require approved scopes, partners, and legal review." },
+  { title: "No mailbox access", body: "Vognary does not access or scan Gmail. Any mail sent to a private receipt address can reach the receiving provider, so the address must be kept confidential." },
+  { title: "Signed receipt ingress", body: "Resend webhook requests are verified against the untouched request body, bounded, replay-fenced, and resolved through a secret alias before content is retrieved." },
+  { title: "Encrypted Recovery storage", body: "Accepted raw source text uses authenticated application-layer encryption. Protected routes recheck the session and workspace role; normalized facts retain evidence references." },
+  { title: "Separate retention boundaries", body: "Vognary minimizes encrypted raw source text and terminal transport metadata under its retention policy. Provider-held email follows Resend’s separate retention and deletion controls." },
+  { title: "Source before action", body: "Each suggestion links to receipt evidence. Planning to cancel records your intent; Vognary does not cancel the service." },
 ];

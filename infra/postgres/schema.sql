@@ -325,7 +325,8 @@ create table connected_accounts (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique nulls not distinct (workspace_id, connector_id, provider_account_id)
+  unique nulls not distinct (workspace_id, connector_id, provider_account_id),
+  unique (workspace_id, id)
 );
 
 create index connected_accounts_workspace_connector_idx on connected_accounts(workspace_id, connector_id);
@@ -1437,3 +1438,308 @@ create index if not exists recovery_evidence_source_idx on recovery_evidence(wor
 create index if not exists recovery_commitment_evidence_page_idx on recovery_commitment_evidence(workspace_id, commitment_id, linked_at desc, evidence_id);
 create index if not exists recovery_corrections_history_idx on recovery_corrections(workspace_id, commitment_id, created_at desc, id desc);
 create index if not exists recovery_changes_version_idx on recovery_changes(workspace_id, to_version, detected_at, id);
+
+-- Recovery receipt inbox: secret alias routing and replay-safe provider events.
+alter table recovery_submissions
+  drop constraint if exists recovery_submissions_source_type_check;
+alter table recovery_submissions
+  add constraint recovery_submissions_source_type_check
+  check (source_type in ('RECEIPT_PASTE', 'CSV_IMPORT', 'FORWARDED_EMAIL'));
+
+alter table recovery_sources
+  drop constraint if exists recovery_sources_source_type_check;
+alter table recovery_sources
+  add constraint recovery_sources_source_type_check
+  check (source_type in ('RECEIPT_PASTE', 'CSV_IMPORT', 'FORWARDED_EMAIL'));
+
+alter table recovery_evidence
+  drop constraint if exists recovery_evidence_provenance_kind_check;
+alter table recovery_evidence
+  add constraint recovery_evidence_provenance_kind_check
+  check (provenance_kind in ('USER_SUBMITTED', 'PROVIDER_RECEIVED'));
+
+create table if not exists recovery_inbound_aliases (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  connected_account_id uuid not null,
+  receiving_domain text not null check (
+    receiving_domain = lower(btrim(receiving_domain))
+    and length(receiving_domain) between 3 and 253
+  ),
+  alias_hmac char(64) not null check (alias_hmac ~ '^[0-9a-f]{64}$'),
+  hmac_key_id text not null check (length(btrim(hmac_key_id)) between 1 and 120),
+  encrypted_display jsonb check (encrypted_display is null or jsonb_typeof(encrypted_display) = 'object'),
+  encryption_key_fingerprint text,
+  status text not null default 'ACTIVE' check (status in ('ACTIVE', 'ROTATED', 'REVOKED')),
+  replaced_by_id uuid,
+  created_by_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  rotated_at timestamptz,
+  revoked_at timestamptz,
+  unique (hmac_key_id, alias_hmac),
+  unique (workspace_id, id),
+  foreign key (workspace_id, connected_account_id)
+    references connected_accounts(workspace_id, id) on delete cascade,
+  foreign key (workspace_id, replaced_by_id)
+    references recovery_inbound_aliases(workspace_id, id) on delete set null (replaced_by_id),
+  check (
+    (status = 'ACTIVE' and rotated_at is null and revoked_at is null and encrypted_display is not null)
+    or (status = 'ROTATED' and rotated_at is not null and revoked_at is null and encrypted_display is null)
+    or (status = 'REVOKED' and revoked_at is not null and encrypted_display is null)
+  )
+);
+
+create unique index if not exists recovery_inbound_aliases_active_workspace_idx
+  on recovery_inbound_aliases(workspace_id)
+  where status = 'ACTIVE';
+create index if not exists recovery_inbound_aliases_account_idx
+  on recovery_inbound_aliases(connected_account_id, status);
+
+create table if not exists recovery_inbound_events (
+  id uuid primary key default gen_random_uuid(),
+  provider text not null check (provider = 'RESEND'),
+  svix_id text not null check (length(btrim(svix_id)) between 1 and 240),
+  provider_email_id text not null check (length(btrim(provider_email_id)) between 1 and 240),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  alias_id uuid,
+  event_type text not null check (length(btrim(event_type)) between 1 and 120),
+  payload_hash char(64) not null check (payload_hash ~ '^[0-9a-f]{64}$'),
+  status text not null default 'RECEIVED'
+    check (status in ('RECEIVED', 'PROCESSING', 'PROCESSED', 'IGNORED', 'TERMINAL_FAILED')),
+  error_code text check (error_code is null or length(error_code) <= 120),
+  received_at timestamptz not null default now(),
+  processing_started_at timestamptz,
+  attempt_count integer not null default 0 check (attempt_count >= 0),
+  processed_at timestamptz,
+  foreign key (workspace_id, alias_id)
+    references recovery_inbound_aliases(workspace_id, id) on delete set null (alias_id),
+  unique (provider, svix_id),
+  unique (provider, provider_email_id),
+  unique (workspace_id, id),
+  check ((status in ('PROCESSED', 'IGNORED', 'TERMINAL_FAILED')) = (processed_at is not null)),
+  constraint recovery_inbound_events_processing_lease_check
+    check ((status = 'PROCESSING') = (processing_started_at is not null))
+);
+
+create index if not exists recovery_inbound_events_workspace_received_idx
+  on recovery_inbound_events(workspace_id, received_at desc);
+create index if not exists recovery_inbound_events_pending_idx
+  on recovery_inbound_events(received_at)
+  where status in ('RECEIVED', 'PROCESSING');
+create index if not exists recovery_inbound_events_retention_idx
+  on recovery_inbound_events(received_at)
+  where status in ('PROCESSED', 'IGNORED', 'TERMINAL_FAILED');
+
+create table if not exists recovery_inbound_replay_keys (
+  provider text not null check (provider = 'RESEND'),
+  key_kind text not null check (key_kind in ('SVIX_ID', 'PROVIDER_EMAIL_ID')),
+  key_hash char(64) not null check (key_hash ~ '^[0-9a-f]{64}$'),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (provider, key_kind, key_hash)
+);
+
+create index if not exists recovery_inbound_replay_keys_workspace_idx
+  on recovery_inbound_replay_keys(workspace_id, created_at desc);
+
+alter table recovery_submissions
+  add column if not exists inbound_event_id uuid;
+alter table recovery_submissions
+  drop constraint if exists recovery_submissions_inbound_event_id_fkey;
+alter table recovery_submissions
+  add constraint recovery_submissions_inbound_event_id_fkey
+  foreign key (workspace_id, inbound_event_id)
+  references recovery_inbound_events(workspace_id, id) on delete set null (inbound_event_id);
+create unique index if not exists recovery_submissions_inbound_event_idx
+  on recovery_submissions(inbound_event_id)
+  where inbound_event_id is not null;
+
+-- Add canonical Recovery subscriptions as renewal reminder targets without
+-- rewriting or deleting historical deliveries tied to the legacy ledger.
+alter table renewal_alert_deliveries
+  alter column recurring_item_id drop not null;
+
+alter table renewal_alert_deliveries
+  add column if not exists recovery_commitment_id uuid;
+
+alter table renewal_alert_deliveries
+  drop constraint if exists renewal_alert_deliveries_recovery_commitment_fkey;
+alter table renewal_alert_deliveries
+  add constraint renewal_alert_deliveries_recovery_commitment_fkey
+  foreign key (workspace_id, recovery_commitment_id)
+  references recovery_commitments(workspace_id, id) on delete cascade;
+
+alter table renewal_alert_deliveries
+  drop constraint if exists renewal_alert_deliveries_exactly_one_target_check;
+alter table renewal_alert_deliveries
+  add constraint renewal_alert_deliveries_exactly_one_target_check
+  check (num_nonnulls(recurring_item_id, recovery_commitment_id) = 1);
+
+create unique index if not exists renewal_alert_deliveries_recovery_unique_idx
+  on renewal_alert_deliveries(preference_id, recovery_commitment_id, alert_window, renewal_date)
+  where recovery_commitment_id is not null;
+
+create index if not exists renewal_alert_deliveries_recovery_target_idx
+  on renewal_alert_deliveries(workspace_id, recovery_commitment_id)
+  where recovery_commitment_id is not null;
+
+-- The candidate retention worker reports terminal inbound-event deletion while
+-- 0026 is deliberately held back for the post-deploy worker-drain cutover.
+alter table retention_runs drop constraint if exists retention_runs_counts_check;
+alter table retention_runs drop constraint if exists retention_runs_counts_check1;
+alter table retention_runs drop constraint if exists retention_runs_counts_check2;
+alter table retention_runs drop constraint if exists retention_runs_counts_object_check;
+alter table retention_runs drop constraint if exists retention_runs_counts_keys_check;
+alter table retention_runs drop constraint if exists retention_runs_counts_types_check;
+
+alter table retention_runs
+  add constraint retention_runs_counts_object_check
+    check (jsonb_typeof(counts) = 'object'),
+  add constraint retention_runs_counts_keys_check
+    check ((counts - array[
+      'connectorEvidencePayloadsMinimized',
+      'recoveryRawEvidenceMinimized',
+      'recoveryInboundEventsDeleted',
+      'webhookPayloadsMinimized',
+      'webhookErrorsMinimized',
+      'connectorTransactionRowsMinimized',
+      'productEventsDeleted',
+      'syncRunErrorsMinimized',
+      'syncJobErrorsMinimized',
+      'connectedAccountErrorsMinimized',
+      'dataSubjectRequestsDeleted',
+      'retentionRunsDeleted'
+    ]::text[]) = '{}'::jsonb),
+  add constraint retention_runs_counts_types_check
+    check (
+      coalesce(jsonb_typeof(counts -> 'connectorEvidencePayloadsMinimized') = 'number', true)
+      and coalesce(jsonb_typeof(counts -> 'recoveryRawEvidenceMinimized') = 'number', true)
+      and coalesce(jsonb_typeof(counts -> 'recoveryInboundEventsDeleted') = 'number', true)
+      and coalesce(jsonb_typeof(counts -> 'webhookPayloadsMinimized') = 'number', true)
+      and coalesce(jsonb_typeof(counts -> 'webhookErrorsMinimized') = 'number', true)
+      and coalesce(jsonb_typeof(counts -> 'connectorTransactionRowsMinimized') = 'number', true)
+      and coalesce(jsonb_typeof(counts -> 'productEventsDeleted') = 'number', true)
+      and coalesce(jsonb_typeof(counts -> 'syncRunErrorsMinimized') = 'number', true)
+      and coalesce(jsonb_typeof(counts -> 'syncJobErrorsMinimized') = 'number', true)
+      and coalesce(jsonb_typeof(counts -> 'connectedAccountErrorsMinimized') = 'number', true)
+      and coalesce(jsonb_typeof(counts -> 'dataSubjectRequestsDeleted') = 'number', true)
+      and coalesce(jsonb_typeof(counts -> 'retentionRunsDeleted') = 'number', true)
+    );
+
+-- Terminal receipt-inbox transport metadata follows the workspace operational
+-- retention window. Canonical Recovery submissions and evidence remain intact.
+alter table recovery_inbound_events
+  drop constraint if exists recovery_inbound_events_workspace_id_alias_id_fkey;
+alter table recovery_inbound_events
+  add constraint recovery_inbound_events_workspace_id_alias_id_fkey
+  foreign key (workspace_id, alias_id)
+  references recovery_inbound_aliases(workspace_id, id) on delete set null (alias_id);
+
+alter table recovery_submissions
+  drop constraint if exists recovery_submissions_inbound_event_id_fkey;
+alter table recovery_submissions
+  add constraint recovery_submissions_inbound_event_id_fkey
+  foreign key (workspace_id, inbound_event_id)
+  references recovery_inbound_events(workspace_id, id) on delete set null (inbound_event_id);
+
+alter table recovery_inbound_events
+  add column if not exists processing_started_at timestamptz,
+  add column if not exists attempt_count integer not null default 0;
+alter table recovery_inbound_events
+  drop constraint if exists recovery_inbound_events_attempt_count_check;
+alter table recovery_inbound_events
+  add constraint recovery_inbound_events_attempt_count_check
+  check (attempt_count >= 0);
+update recovery_inbound_events
+set processing_started_at = received_at
+where status = 'PROCESSING' and processing_started_at is null;
+
+create or replace function reject_retired_connector_sync_job()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.status in ('queued', 'running', 'failed', 'paused') then
+    raise exception 'Legacy connector synchronization is retired at Recovery cutover.' using errcode = '55000';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists connector_sync_jobs_recovery_cutover_guard on connector_sync_jobs;
+create trigger connector_sync_jobs_recovery_cutover_guard
+before insert or update of status on connector_sync_jobs
+for each row execute function reject_retired_connector_sync_job();
+
+create or replace function reject_retired_connector_evidence_write()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'UPDATE'
+     and (to_jsonb(new) - array['payload', 'payload_minimized_at']::text[])
+       = (to_jsonb(old) - array['payload', 'payload_minimized_at']::text[])
+     and new.payload = '{}'::jsonb
+     and new.payload_minimized_at is not null then
+    return new;
+  end if;
+  raise exception 'Connector evidence writes are retired at Recovery cutover.' using errcode = '55000';
+end;
+$$;
+
+drop trigger if exists connector_evidence_running_job_guard on connector_evidence;
+create trigger connector_evidence_running_job_guard
+before insert or update on connector_evidence
+for each row execute function reject_retired_connector_evidence_write();
+
+create or replace function reject_nonterminal_legacy_renewal_delivery()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.recurring_item_id is not null and new.status in ('scheduled', 'sending', 'failed') then
+    raise exception 'Legacy renewal deliveries are retired at Recovery cutover.' using errcode = '55000';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists renewal_alert_deliveries_recovery_cutover_guard on renewal_alert_deliveries;
+create trigger renewal_alert_deliveries_recovery_cutover_guard
+before insert or update of recurring_item_id, status on renewal_alert_deliveries
+for each row execute function reject_nonterminal_legacy_renewal_delivery();
+
+update connector_sync_runs run
+set status = 'blocked',
+    finished_at = coalesce(run.finished_at, now()),
+    error_code = 'recovery_cutover',
+    error_message = 'Legacy connector synchronization retired at Recovery cutover.'
+from connector_sync_jobs job
+where run.sync_job_id = job.id
+  and run.status = 'running'
+  and job.status in ('queued', 'running', 'failed', 'paused');
+
+update connector_sync_jobs
+set status = 'blocked',
+    next_run_at = null,
+    locked_at = null,
+    locked_by = null,
+    last_error = 'Legacy connector synchronization retired at Recovery cutover.',
+    last_error_at = now(),
+    updated_at = now()
+where status in ('queued', 'running', 'failed', 'paused');
+
+update renewal_alert_deliveries
+set status = 'cancelled',
+    next_attempt_at = null,
+    locked_at = null,
+    locked_by = null,
+    updated_at = now()
+where recurring_item_id is not null
+  and status in ('scheduled', 'sending', 'failed');
+
+alter table recovery_inbound_events
+  drop constraint if exists recovery_inbound_events_processing_lease_check;
+alter table recovery_inbound_events
+  add constraint recovery_inbound_events_processing_lease_check
+  check ((status = 'PROCESSING') = (processing_started_at is not null));

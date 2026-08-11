@@ -170,7 +170,8 @@ test("workspace primary totals use and name the audit primary currency", () => {
 
 test("Recovery save guidance uses Google and keeps magic link deferred", () => {
   const client = source("src/app/login/login-client.tsx");
-  assert.match(client, /Save this audit with Google/);
+  assert.match(client, /Continue with Google/);
+  assert.match(client, /Google is only for sign-in\. Vognary does not access Gmail\./);
   assert.doesNotMatch(client, /\/api\/auth\/magic-link\/request|Send sign-in link|Email link/);
   assert.match(source("src/lib/server/magic-link-auth.ts"), /ENABLE_MAGIC_LINK_LOGIN === "true"/);
 });

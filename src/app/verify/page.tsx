@@ -6,6 +6,7 @@ import VerifyClient from "./verify-client";
 export const metadata: Metadata = {
   title: "Verify an audit pack · Vognary",
   description: "Check an audit pack's offline checksum and, when present, its separate Vognary Ed25519 issuer signature without uploading financial content.",
+  robots: { index: false, follow: false },
 };
 
 export default function VerifyPage() {

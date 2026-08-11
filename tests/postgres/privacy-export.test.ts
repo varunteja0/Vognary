@@ -134,6 +134,17 @@ test("privacy export includes held product data and excludes all credential mate
       expiresInDays: 30,
     });
     const rawEvidenceTail = "RAW-EVIDENCE-PRIVATE-TAIL-MUST-NOT-EXPORT";
+    const recoveryDates = (await pool.query<{
+      charged_on_1: string;
+      charged_on_2: string;
+      charged_on_3: string;
+      renews_on: string;
+    }>(
+      `select (current_date - 61)::text as charged_on_1,
+              (current_date - 31)::text as charged_on_2,
+              (current_date - 1)::text as charged_on_3,
+              (current_date + 30)::text as renews_on`,
+    )).rows[0]!;
     await submitRecoveryEvidence({
       workspaceId,
       actorUserId: userId,
@@ -141,12 +152,22 @@ test("privacy export includes held product data and excludes all credential mate
       idempotencyKey: `privacy-recovery:${randomUUID()}`,
       request: {
         kind: "RECEIPT_PASTE",
-        receipts: [{
-          clientRef: "privacy-openai",
-          text: `OpenAI subscription charged INR 1,999 on 6 July 2026. Renews monthly on 6 August 2026. ${"context ".repeat(80)}${rawEvidenceTail}`,
-        }],
+        receipts: [
+          {
+            clientRef: "privacy-openai-1",
+            text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on_1}. Renews monthly on ${recoveryDates.renews_on}. ${"context ".repeat(80)}${rawEvidenceTail}`,
+          },
+          {
+            clientRef: "privacy-openai-2",
+            text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on_2}. Renews monthly on ${recoveryDates.renews_on}.`,
+          },
+          {
+            clientRef: "privacy-openai-3",
+            text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on_3}. Renews monthly on ${recoveryDates.renews_on}.`,
+          },
+        ],
       },
-      now: new Date("2026-08-10T08:00:00.000Z"),
+      now: new Date(),
     });
 
     const request = await createAccessExportRequest({ workspaceId, actorUserId: userId });
@@ -164,20 +185,22 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.recovery.workspaceState.version, "1");
     assert.equal(document.recovery.versions.length, 1);
     assert.equal(document.recovery.submissions.length, 1);
-    assert.equal(document.recovery.sources.length, 1);
-    assert.equal(document.recovery.sources[0].rawEvidenceRetained, true);
-    assert.equal("rawEvidence" in document.recovery.sources[0], false);
+    assert.equal(document.recovery.sources.length, 3);
+    assert.equal(document.recovery.sources.every((source: { rawEvidenceRetained: boolean }) => source.rawEvidenceRetained), true);
+    assert.equal(document.recovery.sources.some((source: Record<string, unknown>) => "rawEvidence" in source), false);
     assert.equal(document.recovery.commitments.length, 1);
-    assert.equal(document.recovery.evidence.length, 1);
-    assert.equal(document.recovery.evidence[0].excerpt.length <= 500, true);
-    assert.equal(document.recovery.evidence[0].excerptTruncated, true);
+    assert.equal(document.recovery.evidence.length, 3);
+    assert.equal(document.recovery.evidence.every((evidence: { excerpt: string }) => evidence.excerpt.length <= 500), true);
+    assert.equal(document.recovery.evidence.some((evidence: { excerptTruncated: boolean }) => evidence.excerptTruncated), true);
     assert.doesNotMatch(JSON.stringify(document.recovery), /contentHash|fingerprint/i);
-    assert.equal(document.recovery.commitmentEvidence.length, 1);
+    assert.equal(document.recovery.commitmentEvidence.length, 3);
     assert.equal(document.recovery.decisions.length, 0);
     assert.equal(document.productEvents.length, 1);
     assert.equal(document.renewalAlertPreferences.length, 1);
     assert.equal(document.renewalAlertPreferences[0].weeklyDigestEnabled, true);
     assert.ok(document.renewalAlertDeliveries.length >= 1);
+    assert.equal(document.renewalAlertDeliveries[0].recurringItemId, null);
+    assert.equal(document.renewalAlertDeliveries[0].recoveryCommitmentId, document.recovery.commitments[0].id);
     assert.ok(Array.isArray(document.weeklyDigestDeliveries));
     assert.equal(document.apiTokens.length, 1);
     assert.equal(document.apiTokens[0].tokenPrefix, platformToken.summary.tokenPrefix);

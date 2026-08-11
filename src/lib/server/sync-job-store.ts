@@ -103,6 +103,20 @@ export async function getConnectorSyncJob(jobId: string) {
   return row ? mapSyncJob(row) : null;
 }
 
+export async function assertConnectorSyncRunRunnable(input: { jobId: string; runId: string }) {
+  const result = await getDatabasePool().query<{ runnable: boolean }>(
+    `select exists (
+       select 1
+       from connector_sync_jobs job
+       join connector_sync_runs run on run.sync_job_id = job.id
+       where job.id = $1 and run.id = $2
+         and job.status = 'running' and run.status = 'running'
+     ) as runnable`,
+    [input.jobId, input.runId],
+  );
+  if (!result.rows[0]?.runnable) throw new SyncJobNotRunnableError(input.jobId);
+}
+
 export async function listDueConnectorSyncJobs(limit = 5) {
   assertDatabaseReadyForSyncJobs();
 

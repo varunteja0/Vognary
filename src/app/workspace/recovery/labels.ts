@@ -20,18 +20,18 @@ import type {
 
 export const decisionLabels: Record<Decision, string> = {
   KEEP: "Keep",
-  MONITOR: "Monitor",
-  DOWNGRADE: "Downgrade",
-  CANCEL: "Cancel",
-  INVESTIGATE: "Investigate",
+  MONITOR: "Review later",
+  DOWNGRADE: "Consider a cheaper plan",
+  CANCEL: "Plan to cancel",
+  INVESTIGATE: "I don’t recognize this",
 };
 
 export const decisionMeanings: Record<Decision, string> = {
-  KEEP: "Worth the money. Stop asking me about it.",
-  MONITOR: "Undecided. Show it again when something changes.",
-  DOWNGRADE: "Keep the merchant, move to a cheaper plan.",
-  CANCEL: "Stop this commitment at the source.",
-  INVESTIGATE: "I do not recognise this yet.",
+  KEEP: "Keep tracking it and ask again only when something changes.",
+  MONITOR: "Leave it undecided and bring it back for review later.",
+  DOWNGRADE: "Keep the service but consider moving to a cheaper plan.",
+  CANCEL: "Record that you plan to cancel it at the service itself.",
+  INVESTIGATE: "Mark this for review because you do not recognize it.",
 };
 
 export const decisionStamps: Record<Decision, string> = {
@@ -56,6 +56,7 @@ export const cadenceLabels: Record<Cadence, string> = {
 export const sourceLabels: Record<SourceType, string> = {
   RECEIPT_PASTE: "Pasted receipt",
   CSV_IMPORT: "Imported statement file",
+  FORWARDED_EMAIL: "Forwarded email",
 };
 
 export const commitmentStatusLabels: Record<CommitmentStatus, string> = {
@@ -132,6 +133,7 @@ export const coverageMeanings: Record<CoverageState, string> = {
 
 export const provenanceLabels: Record<EvidenceProvenanceKind, string> = {
   USER_SUBMITTED: "You submitted this evidence",
+  PROVIDER_RECEIVED: "Received through your Vognary receipt address",
 };
 
 export const errorCopy: Record<RecoveryErrorCode, { title: string; detail: string }> = {
@@ -147,6 +149,7 @@ export const errorCopy: Record<RecoveryErrorCode, { title: string; detail: strin
   SAVE_FAILED: { title: "Not saved", detail: "The change did not save. Nothing was changed." },
   REQUEST_TOO_LARGE: { title: "Too much at once", detail: "This submission is larger than the accepted limit. Send less at a time." },
   UNSUPPORTED_MEDIA_TYPE: { title: "Format not accepted", detail: "This format is not accepted as evidence." },
+  FEATURE_UNAVAILABLE: { title: "Not available yet", detail: "This feature is not active for this deployment." },
   RATE_LIMITED: { title: "Too many requests", detail: "Too many requests were sent. Wait before retrying." },
   UNKNOWN: { title: "Unexplained failure", detail: "The workspace returned a failure it did not explain. Nothing is assumed about your money." },
 };

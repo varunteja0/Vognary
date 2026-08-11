@@ -125,7 +125,7 @@ test("a workspace connector cannot fall back to the deployment-wide OpenAI key",
   }
 });
 
-test("connector preview POST rejects an unauthenticated caller before adapter execution", async () => {
+test("connector preview POST is retired before adapter execution", async () => {
   const response = await connectorPreviewPost(
     new Request("https://vognary.example/api/connectors/openai-costs/sync", {
       method: "POST",
@@ -135,8 +135,16 @@ test("connector preview POST rejects an unauthenticated caller before adapter ex
     { params: Promise.resolve({ id: "openai-costs" }) },
   );
 
-  assert.equal(response.status, 401);
-  assert.deepEqual(await response.json(), { error: "Authentication required." });
+  assert.equal(response.status, 410);
+  assert.deepEqual(await response.json(), {
+    status: "retired",
+    ledgerAuthority: "RECOVERY_V1",
+    message: "Direct provider connections are not part of the Recovery launch.",
+    replacements: {
+      forwardedReceipts: "/api/workspaces/current/sources/receipt-inbox",
+      manualEvidence: "/api/workspaces/current/evidence",
+    },
+  });
 });
 
 test("signed cookie parsing rejects tampering and expiry without storing an email claim", () => {

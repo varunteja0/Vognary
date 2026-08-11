@@ -1,54 +1,20 @@
 import { expect, test } from "@playwright/test";
-
-/**
- * Core loop surfaces: first-result metrics, assistant brief, and UPI mandate
- * kill-list from statement-shaped evidence — without login.
- */
-const indiaMandateReceipts = [
-  "NETFLIX.COM UPI-AUTOPAY MANDATE debited INR 649 on 2026-07-05. Netflix Premium renews monthly.",
-  "SPOTIFY PREMIUM UPI AUTOPAY Rs 119 on 05/07/2026. Your subscription renews monthly via PhonePe.",
-  "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly.",
-].join("\n\n");
-
-test("guest paste surfaces first result, brief, and mandate kill-list", async ({ page }) => {
+test("manual financial evidence is not exposed before sign-in", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/app");
 
-  await page.getByLabel("Paste receipts or invoices").fill(indiaMandateReceipts);
-
-  const firstResult = page.getByRole("region", { name: "Your first audit result" });
-  await expect(firstResult).toBeVisible({ timeout: 10_000 });
-  await expect(firstResult.getByText("Monthly burn", { exact: true })).toBeVisible();
-  await expect(firstResult.getByText("Do this first", { exact: true })).toBeVisible();
-  await expect(firstResult.getByText("Proof", { exact: true })).toBeVisible();
-
-  // Founder delivery: a copy-ready report is offered, and its preview carries the
-  // deliverable content (burn, actions, mandates) so a free audit can be sent on.
-  const report = page.getByRole("region", { name: "Deliver this audit" });
-  await expect(report).toBeVisible();
-  await expect(report.getByRole("button", { name: "Copy report" })).toBeVisible();
-  // Both delivery lengths are offered: full report and a WhatsApp-short version.
-  await expect(report.getByRole("button", { name: "Copy for WhatsApp" })).toBeVisible();
-  await report.getByText("Preview report").click();
-  await expect(report.getByText(/Monthly burn:/)).toBeVisible();
-  await expect(report.getByText(/Recurring mandates to stop at the source/i)).toBeVisible();
-
-  const brief = page.getByRole("region", { name: "Your brief" });
-  await expect(brief).toBeVisible();
-  await expect(brief.locator("h2")).not.toBeEmpty();
-
-  // Kill-list only renders when mandate tokens are present in evidence.
-  const killList = page.getByRole("region", { name: "Auto-debit mandate kill-list" });
-  await expect(killList).toBeVisible();
-  await expect(killList.getByText(/UPI AutoPay|mandate/i).first()).toBeVisible();
-  await expect(killList.getByText(/Matched/i).first()).toBeVisible();
+  await expect(page).toHaveURL(/\/login\?next=(?:%2F|\/)app$/);
+  await expect(page.getByLabel("Paste receipts or invoices")).toHaveCount(0);
+  await expect(page.getByText(/UPI AutoPay|mandate kill-list/i)).toHaveCount(0);
 });
 
-test("landing sample ledger is explicitly labelled illustrative", async ({ page }) => {
+test("landing contains no sample ledger or illustrative financial totals", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "See a sample audit" }).click();
-  const sample = page.locator("#product-ledger");
-  await expect(sample).toBeVisible();
-  await expect(sample.getByText(/illustrative sample|Sample audit output/i).first()).toBeVisible();
-  await expect(sample.getByText(/not live output/i)).toBeVisible();
+
+  await expect(page.getByRole("heading", { name: "Know what’s renewing before you pay for it." })).toBeVisible();
+  await expect(page.getByText("Renewing soon", { exact: true })).toBeVisible();
+  await expect(page.getByText("Price changed", { exact: true })).toBeVisible();
+  await expect(page.getByText("Needs a decision", { exact: true })).toBeVisible();
+  await expect(page.getByText(/sample audit|illustrative sample|not live output/i)).toHaveCount(0);
+  await expect(page.locator("#product-ledger")).toHaveCount(0);
 });

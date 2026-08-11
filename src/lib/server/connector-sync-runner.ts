@@ -11,6 +11,7 @@ import { activateConnectedAccount, buildStoredConnectorConnection } from "@/lib/
 import { materializeConnectorBatch } from "@/lib/server/living-ledger-store";
 import { recordProductEvent } from "@/lib/server/product-event-store";
 import {
+  assertConnectorSyncRunRunnable,
   beginConnectorSyncRun,
   completeConnectorSyncRun,
   failConnectorSyncRun,
@@ -66,6 +67,7 @@ export async function runConnectorSyncJob(jobId: string, invocation: ConnectorSy
       startedAt,
       cursorState: job.cursorState,
     });
+    await assertConnectorSyncRunRunnable({ jobId: job.id, runId });
     if (job.connectedAccountId && batch.activationState === "active") {
       await activateConnectedAccount({
         connectedAccountId: job.connectedAccountId,

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
-import { getConnectorSummary, getConnectorSyncSummary } from "@/lib/connectors";
 import { getDatabasePool, isDatabaseConfigured } from "@/lib/server/database";
 import { sessionCookieName } from "@/lib/server/session";
-import { checkTokenVaultConfiguration } from "@/lib/server/token-vault";
 import { requireSession } from "@/lib/server/workspace-auth";
 import { listWorkspacesForUser } from "@/lib/server/workspace-store";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
@@ -61,13 +59,6 @@ export async function GET(request: NextRequest) {
     activeWorkspace,
     workspaces,
     data: profile.data,
-    integrations: {
-      connectedNow: getConnectedNow(profile.data),
-      pending: getPendingIntegrations(),
-      connectorSummary: getConnectorSummary(),
-      connectorSyncSummary: getConnectorSyncSummary(),
-      tokenVault: checkTokenVaultConfiguration().status,
-    },
     deleteConfirmation,
   });
 }
@@ -211,16 +202,34 @@ async function getWorkspaceDataCounts(workspaceId: string): Promise<ProfileDataC
     latest_summary: Record<string, unknown> | null;
   }>(
     `select
-      (select count(*) from workspace_states where workspace_id = $1) as audit_reports,
-       (select count(*) from data_sources where workspace_id = $1) as data_sources,
-       (select count(*) from connected_accounts where workspace_id = $1) as connected_accounts,
+      ((select count(*) from workspace_states where workspace_id = $1)
+        + (select count(*) from recovery_workspace_states where workspace_id = $1)) as audit_reports,
+       ((select count(*) from data_sources where workspace_id = $1)
+        + (select count(*) from recovery_sources where workspace_id = $1)) as data_sources,
+       (select count(*) from connected_accounts
+        where workspace_id = $1
+          and status = 'active'
+          and metadata ->> 'ledgerAuthority' = 'RECOVERY_V1') as connected_accounts,
        (select count(*) from uploaded_files where workspace_id = $1 and deleted_at is null) as uploaded_files,
-       (select count(*) from transactions where workspace_id = $1) as transactions,
-       (select count(*) from recurring_items where workspace_id = $1) as recurring_items,
-       (select count(*) from connector_evidence where workspace_id = $1) as connector_evidence,
+       ((select count(*) from transactions where workspace_id = $1)
+        + (select count(*) from recovery_evidence where workspace_id = $1 and evidence_kind = 'TRANSACTION')) as transactions,
+       ((select count(*) from recurring_items where workspace_id = $1)
+        + (select count(*) from recovery_commitments where workspace_id = $1)) as recurring_items,
+       ((select count(*) from connector_evidence where workspace_id = $1)
+        + (select count(*) from recovery_evidence where workspace_id = $1 and provenance_kind = 'PROVIDER_RECEIVED')) as connector_evidence,
        (select count(*) from usage_observations where workspace_id = $1) as usage_observations,
-      (select updated_at from workspace_states where workspace_id = $1) as latest_snapshot_at,
-      (select summary from workspace_states where workspace_id = $1) as latest_summary`,
+      (select max(updated_at) from (
+         select updated_at from workspace_states where workspace_id = $1
+         union all
+         select updated_at from recovery_workspace_states where workspace_id = $1
+       ) saved_state) as latest_snapshot_at,
+      coalesce(
+        (select summary from workspace_states where workspace_id = $1),
+        (select jsonb_build_object(
+           'subscriptions', (select count(*) from recovery_commitments where workspace_id = $1),
+           'receipts', (select count(*) from recovery_evidence where workspace_id = $1)
+         ) where exists (select 1 from recovery_workspace_states where workspace_id = $1))
+      ) as latest_summary`,
     [workspaceId],
   );
   const row = result.rows[0];
@@ -255,28 +264,6 @@ function getEmptyDataCounts(): ProfileDataCounts {
   };
 }
 
-function getConnectedNow(data: ProfileDataCounts) {
-  return [
-    "Verified Google or email-link identity",
-    data.auditReports > 0 ? "Encrypted synchronized workspace state" : null,
-    data.connectedAccounts > 0 ? "Connected provider accounts" : null,
-    data.dataSources > 0 ? "Server data sources" : null,
-  ].filter((item): item is string => Boolean(item));
-}
-
-function getPendingIntegrations() {
-  return [
-    "Public Gmail access beyond approved Google test/verified users",
-    "Optional encrypted raw-file retention (request-time imports are not retained by default)",
-    "Account Aggregator bank data",
-    "UPI AutoPay mandate sync",
-    "Card e-mandate sync",
-    "Apple/Google Play user-wide APIs (not offered to third parties; receipt evidence remains the available path)",
-    "PayPal/Cashfree financial connectors and Razorpay transaction discovery",
-    "Provider-authorized cancellation automation",
-  ];
-}
-
 async function listSharedOwnedWorkspaces(userId: string) {
   const result = await getDatabasePool().query<{ id: string; name: string; member_count: string }>(
     `select w.id, w.name, count(wm.user_id)::text as member_count
@@ -297,6 +284,7 @@ async function listOwnedConnectorAccounts(userId: string) {
      join workspaces workspace on workspace.id = account.workspace_id
      where workspace.owner_user_id = $1
        and account.status <> 'revoked'
+       and account.connector_id <> 'receipt-inbox'
      order by account.created_at asc`,
     [userId],
   );

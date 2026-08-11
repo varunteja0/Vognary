@@ -13,7 +13,7 @@ const clientEntry = readFileSync("src/app/profile/profile-client.tsx", "utf8");
 
 test("profile remains an authenticated route", () => {
   assert.match(page, /readCurrentSession/);
-  assert.match(page, /if \(!session\) redirect\("\/login"\)/);
+  assert.match(page, /if \(!session\) redirect\("\/login\?next=\/profile"\)/);
 });
 
 test("profile actions preserve their established server contracts", () => {
@@ -23,18 +23,21 @@ test("profile actions preserve their established server contracts", () => {
   assert.match(client, /sessionStorage\.removeItem\(guestAuditTransferKey\)/);
   assert.match(client, /JSON\.stringify\(\{ confirm: deleteText \}\)/);
   assert.match(client, /localStorage\.removeItem\(localWorkspaceStorageKey\)/);
+  assert.match(client, /setDeletionComplete\(true\)/);
+  assert.match(client, /providerRevocations/);
+  assert.match(clientEntry, /if \(settings\.deletionComplete\)/);
+  assert.doesNotMatch(client, /location\.(?:replace|href).*account=deleted/);
 
   assert.match(client, /fetch\("\/api\/privacy\/consents", \{/);
   assert.match(client, /method: options\.consent \? "DELETE" : "POST"/);
   assert.match(client, /fetch\("\/api\/renewal-alerts\/preferences", \{\s*method: "PUT"/);
-  assert.match(client, /fetch\("\/api\/platform\/tokens", \{\s*method: "POST"/);
-  assert.match(client, /fetch\("\/api\/platform\/tokens", \{\s*method: "DELETE"/);
+  assert.doesNotMatch(client, /\/api\/platform\/tokens|DeveloperSection|developer access/i);
   assert.match(client, /fetch\("\/api\/privacy\/retention-policy", \{\s*method: "PATCH"/);
   assert.match(client, /fetch\("\/api\/privacy\/requests", \{\s*method: "POST"/);
 });
 
 test("profile settings use the required progressive-disclosure groups in task order", () => {
-  const groupOrder = ["AccountSection", "NotificationsSection", "PrivacySection", "DeveloperSection", "DangerZoneSection"];
+  const groupOrder = ["AccountSection", "NotificationsSection", "PrivacySection", "DangerZoneSection"];
   let previous = -1;
   for (const group of groupOrder) {
     const position = clientEntry.indexOf(`<${group}`);
@@ -45,15 +48,15 @@ test("profile settings use the required progressive-disclosure groups in task or
   assert.match(sections, /name="Account"/);
   assert.match(sections, /name="Notifications"/);
   assert.match(sections, /name="Privacy"/);
-  assert.match(sections, /name="Developer"/);
+  assert.doesNotMatch(sections, /name="Developer"|Read-only automation access/);
   assert.match(sections, /name="Danger Zone"/);
 });
 
 test("each profile action group renders its own live status region", () => {
-  assert.equal((sections.match(/<StatusMessage message=/g) ?? []).length, 7);
+  assert.equal((sections.match(/<StatusMessage message=/g) ?? []).length, 6);
   assert.match(sections, /role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(client, /setStatus\("danger", "Deleting server data…"\)/);
-  assert.match(client, /setStatus\("developer", "Creating a read-only platform token…"\)/);
+  assert.doesNotMatch(client, /setStatus\("developer"/);
   assert.match(client, /setStatus\("notifications", next\.enabled/);
   assert.match(client, /setStatus\("privacyConsent", options\.consent/);
   assert.match(client, /setStatus\("privacyData", "Preparing a live privacy export…"\)/);

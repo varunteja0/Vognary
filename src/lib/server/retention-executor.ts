@@ -13,6 +13,7 @@ export type RetentionInvocation = "internal-api" | "cron";
 export type RetentionCounts = {
   connectorEvidencePayloadsMinimized: number;
   recoveryRawEvidenceMinimized: number;
+  recoveryInboundEventsDeleted: number;
   webhookPayloadsMinimized: number;
   webhookErrorsMinimized: number;
   connectorTransactionRowsMinimized: number;
@@ -86,6 +87,25 @@ const workspaceQueries: RetentionQuery[] = [
       update recovery_sources item
       set raw_evidence = '{}'::jsonb, raw_minimized_at = now()
       from candidates where item.id = candidates.id returning 1
+    ) select count(*)::text as count from affected`,
+  },
+  {
+    key: "recoveryInboundEventsDeleted",
+    cutoff: "operational",
+    previewSql: `select count(*)::text as count from (
+      select id from recovery_inbound_events
+      where workspace_id = $1 and received_at < $2
+        and status in ('PROCESSED', 'IGNORED', 'TERMINAL_FAILED')
+      order by received_at asc limit $3
+    ) candidates`,
+    executeSql: `with candidates as (
+      select id from recovery_inbound_events
+      where workspace_id = $1 and received_at < $2
+        and status in ('PROCESSED', 'IGNORED', 'TERMINAL_FAILED')
+      order by received_at asc limit $3 for update skip locked
+    ), affected as (
+      delete from recovery_inbound_events item using candidates
+      where item.id = candidates.id returning 1
     ) select count(*)::text as count from affected`,
   },
   {
@@ -649,6 +669,7 @@ function emptyCounts(): RetentionCounts {
   return {
     connectorEvidencePayloadsMinimized: 0,
     recoveryRawEvidenceMinimized: 0,
+    recoveryInboundEventsDeleted: 0,
     webhookPayloadsMinimized: 0,
     webhookErrorsMinimized: 0,
     connectorTransactionRowsMinimized: 0,

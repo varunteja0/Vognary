@@ -4,9 +4,11 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import pg from "pg";
 import { assertInitialSchemaBaseline } from "./lib/postgres-schema-baseline.mjs";
+import { parseMigrationTarget, selectMigrationFiles } from "./lib/migration-target.mjs";
 
 const { Pool } = pg;
 const databaseUrl = process.env.DATABASE_URL;
+const throughMigrationId = parseMigrationTarget(process.argv.slice(2));
 
 if (!databaseUrl) {
   console.error("DATABASE_URL is required to apply the Vognary PostgreSQL schema.");
@@ -17,6 +19,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const schemaPath = path.join(root, "infra", "postgres", "schema.sql");
 const migrationsPath = path.join(root, "infra", "postgres", "migrations");
 const schema = await readFile(schemaPath, "utf8");
+const migrationFiles = selectMigrationFiles(await listMigrationFiles(), throughMigrationId);
 const migrationLockId = 8_668_642_791;
 
 const pool = new Pool({
@@ -32,6 +35,7 @@ const applied = [];
 try {
   const client = await pool.connect();
   try {
+    await assertTargetedRunUsesExistingSchema(client);
     await ensureMigrationLedger(client);
     const lock = await client.query("select pg_try_advisory_lock($1) as acquired", [migrationLockId]);
     if (lock.rows[0]?.acquired !== true) {
@@ -94,9 +98,7 @@ async function applyInitialSchema(client) {
 }
 
 async function applyPendingMigrations(client) {
-  const files = await listMigrationFiles();
-
-  for (const file of files) {
+  for (const file of migrationFiles) {
     const id = path.basename(file, ".sql");
     const sql = await readFile(path.join(migrationsPath, file), "utf8");
     const expectedChecksum = checksum(sql);
@@ -130,6 +132,14 @@ async function listMigrationFiles() {
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return [];
     throw error;
+  }
+}
+
+async function assertTargetedRunUsesExistingSchema(client) {
+  if (!throughMigrationId) return;
+  const result = await client.query("select to_regclass('public.users') as users");
+  if (!result.rows[0]?.users) {
+    throw new Error("--through is allowed only on an existing schema. Fresh databases must install the complete consolidated schema.");
   }
 }
 

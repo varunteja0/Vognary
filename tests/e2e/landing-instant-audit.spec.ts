@@ -1,45 +1,77 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-const receiptEvidence = [
-  "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly.",
-  "Notion invoice paid INR 830 on 2026-07-01. Notion Plus renews monthly.",
-].join("\n\n");
-
-test("the landing hero performs the audit and hands off to the full audit", async ({ page }) => {
+test("the landing page withholds forwarding until its production gate is proven", async ({ page }) => {
   await page.goto("/");
 
-  const pasteBox = page.getByLabel("Paste a receipt to see it now");
-  await expect(pasteBox).toBeVisible();
-  await expect(page.getByRole("link", { name: "Audit my recurring spend" })).toBeVisible();
+  const heading = page.getByRole("heading", { level: 1, name: "Know what’s renewing before you pay for it." });
+  const hero = page.locator("section").filter({ has: heading });
+  await expect(heading).toBeVisible();
+  await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toBeVisible();
 
-  await pasteBox.fill(receiptEvidence);
+  const getStarted = hero.getByRole("link", { name: "Request private audit", exact: true });
+  const signIn = hero.getByRole("link", { name: "Sign in", exact: true });
+  await expect(getStarted).toHaveAttribute("href", "/private-audit");
+  await expect(signIn).toHaveAttribute("href", "/login?next=/app");
 
-  const result = page.getByRole("region", { name: "Instant audit result" });
-  await expect(result.getByText("Monthly burn")).toBeVisible();
-  await expect(result.getByText("Next renewal")).toBeVisible();
-  await expect(result.getByText("Do this first")).toBeVisible();
-  await expect(result.getByText(/₹\s?2,829/)).toBeVisible();
+  await expect(page.getByText("Vognary does not access your inbox. A private review uses evidence provided through the agreed intake.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What you get" })).toBeVisible();
+  await expect(page.getByText("Renewing soon", { exact: true })).toBeVisible();
+  await expect(page.getByText("Price changed", { exact: true })).toBeVisible();
+  await expect(page.getByText("Needs a decision", { exact: true })).toBeVisible();
+
+  await expect(page.getByRole("textbox")).toHaveCount(0);
+  await expect(page.getByText(/sample audit/i)).toHaveCount(0);
+  await expect(page.getByText(/verified savings/i)).toHaveCount(0);
+  await expect(page.getByText(/account aggregator|upi autopay|card e-mandate/i)).toHaveCount(0);
 
   const axe = await new AxeBuilder({ page }).analyze();
   const serious = axe.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical");
   expect(serious).toEqual([]);
-
-  await page.getByRole("button", { name: "Continue in the full audit" }).click();
-  await page.waitForURL("**/app**");
-
-  await expect(page.getByRole("heading", { name: "Know what renews before it charges" })).toBeVisible();
-  await expect(page.getByLabel("Paste receipts or invoices")).toHaveValue(new RegExp("OpenAI invoice"));
-  await expect(page.getByText("Do this first")).toBeVisible();
 });
 
-test("the sample receipt chip produces a labelled result without typing", async ({ page }) => {
+test("the mobile landing keeps the primary action visible without overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
 
-  await page.getByRole("button", { name: "Try a sample receipt" }).click();
+  const heading = page.getByRole("heading", { level: 1, name: "Know what’s renewing before you pay for it." });
+  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Request private audit", exact: true });
+  await expect(getStarted).toBeVisible();
+  const actionBottom = await getStarted.evaluate((element) => element.getBoundingClientRect().bottom);
+  const metrics = await page.evaluate(() => ({
+    viewportHeight: window.innerHeight,
+    documentWidth: document.documentElement.scrollWidth,
+  }));
+  expect(metrics.documentWidth).toBeLessThanOrEqual(375 + 1);
+  expect(actionBottom).toBeLessThan(metrics.viewportHeight);
+});
 
-  const result = page.getByRole("region", { name: "Instant audit result" });
-  await expect(result.getByText("Monthly burn")).toBeVisible();
-  await expect(result.getByText("Do this first")).toBeVisible();
-  await expect(result.getByRole("button", { name: "Continue in the full audit" })).toBeVisible();
+test("login presents one Google identity path without product detours", async ({ page }) => {
+  await page.goto("/login?next=/app");
+
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in to Vognary" })).toBeVisible();
+  await expect(page.getByText("Use Google to create your saved workspace.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+  await expect(page.getByText("Google is only for sign-in. Vognary does not access Gmail.")).toBeVisible();
+
+  await expect(page.getByRole("link", { name: "Continue privately" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Private audit" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "See product output" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Save and sync with Google" })).toHaveCount(0);
+});
+
+test("signed-out app entry returns to the canonical sign-in path", async ({ page }) => {
+  await page.goto("/app");
+
+  await expect(page).toHaveURL(/\/login\?next=(?:%2F|\/)app$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in to Vognary" })).toBeVisible();
+  await expect(page.getByLabel("Paste receipts or invoices")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "See a sample audit" })).toHaveCount(0);
+});
+
+test("a public query parameter cannot claim account deletion", async ({ page }) => {
+  await page.goto("/?account=deleted");
+
+  await expect(page.getByText(/account.*deleted/i)).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });

@@ -21,6 +21,7 @@
 
 # local tooling artifacts
 /graphify-out
+/Vognary-receipt-ux/
 
 # next.js
 /.next/

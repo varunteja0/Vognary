@@ -57,22 +57,18 @@ export function AccountSection({ settings }: { settings: Settings }) {
         <details className="inset mt-4 p-4">
           <summary className="cursor-pointer font-semibold text-(--ink)">Stored data and connection inventory</summary>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric label="Synced state" value={profile.data.auditReports} />
-            <Metric label="Connected accounts" value={profile.data.connectedAccounts} />
-            <Metric label="Server sources" value={profile.data.dataSources} />
+            <Metric label="Saved account state" value={profile.data.auditReports} />
+            <Metric label="Active sources" value={profile.data.connectedAccounts} />
+            <Metric label="Receipt and source records" value={profile.data.dataSources} />
             <Metric label="Uploaded files" value={profile.data.uploadedFiles} />
             <Metric label="Transactions" value={profile.data.transactions} />
-            <Metric label="Recurring items" value={profile.data.recurringItems} />
-            <Metric label="Connector evidence" value={profile.data.connectorEvidence} />
+            <Metric label="Subscriptions" value={profile.data.recurringItems} />
+            <Metric label="Received source records" value={profile.data.connectorEvidence} />
             <Metric label="Usage observations" value={profile.data.usageObservations} />
           </div>
           <p className="mt-4 text-xs leading-5 text-(--muted)">
-            Latest encrypted workspace sync: {profile.data.latestSnapshotAt ? new Date(profile.data.latestSnapshotAt).toLocaleString("en-IN") : "none yet"}
+            Latest saved update: {profile.data.latestSnapshotAt ? new Date(profile.data.latestSnapshotAt).toLocaleString("en-IN") : "none yet"}
           </p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Inventory title="Available now" items={profile.integrations.connectedNow} empty="No synchronized sources yet." />
-            <Inventory title="Requires provider access" items={profile.integrations.pending} empty="No pending provider surfaces." />
-          </div>
         </details>
       ) : null}
     </ProfileGroup>
@@ -178,51 +174,12 @@ export function PrivacySection({ settings }: { settings: Settings }) {
   );
 }
 
-export function DeveloperSection({ settings }: { settings: Settings }) {
-  const isAdmin = Boolean(settings.profile?.activeWorkspace && ["owner", "admin"].includes(settings.profile.activeWorkspace.role));
-  return (
-    <ProfileGroup name="Developer" description="Read-only automation access">
-      {isAdmin && settings.developerAvailable ? (
-        <>
-          <p className="text-sm leading-6 text-(--muted)">Create a 90-day token that can read the canonical ledger and source freshness. It cannot read credentials or raw evidence, configure connectors, or take actions.</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-            <label>
-              <span className="sr-only">API token name</span>
-              <input value={settings.tokenName} onChange={(event) => settings.setTokenName(event.target.value)} className="field" maxLength={80} placeholder="Token name" />
-            </label>
-            <button type="button" disabled={settings.tokenBusy || !settings.tokenName.trim()} onClick={settings.createReadOnlyApiToken} className="btn btn-primary disabled:opacity-50">Create token</button>
-          </div>
-          {settings.createdToken ? (
-            <div className="mt-4 rounded-[11px] border border-verdict bg-(--verdict-tint) p-3">
-              <p className="text-sm font-semibold text-verdict">Copy now — this value is shown once</p>
-              <code className="mt-2 block break-all text-xs text-(--ink)">{settings.createdToken}</code>
-              <button type="button" className="btn btn-ghost mt-3 h-9 px-3 text-xs" onClick={settings.copyCreatedToken}>Copy token</button>
-            </div>
-          ) : null}
-          <div className="mt-4 grid gap-2">
-            {settings.platformTokens.length ? settings.platformTokens.map((token) => (
-              <div key={token.id} className="inset flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-(--ink)">{token.name} <span className="font-data text-xs font-normal text-(--muted)">{token.tokenPrefix}…</span></p>
-                  <p className="mt-1 text-xs text-(--muted)">{token.scopes.join(" · ")} · expires {new Date(token.expiresAt).toLocaleDateString("en-IN")}{token.revokedAt ? " · revoked" : ""}</p>
-                </div>
-                {!token.revokedAt ? <button type="button" disabled={settings.tokenBusy} onClick={() => settings.revokeReadOnlyApiToken(token.id)} className="btn btn-ghost h-9 px-3 text-xs disabled:opacity-50">Revoke</button> : null}
-              </div>
-            )) : <p className="text-xs text-(--muted)">No platform tokens created.</p>}
-          </div>
-        </>
-      ) : <p className="text-sm text-(--muted)">Developer controls appear only after the server confirms workspace admin access and token support.</p>}
-      <StatusMessage message={settings.statuses.developer} />
-    </ProfileGroup>
-  );
-}
-
 export function DangerZoneSection({ settings }: { settings: Settings }) {
   return (
     <div id="delete-account" className="scroll-mt-6">
       <ProfileGroup name="Danger Zone" description="Permanent account and workspace deletion">
       <h3 className="font-display text-lg font-semibold text-(--ink)">Delete my Vognary data</h3>
-      <p className="mt-2 text-sm leading-6 text-(--muted)">This deletes your server-side user row, solo-owned workspaces and synchronized state, connected accounts, transactions, recurring items, evidence, matching intake leads, and pending magic links. Shared-workspace data remains for other members. Recent authentication is required.</p>
+      <p className="mt-2 text-sm leading-6 text-(--muted)">Deletion removes active sessions, receipt aliases, Recovery evidence, subscriptions, and decisions, plus solo-owned workspace data. Shared-workspace data and legally retained or provider-held data follow the disclosed boundaries. Recent authentication is required.</p>
       <label className="mt-4 block">
         <span className="field-label">Type {settings.profile?.deleteConfirmation ?? "the confirmation phrase"} to confirm</span>
         <input value={settings.deleteText} onChange={(event) => settings.setDeleteText(event.target.value)} className="field mt-1" autoComplete="off" />
@@ -251,11 +208,7 @@ function Info({ label, value }: { label: string; value: string }) {
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-[8px] border border-line px-3 py-3"><p className="eyebrow text-[0.56rem]">{label}</p><p className="font-data mt-2 text-2xl font-semibold tnum text-(--ink)">{value}</p></div>;
-}
-
-function Inventory({ title, items, empty }: { title: string; items: string[]; empty: string }) {
-  return <div><h3 className="text-sm font-semibold text-(--ink)">{title}</h3><ul className="mt-2 grid gap-2 text-xs leading-5 text-(--muted)">{items.length ? items.map((item) => <li key={item}>{item}</li>) : <li>{empty}</li>}</ul></div>;
+  return <div className="rounded-lg border border-line px-3 py-3"><p className="eyebrow text-[0.56rem]">{label}</p><p className="font-data mt-2 text-2xl font-semibold tnum text-(--ink)">{value}</p></div>;
 }
 
 function CheckBox({ label, checked, disabled, onChange }: { label: string; checked: boolean; disabled: boolean; onChange: (checked: boolean) => void }) {

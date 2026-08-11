@@ -22,22 +22,45 @@ const recoveryRelations = [
   "recovery_decisions",
   "recovery_changes",
   "recovery_idempotency_keys",
+  "recovery_inbound_aliases",
+  "recovery_inbound_events",
 ] as const;
 
-test("the real migration runner installs and records Recovery v1 on a fresh database", {
+test("a targeted migration refuses a fresh database before creating schema or ledger state", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("recovery_target_fresh", async (connectionString) => {
+    assert.throws(
+      () => runMigrations(connectionString, ["--through=0025_recovery_renewal_alerts"]),
+      /--through is allowed only on an existing schema/i,
+    );
+    const pool = createPool(connectionString);
+    try {
+      const state = await pool.query<{ users: string | null; ledger: string | null }>(
+        `select to_regclass('public.users')::text as users,
+                to_regclass('public.schema_migrations')::text as ledger`,
+      );
+      assert.deepEqual(state.rows[0], { users: null, ledger: null });
+    } finally {
+      await pool.end();
+    }
+  });
+});
+
+test("the real migration runner installs and records the Recovery receipt inbox on a fresh database", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
   await withDisposableDatabase("recovery_fresh", async (connectionString) => {
     const result = runMigrations(connectionString);
-    assert.equal(result.applied.at(-1)?.id, "0023_recovery_v1");
+    assert.equal(result.applied.at(-1)?.id, "0026_recovery_inbound_retention");
 
     const pool = createPool(connectionString);
     try {
       const migrations = await pool.query<{ id: string }>(
         `select id from schema_migrations order by id`,
       );
-      assert.equal(migrations.rows.at(-1)?.id, "0023_recovery_v1");
-      assert.equal(migrations.rows.length, 23);
+      assert.equal(migrations.rows.at(-1)?.id, "0026_recovery_inbound_retention");
+      assert.equal(migrations.rows.length, 26);
       await assertRecoveryRelations(pool);
     } finally {
       await pool.end();
@@ -45,7 +68,7 @@ test("the real migration runner installs and records Recovery v1 on a fresh data
   });
 });
 
-test("the real migration runner upgrades an existing 0022 database without losing legacy state", {
+test("the real migration runner upgrades an existing 0022 database through Recovery inbound without losing legacy state", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
   await withDisposableDatabase("recovery_upgrade", async (connectionString) => {
@@ -53,23 +76,66 @@ test("the real migration runner upgrades an existing 0022 database without losin
     const userId = randomUUID();
     const workspaceId = randomUUID();
     const recurringItemId = randomUUID();
+    let legacySyncRunId = "";
+    let legacyEvidenceId = "";
 
     try {
       await seedSchemaThrough0022(seedPool);
-      await seedLegacyState(seedPool, { userId, workspaceId, recurringItemId });
+      const legacy = await seedLegacyState(seedPool, { userId, workspaceId, recurringItemId });
+      legacySyncRunId = legacy.syncRunId;
+      legacyEvidenceId = legacy.evidenceId;
     } finally {
       await seedPool.end();
     }
 
+    const expanded = runMigrations(connectionString, ["--through=0025_recovery_renewal_alerts"]);
+    assert.deepEqual(expanded.applied, [
+      { id: "0023_recovery_v1", mode: "applied-migration" },
+      { id: "0024_recovery_inbound_receipts", mode: "applied-migration" },
+      { id: "0025_recovery_renewal_alerts", mode: "applied-migration" },
+    ]);
+    const expandedPool = createPool(connectionString);
+    try {
+      const expandedState = await expandedPool.query<{ job_status: string; reminder_status: string; has_recovery_target: boolean }>(
+        `select
+           (select status::text from connector_sync_jobs where workspace_id = $1 limit 1) as job_status,
+           (select status::text from renewal_alert_deliveries where workspace_id = $1 limit 1) as reminder_status,
+           exists (
+             select 1 from information_schema.columns
+             where table_schema = 'public'
+               and table_name = 'renewal_alert_deliveries'
+               and column_name = 'recovery_commitment_id'
+           ) as has_recovery_target`,
+        [workspaceId],
+      );
+      assert.deepEqual(expandedState.rows[0], {
+        job_status: "running",
+        reminder_status: "scheduled",
+        has_recovery_target: true,
+      });
+      await assert.doesNotReject(
+        expandedPool.query(
+          `update retention_runs
+           set counts = counts || '{"recoveryInboundEventsDeleted":0}'::jsonb
+           where workspace_id = $1`,
+          [workspaceId],
+        ),
+      );
+    } finally {
+      await expandedPool.end();
+    }
+
     const result = runMigrations(connectionString);
-    assert.deepEqual(result.applied, [{ id: "0023_recovery_v1", mode: "applied-migration" }]);
+    assert.deepEqual(result.applied, [
+      { id: "0026_recovery_inbound_retention", mode: "applied-migration" },
+    ]);
 
     const verifyPool = createPool(connectionString);
     try {
       const migration = await verifyPool.query<{ id: string }>(
-        `select id from schema_migrations where id = '0023_recovery_v1'`,
+        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention')`,
       );
-      assert.equal(migration.rowCount, 1);
+      assert.equal(migration.rowCount, 4);
       await assertRecoveryRelations(verifyPool);
 
       const preserved = await verifyPool.query<{
@@ -80,6 +146,10 @@ test("the real migration runner upgrades an existing 0022 database without losin
         commitment_decisions: string;
         workspace_states: string;
         retention_runs: string;
+        sync_job_status: string;
+        sync_run_status: string;
+        sync_run_finished: boolean;
+        legacy_reminder_status: string;
       }>(
         `select
            (select count(*)::text from users where id = $1) as users,
@@ -88,8 +158,12 @@ test("the real migration runner upgrades an existing 0022 database without losin
            (select count(*)::text from evidence_links where recurring_item_id = $3) as evidence_links,
            (select count(*)::text from commitment_decisions where recurring_item_id = $3) as commitment_decisions,
            (select count(*)::text from workspace_states where workspace_id = $2) as workspace_states,
-           (select count(*)::text from retention_runs where workspace_id = $2) as retention_runs`,
-        [userId, workspaceId, recurringItemId],
+           (select count(*)::text from retention_runs where workspace_id = $2) as retention_runs,
+           (select status::text from connector_sync_jobs where workspace_id = $2 limit 1) as sync_job_status,
+            (select status::text from connector_sync_runs where id = $4) as sync_run_status,
+            (select finished_at is not null from connector_sync_runs where id = $4) as sync_run_finished,
+           (select status::text from renewal_alert_deliveries where workspace_id = $2 limit 1) as legacy_reminder_status`,
+          [userId, workspaceId, recurringItemId, legacySyncRunId],
       );
       assert.deepEqual(preserved.rows[0], {
         users: "1",
@@ -99,6 +173,10 @@ test("the real migration runner upgrades an existing 0022 database without losin
         commitment_decisions: "1",
         workspace_states: "1",
         retention_runs: "1",
+        sync_job_status: "blocked",
+        sync_run_status: "blocked",
+        sync_run_finished: true,
+        legacy_reminder_status: "cancelled",
       });
 
       await assert.doesNotReject(
@@ -108,6 +186,63 @@ test("the real migration runner upgrades an existing 0022 database without losin
            where workspace_id = $1`,
           [workspaceId],
         ),
+      );
+      await assert.doesNotReject(
+        verifyPool.query(
+          `update connector_evidence
+           set payload = '{}'::jsonb, payload_minimized_at = now()
+           where id = $1`,
+          [legacyEvidenceId],
+        ),
+      );
+      await assert.rejects(
+        verifyPool.query(
+          `update connector_evidence set merchant_raw = 'Changed legacy merchant' where id = $1`,
+          [legacyEvidenceId],
+        ),
+        /connector evidence writes are retired/i,
+      );
+      await assert.rejects(
+        verifyPool.query(
+          `insert into connector_evidence (
+             workspace_id, sync_run_id, connector_id, provider, evidence_type,
+             observed_at, confidence_score, payload_hash
+           ) values ($1, $2, 'openai-costs', 'openai', 'cost', now(), 90, $3)`,
+          [workspaceId, legacySyncRunId, "f".repeat(64)],
+        ),
+        /connector evidence writes are retired/i,
+      );
+      await assert.rejects(
+        verifyPool.query(
+          `insert into connector_evidence (
+             workspace_id, connector_id, provider, evidence_type,
+             observed_at, confidence_score, payload_hash
+           ) values ($1, 'openai-costs', 'openai', 'cost', now(), 90, $2)`,
+          [workspaceId, "e".repeat(64)],
+        ),
+        /connector evidence writes are retired/i,
+      );
+      await assert.rejects(
+        verifyPool.query(
+          `insert into connector_sync_jobs (workspace_id, connector_id, job_type, status, next_run_at)
+           values ($1, 'openai-costs', 'incremental_sync', 'queued', now())`,
+          [workspaceId],
+        ),
+        /legacy connector synchronization is retired/i,
+      );
+      await assert.rejects(
+        verifyPool.query(
+          `insert into renewal_alert_deliveries (
+             workspace_id, user_id, preference_id, consent_grant_id, recurring_item_id,
+             alert_window, renewal_date, scheduled_for, status
+           )
+           select $1, $2, preference.id, preference.consent_grant_id, $3,
+                  '7_day', current_date + 14, now() + interval '7 days', 'scheduled'
+           from renewal_alert_preferences preference
+           where preference.workspace_id = $1 and preference.user_id = $2`,
+          [workspaceId, userId, recurringItemId],
+        ),
+        /legacy renewal deliveries are retired/i,
       );
     } finally {
       await verifyPool.end();
@@ -131,8 +266,8 @@ async function withDisposableDatabase(
   }
 }
 
-function runMigrations(connectionString: string) {
-  const output = execFileSync(process.execPath, ["scripts/apply-postgres-schema.mjs"], {
+function runMigrations(connectionString: string, args: string[] = []) {
+  const output = execFileSync(process.execPath, ["scripts/apply-postgres-schema.mjs", ...args], {
     cwd: root,
     encoding: "utf8",
     env: {
@@ -225,6 +360,45 @@ async function seedLegacyState(
      values ($1, 'cron', false, 'completed', '{"connectorEvidencePayloadsMinimized":0}'::jsonb)`,
     [ids.workspaceId],
   );
+  const syncJob = await pool.query<{ id: string }>(
+    `insert into connector_sync_jobs (workspace_id, connector_id, job_type, status, next_run_at)
+     values ($1, 'openai-costs', 'incremental_sync', 'running', null)
+     returning id`,
+    [ids.workspaceId],
+  );
+  const syncRunId = randomUUID();
+  await pool.query(
+    `insert into connector_sync_runs (id, sync_job_id, workspace_id, connector_id, invocation, status)
+     values ($1, $2, $3, 'openai-costs', 'cron', 'running')`,
+    [syncRunId, syncJob.rows[0]!.id, ids.workspaceId],
+  );
+  const evidence = await pool.query<{ id: string }>(
+    `insert into connector_evidence (
+       workspace_id, sync_run_id, connector_id, provider, evidence_type,
+       observed_at, merchant_raw, confidence_score, payload_hash, payload
+     ) values ($1, $2, 'openai-costs', 'openai', 'cost', now(), 'Legacy merchant', 90, $3, '{"raw":"private"}'::jsonb)
+     returning id`,
+    [ids.workspaceId, syncRunId, "d".repeat(64)],
+  );
+  await pool.query(
+    `with consent as (
+       insert into consent_grants (workspace_id, user_id, subject_email, purpose, notice_version, source)
+       values ($1, $2, $3, 'renewal-alerts', 'migration-test', 'migration-test')
+       returning id
+     ), preference as (
+       insert into renewal_alert_preferences (workspace_id, user_id, consent_grant_id, enabled)
+       select $1, $2, id, true from consent
+       returning id, consent_grant_id
+     )
+     insert into renewal_alert_deliveries (
+       workspace_id, user_id, preference_id, consent_grant_id, recurring_item_id,
+       alert_window, renewal_date, scheduled_for, status
+     )
+     select $1, $2, id, consent_grant_id, $4, '7_day', current_date + 7, now() + interval '1 day', 'scheduled'
+     from preference`,
+    [ids.workspaceId, ids.userId, `${ids.userId}@migration.test`, ids.recurringItemId],
+  );
+  return { syncRunId, evidenceId: evidence.rows[0]!.id };
 }
 
 async function assertRecoveryRelations(pool: Pool) {
