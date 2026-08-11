@@ -14,7 +14,7 @@ test("the landing page withholds forwarding until its production gate is proven"
   await expect(getStarted).toHaveAttribute("href", "/private-audit");
   await expect(signIn).toHaveAttribute("href", "/login?next=/app");
 
-  await expect(page.getByText("Vognary does not access your inbox. The private review uses only evidence you intentionally submit.")).toBeVisible();
+  await expect(page.getByText("Vognary does not access your inbox. A private review uses evidence provided through the agreed intake.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "What you get" })).toBeVisible();
   await expect(page.getByText("Renewing soon", { exact: true })).toBeVisible();
   await expect(page.getByText("Price changed", { exact: true })).toBeVisible();
