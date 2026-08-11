@@ -192,6 +192,8 @@ test("Lighthouse measures the signed-out app without hydration delay and respect
   const lighthouse = read("scripts/check-lighthouse.mjs");
   const loginPage = read("src/app/login/page.tsx");
   const loginClient = read("src/app/login/login-client.tsx");
+  assert.match(lighthouse, /path: "\/login\?next=\/app", categories: \["performance", "accessibility", "best-practices"\]/);
+  assert.doesNotMatch(lighthouse, /path: "\/app", categories:/);
   assert.match(lighthouse, /path: "\/verify", categories: \["performance", "accessibility", "best-practices"\]/);
   assert.match(loginPage, /initialSession=/);
   assert.match(loginPage, /readCurrentSession/);
