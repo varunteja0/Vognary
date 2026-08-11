@@ -1,4 +1,4 @@
-# CONTINUE HERE — live handoff (2026-07-21, post-THE-LAW)
+# CONTINUE HERE — live handoff (2026-08-11)
 
 > **New chat — mandatory order:**
 > 1. [`docs/THE-LAW.md`](THE-LAW.md) — **supreme company + agent directive** (read first)
@@ -27,7 +27,7 @@ money first-class before anything else, and the world must work too.**
   default to India.
 - Honesty invariant holds everywhere: name a rail only at its proven `*_STATUS`.
 
-## 1. Where things stand (verified 2026-07-21, after Phase 0 cleanup)
+## 1. Where things stand (verified 2026-08-11)
 
 - **Recovery v1 launch implementation is locally green (verified 2026-08-11):**
   branch `recovery/v1` has one canonical signed path under
@@ -40,15 +40,18 @@ money first-class before anything else, and the world must work too.**
   not fabricate recurrence, while two matching charges infer cadence through the
   existing engine. Empty Home now leads with the private receipt address when it
   is actually available and keeps manual evidence as the fallback. Evidence:
-  **556/556 unit/source-contract tests**, **41/41 PostgreSQL tests** from a fresh
+  **557/557 unit/source-contract tests**, **41/41 PostgreSQL tests** from a fresh
   schema through migrations `0024`–`0026`, and all **76 browser scenarios**
   exercised across desktop/mobile (one 5-second dev cold-start miss in the full
   run; the unchanged mobile Customer #0 test passed **1/1** immediately on rerun),
   with no serious/critical axe violations. Lint, typecheck, claims, tokens, build,
-  and performance budgets pass. Production activation remains blocked: the live
-  receipt inbox and reminder worker are unconfigured, and real Google/session,
-  delivered-reminder, Customer #0, CI/main ancestry, and exact-SHA deployment
-  evidence remain to prove.
+  and performance budgets pass. Production now has a clean Recovery cutover
+  through `0026`, an exact-main-SHA deployment, Google identity configuration,
+  daily reminder/retention cron routes, and a verified Resend sending + receiving
+  domain with the canonical `email.received` webhook. The provider is configured,
+  but receipt-inbox launch attestations remain deliberately blank until a real
+  signed event proves processing, replay, and retention. Real Google/session,
+  real receipt/PDF processing, delivered reminder, and Customer #0 remain to prove.
 - **Recovery launch identity is Google OIDC only (2026-08-10):** the bearer
   magic-link UI is removed from the Recovery login path and server readiness is
   opt-in disabled unless `ENABLE_MAGIC_LINK_LOGIN=true`. Magic link is deferred
@@ -125,7 +128,7 @@ recurring charge → assistant brief → user decides → decision + outcome log
 |---|---|---|
 | **0** | Repo hygiene | **DONE 2026-07-21** |
 | **A** | Market contact: 10 audits, CRM, outreach, report template | **ACTIVE** — `docs/execution/phase-a-market-contact.md` |
-| **B** | Loop shipping: WP-B0…B8 architecture for agents | **TECHNICAL GATE GREEN** — automated Customer #0 passes; real-human <3 min evidence still pending |
+| **B** | Loop shipping: WP-B0…B8 architecture for agents | **TECHNICAL GATE GREEN; PRODUCTION PROOF ACTIVE** — automated Customer #0 passes; real-human <3 min evidence still pending |
 | **C–F** | Production min → moat → distribution → platform | PENDING / blocked until A–B signal |
 
 ### 2b. Product engineering phases (code loop)

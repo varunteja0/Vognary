@@ -11,8 +11,8 @@
 | Intelligence engine | 6 | 2026-07-21 | Engines strong; corpus empty |
 | Trust & honesty | 9 | 2026-07-21 | Claims CI + fail-closed design |
 | Product UX | 7.5 | 2026-08-11 | Receipt-address-first empty Home; 76 desktop/mobile browser scenarios exercised with axe (one dev cold-start miss passed unchanged on rerun); real-human <3 min remains unmeasured |
-| Backend readiness | 9 | 2026-08-11 | Recovery v1: 556/556 unit, 41/41 PostgreSQL from fresh schema through 0026, realistic repeated-receipt inference, build/perf green |
-| Production activation | 3.5 | 2026-08-11 | Live probe: receipt inbox disabled, reminder worker unconfigured, and Google/Customer #0/exact-SHA deployment evidence absent |
+| Backend readiness | 9 | 2026-08-11 | Recovery v1: 557/557 unit, 41/41 PostgreSQL from fresh schema through 0026, realistic repeated-receipt inference, build/perf green |
+| Production activation | 5.5 | 2026-08-11 | Clean 0026 cutover and exact-main deployment proven; Google identity, cron routes, Resend sending/receiving domain, and canonical webhook configured; real Google, signed receipt/PDF, delivered reminder, and Customer #0 still unproven |
 | Live connector depth | 4 | 2026-07-21 | Registry ≠ live |
 | Data / network moat | 3 | 2026-07-21 | No network data yet |
 | Business validation | 1.5 | 2026-07-21 | Pipeline not asked — founder Phase A |
@@ -36,8 +36,8 @@
 | --- | --- | --- |
 | 0 Hygiene | DONE | 2026-07-21 |
 | A Market contact | ACTIVE | CRM + scripts ready; founder must message |
-| B Loop shipping | TECHNICAL GATE GREEN | Recovery browser loop passes desktop/mobile; real-human <3 min and external activation remain |
-| C Production min | PENDING | Founder-ops heavy |
+| B Loop shipping | TECHNICAL GATE GREEN | Recovery browser loop passes desktop/mobile; real-human <3 min and final external proof remain |
+| C Production min | ACTIVE | Provider/domain/deployment configuration is live; signed receipt, real Google, delivered reminder, and Customer #0 proof remain |
 | D Intelligence moat | PENDING | Needs corpus |
 | E Distribution | PENDING | After A signal |
 | F Platform | BLOCKED | Until A–E |

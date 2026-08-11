@@ -103,6 +103,16 @@ for (const [path, init] of [
 const sourcesWithoutSession = await fetch(`${baseUrl}/api/workspaces/current/sources`);
 if (!(allowUnconfigured ? [401, 503] : [401]).includes(sourcesWithoutSession.status)) throw new Error(`Recovery Sources without session returned ${sourcesWithoutSession.status}`);
 
+const unsignedReceiptWebhook = await fetch(`${baseUrl}/api/webhooks/resend/inbound`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ type: "email.received", data: {} }),
+});
+const expectedUnsignedReceiptStatus = process.env.ENABLE_RECEIPT_INBOX === "true" ? 401 : 501;
+if (unsignedReceiptWebhook.status !== expectedUnsignedReceiptStatus) {
+  throw new Error(`Unsigned receipt webhook returned ${unsignedReceiptWebhook.status} instead of ${expectedUnsignedReceiptStatus}`);
+}
+
 const internalSyncWithoutSecret = await fetch(`${baseUrl}/api/internal/sync-jobs`, {
   method: "POST",
   headers: { "content-type": "application/json" },
