@@ -79,6 +79,7 @@ test("the guarded legacy cutover preserves evidence in Recovery before retiring 
     const userId = randomUUID();
     const workspaceId = randomUUID();
     const sourceId = randomUUID();
+    const unlinkedSourceId = randomUUID();
     const recurringItemId = randomUUID();
 
     try {
@@ -96,6 +97,12 @@ test("the guarded legacy cutover preserves evidence in Recovery before retiring 
            id, workspace_id, kind, display_name, coverage_start_at, coverage_end_at
          ) values ($1, $2, 'manual_entry', 'Legacy receipt', now() - interval '30 days', now())`,
         [sourceId, workspaceId],
+      );
+      await pool.query(
+        `insert into data_sources (
+           id, workspace_id, kind, display_name, coverage_start_at, coverage_end_at
+         ) values ($1, $2, 'manual_entry', 'Legacy empty source', null, null)`,
+        [unlinkedSourceId, workspaceId],
       );
       await pool.query(
         `insert into recurring_items (
@@ -134,7 +141,7 @@ test("the guarded legacy cutover preserves evidence in Recovery before retiring 
       assert.deepEqual(migrated, {
         status: "migrated",
         workspacesMigrated: 1,
-        sourcesMigrated: 1,
+        sourcesMigrated: 2,
         commitmentsMigrated: 1,
         evidenceMigrated: 1,
         decisionsMigrated: 1,
@@ -175,7 +182,7 @@ test("the guarded legacy cutover preserves evidence in Recovery before retiring 
       assert.deepEqual(state.rows[0], {
         legacy_rows: "0",
         recovery_workspaces: "1",
-        recovery_sources: "1",
+        recovery_sources: "2",
         recovery_commitments: "1",
         recovery_evidence: "1",
         recovery_decisions: "1",
