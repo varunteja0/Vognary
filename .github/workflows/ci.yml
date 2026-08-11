@@ -119,6 +119,7 @@ jobs:
           exit 1
       - run: npm run smoke
         env:
+          ENABLE_RECEIPT_INBOX: "true"
           SMOKE_BASE_URL: http://127.0.0.1:3000
           SMOKE_INTERNAL_SECRET: ci-internal-sync-secret
           SMOKE_ALLOW_UNCONFIGURED: "true"
