@@ -76,7 +76,10 @@ jobs:
           }
 
           const projectResponse = await request("");
-          const branchId = projectResponse.project?.default_branch_id;
+          const branchResponse = await request("/branches?search=main&limit=100");
+          const mainBranches = (branchResponse.branches ?? []).filter((branch) => branch.name === "main");
+          if (mainBranches.length !== 1) throw new Error(`Expected exactly one Neon main branch; found ${mainBranches.length}.`);
+          const branchId = projectResponse.project?.default_branch_id ?? mainBranches[0].id;
           if (!branchId) throw new Error("The Neon project has no default branch.");
 
           const databaseResponse = await request(`/branches/${encodeURIComponent(branchId)}/databases`);
