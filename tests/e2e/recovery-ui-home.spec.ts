@@ -183,7 +183,7 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await page.goto("/app");
 
   await expect(page.getByRole("heading", { level: 1, name: "Your subscriptions" })).toBeVisible();
-  await expect(page.getByText("Saved to Vognary")).toBeVisible();
+  await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 
   const nav = page.getByRole("navigation", { name: "Primary" });
   for (const label of ["Home", "Subscriptions", "Sources"]) {
@@ -295,7 +295,7 @@ test("three primary choices and two secondary choices preserve the server decisi
 
   await group.getByRole("button", { name: /^Plan to cancel/ }).click();
   await expect(page.getByText(/Saved Plan to cancel on/)).toBeVisible();
-  await expect(page.getByText("Saved to Vognary")).toBeVisible();
+  await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 });
 
 test("a rejected decision rolls back visibly and states what the workspace still holds", async ({ page }) => {

@@ -190,7 +190,7 @@ async function resetCustomerZeroThroughUi(page: Page) {
   const deleteButton = page.getByRole("button", { name: "Delete server data" });
   await expect(deleteButton).toBeEnabled();
   await deleteButton.click();
-  await expect(page).toHaveURL(/\/profile$/);
+  expect(new URL(page.url()).pathname).toBe("/profile");
   await expect(page.getByRole("heading", { name: "Your Vognary account was deleted" })).toBeVisible();
   await expect(page.getByRole("status")).toContainText(/Deleted 1 workspace\(s\) and signed out/);
   await page.context().clearCookies();
