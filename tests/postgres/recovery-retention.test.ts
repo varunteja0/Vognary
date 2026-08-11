@@ -49,10 +49,10 @@ test("Recovery retention minimizes raw bodies and terminal inbox metadata while 
     await pool.query(
       `insert into recovery_inbound_events (
          id, provider, svix_id, provider_email_id, workspace_id, event_type,
-         payload_hash, status, error_code, received_at, processed_at
+         payload_hash, status, error_code, received_at, processing_started_at, processed_at
        ) values
-         ($2, 'RESEND', $4, $5, $1, 'email.received', $6, 'PROCESSED', null, now() - interval '60 days', now() - interval '60 days'),
-         ($3, 'RESEND', $7, $8, $1, 'email.received', $9, 'PROCESSING', null, now() - interval '60 days', null)`,
+         ($2, 'RESEND', $4, $5, $1, 'email.received', $6, 'PROCESSED', null, now() - interval '60 days', null, now() - interval '60 days'),
+         ($3, 'RESEND', $7, $8, $1, 'email.received', $9, 'PROCESSING', null, now() - interval '60 days', now() - interval '60 days', null)`,
       [
         workspaceId,
         terminalEventId,

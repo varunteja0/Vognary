@@ -134,6 +134,9 @@ test("privacy export includes held product data and excludes all credential mate
       expiresInDays: 30,
     });
     const rawEvidenceTail = "RAW-EVIDENCE-PRIVATE-TAIL-MUST-NOT-EXPORT";
+    const recoveryDates = (await pool.query<{ charged_on: string; renews_on: string }>(
+      `select (current_date - 1)::text as charged_on, (current_date + 30)::text as renews_on`,
+    )).rows[0]!;
     await submitRecoveryEvidence({
       workspaceId,
       actorUserId: userId,
@@ -143,10 +146,10 @@ test("privacy export includes held product data and excludes all credential mate
         kind: "RECEIPT_PASTE",
         receipts: [{
           clientRef: "privacy-openai",
-          text: `OpenAI subscription charged INR 1,999 on 6 July 2026. Renews monthly on 6 August 2026. ${"context ".repeat(80)}${rawEvidenceTail}`,
+          text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on}. Renews monthly on ${recoveryDates.renews_on}. ${"context ".repeat(80)}${rawEvidenceTail}`,
         }],
       },
-      now: new Date("2026-08-10T08:00:00.000Z"),
+      now: new Date(),
     });
 
     const request = await createAccessExportRequest({ workspaceId, actorUserId: userId });

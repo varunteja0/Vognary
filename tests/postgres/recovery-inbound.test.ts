@@ -569,7 +569,7 @@ test("an expired inbound worker cannot overwrite the reclaimed attempt", {
         `To: ${inbox.alias!.address}`,
         "Content-Type: text/plain; charset=utf-8",
         "",
-        "Linear charged INR 900 on 9 July 2026. Renews monthly on 9 August 2026.",
+        "Linear subscription charged INR 900 on 9 July 2026. Renews monthly on 9 August 2026.",
       ].join("\r\n"),
     });
     releaseOld("");
