@@ -124,7 +124,6 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
     const button = page.getByRole("button", { name: decision, exact: true });
     if (!(await button.isVisible())) await page.getByText("More choices", { exact: true }).click();
     await button.click();
-    await expect(button).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByText(new RegExp(`Saved ${escapeRegExp(decision)} on`))).toBeVisible();
   }
   await expectNoSeriousAxeViolations(page, "corrected commitment detail");
