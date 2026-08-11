@@ -44,6 +44,7 @@
     "backup:postgres": "node scripts/backup-postgres.mjs",
     "backup:restore-drill": "node scripts/restore-postgres-drill.mjs",
     "db:apply-schema": "node scripts/apply-postgres-schema.mjs",
+    "db:migrate-legacy-recovery": "node --conditions=react-server --import=tsx scripts/migrate-legacy-recovery.ts",
     "secrets:generate-backup-key": "node scripts/generate-backup-encryption-key.mjs",
     "secrets:generate-token-key": "node scripts/generate-token-encryption-key.mjs"
   },

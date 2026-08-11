@@ -7,6 +7,8 @@ import path from "node:path";
 import test from "node:test";
 import { Pool } from "pg";
 
+import { migrateLegacyRecovery } from "../../scripts/lib/migrate-legacy-recovery";
+
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const databaseUrl = process.env.DATABASE_URL;
 const databaseConfigured = Boolean(databaseUrl);
@@ -63,6 +65,138 @@ test("the real migration runner installs and records the Recovery receipt inbox 
       assert.equal(migrations.rows.length, 26);
       await assertRecoveryRelations(pool);
     } finally {
+      await pool.end();
+    }
+  });
+});
+
+test("the guarded legacy cutover preserves evidence in Recovery before retiring duplicate authority", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("legacy_recovery_cutover", async (connectionString) => {
+    runMigrations(connectionString);
+    const pool = createPool(connectionString);
+    const userId = randomUUID();
+    const workspaceId = randomUUID();
+    const sourceId = randomUUID();
+    const recurringItemId = randomUUID();
+
+    try {
+      await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, `${userId}@legacy-cutover.test`]);
+      await pool.query(
+        `insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Legacy Recovery cutover')`,
+        [workspaceId, userId],
+      );
+      await pool.query(
+        `insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`,
+        [workspaceId, userId],
+      );
+      await pool.query(
+        `insert into data_sources (
+           id, workspace_id, kind, display_name, coverage_start_at, coverage_end_at
+         ) values ($1, $2, 'manual_entry', 'Legacy receipt', now() - interval '30 days', now())`,
+        [sourceId, workspaceId],
+      );
+      await pool.query(
+        `insert into recurring_items (
+           id, workspace_id, merchant, normalized_merchant, category, frequency,
+           currency, amount_min, amount_max, average_amount, monthly_cost,
+           annual_cost, last_charge_date, next_expected_date, confidence_score,
+           status, recommendation_reason, risk_tags
+         ) values (
+           $1, $2, 'Acme AI', 'acme ai', 'Software', 'monthly', 'INR',
+           100.00, 100.00, 100.00, 100.00, 1200.00,
+           current_date - 10, current_date + 20, 92, 'watch',
+           'Review before renewal.', array['renewal-soon']::text[]
+         )`,
+        [recurringItemId, workspaceId],
+      );
+      await pool.query(
+        `insert into evidence_links (
+           recurring_item_id, source_id, evidence_type, evidence_text,
+           evidence_date, amount
+         ) values ($1, $2, 'receipt', 'Acme AI invoice charged INR 100.', current_date - 10, 100.00)`,
+        [recurringItemId, sourceId],
+      );
+      await pool.query(
+        `insert into commitment_decisions (
+           workspace_id, recurring_item_id, decided_by_user_id, action
+         ) values ($1, $2, $3, 'watch')`,
+        [workspaceId, recurringItemId, userId],
+      );
+      await pool.query(
+        `insert into workspace_states (workspace_id, encrypted_snapshot, updated_by_user_id)
+         values ($1, '{}'::jsonb, $2)`,
+        [workspaceId, userId],
+      );
+
+      const migrated = await migrateLegacyRecovery(pool);
+      assert.deepEqual(migrated, {
+        status: "migrated",
+        workspacesMigrated: 1,
+        sourcesMigrated: 1,
+        commitmentsMigrated: 1,
+        evidenceMigrated: 1,
+        decisionsMigrated: 1,
+        remindersScheduled: 0,
+      });
+
+      const state = await pool.query<{
+        legacy_rows: string;
+        recovery_workspaces: string;
+        recovery_sources: string;
+        recovery_commitments: string;
+        recovery_evidence: string;
+        recovery_decisions: string;
+        amount_minor: string;
+        monthly_minor: string;
+        cadence: string;
+        decision: string;
+        snapshot_version: string;
+      }>(
+        `select
+           ((select count(*) from workspace_states)
+             + (select count(*) from recurring_items)
+             + (select count(*) from evidence_links)
+             + (select count(*) from commitment_decisions)
+             + (select count(*) from data_sources))::text as legacy_rows,
+           (select count(*)::text from recovery_workspace_states where workspace_id = $1) as recovery_workspaces,
+           (select count(*)::text from recovery_sources where workspace_id = $1) as recovery_sources,
+           (select count(*)::text from recovery_commitments where workspace_id = $1) as recovery_commitments,
+           (select count(*)::text from recovery_evidence where workspace_id = $1) as recovery_evidence,
+           (select count(*)::text from recovery_decisions where workspace_id = $1) as recovery_decisions,
+           (select effective_amount_minor::text from recovery_commitments where workspace_id = $1) as amount_minor,
+           (select effective_monthly_minor::text from recovery_commitments where workspace_id = $1) as monthly_minor,
+           (select effective_cadence from recovery_commitments where workspace_id = $1) as cadence,
+           (select decision from recovery_decisions where workspace_id = $1) as decision,
+           (select snapshot ->> 'version' from recovery_workspace_versions where workspace_id = $1 and version = 1) as snapshot_version`,
+        [workspaceId],
+      );
+      assert.deepEqual(state.rows[0], {
+        legacy_rows: "0",
+        recovery_workspaces: "1",
+        recovery_sources: "1",
+        recovery_commitments: "1",
+        recovery_evidence: "1",
+        recovery_decisions: "1",
+        amount_minor: "10000",
+        monthly_minor: "10000",
+        cadence: "MONTHLY",
+        decision: "MONITOR",
+        snapshot_version: "1",
+      });
+      assert.deepEqual(await migrateLegacyRecovery(pool), {
+        status: "already-clean",
+        workspacesMigrated: 0,
+        sourcesMigrated: 0,
+        commitmentsMigrated: 0,
+        evidenceMigrated: 0,
+        decisionsMigrated: 0,
+        remindersScheduled: 0,
+      });
+    } finally {
+      await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+      await pool.query(`delete from users where id = $1`, [userId]);
       await pool.end();
     }
   });
