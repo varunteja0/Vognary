@@ -19,7 +19,7 @@ export type SourceType = (typeof sourceTypes)[number];
 export const receiptInboxAliasStates = ["ACTIVE", "ROTATED", "REVOKED"] as const;
 export type ReceiptInboxAliasState = (typeof receiptInboxAliasStates)[number];
 
-export const receiptInboxUpdateStates = ["NOT_PROVISIONED", "WAITING", "RECEIVED", "PROCESSING", "READY", "FAILED", "REVOKED"] as const;
+export const receiptInboxUpdateStates = ["UNAVAILABLE", "NOT_PROVISIONED", "WAITING", "RECEIVED", "PROCESSING", "READY", "FAILED", "REVOKED"] as const;
 export type ReceiptInboxUpdateState = (typeof receiptInboxUpdateStates)[number];
 
 export const commitmentStatuses = ["ACTIVE", "NOT_RECURRING"] as const;
@@ -246,6 +246,7 @@ export type UpcomingItemDto = {
   amount: MoneyDto;
   decision: DecisionDto | null;
   confidence: ConfidenceDto;
+  reminderEligible: boolean;
   evidenceIds: NonEmptyIds;
 };
 

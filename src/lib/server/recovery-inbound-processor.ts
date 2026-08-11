@@ -58,15 +58,19 @@ export async function processResendReceivedEvent(
       : new ResendInboundRetryableError("Receipt provider retrieval failed.");
   }
 
-  let receipts;
+  let extraction;
   try {
-    receipts = await extractForwardedReceiptTexts(raw);
+    extraction = await extractForwardedReceiptTexts(raw);
   } catch {
     const marked = await markTerminalFailure(reservation, "MIME_INVALID");
     return { status: marked ? "ignored" : "duplicate" };
   }
+  const receipts = extraction.texts;
   if (!receipts.length) {
-    const marked = await markTerminalFailure(reservation, "NO_PLAIN_TEXT_RECEIPT");
+    const marked = await markTerminalFailure(
+      reservation,
+      extraction.skippedAttachments.length ? "UNSUPPORTED_ATTACHMENT" : "NO_PLAIN_TEXT_RECEIPT",
+    );
     return { status: marked ? "ignored" : "duplicate" };
   }
 

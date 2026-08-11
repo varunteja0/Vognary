@@ -145,6 +145,7 @@ const home = {
     amount: money,
     decision: null,
     confidence,
+    reminderEligible: true,
     evidenceIds: [evidence.id],
   }],
   coverage: {
@@ -248,7 +249,7 @@ test("Recovery v1 freezes every product enum exhaustively", () => {
   assert.deepEqual(coverageStates, ["NO_EVIDENCE", "BASELINE_ONLY", "PARTIAL", "CURRENT", "STALE"]);
   assert.deepEqual(evidenceProvenanceKinds, ["USER_SUBMITTED", "PROVIDER_RECEIVED"]);
   assert.deepEqual(receiptInboxAliasStates, ["ACTIVE", "ROTATED", "REVOKED"]);
-  assert.deepEqual(receiptInboxUpdateStates, ["NOT_PROVISIONED", "WAITING", "RECEIVED", "PROCESSING", "READY", "FAILED", "REVOKED"]);
+  assert.deepEqual(receiptInboxUpdateStates, ["UNAVAILABLE", "NOT_PROVISIONED", "WAITING", "RECEIVED", "PROCESSING", "READY", "FAILED", "REVOKED"]);
   assert.deepEqual(recoveryErrorCodes, ["AUTH_REQUIRED", "FORBIDDEN", "NOT_FOUND", "INVALID_EVIDENCE", "PARSE_FAILED", "DUPLICATE_EVIDENCE", "DATABASE_UNAVAILABLE", "CONFLICT", "STALE_STATE", "SAVE_FAILED", "REQUEST_TOO_LARGE", "UNSUPPORTED_MEDIA_TYPE", "FEATURE_UNAVAILABLE", "RATE_LIMITED", "UNKNOWN"]);
   assert.equal(Object.keys(decisionLabels).length, decisions.length);
   assert.equal(Object.keys(cadenceLabels).length, cadences.length);

@@ -73,6 +73,15 @@ export function RecoverySources({
               <button type="button" onClick={onRetry} className="btn btn-sm btn-ghost">Try again</button>
             </StateBlock>
           </div>
+        ) : receiptInbox?.state === "UNAVAILABLE" ? (
+          <div className="mt-5">
+            <StateBlock
+              eyebrow="Forwarding unavailable"
+              title="Receipt forwarding is not active yet"
+              detail="Use the manual fallback below. Nothing is connected, and Vognary does not access your inbox."
+              tone="caution"
+            />
+          </div>
         ) : receiptInbox?.state === "NOT_PROVISIONED" || !receiptInbox ? (
           <div className="mt-5 border-t border-line pt-5">
             <p className="text-sm leading-6 text-(--ink-soft)">
@@ -143,7 +152,7 @@ export function RecoverySources({
 }
 
 function ReceiptInboxState({ status }: { status: ReceiptInboxStatusDto }) {
-  if (status.state === "NOT_PROVISIONED" || status.state === "REVOKED") return null;
+  if (status.state === "UNAVAILABLE" || status.state === "NOT_PROVISIONED" || status.state === "REVOKED") return null;
   const contentByState: Record<typeof status.state, {
     eyebrow: string;
     title: string;
@@ -177,7 +186,7 @@ function ReceiptInboxState({ status }: { status: ReceiptInboxStatusDto }) {
     FAILED: {
       eyebrow: "Needs another receipt",
       title: "Vognary could not prove a renewal",
-      detail: "The email arrived, but it did not contain enough billing information. Try a receipt with a service name, amount, and date.",
+      detail: "The email arrived, but no receipt could be read from it. Forward one that shows the service name, amount, and date in the message or as a PDF invoice. Scans and screenshots cannot be read.",
       tone: "caution" as const,
     },
   };

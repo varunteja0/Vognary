@@ -1,20 +1,20 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-test("the landing page withholds forwarding until its production gate is proven", async ({ page }) => {
+test("the landing sends every visitor to the product without claiming forwarding", async ({ page }) => {
   await page.goto("/");
 
   const heading = page.getByRole("heading", { level: 1, name: "Know what’s renewing before you pay for it." });
   const hero = page.locator("section").filter({ has: heading });
   await expect(heading).toBeVisible();
-  await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toBeVisible();
+  await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
 
-  const getStarted = hero.getByRole("link", { name: "Request private audit", exact: true });
-  const signIn = hero.getByRole("link", { name: "Sign in", exact: true });
-  await expect(getStarted).toHaveAttribute("href", "/private-audit");
+  const getStarted = hero.getByRole("link", { name: "Get started", exact: true });
+  const signIn = page.getByRole("navigation", { name: "Public" }).getByRole("link", { name: "Sign in", exact: true });
+  await expect(getStarted).toHaveAttribute("href", "/login?next=/app");
   await expect(signIn).toHaveAttribute("href", "/login?next=/app");
 
-  await expect(page.getByText("Vognary does not access your inbox. A private review uses evidence provided through the agreed intake.")).toBeVisible();
+  await expect(page.getByText("Add the billing receipts you already have. Vognary shows the amount, the expected date, and the receipt behind each one. No bank passwords. No mailbox access.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "What you get" })).toBeVisible();
   await expect(page.getByText("Renewing soon", { exact: true })).toBeVisible();
   await expect(page.getByText("Price changed", { exact: true })).toBeVisible();
@@ -35,7 +35,7 @@ test("the mobile landing keeps the primary action visible without overflow", asy
   await page.goto("/");
 
   const heading = page.getByRole("heading", { level: 1, name: "Know what’s renewing before you pay for it." });
-  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Request private audit", exact: true });
+  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Get started", exact: true });
   await expect(getStarted).toBeVisible();
   const actionBottom = await getStarted.evaluate((element) => element.getBoundingClientRect().bottom);
   const metrics = await page.evaluate(() => ({

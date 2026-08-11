@@ -15,8 +15,8 @@ test("the public page resolves receipt inbox readiness at request time", () => {
 });
 
 test("the landing selects the proven entry path without demo or instant-audit surfaces", () => {
-  assert.match(landingSource, /receiptInboxAvailable \? "\/login\?next=\/app" : "\/private-audit"/);
-  assert.match(landingSource, /receiptInboxAvailable \? "Get started" : "Request private audit"/);
+  assert.match(landingSource, /const primaryHref = "\/login\?next=\/app";/);
+  assert.match(landingSource, /const primaryLabel = "Get started";/);
   assert.doesNotMatch(landingSource, /sample|demo|InstantAudit|instant audit/i);
 });
 

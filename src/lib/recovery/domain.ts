@@ -50,6 +50,9 @@ export type HomeProjectionInput = {
   changed: HomeChangedDto;
 };
 
+// The single confidence bar for reminders: Home labels it, the alert scheduler enforces it.
+export const renewalAlertMinimumConfidence = 80;
+
 export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionDto {
   assertReconstructibleChanges(input.changed.items);
   const generatedAt = input.generatedAt ?? new Date();
@@ -76,6 +79,7 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
       amount: toMoneyDto(commitment.amountMinor, commitment.currency),
       decision: commitment.decision,
       confidence: toConfidence(commitment),
+      reminderEligible: commitment.confidenceScore >= renewalAlertMinimumConfidence && commitment.decision?.value !== "KEEP",
       evidenceIds: commitment.evidenceIds,
     }));
 

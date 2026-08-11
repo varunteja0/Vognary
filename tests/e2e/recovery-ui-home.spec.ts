@@ -110,6 +110,7 @@ const home = {
       amount: money,
       decision: null,
       confidence,
+      reminderEligible: true,
       evidenceIds: ["evidence-1"],
     },
   ],

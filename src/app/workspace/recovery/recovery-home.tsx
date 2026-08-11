@@ -1,6 +1,6 @@
 "use client";
 
-import type { AttentionItemDto, ChangeItemDto, HomeProjectionDto, UpcomingItemDto } from "@/lib/recovery/contracts";
+import type { AttentionItemDto, ChangeItemDto, HomeProjectionDto, ProjectionTotalDto, UpcomingItemDto } from "@/lib/recovery/contracts";
 import {
   attentionReasonLabels,
   cadenceLabels,
@@ -29,8 +29,34 @@ export function RecoveryHome({
   onInspectEvidence: InspectEvidence;
   onAddEvidence: () => void;
 }) {
+  if (!home.coverage.evidenceCount) {
+    return (
+      <section aria-label="Get your first result" className="panel p-5 sm:p-6">
+        <h3 className="font-display text-xl font-semibold text-(--ink) sm:text-2xl">Add 2 receipts to get your first result</h3>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">
+          Vognary needs two charges from the same merchant before it can show what renews next.
+        </p>
+        <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-5">Add receipts</button>
+      </section>
+    );
+  }
+
   return (
     <div className="grid gap-5">
+      {home.monthlyTotals.length || home.next30DayTotals.length ? (
+        <section aria-label="Software spend" className="panel p-4 sm:p-5">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <TotalBlock label="Monthly software spend" totals={home.monthlyTotals} empty="No recurring amount yet" />
+            <TotalBlock label="Next 30 days" totals={home.next30DayTotals} empty="Nothing expected in the next 30 days" />
+          </div>
+          {home.monthlyTotals.length > 1 || home.next30DayTotals.length > 1 ? (
+            <p className="mt-4 text-xs leading-5 text-(--muted)">
+              Currencies stay separate because Vognary does not invent an exchange rate.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
       <section aria-labelledby="recovery-needs-me" className="panel p-4 sm:p-5">
         <h3 id="recovery-needs-me" className="font-display text-xl font-semibold text-(--ink)">Needs attention</h3>
         <div className="mt-4 grid gap-3">
@@ -38,11 +64,9 @@ export function RecoveryHome({
             home.needsMe.map((item) => <AttentionRow key={item.id} item={item} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />)
           ) : (
             <StateBlock
-              eyebrow={home.coverage.evidenceCount ? "Up to date" : "No receipts yet"}
-              title={home.coverage.evidenceCount ? "Nothing needs attention right now" : "No software renewals yet"}
-              detail={home.coverage.evidenceCount
-                ? "Based on the receipts Vognary has checked, there is no decision waiting for you."
-                : "Add recent software receipts and Vognary will show only the renewals it can support."}
+              eyebrow="Up to date"
+              title="Nothing needs attention right now"
+              detail="Based on the receipts Vognary has checked, there is no decision waiting for you."
             >
               <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-primary">Add receipts</button>
             </StateBlock>
@@ -86,13 +110,28 @@ export function RecoveryHome({
         <div>
           <h3 id="recovery-receipts" className="font-display text-base font-semibold text-(--ink)">Receipts checked</h3>
           <p className="mt-1 font-data text-xs text-(--muted)">
-            {home.coverage.evidenceCount
-              ? `${home.coverage.evidenceCount} item${home.coverage.evidenceCount === 1 ? "" : "s"} from ${home.coverage.sourceCount} source${home.coverage.sourceCount === 1 ? "" : "s"} · latest ${home.coverage.lastEvidenceAt ? formatMoment(home.coverage.lastEvidenceAt) : "date unavailable"}`
-              : "No receipts have been checked yet."}
+            {`${home.coverage.evidenceCount} item${home.coverage.evidenceCount === 1 ? "" : "s"} from ${home.coverage.sourceCount} source${home.coverage.sourceCount === 1 ? "" : "s"} · latest ${home.coverage.lastEvidenceAt ? formatMoment(home.coverage.lastEvidenceAt) : "date unavailable"}`}
           </p>
         </div>
         <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-ghost">Add receipts</button>
       </section>
+    </div>
+  );
+}
+
+function TotalBlock({ label, totals, empty }: { label: string; totals: readonly ProjectionTotalDto[]; empty: string }) {
+  return (
+    <div>
+      <p className="eyebrow eyebrow-xs">{label}</p>
+      {totals.length ? (
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1">
+          {totals.map((total) => (
+            <MoneyValue key={total.amount.currency} amount={total.amount} className="text-3xl font-semibold text-(--ink)" />
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 font-data text-sm text-(--muted)">{empty}</p>
+      )}
     </div>
   );
 }
@@ -189,6 +228,13 @@ function UpcomingRow({ item, onOpenCommitment, onInspectEvidence }: { item: Upco
           {item.decision ? `Your decision: ${decisionLabels[item.decision.value]}` : "You have not decided yet"}
         </span>
       </div>
+      <p className="mt-2 font-data text-xs text-(--muted)">
+        {item.reminderEligible
+          ? "Reminder active — Vognary emails you before this charge if reminders are on."
+          : item.decision?.value === "KEEP"
+            ? "No reminder — you chose Keep for this subscription."
+            : "No reminder — the evidence behind this date is not strong enough yet."}
+      </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" id={evidenceButtonId} onClick={() => onInspectEvidence(item.commitmentId, item.evidenceIds[0], evidenceButtonId)} className="btn btn-sm btn-primary">Inspect exact evidence</button>
         <button type="button" onClick={() => onOpenCommitment(item.commitmentId)} className="btn btn-sm btn-ghost">Open commitment</button>

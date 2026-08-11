@@ -22,8 +22,8 @@ export default function LaunchLanding({
 }: {
   receiptInboxAvailable?: boolean;
 }) {
-  const primaryHref = receiptInboxAvailable ? "/login?next=/app" : "/private-audit";
-  const primaryLabel = receiptInboxAvailable ? "Get started" : "Request private audit";
+  const primaryHref = "/login?next=/app";
+  const primaryLabel = "Get started";
   return (
     <main id="ledger-main" className="relative overflow-hidden px-4 pb-12 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
@@ -34,7 +34,6 @@ export default function LaunchLanding({
           </Link>
           <div className="flex items-center gap-2">
             <Link href="/login?next=/app" className="btn btn-sm btn-ghost">Sign in</Link>
-            <Link href={primaryHref} className="btn btn-sm btn-primary">{primaryLabel}</Link>
           </div>
         </nav>
 
@@ -49,17 +48,16 @@ export default function LaunchLanding({
             <p className="mt-5 max-w-2xl text-base leading-7 text-(--ink-soft) sm:text-lg">
               {receiptInboxAvailable
                 ? "Forward software receipts to your Vognary address. See what may renew next, what changed, and what needs attention."
-                : "Receipt forwarding is not active in this deployment. Request a private review based on evidence provided through the agreed intake."}
+                : "Vognary tracks your software renewals from billing receipts and shows what needs attention before the next charge."}
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</Link>
-              <Link href="/login?next=/app" className="btn btn-ghost btn-lg">Sign in</Link>
             </div>
             <p className="mt-6 flex max-w-2xl items-start gap-2 text-sm leading-6 text-(--muted)">
               <span className="live-dot mt-2 shrink-0" aria-hidden />
               <span>{receiptInboxAvailable
                 ? "Messages sent to your private Vognary address are processed as receipt evidence. Keep the address private and forward only billing mail you want reviewed."
-                : "Vognary does not access your inbox. A private review uses evidence provided through the agreed intake."}</span>
+                : "Add the billing receipts you already have. Vognary shows the amount, the expected date, and the receipt behind each one. No bank passwords. No mailbox access."}</span>
             </p>
           </div>
           <Nakul
@@ -92,7 +90,7 @@ export default function LaunchLanding({
             <p className="mt-4 max-w-xl text-sm leading-7 text-(--muted)">
               {receiptInboxAvailable
                 ? "Forward billing emails manually to your Vognary address as they arrive."
-                : "Receipt forwarding remains unavailable until the provider, webhook, replay, and retention gates are proven."}
+                : "Add new billing receipts as they arrive and Vognary updates what renews next."}
             </p>
           </div>
           <div>
@@ -116,8 +114,11 @@ export default function LaunchLanding({
             Start with the billing emails you already have.
           </h2>
           <Link href={primaryHref} className="btn btn-primary btn-lg mt-6">
-            {receiptInboxAvailable ? "Start with my receipts" : "Request private audit"}
+            {primaryLabel}
           </Link>
+          <p className="mt-5 text-sm leading-6 muted-on-dark">
+            Want it done for you? <Link href="/private-audit" className="underline underline-offset-4">Request a private audit</Link>.
+          </p>
         </section>
 
         <footer className="flex flex-col items-center justify-between gap-4 border-t border-line py-7 text-center sm:flex-row sm:text-left">
