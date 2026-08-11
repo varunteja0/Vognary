@@ -188,6 +188,17 @@ test("CI browser journeys exercise the built Next.js production artifact", () =>
   assert.match(server, /cpSync[\s\S]*public/);
 });
 
+test("Lighthouse measures the signed-out app without hydration delay and respects noindex utilities", () => {
+  const lighthouse = read("scripts/check-lighthouse.mjs");
+  const loginPage = read("src/app/login/page.tsx");
+  const loginClient = read("src/app/login/login-client.tsx");
+  assert.match(lighthouse, /path: "\/verify", categories: \["performance", "accessibility", "best-practices"\]/);
+  assert.match(loginPage, /initialSession=/);
+  assert.match(loginPage, /readCurrentSession/);
+  assert.match(loginClient, /initialSession: SessionPayload/);
+  assert.match(loginClient, /useState<SessionPayload>\(initialSession\)/);
+});
+
 test("standalone PDF ingestion preserves the dynamically loaded pdf.js worker", () => {
   const config = read("next.config.ts");
   assert.match(config, /agentRules: false/);

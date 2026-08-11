@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { checkSessionConfiguration, readCurrentSession } from "@/lib/server/session";
 import LoginClient from "./login-client";
 
 export const metadata: Metadata = {
@@ -16,12 +18,32 @@ type LoginPageProps = {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
+  const initialSession = await readInitialSession();
   return (
     <LoginClient
       initialGoogleReason={firstQueryValue(params.google)}
       initialNextPath={firstQueryValue(params.next)}
+      initialSession={initialSession}
     />
   );
+}
+
+async function readInitialSession() {
+  const requestHeaders = await headers();
+  const configuration = checkSessionConfiguration();
+  const session = await readCurrentSession(new Request("https://vognary.local", {
+    headers: { cookie: requestHeaders.get("cookie") ?? "" },
+  })).catch(() => null);
+  return {
+    authenticated: Boolean(session?.workspaceId),
+    configuration,
+    session: session?.workspaceId ? {
+      userId: session.userId,
+      email: session.email,
+      workspaceId: session.workspaceId,
+      expiresAt: new Date(session.expiresAt).toISOString(),
+    } : null,
+  };
 }
 
 function firstQueryValue(value: string | string[] | undefined) {

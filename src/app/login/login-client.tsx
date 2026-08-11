@@ -32,6 +32,7 @@ const isDevEnv = process.env.NODE_ENV !== "production";
 type LoginClientProps = {
   initialGoogleReason?: string;
   initialNextPath?: string;
+  initialSession: SessionPayload;
 };
 
 function isValidEmail(value: string) {
@@ -52,9 +53,9 @@ function safeNextPath(raw: string | null): string {
   return raw;
 }
 
-export default function LoginClient({ initialGoogleReason, initialNextPath }: LoginClientProps) {
+export default function LoginClient({ initialGoogleReason, initialNextPath, initialSession }: LoginClientProps) {
   const [form, setForm] = useState({ name: "", email: "", workspaceName: "", accessCode: "" });
-  const [session, setSession] = useState<SessionPayload | null>(null);
+  const [session, setSession] = useState<SessionPayload>(initialSession);
   const [status, setStatus] = useState<Banner>(null);
   const [googleStatus, setGoogleStatus] = useState<Banner>(() => initialGoogleReason
     ? { tone: "error", text: getGoogleFailureMessage(initialGoogleReason) }
@@ -156,7 +157,6 @@ export default function LoginClient({ initialGoogleReason, initialNextPath }: Lo
     setStatus({ tone: "success", text: "Signed out." });
   }
 
-  const loadingSession = session === null;
   const googleButton = (
     <button disabled={googleSubmitting} type="button" onClick={startGoogleSignIn} className="btn btn-google btn-block">
       <GoogleGlyph />
@@ -180,9 +180,7 @@ export default function LoginClient({ initialGoogleReason, initialNextPath }: Lo
           <h1 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">Sign in to Vognary</h1>
           <p className="mt-2 text-sm leading-6 text-(--muted)">Use Google to create your saved workspace.</p>
 
-          {loadingSession ? (
-            <LoadingState />
-          ) : session.authenticated ? (
+          {session.authenticated ? (
             <div className="mt-6 rounded-xl border border-line bg-(--card-2) p-4" role="status" aria-live="polite">
               <p className="font-data text-xs uppercase tracking-[0.16em] text-verdict">Signed in</p>
               <p className="mt-2 font-semibold text-(--ink)">{session.session?.email}</p>
@@ -252,16 +250,6 @@ export default function LoginClient({ initialGoogleReason, initialNextPath }: Lo
         </section>
       </div>
     </main>
-  );
-}
-
-function LoadingState() {
-  return (
-    <div className="mt-6 grid gap-3" aria-hidden>
-      <div className="h-[3.6rem] w-full animate-pulse rounded-xl border border-line bg-(--card-2)" />
-      <div className="h-11 w-full animate-pulse rounded-xl border border-line bg-(--card-2)" />
-      <div className="h-4 w-2/3 animate-pulse rounded bg-(--card-2)" />
-    </div>
   );
 }
 

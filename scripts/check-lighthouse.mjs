@@ -9,7 +9,7 @@ const serverPath = new URL("../.next/standalone/server.js", import.meta.url);
 const routes = [
   { path: "/", categories: ["performance", "accessibility", "best-practices", "seo"] },
   { path: "/app", categories: ["performance", "accessibility", "best-practices"] },
-  { path: "/verify", categories: ["performance", "accessibility", "best-practices", "seo"] },
+  { path: "/verify", categories: ["performance", "accessibility", "best-practices"] },
 ];
 const runCount = 3;
 const categoryThreshold = 0.95;
