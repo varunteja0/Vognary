@@ -138,16 +138,12 @@ test("privacy export includes held product data and excludes all credential mate
       charged_on_1: string;
       charged_on_2: string;
       charged_on_3: string;
-      renews_on_1: string;
-      renews_on_2: string;
-      renews_on_3: string;
+      renews_on: string;
     }>(
       `select (current_date - 61)::text as charged_on_1,
               (current_date - 31)::text as charged_on_2,
               (current_date - 1)::text as charged_on_3,
-              (current_date - 31)::text as renews_on_1,
-              (current_date - 1)::text as renews_on_2,
-              (current_date + 30)::text as renews_on_3`,
+              (current_date + 30)::text as renews_on`,
     )).rows[0]!;
     await submitRecoveryEvidence({
       workspaceId,
@@ -159,15 +155,15 @@ test("privacy export includes held product data and excludes all credential mate
         receipts: [
           {
             clientRef: "privacy-openai-1",
-            text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on_1}. Renews monthly on ${recoveryDates.renews_on_1}. ${"context ".repeat(80)}${rawEvidenceTail}`,
+            text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on_1}. Renews monthly on ${recoveryDates.renews_on}. ${"context ".repeat(80)}${rawEvidenceTail}`,
           },
           {
             clientRef: "privacy-openai-2",
-            text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on_2}. Renews monthly on ${recoveryDates.renews_on_2}.`,
+            text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on_2}. Renews monthly on ${recoveryDates.renews_on}.`,
           },
           {
             clientRef: "privacy-openai-3",
-            text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on_3}. Renews monthly on ${recoveryDates.renews_on_3}.`,
+            text: `OpenAI subscription charged INR 1,999 on ${recoveryDates.charged_on_3}. Renews monthly on ${recoveryDates.renews_on}.`,
           },
         ],
       },
