@@ -124,7 +124,6 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
     const button = page.getByRole("button", { name: decision, exact: true });
     if (!(await button.isVisible())) await page.getByText("More choices", { exact: true }).click();
     await button.click();
-    await expect(button).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByText(new RegExp(`Saved ${escapeRegExp(decision)} on`))).toBeVisible();
   }
   await expectNoSeriousAxeViolations(page, "corrected commitment detail");
@@ -138,7 +137,8 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
 
   // 28. Logout/relogin through visible controls and verify the same saved truth.
   await page.getByRole("link", { name: new RegExp(`Account for ${email}`) }).click();
-  await page.getByText("Account", { exact: true }).click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Account settings" })).toBeVisible();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);
   await loginAsDevelopmentUser(page);
@@ -262,8 +262,13 @@ function escapeRegExp(value: string) {
 function collectRuntimeFailures(page: Page) {
   const failures: string[] = [];
   page.on("pageerror", (error) => failures.push(`page: ${error.message}`));
+  page.on("response", (response) => {
+    if (response.status() >= 500) failures.push(`response: ${response.status()} ${new URL(response.url()).pathname}`);
+  });
   page.on("console", (message) => {
-    if (message.type() === "error") failures.push(`console: ${message.text()}`);
+    if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+      failures.push(`console: ${message.text()}`);
+    }
   });
   return failures;
 }

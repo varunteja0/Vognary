@@ -140,6 +140,21 @@ test("Recovery home is an honest first baseline and keeps currency totals separa
   assert.equal(home.coverage.state, "BASELINE_ONLY");
 });
 
+test("upcoming items require reminder confidence and suppress KEEP decisions", () => {
+  const home = buildHomeProjection({
+    workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
+    generatedAt: now,
+    commitments,
+    sources: [],
+    changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 1, items: [] },
+  });
+
+  assert.deepEqual(home.next.map((item) => [item.commitmentId, item.reminderEligible]), [
+    ["commitment-inr", false],
+    ["commitment-usd", false],
+  ]);
+});
+
 test("Recovery rejects Changed items without reconstructible provenance", () => {
   const invalid = [{
     id: "change-1",

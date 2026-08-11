@@ -4,6 +4,7 @@
 > **Goal:** Prove humans care and will pay. Not more product features.  
 > **Owner:** Founder primary; agents support with CRM hygiene, report generation, redaction helpers, copy polish.  
 > **Exit:** Day-21 stop/go using THE-LAW scoreboard metrics.
+> **Live field memory (people, threads, learnings, scripts):** [`people-conversation-learning.md`](people-conversation-learning.md) — read before new outreach; append same day.
 
 ---
 
@@ -41,7 +42,7 @@ Agents: never invent “completed” statuses. Founder owns Status transitions.
 | `company` | string | |
 | `segment` | enum | `funded-startup` \| `freelancer` \| `solo-founder` \| `smb` \| `household` \| `ca-client` |
 | `contact` | url/email | LinkedIn URL or email |
-| `channel` | enum | `linkedin-dm` \| `linkedin-post` \| `email` \| `whatsapp` \| `referral` \| `inbound` |
+| `channel` | enum | `linkedin-dm` \| `linkedin-post` \| `email` \| `whatsapp` \| `referral` \| `inbound` \| `x-public` \| `x-dm` \| `peerlist` |
 | `source` | string | How found |
 | `asked_at` | date | First outreach ISO date |
 | `status` | enum | see below |

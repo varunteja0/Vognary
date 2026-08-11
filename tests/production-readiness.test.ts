@@ -323,6 +323,7 @@ test("public health remains a minimal liveness surface", () => {
 
 test("production smoke accepts disabled code login and materialization-aware connector states", () => {
   const source = read("scripts/smoke-test.mjs");
+  const ci = read(".github/workflows/ci.yml");
   assert.match(source, /SMOKE_ALLOW_UNCONFIGURED/);
   assert.match(source, /allowUnconfigured && !targetIsLocal/);
   assert.match(source, /Production smoke requires a ready database/);
@@ -335,6 +336,7 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.match(source, /\['ready', 'not-configured'\]\.includes\(auditIntake\.status\)/);
   assert.doesNotMatch(source, /fetch\(`\$\{baseUrl\}\/api\/audit-intake`,\s*\{[\s\S]*?method:\s*"POST"/);
   assert.match(source, /Recovery Sources without session/);
+  assert.match(ci, /SMOKE_BASE_URL: http:\/\/127\.0\.0\.1:3000[\s\S]*SMOKE_ALLOW_UNCONFIGURED: "true"/);
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[410\]/);
   assert.match(activation, /Feature migrations 0002 through 0026/);

@@ -338,6 +338,64 @@ test("Recovery v1 persists the canonical Customer #0 lifecycle with isolation an
   }
 });
 
+test("two realistic receipt observations infer one canonical monthly subscription", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const pool = getDatabasePool();
+  const ownerUserId = randomUUID();
+  const workspaceId = randomUUID();
+  const suffix = randomUUID().slice(0, 8);
+
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [ownerUserId, `recovery-observed-${suffix}@example.test`]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Observed receipt workspace')`, [workspaceId, ownerUserId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, ownerUserId]);
+
+  try {
+    const first = await submitRecoveryEvidence({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: 0,
+      idempotencyKey: `observed-first-${suffix}`,
+      request: {
+        kind: "RECEIPT_PASTE",
+        receipts: [{
+          clientRef: "openai-july",
+          text: "OpenAI ChatGPT Plus subscription\nAmount: INR 1,999.00\nCharged on 6 July 2026",
+        }],
+      },
+      now: new Date("2026-08-09T10:00:00.000Z"),
+    });
+    assert.equal(first.data.submission.acceptedEvidenceCount, 1);
+    assert.equal(first.data.commitments.length, 0, "one observed charge must not fabricate recurrence");
+
+    const second = await submitRecoveryEvidence({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: 1,
+      idempotencyKey: `observed-second-${suffix}`,
+      request: {
+        kind: "RECEIPT_PASTE",
+        receipts: [{
+          clientRef: "openai-august",
+          text: "OpenAI ChatGPT Plus subscription\nAmount: INR 1,999.00\nCharged on 6 August 2026",
+        }],
+      },
+      now: new Date("2026-08-10T10:00:00.000Z"),
+    });
+
+    assert.equal(second.data.submission.acceptedEvidenceCount, 1);
+    assert.equal(second.data.commitments.length, 1);
+    assert.equal(second.data.commitments[0]?.merchant, "OpenAI");
+    assert.equal(second.data.commitments[0]?.cadence, "MONTHLY");
+    assert.equal(second.data.commitments[0]?.amount.minor, "199900");
+    assert.equal(second.data.commitments[0]?.evidenceCount, 2);
+    assert.equal(second.data.commitments[0]?.nextExpectedDate, "2026-09-06");
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [ownerUserId]);
+  }
+});
+
 test("Recovery Home never combines workspace version v with commitment rows from v+1", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {

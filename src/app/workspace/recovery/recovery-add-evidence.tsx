@@ -43,7 +43,7 @@ export function RecoveryAddEvidence({
         </h3>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
           {variant === "EMPTY_WORKSPACE"
-            ? "Nothing is in this workspace yet. Paste one renewal receipt — merchant, amount, date — and the workspace saves it as evidence you can inspect later."
+            ? "Add at least 2 receipts from the same recurring service, now or as they arrive, to help Vognary infer its pattern. Each receipt should show the merchant, amount, and charge date."
             : "Paste the receipt text exactly as you received it. It is stored as evidence and never edited."}
         </p>
 

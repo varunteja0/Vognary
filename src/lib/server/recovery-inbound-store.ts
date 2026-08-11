@@ -298,7 +298,9 @@ export async function revokeReceiptInbox(input: { workspaceId: string; actorUser
 }
 
 export async function getReceiptInboxStatus(input: { workspaceId: string; actorUserId: string }): Promise<ReceiptInboxStatusDto> {
-  requireReceiptInboxConfiguration();
+  if (getReceiptInboxConfiguration().status !== "ready") {
+    return { state: "UNAVAILABLE", alias: null, lastReceivedAt: null, lastProcessedAt: null, lastFailureCode: null };
+  }
   const client = await getDatabasePool().connect();
   try {
     await client.query("begin isolation level repeatable read read only");

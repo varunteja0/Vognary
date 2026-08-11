@@ -10,7 +10,7 @@ import {
 } from "@/lib/renewal-alerts";
 import { recordConsentGrant } from "@/lib/server/consent-store";
 import { getDatabasePool } from "@/lib/server/database";
-import { toMoneyDto } from "@/lib/recovery/domain";
+import { renewalAlertMinimumConfidence, toMoneyDto } from "@/lib/recovery/domain";
 import type { MoneyDto } from "@/lib/recovery/contracts";
 
 const maxDeliveryAttempts = 5;
@@ -218,7 +218,7 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
            on commitment.workspace_id = p.workspace_id
           and commitment.effective_status = 'ACTIVE'
           and commitment.effective_next_expected_date is not null
-          and commitment.confidence_score >= 80
+          and commitment.confidence_score >= ${renewalAlertMinimumConfidence}
          left join recovery_decisions decision
            on decision.workspace_id = commitment.workspace_id
           and decision.commitment_id = commitment.id
@@ -329,7 +329,7 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
          where preference.id = delivery.preference_id
            and preference.enabled
            and delivery.recovery_commitment_id is not null
-           and recovery.confidence_score >= 80
+           and recovery.confidence_score >= ${renewalAlertMinimumConfidence}
            and decision.decision is distinct from 'KEEP'
            and case delivery.alert_window
              when '7_day' then preference.seven_day_enabled
@@ -563,7 +563,7 @@ export async function claimDueRenewalAlerts(input: { limit: number; workerId: st
         and recovery.workspace_id = delivery.workspace_id
         and recovery.effective_status = 'ACTIVE'
         and recovery.effective_next_expected_date = delivery.renewal_date
-        and recovery.confidence_score >= 80
+        and recovery.confidence_score >= ${renewalAlertMinimumConfidence}
        left join recovery_decisions decision
          on decision.workspace_id = recovery.workspace_id
         and decision.commitment_id = recovery.id
@@ -632,20 +632,20 @@ export async function isRenewalAlertStillDeliverable(deliveryId: string, workerI
         and consent.withdrawn_at is null
         and (consent.expires_at is null or consent.expires_at > now())
        join users recipient on recipient.id = delivery.user_id and recipient.deleted_at is null
-       join recovery_commitments recovery
-         on recovery.id = delivery.recovery_commitment_id
-        and recovery.workspace_id = delivery.workspace_id
-        and recovery.effective_status = 'ACTIVE'
-        and recovery.effective_next_expected_date = delivery.renewal_date
-        and recovery.confidence_score >= 80
-       left join recovery_decisions decision
-         on decision.workspace_id = recovery.workspace_id
-        and decision.commitment_id = recovery.id
-       where delivery.id = $1
-         and delivery.status = 'sending'
-         and delivery.locked_by = $2
-         and delivery.recurring_item_id is null
-         and decision.decision is distinct from 'KEEP'
+         join recovery_commitments recovery
+           on recovery.id = delivery.recovery_commitment_id
+          and recovery.workspace_id = delivery.workspace_id
+          and recovery.effective_status = 'ACTIVE'
+          and recovery.effective_next_expected_date = delivery.renewal_date
+          and recovery.confidence_score >= ${renewalAlertMinimumConfidence}
+         left join recovery_decisions decision
+           on decision.workspace_id = recovery.workspace_id
+          and decision.commitment_id = recovery.id
+         where delivery.id = $1
+           and delivery.status = 'sending'
+           and delivery.locked_by = $2
+           and delivery.recurring_item_id is null
+           and decision.decision is distinct from 'KEEP'
          and case delivery.alert_window
            when '7_day' then preference.seven_day_enabled
            when '1_day' then preference.one_day_enabled

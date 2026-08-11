@@ -1,11 +1,30 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { extractReceiptCandidates, receiptTextToManualInputs, splitReceiptSnippets } from "../src/lib/receipt-parser";
+import { extractObservedReceipt, extractReceiptCandidates, receiptTextToManualInputs, splitReceiptSnippets } from "../src/lib/receipt-parser";
 
 const sampleReceipts = [
   "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly.",
   "Cloudflare domain renewal notice INR 1,200 annual renewal due 2026-09-10. Auto-renew enabled.",
 ].join("\n\n");
+
+test("a receipt that states no cadence is still kept as one observed charge", () => {
+  const snippet = "OpenAI ChatGPT Plus subscription\nAmount: INR 1,999.00\nCharged on 6 July 2026";
+
+  assert.deepEqual(extractReceiptCandidates([snippet]), []);
+
+  const observed = extractObservedReceipt(snippet);
+  assert.ok(observed, "a merchant, amount, and charge date is enough to record an observation");
+  assert.equal(observed.merchant, "OpenAI");
+  assert.equal(observed.amountDecimal, "1999.00");
+  assert.equal(observed.currency, "INR");
+  assert.equal(observed.observedDate, "2026-07-06");
+});
+
+test("an observed receipt still needs a merchant, an amount, and a real charge date", () => {
+  assert.equal(extractObservedReceipt("OpenAI ChatGPT Plus subscription. Amount: INR 1,999.00"), null);
+  assert.equal(extractObservedReceipt("Amount: INR 1,999.00 charged on 6 July 2026"), null);
+  assert.equal(extractObservedReceipt("OpenAI ChatGPT Plus renews on 6 August 2026"), null);
+});
 
 test("splits pasted text into separate receipt snippets", () => {
   const snippets = splitReceiptSnippets(sampleReceipts);

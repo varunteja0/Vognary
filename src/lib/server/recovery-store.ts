@@ -35,7 +35,13 @@ import {
   type CanonicalCommitmentRecord,
   type RecoveryCoverageSource,
 } from "@/lib/recovery/domain";
-import { extractReceiptCandidates, splitReceiptSnippets } from "@/lib/receipt-parser";
+import {
+  extractObservedReceipt,
+  extractReceiptCandidates,
+  splitReceiptSnippets,
+  type ObservedReceipt,
+  type ReceiptCandidate,
+} from "@/lib/receipt-parser";
 import { redactText } from "@/lib/redaction";
 import {
   analyzeStatements,
@@ -1038,11 +1044,19 @@ function extractReceiptEvidence(
   now: Date,
   provenanceKind: EvidenceProvenanceKind,
 ): ExtractedEvidence[] {
-  const candidates = splitReceiptSnippets(redactText(text).text).flatMap((snippet) => {
+  const declared: { candidate: ReceiptCandidate; normalizedSnippet: string }[] = [];
+  const observed: ObservedReceipt[] = [];
+  for (const snippet of splitReceiptSnippets(redactText(text).text)) {
     const normalizedSnippet = snippet.replace(/\s+/g, " ").trim();
-    return extractReceiptCandidates([snippet]).map((candidate) => ({ candidate, normalizedSnippet }));
-  });
-  return candidates.flatMap(({ candidate, normalizedSnippet }, index) => {
+    const [candidate] = extractReceiptCandidates([snippet]);
+    if (candidate) {
+      declared.push({ candidate, normalizedSnippet });
+      continue;
+    }
+    const observation = extractObservedReceipt(snippet);
+    if (observation) observed.push(observation);
+  }
+  const declaredEvidence = declared.flatMap(({ candidate, normalizedSnippet }, index) => {
     const item: ManualRecurringInput = {
       id: candidate.id,
       merchant: candidate.merchant,
@@ -1082,6 +1096,49 @@ function extractReceiptEvidence(
       confidenceReasons: [recurring.recommendationReason],
     }];
   });
+  return [
+    ...declaredEvidence,
+    ...extractObservedReceiptEvidence(observed, sourceId, sourceName, submissionId, now, provenanceKind, declaredEvidence.length),
+  ];
+}
+
+function extractObservedReceiptEvidence(
+  observed: readonly ObservedReceipt[],
+  sourceId: string,
+  sourceName: string,
+  submissionId: string,
+  now: Date,
+  provenanceKind: EvidenceProvenanceKind,
+  rowOffset: number,
+): ExtractedEvidence[] {
+  if (!observed.length) return [];
+  const lines = ["Date,Description,Debit,Credit,Currency"];
+  for (const item of observed) {
+    lines.push([item.observedDate, csvCell(item.evidenceText), item.amountDecimal, "", item.currency].join(","));
+  }
+  const audit = analyzeStatements([{ name: sourceName, text: `${lines.join("\n")}\n` }], [], { today: now });
+  return audit.transactions.map((transaction, index) => ({
+    id: randomUUID(),
+    sourceId,
+    evidenceKind: "TRANSACTION" as const,
+    rowNumber: rowOffset + index + 1,
+    observedAt: `${transaction.date}T00:00:00.000Z`,
+    excerpt: transaction.description,
+    excerptTruncated: transaction.description.replace(/\s+/g, " ").trim().length > recoveryLimits.maxEvidenceExcerptCharacters,
+    merchant: transaction.normalizedMerchant,
+    normalizedMerchant: transaction.normalizedMerchant,
+    category: transaction.category,
+    amountMinor: decimalToMinorUnits(transaction.amountDecimal, transaction.currency),
+    currency: transaction.currency,
+    evidenceDate: transaction.date,
+    direction: transaction.direction,
+    cadenceHint: null,
+    nextExpectedDate: null,
+    provenanceKind,
+    provenanceReference: `${submissionId}:${sourceId}:${rowOffset + index + 1}`,
+    confidenceScore: 55,
+    confidenceReasons: ["Parsed deterministically from a receipt that proved a charge but stated no renewal date."],
+  }));
 }
 
 function extractCsvEvidence(
@@ -1212,15 +1269,27 @@ function buildSyntheticCsv(rows: EvidenceRow[]) {
   for (const row of [...rows].sort((left, right) => left.row_number - right.row_number)) {
     if (!row.evidence_date || !row.amount_minor || !row.currency || row.direction === "credit") continue;
     const amountDecimal = minorUnitsToDecimal(row.amount_minor, currencyExponent(row.currency));
+    // Receipt prose often says "subscription" even when it proves only one
+    // charge. Preserve that prose as inspectable evidence, but classify the
+    // synthetic transaction by merchant so the recurring engine requires a
+    // repeated observation. Statement imports keep their original description
+    // because singleton hints there are an established engine behavior.
+    const description = transactionAnalysisDescription(row);
     lines.push([
       toDateOnly(row.evidence_date),
-      csvCell(row.excerpt),
+      csvCell(description),
       amountDecimal,
       "",
       row.currency,
     ].join(","));
   }
   return `${lines.join("\n")}\n`;
+}
+
+function transactionAnalysisDescription(row: EvidenceRow) {
+  return row.evidence_kind === "TRANSACTION" && row.source_type !== "CSV_IMPORT"
+    ? row.normalized_merchant
+    : row.excerpt;
 }
 
 async function upsertCanonicalCommitments(client: PoolClient, workspaceId: string, items: readonly RecurringItem[]) {
@@ -1440,7 +1509,7 @@ async function linkCanonicalEvidence(client: PoolClient, workspaceId: string, it
       sourceEngineName(row.source_id),
       row.evidence_kind === "RECEIPT" ? toDateOnly(row.next_expected_date) : toDateOnly(row.evidence_date),
       row.amount_minor,
-      row.excerpt,
+      transactionAnalysisDescription(row),
     );
     byKey.set(key, [...(byKey.get(key) ?? []), row]);
   }

@@ -60,6 +60,46 @@ export function receiptTextToManualInputs(text: string, sourceName = "Pasted rec
   }));
 }
 
+export type ObservedReceipt = {
+  merchant: string;
+  amountDecimal: string;
+  currency: string;
+  category: string;
+  observedDate: string;
+  evidenceText: string;
+};
+
+// A receipt proving one real charge but declaring no cadence. Two of these let the
+// recurring engine infer the schedule from the gap instead of discarding both.
+export function extractObservedReceipt(message: string): ObservedReceipt | null {
+  const normalized = message.replace(/\s+/g, " ").trim();
+  if (!normalized) return null;
+
+  const amountMatch = normalized.match(amountPattern);
+  const merchantMatch = merchantPatterns.map((pattern) => normalized.match(pattern)).find(Boolean);
+  if (!amountMatch || !merchantMatch) return null;
+
+  const observedDate = inferObservedDate(normalized);
+  if (!observedDate) return null;
+
+  const currency = detectReceiptCurrency(amountMatch[0]);
+  if (!currency) return null;
+
+  const amountDecimal = normalizeAmountDecimal(amountMatch[1]);
+  const amount = Number(amountDecimal);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > Number.MAX_SAFE_INTEGER) return null;
+
+  const merchant = (merchantMatch[1] || merchantMatch[0]).replace(/[:\s]+$/g, "").trim();
+  return {
+    merchant,
+    amountDecimal,
+    currency,
+    category: inferCategory(merchant),
+    observedDate,
+    evidenceText: normalized.slice(0, 500),
+  };
+}
+
 function extractReceiptCandidate(message: string): ReceiptCandidate | null {
   const normalized = message.replace(/\s+/g, " ").trim();
   if (!normalized) return null;

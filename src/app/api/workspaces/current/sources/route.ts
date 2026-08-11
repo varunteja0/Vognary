@@ -7,5 +7,6 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   return runReceiptInboxRoute(request, {
     namespace: "recovery-sources-read",
+    configurationRequired: false,
   }, getReceiptInboxStatus);
 }

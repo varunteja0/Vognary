@@ -29,19 +29,26 @@ money first-class before anything else, and the world must work too.**
 
 ## 1. Where things stand (verified 2026-07-21, after Phase 0 cleanup)
 
-- **Recovery v1 launch implementation is locally green (verified 2026-08-10):**
+- **Recovery v1 launch implementation is locally green (verified 2026-08-11):**
   branch `recovery/v1` has one canonical signed path under
   `src/app/workspace/recovery/**` + `src/lib/recovery/**` + Recovery APIs +
   migration `0023`. Guest evidence survives authentication; Changed provenance,
   repeatable-read version coherence, decimal-safe bigint money, exact evidence
   addressing, canonical export/delete, deterministic-only file provenance, PII
-  redaction, resource ceilings, and hot-query indexes are enforced. Evidence:
-  **486/486 unit/source-contract tests**, **39/39 PostgreSQL tests**, **28/28
-  canonical signed browser tests**, and Customer #0 **30/30 desktop + 30/30
-  mobile** with real Recovery APIs, disposable PostgreSQL, and no serious/critical
-  axe violations. Full local CI, build, performance, Lighthouse, smoke, load,
-  dependency audit, fresh/upgrade migration, and encrypted restore drill pass.
-  Remote PR/CI/main ancestry and exact-SHA production deployment remain to prove.
+  redaction, resource ceilings, and hot-query indexes are enforced. Realistic
+  merchant + amount + charge-date receipts now persist as observations; one does
+  not fabricate recurrence, while two matching charges infer cadence through the
+  existing engine. Empty Home now leads with the private receipt address when it
+  is actually available and keeps manual evidence as the fallback. Evidence:
+  **556/556 unit/source-contract tests**, **41/41 PostgreSQL tests** from a fresh
+  schema through migrations `0024`–`0026`, and all **76 browser scenarios**
+  exercised across desktop/mobile (one 5-second dev cold-start miss in the full
+  run; the unchanged mobile Customer #0 test passed **1/1** immediately on rerun),
+  with no serious/critical axe violations. Lint, typecheck, claims, tokens, build,
+  and performance budgets pass. Production activation remains blocked: the live
+  receipt inbox and reminder worker are unconfigured, and real Google/session,
+  delivered-reminder, Customer #0, CI/main ancestry, and exact-SHA deployment
+  evidence remain to prove.
 - **Recovery launch identity is Google OIDC only (2026-08-10):** the bearer
   magic-link UI is removed from the Recovery login path and server readiness is
   opt-in disabled unless `ENABLE_MAGIC_LINK_LOGIN=true`. Magic link is deferred
@@ -51,9 +58,10 @@ money first-class before anything else, and the world must work too.**
   in "CVT Group" means paths must always be quoted. This is now the **only**
   worktree; the orphaned `Vognary-gate-trust/` + `Vognary-program/` dirs (dead
   worktrees of a deleted clone) were removed with founder approval.
-- **Branches:** only `docs/continue-here` (superset, live) and `main` (synced to
-  origin) remain locally. All 14 stale branches deleted; the one arguably-unique
-  commit is preserved as tag `archive/mentor-scorecard` (7f1d25e).
+- **Active branch:** `recovery/v1` in the original checkout under the
+  founder-authorized same-checkout exception; it is the only worktree. No agent
+  may create a branch, worktree, clone, stash, merge, or rebase until Recovery v1
+  reaches `main`.
 - **`main`/origin is fully landed through PR #9**: Twin engine (`src/lib/twin/*`),
   RunwayStrip, AI cite-or-shut-up spine + live layer (`src/lib/server/ai/*`).
 - **AI models decision (live in code):** `AI_MODELS` in `src/lib/server/ai/models.ts`
@@ -106,7 +114,7 @@ money first-class before anything else, and the world must work too.**
 ## 2. THE PLAN — company phases (THE-LAW) + product phases (engineering)
 
 **Company sequence (THE-LAW):** Phase **A** market proof + Phase **B** loop shipping run **in parallel** now.
-Live CRM: `docs/execution/private-audit-crm.csv` · Scoreboard: `docs/execution/scoreboard.md`
+Live CRM: `docs/execution/private-audit-crm.csv` · Scoreboard: `docs/execution/scoreboard.md` · Field memory (people/threads/learnings): `docs/execution/people-conversation-learning.md`
 
 The one product loop: **evidence in (paste/upload/Gmail) → audit finds every
 recurring charge → assistant brief → user decides → decision + outcome logged with proof.**
