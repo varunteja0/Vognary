@@ -60,7 +60,7 @@ jobs:
       - name: Resolve the production database without exposing credentials
         run: |
           node <<'NODE'
-          const { appendFileSync } = require("node:fs");
+          const { appendFileSync } = await import("node:fs");
 
           const apiKey = process.env.NEON_API_KEY;
           const projectId = process.env.NEON_PROJECT_ID;
@@ -103,7 +103,7 @@ jobs:
       - name: Inspect the Recovery cutover state
         run: |
           node <<'NODE'
-          const pg = require("pg");
+          const { default: pg } = await import("pg");
           const pool = new pg.Pool({
             connectionString: process.env.DATABASE_URL,
             ssl: { rejectUnauthorized: false },
@@ -146,7 +146,7 @@ jobs:
         if: inputs.operation == 'apply-0026'
         run: |
           node <<'NODE'
-          const pg = require("pg");
+          const { default: pg } = await import("pg");
           const pool = new pg.Pool({
             connectionString: process.env.DATABASE_URL,
             ssl: { rejectUnauthorized: false },
