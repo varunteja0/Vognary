@@ -50,7 +50,7 @@ export type HomeProjectionInput = {
   changed: HomeChangedDto;
 };
 
-// The single confidence bar for reminders: Home labels it, the alert scheduler enforces it.
+// The single reminder rule: Home labels exactly what scheduleRenewalAlertsForWorkspace will act on.
 export const renewalAlertMinimumConfidence = 80;
 
 export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionDto {
