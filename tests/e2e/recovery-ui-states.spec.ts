@@ -171,7 +171,9 @@ test("account access leaves Recovery for the canonical profile route", async ({ 
 
   const account = page.getByRole("link", { name: `Account for ${email}` });
   await expect(account).toHaveAttribute("href", "/profile");
-  await account.click();
+  await account.focus();
+  await expect(account).toBeFocused();
+  await account.press("Enter");
   await expect(page).toHaveURL(/\/profile$/);
   await expect(page.getByRole("heading", { level: 1, name: "Account Settings" })).toBeVisible();
 });
