@@ -1,6 +1,7 @@
 "use client";
 
-import type { AttentionItemDto, ChangeItemDto, HomeProjectionDto, ProjectionTotalDto, UpcomingItemDto } from "@/lib/recovery/contracts";
+import { useState } from "react";
+import type { AttentionItemDto, ChangeItemDto, HomeProjectionDto, ProjectionTotalDto, ReceiptInboxStatusDto, UpcomingItemDto } from "@/lib/recovery/contracts";
 import {
   attentionReasonLabels,
   cadenceLabels,
@@ -12,6 +13,7 @@ import {
   priorityLabels,
 } from "./labels";
 import { ConfidenceBadge, MoneyValue, StateBlock } from "./recovery-states";
+import type { LoadState } from "./state";
 
 // Home renders the server's home projection verbatim, in the server's order.
 // It performs no ranking, totalling, or recurrence reasoning of its own.
@@ -23,22 +25,28 @@ export function RecoveryHome({
   onOpenCommitment,
   onInspectEvidence,
   onAddEvidence,
+  receiptInbox,
+  sourceStatus,
+  pendingSourceAction,
+  onProvisionReceiptInbox,
 }: {
   home: HomeProjectionDto;
   onOpenCommitment: (commitmentId: string) => void;
   onInspectEvidence: InspectEvidence;
   onAddEvidence: () => void;
+  receiptInbox: ReceiptInboxStatusDto | null;
+  sourceStatus: LoadState;
+  pendingSourceAction: "PROVISION" | "ROTATE" | "REVOKE" | null;
+  onProvisionReceiptInbox: () => void;
 }) {
   if (!home.coverage.evidenceCount) {
-    return (
-      <section aria-label="Get your first result" className="panel p-5 sm:p-6">
-        <h3 className="font-display text-xl font-semibold text-(--ink) sm:text-2xl">Add 2 receipts to get your first result</h3>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">
-          Vognary needs two charges from the same merchant before it can show what renews next.
-        </p>
-        <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-5">Add receipts</button>
-      </section>
-    );
+    return <EmptyRecoveryHome
+      receiptInbox={receiptInbox}
+      sourceStatus={sourceStatus}
+      pendingSourceAction={pendingSourceAction}
+      onProvisionReceiptInbox={onProvisionReceiptInbox}
+      onAddEvidence={onAddEvidence}
+    />;
   }
 
   return (
@@ -116,6 +124,89 @@ export function RecoveryHome({
         <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-ghost">Add receipts</button>
       </section>
     </div>
+  );
+}
+
+function EmptyRecoveryHome({
+  receiptInbox,
+  sourceStatus,
+  pendingSourceAction,
+  onProvisionReceiptInbox,
+  onAddEvidence,
+}: {
+  receiptInbox: ReceiptInboxStatusDto | null;
+  sourceStatus: LoadState;
+  pendingSourceAction: "PROVISION" | "ROTATE" | "REVOKE" | null;
+  onProvisionReceiptInbox: () => void;
+  onAddEvidence: () => void;
+}) {
+  const [copyStatus, setCopyStatus] = useState("");
+  const alias = receiptInbox?.alias ?? null;
+
+  async function copyAddress() {
+    if (!alias) return;
+    try {
+      await navigator.clipboard.writeText(alias.address);
+      setCopyStatus("Address copied.");
+    } catch {
+      setCopyStatus("Could not copy automatically. Select the address and copy it.");
+    }
+  }
+
+  if (alias) {
+    return (
+      <section aria-label="Get your first result" className="panel p-5 sm:p-6">
+        <p className="eyebrow eyebrow-xs text-ochre">Recommended first step</p>
+        <h3 className="mt-3 font-display text-xl font-semibold text-(--ink) sm:text-2xl">Your Vognary receipt address</h3>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">Forward billing receipts here.</p>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <input aria-label="Your Vognary receipt address" className="field field-mono min-w-0" value={alias.address} readOnly />
+          <button type="button" onClick={() => void copyAddress()} className="btn btn-primary shrink-0">Copy address</button>
+        </div>
+        <p role="status" aria-live="polite" className="mt-2 min-h-5 text-xs text-(--muted)">{copyStatus}</p>
+        <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-ghost mt-3">Add receipts manually</button>
+      </section>
+    );
+  }
+
+  if (sourceStatus.kind === "IDLE" || sourceStatus.kind === "LOADING") {
+    return (
+      <StateBlock
+        eyebrow="Preparing your first source"
+        title="Opening your receipt options…"
+        detail="Vognary is checking whether this deployment can create your private receipt address."
+      />
+    );
+  }
+
+  const canProvision = receiptInbox?.state === "NOT_PROVISIONED" || receiptInbox?.state === "REVOKED";
+  if (canProvision) {
+    return (
+      <section aria-label="Get your first result" className="panel p-5 sm:p-6">
+        <p className="eyebrow eyebrow-xs text-ochre">Recommended first step</p>
+        <h3 className="mt-3 font-display text-xl font-semibold text-(--ink) sm:text-2xl">Get your private receipt address</h3>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">
+          Forward software billing receipts there. Vognary never accesses or scans your inbox.
+        </p>
+        <button type="button" onClick={onProvisionReceiptInbox} disabled={pendingSourceAction !== null} className="btn btn-primary btn-lg mt-5">
+          {pendingSourceAction === "PROVISION" ? "Setting up address…" : "Set up receipt address"}
+        </button>
+        <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-ghost ml-0 mt-3 sm:ml-2">Add receipts manually</button>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label="Get your first result" className="panel p-5 sm:p-6">
+      <h3 className="font-display text-xl font-semibold text-(--ink) sm:text-2xl">Add receipts to get your first result</h3>
+      <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">
+        Add at least 2 receipts from the same recurring service to help Vognary infer its pattern.
+      </p>
+      {sourceStatus.kind === "FAILED" ? (
+        <p className="mt-2 text-xs leading-5 text-ochre">The receipt address could not be opened. Manual evidence still works.</p>
+      ) : null}
+      <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-5">Add receipts manually</button>
+    </section>
   );
 }
 

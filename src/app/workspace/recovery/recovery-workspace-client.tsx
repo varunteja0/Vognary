@@ -99,6 +99,7 @@ export default function RecoveryWorkspaceClient() {
   const [inspectedEvidence, setInspectedEvidence] = useState<EvidenceDto | null>(null);
   const [inspectedEvidenceFailure, setInspectedEvidenceFailure] = useState<TransportFailure | null>(null);
   const [inspectingEvidence, setInspectingEvidence] = useState(false);
+  const [manualFallbackOpen, setManualFallbackOpen] = useState(false);
   const viewHeadingRef = useRef<HTMLHeadingElement>(null);
   const viewChangedRef = useRef(false);
 
@@ -359,6 +360,15 @@ export default function RecoveryWorkspaceClient() {
     if (state.view !== "ADD_EVIDENCE") return;
     void loadSources();
   }, [loadSources, state.view]);
+
+  useEffect(() => {
+    if (
+      state.status.kind !== "READY"
+      || state.home?.coverage.evidenceCount
+      || state.sourceStatus.kind !== "IDLE"
+    ) return;
+    void loadSources();
+  }, [loadSources, state.home?.coverage.evidenceCount, state.sourceStatus.kind, state.status.kind]);
 
   useEffect(() => {
     if (state.view === "ADD_EVIDENCE" && state.sourceStatus.kind === "READY" && state.refreshRequired) {
@@ -715,6 +725,8 @@ export default function RecoveryWorkspaceClient() {
           onRotate={() => void updateReceiptInbox("ROTATE")}
           onRevoke={() => void updateReceiptInbox("REVOKE")}
           onRetry={() => void loadSources()}
+          manualFallbackOpen={manualFallbackOpen}
+          onManualFallbackToggle={setManualFallbackOpen}
           manualFallback={
             <RecoveryAddEvidence
               draft={state.evidenceDraft}
@@ -745,7 +757,14 @@ export default function RecoveryWorkspaceClient() {
         home={state.home}
         onOpenCommitment={openCommitment}
         onInspectEvidence={inspectEvidence}
-        onAddEvidence={() => selectView("ADD_EVIDENCE")}
+        onAddEvidence={() => {
+          setManualFallbackOpen(true);
+          selectView("ADD_EVIDENCE");
+        }}
+        receiptInbox={state.receiptInbox}
+        sourceStatus={state.sourceStatus}
+        pendingSourceAction={state.pendingSourceAction}
+        onProvisionReceiptInbox={() => void updateReceiptInbox("PROVISION")}
       />
     ) : (
       <LoadingBlock label="Opening your saved workspace…" />

@@ -15,6 +15,8 @@ export function RecoverySources({
   onRevoke,
   onRetry,
   manualFallback,
+  manualFallbackOpen,
+  onManualFallbackToggle,
 }: {
   receiptInbox: ReceiptInboxStatusDto | null;
   sourceStatus: LoadState;
@@ -24,6 +26,8 @@ export function RecoverySources({
   onRevoke: () => void;
   onRetry: () => void;
   manualFallback: ReactNode;
+  manualFallbackOpen: boolean;
+  onManualFallbackToggle: (open: boolean) => void;
 }) {
   const [copyStatus, setCopyStatus] = useState("");
   const alias = receiptInbox?.alias ?? null;
@@ -143,7 +147,11 @@ export function RecoverySources({
         ) : null}
       </section>
 
-      <details className="border-y border-line">
+      <details
+        open={manualFallbackOpen}
+        onToggle={(event) => onManualFallbackToggle(event.currentTarget.open)}
+        className="border-y border-line"
+      >
         <summary className="cursor-pointer px-4 py-4 font-display text-base font-semibold text-(--ink) sm:px-6">Manual fallback</summary>
         <div className="border-t border-line p-4 sm:p-6">{manualFallback}</div>
       </details>

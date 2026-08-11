@@ -10,9 +10,9 @@
 | Wedge sharpness | 8 | 2026-07-21 | Strategy review |
 | Intelligence engine | 6 | 2026-07-21 | Engines strong; corpus empty |
 | Trust & honesty | 9 | 2026-07-21 | Claims CI + fail-closed design |
-| Product UX | 7.5 | 2026-08-10 | Customer #0 30/30 browser journey passes desktop + mobile with axe; real-human <3 min evidence still unmeasured |
-| Backend readiness | 9 | 2026-08-10 | Recovery v1: 486/486 unit, 39/39 PostgreSQL, fresh + 0022 upgrade, encrypted nonzero restore, full local CI/build/perf/smoke/load green |
-| Production activation | 3.5 | 2026-07-21 | production:check gaps |
+| Product UX | 7.5 | 2026-08-11 | Receipt-address-first empty Home; 76 desktop/mobile browser scenarios exercised with axe (one dev cold-start miss passed unchanged on rerun); real-human <3 min remains unmeasured |
+| Backend readiness | 9 | 2026-08-11 | Recovery v1: 556/556 unit, 41/41 PostgreSQL from fresh schema through 0026, realistic repeated-receipt inference, build/perf green |
+| Production activation | 3.5 | 2026-08-11 | Live probe: receipt inbox disabled, reminder worker unconfigured, and Google/Customer #0/exact-SHA deployment evidence absent |
 | Live connector depth | 4 | 2026-07-21 | Registry ≠ live |
 | Data / network moat | 3 | 2026-07-21 | No network data yet |
 | Business validation | 1.5 | 2026-07-21 | Pipeline not asked — founder Phase A |

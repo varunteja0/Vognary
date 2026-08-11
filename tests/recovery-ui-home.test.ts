@@ -96,6 +96,15 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   assert.match(clientSource, /transport\.evidence\(/);
 });
 
+test("an empty Home loads and surfaces the receipt source before manual evidence", () => {
+  assert.match(clientSource, /void loadSources\(\)/);
+  assert.match(clientSource, /receiptInbox=\{state\.receiptInbox\}/);
+  assert.match(homeSource, /Your Vognary receipt address/);
+  assert.match(homeSource, /Copy address/);
+  assert.match(homeSource, /Set up receipt address/);
+  assert.match(homeSource, /Add receipts manually/);
+});
+
 test("subscriptions use ordinary language and three primary choices", () => {
   assert.deepEqual(decisionLabels, {
     KEEP: "Keep",
