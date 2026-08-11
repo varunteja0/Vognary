@@ -424,7 +424,6 @@ async function assertMigrationPreconditions(client: PoolClient, workspaceIds: st
   const result = await client.query<{
     unsupported_sources: number;
     incomplete_evidence: number;
-    sources_without_evidence: number;
     items_without_evidence: number;
     unsupported_actions: number;
     transactions: number;
@@ -440,9 +439,6 @@ async function assertMigrationPreconditions(client: PoolClient, workspaceIds: st
          join recurring_items item on item.id = link.recurring_item_id
          where item.workspace_id = any($1::uuid[])
            and (link.source_id is null or link.amount is null or link.evidence_date is null)) as incomplete_evidence,
-       (select count(*)::int from data_sources source
-         where source.workspace_id = any($1::uuid[])
-           and not exists (select 1 from evidence_links link where link.source_id = source.id)) as sources_without_evidence,
        (select count(*)::int from recurring_items item
          where item.workspace_id = any($1::uuid[])
            and not exists (select 1 from evidence_links link where link.recurring_item_id = item.id)) as items_without_evidence,
