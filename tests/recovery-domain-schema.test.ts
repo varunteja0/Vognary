@@ -71,8 +71,9 @@ test("Recovery inbound receipts add HMAC-only routing and replay-safe provider e
 test("Recovery inbound aliases cannot cross workspace ownership boundaries", () => {
   assert.match(
     inboundMigration,
-    /alter table connected_accounts\s+drop constraint if exists connected_accounts_workspace_id_id_key;\s*alter table connected_accounts\s+add constraint connected_accounts_workspace_id_id_key\s+unique \(workspace_id, id\);/i,
+    /if not exists \([\s\S]*conname = 'connected_accounts_workspace_id_id_key'[\s\S]*add constraint connected_accounts_workspace_id_id_key\s+unique \(workspace_id, id\)/i,
   );
+  assert.doesNotMatch(inboundMigration, /drop constraint(?: if exists)? connected_accounts_workspace_id_id_key/i);
   const connectedAccountsTable = schema.match(/create table connected_accounts \([\s\S]*?\n\);/i)?.[0];
   assert.ok(connectedAccountsTable);
   assert.match(connectedAccountsTable, /unique \(workspace_id, id\)/i);

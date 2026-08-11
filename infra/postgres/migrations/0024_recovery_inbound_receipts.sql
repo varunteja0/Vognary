@@ -18,11 +18,20 @@ alter table recovery_evidence
   add constraint recovery_evidence_provenance_kind_check
   check (provenance_kind in ('USER_SUBMITTED', 'PROVIDER_RECEIVED'));
 
-alter table connected_accounts
-  drop constraint if exists connected_accounts_workspace_id_id_key;
-alter table connected_accounts
-  add constraint connected_accounts_workspace_id_id_key
-  unique (workspace_id, id);
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'connected_accounts'::regclass
+      and conname = 'connected_accounts_workspace_id_id_key'
+  ) then
+    alter table connected_accounts
+      add constraint connected_accounts_workspace_id_id_key
+      unique (workspace_id, id);
+  end if;
+end
+$$;
 
 create table if not exists recovery_inbound_aliases (
   id uuid primary key default gen_random_uuid(),
