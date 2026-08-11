@@ -11,8 +11,9 @@ on:
         options:
           - inspect
           - apply-0026
+          - migrate-legacy
       confirmation:
-        description: Enter INSPECT_PRODUCTION or APPLY_0026_PRODUCTION
+        description: Enter INSPECT_PRODUCTION, APPLY_0026_PRODUCTION, or MIGRATE_LEGACY_PRODUCTION
         required: true
         type: string
 
@@ -42,6 +43,9 @@ jobs:
           expected=INSPECT_PRODUCTION
           if [ "$OPERATION" = "apply-0026" ]; then
             expected=APPLY_0026_PRODUCTION
+          fi
+          if [ "$OPERATION" = "migrate-legacy" ]; then
+            expected=MIGRATE_LEGACY_PRODUCTION
           fi
           if [ "$CONFIRMATION" != "$expected" ]; then
             echo "Confirmation does not match the selected operation." >&2
@@ -205,3 +209,7 @@ jobs:
             await pool.end();
           }
           NODE
+
+      - name: Materialize legacy evidence into Recovery and retire duplicate authority
+        if: inputs.operation == 'migrate-legacy'
+        run: npm run db:migrate-legacy-recovery -- --confirm
