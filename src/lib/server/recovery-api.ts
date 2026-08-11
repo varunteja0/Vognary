@@ -7,6 +7,7 @@ import {
   type ApiFailure,
   type CreateCorrectionRequest,
   type EvidenceIngestRequest,
+  type ForwardedEmailMaterializationRequest,
   type PutDecisionRequest,
   type RecoveryErrorCode,
 } from "@/lib/recovery/contracts";
@@ -25,6 +26,7 @@ const safeMessages: Record<RecoveryErrorCode, string> = {
   SAVE_FAILED: "Recovery could not save the request.",
   REQUEST_TOO_LARGE: "The Recovery request is too large.",
   UNSUPPORTED_MEDIA_TYPE: "Content-Type must be application/json.",
+  FEATURE_UNAVAILABLE: "This Recovery feature is not available for this deployment.",
   RATE_LIMITED: "Too many requests. Retry later.",
   UNKNOWN: "Recovery could not complete the request.",
 };
@@ -94,6 +96,19 @@ export function normalizeEvidenceRequest(value: unknown): EvidenceIngestRequest 
     };
   }
   throw invalid("kind must be RECEIPT_PASTE or CSV_IMPORT.");
+}
+
+export function normalizeForwardedEmailMaterializationRequest(value: unknown): ForwardedEmailMaterializationRequest {
+  const record = requireRecord(value, "Forwarded email materialization request");
+  rejectUnknown(record, new Set(["kind", "receipts"]), "forwarded email materialization request");
+  if (record.kind !== "FORWARDED_EMAIL") throw invalid("kind must be FORWARDED_EMAIL.");
+  if (!Array.isArray(record.receipts) || !record.receipts.length || record.receipts.length > recoveryLimits.maxReceiptSnippets) {
+    throw invalid(`receipts must contain 1 to ${recoveryLimits.maxReceiptSnippets} snippets.`);
+  }
+  const receipts = record.receipts.map((entry, index) => normalizeReceipt(entry, index));
+  const characters = receipts.reduce((total, receipt) => total + receipt.text.length, 0);
+  if (characters > recoveryLimits.maxReceiptCharacters) throw tooLarge("Forwarded receipt evidence exceeds the character limit.");
+  return { kind: "FORWARDED_EMAIL", receipts };
 }
 
 export function normalizeCorrectionRequest(value: unknown): CreateCorrectionRequest {

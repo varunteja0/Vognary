@@ -3,28 +3,17 @@
 import dynamic from "next/dynamic";
 import type { RecoveryCutoverStatus } from "@/lib/recovery/contracts";
 
-const GuestAuditClient = dynamic(() => import("../guest-audit-client"), {
-  loading: () => <ExperienceLoading label="Opening the private audit…" />,
-});
-
 // Signed-in readers get the Recovery workspace. The legacy monolith stays in the
 // tree, untouched, as the rollback reference for this switch.
 const RecoveryWorkspaceClient = dynamic(() => import("../workspace/recovery/recovery-workspace-client"), {
   loading: () => <ExperienceLoading label="Opening the workspace…" />,
 });
 
-export type GmailConnectAvailability = { available: boolean; label: string; meaning: string };
-
 export default function ExperienceClient({
-  signedIn,
   recoveryCutover,
-  gmailConnect,
 }: {
-  signedIn: boolean;
   recoveryCutover: RecoveryCutoverStatus | null;
-  gmailConnect: GmailConnectAvailability;
 }) {
-  if (!signedIn) return <GuestAuditClient gmailConnect={gmailConnect} />;
   if (recoveryCutover?.status === "LEGACY_DATA_REQUIRES_MIGRATION") {
     return <LegacyContinuityBlock counts={recoveryCutover.counts} />;
   }

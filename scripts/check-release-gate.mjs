@@ -194,7 +194,12 @@ async function runLocalSmoke(step, environment) {
   try {
     await waitForHealth(origin, server, () => serverOutput);
     const code = await spawnAndWait(process.execPath, ["scripts/smoke-test.mjs"], {
-      env: { ...serverEnvironment, SMOKE_BASE_URL: origin, SMOKE_INTERNAL_SECRET: internalSecret },
+      env: {
+        ...serverEnvironment,
+        SMOKE_BASE_URL: origin,
+        SMOKE_INTERNAL_SECRET: internalSecret,
+        SMOKE_ALLOW_UNCONFIGURED: "true",
+      },
       stdio: "inherit",
     });
     return { id: step.id, status: code === 0 ? "passed" : "failed", exitCode: code };
@@ -340,6 +345,7 @@ function sanitizeLocalEnvironment(input) {
     "GOOGLE_",
     "OPENAI_",
     "RAZORPAY_",
+    "RECEIPT_INBOX_",
     "RESEND_",
     "SENTRY_",
     "SETU_",
@@ -357,6 +363,7 @@ function sanitizeLocalEnvironment(input) {
     "DATABASE_URL",
     "DATABASE_URL_UNPOOLED",
     "INTERNAL_SYNC_SECRET",
+    "ENABLE_RECEIPT_INBOX",
     "MONITORING_DELIVERY_TEST_STATUS",
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
     "PRIVATE_BETA_ACCESS_CODE",

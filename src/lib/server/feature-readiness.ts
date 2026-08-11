@@ -26,6 +26,9 @@ export const productionFeatureMigrations = [
   "0021_pending_connector_consent",
   "0022_weekly_digest",
   "0023_recovery_v1",
+  "0024_recovery_inbound_receipts",
+  "0025_recovery_renewal_alerts",
+  "0026_recovery_inbound_retention",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];
@@ -146,7 +149,8 @@ async function checkRecoveryV1(applied: Set<string>) {
           + (select count(*) from transactions)
           + (select count(*) from data_sources)
           + (select count(*) from connector_evidence)
-          + (select count(*) from connected_accounts))::int as legacy_rows,
+           + (select count(*) from connected_accounts
+             where coalesce(metadata ->> 'ledgerAuthority', 'LEGACY') <> 'RECOVERY_V1'))::int as legacy_rows,
          (select count(*)::int from recovery_workspace_states) as recovery_workspaces`,
     );
     const legacyRows = result.rows[0]?.legacy_rows ?? 0;

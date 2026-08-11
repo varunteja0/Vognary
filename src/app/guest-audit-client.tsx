@@ -28,7 +28,7 @@ import { RunwayStrip } from "./runway-strip";
 import { AssistantBriefPanel } from "./workspace/assistant-brief-panel";
 import { MandateKillListPanel } from "./workspace/mandate-killlist-panel";
 
-import type { GmailConnectAvailability } from "./app/experience-client";
+type GmailConnectAvailability = { available: boolean; label: string; meaning: string };
 
 export default function GuestAuditClient({ gmailConnect }: { gmailConnect?: GmailConnectAvailability }) {
   const gmailAvailable = gmailConnect?.available ?? false;

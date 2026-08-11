@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: "How Vognary collects, uses, protects, retains, exports, and deletes personal and financial evidence.",
 };
 
-const effectiveDate = "13 July 2026";
+const effectiveDate = "11 August 2026";
 
 const sections = [
   {
@@ -27,8 +27,8 @@ const sections = [
       <>
         Account data can include your name, verified email, workspace membership, consent choices, and authentication events. Product
         data can include recurring-payment evidence, merchant names, dates, amounts, currency, cadence, source references, decisions,
-        notes, and review history. Connected sources can provide receipt, invoice, subscription, usage, or billing metadata within the
-        exact scope you approve. Operational data can include IP-derived rate-limit keys, request timestamps, error codes, device/browser
+        notes, review history, and bounded text extracted from billing emails sent to your private Vognary receipt address. Operational
+        data can include IP-derived rate-limit keys, request timestamps, error codes, device/browser
         metadata, and synchronization status. Private-audit and contact forms store the information you submit when durable intake is configured.
       </>
     ),
@@ -47,9 +47,11 @@ const sections = [
     title: "4. How data is collected",
     body: (
       <>
-        Data comes directly from you, from files or text you intentionally submit, from providers you explicitly connect, and from
-        service telemetry needed to secure and operate Vognary. A connection does not imply universal coverage: each source has its own
-        date range, fields, update timing, and authorization limits.
+        Data comes directly from you, from files or text you submit, from messages sent to your private receipt address, and from service
+        telemetry needed to secure and operate Vognary. Google is used for sign-in only; Vognary does not access or scan Gmail. Resend
+        accepts mail sent to the configured receiving domain and sends Vognary a metadata-only webhook. Vognary verifies that webhook,
+        resolves the secret recipient alias, and then retrieves bounded message content. Keep the private address confidential and send
+        only billing mail you want reviewed. A source does not guarantee that every subscription or charge has been found.
       </>
     ),
   },
@@ -83,6 +85,11 @@ const sections = [
     title: "7. Storage and retention",
     body: (
       <>
+        Resend stores received email so it remains available through its dashboard and Receiving API, including when webhook delivery is
+        retried. Vognary cannot promise when provider-held copies are deleted; that retention follows Resend&apos;s own service terms and
+        controls. Vognary retrieves bounded MIME content, extracts text from supported receipt parts, encrypts accepted raw source text,
+        and stores normalized subscription facts plus bounded evidence excerpts. The default Vognary retention policy minimizes encrypted
+        raw source text after 30 days while preserving normalized facts and excerpts until workspace or account deletion.
         Statement and PDF upload endpoints process files for the request and do not intentionally retain the original file by default.
         A guest audit keeps converted evidence in the current tab&apos;s session storage for up to two hours so the same tab can survive a
         refresh and complete sign-in. The transfer is bounded, never placed in a URL, can be cleared from the guest page, and is removed
@@ -97,10 +104,12 @@ const sections = [
         objects, provider-held data, backups, or records held by external delivery and monitoring services; those remain governed by
         their separate deletion and recovery processes. Renewal preferences and minimized delivery status remain with the workspace
         until the user or workspace is deleted; delivery rows do not duplicate recipient email, merchant, amount, or source evidence.
-        Paid checkout rows, provider payment/refund identifiers, amounts, currency, offer/terms versions, and one-time fulfillment status
+        Terminal receipt transport metadata is deleted under the operational retention window while hashed replay keys remain to prevent
+        a previously processed provider message from being accepted again. Paid checkout rows, provider payment/refund identifiers, amounts, currency, offer/terms versions, and one-time fulfillment status
         can be retained or pseudonymized when narrowly required for reconciliation, refunds, disputes, accounting, fraud prevention, or
         legal obligations. Account deletion removes direct email and user/workspace links from those retained settlement rows. Vognary
-        does not promise instant deletion from immutable backups.
+        does not promise instant deletion from immutable backups. Account deletion revokes the Vognary receipt alias and removes
+        Vognary-held workspace records; it cannot guarantee immediate deletion of copies held by Resend or other providers.
       </>
     ),
   },
@@ -108,8 +117,8 @@ const sections = [
     title: "8. Service providers and transfers",
     body: (
       <>
-        Vognary can use hosting, database, email-delivery, monitoring, backup, and connected-provider services solely to operate the
-        product. Those providers process only the data required for their role and may process it outside your state or country subject
+        Vognary uses Resend to receive mail sent to private receipt addresses and to deliver opted-in product email. Vognary can also use
+        hosting, database, monitoring, and backup services solely to operate the product. Those providers process only the data required for their role and may process it outside your state or country subject
         to their terms, contractual safeguards, and applicable transfer restrictions. Vognary does not sell personal financial evidence.
       </>
     ),

@@ -157,29 +157,14 @@ test("going offline is stated before any action is attempted", async ({ page }) 
   await expect(page.getByText("This device is offline")).toHaveCount(0);
 });
 
-test("profile presents persistence, export, and a confirmed destructive deletion", async ({ page }) => {
+test("account access leaves Recovery for the canonical profile route", async ({ page }) => {
   await signIn(page);
   await mockEmptyWorkspace(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Profile" }).click();
-
-  await expect(page.getByText(email!)).toBeVisible();
-  await expect(page.getByText("Version 4", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Reloading this page, closing the tab/)).toBeVisible();
-  await expect(page.getByRole("link", { name: "Open canonical privacy export" })).toHaveAttribute("href", "/profile#privacy-export");
-
-  const trigger = page.getByRole("button", { name: "Delete saved workspace data…" });
-  await trigger.click();
-  const dialog = page.getByRole("dialog", { name: "Delete saved workspace data" });
-  await expect(dialog).toBeVisible();
-  const confirm = dialog.getByRole("link", { name: "Continue to permanent deletion" });
-  await expect(confirm).toHaveAttribute("aria-disabled", "true");
-
-  await dialog.getByLabel(/Type DELETE to confirm/).fill("DELETE");
-  await expect(confirm).toHaveAttribute("aria-disabled", "false");
-
-  await dialog.getByRole("button", { name: "Keep my data" }).click();
-  await expect(dialog).toHaveCount(0);
-  await expect(trigger).toBeFocused();
+  const account = page.getByRole("link", { name: `Account for ${email}` });
+  await expect(account).toHaveAttribute("href", "/profile");
+  await account.click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Account Settings" })).toBeVisible();
 });

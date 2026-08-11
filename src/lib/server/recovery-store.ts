@@ -15,11 +15,14 @@ import {
   type Decision,
   type EvidenceDto,
   type EvidenceIngestRequest,
+  type EvidenceProvenanceKind,
   type EvidenceSubmissionDto,
+  type ForwardedEmailMaterializationRequest,
   type HomeChangedDto,
   type HomeProjectionDto,
   type PutDecisionRequest,
   type RecoveryCutoverStatus,
+  type SourceType,
   type SubmitEvidenceResponse,
 } from "@/lib/recovery/contracts";
 import {
@@ -43,7 +46,9 @@ import {
   type StatementSource,
 } from "@/lib/recurring-audit";
 import { getDatabasePool } from "@/lib/server/database";
-import { RecoveryServiceError, hashRecoveryRequest } from "@/lib/server/recovery-api";
+import { recoveryEvidenceFingerprint } from "@/lib/recovery/evidence-fingerprint";
+import { RecoveryServiceError, hashRecoveryRequest, normalizeForwardedEmailMaterializationRequest } from "@/lib/server/recovery-api";
+import { scheduleRenewalAlertsForWorkspace } from "@/lib/server/renewal-alert-store";
 import { encryptSecret } from "@/lib/server/token-vault";
 
 const roleRank = { viewer: 1, member: 2, admin: 3, owner: 4 } as const;
@@ -111,7 +116,7 @@ type CommitmentRow = {
 
 type SourceRow = {
   id: string;
-  source_type: "RECEIPT_PASTE" | "CSV_IMPORT";
+  source_type: SourceType;
   client_ref: string;
   label: string;
   ingested_at: Date;
@@ -123,7 +128,7 @@ type SourceRow = {
 type EvidenceRow = {
   id: string;
   source_id: string;
-  source_type: "RECEIPT_PASTE" | "CSV_IMPORT";
+  source_type: SourceType;
   source_label: string;
   source_ingested_at: Date;
   source_coverage_start: Date | string | null;
@@ -142,7 +147,7 @@ type EvidenceRow = {
   direction: ParsedTransaction["direction"] | null;
   cadence_hint: Cadence | null;
   next_expected_date: Date | string | null;
-  provenance_kind: "USER_SUBMITTED";
+  provenance_kind: EvidenceProvenanceKind;
   provenance_reference: string;
   confidence_state: "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN";
   confidence_score: number | null;
@@ -194,6 +199,7 @@ type ExtractedEvidence = {
   direction: ParsedTransaction["direction"] | null;
   cadenceHint: Cadence | null;
   nextExpectedDate: string | null;
+  provenanceKind: EvidenceProvenanceKind;
   provenanceReference: string;
   confidenceScore: number;
   confidenceReasons: string[];
@@ -225,7 +231,10 @@ export async function getRecoveryCutoverStatus(input: {
          (select count(*)::int from transactions where workspace_id = $1) as transactions,
          (select count(*)::int from data_sources where workspace_id = $1) as data_sources,
          (select count(*)::int from connector_evidence where workspace_id = $1) as connector_evidence,
-         (select count(*)::int from connected_accounts where workspace_id = $1) as connected_accounts`,
+        (select count(*)::int
+         from connected_accounts
+         where workspace_id = $1
+          and coalesce(metadata ->> 'ledgerAuthority', 'LEGACY') <> 'RECOVERY_V1') as connected_accounts`,
       [input.workspaceId],
     );
     const row = result.rows[0];
@@ -244,6 +253,146 @@ export async function getRecoveryCutoverStatus(input: {
       counts,
     };
   });
+}
+
+export async function materializeForwardedEmailEvidence(input: {
+  workspaceId: string;
+  inboundEventId: string;
+  providerEventId: string;
+  expectedAttemptCount: number;
+  request: ForwardedEmailMaterializationRequest;
+  now?: Date;
+}): Promise<{
+  submission: EvidenceSubmissionDto;
+  commitmentTotal: number;
+  workspaceVersion: number;
+  replayed: boolean;
+}> {
+  const request = normalizeForwardedEmailMaterializationRequest(input.request);
+  const client = await getDatabasePool().connect();
+  const operation = "recovery.materialize-forwarded-email";
+  const idempotencyKey = `forwarded-email:${sha256(`RESEND\0${input.providerEventId}`)}`;
+  const requestHash = hashRecoveryRequest({ operation, providerEventId: input.providerEventId, request });
+  const now = input.now ?? new Date();
+  try {
+    await client.query("begin");
+    await lockRecoveryWorkspace(client, input.workspaceId);
+    const event = await client.query<{ status: string; svix_id: string; provider: string; attempt_count: number }>(
+      `select status, svix_id, provider, attempt_count
+       from recovery_inbound_events
+       where id = $1 and workspace_id = $2
+       for update`,
+      [input.inboundEventId, input.workspaceId],
+    );
+    const eventRow = event.rows[0];
+    if (!eventRow || eventRow.provider !== "RESEND" || eventRow.svix_id !== input.providerEventId) {
+      throw new RecoveryServiceError("NOT_FOUND");
+    }
+    const replay = await readIdempotent<{ submission: EvidenceSubmissionDto; commitmentTotal: number }>(
+      client,
+      input.workspaceId,
+      idempotencyKey,
+      operation,
+      requestHash,
+    );
+    if (replay) {
+      await client.query("commit");
+      return { ...replay.response, workspaceVersion: replay.workspaceVersion, replayed: true };
+    }
+    if (eventRow.status !== "PROCESSING" || eventRow.attempt_count !== input.expectedAttemptCount) {
+      throw new RecoveryServiceError("CONFLICT", "Receipt processing lease changed before materialization.");
+    }
+
+    const workspace = await client.query(`select 1 from workspaces where id = $1 for share`, [input.workspaceId]);
+    if (!workspace.rows[0]) throw new RecoveryServiceError("NOT_FOUND");
+    const state = await ensureWorkspaceState(client, input.workspaceId);
+    const submission = await client.query<{ id: string; ingested_at: Date }>(
+      `insert into recovery_submissions (
+         workspace_id, submitted_by_user_id, source_type, inbound_event_id
+       ) values ($1, null, 'FORWARDED_EMAIL', $2)
+       returning id, ingested_at`,
+      [input.workspaceId, input.inboundEventId],
+    );
+    const submissionRow = submission.rows[0];
+    if (!submissionRow) throw new RecoveryServiceError("SAVE_FAILED");
+
+    const materialized = await persistSubmissionSources(client, {
+      workspaceId: input.workspaceId,
+      submissionId: submissionRow.id,
+      request,
+      now,
+    });
+    await client.query(
+      `update recovery_submissions
+       set accepted_evidence_count = $3, results = $4::jsonb
+       where workspace_id = $1 and id = $2`,
+      [input.workspaceId, submissionRow.id, materialized.acceptedEvidenceCount, JSON.stringify(materialized.results)],
+    );
+
+    let workspaceVersion = Number(state.version);
+    if (materialized.acceptedSourceIds.length) {
+      const before = await loadCommitmentRecords(client, input.workspaceId);
+      const audit = await analyzePersistedEvidence(client, input.workspaceId, now);
+      await upsertCanonicalCommitments(client, input.workspaceId, audit.recurringItems);
+      await linkCanonicalEvidence(client, input.workspaceId, audit.recurringItems);
+      const after = await loadCommitmentRecords(client, input.workspaceId);
+      const nextVersion = workspaceVersion + 1;
+      const changes = state.baseline_version === null
+        ? []
+        : await persistChanges(client, input.workspaceId, workspaceVersion, nextVersion, before, after, {
+            kind: "EVIDENCE",
+            submissionId: submissionRow.id,
+            sourceIds: materialized.acceptedSourceIds,
+          }, now);
+      workspaceVersion = await advanceWorkspaceVersion(client, {
+        workspaceId: input.workspaceId,
+        actorUserId: null,
+        currentState: state,
+        mutationKind: "EVIDENCE",
+        changes,
+      });
+      await scheduleRenewalAlertsForWorkspace(input.workspaceId, client);
+    }
+
+    const submissionDto: EvidenceSubmissionDto = {
+      id: submissionRow.id,
+      type: "FORWARDED_EMAIL",
+      ingestedAt: submissionRow.ingested_at.toISOString(),
+      acceptedEvidenceCount: materialized.acceptedEvidenceCount,
+      results: materialized.results,
+    };
+    const commitmentTotal = Number((await client.query<{ total: string }>(
+      `select count(*)::text as total from recovery_commitments where workspace_id = $1`,
+      [input.workspaceId],
+    )).rows[0]?.total ?? 0);
+    const response = { submission: submissionDto, commitmentTotal };
+    await writeIdempotent(client, input.workspaceId, idempotencyKey, operation, requestHash, response, workspaceVersion);
+    const accepted = materialized.acceptedEvidenceCount > 0;
+    const completedEvent = await client.query(
+      `update recovery_inbound_events
+         set status = $3, processing_started_at = null,
+           processed_at = $4, error_code = $5
+       where id = $1 and workspace_id = $2
+         and status = 'PROCESSING' and attempt_count = $6`,
+      [input.inboundEventId, input.workspaceId, accepted ? "PROCESSED" : "TERMINAL_FAILED", now, accepted ? null : "PARSE_FAILED", input.expectedAttemptCount],
+    );
+    if (completedEvent.rowCount !== 1) {
+      throw new RecoveryServiceError("CONFLICT", "Receipt processing lease changed before completion.");
+    }
+    await writeRecoveryAudit(client, input.workspaceId, null, "recovery.forwarded-email.materialized", submissionRow.id, {
+      actorKind: "system",
+      provider: "resend",
+      acceptedEvidenceCount: materialized.acceptedEvidenceCount,
+      workspaceVersion,
+    });
+    await client.query("commit");
+    return { ...response, workspaceVersion, replayed: false };
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw normalizeStoreError(error);
+  } finally {
+    client.release();
+  }
 }
 
 export async function getRecoveryHome(input: {
@@ -446,6 +595,7 @@ export async function submitRecoveryEvidence(input: {
         mutationKind: "EVIDENCE",
         changes,
       });
+      await scheduleRenewalAlertsForWorkspace(input.workspaceId, client);
     }
 
     const currentState = await readWorkspaceState(client, input.workspaceId);
@@ -550,6 +700,7 @@ export async function putRecoveryDecision(input: {
       mutationKind: "DECISION",
       changes: [],
     });
+    await scheduleRenewalAlertsForWorkspace(input.workspaceId, client);
     const updated = await getCommitmentRow(client, input.workspaceId, input.request.commitmentId);
     if (!updated || !decision.rows[0]) throw new RecoveryServiceError("SAVE_FAILED");
     const data: PutDecisionMutationData = {
@@ -700,6 +851,7 @@ async function mutateCorrection(input: {
       mutationKind: input.reverseCorrectionId ? "CORRECTION_REVERSAL" : "CORRECTION",
       changes,
     });
+    await scheduleRenewalAlertsForWorkspace(input.workspaceId, client);
     const updated = await getCommitmentRow(client, input.workspaceId, input.commitmentId);
     if (!updated) throw new RecoveryServiceError("SAVE_FAILED");
     const data: CorrectionMutationData = {
@@ -729,7 +881,7 @@ async function mutateCorrection(input: {
 async function persistSubmissionSources(client: PoolClient, input: {
   workspaceId: string;
   submissionId: string;
-  request: EvidenceIngestRequest;
+  request: EvidenceIngestRequest | ForwardedEmailMaterializationRequest;
   now: Date;
 }) {
   const existingEvidence = await client.query<{ total: string }>(
@@ -741,16 +893,20 @@ async function persistSubmissionSources(client: PoolClient, input: {
   const results: EvidenceSubmissionDto["results"][number][] = [];
   const acceptedSourceIds: string[] = [];
   let acceptedEvidenceCount = 0;
-  const entries = input.request.kind === "RECEIPT_PASTE"
-    ? input.request.receipts.map((receipt) => ({ clientRef: receipt.clientRef, label: "Pasted receipt", text: receipt.text }))
-    : input.request.sources.map((source) => ({ clientRef: source.clientRef, label: source.name, text: source.text }));
+  const entries = input.request.kind === "CSV_IMPORT"
+    ? input.request.sources.map((source) => ({ clientRef: source.clientRef, text: source.text }))
+    : input.request.receipts.map((receipt) => ({ clientRef: receipt.clientRef, text: receipt.text }));
 
   for (const entry of entries) {
     const storedClientRef = `client-${sha256(entry.clientRef).slice(0, 16)}`;
-    const contentHash = sha256(`${input.request.kind}\0${entry.text}`);
+    const receiptSource = input.request.kind !== "CSV_IMPORT";
+    const contentHash = sha256(`${receiptSource ? "RECEIPT" : "CSV_IMPORT"}\0${entry.text}`);
+    const duplicateHashes = receiptSource
+      ? [contentHash, sha256(`RECEIPT_PASTE\0${entry.text}`), sha256(`FORWARDED_EMAIL\0${entry.text}`)]
+      : [contentHash];
     const duplicate = await client.query(
-      `select 1 from recovery_sources where workspace_id = $1 and content_hash = $2 limit 1`,
-      [input.workspaceId, contentHash],
+      `select 1 from recovery_sources where workspace_id = $1 and content_hash = any($2::text[]) limit 1`,
+      [input.workspaceId, duplicateHashes],
     );
     if (duplicate.rows[0]) {
       results.push({
@@ -763,10 +919,21 @@ async function persistSubmissionSources(client: PoolClient, input: {
     }
 
     const sourceId = randomUUID();
-    const storedLabel = input.request.kind === "RECEIPT_PASTE" ? "Pasted receipt" : "Imported statement";
+    const storedLabel = input.request.kind === "RECEIPT_PASTE"
+      ? "Pasted receipt"
+      : input.request.kind === "FORWARDED_EMAIL"
+        ? "Forwarded email"
+        : "Imported statement";
     const sourceName = sourceEngineName(sourceId);
-    const extracted = input.request.kind === "RECEIPT_PASTE"
-      ? extractReceiptEvidence(entry.text, sourceId, sourceName, input.submissionId, input.now)
+    const extracted = receiptSource
+      ? extractReceiptEvidence(
+          entry.text,
+          sourceId,
+          sourceName,
+          input.submissionId,
+          input.now,
+          input.request.kind === "FORWARDED_EMAIL" ? "PROVIDER_RECEIVED" : "USER_SUBMITTED",
+        )
       : extractCsvEvidence(entry.text, sourceId, sourceName, input.submissionId, input.now);
     if (!extracted.length) {
       results.push({
@@ -777,12 +944,24 @@ async function persistSubmissionSources(client: PoolClient, input: {
       });
       continue;
     }
-    projectedEvidenceCount += extracted.length;
+    const novelEvidence = receiptSource
+      ? await filterNovelReceiptEvidence(client, input.workspaceId, extracted)
+      : extracted;
+    if (!novelEvidence.length) {
+      results.push({
+        clientRef: storedClientRef,
+        status: "REJECTED",
+        code: "DUPLICATE_EVIDENCE",
+        message: "A receipt with the same merchant, amount, and dates is already saved in this workspace.",
+      });
+      continue;
+    }
+    projectedEvidenceCount += novelEvidence.length;
     if (projectedEvidenceCount > recoveryLimits.maxWorkspaceEvidenceRecords) {
       throw new RecoveryServiceError("REQUEST_TOO_LARGE", "Recovery workspace evidence limit reached.");
     }
 
-    const dates = extracted.map((evidence) => evidence.evidenceDate).sort();
+    const dates = novelEvidence.map((evidence) => evidence.evidenceDate).sort();
     const encrypted = encryptSecret(entry.text, recoveryRawAssociatedData(input.workspaceId, sourceId));
     await client.query(
       `insert into recovery_sources (
@@ -803,12 +982,52 @@ async function persistSubmissionSources(client: PoolClient, input: {
         input.now,
       ],
     );
-    for (const evidence of extracted) await insertExtractedEvidence(client, input.workspaceId, evidence);
+    for (const evidence of novelEvidence) await insertExtractedEvidence(client, input.workspaceId, evidence);
     acceptedSourceIds.push(sourceId);
-    acceptedEvidenceCount += extracted.length;
+    acceptedEvidenceCount += novelEvidence.length;
     results.push({ clientRef: storedClientRef, status: "ACCEPTED", code: null, message: null });
   }
   return { results, acceptedSourceIds, acceptedEvidenceCount };
+}
+
+async function filterNovelReceiptEvidence(client: PoolClient, workspaceId: string, evidenceRows: readonly ExtractedEvidence[]) {
+  const novel: ExtractedEvidence[] = [];
+  const seen = new Set<string>();
+  for (const evidence of evidenceRows) {
+    const fingerprint = evidenceFingerprint(evidence);
+    if (seen.has(fingerprint)) continue;
+    seen.add(fingerprint);
+    const existing = await client.query(
+      `select 1
+       from recovery_evidence
+       where workspace_id = $1
+         and evidence_kind = 'RECEIPT'
+         and (
+           fingerprint = $2
+           or (
+             lower(normalized_merchant) = lower($3)
+             and amount_minor is not distinct from $4::bigint
+             and currency is not distinct from $5::char(3)
+             and evidence_date is not distinct from $6::date
+             and cadence_hint is not distinct from $7::text
+             and next_expected_date is not distinct from $8::date
+           )
+         )
+       limit 1`,
+      [
+        workspaceId,
+        fingerprint,
+        evidence.normalizedMerchant,
+        evidence.amountMinor,
+        evidence.currency,
+        evidence.evidenceDate,
+        evidence.cadenceHint,
+        evidence.nextExpectedDate,
+      ],
+    );
+    if (!existing.rows[0]) novel.push(evidence);
+  }
+  return novel;
 }
 
 function extractReceiptEvidence(
@@ -817,6 +1036,7 @@ function extractReceiptEvidence(
   sourceName: string,
   submissionId: string,
   now: Date,
+  provenanceKind: EvidenceProvenanceKind,
 ): ExtractedEvidence[] {
   const candidates = splitReceiptSnippets(redactText(text).text).flatMap((snippet) => {
     const normalizedSnippet = snippet.replace(/\s+/g, " ").trim();
@@ -856,6 +1076,7 @@ function extractReceiptEvidence(
       direction: null,
       cadenceHint: frequencyToCadence[item.frequency],
       nextExpectedDate: item.nextExpectedDate,
+      provenanceKind,
       provenanceReference: `${submissionId}:${sourceId}:${index + 1}`,
       confidenceScore: recurring.confidenceScore,
       confidenceReasons: [recurring.recommendationReason],
@@ -888,6 +1109,7 @@ function extractCsvEvidence(
     direction: transaction.direction,
     cadenceHint: null,
     nextExpectedDate: null,
+    provenanceKind: "USER_SUBMITTED",
     provenanceReference: `${submissionId}:${sourceId}:${transaction.rowNumber}`,
     confidenceScore: 55,
     confidenceReasons: ["Parsed deterministically from a user-submitted CSV row."],
@@ -899,25 +1121,17 @@ async function insertExtractedEvidence(client: PoolClient, workspaceId: string, 
   const boundedExcerpt = excerpt.slice(0, recoveryLimits.maxEvidenceExcerptCharacters);
   const merchant = redactText(evidence.merchant).text.slice(0, 240);
   const normalizedMerchant = redactText(evidence.normalizedMerchant).text.slice(0, 240);
-  const fingerprint = sha256([
-    evidence.sourceId,
-    evidence.evidenceKind,
-    evidence.rowNumber,
-    evidence.evidenceDate,
-    evidence.amountMinor,
-    evidence.currency,
-    excerpt.normalize("NFKC").toLowerCase(),
-  ].join("|"));
+  const fingerprint = evidenceFingerprint(evidence);
   await client.query(
     `insert into recovery_evidence (
        id, workspace_id, source_id, fingerprint, evidence_kind, row_number,
        observed_at, excerpt, excerpt_truncated, merchant, normalized_merchant,
        category, amount_minor, currency, evidence_date, direction, cadence_hint,
-       next_expected_date, provenance_reference, confidence_state,
+       next_expected_date, provenance_kind, provenance_reference, confidence_state,
        confidence_score, confidence_reasons
      ) values (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-       $15, $16, $17, $18, $19, $20, $21, $22::jsonb
+       $15, $16, $17, $18, $19, $20, $21, $22, $23::jsonb
      )`,
     [
       evidence.id,
@@ -938,12 +1152,28 @@ async function insertExtractedEvidence(client: PoolClient, workspaceId: string, 
       evidence.direction,
       evidence.cadenceHint,
       evidence.nextExpectedDate,
+      evidence.provenanceKind,
       evidence.provenanceReference,
       confidenceState(evidence.confidenceScore),
       evidence.confidenceScore,
       JSON.stringify(evidence.confidenceReasons),
     ],
   );
+}
+
+function evidenceFingerprint(evidence: ExtractedEvidence) {
+  return recoveryEvidenceFingerprint({
+    sourceId: evidence.sourceId,
+    evidenceKind: evidence.evidenceKind,
+    rowNumber: evidence.rowNumber,
+    normalizedMerchant: evidence.normalizedMerchant,
+    amountMinor: evidence.amountMinor,
+    currency: evidence.currency,
+    evidenceDate: evidence.evidenceDate,
+    direction: evidence.direction,
+    cadenceHint: evidence.cadenceHint,
+    nextExpectedDate: evidence.nextExpectedDate,
+  });
 }
 
 async function analyzePersistedEvidence(client: PoolClient, workspaceId: string, today: Date) {
@@ -1343,7 +1573,7 @@ async function loadSupportingEvidence(client: PoolClient, workspaceId: string, s
 
 async function advanceWorkspaceVersion(client: PoolClient, input: {
   workspaceId: string;
-  actorUserId: string;
+  actorUserId: string | null;
   currentState: WorkspaceStateRow;
   mutationKind: "EVIDENCE" | "CORRECTION" | "CORRECTION_REVERSAL" | "DECISION";
   changes: readonly ChangeItemDto[];
@@ -1835,7 +2065,7 @@ async function writeIdempotent(
 async function writeRecoveryAudit(
   client: PoolClient,
   workspaceId: string,
-  userId: string,
+  userId: string | null,
   action: string,
   entityId: string,
   metadata: Record<string, unknown>,

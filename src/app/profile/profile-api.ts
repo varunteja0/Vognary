@@ -1,6 +1,5 @@
 import type {
   ConsentRecord,
-  PlatformTokenSummary,
   PrivacyRequest,
   RenewalAlertPreference,
   RetentionPolicy,
@@ -16,13 +15,6 @@ export async function fetchConsentRecords(): Promise<ConsentRecord[]> {
     ...consent,
     active: !consent.withdrawnAt && (!consent.expiresAt || Date.parse(consent.expiresAt) > checkedAt),
   }));
-}
-
-export async function fetchPlatformTokens(): Promise<PlatformTokenSummary[]> {
-  const response = await fetch("/api/platform/tokens", { cache: "no-store" });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error ?? "Platform tokens are unavailable.");
-  return Array.isArray(payload.tokens) ? payload.tokens : [];
 }
 
 export async function fetchRenewalAlertPreference(): Promise<RenewalAlertPreference> {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PDFParse } from "pdf-parse";
+import { allowsAiPdfAssist } from "@/lib/ingest-mode";
 import { assertPdfTextWithinLimits, hasReadablePdfTextLayer, maxPdfPages } from "@/lib/pdf-ingest";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { redactText } from "@/lib/redaction";
@@ -176,10 +177,6 @@ export async function POST(request: NextRequest) {
     storage: "none",
     sources,
   });
-}
-
-export function allowsAiPdfAssist(mode: FormDataEntryValue | null) {
-  return mode !== "recovery-v1";
 }
 
 function countRows(text: string): number {

@@ -141,8 +141,9 @@ test("Recovery HTTP routes enforce session, version, replay, isolation, and safe
 
     const list = await listCommitments(authenticatedRequest("/api/workspaces/current/commitments?limit=1", cookieHeader));
     assert.equal(list.status, 200);
-    const listPayload = await list.json() as ApiSuccess<{ items: { id: string }[]; nextCursor: string | null }>;
+    const listPayload = await list.json() as ApiSuccess<{ items: { id: string }[]; total: number; nextCursor: string | null }>;
     assert.equal(listPayload.data.items.length, 1);
+    assert.equal(listPayload.data.total, 1);
     const commitmentId = listPayload.data.items[0].id;
 
     const detail = await getCommitment(

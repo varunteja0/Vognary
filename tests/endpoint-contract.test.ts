@@ -13,7 +13,7 @@ import { publicOffer } from "../src/lib/public-offer";
  * request-security / audit-route / product-events tests). They lock two
  * guarantees that back the connect + checkout buttons:
  *
- *  1. /api/connectors advertises the real registry (both consent rails present).
+ *  1. /api/connectors cannot advertise the retired legacy registry.
  *  2. /api/checkout is honestly gated: it returns `not-configured` with the
  *     exact required env until the provider is switched on, flips to `ready`
  *     only when it is, and refuses any SKU that isn't the public offer. This is
@@ -62,18 +62,19 @@ function checkoutRequest(plan: string | null) {
 // regardless of the ambient shell environment.
 const cleared = Object.fromEntries(CHECKOUT_ENV_KEYS.map((key) => [key, undefined]));
 
-test("GET /api/connectors advertises the real registry with both consent rails", async () => {
+test("GET /api/connectors retires the legacy registry without leaking dead integrations", async () => {
   const response = await connectorsGet();
-  assert.equal(response.status, 200);
+  assert.equal(response.status, 410);
+  assert.equal(response.headers.get("cache-control"), "no-store");
   const body = await response.json();
 
-  assert.equal(body.status, "ok");
-  assert.ok(Array.isArray(body.connectors), "connectors must be a list");
-  const ids = body.connectors.map((connector: { id: string }) => connector.id);
-  assert.ok(ids.includes("gmail-readonly"), "email consent rail must be registered");
-  assert.ok(ids.includes("account-aggregator"), "bank consent rail must be registered");
-  assert.ok(Array.isArray(body.readiness) && body.readiness.length > 0, "readiness map must be present");
-  assert.ok(body.honesty && typeof body.honesty === "object", "honesty map must be present");
+  assert.equal(body.status, "retired");
+  assert.equal(body.ledgerAuthority, "RECOVERY_V1");
+  assert.equal(body.replacements.forwardedReceipts, "/api/workspaces/current/sources/receipt-inbox");
+  assert.equal(body.replacements.manualEvidence, "/api/workspaces/current/evidence");
+  assert.equal("connectors" in body, false);
+  assert.equal("adapters" in body, false);
+  assert.doesNotMatch(JSON.stringify(body), /gmail|account-aggregator|setu|aws|openai-costs/i);
 });
 
 test("GET /api/checkout refuses any SKU that is not the public offer", async () => {

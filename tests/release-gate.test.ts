@@ -16,6 +16,8 @@ test("release gate keeps tests off production data and owns every ship-blocking 
   assert.match(source, /output\[name\] = ""/);
   assert.match(source, /"GOOGLE_"/);
   assert.match(source, /"RAZORPAY_"/);
+  assert.match(source, /"RECEIPT_INBOX_"/);
+  assert.match(source, /"ENABLE_RECEIPT_INBOX"/);
   assert.match(source, /PLAYWRIGHT_EXTERNAL_SERVER: "1"/);
   assert.match(source, /VOGNARY_E2E_EVIDENCE_DIR: "output\/release-evidence"/);
   assert.match(source, /\["run", "ci"\]/);
@@ -24,6 +26,7 @@ test("release gate keeps tests off production data and owns every ship-blocking 
   assert.match(source, /\["run", "corpus:strict"\]/);
   assert.match(source, /\["run", "receipt-corpus:strict"\]/);
   assert.match(source, /scripts\/smoke-test\.mjs/);
+  assert.match(source, /SMOKE_ALLOW_UNCONFIGURED: "true"/);
   assert.match(source, /scripts\/check-load-budget\.mjs/);
   assert.match(source, /delete from rate_limit_buckets/);
   assert.match(source, /scripts\/check-production-activation\.mjs", target, "--strict"/);

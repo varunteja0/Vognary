@@ -13,6 +13,8 @@ import {
   coverageStates,
   decisions,
   evidenceProvenanceKinds,
+  receiptInboxAliasStates,
+  receiptInboxUpdateStates,
   recoveryEndpoints,
   recoveryErrorCodes,
   recoveryErrorStatusByCode,
@@ -34,6 +36,9 @@ import {
   type Decision,
   type EvidenceIngestRequest,
   type EvidenceProvenanceKind,
+  type ReceiptInboxAliasState,
+  type ReceiptInboxStatusDto,
+  type ReceiptInboxUpdateState,
   type GetCommitmentResponse,
   type GetCommitmentQuery,
   type GetHomeResponse,
@@ -65,6 +70,8 @@ const changeLabels = exhaustive(changeKinds) satisfies Record<ChangeKind, string
 const attentionLabels = exhaustive(attentionReasons) satisfies Record<AttentionReason, string>;
 const coverageLabels = exhaustive(coverageStates) satisfies Record<CoverageState, string>;
 const provenanceLabels = exhaustive(evidenceProvenanceKinds) satisfies Record<EvidenceProvenanceKind, string>;
+const receiptInboxAliasLabels = exhaustive(receiptInboxAliasStates) satisfies Record<ReceiptInboxAliasState, string>;
+const receiptInboxUpdateLabels = exhaustive(receiptInboxUpdateStates) satisfies Record<ReceiptInboxUpdateState, string>;
 const errorLabels = exhaustive(recoveryErrorCodes) satisfies Record<RecoveryErrorCode, string>;
 
 const money = { currency: "INR", minor: "199900", exponent: 2, display: "₹1,999.00" } as const;
@@ -231,7 +238,7 @@ const allChangeVariants = [
 test("Recovery v1 freezes every product enum exhaustively", () => {
   assert.deepEqual(decisions, ["KEEP", "MONITOR", "DOWNGRADE", "CANCEL", "INVESTIGATE"]);
   assert.deepEqual(cadences, ["WEEKLY", "BIWEEKLY", "SEMIMONTHLY", "MONTHLY", "BIMONTHLY", "QUARTERLY", "YEARLY", "IRREGULAR"]);
-  assert.deepEqual(sourceTypes, ["RECEIPT_PASTE", "CSV_IMPORT"]);
+  assert.deepEqual(sourceTypes, ["RECEIPT_PASTE", "CSV_IMPORT", "FORWARDED_EMAIL"]);
   assert.deepEqual(commitmentStatuses, ["ACTIVE", "NOT_RECURRING"]);
   assert.deepEqual(confidenceStates, ["HIGH", "MEDIUM", "LOW", "UNKNOWN"]);
   assert.deepEqual(correctionFields, ["MERCHANT", "AMOUNT", "NEXT_EXPECTED_DATE", "CADENCE", "IS_RECURRING"]);
@@ -239,8 +246,10 @@ test("Recovery v1 freezes every product enum exhaustively", () => {
   assert.deepEqual(changeKinds, ["ADDED", "MERCHANT", "AMOUNT", "DATE", "CADENCE", "RECURRING_CLASSIFICATION"]);
   assert.deepEqual(attentionReasons, ["DECISION_REQUIRED", "RENEWS_SOON", "LOW_CONFIDENCE", "PRICE_INCREASE", "EVIDENCE_CONFLICT"]);
   assert.deepEqual(coverageStates, ["NO_EVIDENCE", "BASELINE_ONLY", "PARTIAL", "CURRENT", "STALE"]);
-  assert.deepEqual(evidenceProvenanceKinds, ["USER_SUBMITTED"]);
-  assert.deepEqual(recoveryErrorCodes, ["AUTH_REQUIRED", "FORBIDDEN", "NOT_FOUND", "INVALID_EVIDENCE", "PARSE_FAILED", "DUPLICATE_EVIDENCE", "DATABASE_UNAVAILABLE", "CONFLICT", "STALE_STATE", "SAVE_FAILED", "REQUEST_TOO_LARGE", "UNSUPPORTED_MEDIA_TYPE", "RATE_LIMITED", "UNKNOWN"]);
+  assert.deepEqual(evidenceProvenanceKinds, ["USER_SUBMITTED", "PROVIDER_RECEIVED"]);
+  assert.deepEqual(receiptInboxAliasStates, ["ACTIVE", "ROTATED", "REVOKED"]);
+  assert.deepEqual(receiptInboxUpdateStates, ["NOT_PROVISIONED", "WAITING", "RECEIVED", "PROCESSING", "READY", "FAILED", "REVOKED"]);
+  assert.deepEqual(recoveryErrorCodes, ["AUTH_REQUIRED", "FORBIDDEN", "NOT_FOUND", "INVALID_EVIDENCE", "PARSE_FAILED", "DUPLICATE_EVIDENCE", "DATABASE_UNAVAILABLE", "CONFLICT", "STALE_STATE", "SAVE_FAILED", "REQUEST_TOO_LARGE", "UNSUPPORTED_MEDIA_TYPE", "FEATURE_UNAVAILABLE", "RATE_LIMITED", "UNKNOWN"]);
   assert.equal(Object.keys(decisionLabels).length, decisions.length);
   assert.equal(Object.keys(cadenceLabels).length, cadences.length);
   assert.equal(Object.keys(sourceLabels).length, sourceTypes.length);
@@ -252,6 +261,8 @@ test("Recovery v1 freezes every product enum exhaustively", () => {
   assert.equal(Object.keys(attentionLabels).length, attentionReasons.length);
   assert.equal(Object.keys(coverageLabels).length, coverageStates.length);
   assert.equal(Object.keys(provenanceLabels).length, evidenceProvenanceKinds.length);
+  assert.equal(Object.keys(receiptInboxAliasLabels).length, receiptInboxAliasStates.length);
+  assert.equal(Object.keys(receiptInboxUpdateLabels).length, receiptInboxUpdateStates.length);
   assert.equal(Object.keys(errorLabels).length, recoveryErrorCodes.length);
   assert.equal(correctionPatches.length, correctionFields.length);
   assert.equal(correctionHistory.length, correctionStatuses.length);
@@ -273,6 +284,10 @@ test("Recovery v1 freezes endpoint methods and paths without database vocabulary
   assert.deepEqual(recoveryEndpoints.reverseCorrection("commitment 1", "correction 1"), { method: "DELETE", path: "/api/workspaces/current/commitments/commitment%201/corrections/correction%201" });
   assert.deepEqual(recoveryEndpoints.decisions, { method: "GET", path: "/api/workspaces/current/decisions" });
   assert.deepEqual(recoveryEndpoints.decision, { method: "PUT", path: "/api/workspaces/current/decisions" });
+  assert.deepEqual(recoveryEndpoints.sources, { method: "GET", path: "/api/workspaces/current/sources" });
+  assert.deepEqual(recoveryEndpoints.receiptInbox, { method: "POST", path: "/api/workspaces/current/sources/receipt-inbox" });
+  assert.deepEqual(recoveryEndpoints.rotateReceiptInbox, { method: "POST", path: "/api/workspaces/current/sources/receipt-inbox/rotate" });
+  assert.deepEqual(recoveryEndpoints.revokeReceiptInbox, { method: "DELETE", path: "/api/workspaces/current/sources/receipt-inbox" });
 
   const sourceText = readFileSync(new URL("../src/lib/recovery/contracts.ts", import.meta.url), "utf8");
   assert.doesNotMatch(sourceText, /from ["'](?:pg|server-only|@\/lib\/server)/);
@@ -312,6 +327,10 @@ test("Recovery v1 freezes bounded immutable evidence and typed endpoint payload 
     reverseCorrection: true,
     decisions: true,
     decision: true,
+    sources: true,
+    receiptInbox: true,
+    rotateReceiptInbox: true,
+    revokeReceiptInbox: true,
   } satisfies Record<keyof typeof recoveryEndpoints & keyof RecoveryEndpointContracts, true>;
   assert.deepEqual(Object.keys(endpointWitness), Object.keys(recoveryEndpoints));
 
@@ -408,8 +427,22 @@ test("first ingestion is an honest baseline and all payloads round-trip as produ
     configuration: { status: "not-configured", cookieName: "vognary_session" },
     session: null,
   } as const satisfies RecoverySessionResponse;
+  const receiptInbox = {
+    state: "WAITING",
+    alias: {
+      id: "11111111-1111-4111-8111-111111111111",
+      status: "ACTIVE",
+      address: "rcpt_example@receipts.vognary.com",
+      createdAt: "2026-08-10T10:00:00.000Z",
+      rotatedAt: null,
+      revokedAt: null,
+    },
+    lastReceivedAt: null,
+    lastProcessedAt: null,
+    lastFailureCode: null,
+  } as const satisfies ReceiptInboxStatusDto;
 
-  for (const payload of [receiptRequest, csvRequest, submitResponse, homeResponse, listResponse, detailResponse, decisionRequest, decisionResponse, reverseResponse, session, signedOutSession, correctionHistory, allChangeVariants]) {
+  for (const payload of [receiptRequest, csvRequest, submitResponse, homeResponse, listResponse, detailResponse, decisionRequest, decisionResponse, reverseResponse, session, signedOutSession, receiptInbox, correctionHistory, allChangeVariants]) {
     assert.deepEqual(JSON.parse(JSON.stringify(payload)), payload);
   }
 });
@@ -428,6 +461,7 @@ test("frontend-safe errors have exhaustive primary HTTP statuses and no raw exce
     SAVE_FAILED: 502,
     REQUEST_TOO_LARGE: 413,
     UNSUPPORTED_MEDIA_TYPE: 415,
+    FEATURE_UNAVAILABLE: 503,
     RATE_LIMITED: 429,
     UNKNOWN: 500,
   } satisfies Record<RecoveryErrorCode, number>);

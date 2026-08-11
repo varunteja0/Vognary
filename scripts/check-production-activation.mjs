@@ -9,7 +9,8 @@ const beta = args.includes("--beta");
 const urlArg = args.find((arg) => arg.startsWith("http://") || arg.startsWith("https://"));
 const baseUrl = (urlArg || process.env.NEXT_PUBLIC_APP_URL || "https://www.vognary.com").replace(/\/$/, "");
 
-const betaRequiredGroupIds = new Set(["lead-persistence", "encrypted-snapshots"]);
+const activationProfile = "receipt-forwarding";
+const betaRequiredGroupIds = new Set(["persistent-backend", "feature-migrations", "receipt-inbox", "privacy-lifecycle", "redis-rate-limit"]);
 const betaSignInGroupIds = new Set(["identity-provider"]);
 const targetUrl = new URL(baseUrl);
 const targetIsLocal = targetUrl.hostname === "localhost" || targetUrl.hostname === "127.0.0.1" || targetUrl.hostname === "::1";
@@ -23,6 +24,7 @@ const groups = [
     label: "Lead persistence",
     requiredAny: ["DATABASE_URL", "AUDIT_INTAKE_WEBHOOK_URL", "WAITLIST_WEBHOOK_URL"],
     probe: isLeadPersistenceReady,
+    launchBlocking: false,
     why: "Persists private audit and waitlist leads in Postgres or a webhook instead of preview-only responses.",
   },
   {
@@ -44,48 +46,45 @@ const groups = [
       RAZORPAY_RECONCILIATION_STATUS: "passed",
     },
     probe: isPaymentReady,
+    launchBlocking: false,
     why: "Requires the versioned one-time assisted-audit offer, legal terms approval, tracked checkout creation, signed settlement webhooks, and an observed assisted-audit order. Static payment links stay hidden.",
   },
   {
-    id: "gmail-oauth",
-    label: "Gmail OAuth",
-    required: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI"],
-    probe: isGmailOAuthReady,
-    why: "Lets users authorize their own Gmail accounts for receipt discovery.",
+    id: "receipt-inbox",
+    label: "Recovery receipt inbox",
+    required: [
+      "DATABASE_URL",
+      "TOKEN_ENCRYPTION_KEY",
+      "ENABLE_RECEIPT_INBOX",
+      "RESEND_RECEIVING_API_KEY",
+      "RESEND_INBOUND_WEBHOOK_SECRET",
+      "RESEND_RECEIVING_DOMAIN",
+      "RECEIPT_INBOX_ALIAS_HMAC_SECRET",
+      "RECEIPT_INBOX_ALIAS_HMAC_KEY_ID",
+    ],
+    requiredValues: {
+      ENABLE_RECEIPT_INBOX: "true",
+      RECEIPT_INBOX_PROVIDER_STATUS: "production-live",
+      RECEIPT_INBOX_WEBHOOK_PROOF_STATUS: "passed",
+      RECEIPT_INBOX_REPLAY_PROOF_STATUS: "passed",
+      RECEIPT_INBOX_RETENTION_REVIEW_STATUS: "approved",
+    },
+    probe: isReceiptInboxReady,
+    why: "Requires the receiving provider, signed webhook, replay/idempotency proof, retention review, and Recovery migrations before forwarding is advertised.",
   },
   {
     id: "persistent-backend",
     label: "Persistent backend",
-    required: ["DATABASE_URL", "TOKEN_ENCRYPTION_KEY", "SESSION_SECRET", "INTERNAL_SYNC_SECRET"],
+    required: ["DATABASE_URL", "TOKEN_ENCRYPTION_KEY", "SESSION_SECRET"],
     probe: isPersistentBackendReady,
     why: "Enables encrypted connected accounts, token storage, sync jobs, and workspace sessions.",
   },
   {
     id: "feature-migrations",
-    label: "Feature migrations 0002 through 0023",
+    label: "Feature migrations 0002 through 0026",
     required: ["DATABASE_URL"],
     probe: isFeatureMigrationsReady,
-    why: "Confirms the target database recorded every forward migration through Recovery v1 and can query persistent capability schema.",
-  },
-  {
-    id: "verified-outcomes",
-    label: "Permissioned verified-savings concierge",
-    required: ["DATABASE_URL", "INTERNAL_SYNC_SECRET", "CRON_SECRET"],
-    requiredValues: {
-      CONCIERGE_LEGAL_TERMS_STATUS: "approved",
-      CONCIERGE_OPERATIONS_STATUS: "production-ready",
-      CONCIERGE_PRIVACY_REVIEW_STATUS: "approved",
-    },
-    probe: isVerifiedOutcomesReady,
-    why: "Requires the permissioned action schema, explicit legal/privacy/operations approval, protected worker routes, and proof-gated savings receipts.",
-  },
-  {
-    id: "sync-scheduler",
-    label: "Scheduled sync worker",
-    required: ["CRON_SECRET"],
-    requiredValues: { SYNC_SCHEDULER_STATUS: "production-live" },
-    probe: isSyncSchedulerReady,
-    why: "Requires an operator attestation after deployed Vercel Cron logs and connector-run evidence prove the schedule, not merely a configured secret.",
+    why: "Confirms the target database recorded every forward migration through Recovery receipt-inbox retention and can query persistent capability schema.",
   },
   {
     id: "privacy-lifecycle",
@@ -101,6 +100,7 @@ const groups = [
     required: ["DATABASE_URL", "RESEND_API_KEY", "RESEND_FROM_EMAIL", "NEXT_PUBLIC_APP_URL", "CRON_SECRET"],
     requiredValues: { RENEWAL_ALERT_DELIVERY_STATUS: "production-live" },
     probe: isRenewalAlertsReady,
+    launchBlocking: false,
     why: "Requires migration 0006, complete email configuration, a delivered opt-in test reminder, and an operator-verified deployed cron.",
   },
   {
@@ -108,6 +108,7 @@ const groups = [
     label: "Encrypted synchronized workspace state",
     required: ["DATABASE_URL", "TOKEN_ENCRYPTION_KEY", "SESSION_SECRET"],
     probe: isEncryptedSnapshotsReady,
+    launchBlocking: false,
     why: "Enables signed-in beta users to auto-sync revisioned encrypted workspace state and normalized upload/manual ledger rows.",
   },
   {
@@ -129,6 +130,7 @@ const groups = [
     label: "Read-only platform API surface",
     required: ["DATABASE_URL"],
     probe: isPlatformApiReady,
+    launchBlocking: false,
     why: "Confirms migration 0008, shared rate limiting, and unauthenticated denial on the read-only ledger/source routes. It does not claim partner adoption.",
   },
   {
@@ -146,34 +148,6 @@ const groups = [
     probe: isBackupStorageReady,
     why: "Required before storing files or long-lived reports server-side.",
   },
-  {
-    id: "core-connectors",
-    label: "Public launch connectors (Gmail + Account Aggregator)",
-    required: [
-      "DATABASE_URL",
-      "TOKEN_ENCRYPTION_KEY",
-      "GOOGLE_REDIRECT_URI",
-      "SETU_AA_CLIENT_ID",
-      "SETU_AA_CLIENT_SECRET",
-      "SETU_AA_PRODUCT_INSTANCE_ID",
-      "SETU_AA_BASE_URL",
-    ],
-    requiredAny: ["GOOGLE_CLIENT_ID", "GOOGLE_AUTH_CLIENT_ID"],
-    requiredValues: {
-      GOOGLE_OAUTH_VERIFICATION_COMPLETE: "true",
-      ACCOUNT_AGGREGATOR_PARTNER_STATUS: "production-live",
-    },
-    probe: isCoreConnectorsReady,
-    why: "Public launch requires verified Gmail read-only consent plus an approved production Account Aggregator FIU endpoint. UPI/card mandate rails remain claims-safe follow-on work.",
-  },
-  {
-    id: "partner-rails",
-    label: "AA / UPI / card mandate partner rails",
-    required: ["ACCOUNT_AGGREGATOR_PARTNER_STATUS", "UPI_MANDATE_PARTNER_STATUS", "CARD_MANDATE_PARTNER_STATUS"],
-    probe: isPartnerRailsReady,
-    launchBlocking: false,
-    why: "Tracks the full AA / UPI / card mandate moat. Public launch blocks on AA through core-connectors; UPI and card remain non-blocking until their own regulated production access exists.",
-  },
 ];
 
 const endpointChecks = [
@@ -190,7 +164,7 @@ const endpointChecks = [
       headers: { authorization: `Bearer ${targetInternalSecret}` },
     },
   },
-  { id: "connectors", path: "/api/connectors", expected: [200] },
+  { id: "connectors", path: "/api/connectors", expected: [410] },
   { id: "auth-session", path: "/api/auth/session", expected: [200] },
   { id: "auth-google-start", path: "/api/auth/google/start?mode=json", expected: [200, 501], captureJson: true },
   {
@@ -211,7 +185,7 @@ const endpointChecks = [
   { id: "workspace-decisions-auth-guard", path: "/api/workspaces/current/decisions", expected: [401] },
   { id: "workspace-proof-graph-auth-guard", path: "/api/workspaces/current/proof-graph", expected: [401] },
   { id: "workspace-current-auth-guard", path: "/api/workspaces/current", expected: [401] },
-  { id: "workspace-actions-auth-guard", path: "/api/workspaces/current/actions", expected: [401] },
+  { id: "workspace-actions-retired", path: "/api/workspaces/current/actions", expected: [410], captureJson: true },
   {
     id: "workspace-ask-auth-guard",
     path: "/api/workspaces/current/ask",
@@ -223,6 +197,7 @@ const endpointChecks = [
     },
   },
   { id: "workspace-commitments-auth-guard", path: "/api/workspaces/current/commitments", expected: [401] },
+  { id: "workspace-sources-auth-guard", path: "/api/workspaces/current/sources", expected: [401] },
   { id: "renewal-alert-preferences-auth-guard", path: "/api/renewal-alerts/preferences", expected: [401] },
   { id: "privacy-retention-policy-auth-guard", path: "/api/privacy/retention-policy", expected: [401] },
   { id: "privacy-requests-auth-guard", path: "/api/privacy/requests", expected: [401] },
@@ -233,7 +208,7 @@ const endpointChecks = [
   {
     id: "workspace-connector-sync-auth-guard",
     path: "/api/workspaces/current/connectors/00000000-0000-4000-8000-000000000000/sync",
-    expected: [401],
+    expected: [410],
     init: { method: "POST" },
   },
   {
@@ -252,11 +227,11 @@ const endpointChecks = [
   { id: "audit-intake-status", path: "/api/audit-intake", expected: [200, 501], captureJson: true },
   { id: "billing-return-page", path: "/billing/return", expected: [200] },
   { id: "checkout-status-guard", path: "/api/checkout/00000000-0000-4000-8000-000000000000", expected: [404, 501, 503], captureJson: true },
-  { id: "gmail-product-start", path: "/api/integrations/gmail/start?mode=json", expected: [200, 401, 501], captureJson: true },
-  { id: "gmail-callback-config", path: "/api/integrations/gmail/callback", expected: [400, 501], captureJson: true },
-  { id: "sync-due-run-cron-guard", path: "/api/internal/sync-jobs/due/run", expected: [401, 501], captureJson: true },
+  { id: "gmail-product-start", path: "/api/integrations/gmail/start?mode=json", expected: [410], captureJson: true },
+  { id: "gmail-callback-config", path: "/api/integrations/gmail/callback", expected: [410], captureJson: true },
+  { id: "sync-due-run-retired", path: "/api/internal/sync-jobs/due/run", expected: [410], captureJson: true },
   { id: "renewal-alert-due-run-cron-guard", path: "/api/internal/renewal-alerts/due/run", expected: [401, 501], captureJson: true },
-  { id: "savings-verification-due-run-cron-guard", path: "/api/internal/savings-verification/due/run", expected: [401, 501], captureJson: true },
+  { id: "savings-verification-retired", path: "/api/internal/savings-verification/due/run", expected: [410], captureJson: true },
   {
     id: "privacy-retention-worker-secret-guard",
     path: "/api/internal/privacy/retention/run",
@@ -267,7 +242,7 @@ const endpointChecks = [
   {
     id: "openai-cost-sync-auth-guard",
     path: "/api/connectors/openai-costs/sync",
-    expected: [401],
+    expected: [410],
     captureJson: true,
     init: {
       method: "POST",
@@ -309,6 +284,7 @@ const activationContext = { endpointPayloads, endpointReport };
 const envReport = groups.map((group) => buildActivationReport(group, activationContext));
 
 const summary = {
+  activationProfile,
   baseUrl,
   strict,
   beta,
@@ -431,11 +407,9 @@ function isPaymentReady({ endpointPayloads }) {
     && endpointPayloads.readiness?.hardening?.payments === "settlement-observed";
 }
 
-function isGmailOAuthReady(context) {
-  const start = context.endpointPayloads["gmail-product-start"];
-  const callback = getEndpoint(context, "gmail-callback-config");
-  if (!start || !callback) return undefined;
-  return start.status === "ready" && callback.status === 400;
+function isReceiptInboxReady({ endpointPayloads }) {
+  const status = endpointPayloads.readiness?.hardening?.receiptInbox;
+  return typeof status === "string" ? status === "operator-attested-production-live" : undefined;
 }
 
 function isPersistentBackendReady({ endpointPayloads }) {
@@ -444,33 +418,21 @@ function isPersistentBackendReady({ endpointPayloads }) {
   return readiness.database?.status === "ready"
     && readiness.tokenVault?.status === "ready"
     && readiness.auth?.session?.status === "ready"
-    && readiness.hardening?.internalSyncJobApi === "configured"
     && readiness.capabilities?.schema?.status === "ready";
-}
-
-function isSyncSchedulerReady({ endpointPayloads }) {
-  const status = endpointPayloads.readiness?.hardening?.syncWorkers;
-  return typeof status === "string" ? status === "operator-attested-production-live" : undefined;
 }
 
 function isFeatureMigrationsReady({ endpointPayloads }) {
   const capabilities = endpointPayloads.readiness?.capabilities;
   if (!capabilities) return undefined;
   return capabilities.schema?.status === "ready"
-    && capabilities.schema.required?.includes("0023_recovery_v1") === true
-    && capabilities.schema.applied?.includes("0023_recovery_v1") === true
+    && capabilities.schema.required?.includes("0026_recovery_inbound_retention") === true
+    && capabilities.schema.applied?.includes("0026_recovery_inbound_retention") === true
     && capabilities.privacyLifecycle?.status !== "schema-query-failed"
     && capabilities.renewalAlerts?.status !== "schema-query-failed"
     && capabilities.commitmentDecisions?.status !== "schema-query-failed"
     && capabilities.platformApi?.status !== "schema-query-failed"
     && capabilities.billing?.status !== "schema-query-failed"
     && capabilities.recoveryV1?.status === "schema-ready-clean-cutover";
-}
-
-function isVerifiedOutcomesReady({ endpointPayloads }) {
-  const capability = endpointPayloads.readiness?.capabilities?.verifiedOutcomes;
-  if (!capability) return undefined;
-  return capability.status !== "migration-pending" && capability.status !== "schema-query-failed";
 }
 
 function isPrivacyLifecycleReady({ endpointPayloads }) {
@@ -531,16 +493,6 @@ function isMonitoringReady({ endpointPayloads }) {
 function isBackupStorageReady({ endpointPayloads }) {
   const status = endpointPayloads.readiness?.hardening?.backups;
   return typeof status === "string" ? status === "configured" : undefined;
-}
-
-function isPartnerRailsReady({ endpointPayloads }) {
-  const status = endpointPayloads.readiness?.hardening?.partnerRails;
-  return typeof status === "string" ? status === "production-live" : undefined;
-}
-
-function isCoreConnectorsReady({ endpointPayloads }) {
-  const status = endpointPayloads.readiness?.hardening?.coreConnectorLaunch;
-  return typeof status === "string" ? status === "production-live" : undefined;
 }
 
 function getEndpoint(context, id) {

@@ -43,9 +43,11 @@ const sourceOf = (file: string) => readFileSync(`${recoveryDir}/${file}`, "utf8"
 const allSource = recoveryFiles.map(sourceOf).join("\n");
 const homeSource = sourceOf("recovery-home.tsx");
 const clientSource = sourceOf("recovery-workspace-client.tsx");
+const commitmentsSource = sourceOf("recovery-commitments.tsx");
 const dialogSource = sourceOf("recovery-dialog.tsx");
 const statesSource = sourceOf("recovery-states.tsx");
-const profileSource = sourceOf("recovery-profile.tsx");
+const accountSectionsSource = readFileSync("src/app/profile/profile-sections.tsx", "utf8");
+const inboundStoreSource = readFileSync("src/lib/server/recovery-inbound-store.ts", "utf8");
 
 test("every contract enum has presentation copy, so a contract change cannot render a blank", () => {
   const cases: [readonly string[], Record<string, unknown>][] = [
@@ -72,24 +74,70 @@ test("every contract enum has presentation copy, so a contract change cannot ren
   }
 });
 
-test("primary navigation is exactly Home, Commitments, Add evidence, Profile", () => {
-  assert.deepEqual([...recoveryViews], ["HOME", "COMMITMENTS", "ADD_EVIDENCE", "PROFILE"]);
-  assert.deepEqual(Object.values(recoveryViewLabels), ["Home", "Commitments", "Add evidence", "Profile"]);
+test("primary navigation is exactly Home, Subscriptions, Sources, with Account outside the tabs", () => {
+  assert.deepEqual([...recoveryViews], ["HOME", "COMMITMENTS", "ADD_EVIDENCE"]);
+  assert.deepEqual(Object.values(recoveryViewLabels), ["Home", "Subscriptions", "Sources"]);
   assert.match(clientSource, /<nav aria-label="Primary"/);
   assert.match(clientSource, /aria-current=\{state\.view === view \? "page" : undefined\}/);
+  assert.match(clientSource, /href="\/profile"/);
+  assert.doesNotMatch(clientSource, /state\.view === "PROFILE"/);
 });
 
-test("home renders the four required sections and the honest no-baseline state", () => {
-  for (const heading of ["WHAT NEEDS ME?", "WHAT CHANGED?", "WHAT HAPPENS NEXT?", "COVERAGE"]) {
+test("home leads with action, only shows real changes, and keeps source freshness compact", () => {
+  for (const heading of ["Needs attention", "Since your last visit", "Coming up", "Receipts checked"]) {
     assert.ok(homeSource.includes(heading), `home must render ${heading}`);
   }
-  assert.match(homeSource, /home\.changed\.state === "NO_PRIOR_BASELINE"/);
-  assert.match(homeSource, /There is nothing earlier to compare this against/);
-  assert.match(homeSource, /Currencies are never combined into one number/);
+  assert.match(homeSource, /home\.changed\.state === "COMPARED"/);
+  assert.doesNotMatch(homeSource, /WHAT NEEDS ME\?|WHAT CHANGED\?|WHAT HAPPENS NEXT\?|COVERAGE/);
+  assert.doesNotMatch(homeSource, /TotalsStrip|Server totals|Compared version|No prior baseline/);
   assert.match(homeSource, /onInspectEvidence/);
   assert.match(homeSource, /item\.evidenceIds\[0\]/);
   assert.match(homeSource, /item\.provenance\.evidenceIds\[0\]/);
   assert.match(clientSource, /transport\.evidence\(/);
+});
+
+test("subscriptions use ordinary language and three primary choices", () => {
+  assert.deepEqual(decisionLabels, {
+    KEEP: "Keep",
+    MONITOR: "Review later",
+    DOWNGRADE: "Consider a cheaper plan",
+    CANCEL: "Plan to cancel",
+    INVESTIGATE: "I don’t recognize this",
+  });
+  assert.match(commitmentsSource, /const primaryDecisions = \["KEEP", "CANCEL", "MONITOR"\]/);
+  assert.match(commitmentsSource, /What do you want to do\?/);
+  assert.match(commitmentsSource, /Planning to cancel records your intent; Vognary does not cancel the service\./);
+  assert.match(commitmentsSource, /Why Vognary thinks this/);
+  assert.doesNotMatch(commitmentsSource, />Your decision</);
+  assert.doesNotMatch(commitmentsSource, />Evidence behind this</);
+});
+
+test("Sources makes receipt forwarding primary and keeps manual evidence behind a fallback", () => {
+  assert.ok(recoveryFiles.includes("recovery-sources.tsx"), "Recovery Sources view must exist");
+  const sourcesSource = sourceOf("recovery-sources.tsx");
+  for (const copy of [
+    "Your Vognary receipt address",
+    "Vognary never accesses or scans your inbox",
+    "Create receipt address",
+    "Waiting for a receipt",
+    "Receipt received",
+    "Looking for renewals",
+    "Keep Vognary current",
+    "Rotate address",
+    "Stop receiving",
+    "Manual fallback",
+    "do not use this address in Gmail’s automatic-forwarding setup yet",
+  ]) {
+    assert.ok(sourcesSource.includes(copy), `Sources must render ${copy}`);
+  }
+  assert.match(clientSource, /<RecoverySources/);
+  assert.match(clientSource, /manualFallback=\{/);
+  assert.match(clientSource, /window\.setInterval\(\(\) => void loadSources\(\), 10_000\)/);
+  assert.match(clientSource, /state\.sourceStatus\.kind === "READY" && state\.refreshRequired[\s\S]*void loadSnapshot\(\)/);
+  assert.match(clientSource, /state\.receiptInbox\?\.alias/);
+  assert.match(sourcesSource, /Source update failed/);
+  assert.match(inboundStoreSource, /and \(\$2::uuid is null or alias_id = \$2\)/);
+  assert.doesNotMatch(clientSource, /workspaceEmpty && state\.view === "HOME"/);
 });
 
 test("money is only ever the server's own display string", () => {
@@ -124,18 +172,16 @@ test("dialogs are modal, labelled, trapped, and give focus back", () => {
   assert.match(dialogSource, /restoreTarget\?\.focus\(\)/);
 });
 
-test("deletion is destructive-confirmed and never silently performed by this view", () => {
-  assert.match(clientSource, /DELETE_WORKSPACE_DATA/);
-  assert.match(clientSource, /Type DELETE to confirm/);
-  assert.match(clientSource, /deleteConfirmation !== "DELETE"/);
-  assert.match(clientSource, /Nothing is deleted by this dialog/);
-  assert.match(clientSource, /href="\/profile#delete-account"/);
+test("workspace delegates destructive account controls to the canonical Account route", () => {
+  assert.match(clientSource, /href="\/profile"/);
+  assert.doesNotMatch(clientSource, /DELETE_WORKSPACE_DATA|deleteConfirmation|Type DELETE to confirm/);
 });
 
 test("Recovery delegates export authority to the canonical privacy lifecycle", () => {
-  assert.match(profileSource, /href="\/profile#privacy-export"/);
+  assert.match(accountSectionsSource, /id="privacy-export"/);
+  assert.match(clientSource, /href="\/profile"/);
   assert.doesNotMatch(clientSource, /createObjectURL|new Blob|exportWorkspace/);
-  assert.doesNotMatch(profileSource, /Download this workspace as JSON|already on screen/);
+  assert.doesNotMatch(accountSectionsSource, /Download this workspace as JSON|already on screen/);
 });
 
 test("dates are formatted for reading without shifting a calendar day", () => {

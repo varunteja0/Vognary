@@ -37,12 +37,6 @@ export type ProfilePayload = {
     latestSnapshotAt: string | null;
     latestSummary: Record<string, unknown> | null;
   };
-  integrations: {
-    connectedNow: string[];
-    pending: string[];
-    connectorSummary: Record<string, number>;
-    tokenVault: string;
-  };
   deleteConfirmation: string;
 };
 
@@ -56,17 +50,6 @@ export type ConsentRecord = {
   withdrawnAt: string | null;
   expiresAt: string | null;
   active: boolean;
-};
-
-export type PlatformTokenSummary = {
-  id: string;
-  name: string;
-  tokenPrefix: string;
-  scopes: string[];
-  expiresAt: string;
-  lastUsedAt: string | null;
-  revokedAt: string | null;
-  createdAt: string;
 };
 
 export type RenewalAlertPreference = {
@@ -98,6 +81,6 @@ export type PrivacyRequest = {
   downloadCount: number;
 };
 
-export type ProfileStatusScope = "account" | "notifications" | "privacyConsent" | "privacyData" | "developer" | "danger";
+export type ProfileStatusScope = "account" | "notifications" | "privacyConsent" | "privacyData" | "danger";
 
 export type ProfileStatuses = Record<ProfileStatusScope, string>;

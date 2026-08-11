@@ -18,6 +18,6 @@ export async function GET(request: Request) {
       limit: readRecoveryPageSize(url.searchParams.get("limit"), "limit", 50),
       cursor: url.searchParams.get("cursor") || undefined,
     });
-    return recoverySuccessResponse({ items: result.items, nextCursor: result.nextCursor }, requestId, result.workspaceVersion);
+    return recoverySuccessResponse({ items: result.items, total: result.total, nextCursor: result.nextCursor }, requestId, result.workspaceVersion);
   });
 }

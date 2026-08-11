@@ -178,6 +178,8 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.renewalAlertPreferences.length, 1);
     assert.equal(document.renewalAlertPreferences[0].weeklyDigestEnabled, true);
     assert.ok(document.renewalAlertDeliveries.length >= 1);
+    assert.equal(document.renewalAlertDeliveries[0].recurringItemId, null);
+    assert.equal(document.renewalAlertDeliveries[0].recoveryCommitmentId, document.recovery.commitments[0].id);
     assert.ok(Array.isArray(document.weeklyDigestDeliveries));
     assert.equal(document.apiTokens.length, 1);
     assert.equal(document.apiTokens[0].tokenPrefix, platformToken.summary.tokenPrefix);

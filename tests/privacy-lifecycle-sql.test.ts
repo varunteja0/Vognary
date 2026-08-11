@@ -28,6 +28,10 @@ test("retention predicates preserve manual rows and dead-letter stale verified w
   assert.match(source, /where workspace_id is null and occurred_at < \$1/);
   assert.match(source, /recoveryRawEvidenceMinimized/);
   assert.match(source, /update recovery_sources item\s+set raw_evidence = '\{\}'::jsonb, raw_minimized_at = now\(\)/);
+  assert.match(source, /recoveryInboundEventsDeleted/);
+  assert.match(source, /delete from recovery_inbound_events item using candidates/);
+  assert.match(source, /status in \('PROCESSED', 'IGNORED', 'TERMINAL_FAILED'\)/);
+  assert.doesNotMatch(source, /status in \([^)]*'RECEIVED'[^)]*\)[\s\S]{0,200}delete from recovery_inbound_events/);
 });
 
 test("connector upserts cannot repopulate payloads after minimization", () => {
@@ -89,6 +93,13 @@ test("privacy migration carries bounded policy, coherent request, and allowliste
   const recoveryMigration = read("infra/postgres/migrations/0023_recovery_v1.sql");
   assert.match(recoveryMigration, /recoveryRawEvidenceMinimized/);
   assert.match(recoveryMigration, /recovery_sources_retention_idx/);
+
+  const expansionMigration = read("infra/postgres/migrations/0025_recovery_renewal_alerts.sql");
+  assert.match(expansionMigration, /recoveryInboundEventsDeleted/);
+  assert.match(expansionMigration, /retention_runs_counts_keys_check/);
+  assert.doesNotMatch(read("infra/postgres/migrations/0026_recovery_inbound_retention.sql"), /retention_runs_counts_keys_check/);
+  const schema = read("infra/postgres/schema.sql");
+  assert.match(schema, /recoveryInboundEventsDeleted/);
 });
 
 test("retention cron executes a fixed bounded enforcement batch", () => {

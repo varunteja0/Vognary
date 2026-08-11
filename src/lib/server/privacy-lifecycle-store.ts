@@ -672,7 +672,22 @@ async function buildAccessExport(client: PoolClient, input: {
                evidence_ids as "evidenceIds", detected_at as "detectedAt"
           from recovery_changes where workspace_id = $1
           order by to_version asc, detected_at asc, id asc limit $2
-        ) record) as changes`,
+        ) record) as changes,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, connected_account_id as "connectedAccountId",
+                 receiving_domain as "receivingDomain", status,
+                 replaced_by_id as "replacedById", created_at as "createdAt",
+                 rotated_at as "rotatedAt", revoked_at as "revokedAt"
+          from recovery_inbound_aliases where workspace_id = $1
+          order by created_at asc, id asc limit $2
+        ) record) as inbound_aliases,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, provider, event_type as "eventType", status,
+                 error_code as "errorCode", received_at as "receivedAt",
+                 processed_at as "processedAt"
+          from recovery_inbound_events where workspace_id = $1
+          order by received_at asc, id asc limit $2
+        ) record) as inbound_events`,
       [input.workspaceId, exportRowLimits.recoveryRecords + 1],
     ),
     query<{
@@ -721,7 +736,8 @@ async function buildAccessExport(client: PoolClient, input: {
       user_id: string;
       preference_id: string;
       consent_grant_id: string;
-      recurring_item_id: string;
+      recurring_item_id: string | null;
+      recovery_commitment_id: string | null;
       alert_window: string;
       renewal_date: Date | string;
       scheduled_for: Date;
@@ -734,7 +750,8 @@ async function buildAccessExport(client: PoolClient, input: {
       created_at: Date;
       updated_at: Date;
     }>(
-      `select id, user_id, preference_id, consent_grant_id, recurring_item_id,
+            `select id, user_id, preference_id, consent_grant_id, recurring_item_id,
+              recovery_commitment_id,
               alert_window, renewal_date, scheduled_for, status, attempt_count,
               next_attempt_at, sent_at, last_error_code, last_error_at,
               created_at, updated_at
@@ -1160,6 +1177,8 @@ async function buildAccessExport(client: PoolClient, input: {
     recovery.corrections,
     recovery.decisions,
     recovery.changes,
+    recovery.inbound_aliases,
+    recovery.inbound_events,
   ]) {
     assertWithinExportLimit("recoveryRecords", records.length);
   }
@@ -1296,6 +1315,8 @@ async function buildAccessExport(client: PoolClient, input: {
       corrections: recovery.corrections,
       decisions: recovery.decisions,
       changes: recovery.changes,
+      inboundAliases: recovery.inbound_aliases,
+      inboundEvents: recovery.inbound_events,
     },
     productEvents: productEventResult.rows.map((row) => ({
       id: row.id,
@@ -1327,6 +1348,7 @@ async function buildAccessExport(client: PoolClient, input: {
       preferenceId: row.preference_id,
       consentGrantId: row.consent_grant_id,
       recurringItemId: row.recurring_item_id,
+      recoveryCommitmentId: row.recovery_commitment_id,
       alertWindow: row.alert_window,
       renewalDate: toDateOnly(row.renewal_date),
       scheduledFor: row.scheduled_for.toISOString(),
@@ -1865,6 +1887,8 @@ type RecoveryExportRow = {
   corrections: Array<Record<string, unknown>>;
   decisions: Array<Record<string, unknown>>;
   changes: Array<Record<string, unknown>>;
+  inbound_aliases: Array<Record<string, unknown>>;
+  inbound_events: Array<Record<string, unknown>>;
 };
 
 type ConsentExportRow = {

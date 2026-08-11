@@ -1,18 +1,7 @@
-import { NextResponse } from "next/server";
-import { connectors, getConnectorSummary, getConnectorSyncSummary } from "@/lib/connectors";
-import { listConnectorAdapters } from "@/lib/connectors/adapter-registry";
-import { buildConnectorHonestyMap, buildConnectorReadiness } from "@/lib/connector-runtime";
+import { legacyConnectorRetiredResponse } from "@/lib/legacy-connector-retirement";
 
 export const dynamic = "force-dynamic";
 
 export function GET() {
-  return NextResponse.json({
-    status: "ok",
-    summary: getConnectorSummary(),
-    syncSummary: getConnectorSyncSummary(),
-    readiness: buildConnectorReadiness(),
-    honesty: buildConnectorHonestyMap(),
-    adapters: listConnectorAdapters(),
-    connectors,
-  });
+  return legacyConnectorRetiredResponse();
 }

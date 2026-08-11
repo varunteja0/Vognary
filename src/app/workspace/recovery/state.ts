@@ -9,6 +9,7 @@ import type {
   EvidenceSubmissionDto,
   HomeProjectionDto,
   RecoveryError,
+  ReceiptInboxStatusDto,
   RecoverySessionResponse,
   SourceType,
 } from "@/lib/recovery/contracts";
@@ -20,14 +21,13 @@ import type { FailureOrigin, ResponseMeta, TransportFailure } from "./transport"
 // (draft input, selection, dialogs, focus, pending mutation, rollback metadata).
 // It never derives recurrence, totals, confidence, ordering, or exposure.
 
-export const recoveryViews = ["HOME", "COMMITMENTS", "ADD_EVIDENCE", "PROFILE"] as const;
+export const recoveryViews = ["HOME", "COMMITMENTS", "ADD_EVIDENCE"] as const;
 export type RecoveryView = (typeof recoveryViews)[number];
 
 export const recoveryViewLabels: Record<RecoveryView, string> = {
   HOME: "Home",
-  COMMITMENTS: "Commitments",
-  ADD_EVIDENCE: "Add evidence",
-  PROFILE: "Profile",
+  COMMITMENTS: "Subscriptions",
+  ADD_EVIDENCE: "Sources",
 };
 
 export type RecoveryFailure = { error: RecoveryError; origin: FailureOrigin };
@@ -66,8 +66,7 @@ export type CorrectionDraft = {
 
 export type RecoveryDialog =
   | { kind: "EVIDENCE_INSPECTOR"; commitmentId: string; evidenceId: string }
-  | { kind: "CORRECTION"; commitmentId: string; field: CorrectionField }
-  | { kind: "DELETE_WORKSPACE_DATA" };
+  | { kind: "CORRECTION"; commitmentId: string; field: CorrectionField };
 
 export type PendingMutation =
   | { kind: "EVIDENCE"; idempotencyKey: string }
@@ -83,6 +82,9 @@ export type RecoveryState = {
   session: RecoverySessionResponse | null;
   status: LoadState;
   detailStatus: LoadState;
+  sourceStatus: LoadState;
+  receiptInbox: ReceiptInboxStatusDto | null;
+  pendingSourceAction: "PROVISION" | "ROTATE" | "REVOKE" | null;
   workspaceVersion: number | null;
   requestId: string | null;
   home: HomeProjectionDto | null;
@@ -128,6 +130,9 @@ export const initialRecoveryState: RecoveryState = {
   session: null,
   status: { kind: "LOADING" },
   detailStatus: { kind: "IDLE" },
+  sourceStatus: { kind: "IDLE" },
+  receiptInbox: null,
+  pendingSourceAction: null,
   workspaceVersion: null,
   requestId: null,
   home: null,
@@ -162,6 +167,12 @@ export type RecoveryAction =
   | { type: "DETAIL_EVIDENCE_PAGE_REQUESTED"; cursor: string | null }
   | { type: "DETAIL_LOADED"; detail: CommitmentDetailDto; meta: ResponseMeta }
   | { type: "DETAIL_FAILED"; failure: TransportFailure }
+  | { type: "SOURCES_REQUESTED" }
+  | { type: "SOURCES_LOADED"; receiptInbox: ReceiptInboxStatusDto; meta: ResponseMeta }
+  | { type: "SOURCES_FAILED"; failure: TransportFailure }
+  | { type: "SOURCE_ACTION_STARTED"; action: "PROVISION" | "ROTATE" | "REVOKE" }
+  | { type: "SOURCE_ACTION_SAVED"; receiptInbox: ReceiptInboxStatusDto; meta: ResponseMeta }
+  | { type: "SOURCE_ACTION_FAILED"; failure: TransportFailure }
   | { type: "DIALOG_OPENED"; dialog: RecoveryDialog; returnFocusId: string | null }
   | { type: "DIALOG_CLOSED" }
   | { type: "EVIDENCE_MODE_SELECTED"; mode: SourceType }
@@ -335,6 +346,68 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
       return {
         ...state,
         detailStatus: authRequired(action.failure) ? { kind: "AUTH_REQUIRED" } : { kind: "FAILED", failure: asFailure(action.failure) },
+        announcement: action.failure.error.message,
+      };
+
+    case "SOURCES_REQUESTED":
+      return {
+        ...state,
+        sourceStatus: state.receiptInbox ? state.sourceStatus : { kind: "LOADING" },
+      };
+
+    case "SOURCES_LOADED":
+      {
+      const versionChanged = state.workspaceVersion !== null && action.meta.workspaceVersion !== state.workspaceVersion;
+      return {
+        ...state,
+        sourceStatus: { kind: "READY" },
+        receiptInbox: action.receiptInbox,
+        refreshRequired: state.refreshRequired || versionChanged,
+        announcement: versionChanged
+          ? "A receipt changed the saved workspace. Refreshing Home now."
+          : "Source status loaded.",
+      };
+      }
+
+    case "SOURCES_FAILED":
+      return authRequired(action.failure) ? {
+        ...state,
+        status: { kind: "AUTH_REQUIRED" },
+        sourceStatus: { kind: "AUTH_REQUIRED" },
+        announcement: action.failure.error.message,
+      } : {
+        ...state,
+        sourceStatus: { kind: "FAILED", failure: asFailure(action.failure) },
+        announcement: action.failure.error.message,
+      };
+
+    case "SOURCE_ACTION_STARTED":
+      return {
+        ...state,
+        pendingSourceAction: action.action,
+        announcement: `${action.action === "PROVISION" ? "Creating" : action.action === "ROTATE" ? "Rotating" : "Stopping"} receipt address…`,
+      };
+
+    case "SOURCE_ACTION_SAVED":
+      return {
+        ...state,
+        sourceStatus: { kind: "READY" },
+        receiptInbox: action.receiptInbox,
+        pendingSourceAction: null,
+        announcement: "Receipt source updated.",
+      };
+
+    case "SOURCE_ACTION_FAILED":
+      return authRequired(action.failure) ? {
+        ...state,
+        status: { kind: "AUTH_REQUIRED" },
+        sourceStatus: { kind: "AUTH_REQUIRED" },
+        pendingSourceAction: null,
+        announcement: action.failure.error.message,
+      } : {
+        ...state,
+        sourceStatus: { kind: "FAILED", failure: asFailure(action.failure) },
+        pendingSourceAction: null,
         announcement: action.failure.error.message,
       };
 

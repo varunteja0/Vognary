@@ -17,6 +17,7 @@ import {
   type LogoutResponse,
   type PrepareImportResponse,
   type PutDecisionRequest,
+  type ReceiptInboxStatusDto,
   type RecoveryError,
   type RecoveryMutationHeaders,
   type RecoverySessionResponse,
@@ -169,6 +170,24 @@ export function createRecoveryTransport(fetchImpl?: FetchLike) {
         doFetch,
         withQuery(recoveryEndpoints.commitment(commitmentId).path, { evidenceLimit: query.evidenceLimit, evidenceCursor: query.evidenceCursor }),
       ),
+
+    sources: () => call<ReceiptInboxStatusDto>(doFetch, recoveryEndpoints.sources.path),
+
+    provisionReceiptInbox: () =>
+      call<ReceiptInboxStatusDto>(doFetch, recoveryEndpoints.receiptInbox.path, {
+        method: recoveryEndpoints.receiptInbox.method,
+      }),
+
+    rotateReceiptInbox: (aliasId: string, idempotencyKey: string) =>
+      call<ReceiptInboxStatusDto>(doFetch, recoveryEndpoints.rotateReceiptInbox.path, {
+        method: recoveryEndpoints.rotateReceiptInbox.method,
+        headers: { "Idempotency-Key": idempotencyKey, "If-Match": `"${aliasId}"` },
+      }),
+
+    revokeReceiptInbox: () =>
+      call<ReceiptInboxStatusDto>(doFetch, recoveryEndpoints.revokeReceiptInbox.path, {
+        method: recoveryEndpoints.revokeReceiptInbox.method,
+      }),
 
     submitEvidence: (request: EvidenceIngestRequest, context: MutationContext) =>
       call<{ submission: EvidenceSubmissionDto; home: HomeProjectionDto; commitments: readonly CommitmentSummaryDto[]; commitmentTotal: number }>(

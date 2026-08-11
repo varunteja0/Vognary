@@ -142,6 +142,43 @@ test("successful payloads are returned exactly as published, without reshaping",
   assert.deepEqual(result.meta, { requestId: "request-4", workspaceVersion: 4 });
 });
 
+test("receipt inbox transport uses exact source paths and preserves server state", async () => {
+  const receiptInbox = {
+    state: "WAITING",
+    alias: {
+      id: "11111111-1111-4111-8111-111111111111",
+      status: "ACTIVE",
+      address: "rcpt_example@receipts.vognary.test",
+      createdAt: "2026-08-10T10:00:00.000Z",
+      rotatedAt: null,
+      revokedAt: null,
+    },
+    lastReceivedAt: null,
+    lastProcessedAt: null,
+    lastFailureCode: null,
+  };
+  const { calls, fetchImpl } = recorder(() => json({ data: receiptInbox, meta: { requestId: "request-source", workspaceVersion: 4 } }));
+  const transport = createRecoveryTransport(fetchImpl);
+
+  const read = await transport.sources();
+  const provision = await transport.provisionReceiptInbox();
+  const rotate = await transport.rotateReceiptInbox("11111111-1111-4111-8111-111111111111", "rotate-source-1234");
+  const revoke = await transport.revokeReceiptInbox();
+
+  assert.deepEqual(calls.map((call) => [call.path, call.init?.method ?? "GET"]), [
+    ["/api/workspaces/current/sources", "GET"],
+    ["/api/workspaces/current/sources/receipt-inbox", "POST"],
+    ["/api/workspaces/current/sources/receipt-inbox/rotate", "POST"],
+    ["/api/workspaces/current/sources/receipt-inbox", "DELETE"],
+  ]);
+  assert.equal(calls[2].init?.headers && (calls[2].init.headers as Record<string, string>)["If-Match"], '"11111111-1111-4111-8111-111111111111"');
+  assert.equal(calls[2].init?.headers && (calls[2].init.headers as Record<string, string>)["Idempotency-Key"], "rotate-source-1234");
+  for (const result of [read, provision, rotate, revoke]) {
+    assert.equal(result.ok, true);
+    if (result.ok) assert.deepEqual(result.data, receiptInbox);
+  }
+});
+
 test("session and file preparation use their unwrapped contract responses", async () => {
   const sessionPayload = { authenticated: true, configuration: { status: "ready", cookieName: "vognary_session" }, session: { userId: "user-1", email: "founder@example.com", workspaceId: "workspace-1", expiresAt: "2026-08-16T10:00:00.000Z" } };
   const session = await createRecoveryTransport(recorder(() => json(sessionPayload)).fetchImpl).session();

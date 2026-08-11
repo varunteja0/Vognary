@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import LoginClient from "./login-client";
 
 export const metadata: Metadata = {
-  title: "Start Recurring Audit",
-  description: "Start a Vognary proof-backed recurring-money audit workspace.",
+  title: "Sign in",
+  description: "Sign in to your saved Vognary workspace with Google.",
   robots: { index: false, follow: false },
 };
 

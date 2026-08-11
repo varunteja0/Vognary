@@ -6,6 +6,9 @@ import { CorrectionHistory, EvidenceRow } from "./recovery-evidence-panels";
 import { ConfidenceBadge, ConfidenceDetail, FailureBlock, LoadingBlock, MoneyValue, StateBlock } from "./recovery-states";
 import { displayedDecision, type PendingMutation, type RecoveryState } from "./state";
 
+const primaryDecisions = ["KEEP", "CANCEL", "MONITOR"] as const satisfies readonly Decision[];
+const secondaryDecisions = ["DOWNGRADE", "INVESTIGATE"] as const satisfies readonly Decision[];
+
 export type CommitmentsHandlers = {
   onSelect: (commitmentId: string | null) => void;
   onDecide: (commitment: CommitmentSummaryDto, decision: Decision) => void;
@@ -26,19 +29,19 @@ export function RecoveryCommitments({ state, handlers }: { state: RecoveryState;
     return (
       <StateBlock
         eyebrow="Nothing saved yet"
-        title="No commitments are saved in this workspace"
-        detail="Vognary only shows what your own evidence proves. Paste one receipt and the first commitment appears here."
+        title="No subscriptions yet"
+        detail="Add a software receipt and Vognary will show a subscription only when the receipt supports it."
       >
-        <button type="button" onClick={handlers.onAddEvidence} className="btn btn-primary">Paste a receipt</button>
+        <button type="button" onClick={handlers.onAddEvidence} className="btn btn-primary">Add receipts</button>
       </StateBlock>
     );
   }
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] lg:items-start">
-      <section aria-label="Saved commitments" className={`panel p-3 sm:p-4 ${selected ? "hidden lg:block" : "block"}`}>
+      <section aria-label="Subscriptions" className={`panel p-3 sm:p-4 ${selected ? "hidden lg:block" : "block"}`}>
         <div className="flex items-baseline justify-between gap-2 px-1">
-          <h3 className="folio" data-folio="05">Commitments</h3>
+          <h3 className="folio" data-folio="05">Subscriptions</h3>
           <span className="font-data text-xs text-(--muted)">{state.commitments.length} shown</span>
         </div>
         <ul className="mt-3 grid gap-2">
@@ -58,7 +61,7 @@ export function RecoveryCommitments({ state, handlers }: { state: RecoveryState;
                 <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-data text-xs text-(--muted)">
                   <span>{cadenceLabels[commitment.cadence]}</span>
                   <span>{commitment.nextExpectedDate ? formatDay(commitment.nextExpectedDate) : "No date published"}</span>
-                  <span>{commitment.evidenceCount} evidence</span>
+                  <span>{commitment.evidenceCount} receipt{commitment.evidenceCount === 1 ? "" : "s"}</span>
                 </span>
                 <span className="mt-2 flex flex-wrap items-center gap-2">
                   <span className={decisionStamps[commitment.decision?.value ?? commitment.recommendedDecision]}>
@@ -88,8 +91,8 @@ export function RecoveryCommitments({ state, handlers }: { state: RecoveryState;
         ) : (
           <StateBlock
             eyebrow="Nothing selected"
-            title="Choose a commitment to see its evidence"
-            detail="Every amount, date, and cadence in this workspace can be traced to the exact text you submitted."
+            title="Choose a subscription to see why it appears"
+            detail="Every amount, date, and frequency can be traced to a receipt or source you provided."
           />
         )}
       </div>
@@ -139,9 +142,9 @@ function CommitmentDetailPanel({ state, handlers }: { state: RecoveryState; hand
         </div>
 
         <dl className="mt-4 grid gap-3 sm:grid-cols-3">
-          <DetailFact label="Cadence" value={cadenceLabels[detail.cadence]} />
-          <DetailFact label="Next expected" value={detail.nextExpectedDate ? formatDay(detail.nextExpectedDate) : "Not published"} />
-          <DetailFact label="Monthly equivalent" value={detail.monthlyEquivalent.display} note={`Published by the workspace in ${detail.monthlyEquivalent.currency}`} />
+          <DetailFact label="Frequency" value={cadenceLabels[detail.cadence]} />
+          <DetailFact label="Expected next charge" value={detail.nextExpectedDate ? formatDay(detail.nextExpectedDate) : "Not enough information"} />
+          <DetailFact label="Estimated monthly cost" value={detail.monthlyEquivalent.display} note={detail.monthlyEquivalent.currency} />
         </dl>
 
         <div className="mt-4 inset p-4">
@@ -155,13 +158,13 @@ function CommitmentDetailPanel({ state, handlers }: { state: RecoveryState; hand
       </section>
 
       <section aria-labelledby="recovery-decision-heading" className="panel p-4 sm:p-5">
-        <h4 id="recovery-decision-heading" className="folio" data-folio="06">Your decision</h4>
+        <h4 id="recovery-decision-heading" className="font-display text-xl font-semibold text-(--ink)">What do you want to do?</h4>
         <p className="mt-3 text-sm leading-6 text-(--ink-soft)">
-          The workspace suggests <strong>{decisionLabels[detail.recommendedDecision]}</strong>. {detail.recommendationReason}
+          Vognary suggests <strong>{decisionLabels[detail.recommendedDecision]}</strong>. {detail.recommendationReason}
         </p>
-        <p className="mt-1 text-xs leading-5 text-(--muted)">A suggestion is never applied for you. Nothing is recorded until you choose.</p>
-        <div role="group" aria-label="Decision" className="mt-4 flex flex-wrap gap-2">
-          {decisions.map((decision) => {
+        <p className="mt-1 text-xs leading-5 text-(--muted)">Nothing changes until you choose.</p>
+        <div role="group" aria-label="Your choice" className="mt-4 flex flex-wrap gap-2">
+          {primaryDecisions.map((decision) => {
             const active = shown.value === decision;
             return (
               <button
@@ -179,21 +182,44 @@ function CommitmentDetailPanel({ state, handlers }: { state: RecoveryState; hand
             );
           })}
         </div>
+        <details className="mt-3">
+          <summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">More choices</summary>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {secondaryDecisions.map((decision) => {
+              const active = shown.value === decision;
+              return (
+                <button
+                  key={decision}
+                  type="button"
+                  aria-pressed={active}
+                  aria-describedby={`recovery-decision-meaning-${decision}`}
+                  disabled={state.pending !== null}
+                  onClick={() => handlers.onDecide(detail, decision)}
+                  className={`btn btn-sm ${active ? "btn-primary" : "btn-ghost"}`}
+                >
+                  {decisionLabels[decision]}
+                  {active && decisionPending ? " · saving…" : ""}
+                </button>
+              );
+            })}
+          </div>
+        </details>
         <ul className="sr-only">
           {decisions.map((decision) => (
             <li key={decision} id={`recovery-decision-meaning-${decision}`}>{decisionMeanings[decision]}</li>
           ))}
         </ul>
+        <p className="mt-3 text-xs leading-5 text-(--muted)">Planning to cancel records your intent; Vognary does not cancel the service.</p>
         <p className="mt-3 font-data text-xs text-(--muted)">
           {detail.decision
-            ? `Recorded ${decisionLabels[detail.decision.value]} on ${formatMoment(detail.decision.decidedAt)} · last updated ${formatMoment(detail.decision.updatedAt)}.`
-            : "No decision has been recorded for this commitment yet."}
+            ? `Saved ${decisionLabels[detail.decision.value]} on ${formatMoment(detail.decision.decidedAt)} · last updated ${formatMoment(detail.decision.updatedAt)}.`
+            : "No choice has been saved for this subscription yet."}
         </p>
       </section>
 
       <section aria-labelledby="recovery-evidence-heading" className="panel p-4 sm:p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h4 id="recovery-evidence-heading" className="folio" data-folio="07">Evidence behind this</h4>
+          <h4 id="recovery-evidence-heading" className="font-display text-xl font-semibold text-(--ink)">Why Vognary thinks this</h4>
           <span className="font-data text-xs text-(--muted)">
             Showing {detail.evidence.items.length} of {detail.evidence.total}
           </span>

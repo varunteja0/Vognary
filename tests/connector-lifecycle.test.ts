@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -8,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { POST as receiveConnectorWebhook } from "../src/app/api/connectors/[id]/webhook/route";
 import { ConnectorReauthorizationRequiredError } from "../src/lib/connector-errors";
 import { revokeConnectorCredentialAtProviderWithDependencies } from "../src/lib/connector-provider-revocation";
+import { legacyConnectorRetirementPayload } from "../src/lib/legacy-connector-retirement";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 
@@ -97,38 +97,13 @@ test("API-key disconnects explicitly require provider-side rotation", async () =
   assert.match(outcome.message, /revoke or rotate/i);
 });
 
-test("signed connector webhooks fail closed when durable storage is unavailable", async () => {
-  const previousDatabaseUrl = process.env.DATABASE_URL;
-  const previousSecret = process.env.CONNECTOR_WEBHOOK_SECRET_OPENAI_COSTS;
-  const secret = "connector-webhook-test-secret";
-  const rawBody = JSON.stringify({ id: "evt_test", type: "cost.updated" });
-  process.env.CONNECTOR_WEBHOOK_SECRET_OPENAI_COSTS = secret;
-  delete process.env.DATABASE_URL;
+test("legacy connector webhooks are retired before signature or storage handling", async () => {
+  const response = await receiveConnectorWebhook(new Request("https://vognary.test/api/connectors/openai-costs/webhook", {
+    method: "POST",
+  }), { params: Promise.resolve({ id: "openai-costs" }) });
 
-  try {
-    const signature = createHmac("sha256", secret).update(rawBody).digest("hex");
-    const response = await receiveConnectorWebhook(new Request("https://vognary.test/api/connectors/openai-costs/webhook", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-vognary-signature": signature,
-      },
-      body: rawBody,
-    }), { params: Promise.resolve({ id: "openai-costs" }) });
-
-    assert.equal(response.status, 501);
-    assert.deepEqual(await response.json(), {
-      status: "not-configured",
-      connectorId: "openai-costs",
-      requiredEnv: ["DATABASE_URL"],
-      message: "Durable webhook storage is not configured. The event was not accepted.",
-    });
-  } finally {
-    if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
-    else process.env.DATABASE_URL = previousDatabaseUrl;
-    if (previousSecret === undefined) delete process.env.CONNECTOR_WEBHOOK_SECRET_OPENAI_COSTS;
-    else process.env.CONNECTOR_WEBHOOK_SECRET_OPENAI_COSTS = previousSecret;
-  }
+  assert.equal(response.status, 410);
+  assert.deepEqual(await response.json(), legacyConnectorRetirementPayload);
 });
 
 test("sync and disconnect SQL enforce terminal lifecycle states and erase local token material", () => {
@@ -145,10 +120,10 @@ test("sync and disconnect SQL enforce terminal lifecycle states and erase local 
   assert.match(accountStore, /where connected_account_id = \$1\n\s+and status in \('queued', 'running', 'failed', 'paused'\)/);
 });
 
-test("scheduled sync uses the shared timing-safe cron guard", () => {
+test("scheduled legacy sync is retired before cron authentication", () => {
   const route = source("src/app/api/internal/sync-jobs/due/run/route.ts");
-  assert.match(route, /import \{ requireCronSecret, requireInternalSecret \} from "@\/lib\/server\/internal-auth"/);
-  assert.doesNotMatch(route, /function requireCronSecret\(/);
+  assert.match(route, /legacyConnectorRetiredResponse/);
+  assert.doesNotMatch(route, /requireCronSecret|runConnectorSyncJob|listDueConnectorSyncJobs/);
 });
 
 test("disconnect preserves request-origin authorization and revokes provider before local state", () => {
@@ -167,8 +142,8 @@ test("disconnect preserves request-origin authorization and revokes provider bef
   assert.match(runner, /status: "needs_reauth" as const/);
 
   const manualSyncRoute = source("src/app/api/workspaces/current/connectors/[accountId]/sync/route.ts");
-  assert.match(manualSyncRoute, /account\.status === "needs_reauth"/);
-  assert.match(manualSyncRoute, /status: 409/);
+  assert.match(manualSyncRoute, /legacyConnectorRetiredResponse/);
+  assert.doesNotMatch(manualSyncRoute, /runConnectorSyncJob|createConnectorSyncJob/);
 });
 
 test("account deletion attempts provider revocation before deleting owned workspace data", () => {

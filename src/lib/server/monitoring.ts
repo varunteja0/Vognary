@@ -263,7 +263,7 @@ export function sanitizeMonitoringValue(value: unknown, depth = 0): unknown {
   if (Array.isArray(value)) return value.slice(0, 25).map((entry) => sanitizeMonitoringValue(entry, depth + 1));
   if (typeof value !== "object") return String(value);
 
-  const blockedKeys = /(?:authorization|cookie|token|secret|password|passcode|code|state|email|phone|account|card|payload|body|query|search)/i;
+  const blockedKeys = /(?:authorization|cookie|token|secret|password|passcode|code|state|email|phone|account|card|payload|body|query|search|alias|recipient|subject|message|attachment|svix)/i;
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
       .filter(([key]) => !blockedKeys.test(key))
@@ -277,6 +277,7 @@ export function redactMonitoringText(value: string) {
     .replace(/\b(?:postgres(?:ql)?|redis|https?):\/\/[^\s]+/gi, "[REDACTED_URL]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, "Bearer [REDACTED]")
     .replace(/\b(?:sk|rk|pk|sess|token)[-_][A-Za-z0-9_-]{12,}\b/gi, "[REDACTED_SECRET]")
+    .replace(/\brcpt_[a-f0-9]{40}\b/gi, "[REDACTED_RECEIPT_ALIAS]")
     .replace(/\b[A-Fa-f0-9]{40,}\b/g, "[REDACTED_SECRET]")
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[REDACTED_EMAIL]")
     .replace(/([?&](?:token|code|state|key|secret|email)=)[^&#\s]*/gi, "$1[REDACTED]");

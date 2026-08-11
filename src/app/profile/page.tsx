@@ -8,13 +8,13 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Account Settings",
-  description: "Manage your Vognary account, notifications, privacy, developer access, and deletion controls.",
+  description: "Manage your Vognary account, notifications, privacy, and deletion controls.",
   robots: { index: false, follow: false },
 };
 
 export default async function ProfilePage() {
   const session = await readRequestSession();
-  if (!session) redirect("/login");
+  if (!session) redirect("/login?next=/profile");
 
   return <ProfileClient />;
 }

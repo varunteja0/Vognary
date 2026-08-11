@@ -26,7 +26,7 @@ type GoogleStartPayload = {
 type Tone = "info" | "error" | "success";
 type Banner = { tone: Tone; text: string } | null;
 
-const trustPoints = ["No bank passwords", "Read-only identity", "Encrypted workspace state", "Delete anytime"];
+const trustPoints = ["No bank passwords", "Google for sign-in only", "Saved workspace", "Export or delete your data"];
 const isDevEnv = process.env.NODE_ENV !== "production";
 
 type LoginClientProps = {
@@ -39,16 +39,16 @@ function isValidEmail(value: string) {
 }
 
 function safeNextPath(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return "/app#connect";
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return "/app";
   try {
     const decoded = decodeURIComponent(raw);
-    if (decoded.startsWith("//") || decoded.includes("\\") || /[\u0000-\u001f\u007f]/.test(decoded)) return "/app#connect";
+    if (decoded.startsWith("//") || decoded.includes("\\") || /[\u0000-\u001f\u007f]/.test(decoded)) return "/app";
     const base = new URL("https://vognary.invalid/");
-    if (new URL(raw, base).origin !== base.origin) return "/app#connect";
+    if (new URL(raw, base).origin !== base.origin) return "/app";
   } catch {
-    return "/app#connect";
+    return "/app";
   }
-  if (raw === "/login" || raw.startsWith("/login?") || raw.startsWith("/login/")) return "/app#connect";
+  if (raw === "/login" || raw.startsWith("/login?") || raw.startsWith("/login/")) return "/app";
   return raw;
 }
 
@@ -160,7 +160,7 @@ export default function LoginClient({ initialGoogleReason, initialNextPath }: Lo
   const googleButton = (
     <button disabled={googleSubmitting} type="button" onClick={startGoogleSignIn} className="btn btn-google btn-block">
       <GoogleGlyph />
-      {googleSubmitting ? "Opening Google…" : guestAuditWaiting ? "Save this audit with Google" : "Save and sync with Google"}
+      {googleSubmitting ? "Opening Google…" : "Continue with Google"}
     </button>
   );
 
@@ -172,16 +172,13 @@ export default function LoginClient({ initialGoogleReason, initialNextPath }: Lo
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Home</Link>
-            <Link href="/private-audit" className="btn btn-sm btn-ghost">Private audit</Link>
-          </div>
+          <Link href="/" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Home</Link>
         </nav>
 
         <section className="panel p-6 sm:p-8 rise">
           <span className="folio" data-folio="01">Sign in</span>
-          <h1 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">Start recurring-money audit</h1>
-          <p className="mt-2 text-sm leading-6 text-(--muted)">Google creates your workspace session. Gmail receipt proof is connected separately inside the app.</p>
+          <h1 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">Sign in to Vognary</h1>
+          <p className="mt-2 text-sm leading-6 text-(--muted)">Use Google to create your saved workspace.</p>
 
           {loadingSession ? (
             <LoadingState />
@@ -199,36 +196,16 @@ export default function LoginClient({ initialGoogleReason, initialNextPath }: Lo
             <div className="mt-5 grid gap-5">
               <div className="rounded-xl border border-line bg-(--card-2) p-5">
                 {guestAuditWaiting ? (
-                  <>
-                    <p className="eyebrow eyebrow-xs">Your audit is waiting</p>
+                  <div className="mb-4 border-b border-line pb-4">
+                    <p className="eyebrow eyebrow-xs">Your receipts are waiting</p>
                     <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
-                      The tab you came from still holds the receipts you pasted. Sign in with Google to save that audit into a workspace you can
-                      reopen later on any device.
+                      Sign in to save the receipts staged in this tab. They stay here until Vognary confirms the save.
                     </p>
-                    <div className="mt-4">{googleButton}</div>
-                    <Notice banner={googleStatus} />
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      <Link href="/app" className="btn btn-ghost btn-lg">Keep working without saving</Link>
-                      <Link href="/private-audit" className="btn btn-ghost btn-lg">Request private audit</Link>
-                    </div>
-                    <p className="mt-3 text-xs leading-5 text-(--muted)">Your pasted evidence stays in the original tab until an encrypted save succeeds.</p>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="pill pill-ready">Recommended</span>
-                      <span className="text-sm font-medium text-(--ink-soft)">Fastest and most secure</span>
-                    </div>
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                      <Link href="/app" className="btn btn-primary btn-lg">Continue privately</Link>
-                      <Link href="/private-audit" className="btn btn-ghost btn-lg">Request private audit</Link>
-                    </div>
-                    <div className="mt-3">{googleButton}</div>
-                    <p className="mt-3 text-xs leading-5 text-(--muted)">Browser-only mode lets you see the ledger before trusting Vognary with real evidence. Google creates a workspace when OAuth is configured.</p>
-                    <Notice banner={googleStatus} />
-                  </>
-                )}
-                <Link href="/#product-ledger" className="btn btn-ghost btn-block mt-3">See product output</Link>
+                  </div>
+                ) : null}
+                {googleButton}
+                <p className="mt-3 text-xs leading-5 text-(--muted)">Google is only for sign-in. Vognary does not access Gmail.</p>
+                <Notice banner={googleStatus} />
               </div>
 
               {isDevEnv ? <details className="rounded-xl border border-line bg-(--card-2) p-4">

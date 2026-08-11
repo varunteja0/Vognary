@@ -13,8 +13,14 @@ export const cadences = [
 ] as const;
 export type Cadence = (typeof cadences)[number];
 
-export const sourceTypes = ["RECEIPT_PASTE", "CSV_IMPORT"] as const;
+export const sourceTypes = ["RECEIPT_PASTE", "CSV_IMPORT", "FORWARDED_EMAIL"] as const;
 export type SourceType = (typeof sourceTypes)[number];
+
+export const receiptInboxAliasStates = ["ACTIVE", "ROTATED", "REVOKED"] as const;
+export type ReceiptInboxAliasState = (typeof receiptInboxAliasStates)[number];
+
+export const receiptInboxUpdateStates = ["NOT_PROVISIONED", "WAITING", "RECEIVED", "PROCESSING", "READY", "FAILED", "REVOKED"] as const;
+export type ReceiptInboxUpdateState = (typeof receiptInboxUpdateStates)[number];
 
 export const commitmentStatuses = ["ACTIVE", "NOT_RECURRING"] as const;
 export type CommitmentStatus = (typeof commitmentStatuses)[number];
@@ -37,7 +43,7 @@ export type AttentionReason = (typeof attentionReasons)[number];
 export const coverageStates = ["NO_EVIDENCE", "BASELINE_ONLY", "PARTIAL", "CURRENT", "STALE"] as const;
 export type CoverageState = (typeof coverageStates)[number];
 
-export const evidenceProvenanceKinds = ["USER_SUBMITTED"] as const;
+export const evidenceProvenanceKinds = ["USER_SUBMITTED", "PROVIDER_RECEIVED"] as const;
 export type EvidenceProvenanceKind = (typeof evidenceProvenanceKinds)[number];
 
 export const recoveryErrorCodes = [
@@ -53,6 +59,7 @@ export const recoveryErrorCodes = [
   "SAVE_FAILED",
   "REQUEST_TOO_LARGE",
   "UNSUPPORTED_MEDIA_TYPE",
+  "FEATURE_UNAVAILABLE",
   "RATE_LIMITED",
   "UNKNOWN",
 ] as const;
@@ -82,6 +89,7 @@ export const recoveryErrorStatusByCode = {
   SAVE_FAILED: 502,
   REQUEST_TOO_LARGE: 413,
   UNSUPPORTED_MEDIA_TYPE: 415,
+  FEATURE_UNAVAILABLE: 503,
   RATE_LIMITED: 429,
   UNKNOWN: 500,
 } as const satisfies Record<RecoveryErrorCode, number>;
@@ -307,6 +315,23 @@ export type RecoveryCutoverStatus = {
   };
 };
 
+export type ReceiptInboxAliasDto = {
+  id: string;
+  status: ReceiptInboxAliasState;
+  address: string;
+  createdAt: string;
+  rotatedAt: string | null;
+  revokedAt: string | null;
+};
+
+export type ReceiptInboxStatusDto = {
+  state: ReceiptInboxUpdateState;
+  alias: ReceiptInboxAliasDto | null;
+  lastReceivedAt: string | null;
+  lastProcessedAt: string | null;
+  lastFailureCode: string | null;
+};
+
 export type EvidenceIngestRequest =
   | {
       kind: "RECEIPT_PASTE";
@@ -316,6 +341,11 @@ export type EvidenceIngestRequest =
       kind: "CSV_IMPORT";
       sources: readonly { clientRef: string; name: string; text: string }[];
     };
+
+export type ForwardedEmailMaterializationRequest = {
+  kind: "FORWARDED_EMAIL";
+  receipts: readonly { clientRef: string; text: string }[];
+};
 
 export type PreparedImportSourceDto = {
   name: string;
@@ -444,6 +474,11 @@ export type RecoveryMutationHeaders = {
   "If-Match": WorkspaceVersionTag;
 };
 
+export type ReceiptInboxRotationHeaders = {
+  "Idempotency-Key": string;
+  "If-Match": string;
+};
+
 export type RecoveryEndpointContracts = {
   guestAudit: { ownership: "LEGACY_PATH_ONLY"; request: never; response: never; headers: never };
   prepareImport: { ownership: "RECOVERY_V1"; request: FormData; response: PrepareImportResponse | ApiFailure; headers: never };
@@ -459,6 +494,10 @@ export type RecoveryEndpointContracts = {
   reverseCorrection: { ownership: "RECOVERY_V1"; request: never; response: ReverseCorrectionResponse | ApiFailure; headers: RecoveryMutationHeaders };
   decisions: { ownership: "RECOVERY_V1"; request: never; response: ListDecisionsResponse | ApiFailure; headers: never };
   decision: { ownership: "RECOVERY_V1"; request: PutDecisionRequest; response: PutDecisionResponse | ApiFailure; headers: RecoveryMutationHeaders };
+  sources: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<ReceiptInboxStatusDto> | ApiFailure; headers: never };
+  receiptInbox: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<ReceiptInboxStatusDto> | ApiFailure; headers: never };
+  rotateReceiptInbox: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<ReceiptInboxStatusDto> | ApiFailure; headers: ReceiptInboxRotationHeaders };
+  revokeReceiptInbox: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<ReceiptInboxStatusDto> | ApiFailure; headers: never };
 };
 
 const encodePathSegment = (value: string) => encodeURIComponent(value);
@@ -490,4 +529,8 @@ export const recoveryEndpoints = {
   }),
   decisions: { method: "GET", path: "/api/workspaces/current/decisions" },
   decision: { method: "PUT", path: "/api/workspaces/current/decisions" },
+  sources: { method: "GET", path: "/api/workspaces/current/sources" },
+  receiptInbox: { method: "POST", path: "/api/workspaces/current/sources/receipt-inbox" },
+  rotateReceiptInbox: { method: "POST", path: "/api/workspaces/current/sources/receipt-inbox/rotate" },
+  revokeReceiptInbox: { method: "DELETE", path: "/api/workspaces/current/sources/receipt-inbox" },
 } as const;

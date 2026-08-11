@@ -29,19 +29,16 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.vognary.com"),
   applicationName: "Vognary",
   title: {
-    default: "Vognary - Review recurring payments",
+    default: "Vognary - Know what’s renewing before you pay",
     template: "%s - Vognary",
   },
   description:
-    "Vognary helps you find subscriptions, mandates, and recurring charges, review the proof, and decide what to keep, change, or cancel.",
+    "Vognary helps solo founders review software renewals from submitted evidence and decide what needs attention.",
   keywords: [
-    "recurring payments",
-    "subscription audit",
-    "recurring money",
-    "mandates",
-    "UPI AutoPay",
-    "cancel subscriptions",
-    "spend audit",
+    "software renewals",
+    "subscription receipts",
+    "SaaS renewals",
+    "renewal reminders",
     "Vognary",
   ],
   authors: [{ name: "Vognary" }],
@@ -62,15 +59,15 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "Vognary",
     url: "/",
-    title: "Vognary - Review recurring payments",
+    title: "Vognary - Know what’s renewing before you pay",
     description:
-      "Find subscriptions and mandates, review the proof, and decide what to keep, change, or cancel.",
+      "Vognary helps solo founders review software renewals from submitted evidence and decide what needs attention.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vognary - Review recurring payments",
+    title: "Vognary - Know what’s renewing before you pay",
     description:
-      "Find subscriptions and mandates, review the proof, and decide what to keep, change, or cancel.",
+      "Vognary helps solo founders review software renewals from submitted evidence and decide what needs attention.",
   },
 };
 

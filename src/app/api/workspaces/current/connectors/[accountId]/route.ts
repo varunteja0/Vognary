@@ -1,5 +1,6 @@
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { isDatabaseConfigured } from "@/lib/server/database";
+import { revokeReceiptInbox } from "@/lib/server/recovery-inbound-store";
 import {
   getWorkspaceConnectedAccount,
   revokeWorkspaceConnectedAccount,
@@ -39,6 +40,18 @@ export async function DELETE(request: Request, context: ConnectorAccountRouteCon
 
   const account = await getWorkspaceConnectedAccount(session.workspaceId, accountId);
   if (!account) return Response.json({ error: "Connected account not found." }, { status: 404 });
+  if (account.connectorId === "receipt-inbox") {
+    const receiptInbox = await revokeReceiptInbox({
+      workspaceId: session.workspaceId,
+      actorUserId: session.userId,
+    });
+    return Response.json({
+      status: "revoked",
+      localCredentialsDeleted: true,
+      source: "receipt-inbox",
+      receiptInbox,
+    }, { headers: { "cache-control": "private, no-store" } });
+  }
 
   let providerRevocation: ProviderRevocationOutcome;
   try {

@@ -10,8 +10,28 @@ import {
 } from "@/lib/renewal-alerts";
 import { recordConsentGrant } from "@/lib/server/consent-store";
 import { getDatabasePool } from "@/lib/server/database";
+import { toMoneyDto } from "@/lib/recovery/domain";
+import type { MoneyDto } from "@/lib/recovery/contracts";
 
 const maxDeliveryAttempts = 5;
+
+const weeklyDigestItemsSql = `
+  select
+    commitment.workspace_id,
+    commitment.id,
+    commitment.identity_key,
+    commitment.effective_merchant as merchant,
+    commitment.base_currency::text as currency,
+    commitment.effective_amount_minor as amount_minor,
+    commitment.effective_monthly_minor as monthly_minor,
+    commitment.effective_next_expected_date as next_expected_date,
+    commitment.confidence_score,
+    decision.decision as user_decision
+  from recovery_commitments commitment
+  left join recovery_decisions decision
+    on decision.workspace_id = commitment.workspace_id
+   and decision.commitment_id = commitment.id
+  where commitment.effective_status = 'ACTIVE'`;
 
 type PreferenceRow = {
   id: string;
@@ -43,12 +63,10 @@ export type ClaimedWeeklyDigest = {
   deliveryId: string;
   email: string;
   weekStart: string;
-  monthlyBurn: number;
-  currency: string;
-  foreignMonthlyTotals: Record<string, number>;
+  monthlyTotals: readonly MoneyDto[];
   renewalCountNext7Days: number;
-  renewalTotalNext7Days: number;
-  suggestion: null | { merchant: string; monthlyCost: number };
+  renewalTotalsNext7Days: readonly MoneyDto[];
+  suggestion: null | { merchant: string; monthlyCost: MoneyDto };
 };
 
 export async function getRenewalAlertPreference(input: { workspaceId: string; userId: string }) {
@@ -182,11 +200,11 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
          p.user_id,
          p.id as preference_id,
          p.consent_grant_id,
-         ri.id as recurring_item_id,
+         commitment.id as recovery_commitment_id,
          reminder.alert_window,
-         ri.next_expected_date as renewal_date,
+         commitment.effective_next_expected_date as renewal_date,
          (
-           (ri.next_expected_date - reminder.lead_days)::timestamp
+           (commitment.effective_next_expected_date - reminder.lead_days)::timestamp
            + make_interval(hours => p.send_hour_local)
          ) at time zone p.time_zone as scheduled_for
        from renewal_alert_preferences p
@@ -196,7 +214,14 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
         and consent.withdrawn_at is null
         and (consent.expires_at is null or consent.expires_at > now())
        join pg_timezone_names time_zone on time_zone.name = p.time_zone
-       join recurring_items ri on ri.workspace_id = p.workspace_id
+         join recovery_commitments commitment
+           on commitment.workspace_id = p.workspace_id
+          and commitment.effective_status = 'ACTIVE'
+          and commitment.effective_next_expected_date is not null
+          and commitment.confidence_score >= 80
+         left join recovery_decisions decision
+           on decision.workspace_id = commitment.workspace_id
+          and decision.commitment_id = commitment.id
        cross join lateral (values
          ('7_day', 7, p.seven_day_enabled),
          ('1_day', 1, p.one_day_enabled)
@@ -204,7 +229,7 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
        where p.workspace_id = $1
          and p.enabled
          and reminder.enabled
-         and ri.next_expected_date is not null
+         and decision.decision is distinct from 'KEEP'
      ), eligible as (
        select * from candidates where scheduled_for > now()
      )
@@ -214,6 +239,7 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
        preference_id,
        consent_grant_id,
        recurring_item_id,
+      recovery_commitment_id,
        alert_window,
        renewal_date,
        scheduled_for,
@@ -224,13 +250,15 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
        user_id,
        preference_id,
        consent_grant_id,
-       recurring_item_id,
+      null,
+      recovery_commitment_id,
        alert_window,
        renewal_date,
        scheduled_for,
        scheduled_for
      from eligible
-     on conflict (preference_id, recurring_item_id, alert_window, renewal_date)
+     on conflict (preference_id, recovery_commitment_id, alert_window, renewal_date)
+       where recovery_commitment_id is not null
      do update set
        consent_grant_id = excluded.consent_grant_id,
        scheduled_for = excluded.scheduled_for,
@@ -278,8 +306,10 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
          locked_by = null,
          updated_at = now()
      where delivery.workspace_id = $1
-       and delivery.status in ('scheduled', 'failed')
-       and not exists (
+       and delivery.status in ('scheduled', 'failed', 'sending')
+       and (
+         delivery.recurring_item_id is not null
+         or not exists (
          select 1
          from renewal_alert_preferences preference
          join consent_grants consent
@@ -288,17 +318,25 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
           and consent.purpose = 'renewal-alerts'
           and consent.withdrawn_at is null
           and (consent.expires_at is null or consent.expires_at > now())
-         join recurring_items item
-           on item.id = delivery.recurring_item_id
-          and item.workspace_id = preference.workspace_id
-          and item.next_expected_date = delivery.renewal_date
+         join recovery_commitments recovery
+           on recovery.id = delivery.recovery_commitment_id
+          and recovery.workspace_id = preference.workspace_id
+          and recovery.effective_status = 'ACTIVE'
+          and recovery.effective_next_expected_date = delivery.renewal_date
+         left join recovery_decisions decision
+           on decision.workspace_id = recovery.workspace_id
+          and decision.commitment_id = recovery.id
          where preference.id = delivery.preference_id
            and preference.enabled
+           and delivery.recovery_commitment_id is not null
+           and recovery.confidence_score >= 80
+           and decision.decision is distinct from 'KEEP'
            and case delivery.alert_window
              when '7_day' then preference.seven_day_enabled
              when '1_day' then preference.one_day_enabled
              else false
            end
+         )
        )`,
     [workspaceId],
   );
@@ -309,7 +347,7 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
 export async function scheduleDueWeeklyDigests(client?: PoolClient) {
   const queryable = client ?? getDatabasePool();
   const scheduled = await queryable.query<{ id: string }>(
-    `with local_preferences as (
+    `with digest_items as (${weeklyDigestItemsSql}), local_preferences as (
        select
          preference.*,
          (now() at time zone preference.time_zone) as local_now,
@@ -328,7 +366,7 @@ export async function scheduleDueWeeklyDigests(client?: PoolClient) {
          (preference.week_start::timestamp + make_interval(hours => preference.send_hour_local)) at time zone preference.time_zone as scheduled_for
        from local_preferences preference
        where extract(isodow from preference.local_now) = 1
-         and exists (select 1 from recurring_items item where item.workspace_id = preference.workspace_id)
+         and exists (select 1 from digest_items item where item.workspace_id = preference.workspace_id)
      )
      insert into weekly_digest_deliveries (
        workspace_id,
@@ -358,7 +396,8 @@ export async function scheduleDueWeeklyDigests(client?: PoolClient) {
 async function cancelIneligibleWeeklyDigests(workspaceId?: string, client?: PoolClient) {
   const queryable = client ?? getDatabasePool();
   const result = await queryable.query(
-    `update weekly_digest_deliveries delivery
+    `with digest_items as (${weeklyDigestItemsSql})
+     update weekly_digest_deliveries delivery
      set status = 'cancelled',
          next_attempt_at = null,
          locked_at = null,
@@ -377,6 +416,7 @@ async function cancelIneligibleWeeklyDigests(workspaceId?: string, client?: Pool
           and (consent.expires_at is null or consent.expires_at > now())
          where preference.id = delivery.preference_id
            and preference.weekly_digest_enabled
+           and exists (select 1 from digest_items item where item.workspace_id = delivery.workspace_id)
        )`,
     [workspaceId ?? null],
   );
@@ -388,14 +428,14 @@ export async function claimDueWeeklyDigests(input: { limit: number; workerId: st
     delivery_id: string;
     email: string;
     week_start: string;
-    monthly_burn: string;
-    foreign_monthly_totals: Record<string, number> | null;
+    monthly_totals: Array<{ currency: string; minor: string }> | null;
     renewal_count: string;
-    renewal_total: string;
+    renewal_totals: Array<{ currency: string; minor: string }> | null;
     suggestion_merchant: string | null;
     suggestion_monthly_cost: string | null;
+    suggestion_currency: string | null;
   }>(
-    `with due as (
+    `with digest_items as (${weeklyDigestItemsSql}), due as (
        select delivery.id
        from weekly_digest_deliveries delivery
        join renewal_alert_preferences preference
@@ -409,7 +449,7 @@ export async function claimDueWeeklyDigests(input: { limit: number; workerId: st
         and (consent.expires_at is null or consent.expires_at > now())
        join users recipient on recipient.id = delivery.user_id and recipient.deleted_at is null
        where delivery.attempt_count < $2
-         and exists (select 1 from recurring_items item where item.workspace_id = delivery.workspace_id)
+         and exists (select 1 from digest_items item where item.workspace_id = delivery.workspace_id)
          and (
            (delivery.status = 'scheduled' and delivery.scheduled_for <= now())
            or (delivery.status = 'failed' and delivery.next_attempt_at is not null and delivery.next_attempt_at <= now())
@@ -434,45 +474,49 @@ export async function claimDueWeeklyDigests(input: { limit: number; workerId: st
        claimed.id as delivery_id,
        recipient.email,
        claimed.week_start::text,
-       totals.monthly_burn::text,
-       totals.foreign_monthly_totals,
+      totals.monthly_totals,
        totals.renewal_count::text,
-       totals.renewal_total::text,
+      totals.renewal_totals,
        suggestion.merchant as suggestion_merchant,
-       suggestion.monthly_cost::text as suggestion_monthly_cost
+      suggestion.monthly_minor::text as suggestion_monthly_cost,
+      suggestion.currency as suggestion_currency
      from claimed
      join users recipient on recipient.id = claimed.user_id and recipient.deleted_at is null
      join lateral (
        select
-         coalesce(sum(item.monthly_cost) filter (where item.currency = 'INR'), 0) as monthly_burn,
          coalesce((
-           select jsonb_object_agg(foreign_totals.currency, foreign_totals.monthly_total)
+           select jsonb_agg(jsonb_build_object('currency', monthly.currency, 'minor', monthly.minor) order by monthly.currency)
            from (
-             select item_by_currency.currency, sum(item_by_currency.monthly_cost) as monthly_total
-             from recurring_items item_by_currency
+             select item_by_currency.currency, sum(item_by_currency.monthly_minor)::text as minor
+             from digest_items item_by_currency
              where item_by_currency.workspace_id = claimed.workspace_id
-               and item_by_currency.currency <> 'INR'
              group by item_by_currency.currency
-           ) foreign_totals
-         ), '{}'::jsonb) as foreign_monthly_totals,
-         count(*) filter (
-           where item.next_expected_date >= claimed.week_start
-             and item.next_expected_date < claimed.week_start + 7
-         ) as renewal_count,
-         coalesce(sum(item.average_amount) filter (
-           where item.currency = 'INR'
-             and item.next_expected_date >= claimed.week_start
-             and item.next_expected_date < claimed.week_start + 7
-         ), 0) as renewal_total
-       from recurring_items item
-       where item.workspace_id = claimed.workspace_id
+           ) monthly
+         ), '[]'::jsonb) as monthly_totals,
+         (select count(*) from digest_items item
+          where item.workspace_id = claimed.workspace_id
+            and item.next_expected_date >= claimed.week_start
+            and item.next_expected_date < claimed.week_start + 7) as renewal_count,
+         coalesce((
+           select jsonb_agg(jsonb_build_object('currency', renewal.currency, 'minor', renewal.minor) order by renewal.currency)
+           from (
+             select item_by_currency.currency, sum(item_by_currency.amount_minor)::text as minor
+             from digest_items item_by_currency
+             where item_by_currency.workspace_id = claimed.workspace_id
+               and item_by_currency.next_expected_date >= claimed.week_start
+               and item_by_currency.next_expected_date < claimed.week_start + 7
+             group by item_by_currency.currency
+           ) renewal
+         ), '[]'::jsonb) as renewal_totals
      ) totals on true
      left join lateral (
-       select item.merchant, item.monthly_cost
-       from recurring_items item
+       select item.merchant, item.monthly_minor, item.currency
+       from digest_items item
        where item.workspace_id = claimed.workspace_id
          and item.currency = 'INR'
-       order by item.monthly_cost desc, item.normalized_merchant, item.id
+         and item.confidence_score >= 80
+         and item.user_decision is distinct from 'KEEP'
+      order by item.monthly_minor desc, item.identity_key, item.id
        limit 1
      ) suggestion on true`,
     [Math.max(1, Math.min(input.limit, 25)), maxDeliveryAttempts, input.workerId, input.invocation],
@@ -482,13 +526,11 @@ export async function claimDueWeeklyDigests(input: { limit: number; workerId: st
     deliveryId: row.delivery_id,
     email: row.email,
     weekStart: row.week_start,
-    monthlyBurn: Number(row.monthly_burn),
-    currency: "INR",
-    foreignMonthlyTotals: Object.fromEntries(Object.entries(row.foreign_monthly_totals ?? {}).map(([currency, total]) => [currency, Number(total)])),
+    monthlyTotals: (row.monthly_totals ?? []).map((total) => toMoneyDto(total.minor, total.currency)),
     renewalCountNext7Days: Number(row.renewal_count),
-    renewalTotalNext7Days: Number(row.renewal_total),
-    suggestion: row.suggestion_merchant && row.suggestion_monthly_cost !== null
-      ? { merchant: row.suggestion_merchant, monthlyCost: Number(row.suggestion_monthly_cost) }
+    renewalTotalsNext7Days: (row.renewal_totals ?? []).map((total) => toMoneyDto(total.minor, total.currency)),
+    suggestion: row.suggestion_merchant && row.suggestion_monthly_cost !== null && row.suggestion_currency
+      ? { merchant: row.suggestion_merchant, monthlyCost: toMoneyDto(row.suggestion_monthly_cost, row.suggestion_currency) }
       : null,
   }));
 }
@@ -516,11 +558,18 @@ export async function claimDueRenewalAlerts(input: { limit: number; workerId: st
        join users recipient
          on recipient.id = delivery.user_id
         and recipient.deleted_at is null
-       join recurring_items item
-         on item.id = delivery.recurring_item_id
-        and item.workspace_id = delivery.workspace_id
-        and item.next_expected_date = delivery.renewal_date
+       join recovery_commitments recovery
+         on recovery.id = delivery.recovery_commitment_id
+        and recovery.workspace_id = delivery.workspace_id
+        and recovery.effective_status = 'ACTIVE'
+        and recovery.effective_next_expected_date = delivery.renewal_date
+        and recovery.confidence_score >= 80
+       left join recovery_decisions decision
+         on decision.workspace_id = recovery.workspace_id
+        and decision.commitment_id = recovery.id
        where delivery.attempt_count < $2
+         and delivery.recurring_item_id is null
+         and decision.decision is distinct from 'KEEP'
          and case delivery.alert_window
            when '7_day' then preference.seven_day_enabled
            when '1_day' then preference.one_day_enabled
@@ -544,17 +593,18 @@ export async function claimDueRenewalAlerts(input: { limit: number; workerId: st
            updated_at = now()
        from due
        where delivery.id = due.id
-       returning delivery.id, delivery.user_id, delivery.recurring_item_id, delivery.renewal_date, delivery.alert_window
+      returning delivery.id, delivery.user_id, delivery.recurring_item_id,
+           delivery.recovery_commitment_id, delivery.renewal_date, delivery.alert_window
      )
      select
        claimed.id as delivery_id,
        recipient.email,
-       item.merchant,
+      recovery.effective_merchant as merchant,
        claimed.renewal_date::text,
        claimed.alert_window
      from claimed
-     join users recipient on recipient.id = claimed.user_id and recipient.deleted_at is null
-     join recurring_items item on item.id = claimed.recurring_item_id`,
+    join users recipient on recipient.id = claimed.user_id and recipient.deleted_at is null
+    join recovery_commitments recovery on recovery.id = claimed.recovery_commitment_id`,
     [Math.max(1, Math.min(input.limit, 25)), maxDeliveryAttempts, input.workerId, input.invocation],
   );
 
@@ -582,12 +632,20 @@ export async function isRenewalAlertStillDeliverable(deliveryId: string, workerI
         and consent.withdrawn_at is null
         and (consent.expires_at is null or consent.expires_at > now())
        join users recipient on recipient.id = delivery.user_id and recipient.deleted_at is null
-       join recurring_items item
-         on item.id = delivery.recurring_item_id
-        and item.next_expected_date = delivery.renewal_date
+       join recovery_commitments recovery
+         on recovery.id = delivery.recovery_commitment_id
+        and recovery.workspace_id = delivery.workspace_id
+        and recovery.effective_status = 'ACTIVE'
+        and recovery.effective_next_expected_date = delivery.renewal_date
+        and recovery.confidence_score >= 80
+       left join recovery_decisions decision
+         on decision.workspace_id = recovery.workspace_id
+        and decision.commitment_id = recovery.id
        where delivery.id = $1
          and delivery.status = 'sending'
          and delivery.locked_by = $2
+         and delivery.recurring_item_id is null
+         and decision.decision is distinct from 'KEEP'
          and case delivery.alert_window
            when '7_day' then preference.seven_day_enabled
            when '1_day' then preference.one_day_enabled
@@ -664,7 +722,8 @@ export async function markRenewalAlertFailed(input: {
 
 export async function isWeeklyDigestStillDeliverable(deliveryId: string, workerId: string) {
   const result = await getDatabasePool().query<{ active: boolean }>(
-    `select exists (
+    `with digest_items as (${weeklyDigestItemsSql})
+     select exists (
        select 1
        from weekly_digest_deliveries delivery
        join renewal_alert_preferences preference
@@ -680,7 +739,7 @@ export async function isWeeklyDigestStillDeliverable(deliveryId: string, workerI
        where delivery.id = $1
          and delivery.status = 'sending'
          and delivery.locked_by = $2
-         and exists (select 1 from recurring_items item where item.workspace_id = delivery.workspace_id)
+         and exists (select 1 from digest_items item where item.workspace_id = delivery.workspace_id)
      ) as active`,
     [deliveryId, workerId],
   );

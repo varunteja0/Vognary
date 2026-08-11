@@ -1,757 +1,181 @@
-# Vognary Production Activation Runbook
+# Vognary Production Activation
 
-Use this runbook to turn the current deployed product into a fully activated production system. The code is ready for these gates, but each gate needs external accounts, credentials, or partner approval.
+This runbook activates the Recovery receipt-forwarding product. Direct Gmail reading, Account Aggregator, API-key connectors, environment sync previews, and generic connector webhooks are retired for this launch and must return `410 Gone`.
 
-## Stage Gates
+Times in this runbook use IST.
 
-Run this after every setup change:
+## Phase 0: Stop Conditions
 
-```bash
-npm run production:check -- https://www.vognary.com
-```
+Do not show the forwarding-first landing or set any receipt-inbox operator flag unless all earlier phases pass.
 
-The command loads `.env.production.local` when it exists. `/api/readiness` is intentionally internal-only: keep its guard in place and set the operator-only `PRODUCTION_INTERNAL_SYNC_SECRET` to the deployed `INTERNAL_SYNC_SECRET`. A `401` is configuration drift between the operator copy and the deployed secret, not a reason to make readiness public.
+Stop immediately when any of these is true:
 
-Run strict mode only when you expect every external service to be configured:
+- PostgreSQL migrations through `0026_recovery_inbound_retention` are not applied.
+- A signed Resend event cannot produce one canonical Recovery submission.
+- Replaying that event creates another submission, source, evidence row, or commitment.
+- A raw provider address, alias token, message subject, body, or attachment appears in logs or privacy export.
+- Terminal inbound metadata cannot be deleted while its canonical Recovery submission remains.
+- Account deletion cannot revoke the receipt address and remove Vognary-held workspace rows.
+- Any legacy connector setup, sync, or webhook route returns something other than `410`.
 
-```bash
-npm run production:check -- https://www.vognary.com --strict
-```
+Rollback means setting `ENABLE_RECEIPT_INBOX=false`, clearing the four operator evidence flags, redeploying, and confirming the landing says receipt forwarding is unavailable. Do not delete provider or database state during rollback.
 
-Stop if endpoint health fails. Continue if only external activation is incomplete.
+## Phase 1: Runtime And Database
 
-Before a release candidate, preview the complete non-mutating gate plan with `npm run release:gate -- --plan https://www.vognary.com`. The real gate additionally requires a disposable `RELEASE_DATABASE_URL`, `RELEASE_CONFIRM_DISPOSABLE=true`, and the two `VOGNARY_E2E_DEV_LOGIN_*` values. It rejects the same normalized database identity even when credentials/query parameters differ, clears only disposable rate-limit buckets before browser tests, shadows production provider credentials with blank values in local child processes (including keys found in Next-loaded env files), writes browser evidence under ignored `output/release-evidence/`, and runs the audit/PDF load budget only against its loopback production-build server. `npm run load:gate` itself permanently rejects non-loopback targets.
-
-## 1. Persist Private Audit Leads
-
-Goal: `/private-audit` and `/api/audit-intake` should store leads instead of returning preview-only responses.
-
-Recommended fastest path: Tally or Make/Zapier webhook into Google Sheets.
-
-Click-by-click using Make:
-
-1. Open `https://www.make.com/`.
-2. Click `Create a new scenario`.
-3. Click the large plus button.
-4. Search for `Webhooks`.
-5. Select `Custom webhook`.
-6. Click `Add`.
-7. Name it `Vognary private audit intake`.
-8. Copy the generated webhook URL.
-9. Open Vercel Dashboard.
-10. Select the `Vognary` project.
-11. Click `Settings`.
-12. Click `Environment Variables`.
-13. Add key `AUDIT_INTAKE_WEBHOOK_URL`.
-14. Paste the Make webhook URL as the value.
-15. Select `Production`.
-16. Click `Save`.
-17. Redeploy production.
-18. Visit `https://www.vognary.com/private-audit`.
-19. Submit a test request with your own email.
-20. Verify the Make scenario receives a webhook event.
-21. Add a Google Sheets module in Make and map fields: name, email, persona, paymentTypes, sourceTypes, score, createdAt.
-
-Success check:
+1. Select Node `22.22.2` or a later `22.x` version allowed by `package.json`.
+2. Keep `ENABLE_RECEIPT_INBOX=false` and all four receipt-inbox operator evidence flags blank.
+3. Configure `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `SESSION_SECRET`, `INTERNAL_SYNC_SECRET`, and `CRON_SECRET` in the production deployment.
+4. Before deploying the candidate, apply only the additive Recovery inbox and reminder migrations. They are compatible with the old deployment and provide the columns the candidate uses:
 
 ```bash
-npm run production:check -- https://www.vognary.com
+DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema -- --through=0025_recovery_renewal_alerts
 ```
 
-Expected: `Lead persistence` becomes `READY`.
-
-Rollback:
-
-- Remove `AUDIT_INTAKE_WEBHOOK_URL` from Vercel if the webhook is leaking or failing.
-- The site will fall back to preview mode and still produce a backup brief.
-
-## 2. Tracked Razorpay Billing
-
-Goal: a durably stored private-audit lead can create one tracked INR 999 assisted-audit checkout, and fulfillment exists only after a signed settlement webhook.
-
-Static `PAYMENT_LINK_*` URLs and legacy monitoring plans are not exposed in Vognary 1.0.
-
-1. Complete Razorpay business/KYC activation and create keys for the intended mode. Follow Razorpay's current official key instructions: `https://razorpay.com/docs/payments/dashboard/settings/api-keys/`.
-2. Apply migrations through `0022_weekly_digest` to the production database.
-3. Obtain qualified legal review of Terms and Privacy. Only after approval, configure `ASSISTED_AUDIT_LEGAL_TERMS_STATUS=approved` with `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, a live-mode `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET`. The INR 999 amount is server-owned.
-4. In Razorpay, configure `https://www.vognary.com/api/billing/webhooks/razorpay` as the webhook URL using the same independently generated webhook secret. Follow the current official webhook instructions: `https://razorpay.com/docs/webhooks/setup-edit-payments/`.
-5. Subscribe the webhook to `payment_link.paid`, `payment_link.cancelled`, `payment_link.expired`, and `refund.processed`.
-6. Redeploy production.
-7. Submit a disposable private-audit lead and start the `assisted-audit` checkout from `/private-audit` after accepting current terms.
-8. Confirm checkout creation returns `status: "ready"`, the server-owned amount/offer/terms versions, settlement tracking, and a Razorpay URL.
-9. Complete the test payment, verify the signed webhook changed the checkout to `paid`, and verify exactly one `assisted_audit_orders` row and zero workspace entitlements for that checkout.
-10. Replay same/fresh event IDs, process duplicate/partial/full/out-of-order refunds, and run `npm run billing:reconcile -- --report-only`; require exit code 0 and zero findings. Attach the outputs, then set the five `RAZORPAY_*_STATUS` attestations listed in the billing runbook and redeploy.
-11. Follow the complete proof and rollback conditions in `docs/billing-activation-runbook.md`.
-
-Success check:
+5. Verify `schema_migrations` ends at `0025_recovery_renewal_alerts`; do not continue if `0026` is already present unexpectedly.
+6. Deploy the exact candidate SHA. `vercel-build` intentionally compiles without mutating production schema.
+7. Verify the deployed SHA returns `410` for connector setup/sync/webhook routes, action-case routes, the legacy sync worker, and the legacy savings-verification worker. Verify the deployed cron configuration contains neither retired worker path.
+8. Record the deployment time in IST. Wait at least five minutes after the last old sync, reminder, or savings-verification invocation finishes. Stop if an old invocation is still running or a new legacy invocation starts.
+9. From a trusted operator terminal, apply the remaining contract migration:
 
 ```bash
-npm run production:check -- https://www.vognary.com --strict
+DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
 ```
 
-Expected: `Tracked Razorpay billing` becomes `READY` only after the assisted-audit probe reports `ready` and the readiness API reports `settlement-observed` from a real order.
+10. Query `schema_migrations` and verify the last row is `0026_recovery_inbound_retention`.
+11. Verify PostgreSQL contains `connector_sync_jobs_recovery_cutover_guard`, `connector_evidence_running_job_guard`, and `renewal_alert_deliveries_recovery_cutover_guard`. Require zero connector jobs in `queued`, `running`, `failed`, or `paused`, zero connector runs in `running`, and zero legacy renewal deliveries in `scheduled`, `sending`, or `failed`.
+12. Run the fresh and staged upgrade migration tests against disposable PostgreSQL 16. The upgrade test must prove `0024`/`0025` leave old work operational before deployment and `0026` later rejects a new legacy job, reminder, and connector-evidence write.
 
-Stop conditions:
+Expected success:
 
-- Do not announce paid access from a browser redirect or a static payment URL.
-- Stop on missing legal approval, webhook signature failures, reconciliation mismatches, duplicate orders, duplicate payment/refund application, or a refund that does not update checkout/order state.
+- `/api/readiness` reports `capabilities.schema.status = ready`.
+- `capabilities.schema.applied` contains `0024_recovery_inbound_receipts`, `0025_recovery_renewal_alerts`, and `0026_recovery_inbound_retention`.
+- `capabilities.recoveryV1.status = schema-ready-clean-cutover`.
 
-## 3. Gmail OAuth For User-Owned Gmail Receipt Sync
+Stop before `0026` if the retired SHA is not live or old workers have not drained. Keep forwarding disabled and stop activation if checksums differ, the additive phase does not stop exactly at `0025`, any cutover trigger is absent, a nonterminal legacy row remains, a fresh database fails, or an upgrade loses legacy rows.
 
-Important: users can authorize their own Gmail, but Vognary must still own a Google OAuth app. That is not hardcoding your data; it is the app identity Google requires before users can consent.
+## Phase 2: Google Identity Only
 
-Click-by-click:
+Configure the dedicated Google OIDC identity path with `GOOGLE_AUTH_CLIENT_ID` and `GOOGLE_AUTH_CLIENT_SECRET`.
 
-1. Open `https://console.cloud.google.com/`.
-2. Click the project selector at the top.
-3. Click `New Project`.
-4. Name it `Vognary Production`.
-5. Click `Create`.
-6. Open the project.
-7. Search `Gmail API` in the top search bar.
-8. Open `Gmail API`.
-9. Click `Enable`.
-10. Go to `APIs & Services` > `OAuth consent screen`.
-11. Choose `External`.
-12. Click `Create`.
-13. App name: `Vognary`.
-14. User support email: your support email.
-15. App logo: upload Vognary mark if available.
-16. App domain: `vognary.com`.
-17. Authorized domains: add `vognary.com`.
-18. Developer contact email: your email.
-19. Click `Save and Continue`.
-20. Click `Add or Remove Scopes`.
-21. Add `https://www.googleapis.com/auth/gmail.readonly`.
-22. Save scopes.
-23. Add test users: your Gmail account and early beta users.
-24. Click `Save and Continue` until complete.
-25. Go to `Credentials`.
-26. Click `Create Credentials`.
-27. Select `OAuth client ID`.
-28. Application type: `Web application`.
-29. Name: `Vognary Web`.
-30. Authorized JavaScript origins: `https://www.vognary.com`.
-31. Authorized redirect URIs: `https://www.vognary.com/api/integrations/gmail/callback`.
-32. Click `Create`.
-33. Copy `Client ID` and `Client secret`.
-34. Open Vercel Dashboard > Vognary > Settings > Environment Variables.
-35. Add:
-    - `GOOGLE_CLIENT_ID`
-    - `GOOGLE_CLIENT_SECRET`
-    - `GOOGLE_REDIRECT_URI=https://www.vognary.com/api/integrations/gmail/callback`
-36. Redeploy production.
-37. Visit `https://www.vognary.com`.
-38. Click `Connect Gmail`.
-39. Select a test user Gmail account.
-40. Grant read-only Gmail access.
-41. Confirm Vognary returns receipt candidates or a connected preview response.
+Expected success:
 
-Verification:
+- `/api/auth/google/start?mode=json` returns the identity authorization contract.
+- Login says Google is used only for sign-in and Vognary does not access Gmail.
+- `/api/integrations/gmail/start`, its callback, Account Aggregator, and generic connector routes return `410`.
 
-```bash
-curl 'https://www.vognary.com/api/integrations/gmail/start?mode=json'
-```
+Do not request the Gmail read-only scope. Google identity is not mailbox consent.
 
-Expected before redirect: `status: "ready"` and an `authUrl`.
+## Phase 3: Resend Receiving Configuration
 
-Google verification for public users:
-
-1. Go back to `OAuth consent screen`.
-2. Click `Publish App` or `Submit for verification` if prompted.
-3. Provide app homepage: `https://www.vognary.com`.
-4. Provide privacy policy: `https://www.vognary.com/privacy`.
-5. Provide terms: `https://www.vognary.com/terms`.
-6. Explain scope usage: read-only Gmail is used to discover receipt and renewal snippets for recurring-payment audits; Vognary does not ask for passwords and does not store mailbox contents by default.
-7. Submit verification.
-
-Stop condition:
-
-- Do not invite non-test Gmail users until Google verification is complete.
-
-## 4. Persistent Backend: Database And Secrets
-
-Goal: readiness reports database, token vault, internal sync secret, and session primitives as ready.
-
-Fast path using Neon Postgres:
-
-1. Open `https://console.neon.tech/`.
-2. Click `New Project`.
-3. Name it `vognary-production`.
-4. Select a region close to users, preferably Asia if available.
-5. Click `Create Project`.
-6. Copy the pooled connection string.
-7. Open Vercel Dashboard > Vognary > Settings > Environment Variables.
-8. Add `DATABASE_URL` with the Neon connection string.
-9. Add `POSTGRES_SSL=true`.
-10. Generate token key locally:
-
-```bash
-npm run secrets:generate-token-key
-```
-
-11. Copy only the generated value.
-12. Add `TOKEN_ENCRYPTION_KEY` in Vercel.
-13. Generate session secret:
-
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
-```
-
-14. Add `SESSION_SECRET` in Vercel.
-15. Generate internal sync secret:
-
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
-```
-
-16. Add `INTERNAL_SYNC_SECRET` in Vercel.
-17. Generate cron secret:
-
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
-```
-
-18. Add `CRON_SECRET` in Vercel. Vercel Cron sends this as the `Authorization` header to the connector-sync, renewal-alert, verified-savings, and retention `GET` workers.
-19. Redeploy production.
-20. Apply schema from a trusted terminal with production `DATABASE_URL` set:
-
-```bash
-DATABASE_URL='<production-neon-url>' POSTGRES_SSL=true npm run db:apply-schema
-```
-
-This creates or updates the `schema_migrations` ledger. On a database where the initial schema already exists, the script records `0001_initial_schema` as a baseline before applying later files from `infra/postgres/migrations`.
-
-21. Verify:
-
-```bash
-curl https://www.vognary.com/api/readiness \
-  -H "Authorization: Bearer $INTERNAL_SYNC_SECRET"
-```
-
-Expected:
-
-- `database.status` is `ready`.
-- `tokenVault.status` is `ready`.
-- `hardening.connectorTokenStore` is `ready` or `configured`.
-- `capabilities.schema.status` is `ready`, with every migration from `0002_revocable_sessions` through
-  `0021_pending_connector_consent` in `capabilities.schema.applied`.
-- Each capability status is queryable rather than `migration-pending`, `migration-ledger-unavailable`, or `schema-query-failed`.
-- `hardening.syncWorkers` is `cron-secret-configured-deployment-schedule-unverified` until a cron-invoked successful sync writes evidence. It becomes `operator-attested-production-live` only after that evidence exists and `SYNC_SCHEDULER_STATUS=production-live` is set.
-
-Stop condition:
-
-- If schema apply fails or readiness reports a pending/failed capability query, do not store user credentials or enable the affected
-  automation. Fix the database and rerun the migration command first.
-
-## 4A. Optional Audit-Pack Issuer Signing
-
-Goal: authenticated workspace exports carry a Vognary Ed25519 signature in addition to their offline self-checksum. The signing endpoint receives only checksum and issuance metadata, never the report's merchant, amount, evidence, or notes.
-
-1. Generate an Ed25519 PKCS#8 key in a trusted local environment:
-
-```bash
-openssl genpkey -algorithm ED25519 -out audit-pack-signing-private.pem
-```
-
-2. Add the complete private PEM as `AUDIT_PACK_SIGNING_PRIVATE_KEY` in the production secret store.
-3. Set a stable identifier such as `AUDIT_PACK_SIGNING_KEY_ID=vognary-2026-01`.
-4. Redeploy, then check public-key discovery:
-
-```bash
-curl https://www.vognary.com/api/audit-packs/sign
-```
-
-Expected: `signingAvailable: true` and one current Ed25519 public key. No private material is returned.
-
-5. Sign in, export an audit pack, and verify it at `/verify`. The page must show both `Self-checksum intact` and `Vognary signature valid`.
-6. Before rotating the private key, export the old public key as base64 SPKI and preserve it in `AUDIT_PACK_TRUSTED_PUBLIC_KEYS` as a JSON map from old key id to public key. Historical signatures become `unknown-key` if their public key is removed.
-
-Stop conditions:
-
-- Never place the private key in a `NEXT_PUBLIC_` variable, browser bundle, pack, or public-key response.
-- Do not describe an unsigned pack as Vognary-issued. Its checksum detects edits but can be recreated by anyone.
-- A valid signature proves the signing service issued that hash for an authenticated workspace; it does not certify the accuracy or completeness of the financial claims.
-
-## 5. OpenAI Cost Sync
-
-Goal: first direct provider adapter can sync organization costs.
-
-Click-by-click:
-
-1. Open `https://platform.openai.com/` as the workspace's organization admin.
-2. Create the least-privileged admin/read key that can read organization costs.
-3. Sign in to Vognary as that workspace's owner or admin.
-4. Connect OpenAI through the authenticated connector flow; Vognary stores the key encrypted and scoped to that workspace account.
-5. Test the persisted account:
-
-```bash
-curl -X POST https://www.vognary.com/api/connectors/openai-costs/start \
-  -H 'Content-Type: application/json' \
-  -H 'Cookie: vognary_session=<current-session-cookie>' \
-  -d '{"workspaceId":"<workspace-uuid>","apiKey":"<workspace-openai-admin-key>","displayName":"OpenAI org costs"}'
-```
-
-Expected:
-
-- `status` is `connected`, an encrypted token reference is created, and an initial sync job is queued.
-- Unauthenticated `POST /api/connectors/openai-costs/sync` returns `401`; the environment-preview execution path is unavailable in production.
-
-Token-backed workspace connection test after login:
-
-```bash
-curl -X POST https://www.vognary.com/api/connectors/openai-costs/start \
-  -H 'Content-Type: application/json' \
-  -H 'Cookie: vognary_session=<signed-session-cookie>' \
-  -d '{"workspaceId":"<workspace-uuid>","apiKey":"<WORKSPACE_OPENAI_ADMIN_KEY>","displayName":"OpenAI org costs"}'
-```
-
-Expected: `status: "connected"`, a `connectedAccount.id`, a token `keyFingerprint`, and an `initial_sync` job id. The API key must not appear in the response.
-
-After a connected account exists, verify the user-facing account and evidence surface:
-
-```bash
-curl https://www.vognary.com/api/workspaces/current/connectors \
-  -H 'Cookie: vognary_session=<signed-session-cookie>'
-
-curl -X POST https://www.vognary.com/api/workspaces/current/connectors/<connected-account-id>/sync \
-  -H 'Cookie: vognary_session=<signed-session-cookie>'
-```
-
-Expected: the first response lists the connected account, latest run status, and evidence count. The second response creates a `manual_refresh` job and returns a sync result. The app connection hub should then show `Run now`, `Import evidence`, `Refresh`, and `Disconnect` controls.
-
-Stop condition:
-
-- If OpenAI returns 401/403, rotate the key or use an organization admin key with costs access.
-
-## 5A. Scheduled Connector Sync Worker
-
-Goal: queued connector sync jobs should not sit idle after Gmail or API-key connections are stored.
-
-The repo includes `vercel.json` with a Hobby-compatible daily Vercel Cron job at 05:30 IST (`00:00 UTC`) for `/api/internal/sync-jobs/due/run`. Due jobs can wait until the next daily invocation on this plan.
-
-Activation steps:
-
-1. Confirm `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `INTERNAL_SYNC_SECRET`, and `CRON_SECRET` are set in Vercel.
-2. Redeploy production after adding `CRON_SECRET`.
-3. Run:
-
-```bash
-curl https://www.vognary.com/api/internal/sync-jobs/due/run
-```
-
-Expected without the Vercel cron header: `401` if `CRON_SECRET` is configured, or `501` if it is missing.
-
-4. Manually run due jobs from a trusted terminal when needed:
-
-```bash
-curl -X POST https://www.vognary.com/api/internal/sync-jobs/due/run \
-  -H 'Authorization: Bearer <INTERNAL_SYNC_SECRET>'
-```
-
-Expected with no due jobs: `status: "completed"` and `selectedJobs: 0`.
-
-5. Observe at least two scheduled invocations in the deployed Vercel Cron logs and confirm a due job advances to a terminal sync run
-   without a manual request.
-6. Only after that evidence exists, set `SYNC_SCHEDULER_STATUS=production-live`, redeploy, and confirm
-   `hardening.syncWorkers` becomes `operator-attested-production-live`.
-
-`CRON_SECRET` by itself proves only that the route can authenticate a scheduler. It does not prove the schedule is deployed or firing.
-
-Stop condition:
-
-- Do not claim automatic connected monitoring until at least one stored Gmail or provider account queues a job, the due-job endpoint runs it, and `connector_evidence` receives rows.
-
-## 5B. Consent-Gated Renewal Alert Worker
-
-Goal: users who explicitly opt in receive deduplicated email reminders before canonical renewal dates.
-
-1. Apply PostgreSQL migration `0006_renewal_alerts.sql` with `npm run db:apply-schema`.
-2. Confirm `DATABASE_URL`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`, and `INTERNAL_SYNC_SECRET` are configured.
-3. Keep the `/api/internal/sync-jobs/due/run` cron. The additional `/api/internal/renewal-alerts/due/run` cron runs daily at 09:00 IST (`03:30 UTC`); the two workers serve different queues. On the Hobby plan, delivery can lag a user's configured local send time until this daily invocation.
-4. Explicitly opt a test user in through `PUT /api/renewal-alerts/preferences`. Deployment alone must leave every user disabled.
-5. Sync a source whose canonical `next_expected_date` is more than seven days ahead.
-6. Confirm exactly one `7_day` and one `1_day` delivery row exists for each selected window, then rerun sync and confirm the count does not increase.
-7. Run the worker manually from a trusted terminal:
-
-```bash
-curl -X POST 'https://www.vognary.com/api/internal/renewal-alerts/due/run?limit=10' \
-  -H 'Authorization: Bearer <INTERNAL_SYNC_SECRET>'
-```
-
-The response must contain aggregate selected/sent/failed/cancelled counts only. It must not contain an email, merchant, amount, evidence text, or credential. See `docs/renewal-alerts-runbook.md` for the preference contract, retry behavior, safe operational queries, and rollback.
-
-8. After the opted-in test email arrives and deployed cron logs show scheduled invocation, set
-   `RENEWAL_ALERT_DELIVERY_STATUS=production-live`, redeploy, and confirm `hardening.renewalAlerts` becomes
-   `operator-attested-production-live`. Readiness rejects that attestation when no sent delivery is recorded.
-
-Stop condition:
-
-- Do not advertise renewal email alerts until one explicitly opted-in test user receives a reminder, repeat scheduling remains idempotent, opt-out cancels unsent rows, and cron failures are monitored.
-
-## 5C. Permissioned Verified-Savings Concierge
-
-Goal: an eligible customer can authorize exactly one cancel or downgrade action, see every state transition, and receive a saving receipt only after the system proves the changed debit across the required same-source windows.
-
-1. Apply migrations `0019_verified_outcome_loop` and `0020_authorization_evidence`; verify both checksums in `schema_migrations`.
-2. Obtain qualified approval for the exact authorization, success-fee terms, dispute process, operator playbook, and privacy treatment. Do not infer approval from completed code.
-3. Only after those reviews, set all three production gates exactly:
+Use a dedicated receiving subdomain and a least-privilege receiving API key. Configure:
 
 ```text
-CONCIERGE_LEGAL_TERMS_STATUS=approved
-CONCIERGE_OPERATIONS_STATUS=production-ready
-CONCIERGE_PRIVACY_REVIEW_STATUS=approved
+ENABLE_RECEIPT_INBOX=true
+RESEND_RECEIVING_API_KEY=<receiving-only key>
+RESEND_INBOUND_WEBHOOK_SECRET=<Svix signing secret>
+RESEND_RECEIVING_DOMAIN=<dedicated receiving subdomain>
+RECEIPT_INBOX_ALIAS_HMAC_SECRET=<32-byte secret encoded as hex or base64url>
+RECEIPT_INBOX_ALIAS_HMAC_KEY_ID=receipt-alias-v1
 ```
 
-`CONCIERGE_MODE=test` is local-only and is rejected in production.
+Before continuing, verify in the provider dashboard and DNS that the receiving domain is active. Do not infer this from environment variables.
 
-4. Confirm `DATABASE_URL`, `INTERNAL_SYNC_SECRET`, and `CRON_SECRET` are configured, deploy, and run `npm run production:check -- https://www.vognary.com --strict`.
-5. In a disposable production-owned workspace, select an eligible discretionary subscription, create a case, read the complete authorization, and authorize it. Verify one `action_authorizations` row contains the exact accepted `authorization_text`, version, terms version, fee basis points, and maximum fee.
-6. Exercise customer withdrawal before execution and confirm the authorization is revoked. Create a new case for the real proof run.
-7. From the protected operator system, move only through an allowed path such as `authorized → in-progress → provider-pending → executed`, using a fresh Idempotency-Key on every call. Operators cannot transition a case to `verified`.
-8. Let `/api/internal/savings-verification/due/run` open the verification windows. Connect or refresh the same financial source that established the baseline so coverage passes beyond every expected debit window.
-9. For cancellation, require two clean covered cycles unless the commitment is yearly; for downgrade, require an observed meaningfully lower charge. Missing coverage remains `verifying`; a continuing charge fails the case.
-10. Confirm the system—not an operator—created exactly one active `verified_saving_receipts` row, a Proof Graph `action → saving` edge, a hash-chained ledger event, and at most one capped `success_fee_invoices` row. Confirm the customer can dispute it and that the privacy export includes the full case history.
-11. Observe at least two deployed cron invocations and alert on any `completed-with-failures` response before opening the feature broadly.
+Provision one disposable Vognary account and verify:
 
-Stop conditions:
+- The address matches `rcpt_<40 lowercase hex characters>@<receiving domain>`.
+- The database stores only the HMAC lookup plus encrypted display value.
+- Rotation invalidates the previous address.
+- Revocation removes encrypted display material, withdraws consent, and stops future routing.
 
-- Keep the concierge hidden if any of the three approval gates is absent, the exact authorization text is not stored, an operator can mint verification, same-source coverage is missing, a receipt duplicates, a fee exceeds its authorization cap, or withdrawal/dispute fails.
-- Never use this flow for debt/EMI, insurance, SIP/investment, utility, or another protected class. Those remain guidance-only.
+## Phase 4: Real Inbound Proof
 
-## 6. Recovery Identity Provider — Google OIDC
+1. Send one real plain-text software receipt to the disposable address.
+2. Capture the provider event ID and Vognary request ID in the restricted operator record. Do not copy message content into the record.
+3. Confirm the raw-body Svix verification succeeds before provider retrieval.
+4. Confirm exactly one row reaches `PROCESSED`, exactly one Recovery submission is linked, and provenance is `PROVIDER_RECEIVED`.
+5. Replay the exact signed event.
+6. Confirm the replay is acknowledged without another provider retrieval or canonical write.
+7. Force one retrieval failure and confirm the provider receives a retryable response.
+8. Force one stale `PROCESSING` lease and confirm it is reclaimed after five minutes, while a fresh lease remains retryable.
 
-Recovery launch uses the dedicated Google OIDC client only. Configure
-`GOOGLE_AUTH_CLIENT_ID`, `GOOGLE_AUTH_CLIENT_SECRET`, and the production callback
-`GOOGLE_AUTH_REDIRECT_URI=https://www.vognary.com/api/auth/google/callback`.
-The Gmail connector OAuth client is separate and is never an auth fallback.
+Only after this evidence exists set:
 
-Verify in this order:
+```text
+RECEIPT_INBOX_PROVIDER_STATUS=production-live
+RECEIPT_INBOX_WEBHOOK_PROOF_STATUS=passed
+RECEIPT_INBOX_REPLAY_PROOF_STATUS=passed
+```
 
-1. Add the exact production callback URI to the dedicated Google OAuth web client.
-2. Add the three `GOOGLE_AUTH_*` values plus `SESSION_SECRET` and `DATABASE_URL` to the production environment.
-3. Redeploy the exact accepted `main` SHA.
-4. Open `https://www.vognary.com/login` and click the Google save path.
-5. Complete real Google consent and verify `/api/auth/session` reports the intended user and workspace.
-6. Run `npm run production:check -- https://www.vognary.com --strict` and require `Recovery identity provider / Google` to be `READY`.
+These are operator attestations backed by retained evidence references. Setting secrets alone does not prove the provider, webhook, or replay path works.
 
-Magic link is deferred for Recovery v1. Its bearer token is not bound to a
-browser intent/challenge, so the login UI does not expose it and
-`ENABLE_MAGIC_LINK_LOGIN` defaults to `false`. Do not set it for Recovery launch
-or describe a Resend email as Google proof. Re-enable only in a separate reviewed
-work package after browser-intent binding and session-replacement tests exist.
+## Phase 5: Retention And Deletion
 
-Stop condition:
+1. Insert or receive one terminal inbound event linked to a canonical Recovery submission.
+2. Age the event beyond the workspace operational retention window in disposable PostgreSQL.
+3. Run retention in dry-run mode and verify `recoveryInboundEventsDeleted = 1`.
+4. Run execution mode.
+5. Confirm the transport event is gone, `recovery_submissions.workspace_id` is unchanged, `inbound_event_id` is null, and canonical evidence/commitments remain.
+6. Confirm a `RECEIVED` or fresh `PROCESSING` event is not deleted.
+7. Complete an account deletion rehearsal and verify the active alias, events, submissions, evidence, commitments, and workspace state are removed from Vognary.
+8. Record the separate provider retention boundary; Vognary does not claim immediate deletion of provider-held raw mail.
 
-- Do not market saved Recovery workspaces until real Google OIDC succeeds on the deployed accepted SHA. Development login and magic-link compatibility endpoints do not count.
+Only after privacy review approves this evidence set:
 
-## 7. Shared Multi-Instance Rate Limiting
+```text
+RECEIPT_INBOX_RETENTION_REVIEW_STATUS=approved
+```
 
-Production rate limiting automatically uses atomic Postgres buckets when `DATABASE_URL` is configured and migration `0017_shared_rate_limits` is applied. Upstash REST remains an optional preferred backend for higher traffic. When neither shared backend is usable, production endpoints fail closed with `503`. `ALLOW_IN_MEMORY_RATE_LIMITS=true` is an emergency bypass only, not a launch state.
+## Phase 6: Renewal Return Loop
 
-Required Postgres path:
+Configure outbound Resend separately with `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `NEXT_PUBLIC_APP_URL`.
 
-1. Configure the production `DATABASE_URL`.
-2. Run `npm run db:apply-schema` against production and confirm `0017_shared_rate_limits` in `schema_migrations`.
-3. Redeploy production.
-4. Verify `npm run production:check -- https://www.vognary.com` reports `Shared multi-instance rate limiting` as `READY`.
+1. Opt in with a disposable account.
+2. Confirm a high-confidence Recovery subscription schedules the selected reminder window.
+3. Confirm `KEEP` cancels or suppresses an individual reminder.
+4. Confirm a corrected renewal date replaces the old scheduled target.
+5. Confirm the weekly digest uses Recovery commitments, keeps currencies separate, and excludes `KEEP` only from the suggested action, not honest spend totals.
+6. Observe one real delivered reminder and one digest.
+7. Disable consent and confirm unsent deliveries are cancelled.
 
-Optional high-scale Upstash path:
+Only after deployed delivery and cron logs are reviewed set `RENEWAL_ALERT_DELIVERY_STATUS=production-live`.
 
-1. Open `https://console.upstash.com/`.
-2. Click `Create Database`.
-3. Product: Redis.
-4. Name: `vognary-rate-limit`.
-5. Region: close to Vercel deployment.
-6. Copy `UPSTASH_REDIS_REST_URL`.
-7. Copy `UPSTASH_REDIS_REST_TOKEN`.
-8. Add both to Vercel.
-9. Redeploy production.
-10. Verify `npm run production:check -- https://www.vognary.com` still reports `Shared multi-instance rate limiting` as `READY` and `/api/readiness` reports `configured-upstash-rest`.
+`CRON_SECRET` proves only that the endpoint can authenticate. It does not prove the schedule is deployed or firing. The current readiness value is an operator attestation rather than independent scheduler telemetry.
 
-Stop condition:
+The renewal worker runs daily at 9:00 AM IST. The retention worker runs daily at 3:00 AM IST.
 
-- Do not run high-traffic campaigns until `/api/readiness` reports `hardening.sharedRateLimiting` with a `configured-` status.
+## Phase 7: Privacy Lifecycle
 
-## 8. Monitoring, Alerts, Backups
+Run at least one audited non-dry retention execution and verify raw Recovery source minimization, terminal inbound deletion, webhook minimization, and bounded error cleanup.
 
-Recommended minimal production stack:
+Only then set `RETENTION_SCHEDULER_STATUS=production-live`.
 
-- Sentry for app errors.
-- Better Stack or UptimeRobot for uptime checks.
-- Neon automated backups for Postgres.
-- Vercel deployment notifications.
+The read-only platform API remains separately authenticated and does not label the API as adopted by a partner.
 
-Sentry click-by-click:
+## Phase 8: Monitoring, Backups, And Billing
 
-1. Open `https://sentry.io/`.
-2. Create organization or project.
-3. Platform: Next.js.
-4. Copy `SENTRY_DSN`.
-5. Add `SENTRY_DSN` to Vercel.
-6. Redeploy production.
-7. Run `INTERNAL_SYNC_SECRET='<production-secret>' npm run monitoring:test -- https://www.vognary.com`.
-8. Verify the script returns `status: "delivered"` and the synthetic event is visible in Sentry.
-9. Verify `npm run production:check -- https://www.vognary.com` reports `Monitoring and incident alerts` as `READY`.
+Before public activation:
 
-Better Stack alternative:
+- Prove monitoring delivery with the protected monitoring test route.
+- Complete and record an encrypted backup restore drill.
+- Keep assisted-audit checkout hidden unless Razorpay KYC, signed webhook, replay, refund, reconciliation, and legal terms gates all pass.
+- Verify deletion follow-up for provider credentials created before connector retirement.
 
-1. Open `https://betterstack.com/`.
-2. Create a logs source for `Vognary web`.
-3. Copy `BETTER_STACK_SOURCE_TOKEN`.
-4. Add `BETTER_STACK_SOURCE_TOKEN` to Vercel.
-5. Redeploy production.
-6. Run `INTERNAL_SYNC_SECRET='<production-secret>' npm run monitoring:test -- https://www.vognary.com`.
-7. Verify the script returns `status: "delivered"` and the synthetic event is visible in Better Stack.
-8. Verify `/api/readiness` reports `hardening.monitoring` as `configured-better-stack-server-errors`.
+## Phase 9: Strict Activation
 
-Backups:
+Set `PRODUCTION_INTERNAL_SYNC_SECRET` to the deployed `INTERNAL_SYNC_SECRET` only in the operator environment. A `401` from `/api/readiness` indicates configuration drift between the operator copy and the deployed secret; never weaken the readiness guard.
 
-1. Open Neon project.
-2. Go to `Branches` or `Backups`.
-3. Confirm Point-in-Time Restore is enabled.
-4. Set retention according to plan.
-
-5. Generate a separate backup key: `npm run secrets:generate-backup-key`.
-6. Store `BACKUP_ENCRYPTION_KEY` in the production secret manager.
-7. Create or choose encrypted S3/R2-compatible backup/object storage.
-8. Set the storage upload envs in the backup runner or secret manager:
+Run:
 
 ```bash
-BACKUP_STORAGE_BUCKET='<bucket>' # or S3_BUCKET / R2_BUCKET
-BACKUP_STORAGE_REGION='<region-or-auto>'
-BACKUP_STORAGE_ENDPOINT='<required-for-r2-or-s3-compatible-storage>'
-BACKUP_STORAGE_ACCESS_KEY_ID='<access-key-id>'
-BACKUP_STORAGE_SECRET_ACCESS_KEY='<secret-access-key>'
-BACKUP_STORAGE_PREFIX='vognary-postgres/'
+npm run production:check -- --strict https://www.vognary.com
 ```
 
-9. Run a preflight without printing secrets:
+Expected success:
 
-```bash
-npm run ops:preflight -- --report-only https://www.vognary.com
-```
+- Every endpoint probe passes.
+- `Recovery receipt inbox` is `READY`.
+- Feature migrations are `READY` through 0026.
+- Identity provider, persistent backend, shared rate limiting, privacy lifecycle, monitoring, backups, and any enabled billing/notification group are `READY`.
+- All retired connector endpoints return `410`.
 
-10. From a trusted operator terminal, create an encrypted dump and upload it automatically when storage envs are configured:
-
-```bash
-DATABASE_URL='<production-postgres-url>' \
-BACKUP_ENCRYPTION_KEY='<backup-key>' \
-POSTGRES_SSL=true \
-npm run backup:postgres
-```
-
-If `pg_dump` is not installed locally, the script uses Docker with the official `postgres:16` image when Docker is available.
-
-11. Restore the backup into a disposable Postgres database:
-
-```bash
-RESTORE_DATABASE_URL='<disposable-postgres-url>' \
-RESTORE_CONFIRM_DISPOSABLE=true \
-BACKUP_ENCRYPTION_KEY='<backup-key>' \
-POSTGRES_SSL=true \
-npm run backup:restore-drill -- backups/postgres/<backup>.manifest.json
-```
-
-If `pg_restore` is not installed locally, the restore script uses the same Docker fallback.
-
-12. Record the generated `keyFingerprint` as `BACKUP_KEY_FINGERPRINT` if the web runtime should not receive `BACKUP_ENCRYPTION_KEY`.
-13. Add `BACKUP_RESTORE_DRILL_STATUS=passed` in Vercel only after the restore drill succeeds and the encrypted storage upload is confirmed.
-14. Redeploy production.
-15. Verify `/api/readiness` reports `hardening.backups` as `configured` and includes `hardening.backupReadiness.restoreDrill: "passed"`.
-
-GitHub Actions automation:
-
-- `.github/workflows/ops-backup-drill.yml` installs PostgreSQL client tools, runs `backup:postgres`, uploads encrypted artifacts to configured S3/R2 storage, optionally runs `backup:restore-drill` when `RESTORE_DATABASE_URL` is configured, and keeps a short-retention encrypted artifact copy.
-- Required GitHub secrets: `DATABASE_URL`, `BACKUP_ENCRYPTION_KEY`, storage bucket/endpoint/region/access-key secrets, and optionally `RESTORE_DATABASE_URL` for restore drills.
-
-Stop condition:
-
-- Do not store user financial source files until backup restore has been tested.
-
-### Privacy lifecycle retention
-
-Migration `0004_privacy_lifecycle.sql` adds bounded workspace policies, data-subject request history, retention-run audit records, and
-minimization timestamps. Apply migrations through `npm run db:apply-schema` before enabling this executor. Do not run the executor against
-a production database until a restorable backup has been verified.
-
-The internal endpoint is `POST /api/internal/privacy/retention/run`. It accepts `Authorization: Bearer <INTERNAL_SYNC_SECRET>` or the
-configured `CRON_SECRET`, uses bounded JSON, and defaults to a non-mutating dry run. Start with:
-
-```bash
-curl -X POST https://www.vognary.com/api/internal/privacy/retention/run \
-  -H "Authorization: Bearer $INTERNAL_SYNC_SECRET" \
-  -H 'Content-Type: application/json' \
-  --data '{"dryRun":true}'
-```
-
-Review every numeric count and `hasMore` flag. To process one workspace during a controlled rollout, include its UUID as `workspaceId`.
-For more than five workspaces, pass the returned `nextWorkspaceCursor` back as `afterWorkspaceId` on the next dry run until the cursor is
-null. The cursor is accepted only for dry runs and cannot be combined with `workspaceId`. Only after the dry-run result is understood and
-a current backup is verified should an operator execute:
-
-```bash
-curl -X POST https://www.vognary.com/api/internal/privacy/retention/run \
-  -H "Authorization: Bearer $INTERNAL_SYNC_SECRET" \
-  -H 'Content-Type: application/json' \
-  --data '{"dryRun":false,"workspaceLimit":10,"batchSize":1000}'
-```
-
-Defaults are 30 days for raw connector payload JSON, 90 days for optional product events, and 30 days for operational error text.
-Workspace policy bounds are 7–90, 30–365, and 7–90 days respectively. Each call is capped at 10 workspaces and 2,000 rows per category
-per workspace; repeat controlled calls while `hasMore` is true. Request-history metadata uses a fixed 730-day window, and retention-run
-metadata uses 365 days.
-
-The executor minimizes raw JSON and error text or deletes optional product events. It preserves normalized recurring facts, normalized
-evidence columns, transactions, payload hashes, and audit events. It does not erase uploaded-file objects, immutable or provider-managed
-backups, provider-held data, or external monitoring and delivery records. Those systems need their own lifecycle controls.
-
-Webhook events currently enter storage as `verified`. If no processor moves an event to a terminal state before its raw-payload window,
-the executor marks the stale event `ignored`, records a processing timestamp, and minimizes its payload. Operational webhook error text
-uses the same bounded error window as connector synchronization errors. A concurrent executor that cannot acquire a workspace lock returns
-`completed-with-skips` and a `workspace_busy`/`orphaned_busy` result; retry it later rather than treating it as data-loss failure.
-
-`vercel.json` invokes authenticated `GET /api/internal/privacy/retention/run` daily at 03:00 IST (`21:30 UTC`). That GET accepts no
-caller-controlled mutation options: it enforces a fixed batch of at most 10 workspaces and 500 rows per category using `CRON_SECRET`.
-Keep body-driven `POST` for operator dry runs and constrained investigations. Production monitoring should alert on non-2xx responses,
-retain only the numeric response summary, and investigate any workspace result marked `failed`.
-
-Readiness does not independently observe Vercel schedule configuration. Treat retention windows as unenforced until the cron is deployed,
-one constrained destructive run is audited, and the operator has separately monitored subsequent runs.
-
-After those conditions are satisfied, set `RETENTION_SCHEDULER_STATUS=production-live`, redeploy, and confirm
-`hardening.retentionScheduler` becomes `operator-attested-production-live`. Readiness requires a recorded non-dry-run completion in
-addition to the operator flag; it still labels the flag as operator attestation rather than independent scheduler telemetry.
-
-Stop condition:
-
-- Do not enable destructive scheduled runs until the dry run, a constrained actual run, the resulting audit record, and a restore drill
-  have all been verified.
-
-### Commitment decisions and read-only platform API
-
-Migrations `0007_commitment_decisions.sql` and `0008_platform_api.sql` activate durable class-safe review decisions and scoped read-only
-API tokens. Applying the migrations proves schema availability only.
-
-Readiness reports:
-
-- `capabilities.commitmentDecisions.status`: `schema-ready-no-decisions` until a user saves a decision, then `decisions-observed`.
-- `capabilities.platformApi.status`: distinguishes no active token, token creation without consumer traffic, and observed token use.
-- `hardening.platformApi`: remains `schema-ready-shared-rate-limit-required` until Postgres or Upstash shared rate limiting is active.
-
-The platform surface is:
-
-- Admin-only `GET|POST|DELETE /api/platform/tokens` for hashed, expiring, revocable tokens.
-- Cursor-paginated `GET /api/v1/ledger` with `ledger:read` (`limit` 1–200 and opaque `nextCursor`).
-- `GET /api/v1/sources` with `sources:read`.
-
-An unauthenticated platform request must return `401` after database and shared rate limiting are configured. A `503` indicates a
-prerequisite is still missing and is not proof of the token guard. `npm run production:check -- --strict` checks migration readiness,
-shared rate limiting, and both unauthenticated denials. It does not label the API as adopted by a partner; only
-`capabilities.platformApi.lastUsedAt` provides evidence that a token has actually been used.
-
-Stop condition:
-
-- Do not publish a partner/API availability claim until migration `0008` is ready, the unauthenticated checks return `401`, an authorized
-  test token returns only its allowed workspace data, revocation is verified, and rate limiting is active.
-
-## 9. Account Aggregator launch rail and follow-on mandate rails
-
-These cannot be completed in code alone. They need business and regulatory access.
-
-Account Aggregator path:
-
-1. Open [docs/partner-rails-access-playbook.md](partner-rails-access-playbook.md).
-2. Fill [docs/partner-rails-outreach-tracker.csv](partner-rails-outreach-tracker.csv) with real contact URLs or emails.
-3. Shortlist FIU/TSP providers in India.
-4. Ask for sandbox access for account statement data.
-5. Confirm permitted use case: recurring payment audit / personal finance insight.
-6. Sign DPA and compliance paperwork.
-7. Get sandbox credentials.
-8. Build sandbox adapter.
-9. Submit security review.
-10. Move to production credentials.
-
-UPI/card mandate path:
-
-1. Open [docs/partner-rails-access-playbook.md](partner-rails-access-playbook.md).
-2. Shortlist PSPs/payment aggregators/issuers.
-3. Ask for mandate visibility APIs, not only merchant collection APIs.
-4. Confirm if they expose active mandate, next debit, amount, merchant, and cancel/modify status.
-5. Sign partner agreement.
-6. Get sandbox credentials.
-7. Build mandate adapter.
-8. Run legal review for cancellation/modify flows.
-
-Status env rule:
-
-Run the exact-status validator before changing production envs:
-
-```bash
-npm run core-connectors:check
-npm run partner-rails:check
-```
-
-- `outreach-started` means email/contact form sent.
-- `sandbox-requested` means partner acknowledged and requested onboarding material.
-- `sandbox-approved` means sandbox credentials or invitation exists.
-- `production-live` means signed production access, approved consent, production credentials, and at least one production consent test.
-- Public-launch strictness requires verified Gmail plus production-live Account Aggregator (`core-connectors:check`).
-- `partner-rails:check` remains the stricter long-term moat gate and passes only when Account Aggregator, UPI, and card mandate statuses are all `production-live`.
-
-Stop condition:
-
-- Do not claim direct UPI/card mandate sync until partner APIs are signed and tested.
-
-## 10. More Provider Adapters
-
-Live token-backed adapters now exist for:
-
-- OpenAI organization costs.
-- Gmail read-only receipt evidence.
-- GitHub Copilot organization metrics reports.
-- Vercel domain renewals.
-- Render services.
-- Cloudflare accounts.
-
-Build order after these:
-
-1. AWS Cost Explorer.
-2. GitHub billing and Advanced Security billing.
-3. Cloudflare subscriptions/billing where official account endpoints expose it.
-4. Render metrics and cost mapping.
-5. Vercel usage/billing surfaces beyond domains.
-6. Domain registrar renewals.
-
-Activation rule for each provider:
-
-- First build env-gated stateless sync preview.
-- Then move to per-workspace encrypted token storage.
-- Then schedule sync jobs.
-- Then add user-facing connection UI.
-
-## Final Go/No-Go Checklist
-
-You can sell private audits when:
-
-- `/private-audit` works.
-- `/api/audit-intake` persists leads.
-- Payment link exists.
-- Audit report export works.
-- You can manually complete the audit for first users.
-
-You can sell connected monitoring when:
-
-- Login works.
-- Database/token vault are ready.
-- At least Gmail or OpenAI sync works per user/workspace.
-- Sync jobs persist evidence.
-- Monitoring and backups are active.
-
-You can claim universal auto-debit coverage only when:
-
-- Bank/AA partner is live.
-- UPI/card mandate partner is live.
-- App-store evidence path is clear.
-- Cloud/SaaS adapters cover the target segment.
-- The product shows source coverage gaps instead of pretending completeness.
+If strict activation fails, leave the forwarding operator flags blank or clear them, redeploy the honest unavailable landing, and repair the failed phase before retrying.

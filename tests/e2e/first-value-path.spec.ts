@@ -1,10 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const receiptEvidence = [
-  "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly.",
-  "Notion invoice paid INR 830 on 2026-07-01. Notion Plus renews monthly.",
-].join("\n\n");
-
 const assistedAuditOffer = {
   id: "assisted-private-audit",
   version: 1,
@@ -13,101 +8,19 @@ const assistedAuditOffer = {
   currency: "INR",
 };
 
-test("the landing page makes the real audit the single primary path", async ({ page }) => {
+test("the first-value path falls back to private audit until forwarding is proven", async ({ page }) => {
   const failures = collectRuntimeFailures(page);
   await page.goto("/");
 
-  const primary = page.getByRole("link", { name: "Audit my recurring spend" });
+  const primary = page.locator("section").filter({ has: page.getByRole("heading", { name: "Know what’s renewing before you pay for it." }) })
+    .getByRole("link", { name: "Request private audit", exact: true });
   await expect(primary).toBeVisible();
-  await expect(primary).toHaveAttribute("href", "/app");
-  await expect(page.getByRole("link", { name: "See a sample audit" })).toHaveAttribute("href", "#product-ledger");
-  await expect(page.locator('a[href*="demo="], a[href*="guest="]')).toHaveCount(0);
-  expect(failures).toEqual([]);
-});
-
-test("two pasted receipts produce one proof-backed first result without login", async ({ page }) => {
-  const failures = collectRuntimeFailures(page);
-  await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto("/app");
-
-  const initial = await pageMetrics(page);
-  expect(initial.visibleControls).toBeLessThanOrEqual(10);
-  expect(initial.scrollHeight).toBeLessThanOrEqual(812 * 2.5);
-  expect(initial.horizontalOverflow).toBe(false);
-  await expect(page.getByRole("heading", { name: "Know what renews before it charges" })).toBeVisible();
-  await expect(page.getByLabel("Paste receipts or invoices")).toBeVisible();
-  await expect(page.getByText("Connector catalog")).toHaveCount(0);
-  await expect(page.getByText("Verified savings")).toHaveCount(0);
-  await expect(page.getByText("Proof graph", { exact: false })).toHaveCount(0);
-  await expect(page.getByText(/Import statement|Choose statement files/i)).toHaveCount(0);
-
-  const startedAt = await page.evaluate(() => performance.now());
-  await page.getByLabel("Paste receipts or invoices").fill(receiptEvidence);
-  const result = page.getByRole("region", { name: "Your first audit result" });
-  await expect(result).toBeVisible();
-  const resultAt = await page.evaluate(() => performance.now());
-  expect(resultAt - startedAt).toBeLessThan(1_000);
-
-  await expect(result.getByText("₹2,829")).toBeVisible();
-  await expect(result.getByText("Next renewal", { exact: true })).toBeVisible();
-  await expect(result.getByText("Do this first", { exact: true })).toBeVisible();
-  await expect(result.getByText("Proof", { exact: true })).toBeVisible();
-  await expect(result.getByText(/Pasted receipt/i)).toBeVisible();
-  await expect(result.getByRole("link", { name: "Request private audit" })).toHaveAttribute("href", "/private-audit");
-  await expect(result.getByRole("link", { name: "Save this audit" })).toHaveAttribute("href", "/login?next=/app");
-
-  for (const width of [320, 375, 768, 1440]) {
-    await page.setViewportSize({ width, height: width < 700 ? 812 : 900 });
-    const responsive = await pageMetrics(page);
-    expect(responsive.horizontalOverflow, `result overflowed at ${width}px`).toBe(false);
-  }
-
-  await page.context().setOffline(true);
-  await expect(page.getByText(/Offline: paste and manual entry work/i)).toBeVisible();
-  await page.context().setOffline(false);
-  await expect(page.getByText(/Offline: paste and manual entry work/i)).toHaveCount(0);
-
-  expect(new URL(page.url()).searchParams.has("item")).toBe(false);
-  const transferKey = "vognary.guest-audit-transfer.v1";
-  const stagedBeforeLogin = await page.evaluate((key) => sessionStorage.getItem(key), transferKey);
-  expect(stagedBeforeLogin).toContain("OpenAI invoice");
-  await page.reload();
-  await expect(page.getByLabel("Paste receipts or invoices")).toHaveValue(receiptEvidence);
-  await expect(page.getByRole("region", { name: "Your first audit result" })).toBeVisible();
-  let sessionChecks = 0;
-  await page.route("**/api/auth/session", async (route) => {
-    sessionChecks += 1;
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ authenticated: false, configuration: { status: "ready", cookieName: "vognary_session" }, session: null }),
-    });
-  });
-  await page.getByRole("region", { name: "Your first audit result" }).getByRole("link", { name: "Save this audit" }).click();
-  await expect(page).toHaveURL(/\/login\?next=%2Fapp$|\/login\?next=\/app$/);
-  await expect.poll(() => sessionChecks).toBeGreaterThanOrEqual(1);
-  expect(page.url()).not.toContain("OpenAI");
-  expect(await page.evaluate((key) => sessionStorage.getItem(key), transferKey)).toBe(stagedBeforeLogin);
-  const checksBeforeFocus = sessionChecks;
-  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect.poll(() => sessionChecks).toBeGreaterThan(checksBeforeFocus);
-  expect(failures).toEqual([]);
-});
-
-test("the sample audit is clearly labelled, reversible, and never staged as user data", async ({ page }) => {
-  const failures = collectRuntimeFailures(page);
-  await page.goto("/app");
-
-  await page.getByRole("button", { name: "See a sample audit" }).click();
-  await expect(page.getByText("Sample audit.", { exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Your first audit result" })).toBeVisible();
-  await expect.poll(async () => (await page.getByLabel("Paste receipts or invoices").inputValue()).split(/\n\s*\n/).filter(Boolean).length).toBe(8);
-  await expect(page.getByRole("button", { name: "Clear sample" }).first()).toBeVisible();
-  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("vognary.guest-audit-transfer.v1"))).toBeNull();
-
-  await page.getByRole("button", { name: "Clear sample" }).first().click();
-  await expect(page.getByRole("region", { name: "Your first audit result" })).toHaveCount(0);
-  await expect(page.getByLabel("Paste receipts or invoices")).toHaveValue("");
+  await expect(primary).toHaveAttribute("href", "/private-audit");
+  await primary.click();
+  await expect(page).toHaveURL(/\/private-audit$/);
+  await expect(page.getByRole("heading", { name: /Prove what renews/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Request private audit" })).toBeVisible();
+  await expect(page.getByText(/sample audit/i)).toHaveCount(0);
   expect(failures).toEqual([]);
 });
 
@@ -139,7 +52,7 @@ test("private audit intake immediately gives a safe source plan and continuation
   await expect(plan).toBeVisible();
   await expect(plan.getByText(/Start with/i)).toBeVisible();
   await expect(plan.getByText(/Never share passwords, OTPs, CVV/i)).toBeVisible();
-  await expect(plan.getByRole("link", { name: "Continue my audit" })).toHaveAttribute("href", "/app");
+  await expect(plan.getByRole("link", { name: "Sign in to Vognary" })).toHaveAttribute("href", "/login?next=/app");
   await expect(page.getByText(/will reply with the safest minimum source/i)).toHaveCount(0);
   await expect(page.getByText(/Online payment is not activated|Payment status could not/i)).toHaveCount(0);
   expect(failures).toEqual([]);
@@ -221,23 +134,6 @@ test("tracked assisted-audit checkout appears only for the exact server offer an
   expect(failures).toEqual([]);
 });
 
-async function pageMetrics(page: Page) {
-  return page.evaluate(() => {
-    const visible = (element: Element) => {
-      if (element.closest("nextjs-portal") || element.matches(".sr-only:not(:focus)")) return false;
-      if (element.closest("details:not([open])") && element.tagName !== "SUMMARY") return false;
-      const rect = element.getBoundingClientRect();
-      const style = getComputedStyle(element);
-      return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
-    };
-    return {
-      visibleControls: [...document.querySelectorAll("button,a,input,textarea,select,summary")].filter(visible).length,
-      scrollHeight: document.documentElement.scrollHeight,
-      horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
-    };
-  });
-}
-
 function collectRuntimeFailures(page: Page) {
   const failures: string[] = [];
   page.on("pageerror", (error) => failures.push(`page: ${error.message}`));
@@ -247,9 +143,7 @@ function collectRuntimeFailures(page: Page) {
   page.on("requestfailed", (request) => {
     const error = request.failure()?.errorText ?? "failed";
     const url = new URL(request.url());
-    const headers = request.headers();
-    const speculativePrefetch = headers["next-router-prefetch"] === "1" || headers.purpose === "prefetch";
-    if (error === "net::ERR_ABORTED" && url.searchParams.has("_rsc") && speculativePrefetch) return;
+    if (error === "net::ERR_ABORTED" && request.method() === "GET" && url.searchParams.has("_rsc")) return;
     if (error === "net::ERR_ABORTED" && request.method() === "GET" && url.pathname === "/api/checkout") return;
     failures.push(`request: ${request.url()} ${error}`);
   });

@@ -1,9 +1,5 @@
 import { spawnSync } from "node:child_process";
 
-if (process.env.VERCEL_ENV === "production") {
-  run(process.execPath, ["scripts/apply-postgres-schema.mjs"]);
-}
-
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 run(npmCommand, ["run", "build"]);
 
