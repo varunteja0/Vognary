@@ -204,7 +204,7 @@ test("Lighthouse measures the signed-out app without hydration delay and respect
 test("standalone PDF ingestion preserves the dynamically loaded pdf.js worker", () => {
   const config = read("next.config.ts");
   assert.match(config, /agentRules: false/);
-  assert.match(config, /serverExternalPackages: \["pdf-parse"\]/);
+  assert.match(config, /serverExternalPackages: \["pdf-parse", "@napi-rs\/canvas"\]/);
   assert.match(config, /"\/api\/ingest": \["\.\/node_modules\/pdfjs-dist\/legacy\/build\/pdf\.worker\.mjs"\]/);
 });
 

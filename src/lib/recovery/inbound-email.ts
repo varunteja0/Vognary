@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { htmlToText } from "html-to-text";
 import PostalMime from "postal-mime";
+import "pdf-parse/worker";
 import { PDFParse } from "pdf-parse";
 import { assertPdfTextWithinLimits, hasReadablePdfTextLayer, maxPdfPages } from "@/lib/pdf-ingest";
 import { recoveryLimits } from "@/lib/recovery/contracts";

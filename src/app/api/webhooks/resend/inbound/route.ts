@@ -1,7 +1,6 @@
 import { rateLimit } from "@/lib/rate-limit";
 import { isDatabaseConfigured } from "@/lib/server/database";
 import { getReceiptInboxConfiguration } from "@/lib/server/recovery-inbound-store";
-import { processResendReceivedEvent } from "@/lib/server/recovery-inbound-processor";
 import {
   createResendInboundHandler,
   ResendInboundRetryableError,
@@ -26,6 +25,7 @@ export async function POST(request: Request) {
         identity: "provider:resend",
       });
       if (!rate.allowed) throw new ResendInboundRetryableError("Verified provider rate limit unavailable or exceeded.");
+      const { processResendReceivedEvent } = await import("@/lib/server/recovery-inbound-processor");
       return processResendReceivedEvent(event);
     },
   });

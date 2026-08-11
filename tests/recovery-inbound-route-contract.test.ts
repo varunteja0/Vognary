@@ -51,10 +51,21 @@ test("receipt inbox readiness failures use the canonical Recovery error path", a
 test("the public Resend route mounts the signed handler with a shared provider limit", async () => {
   const source = await readFile(new URL("../src/app/api/webhooks/resend/inbound/route.ts", import.meta.url), "utf8");
   assert.match(source, /createResendInboundHandler/);
-  assert.match(source, /processResendReceivedEvent/);
+  assert.match(source, /await import\("@\/lib\/server\/recovery-inbound-processor"\)/);
   assert.match(source, /requireShared: true/);
   assert.match(source, /identity: "provider:resend"/);
   assert.doesNotMatch(source, /rejectCrossSiteMutation/);
+});
+
+test("the receipt parser loads the Node canvas polyfill before pdf-parse", async () => {
+  const source = await readFile(new URL("../src/lib/recovery/inbound-email.ts", import.meta.url), "utf8");
+  const workerImport = source.indexOf('import "pdf-parse/worker"');
+  const parserImport = source.indexOf('import { PDFParse } from "pdf-parse"');
+  assert.ok(workerImport >= 0);
+  assert.ok(parserImport > workerImport);
+
+  const config = await readFile(new URL("../next.config.ts", import.meta.url), "utf8");
+  assert.match(config, /serverExternalPackages: \["pdf-parse", "@napi-rs\/canvas"\]/);
 });
 
 function assertInvalidEvidence(request: Request) {

@@ -53,6 +53,13 @@ jobs:
       - run: npm test
       - run: npm run corpus
       - run: npm run build
+        env:
+          ENABLE_RECEIPT_INBOX: "true"
+          RESEND_RECEIVING_API_KEY: ci-receiving-api-key
+          RESEND_INBOUND_WEBHOOK_SECRET: whsec_Y2ktcmVjZWlwdC13ZWJob29rLXNlY3JldA==
+          RESEND_RECEIVING_DOMAIN: receipts.vognary.test
+          RECEIPT_INBOX_ALIAS_HMAC_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          RECEIPT_INBOX_ALIAS_HMAC_KEY_ID: receipt-alias-v1
       - run: npm run perf:budget
       - run: npx playwright install --with-deps chromium
       - name: Enforce Lighthouse budgets
@@ -96,7 +103,13 @@ jobs:
           if [ -f /tmp/vognary-dev.pid ]; then kill "$(cat /tmp/vognary-dev.pid)" || true; fi
       - name: Start production server
         run: |
-          ALLOW_IN_MEMORY_RATE_LIMITS=true INTERNAL_SYNC_SECRET=ci-internal-sync-secret PORT=3000 npm run start > /tmp/vognary.log 2>&1 &
+          ALLOW_IN_MEMORY_RATE_LIMITS=true INTERNAL_SYNC_SECRET=ci-internal-sync-secret PORT=3000 \
+            ENABLE_RECEIPT_INBOX=true RESEND_RECEIVING_API_KEY=ci-receiving-api-key \
+            RESEND_INBOUND_WEBHOOK_SECRET=whsec_Y2ktcmVjZWlwdC13ZWJob29rLXNlY3JldA== \
+            RESEND_RECEIVING_DOMAIN=receipts.vognary.test \
+            RECEIPT_INBOX_ALIAS_HMAC_SECRET=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
+            RECEIPT_INBOX_ALIAS_HMAC_KEY_ID=receipt-alias-v1 \
+            npm run start > /tmp/vognary.log 2>&1 &
           echo $! > /tmp/vognary.pid
           for i in {1..30}; do
             curl -fsS http://127.0.0.1:3000/api/health && exit 0
