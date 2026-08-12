@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { extractForwardedReceiptTexts, forwardedEmailMaxMimeBytes } from "@/lib/recovery/inbound-email";
 import { getDatabasePool } from "@/lib/server/database";
+import { RecoveryMaterializationError } from "@/lib/server/recovery-api";
 import {
   getReceiptInboxConfiguration,
   resolveReceiptInboxAlias,
@@ -87,12 +88,18 @@ export async function processResendReceivedEvent(
       ? { status: "processed" }
       : { status: "ignored" };
   } catch (error) {
-    const released = await releaseForRetry(reservation, "MATERIALIZATION_FAILED");
+    const released = await releaseForRetry(reservation, materializationFailureCode(error));
     if (!released) return { status: "duplicate" };
     throw error instanceof ResendInboundRetryableError
       ? error
       : new ResendInboundRetryableError("Receipt materialization failed.");
   }
+}
+
+export function materializationFailureCode(error: unknown) {
+  return error instanceof RecoveryMaterializationError
+    ? `MATERIALIZATION_${error.stage}_${error.code}`
+    : "MATERIALIZATION_FAILED";
 }
 
 async function findExistingInboundEvent(event: ResendReceivedEvent) {
