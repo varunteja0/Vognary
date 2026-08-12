@@ -148,6 +148,13 @@ export type EvidenceDto = {
   confidence: ConfidenceDto;
 };
 
+export type SavedObservationDto = {
+  evidenceId: string;
+  merchant: string | null;
+  amount: MoneyDto | null;
+  date: string | null;
+};
+
 export type DecisionDto = {
   value: Decision;
   decidedAt: string;
@@ -277,6 +284,7 @@ export type HomeChangedDto =
 export type HomeProjectionDto = {
   workspace: WorkspaceDto;
   generatedAt: string;
+  recentObservations: readonly SavedObservationDto[];
   monthlyTotals: readonly ProjectionTotalDto[];
   next30DayTotals: readonly ProjectionTotalDto[];
   needsMe: readonly AttentionItemDto[];

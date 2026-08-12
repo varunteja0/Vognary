@@ -179,11 +179,21 @@ async function signIn(page: Page) {
 }
 
 test("home renders attention, upcoming charges, and receipt freshness without inventing changes", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText = text;
+        },
+      },
+    });
+  });
   await signIn(page);
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Your subscriptions" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 
   const nav = page.getByRole("navigation", { name: "Primary" });
@@ -202,6 +212,11 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByText("Low confidence")).toBeVisible();
   await expect(page.getByText("6 Aug 2026 · in 3 days")).toBeVisible();
   await expect(page.getByText(/1 item from 1 source · latest/)).toBeVisible();
+  await expect(page.getByText("Sheets go stale when new charges land.", { exact: false })).toBeVisible();
+
+  await page.getByRole("button", { name: "Copy for WhatsApp" }).click();
+  await expect(page.getByText("WhatsApp summary copied.", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText)).toContain("Monthly burn from checked receipts: ₹1,999.00/mo.");
 
   await expect(page.getByText(/connect|sync your bank|Gmail/i)).toHaveCount(0);
 });
@@ -238,6 +253,9 @@ test("later evidence produces a genuine changed list instead of a baseline", asy
   await page.goto("/app");
 
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toBeVisible();
+  const changedBox = await page.getByRole("heading", { name: "Since your last visit" }).boundingBox();
+  const attentionBox = await page.getByRole("heading", { name: "Needs attention" }).boundingBox();
+  expect(changedBox?.y).toBeLessThan(attentionBox?.y ?? 0);
   await expect(page.getByText("Amount changed")).toBeVisible();
   const changeRow = page.locator("article").filter({ hasText: "Amount changed" });
   await expect(changeRow.getByText("₹1,999.00")).toBeVisible();

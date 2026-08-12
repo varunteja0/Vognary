@@ -18,7 +18,7 @@ test("the first-value path leads into the product with assisted audit as a secon
   await expect(primary).toHaveAttribute("href", "/login?next=/app");
   await primary.click();
   await expect(page).toHaveURL(/\/login/);
-  await expect(page.getByRole("heading", { name: "Sign in to Vognary" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "See what renews next" })).toBeVisible();
 
   await page.goto("/");
   const assisted = page.getByRole("link", { name: "Request a private audit", exact: true });

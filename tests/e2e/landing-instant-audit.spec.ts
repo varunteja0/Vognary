@@ -49,8 +49,8 @@ test("the mobile landing keeps the primary action visible without overflow", asy
 test("login presents one Google identity path without product detours", async ({ page }) => {
   await page.goto("/login?next=/app");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in to Vognary" })).toBeVisible();
-  await expect(page.getByText("Use Google to create your saved workspace.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "See what renews next" })).toBeVisible();
+  await expect(page.getByText(/save the billing receipts you already have/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await expect(page.getByText("Google is only for sign-in. Vognary does not access Gmail.")).toBeVisible();
 
@@ -64,7 +64,7 @@ test("signed-out app entry returns to the canonical sign-in path", async ({ page
   await page.goto("/app");
 
   await expect(page).toHaveURL(/\/login\?next=(?:%2F|\/)app$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in to Vognary" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "See what renews next" })).toBeVisible();
   await expect(page.getByLabel("Paste receipts or invoices")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "See a sample audit" })).toHaveCount(0);
 });

@@ -34,6 +34,7 @@ import {
   toMoneyDto,
   type CanonicalCommitmentRecord,
   type RecoveryCoverageSource,
+  type RecoveryObservationRecord,
 } from "@/lib/recovery/domain";
 import {
   extractObservedReceipt,
@@ -1742,6 +1743,7 @@ async function loadHome(
   const version = Number(state?.version ?? 0);
   const changed = await loadChanged(client, membership.workspace_id, state, version);
   const commitments = await loadCommitmentRecords(client, membership.workspace_id);
+  const observations = await loadRecentObservationRecords(client, membership.workspace_id);
   const sources = await loadCoverageSources(client, membership.workspace_id);
   return buildHomeProjection({
     workspace: {
@@ -1752,9 +1754,29 @@ async function loadHome(
     },
     generatedAt,
     commitments,
+    observations,
     sources,
     changed,
   });
+}
+
+async function loadRecentObservationRecords(client: PoolClient, workspaceId: string): Promise<RecoveryObservationRecord[]> {
+  const result = await client.query<Pick<EvidenceRow, "id" | "merchant" | "amount_minor" | "currency" | "evidence_date">>(
+    `select evidence.id, evidence.merchant, evidence.amount_minor,
+            evidence.currency, evidence.evidence_date
+     from recovery_evidence evidence
+     where evidence.workspace_id = $1
+     order by evidence.created_at desc, evidence.id desc
+     limit 3`,
+    [workspaceId],
+  );
+  return result.rows.map((row) => ({
+    evidenceId: row.id,
+    merchant: row.merchant || null,
+    amountMinor: row.amount_minor === null ? null : BigInt(normalizeMinorUnits(row.amount_minor)),
+    currency: row.currency,
+    date: toDateOnly(row.evidence_date),
+  }));
 }
 
 async function loadChanged(

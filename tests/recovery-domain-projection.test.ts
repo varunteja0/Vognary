@@ -140,6 +140,39 @@ test("Recovery home is an honest first baseline and keeps currency totals separa
   assert.equal(home.coverage.state, "BASELINE_ONLY");
 });
 
+test("Recovery home publishes saved observation facts without fabricating recurrence", () => {
+  const home = buildHomeProjection({
+    workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
+    generatedAt: now,
+    commitments: [],
+    observations: [{
+      evidenceId: "evidence-once-1",
+      merchant: "Figma",
+      amountMinor: BigInt(1_499_00),
+      currency: "INR",
+      date: "2026-08-08",
+    }],
+    sources: [{
+      id: "source-1",
+      ingestedAt: now.toISOString(),
+      coverageStart: "2026-08-08",
+      coverageEnd: "2026-08-08",
+      evidenceCount: 1,
+    }],
+    changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 1, items: [] },
+  });
+
+  assert.deepEqual(home.recentObservations, [{
+    evidenceId: "evidence-once-1",
+    merchant: "Figma",
+    amount: { currency: "INR", minor: "149900", exponent: 2, display: "₹1,499.00" },
+    date: "2026-08-08",
+  }]);
+  assert.deepEqual(home.monthlyTotals, []);
+  assert.deepEqual(home.next, []);
+  assert.deepEqual(home.needsMe, []);
+});
+
 test("upcoming items require reminder confidence and suppress KEEP decisions", () => {
   const home = buildHomeProjection({
     workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },

@@ -42,10 +42,16 @@ const recoveryFiles = readdirSync(recoveryDir).filter((file) => file.endsWith(".
 const sourceOf = (file: string) => readFileSync(`${recoveryDir}/${file}`, "utf8");
 const allSource = recoveryFiles.map(sourceOf).join("\n");
 const homeSource = sourceOf("recovery-home.tsx");
+const addEvidenceSource = sourceOf("recovery-add-evidence.tsx");
 const clientSource = sourceOf("recovery-workspace-client.tsx");
 const commitmentsSource = sourceOf("recovery-commitments.tsx");
 const dialogSource = sourceOf("recovery-dialog.tsx");
 const statesSource = sourceOf("recovery-states.tsx");
+const landingSource = readFileSync("src/app/launch-landing.tsx", "utf8");
+const loginSource = readFileSync("src/app/login/login-client.tsx", "utf8");
+const appPageSource = readFileSync("src/app/app/page.tsx", "utf8");
+const experienceSource = readFileSync("src/app/app/experience-client.tsx", "utf8");
+const sourcesSource = sourceOf("recovery-sources.tsx");
 const accountSectionsSource = readFileSync("src/app/profile/profile-sections.tsx", "utf8");
 const inboundStoreSource = readFileSync("src/lib/server/recovery-inbound-store.ts", "utf8");
 
@@ -83,6 +89,18 @@ test("primary navigation is exactly Home, Subscriptions, Sources, with Account o
   assert.doesNotMatch(clientSource, /state\.view === "PROFILE"/);
 });
 
+test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
+  for (const source of [landingSource, loginSource, homeSource]) {
+    assert.match(source, /billing receipts you already have/);
+    assert.match(source, /what renews next/);
+  }
+  assert.match(landingSource, /Want it done for you\?/);
+  assert.match(landingSource, /href="\/private-audit"/);
+  assert.match(clientSource, /Your renewal review/);
+  assert.match(landingSource, /No bank passwords\. No mailbox access\. You choose which billing text to add\./);
+  assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
+});
+
 test("home leads with action, only shows real changes, and keeps source freshness compact", () => {
   for (const heading of ["Needs attention", "Since your last visit", "Coming up", "Receipts checked"]) {
     assert.ok(homeSource.includes(heading), `home must render ${heading}`);
@@ -96,6 +114,15 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   assert.match(clientSource, /transport\.evidence\(/);
 });
 
+test("returning Home leads with proven change and exports only the Recovery projection", () => {
+  assert.ok(homeSource.indexOf("Since your last visit") < homeSource.indexOf("Needs attention"));
+  assert.match(homeSource, /Sheets go stale when new charges land/);
+  assert.match(homeSource, /This is a floor from receipts checked, not every debit in India\./);
+  assert.match(homeSource, /renderRecoveryShareText\(home\)/);
+  assert.match(homeSource, /Copy for WhatsApp/);
+  assert.doesNotMatch(homeSource, /renderAuditReportShareText|buildAuditReport/);
+});
+
 test("an empty Home loads and surfaces the receipt source before manual evidence", () => {
   assert.match(clientSource, /void loadSources\(\)/);
   assert.match(clientSource, /receiptInbox=\{state\.receiptInbox\}/);
@@ -103,6 +130,44 @@ test("an empty Home loads and surfaces the receipt source before manual evidence
   assert.match(homeSource, /Copy address/);
   assert.match(homeSource, /Set up receipt address/);
   assert.match(homeSource, /Add receipts manually/);
+});
+
+test("canonical Recovery advertises the receipt inbox only behind public launch readiness", () => {
+  assert.match(appPageSource, /isReceiptInboxPubliclyAvailable/);
+  assert.match(appPageSource, /receiptInboxPubliclyAvailable=\{receiptInboxPubliclyAvailable\}/);
+  assert.match(experienceSource, /receiptInboxPubliclyAvailable/);
+  assert.match(clientSource, /if \(!receiptInboxPubliclyAvailable\) return/);
+  assert.match(homeSource, /receiptInboxPubliclyAvailable/);
+  assert.match(sourcesSource, /if \(!receiptInboxPubliclyAvailable\)/);
+  assert.match(sourcesSource, /Manual evidence only/);
+});
+
+test("one observation is coached toward a second matching receipt instead of rendering a false all-clear", () => {
+  assert.match(clientSource, /commitmentTotal=\{state\.commitmentTotal\}/);
+  assert.match(homeSource, /home\.coverage\.evidenceCount > 0 && commitmentTotal === 0/);
+  for (const copy of [
+    "Seen once",
+    "Saved proof",
+    "Not called recurring yet",
+    "Add a matching receipt",
+    "One charge is evidence, not a pattern",
+    "Inspect exact evidence",
+    "Copy for WhatsApp",
+    "This is a floor from receipts checked, not every debit in India.",
+  ]) {
+    assert.ok(homeSource.includes(copy), `one-observation Home must render ${copy}`);
+  }
+  assert.match(homeSource, /home\.recentObservations\.map/);
+  assert.match(homeSource, /observation\.merchant/);
+  assert.match(homeSource, /observation\.amount/);
+  assert.match(homeSource, /observation\.date/);
+  for (const step of [
+    "Paste 2-3 billing emails or invoices",
+    "Use the same service twice",
+    "See monthly burn, the next expected charge, and one decision",
+  ]) {
+    assert.ok(addEvidenceSource.includes(step), `first-value guide must render ${step}`);
+  }
 });
 
 test("subscriptions use ordinary language and three primary choices", () => {

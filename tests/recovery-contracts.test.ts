@@ -123,6 +123,7 @@ const baseline = {
 const home = {
   workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
   generatedAt: "2026-08-09T10:00:00.000Z",
+  recentObservations: [{ evidenceId: evidence.id, merchant: commitment.merchant, amount: money, date: evidence.date }],
   monthlyTotals: [{ amount: money, commitmentIds: [commitment.id], evidenceIds: [evidence.id] }],
   next30DayTotals: [{ amount: money, commitmentIds: [commitment.id], evidenceIds: [evidence.id] }],
   needsMe: [{

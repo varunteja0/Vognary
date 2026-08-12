@@ -1,4 +1,6 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import type { HomeProjectionDto } from "../../src/lib/recovery/contracts";
 
 /**
  * Recovery v1 — honest states, evidence submission, and the profile surface.
@@ -13,9 +15,10 @@ test.skip(!email || !accessCode, "development login env not configured");
 
 const meta = { requestId: "request-e2e", workspaceVersion: 4 };
 
-const emptyHome = {
+const emptyHome: HomeProjectionDto = {
   workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 4 },
   generatedAt: "2026-08-09T10:00:00.000Z",
+  recentObservations: [],
   monthlyTotals: [],
   next30DayTotals: [],
   needsMe: [],
@@ -32,6 +35,25 @@ const emptyHome = {
   },
 };
 
+const oneObservationHome: HomeProjectionDto = {
+  ...emptyHome,
+  recentObservations: [{
+    evidenceId: "evidence-once-1",
+    merchant: "Figma",
+    amount: { currency: "INR", minor: "149900", exponent: 2, display: "₹1,499.00" },
+    date: "2026-08-09",
+  }],
+  coverage: {
+    state: "BASELINE_ONLY",
+    sourceCount: 1,
+    evidenceCount: 1,
+    lastEvidenceAt: "2026-08-09T10:00:00.000Z",
+    coverageStart: "2026-08-09",
+    coverageEnd: "2026-08-09",
+    limitations: ["One receipt has been checked; no repeated service is proven."],
+  },
+};
+
 async function signIn(page: Page) {
   await page.context().setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${Math.floor(Math.random() * 180) + 50}` });
   await page.goto("/login");
@@ -42,18 +64,47 @@ async function signIn(page: Page) {
   await page.waitForURL(/\/app/);
 }
 
-async function mockEmptyWorkspace(page: Page) {
+async function mockEmptyWorkspace(page: Page, home = emptyHome) {
   await page.route("**/api/workspaces/current/brief", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: emptyHome, meta }) }),
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: home, meta }) }),
   );
   await page.route("**/api/workspaces/current/commitments**", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { items: [], total: 0, nextCursor: null }, meta }) }),
+  );
+  await page.route("**/api/workspaces/current/evidence/evidence-once-1", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          id: "evidence-once-1",
+          source: {
+            id: "source-1",
+            type: "RECEIPT_PASTE",
+            label: "Pasted receipt",
+            ingestedAt: "2026-08-09T10:00:00.000Z",
+            coverageStart: "2026-08-09",
+            coverageEnd: "2026-08-09",
+          },
+          immutable: true,
+          observedAt: "2026-08-09T00:00:00.000Z",
+          excerpt: "Figma invoice paid INR 1,499.00 on 9 August 2026.",
+          excerptTruncated: false,
+          amount: { currency: "INR", minor: "149900", exponent: 2, display: "₹1,499.00" },
+          date: "2026-08-09",
+          provenance: { kind: "USER_SUBMITTED", reference: "submission-1:source-1:1" },
+          confidence: { state: "LOW", score: 55, scale: "PERCENT_0_100", reasons: ["One saved observation."] },
+        },
+        meta,
+      }),
+    }),
   );
 }
 
 async function openManualFallback(page: Page) {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
-  await page.getByText("Manual fallback", { exact: true }).click();
+  const fallback = page.getByText("Manual fallback", { exact: true });
+  if (await fallback.isVisible()) await fallback.click();
   await expect(page.getByLabel("Receipt or invoice text")).toBeVisible();
 }
 
@@ -64,11 +115,64 @@ test("an empty workspace offers exactly one obvious receipt-paste action", async
   await openManualFallback(page);
 
   await expect(page.getByRole("heading", { name: "Paste your first receipt" })).toBeVisible();
+  await expect(page.getByText("Paste 2-3 billing emails or invoices.")).toBeVisible();
+  await expect(page.getByText("Use the same service twice so Vognary can test a cadence.")).toBeVisible();
+  await expect(page.getByText(/See monthly burn, the next expected charge, and one decision/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Save this receipt as evidence" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save this receipt as evidence" })).toBeDisabled();
   await expect(page.getByText("Import a statement file instead (fallback)")).toBeVisible();
   await expect(page.getByRole("button", { name: /connect|Gmail|bank account/i })).toHaveCount(0);
 });
+
+test("one observed charge asks for a matching receipt instead of rendering an all-clear", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText = text;
+        },
+      },
+    });
+  });
+  await signIn(page);
+  await mockEmptyWorkspace(page, oneObservationHome);
+  await page.goto("/app");
+
+  const observed = page.getByRole("region", { name: "Build a recurring pattern" });
+  await expect(observed.getByText("Seen once")).toBeVisible();
+  await expect(observed.getByRole("heading", { name: "Not called recurring yet" })).toBeVisible();
+  await expect(observed.getByText("One charge is evidence, not a pattern.", { exact: false })).toBeVisible();
+  await expect(observed.getByRole("heading", { name: "Saved proof" })).toBeVisible();
+  await expect(observed.getByText("Figma", { exact: true })).toBeVisible();
+  await expect(observed.getByText("₹1,499.00", { exact: true })).toBeVisible();
+  await expect(observed.getByText("9 Aug 2026", { exact: true })).toBeVisible();
+  await expect(observed.getByRole("button", { name: "Inspect exact evidence" })).toBeVisible();
+  await expect(observed.getByRole("button", { name: "Copy for WhatsApp" })).toBeVisible();
+  await expect(observed.getByText("This is a floor from receipts checked, not every debit in India.")).toBeVisible();
+  await expect(page.getByText("Nothing needs attention right now")).toHaveCount(0);
+
+  await observed.getByRole("button", { name: "Inspect exact evidence" }).click();
+  const evidenceDialog = page.getByRole("dialog", { name: "Exact evidence" });
+  await expect(evidenceDialog).toContainText("Figma invoice paid INR 1,499.00 on 9 August 2026.");
+  await page.keyboard.press("Escape");
+  await expect(evidenceDialog).toHaveCount(0);
+
+  await observed.getByRole("button", { name: "Copy for WhatsApp" }).click();
+  await expect(observed.getByText("WhatsApp summary copied.", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText)).toContain("Saved receipt observation (not yet recurring): Figma · ₹1,499.00 · 9 Aug 2026.");
+  await expectNoSeriousAxeViolations(page, "one-observation Home");
+
+  await observed.getByRole("button", { name: "Add a matching receipt" }).click();
+  await expect(page.getByRole("heading", { name: "Sources" })).toBeVisible();
+  await expect(page.getByLabel("Receipt or invoice text")).toBeVisible();
+});
+
+async function expectNoSeriousAxeViolations(page: Page, label: string) {
+  const result = await new AxeBuilder({ page }).analyze();
+  const serious = result.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical");
+  expect(serious, `${label}:\n${serious.map((violation) => `${violation.id}: ${violation.help}`).join("\n")}`).toEqual([]);
+}
 
 test("submitted evidence reports accepted, invalid, unreadable, and duplicate results honestly", async ({ page }) => {
   await signIn(page);

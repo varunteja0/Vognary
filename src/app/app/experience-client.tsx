@@ -11,13 +11,15 @@ const RecoveryWorkspaceClient = dynamic(() => import("../workspace/recovery/reco
 
 export default function ExperienceClient({
   recoveryCutover,
+  receiptInboxPubliclyAvailable,
 }: {
   recoveryCutover: RecoveryCutoverStatus | null;
+  receiptInboxPubliclyAvailable: boolean;
 }) {
   if (recoveryCutover?.status === "LEGACY_DATA_REQUIRES_MIGRATION") {
     return <LegacyContinuityBlock counts={recoveryCutover.counts} />;
   }
-  return <RecoveryWorkspaceClient />;
+  return <RecoveryWorkspaceClient receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable} />;
 }
 
 function LegacyContinuityBlock({ counts }: { counts: RecoveryCutoverStatus["counts"] }) {

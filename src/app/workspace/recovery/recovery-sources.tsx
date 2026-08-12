@@ -7,6 +7,7 @@ import { AuthRequiredBlock, LoadingBlock, StateBlock } from "./recovery-states";
 import type { LoadState } from "./state";
 
 export function RecoverySources({
+  receiptInboxPubliclyAvailable,
   receiptInbox,
   sourceStatus,
   pendingAction,
@@ -18,6 +19,7 @@ export function RecoverySources({
   manualFallbackOpen,
   onManualFallbackToggle,
 }: {
+  receiptInboxPubliclyAvailable: boolean;
   receiptInbox: ReceiptInboxStatusDto | null;
   sourceStatus: LoadState;
   pendingAction: "PROVISION" | "ROTATE" | "REVOKE" | null;
@@ -40,6 +42,17 @@ export function RecoverySources({
     } catch {
       setCopyStatus("Could not copy automatically. Select the address and copy it.");
     }
+  }
+
+  if (!receiptInboxPubliclyAvailable) {
+    return (
+      <div className="grid gap-3">
+        <p className="border-y border-line px-1 py-3 text-sm leading-6 text-(--muted)">
+          <strong className="text-(--ink-soft)">Manual evidence only.</strong> Receipt forwarding is not available yet. Nothing is connected, and Vognary does not access your inbox.
+        </p>
+        {manualFallback}
+      </div>
+    );
   }
 
   return (

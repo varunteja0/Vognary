@@ -367,6 +367,12 @@ test("two realistic receipt observations infer one canonical monthly subscriptio
     });
     assert.equal(first.data.submission.acceptedEvidenceCount, 1);
     assert.equal(first.data.commitments.length, 0, "one observed charge must not fabricate recurrence");
+    assert.equal(first.data.home.recentObservations.length, 1);
+    assert.ok(first.data.home.recentObservations[0]?.evidenceId);
+    assert.equal(first.data.home.recentObservations[0]?.merchant, "OpenAI");
+    assert.equal(first.data.home.recentObservations[0]?.amount?.minor, "199900");
+    assert.equal(first.data.home.recentObservations[0]?.amount?.currency, "INR");
+    assert.equal(first.data.home.recentObservations[0]?.date, "2026-07-06");
 
     const second = await submitRecoveryEvidence({
       workspaceId,
