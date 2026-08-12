@@ -103,6 +103,48 @@ The response contains aggregate counts only:
 }
 ```
 
+## One real reminder proof (founder)
+
+Run this only with a disposable account on the deployment being attested. Clearly labelled test evidence is acceptable for proving delivery infrastructure; it is not a Customer #0 result and must not enter the market CRM.
+
+1. In Recovery Home, confirm one active test commitment shows **High confidence**, an expected date, and a decision other than **Keep**. Stop if those facts are not visible; do not insert or edit production rows by hand.
+2. Choose a send target at least one full hour in the future. In the commitment correction UI, set the expected date to one calendar day after that target date so the 1-day window lands on the target.
+3. Open **Account → Notifications**. Turn the weekly digest off, turn **7 days before** off, turn **1 day before** on, set the tested IANA time zone (for India, `Asia/Kolkata`) and target local hour, then choose **Enable reminders**.
+4. Before the target, verify exactly one future row without selecting recipient or financial fields:
+
+```sql
+select alert_window, status, scheduled_for at time zone 'Asia/Kolkata' as scheduled_for_ist
+from renewal_alert_deliveries
+where workspace_id = '<disposable-workspace-uuid>'
+order by scheduled_for desc;
+```
+
+Expected: one `1_day` row with `status = 'scheduled'` at the chosen local hour. Stop if no row exists, more than one active row exists, or the timestamp is wrong.
+
+5. At or after `scheduled_for_ist`, run one trusted worker batch from a terminal where the secret is already set. Do not paste the secret into chat or command history:
+
+```bash
+test -n "$INTERNAL_SYNC_SECRET" || { echo 'INTERNAL_SYNC_SECRET is not set'; exit 1; }
+curl --fail-with-body --silent --show-error \
+  -X POST 'https://www.vognary.com/api/internal/renewal-alerts/due/run?limit=1' \
+  -H "Authorization: Bearer $INTERNAL_SYNC_SECRET"
+```
+
+Expected aggregate result: `status = "completed"`, `remindersSelected = 1`, `weeklyDigestsSelected = 0`, `sent = 1`, `failed = 0`, and `cancelled = 0`. The response must contain no recipient, merchant, amount, or evidence text.
+
+6. In the disposable mailbox, verify one message with subject **Upcoming renewal reminder from Vognary**, the expected merchant/date in the body, and a working Account link. This observation, not the worker count alone, proves delivery.
+7. Return to **Account → Notifications**, choose **Turn off**, and save with the weekly digest still off. Verify the linked consent is withdrawn and any remaining unsent rows are `cancelled`:
+
+```sql
+select status, count(*)
+from renewal_alert_deliveries
+where workspace_id = '<disposable-workspace-uuid>'
+group by status
+order by status;
+```
+
+Stop and leave `RENEWAL_ALERT_DELIVERY_STATUS` blank if the worker returns `401`, `501`, `503`, or `207`; if `sent` is not `1`; if the email does not arrive; if response/log output exposes PII or money; or if disabling leaves an unsent row scheduled. Only after all seven steps pass may the founder set `RENEWAL_ALERT_DELIVERY_STATUS=production-live` and rerun strict activation.
+
 It never returns recipients, merchants, amounts, evidence, or provider credentials. Resend calls time out after eight seconds and use the delivery UUID as the provider idempotency key, following [Resend's idempotency-key contract](https://resend.com/docs/dashboard/emails/idempotency-keys). Retryable failures use bounded backoff and stop after five total attempts; provider rejections and missing configuration are not retried automatically.
 
 ## Operational checks

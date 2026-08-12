@@ -2,6 +2,128 @@
 
 You send. Nothing auto-sends. Mark CRM after each send.
 
+> **HARD STOP — canonical IDs changed on 2026-08-11.** The older LinkedIn
+> pattern bank later in this file maps `C01`–`C10` to historical prospects who
+> are **not** the people currently stored under those IDs. Never use that section
+> to update [`private-audit-crm.csv`](private-audit-crm.csv). The queue immediately
+> below is the only current identity map. Mark a row only after the founder
+> confirms the message was actually sent.
+
+## Canonical queue — 2026-08-12
+
+Source of truth: [`private-audit-crm.csv`](private-audit-crm.csv) plus
+[`people-conversation-learning.md`](people-conversation-learning.md). The X
+profiles below are publicly reachable and expose a public Mention action. Use
+the existing conversation thread where one is recorded; private-message access
+is not assumed. Vinesh's address is publicly listed on `recurstop.com`.
+
+There are **8 validated sends and 2 holds**, not 10 honest sends. Do not create
+two extra touches to satisfy a round number.
+
+### 1. C01 — Kabandi Saikia — SEND in the existing X thread
+
+```text
+fair — most founders land on a sheet.
+
+how often does something still surprise you — a renewal you forgot to log, or an annual charge that hits while the sheet is stale?
+```
+
+### 2. C05 — Suman Hansada — SEND in the existing X thread
+
+```text
+fair — personal use is the useful case here.
+
+for your own AI/SaaS stack, do you know the annual total and exact next renewal dates, or only each monthly bill when it lands?
+```
+
+### 3. C10 — Arpit Nigam — SEND in the existing X thread
+
+```text
+smart.
+
+is that mostly runtime/LLM usage, or also the boring renewals — SaaS seats, cloud commits, and domains — with dates for the next 30–45 days?
+```
+
+### 4. C12 — Sai Bharadwaj — SEND in the existing X thread
+
+```text
+the unpaid Founder OS point is useful.
+
+did money and renewals actually make that scope, or was it mostly memory/workflows? and for your own stack, do you have seats, domains, and the next 30–45 days of renewal dates in one view?
+```
+
+### 5. C13 — Quby — SEND in the existing X thread
+
+```text
+your $20 Cursor week is the cleaner example.
+
+after cancelling that, do you know what else is still auto-renewing across the rest of your stack, or only when a charge lands?
+```
+
+### 6. C14 — Feifei Qiu — SEND as a light reply, no pitch
+
+```text
+the joke lands because the meta-problem is real 😅
+
+serious question behind it: do you know what's still auto-renewing in the next 30–45 days, or only when the card charge lands?
+```
+
+### 7. A01 — Ahmad / Veluri — SEND founder-to-founder, not as a prospect
+
+```text
+founder to founder: what was the first useful action people took in Veluri, what did they refuse to do, and where did the first ten users come from?
+
+comparing notes, not pitching you as a Vognary user.
+```
+
+### 8. A02 — Vinesh Kumar / RecurStop — SEND by public founder email
+
+Subject: Founder-to-founder question on stale tool sheets
+
+```text
+Hi Vinesh — founder to founder.
+
+Your line that the spreadsheet was accurate for two weeks is exactly the objection I'm hearing. In early RecurStop users, what actually caused the switch: stale renewal dates, duplicate tools, or the reminder channel?
+
+I'm building in a related evidence-first audit lane and comparing field notes, not pitching you as a customer.
+
+— Varun
+```
+
+### 9. C02 — Vikram Pai — HOLD unless he replies today
+
+The first touch was 2026-08-11. Phase A allows one no-reply nudge on day 3, so
+do not send another message before 2026-08-14 unless he reopens the thread.
+
+```text
+20+ subscriptions on one personal card is exactly where the calendar gets fuzzy.
+
+without opening statements, do you know which ones renew in the next 45 days plus the annual dates?
+```
+
+### 10. C03 — Jithin Kumar — HOLD unless the public thread reopens
+
+Do not bump the ignored DM and never write "check your DM". Use this only as a
+public reply after he posts or replies again.
+
+```text
+the token-cost clarity makes sense.
+
+does that clarity also cover the boring stack — hosting, domains, analytics, and renewal dates — or mainly the agent/tool spend?
+```
+
+### Conversion only after they admit chaos or a stale sheet
+
+```text
+that's exactly what I'm testing.
+
+if you're up for it: 2–3 redacted invoices, no bank login. I'll map the next 45 days and what the evidence supports. only useful if it beats memory or the sheet — otherwise ignore me.
+```
+
+After the founder confirms a send, update only that canonical row's `asked_at`,
+`status`, `objection`, `next_follow_up`, and notes. Do not change `audit-done`,
+money, surprise, pay, or consent fields without the matching real event.
+
 **Your name in messages:** replace `Varun` if that is not you.
 
 **Intake link (same for all DMs):**  
@@ -12,7 +134,13 @@ https://www.vognary.com
 
 ---
 
-## How to send on LinkedIn (every person)
+## Historical LinkedIn pattern bank — do not send or update CRM
+
+The identities and `C01`–`C10` instructions below predate the current CRM. Keep
+them only as examples of message shape until the founder explicitly archives or
+remaps the historical research list.
+
+### How the historical LinkedIn pattern worked
 
 1. Click their **OPEN PROFILE** link below  
 2. If you are **not** 1st-degree: click **Connect** → **Add a note** → paste **CONNECT NOTE** → Send  

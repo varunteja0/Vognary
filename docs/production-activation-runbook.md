@@ -179,3 +179,30 @@ Expected success:
 - All retired connector endpoints return `410`.
 
 If strict activation fails, leave the forwarding operator flags blank or clear them, redeploy the honest unavailable landing, and repair the failed phase before retrying.
+
+## Phase 10: Pre-Public Growth Go/No-Go
+
+Strict production activation is necessary but does not prove that users value the audit. Public launch, ads, and growth claims remain blocked until the founder reviews retained evidence for every row below.
+
+| Gate | Required evidence | Current default when absent |
+| --- | --- | --- |
+| Code integrity | `lint`, `typecheck`, `claims:check`, `tokens:check`, unit tests, build, performance budget, and applicable Recovery browser scenarios pass on the candidate | **BLOCKED** |
+| Customer #0 | One real human completes sign-in → evidence → insight → decision → proof; the canonical CRM row links the measured session | **BLOCKED** |
+| Time to insight | Stopwatch durations from at least three real humans; median is under three minutes | **UNMEASURED / BLOCKED** |
+| Passive evidence | One retained signed-event record proves processing, replay, and retention, or every public and signed-in surface remains manual-only | **NOT CLAIMED** |
+| Reminder return loop | One real reminder and weekly digest are delivered, then disabling consent cancels unsent deliveries, or reminders remain unclaimed | **NOT CLAIMED** |
+| Payment | Razorpay passes KYC, webhook, replay, refund, reconciliation, and legal gates, or the founder separately verifies a lawful manual collection and invoice path before offering it | **NOT AVAILABLE / NOT CLAIMED** |
+| Market proof | At least 5 completed real audits for a private batch; public growth still requires the Phase A stop/go threshold of 10 audits, at least 50% surprise, and paid or hard pay-intent evidence | **BLOCKED** |
+| Corpus | Consented fixtures are redacted and stored under the corpus policy; no PII enters Git | **COLLECTION REQUIRED** |
+| Claims | Public copy describes only currently proven sources, outcomes, and delivery paths | **FAIL CLOSED** |
+
+The founder alone records GO or NO-GO after reviewing CRM rows and operator evidence. Green automated tests never substitute for Customer #0, payment, surprise, or return behavior.
+
+Rollback / stop conditions:
+
+- If any code or strict activation gate is red, do not deploy the candidate.
+- If receipt-inbox attestations are missing or revoked, keep Recovery manual-only and clear forwarding claims.
+- If reminders are not delivered, keep notification delivery unclaimed.
+- If payment is not verified, do not show checkout as available or record a prospect as paid.
+- If fewer than 30% of the first 10 completed audits produce a verbatim surprise finding, rework the offer before public acquisition.
+- If 20 valuable free audits produce zero payment or hard pay-intent, stop scaling the current wedge.

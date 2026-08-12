@@ -1,4 +1,4 @@
-# CONTINUE HERE — live handoff (2026-08-11)
+# CONTINUE HERE — live handoff (2026-08-12)
 
 > **New chat — mandatory order:**
 > 1. [`docs/THE-LAW.md`](THE-LAW.md) — **supreme company + agent directive** (read first)
@@ -27,31 +27,35 @@ money first-class before anything else, and the world must work too.**
   default to India.
 - Honesty invariant holds everywhere: name a rail only at its proven `*_STATUS`.
 
-## 1. Where things stand (verified 2026-08-11)
+## 1. Where things stand (verified 2026-08-12)
 
-- **Recovery v1 launch implementation is locally green (verified 2026-08-11):**
+- **Recovery v1 launch implementation is locally green (verified 2026-08-12):**
   branch `recovery/v1` has one canonical signed path under
   `src/app/workspace/recovery/**` + `src/lib/recovery/**` + Recovery APIs +
   migration `0023`. Guest evidence survives authentication; Changed provenance,
   repeatable-read version coherence, decimal-safe bigint money, exact evidence
   addressing, canonical export/delete, deterministic-only file provenance, PII
   redaction, resource ceilings, and hot-query indexes are enforced. Realistic
-  merchant + amount + charge-date receipts now persist as observations; one does
-  not fabricate recurrence, while two matching charges infer cadence through the
-  existing engine. Empty Home now leads with the private receipt address when it
-  is actually available and keeps manual evidence as the fallback. Evidence:
-  **557/557 unit/source-contract tests**, **41/41 PostgreSQL tests** from a fresh
-  schema through migrations `0024`–`0026`, and all **76 browser scenarios**
-  exercised across desktop/mobile (one 5-second dev cold-start miss in the full
-  run; the unchanged mobile Customer #0 test passed **1/1** immediately on rerun),
-  with no serious/critical axe violations. Lint, typecheck, claims, tokens, build,
-  and performance budgets pass. Production now has a clean Recovery cutover
+  merchant + amount + charge-date receipts now persist as observations; one
+  receipt publishes its saved merchant, amount, date, exact evidence, and honest
+  WhatsApp text without fabricating recurrence, while two matching charges infer
+  cadence through the existing engine. Empty Home uses a three-step manual path
+  unless the receipt inbox is publicly attested; Changed appears before attention;
+  currencies remain separate; reminder eligibility never claims delivery.
+  Evidence: **571/571 unit/source-contract tests**, **42/42 PostgreSQL tests**,
+  and the applicable closeout browser matrix **46/46** across desktop/mobile
+  (**44** landing/login/first-value/Home/state scenarios + **2** real-route/
+  PostgreSQL Customer #0 scenarios), with no serious/critical axe violations.
+  Lint has zero errors (8 pre-existing navigation warnings); typecheck, claims,
+  tokens, build, and performance budgets pass. Production now has a clean Recovery cutover
   through `0026`, an exact-main-SHA deployment, Google identity configuration,
   daily reminder/retention cron routes, and a verified Resend sending + receiving
   domain with the canonical `email.received` webhook. The provider is configured,
   but receipt-inbox launch attestations remain deliberately blank until a real
   signed event proves processing, replay, and retention. Real Google/session,
-  real receipt/PDF processing, delivered reminder, and Customer #0 remain to prove.
+  real receipt/PDF processing, delivered reminder, and a human-timed Customer #0
+  remain to prove. Scoreboard human metric cells remain blank because no completed-
+  audit, surprise, pay-intent, TTI, corpus, or return evidence was supplied in this run.
 - **Recovery launch identity is Google OIDC only (2026-08-10):** the bearer
   magic-link UI is removed from the Recovery login path and server readiness is
   opt-in disabled unless `ENABLE_MAGIC_LINK_LOGIN=true`. Magic link is deferred
@@ -118,6 +122,10 @@ money first-class before anything else, and the world must work too.**
 
 **Company sequence (THE-LAW):** Phase **A** market proof + Phase **B** loop shipping run **in parallel** now.
 Live CRM: `docs/execution/private-audit-crm.csv` · Scoreboard: `docs/execution/scoreboard.md` · Field memory (people/threads/learnings): `docs/execution/people-conversation-learning.md`
+
+**Pre-public retention execution (agents):** [`docs/execution/pre-public-retention-wp.md`](execution/pre-public-retention-wp.md) — WP-R0…R8 under Phase A/B. Not a new strategy. Code order: one product story → first-value &lt;3 min → beat spreadsheet (changed-since) → passive inbox honesty → Phase A instruments. Founder still owns Customer #0, pay, keys, go/no-go.
+
+**Ultimate closeout run (craft 10/10 + founder gates):** [`docs/execution/ultimate-closeout-run.md`](execution/ultimate-closeout-run.md) — paste prompt for SOL; closes critic defects D1–D10; company metrics require founder F1–F5 (never invent).
 
 The one product loop: **evidence in (paste/upload/Gmail) → audit finds every
 recurring charge → assistant brief → user decides → decision + outcome logged with proof.**
