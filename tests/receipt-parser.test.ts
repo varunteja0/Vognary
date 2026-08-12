@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { extractObservedReceipt, extractReceiptCandidates, receiptTextToManualInputs, splitReceiptSnippets } from "../src/lib/receipt-parser";
+import { extractObservedReceipt, extractReceiptCandidates, inferReceiptCurrencyHint, receiptTextToManualInputs, splitReceiptSnippets } from "../src/lib/receipt-parser";
 
 const sampleReceipts = [
   "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly.",
@@ -135,6 +135,35 @@ test("detects explicit foreign currencies case-insensitively and rejects ambiguo
   ]);
   assert.deepEqual(candidates.map((candidate) => candidate.currency), ["USD", "EUR", "GBP", "CAD"]);
   assert.deepEqual(extractReceiptCandidates(["Netflix subscription paid $10 on 2026-07-01. Renews monthly."]), []);
+});
+
+test("resolves a bare dollar only from one currency and one merchant across the same MIME", () => {
+  const receipt = "OpenAI invoice $20 charged on 2026-07-04.";
+  const hint = inferReceiptCurrencyHint([
+    receipt,
+    "Invoice currency: USD. Tax reporting currency: INR.",
+    receipt,
+  ]);
+
+  assert.equal(hint, "USD");
+  assert.equal(extractObservedReceipt(receipt, hint)?.currency, "USD");
+  assert.equal(extractObservedReceipt(receipt), null);
+});
+
+test("does not infer a MIME currency across conflicting currencies or merchants", () => {
+  assert.equal(inferReceiptCurrencyHint([
+    "OpenAI invoice $20 charged on 2026-07-04.",
+    "Invoice currency: USD and settlement currency: CAD",
+  ]), null);
+  assert.equal(inferReceiptCurrencyHint([
+    "OpenAI invoice $20 charged on 2026-07-04.",
+    "Netflix receipt $10 charged on 2026-07-05.",
+    "Invoice currency: USD",
+  ]), null);
+  assert.equal(inferReceiptCurrencyHint([
+    "OpenAI invoice $20 charged on 2026-07-04.",
+    "Regional office: USD Services",
+  ]), null);
 });
 
 test("receipt identity is stable when snippets reorder and price or date changes", () => {

@@ -25,9 +25,11 @@ const mandateLikePattern = /pre-?debit|e-?mandate|\bmandate\b|standing instructi
 
 const amountPattern = /(?:₹|Rs\.?|INR|USD|EUR|GBP|CAD|AUD|KWD|JPY|US\$|CA\$|AU\$|€|£|\$)\s*([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{1,3})?|[0-9]+(?:\.[0-9]{1,3})?)/i;
 
-export function extractReceiptCandidates(messages: string[]): ReceiptCandidate[] {
+export type ReceiptCurrencyHint = "USD" | "CAD" | "AUD";
+
+export function extractReceiptCandidates(messages: string[], currencyHint: ReceiptCurrencyHint | null = null): ReceiptCandidate[] {
   return messages
-    .map((message) => extractReceiptCandidate(message))
+    .map((message) => extractReceiptCandidate(message, currencyHint))
     .filter((candidate): candidate is ReceiptCandidate => Boolean(candidate));
 }
 
@@ -45,7 +47,7 @@ export function splitReceiptSnippets(text: string): string[] {
 export function receiptTextToManualInputs(text: string, sourceName = "Pasted receipt snippet"): ManualRecurringInput[] {
   if (!text.trim()) return [];
 
-  return extractReceiptCandidates(splitReceiptSnippets(text)).map((candidate) => ({
+  return extractReceiptCandidates(splitReceiptSnippets(text), inferReceiptCurrencyHint([text])).map((candidate) => ({
     id: `receipt-paste-${candidate.id}`,
     merchant: candidate.merchant,
     amount: candidate.amount,
@@ -71,18 +73,18 @@ export type ObservedReceipt = {
 
 // A receipt proving one real charge but declaring no cadence. Two of these let the
 // recurring engine infer the schedule from the gap instead of discarding both.
-export function extractObservedReceipt(message: string): ObservedReceipt | null {
+export function extractObservedReceipt(message: string, currencyHint: ReceiptCurrencyHint | null = null): ObservedReceipt | null {
   const normalized = message.replace(/\s+/g, " ").trim();
   if (!normalized) return null;
 
   const amountMatch = normalized.match(amountPattern);
-  const merchantMatch = merchantPatterns.map((pattern) => normalized.match(pattern)).find(Boolean);
+  const merchantMatch = matchReceiptMerchant(normalized);
   if (!amountMatch || !merchantMatch) return null;
 
   const observedDate = inferObservedDate(normalized);
   if (!observedDate) return null;
 
-  const currency = detectReceiptCurrency(amountMatch[0]);
+  const currency = detectReceiptCurrency(amountMatch[0], currencyHint);
   if (!currency) return null;
 
   const amountDecimal = normalizeAmountDecimal(amountMatch[1]);
@@ -100,7 +102,7 @@ export function extractObservedReceipt(message: string): ObservedReceipt | null 
   };
 }
 
-function extractReceiptCandidate(message: string): ReceiptCandidate | null {
+function extractReceiptCandidate(message: string, currencyHint: ReceiptCurrencyHint | null): ReceiptCandidate | null {
   const normalized = message.replace(/\s+/g, " ").trim();
   if (!normalized) return null;
 
@@ -108,7 +110,7 @@ function extractReceiptCandidate(message: string): ReceiptCandidate | null {
   const subscriptionLike = mandateLike
     || /subscription|renewal|renew(?:s|ed)?\b|billing|invoice|receipt|charged|auto.?pay|recurring|plan|membership|will be debited|payment (?:of|received|was)/i.test(normalized);
   const amountMatch = normalized.match(amountPattern);
-  const merchantMatch = merchantPatterns.map((pattern) => normalized.match(pattern)).find(Boolean);
+  const merchantMatch = matchReceiptMerchant(normalized);
 
   if (!subscriptionLike || !amountMatch || !merchantMatch) return null;
 
@@ -121,7 +123,7 @@ function extractReceiptCandidate(message: string): ReceiptCandidate | null {
   // RBI pre-debit notifications are the strongest mandate-freshness signal we
   // can legally read today: they arrive by email for the rail we already have.
   const category = baseCategory === "Other" && mandateLike ? "Mandates" : baseCategory;
-  const currency = detectReceiptCurrency(amountMatch[0]);
+  const currency = detectReceiptCurrency(amountMatch[0], currencyHint);
   if (!currency) return null;
   const frequency = inferReceiptFrequency(normalized, mandateLike);
   if (!frequency) return null;
@@ -202,6 +204,26 @@ const receiptDateForms = "\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}|\\d{1,2}[-/]\\d{1,2}[-/
 const explicitNextDatePattern = new RegExp(`(?:renews?\\b|next billing|next charge|due|will be debited|pre-?debit|scheduled (?:for|on)|next debit(?: date)?)[^.\\n]{0,120}?(${receiptDateForms})`, "i");
 const chargeDatePattern = new RegExp(`(?:paid|payment date|charged|billed|debited)[\\s\\S]{0,80}?(${receiptDateForms})`, "i");
 
+export function inferReceiptCurrencyHint(texts: readonly string[]): ReceiptCurrencyHint | null {
+  const currencies = new Set<ReceiptCurrencyHint>();
+  const chargeMerchants = new Set<string>();
+
+  for (const text of texts) {
+    collectExplicitDollarCurrencies(text, currencies);
+    for (const snippet of splitReceiptSnippets(text)) {
+      const amount = snippet.match(amountPattern);
+      if (!amount || !/^\s*\$/.test(amount[0])) continue;
+      const merchant = matchReceiptMerchant(snippet);
+      if (!merchant || !inferObservedDate(snippet)) continue;
+      chargeMerchants.add(receiptMerchantName(merchant).toLowerCase());
+    }
+  }
+
+  if (currencies.size !== 1 || chargeMerchants.size !== 1) return null;
+  const [currency] = currencies;
+  return currency === "USD" || currency === "CAD" || currency === "AUD" ? currency : null;
+}
+
 function inferObservedDate(message: string) {
   const chargeDate = message.match(chargeDatePattern);
   if (!chargeDate || chargeDate.index === undefined) return null;
@@ -243,14 +265,29 @@ function advanceReceiptDate(value: string, frequency: ManualRecurringInput["freq
   return `${result.getFullYear()}-${`${result.getMonth() + 1}`.padStart(2, "0")}-${`${result.getDate()}`.padStart(2, "0")}`;
 }
 
-function detectReceiptCurrency(value: string) {
+function detectReceiptCurrency(value: string, currencyHint: ReceiptCurrencyHint | null = null) {
   if (/\bCAD\b|CA\$/i.test(value)) return "CAD";
   if (/\bAUD\b|AU\$/i.test(value)) return "AUD";
   if (/\bEUR\b|€/i.test(value)) return "EUR";
   if (/\bGBP\b|£/i.test(value)) return "GBP";
   if (/\bUSD\b|US\$/i.test(value)) return "USD";
-  if (/\$/.test(value)) return null;
+  if (/\$/.test(value)) return currencyHint;
   return "INR";
+}
+
+function matchReceiptMerchant(value: string) {
+  return merchantPatterns.map((pattern) => value.match(pattern)).find((match): match is RegExpMatchArray => Boolean(match)) ?? null;
+}
+
+function receiptMerchantName(match: RegExpMatchArray) {
+  return (match[1] || match[0]).replace(/[:\s]+$/g, "").trim();
+}
+
+function collectExplicitDollarCurrencies(value: string, currencies: Set<ReceiptCurrencyHint>) {
+  if (!/invoice|receipt|billing|payment|charge|total|amount|currency|subscription|renewal/i.test(value)) return;
+  if (/\bCAD\b|CA\$/i.test(value)) currencies.add("CAD");
+  if (/\bAUD\b|AU\$/i.test(value)) currencies.add("AUD");
+  if (/\bUSD\b|US\$/i.test(value)) currencies.add("USD");
 }
 
 function slugify(value: string): string {

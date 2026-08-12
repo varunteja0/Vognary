@@ -41,6 +41,7 @@ import {
   splitReceiptSnippets,
   type ObservedReceipt,
   type ReceiptCandidate,
+  type ReceiptCurrencyHint,
 } from "@/lib/receipt-parser";
 import { redactText } from "@/lib/redaction";
 import {
@@ -266,6 +267,7 @@ export async function materializeForwardedEmailEvidence(input: {
   inboundEventId: string;
   providerEventId: string;
   expectedAttemptCount: number;
+  currencyHint?: ReceiptCurrencyHint | null;
   request: ForwardedEmailMaterializationRequest;
   now?: Date;
 }): Promise<{
@@ -278,7 +280,8 @@ export async function materializeForwardedEmailEvidence(input: {
   const client = await getDatabasePool().connect();
   const operation = "recovery.materialize-forwarded-email";
   const idempotencyKey = `forwarded-email:${sha256(`RESEND\0${input.providerEventId}`)}`;
-  const requestHash = hashRecoveryRequest({ operation, providerEventId: input.providerEventId, request });
+  const currencyHint = input.currencyHint ?? null;
+  const requestHash = hashRecoveryRequest({ operation, providerEventId: input.providerEventId, currencyHint, request });
   const now = input.now ?? new Date();
   try {
     await client.query("begin");
@@ -327,6 +330,7 @@ export async function materializeForwardedEmailEvidence(input: {
       submissionId: submissionRow.id,
       request,
       now,
+      currencyHint,
     });
     await client.query(
       `update recovery_submissions
@@ -889,6 +893,7 @@ async function persistSubmissionSources(client: PoolClient, input: {
   submissionId: string;
   request: EvidenceIngestRequest | ForwardedEmailMaterializationRequest;
   now: Date;
+  currencyHint?: ReceiptCurrencyHint | null;
 }) {
   const existingEvidence = await client.query<{ total: string }>(
     `select count(*)::text as total from recovery_evidence where workspace_id = $1`,
@@ -939,6 +944,7 @@ async function persistSubmissionSources(client: PoolClient, input: {
           input.submissionId,
           input.now,
           input.request.kind === "FORWARDED_EMAIL" ? "PROVIDER_RECEIVED" : "USER_SUBMITTED",
+          input.request.kind === "FORWARDED_EMAIL" ? input.currencyHint ?? null : null,
         )
       : extractCsvEvidence(entry.text, sourceId, sourceName, input.submissionId, input.now);
     if (!extracted.length) {
@@ -1043,17 +1049,19 @@ function extractReceiptEvidence(
   submissionId: string,
   now: Date,
   provenanceKind: EvidenceProvenanceKind,
+  currencyHint: ReceiptCurrencyHint | null,
 ): ExtractedEvidence[] {
   const declared: { candidate: ReceiptCandidate; normalizedSnippet: string }[] = [];
   const observed: ObservedReceipt[] = [];
-  for (const snippet of splitReceiptSnippets(redactText(text).text)) {
+  const redactedText = redactText(text).text;
+  for (const snippet of splitReceiptSnippets(redactedText)) {
     const normalizedSnippet = snippet.replace(/\s+/g, " ").trim();
-    const [candidate] = extractReceiptCandidates([snippet]);
+    const [candidate] = extractReceiptCandidates([snippet], currencyHint);
     if (candidate) {
       declared.push({ candidate, normalizedSnippet });
       continue;
     }
-    const observation = extractObservedReceipt(snippet);
+    const observation = extractObservedReceipt(snippet, currencyHint);
     if (observation) observed.push(observation);
   }
   const declaredEvidence = declared.flatMap(({ candidate, normalizedSnippet }, index) => {
