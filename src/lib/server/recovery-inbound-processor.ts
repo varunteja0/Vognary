@@ -273,6 +273,7 @@ function readRawDownloadUrl(value: unknown) {
     const parsed = new URL(downloadUrl);
     const allowedHost = parsed.hostname === "resend.com"
       || parsed.hostname.endsWith(".resend.com")
+      || parsed.hostname === "cdn.resend.app"
       || parsed.hostname.endsWith(".cloudfront.net");
     return parsed.protocol === "https:" && allowedHost ? parsed.toString() : null;
   } catch {
