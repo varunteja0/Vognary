@@ -67,11 +67,11 @@ Do not request the Gmail read-only scope. Google identity is not mailbox consent
 
 ## Phase 3: Resend Receiving Configuration
 
-Use a dedicated receiving subdomain and a least-privilege receiving API key. Configure:
+Use a dedicated receiving subdomain and a dedicated Resend `full_access` key for inbound retrieval. Resend currently exposes only `full_access` and `sending_access`; `sending_access` cannot call the Received Emails API. Isolate and monitor this key as `RESEND_RECEIVING_API_KEY`. Configure:
 
 ```text
 ENABLE_RECEIPT_INBOX=true
-RESEND_RECEIVING_API_KEY=<receiving-only key>
+RESEND_RECEIVING_API_KEY=<dedicated full-access key used for receiving>
 RESEND_INBOUND_WEBHOOK_SECRET=<Svix signing secret>
 RESEND_RECEIVING_DOMAIN=<dedicated receiving subdomain>
 RECEIPT_INBOX_ALIAS_HMAC_SECRET=<32-byte secret encoded as hex or base64url>

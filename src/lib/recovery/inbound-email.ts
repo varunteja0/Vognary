@@ -5,6 +5,7 @@ import "pdf-parse/worker";
 import { PDFParse } from "pdf-parse";
 import { assertPdfTextWithinLimits, hasReadablePdfTextLayer, maxPdfPages } from "@/lib/pdf-ingest";
 import { recoveryLimits } from "@/lib/recovery/contracts";
+import { inferReceiptCurrencyHint, type ReceiptCurrencyHint } from "@/lib/receipt-parser";
 
 export const forwardedEmailMaxMimeBytes = 8 * 1024 * 1024;
 const maxNestedEmailDepth = 2;
@@ -20,12 +21,14 @@ type ForwardedReceiptText = {
 export type ForwardedEmailExtraction = {
   texts: ForwardedReceiptText[];
   skippedAttachments: string[];
+  currencyHint: ReceiptCurrencyHint | null;
 };
 
 export async function extractForwardedReceiptTexts(raw: string | Uint8Array): Promise<ForwardedEmailExtraction> {
   if (byteLength(raw) > forwardedEmailMaxMimeBytes) throw new Error("Forwarded email is too large to process.");
-  const extraction: ForwardedEmailExtraction = { texts: [], skippedAttachments: [] };
+  const extraction: ForwardedEmailExtraction = { texts: [], skippedAttachments: [], currencyHint: null };
   await extractMime(raw, 0, extraction, new Set(), { pdfs: 0 });
+  extraction.currencyHint = inferReceiptCurrencyHint(extraction.texts.map((item) => item.text));
   return extraction;
 }
 

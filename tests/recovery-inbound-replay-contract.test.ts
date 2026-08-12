@@ -20,6 +20,6 @@ test("forwarded materialization idempotency is stable after transport-event rete
     recoveryStore.indexOf("export async function materializeForwardedEmailEvidence"),
     recoveryStore.indexOf("export async function getRecoveryHome"),
   );
-  assert.match(materialization, /hashRecoveryRequest\(\{ operation, providerEventId: input\.providerEventId, request \}\)/);
+  assert.match(materialization, /hashRecoveryRequest\(\{ operation, providerEventId: input\.providerEventId, currencyHint, request \}\)/);
   assert.doesNotMatch(materialization, /hashRecoveryRequest\(\{ operation, inboundEventId/);
 });

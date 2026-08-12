@@ -71,6 +71,33 @@ test("a PDF invoice attachment becomes receipt evidence text", async () => {
   assert.deepEqual(skippedAttachments, []);
 });
 
+test("one MIME currency contextualizes one bare-dollar charge merchant", async () => {
+  const currencyContext = [
+    "From: founder@example.test",
+    "To: rcpt_example@receipts.vognary.test",
+    "Subject: receipt",
+    "MIME-Version: 1.0",
+    "Content-Type: multipart/mixed; boundary=outer",
+    "",
+    "--outer",
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    "OpenAI invoice $20 charged on 6 July 2026.",
+    "--outer",
+    "Content-Type: message/rfc822",
+    "",
+    "From: billing@example.test",
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    "Invoice currency: USD",
+    "--outer--",
+    "",
+  ].join("\r\n");
+
+  const extraction = await extractForwardedReceiptTexts(currencyContext);
+  assert.equal(extraction.currencyHint, "USD");
+});
+
 test("an unreadable image-only attachment is reported instead of silently discarded", async () => {
   const { texts: extracted, skippedAttachments } = await extractForwardedReceiptTexts(
     emailWithAttachment("image/png", "receipt.png", Buffer.from("89504e470d0a1a0a0000000d49484452", "hex")),

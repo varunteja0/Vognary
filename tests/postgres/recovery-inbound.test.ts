@@ -406,12 +406,25 @@ test("the Resend processor reserves, retrieves, parses, materializes, and dedupl
     const retrieveRawEmail = async () => {
       retrievals += 1;
       return [
-        "From: billing@example.test",
+        "From: founder@example.test",
         `To: ${address}`,
         "Subject: OpenAI receipt",
+        "MIME-Version: 1.0",
+        "Content-Type: multipart/mixed; boundary=outer",
+        "",
+        "--outer",
         "Content-Type: text/plain; charset=utf-8",
         "",
-        "OpenAI charged INR 1,999 on 6 July 2026. Renews monthly on 6 August 2026.",
+        "OpenAI subscription $20 charged on 6 July 2026. Renews monthly on 6 August 2026.",
+        "--outer",
+        "Content-Type: message/rfc822",
+        "",
+        "From: billing@example.test",
+        "Content-Type: text/plain; charset=utf-8",
+        "",
+        "Invoice currency: USD",
+        "--outer--",
+        "",
       ].join("\r\n");
     };
 
@@ -499,15 +512,22 @@ test("the Resend processor reserves, retrieves, parses, materializes, and dedupl
     const activeStatus = await getReceiptInboxStatus({ workspaceId, actorUserId: userId });
     assert.equal(activeStatus.state, "READY");
     assert.ok(activeStatus.lastProcessedAt);
-    const canonical = await pool.query<{ events: string; submissions: string; provider_evidence: string; merchants: string[] }>(
+    const canonical = await pool.query<{ events: string; submissions: string; provider_evidence: string; merchants: string[]; currencies: string[] }>(
       `select
          (select count(*)::text from recovery_inbound_events where workspace_id = $1) as events,
          (select count(*)::text from recovery_submissions where workspace_id = $1) as submissions,
          (select count(*)::text from recovery_evidence where workspace_id = $1 and provenance_kind = 'PROVIDER_RECEIVED') as provider_evidence,
-         array(select effective_merchant from recovery_commitments where workspace_id = $1 order by effective_merchant) as merchants`,
+         array(select effective_merchant from recovery_commitments where workspace_id = $1 order by effective_merchant) as merchants,
+         array(select base_currency from recovery_commitments where workspace_id = $1 order by effective_merchant) as currencies`,
       [workspaceId],
     );
-    assert.deepEqual(canonical.rows[0], { events: "3", submissions: "3", provider_evidence: "3", merchants: ["Figma", "Notion", "OpenAI"] });
+    assert.deepEqual(canonical.rows[0], {
+      events: "3",
+      submissions: "3",
+      provider_evidence: "3",
+      merchants: ["Figma", "Notion", "OpenAI"],
+      currencies: ["INR", "INR", "USD"],
+    });
 
     let unknownRetrievals = 0;
     const ignored = await processResendReceivedEvent({ ...received, svixId: `msg_${randomUUID()}`, emailId: `email_${randomUUID()}`, recipient: "rcpt_ffffffffffffffffffffffffffffffffffffffff@receipts.vognary.test" }, {

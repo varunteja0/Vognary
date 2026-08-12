@@ -80,6 +80,7 @@ export async function processResendReceivedEvent(
       inboundEventId: reservation.id,
       providerEventId: event.svixId,
       expectedAttemptCount: reservation.attemptCount,
+      currencyHint: extraction.currencyHint,
       request: { kind: "FORWARDED_EMAIL", receipts },
     });
     return materialized.submission.acceptedEvidenceCount > 0
