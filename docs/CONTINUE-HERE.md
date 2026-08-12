@@ -56,6 +56,20 @@ money first-class before anything else, and the world must work too.**
   real receipt/PDF processing, delivered reminder, and a human-timed Customer #0
   remain to prove. Scoreboard human metric cells remain blank because no completed-
   audit, surprise, pay-intent, TTI, corpus, or return evidence was supplied in this run.
+- **Local F1 was impossible until 2026-08-12 and is now unblocked.** The closeout
+  work was 28 uncommitted files on one laptop; it is now committed and pushed as
+  `9cbccf0` + `6531c0b` on `recovery/v1`. Separately, `.env.local` had no
+  `ENABLE_DEVELOPMENT_LOGIN` / `DEVELOPMENT_LOGIN_EMAIL` /
+  `DEVELOPMENT_LOGIN_ACCESS_CODE`, and no local Google client, so **no one could
+  sign in locally at all** — which is why `recovery_submissions` was 0 and every
+  signed-in browser journey silently skipped on this machine (CI always had the
+  code, so CI counts were real). Development login is now configured locally
+  (gitignored; hard-disabled when `NODE_ENV=production`). `.env.local` still
+  points `DATABASE_URL` at `localhost:5432` for the `docker compose` path, so
+  when using the standalone Postgres on `55432` start the server as:
+  `DATABASE_URL='postgres://vognary@127.0.0.1:55432/vognary' POSTGRES_SSL=false npm run dev -- --hostname 127.0.0.1 --port 3101`.
+  Customer #0 then passes live on that server: **desktop and mobile, 30 actions
+  each, real routes and real PostgreSQL**. Human TTI is still unmeasured.
 - **Recovery launch identity is Google OIDC only (2026-08-10):** the bearer
   magic-link UI is removed from the Recovery login path and server readiness is
   opt-in disabled unless `ENABLE_MAGIC_LINK_LOGIN=true`. Magic link is deferred
