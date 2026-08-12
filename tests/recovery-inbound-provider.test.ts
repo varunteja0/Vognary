@@ -36,7 +36,7 @@ test("Resend retrieval follows the documented raw download contract without forw
         object: "email",
         id: "email-1",
         raw: {
-          download_url: "https://d111111abcdef8.cloudfront.net/receiving/raw/email-1?Signature=signed",
+          download_url: "https://cdn.resend.app/receiving/raw/email-1?Signature=signed",
           expires_at: "2026-08-10T13:00:00.000Z",
         },
       });
@@ -56,7 +56,7 @@ test("Resend retrieval follows the documented raw download contract without forw
         redirect: undefined,
       },
       {
-        url: "https://d111111abcdef8.cloudfront.net/receiving/raw/email-1?Signature=signed",
+        url: "https://cdn.resend.app/receiving/raw/email-1?Signature=signed",
         authorization: null,
         redirect: "error",
       },
@@ -88,6 +88,26 @@ test("raw email redirects fail retryably instead of following an unvalidated hos
   try {
     await assert.rejects(retrieveResendRawEmail("email-2"), /raw email request failed/i);
     assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnvironment();
+  }
+});
+
+test("raw email retrieval rejects Resend hostname lookalikes", async () => {
+  const restoreEnvironment = setEnvironment(receiptInboxEnvironment);
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return Response.json({
+      raw: { download_url: "https://cdn.resend.app.attacker.example/raw/email-2?Signature=signed" },
+    });
+  };
+
+  try {
+    await assert.rejects(retrieveResendRawEmail("email-2"), /raw email is not available yet/i);
+    assert.equal(calls, 1);
   } finally {
     globalThis.fetch = originalFetch;
     restoreEnvironment();
