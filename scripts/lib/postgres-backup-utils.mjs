@@ -8,6 +8,7 @@ import { pipeline } from "node:stream/promises";
 
 const algorithm = "aes-256-gcm";
 const keyByteLength = 32;
+const postgresClientImage = "postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636";
 
 export function parseBackupEncryptionKey(rawKey, name = "BACKUP_ENCRYPTION_KEY") {
   const value = rawKey?.trim();
@@ -172,7 +173,7 @@ export async function runPostgresCommand(command, args, options = {}) {
     "--rm",
     ...volumes.flatMap((volume) => ["-v", `${volume.hostPath}:${volume.containerPath}`]),
     ...dockerEnvNames(dockerEnvironment).flatMap((name) => ["-e", name]),
-    "postgres:16.14@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b",
+    postgresClientImage,
     command,
     ...args.map((arg) => rewriteDockerPath(arg, volumes)),
   ];

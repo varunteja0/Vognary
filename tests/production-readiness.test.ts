@@ -14,6 +14,7 @@ const nodeEngine = ">=22.22.2 <23";
 const npmEngine = ">=10.9.7 <11";
 const nodeImage = "node:22.23.2-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32";
 const postgresImage = "postgres:16.14@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b";
+const postgresClientImage = "postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636";
 const checkoutAction = "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803";
 const setupNodeAction = "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38";
 const uploadArtifactAction = "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02";
@@ -108,7 +109,8 @@ test("runtime and PostgreSQL tooling are pinned to one reproducible foundation",
 
   const compose = parse(read("docker-compose.yml")) as { services?: { postgres?: { image?: string } } };
   assert.equal(compose.services?.postgres?.image, postgresImage);
-  assert.match(read("scripts/lib/postgres-backup-utils.mjs"), new RegExp(postgresImage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(read("scripts/lib/postgres-backup-utils.mjs"), new RegExp(postgresClientImage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(read("scripts/lib/postgres-backup-utils.mjs"), new RegExp(postgresImage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 
   const backupWorkflow = read(".github/workflows/ops-backup-drill.yml");
   assert.match(backupWorkflow, new RegExp(`uses: ${checkoutAction}`));

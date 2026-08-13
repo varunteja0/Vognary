@@ -157,6 +157,15 @@ Before public activation:
 
 - Prove monitoring delivery with the protected monitoring test route.
 - Complete and record an encrypted backup restore drill.
+- Run `pg_dump`/`pg_restore` with a client at least as new as the production
+	server. The repository Docker fallback is pinned to PostgreSQL 18.4 because
+	production currently reports PostgreSQL 18.4; PostgreSQL 16 correctly refuses
+	that dump. A restore rehearsal proves recoverability only when the decrypted
+	checksum, all required core tables, and every Recovery row count match.
+- A successful local/disposable restore does **not** make backups READY by
+	itself. Keep `BACKUP_RESTORE_DRILL_STATUS` blank until the encrypted dump and
+	manifest use a persistent founder-held key, are uploaded to configured durable
+	object storage, and that stored object is the artifact restored in the drill.
 - Keep assisted-audit checkout hidden unless Razorpay KYC, signed webhook, replay, refund, reconciliation, and legal terms gates all pass.
 - Verify deletion follow-up for provider credentials created before connector retirement.
 

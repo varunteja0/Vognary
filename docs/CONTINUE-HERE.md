@@ -70,6 +70,27 @@ money first-class before anything else, and the world must work too.**
   `DATABASE_URL='postgres://vognary@127.0.0.1:55432/vognary' POSTGRES_SSL=false npm run dev -- --hostname 127.0.0.1 --port 3101`.
   Customer #0 then passes live on that server: **desktop and mobile, 30 actions
   each, real routes and real PostgreSQL**. Human TTI is still unmeasured.
+- **Production closeout candidate is live, but public growth remains blocked
+  (verified 2026-08-12):** `www.vognary.com` now serves exact CI-green SHA
+  `2eda24d5d88e4d3e0727d823905d9aba9fdcb0fd`; the closeout landing/login copy,
+  `/api/health`, identity-only Google start contract, retired `410` routes,
+  persistent backend, migrations through `0026`, and shared rate limiting pass.
+  The invalid production `DATABASE_URL` placeholder was replaced by a verified
+  Neon pooled URL. `INTERNAL_SYNC_SECRET` is synchronized across Vercel, GitHub
+  Actions, and the gitignored local operator file; a protected Sentry test
+  returned `status=delivered`, and a protected retention dry run selected all 4
+  workspaces with zero failed executions. A read-only encrypted backup of the
+  PostgreSQL 18.4 production database restored into disposable PostgreSQL 18.4
+  with matching checksum, all 17 core tables, and exact Recovery row counts; all
+  copied data and the temporary key were then destroyed. That rehearsal does
+  **not** make backups READY because no persistent founder-held key or durable
+  object-storage copy exists. Receipt inbox remains NOT CLAIMED: production has
+  3 signed-event records, but 2 are terminal `PARSE_FAILED`, 1 remains
+  `MATERIALIZATION_FAILED`, and zero evidence rows have `PROVIDER_RECEIVED`
+  provenance. Delivered reminders/digests remain 0; Razorpay and legal proof are
+  absent; human F1/TTI, completed audits, surprise, pay intent, consented corpus,
+  and D30 return remain unmeasured. Non-strict production endpoint health passes;
+  Phase 10 and strict public activation remain NO-GO.
 - **Recovery launch identity is Google OIDC only (2026-08-10):** the bearer
   magic-link UI is removed from the Recovery login path and server readiness is
   opt-in disabled unless `ENABLE_MAGIC_LINK_LOGIN=true`. Magic link is deferred
