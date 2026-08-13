@@ -50,6 +50,7 @@ test("feature readiness checks every persistent capability migration with bounde
     "0027_gmail_forwarding_verification",
     "0028_recovery_gmail_oauth_source",
     "0029_legacy_tenant_integrity",
+    "0030_legacy_tenant_ownership_immutable",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }

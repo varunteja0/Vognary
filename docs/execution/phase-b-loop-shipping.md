@@ -108,7 +108,19 @@ Execute in order. Never begin the next WP before the previous PR is merged into 
 
 **Done when:** gates including disposable PostgreSQL are green and reviewers have signed the same head SHA.
 
-**Status (2026-08-13):** Merged as PR #32 at `2e3c776` before required Codex/Opus gates completed. WP-A.1 (legacy tenant integrity) is the required corrective PR; do not start WP-B until it merges.
+**Status (2026-08-13):** Merged as PR #32 at `2e3c776` before required Codex/Opus gates completed.
+
+### WP-A.1 — Legacy tenant integrity (corrective)
+
+Refuse cross-workspace decision/evidence rehoming. Leave historical mismatched rows untouched as cutover blockers.
+
+**Status (2026-08-13):** Merged unexpectedly as PR #33 at `d84e778` before CI/Codex/Opus gates. Codex review of `ad65d055` is **NOT APPROVED**. Do not revert.
+
+### WP-A.2 — Immutable legacy workspace ownership (corrective)
+
+A valid same-workspace evidence link must not become cross-workspace by later updating `data_sources.workspace_id` or `recurring_items.workspace_id`. Additive migration `0030_legacy_tenant_ownership_immutable` rejects an actual workspace change on those frozen tables. No-op same-workspace updates remain permitted. Historical dirty rows stay untouched.
+
+**Status (2026-08-13):** Required. Do not start WP-B until this PR merges with CI green plus real Codex and real Opus on the exact head SHA. A missing, failed, or rate-limited review is not approval.
 
 ### WP-B — Class lock, standing mandate, shadow engine
 
