@@ -39,9 +39,9 @@ test("Recovery cutover blocks queued legacy sync jobs and removes their cron", (
   assert.match(retirementMigration, /where status in \('queued', 'running', 'failed', 'paused'\)/);
   assert.doesNotMatch(vercel, /\/api\/internal\/sync-jobs\/due\/run/);
   assert.doesNotMatch(vercel, /\/api\/internal\/savings-verification\/due\/run/);
-  const recheck = connectorRunner.indexOf("assertConnectorSyncRunRunnable");
-  const materialize = connectorRunner.indexOf("materializeConnectorBatch({");
-  assert.ok(recheck >= 0 && materialize > recheck, "the runner must recheck the job before legacy materialization");
+  assert.match(connectorRunner, /LEGACY_LEDGER_WRITE_FROZEN/);
+  assert.doesNotMatch(connectorRunner, /materializeConnectorBatch\(/);
+  assert.doesNotMatch(connectorRunner, /persistConnectorEvidenceBatch\(/);
 });
 
 test("Recovery reminders schedule canonical subscriptions and cancel unsent legacy deliveries", () => {

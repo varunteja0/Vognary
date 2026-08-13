@@ -34,7 +34,7 @@ type LegacySource = {
   created_at: Date;
 };
 
-type LegacyItem = {
+export type LegacyItem = {
   id: string;
   workspace_id: string;
   merchant: string;
@@ -52,7 +52,7 @@ type LegacyItem = {
   first_detected_at: Date;
 };
 
-type LegacyEvidence = {
+export type LegacyEvidence = {
   id: string;
   recurring_item_id: string;
   source_id: string;
@@ -70,6 +70,36 @@ type LegacyDecision = {
   updated_at: Date;
 };
 
+export type LegacyLedgerBlockerCounts = {
+  unsupportedSources: number;
+  incompleteEvidence: number;
+  itemsWithoutEvidence: number;
+  unsupportedActions: number;
+  transactions: number;
+  connectorEvidence: number;
+  legacyConnectedAccounts: number;
+  actionCases: number;
+  partialRecoveryRows: number;
+  orphanedLegacyRows: number;
+};
+
+export type LegacyLedgerMigratableCounts = {
+  workspaces: number;
+  sources: number;
+  commitments: number;
+  evidence: number;
+  decisions: number;
+};
+
+export type LegacyLedgerCountReport = {
+  status: "clean" | "safely-migratable" | "blocked";
+  legacyRows: number;
+  migratable: LegacyLedgerMigratableCounts;
+  blocked: LegacyLedgerBlockerCounts;
+  recoveryWorkspaces: number;
+  recoveryEvidence: number;
+};
+
 export type LegacyRecoveryMigrationResult = {
   status: "already-clean" | "migrated";
   workspacesMigrated: number;
@@ -80,6 +110,123 @@ export type LegacyRecoveryMigrationResult = {
   remindersScheduled: number;
 };
 
+export class LegacyCutoverBlockedError extends Error {
+  readonly code = "LEGACY_CUTOVER_BLOCKED" as const;
+  readonly blocked: LegacyLedgerBlockerCounts;
+
+  constructor(blocked: LegacyLedgerBlockerCounts) {
+    super(`Legacy Recovery cutover blocked: ${formatBlockerCounts(blocked)}. Unsupported rows were not deleted.`);
+    this.name = "LegacyCutoverBlockedError";
+    this.blocked = blocked;
+  }
+}
+
+export function formatBlockerCounts(blocked: LegacyLedgerBlockerCounts) {
+  return (Object.entries(blocked) as Array<[keyof LegacyLedgerBlockerCounts, number]>)
+    .filter(([, count]) => count > 0)
+    .map(([name, count]) => `${name}=${count}`)
+    .join(", ");
+}
+
+export async function countLegacyLedgerRows(pool: Pool | PoolClient): Promise<LegacyLedgerCountReport> {
+  const result = await pool.query<{
+    legacy_rows: number;
+    recovery_workspaces: number;
+    recovery_evidence: number;
+    migratable_workspaces: number;
+    migratable_sources: number;
+    migratable_commitments: number;
+    migratable_evidence: number;
+    migratable_decisions: number;
+    unsupported_sources: number;
+    incomplete_evidence: number;
+    items_without_evidence: number;
+    unsupported_actions: number;
+    transactions: number;
+    connector_evidence: number;
+    legacy_connected_accounts: number;
+    action_cases: number;
+    partial_recovery_rows: number;
+    orphaned_legacy_rows: number;
+  }>(
+    `select
+       ((select count(*) from workspace_states)
+        + (select count(*) from recurring_items)
+        + (select count(*) from evidence_links)
+        + (select count(*) from commitment_decisions)
+        + (select count(*) from transactions)
+        + (select count(*) from data_sources)
+        + (select count(*) from connector_evidence)
+        + (select count(*) from connected_accounts
+          where coalesce(metadata ->> 'ledgerAuthority', 'LEGACY') <> 'RECOVERY_V1'))::int as legacy_rows,
+       (select count(*)::int from recovery_workspace_states) as recovery_workspaces,
+       (select count(*)::int from recovery_evidence) as recovery_evidence,
+       (select count(*)::int from workspace_states) as migratable_workspaces,
+       (select count(*)::int from data_sources where kind = 'manual_entry') as migratable_sources,
+       (select count(*)::int from recurring_items) as migratable_commitments,
+       (select count(*)::int from evidence_links) as migratable_evidence,
+       (select count(*)::int from commitment_decisions) as migratable_decisions,
+       (select count(*)::int from data_sources where kind <> 'manual_entry') as unsupported_sources,
+       (select count(*)::int from evidence_links link
+         join recurring_items item on item.id = link.recurring_item_id
+         where link.source_id is null or link.amount is null or link.evidence_date is null) as incomplete_evidence,
+       (select count(*)::int from recurring_items item
+         where not exists (select 1 from evidence_links link where link.recurring_item_id = item.id)) as items_without_evidence,
+       (select count(*)::int from commitment_decisions
+         where action not in ('keep', 'watch', 'downgrade', 'cancel', 'investigate')) as unsupported_actions,
+       (select count(*)::int from transactions) as transactions,
+       (select count(*)::int from connector_evidence) as connector_evidence,
+       (select count(*)::int from connected_accounts
+         where coalesce(metadata ->> 'ledgerAuthority', 'LEGACY') <> 'RECOVERY_V1') as legacy_connected_accounts,
+       (select count(*)::int from action_cases) as action_cases,
+       ((select count(*) from recovery_workspace_states state
+         where exists (select 1 from workspace_states legacy where legacy.workspace_id = state.workspace_id))
+         + (select count(*) from recovery_submissions submission
+         where exists (select 1 from workspace_states legacy where legacy.workspace_id = submission.workspace_id))
+         + (select count(*) from recovery_sources source
+         where exists (select 1 from workspace_states legacy where legacy.workspace_id = source.workspace_id))
+         + (select count(*) from recovery_commitments commitment
+         where exists (select 1 from workspace_states legacy where legacy.workspace_id = commitment.workspace_id))
+         + (select count(*) from recovery_evidence evidence
+         where exists (select 1 from workspace_states legacy where legacy.workspace_id = evidence.workspace_id)))::int as partial_recovery_rows,
+       ((select count(*) from recurring_items item
+         where not exists (select 1 from workspace_states state where state.workspace_id = item.workspace_id))
+         + (select count(*) from data_sources source
+         where not exists (select 1 from workspace_states state where state.workspace_id = source.workspace_id)))::int as orphaned_legacy_rows`,
+  );
+  const row = result.rows[0];
+  const blocked: LegacyLedgerBlockerCounts = {
+    unsupportedSources: row?.unsupported_sources ?? 0,
+    incompleteEvidence: row?.incomplete_evidence ?? 0,
+    itemsWithoutEvidence: row?.items_without_evidence ?? 0,
+    unsupportedActions: row?.unsupported_actions ?? 0,
+    transactions: row?.transactions ?? 0,
+    connectorEvidence: row?.connector_evidence ?? 0,
+    legacyConnectedAccounts: row?.legacy_connected_accounts ?? 0,
+    actionCases: row?.action_cases ?? 0,
+    partialRecoveryRows: row?.partial_recovery_rows ?? 0,
+    orphanedLegacyRows: row?.orphaned_legacy_rows ?? 0,
+  };
+  const migratable: LegacyLedgerMigratableCounts = {
+    workspaces: row?.migratable_workspaces ?? 0,
+    sources: row?.migratable_sources ?? 0,
+    commitments: row?.migratable_commitments ?? 0,
+    evidence: row?.migratable_evidence ?? 0,
+    decisions: row?.migratable_decisions ?? 0,
+  };
+  const blockerTotal = Object.values(blocked).reduce((sum, count) => sum + count, 0);
+  const migratableTotal = Object.values(migratable).reduce((sum, count) => sum + count, 0);
+  const legacyRows = row?.legacy_rows ?? 0;
+  return {
+    status: blockerTotal > 0 ? "blocked" : migratableTotal > 0 || legacyRows > 0 ? "safely-migratable" : "clean",
+    legacyRows,
+    migratable,
+    blocked,
+    recoveryWorkspaces: row?.recovery_workspaces ?? 0,
+    recoveryEvidence: row?.recovery_evidence ?? 0,
+  };
+}
+
 export async function migrateLegacyRecovery(pool: Pool): Promise<LegacyRecoveryMigrationResult> {
   const client = await pool.connect();
   try {
@@ -89,10 +236,17 @@ export async function migrateLegacyRecovery(pool: Pool): Promise<LegacyRecoveryM
       "lock table workspace_states, recurring_items, evidence_links, commitment_decisions, data_sources, transactions, connector_evidence, connected_accounts, action_cases in share row exclusive mode",
     );
 
+    const report = await countLegacyLedgerRows(client);
+    if (report.status === "blocked") throw new LegacyCutoverBlockedError(report.blocked);
+    if (report.status === "clean") {
+      await client.query("commit");
+      return cleanResult();
+    }
+
     const migration = await client.query(
-      `select 1 from schema_migrations where id = '0026_recovery_inbound_retention'`,
+      `select 1 from schema_migrations where id = '0028_recovery_gmail_oauth_source'`,
     );
-    if (!migration.rows[0]) throw new Error("Production must be migrated through 0026 before legacy Recovery materialization.");
+    if (!migration.rows[0]) throw new Error("Production must be migrated through 0028 before legacy Recovery materialization.");
 
     const workspaces = await client.query<{ workspace_id: string; owner_user_id: string }>(
       `select state.workspace_id, workspace.owner_user_id
@@ -100,11 +254,7 @@ export async function migrateLegacyRecovery(pool: Pool): Promise<LegacyRecoveryM
        join workspaces workspace on workspace.id = state.workspace_id
        order by state.workspace_id`,
     );
-    if (!workspaces.rowCount) {
-      await assertLegacyAuthorityRemoved(client);
-      await client.query("commit");
-      return cleanResult();
-    }
+    if (!workspaces.rowCount) throw new LegacyCutoverBlockedError(report.blocked);
     const workspaceIds = workspaces.rows.map((row) => row.workspace_id);
     await assertMigrationPreconditions(client, workspaceIds);
 
@@ -392,6 +542,7 @@ export async function migrateLegacyRecovery(pool: Pool): Promise<LegacyRecoveryM
       evidence: evidence.length,
       decisions: decisions.length,
     });
+    await reconcileMigratedRecoveryRecords(client, items, evidence);
 
     await client.query(`delete from recurring_items where workspace_id = any($1::uuid[])`, [workspaceIds]);
     await client.query(`delete from data_sources where workspace_id = any($1::uuid[])`, [workspaceIds]);
@@ -460,9 +611,20 @@ async function assertMigrationPreconditions(client: PoolClient, workspaceIds: st
     [workspaceIds],
   );
   const state = result.rows[0]!;
-  const blockers = Object.entries(state).filter(([, count]) => count !== 0);
-  if (blockers.length) {
-    throw new Error(`Legacy Recovery migration preconditions failed: ${blockers.map(([name, count]) => `${name}=${count}`).join(", ")}.`);
+  const blocked: LegacyLedgerBlockerCounts = {
+    unsupportedSources: state.unsupported_sources,
+    incompleteEvidence: state.incomplete_evidence,
+    itemsWithoutEvidence: state.items_without_evidence,
+    unsupportedActions: state.unsupported_actions,
+    transactions: state.transactions,
+    connectorEvidence: state.connector_evidence,
+    legacyConnectedAccounts: state.legacy_connected_accounts,
+    actionCases: state.action_cases,
+    partialRecoveryRows: state.partial_recovery_rows,
+    orphanedLegacyRows: 0,
+  };
+  if (Object.values(blocked).some((count) => count > 0)) {
+    throw new LegacyCutoverBlockedError(blocked);
   }
 }
 
@@ -496,6 +658,57 @@ async function verifyCanonicalCopy(
     || actual.links !== expected.evidence
     || actual.decisions !== expected.decisions) {
     throw new Error(`Canonical Recovery copy verification failed: ${JSON.stringify(actual)}.`);
+  }
+}
+
+export async function reconcileMigratedRecoveryRecords(
+  client: PoolClient,
+  items: readonly LegacyItem[],
+  evidence: readonly LegacyEvidence[],
+) {
+  if (!items.length) return;
+  const copied = await client.query<{
+    identity_key: string;
+    base_amount_minor: string;
+    base_currency: string;
+    evidence_count: string;
+  }>(
+    `select commitment.identity_key,
+            commitment.base_amount_minor::text as base_amount_minor,
+            commitment.base_currency,
+            (select count(*)::text from recovery_commitment_evidence link where link.commitment_id = commitment.id) as evidence_count
+     from recovery_commitments commitment
+     where commitment.identity_key = any($1::text[])`,
+    [items.map((item) => `legacy:${item.id}`)],
+  );
+  const byKey = new Map(copied.rows.map((row) => [row.identity_key, row]));
+  const evidenceByItem = new Map<string, number>();
+  for (const row of evidence) {
+    evidenceByItem.set(row.recurring_item_id, (evidenceByItem.get(row.recurring_item_id) ?? 0) + 1);
+  }
+  const mismatches: string[] = [];
+  for (const item of items) {
+    const row = byKey.get(`legacy:${item.id}`);
+    if (!row) {
+      mismatches.push(`missing:${item.id}`);
+      continue;
+    }
+    if (row.base_amount_minor !== decimalToMinorUnits(item.average_amount, item.currency) || row.base_currency !== item.currency) {
+      mismatches.push(`amount:${item.id}`);
+    }
+    if (Number(row.evidence_count) !== (evidenceByItem.get(item.id) ?? 0)) {
+      mismatches.push(`evidence:${item.id}`);
+    }
+  }
+  const copiedEvidence = await client.query<{ provenance_reference: string }>(
+    `select provenance_reference from recovery_evidence where provenance_reference = any($1::text[])`,
+    [evidence.map((row) => `legacy-evidence:${row.id}`)],
+  );
+  if (copiedEvidence.rowCount !== evidence.length) {
+    mismatches.push(`evidence_refs expected=${evidence.length} actual=${copiedEvidence.rowCount}`);
+  }
+  if (mismatches.length) {
+    throw new Error(`Record-level Recovery reconciliation failed: ${mismatches.join(", ")}.`);
   }
 }
 

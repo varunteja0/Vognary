@@ -291,6 +291,9 @@ test("forwarded email materializes once into Recovery with provider provenance a
       commitments: string;
       source_type: string;
       provenance_kind: string;
+      provenance_reference: string;
+      inbound_event_id: string | null;
+      ingested_at: Date;
       submitted_by_user_id: string | null;
       actor_user_id: string | null;
       event_status: string;
@@ -302,22 +305,30 @@ test("forwarded email materializes once into Recovery with provider provenance a
          (select count(*)::text from recovery_commitments where workspace_id = $1) as commitments,
          (select source_type from recovery_sources where workspace_id = $1 limit 1) as source_type,
          (select provenance_kind from recovery_evidence where workspace_id = $1 limit 1) as provenance_kind,
+         (select provenance_reference from recovery_evidence where workspace_id = $1 limit 1) as provenance_reference,
+         (select inbound_event_id::text from recovery_submissions where workspace_id = $1 limit 1) as inbound_event_id,
+         (select ingested_at from recovery_submissions where workspace_id = $1 limit 1) as ingested_at,
          (select submitted_by_user_id::text from recovery_submissions where workspace_id = $1 limit 1) as submitted_by_user_id,
          (select actor_user_id::text from recovery_workspace_versions where workspace_id = $1 limit 1) as actor_user_id,
          (select status from recovery_inbound_events where id = $2) as event_status`,
       [workspaceId, inboundEventId],
     );
-    assert.deepEqual(canonical.rows[0], {
-      submissions: "1",
-      sources: "1",
-      evidence: "1",
-      commitments: "1",
-      source_type: "FORWARDED_EMAIL",
-      provenance_kind: "PROVIDER_RECEIVED",
-      submitted_by_user_id: null,
-      actor_user_id: null,
-      event_status: "PROCESSED",
-    });
+    assert.equal(canonical.rows[0]?.submissions, "1");
+    assert.equal(canonical.rows[0]?.sources, "1");
+    assert.equal(canonical.rows[0]?.evidence, "1");
+    assert.equal(canonical.rows[0]?.commitments, "1");
+    assert.equal(canonical.rows[0]?.source_type, "FORWARDED_EMAIL");
+    assert.equal(canonical.rows[0]?.provenance_kind, "PROVIDER_RECEIVED");
+    assert.equal(canonical.rows[0]?.inbound_event_id, inboundEventId);
+    assert.match(canonical.rows[0]?.provenance_reference ?? "", new RegExp(`^${inboundEventId}:`));
+    assert.ok(
+      ["2026-08-10T12:00:00.000Z", "2026-08-10T12:00:01.000Z"].includes(
+        canonical.rows[0]?.ingested_at.toISOString() ?? "",
+      ),
+    );
+    assert.equal(canonical.rows[0]?.submitted_by_user_id, null);
+    assert.equal(canonical.rows[0]?.actor_user_id, null);
+    assert.equal(canonical.rows[0]?.event_status, "PROCESSED");
 
     const legacy = await pool.query<{ data_sources: string; transactions: string; recurring_items: string; connector_evidence: string }>(
       `select

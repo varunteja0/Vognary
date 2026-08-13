@@ -1,7 +1,7 @@
 # People · Conversations · Learning
 
-> **Purpose:** Live field memory for market contact. Any agent or founder doing real-world outreach (users, founders, adjacent builders, investors later) must read this **before** inventing new pitches or product work.
-> **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md) · Phase A: [`phase-a-market-contact.md`](phase-a-market-contact.md) · **Live CRM:** [`private-audit-crm.csv`](private-audit-crm.csv)
+> **Purpose:** Historical field memory from the 2026-08 paste-audit campaign. Read before inventing new pitches. **Not** the live Phase A kit — that is [`phase-a-market-contact.md`](phase-a-market-contact.md) (private autopilot pilots). Do not rewrite these quotes as new pilot evidence.
+> **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md) · Live Phase A: [`phase-a-market-contact.md`](phase-a-market-contact.md) · **Historical CRM (gitignored):** `private-audit-crm.csv` · **Live CRM template:** [`private-autopilot-pilot-crm.csv.example`](private-autopilot-pilot-crm.csv.example)
 > **Rule:** Evidence from humans only. Do not invent quotes. Do not ship features because an agent “thinks” users want them — demand a human line first.
 > **Last major update:** 2026-08-11 (Day-1 acquisition ops + CRM rows C01–C22 / A01–A05 / X99)
 > **ID map:** Field IDs `P01…` / `A01…` in this file = CRM `C01…` / `A01…` in `private-audit-crm.csv` (same person).

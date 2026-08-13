@@ -138,8 +138,8 @@ test("disconnect preserves request-origin authorization and revokes provider bef
   assert.match(route, /localCredentialsDeleted: true/);
 
   const runner = source("src/lib/server/connector-sync-runner.ts");
-  assert.match(runner, /markConnectorReauthorizationRequired/);
-  assert.match(runner, /status: "needs_reauth" as const/);
+  assert.match(runner, /LEGACY_LEDGER_WRITE_FROZEN/);
+  assert.doesNotMatch(runner, /materializeConnectorBatch|markConnectorReauthorizationRequired/);
 
   const manualSyncRoute = source("src/app/api/workspaces/current/connectors/[accountId]/sync/route.ts");
   assert.match(manualSyncRoute, /legacyConnectorRetiredResponse/);

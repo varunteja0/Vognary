@@ -201,7 +201,7 @@ Strict production activation is necessary but does not prove that users value th
 | Passive evidence | One retained signed-event record proves processing, replay, and retention, or every public and signed-in surface remains manual-only | **NOT CLAIMED** |
 | Reminder return loop | One real reminder and weekly digest are delivered, then disabling consent cancels unsent deliveries, or reminders remain unclaimed | **NOT CLAIMED** |
 | Payment | Razorpay passes KYC, webhook, replay, refund, reconciliation, and legal gates, or the founder separately verifies a lawful manual collection and invoice path before offering it | **NOT AVAILABLE / NOT CLAIMED** |
-| Market proof | At least 5 completed real audits for a private batch; public growth still requires the Phase A stop/go threshold of 10 audits, at least 50% surprise, and paid or hard pay-intent evidence | **BLOCKED** |
+| Market proof | At least 5 connected accounts with active standing mandates for a private batch; public growth still requires the Phase A stop/go threshold of 10 connected+mandate, ≥3 zero-chore supported actions, ≥2 covered windows, and **5 actual payments of 20 real offers**. Written pay intent is tracked separately and does not satisfy the paid gate | **BLOCKED** |
 | Corpus | Consented fixtures are redacted and stored under the corpus policy; no PII enters Git | **COLLECTION REQUIRED** |
 | Claims | Public copy describes only currently proven sources, outcomes, and delivery paths | **FAIL CLOSED** |
 
@@ -213,5 +213,5 @@ Rollback / stop conditions:
 - If receipt-inbox attestations are missing or revoked, keep Recovery manual-only and clear forwarding claims.
 - If reminders are not delivered, keep notification delivery unclaimed.
 - If payment is not verified, do not show checkout as available or record a prospect as paid.
-- If fewer than 30% of the first 10 completed audits produce a verbatim surprise finding, rework the offer before public acquisition.
-- If 20 valuable free audits produce zero payment or hard pay-intent, stop scaling the current wedge.
+- If any protected-class or unauthorized execution occurs, stop the wedge immediately.
+- If 20 real autopilot offers produce **zero actual payments**, stop scaling the current wedge. Written pay intent is not a substitute.

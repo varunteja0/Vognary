@@ -1,5 +1,8 @@
 # Pre-public retention work package (agent execution)
 
+> **Historical; retired by the 2026-08-13 autopilot pivot.**
+> Do not execute this packet. Live instructions are [`docs/THE-LAW.md`](../THE-LAW.md), [`docs/CONTINUE-HERE.md`](../CONTINUE-HERE.md), [`docs/execution/phase-a-market-contact.md`](../execution/phase-a-market-contact.md), and [`docs/execution/phase-b-loop-shipping.md`](../execution/phase-b-loop-shipping.md) (WP-A through WP-E). Preserve the measured facts below; do not rewrite them as new pilot evidence.
+
 > **Not a new strategy.** Parent law: [`docs/THE-LAW.md`](../THE-LAW.md).  
 > Live state: [`docs/CONTINUE-HERE.md`](../CONTINUE-HERE.md).  
 > Market: [`phase-a-market-contact.md`](phase-a-market-contact.md).  

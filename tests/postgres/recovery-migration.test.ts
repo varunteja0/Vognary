@@ -7,7 +7,14 @@ import path from "node:path";
 import test from "node:test";
 import { Pool } from "pg";
 
-import { migrateLegacyRecovery } from "../../scripts/lib/migrate-legacy-recovery";
+import {
+  countLegacyLedgerRows,
+  LegacyCutoverBlockedError,
+  migrateLegacyRecovery,
+  reconcileMigratedRecoveryRecords,
+  type LegacyEvidence,
+  type LegacyItem,
+} from "../../scripts/lib/migrate-legacy-recovery";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const databaseUrl = process.env.DATABASE_URL;
@@ -54,15 +61,15 @@ test("the real migration runner installs and records the Recovery receipt inbox 
 }, async () => {
   await withDisposableDatabase("recovery_fresh", async (connectionString) => {
     const result = runMigrations(connectionString);
-    assert.equal(result.applied.at(-1)?.id, "0027_gmail_forwarding_verification");
+    assert.equal(result.applied.at(-1)?.id, "0028_recovery_gmail_oauth_source");
 
     const pool = createPool(connectionString);
     try {
       const migrations = await pool.query<{ id: string }>(
         `select id from schema_migrations order by id`,
       );
-      assert.equal(migrations.rows.at(-1)?.id, "0027_gmail_forwarding_verification");
-      assert.equal(migrations.rows.length, 27);
+      assert.equal(migrations.rows.at(-1)?.id, "0028_recovery_gmail_oauth_source");
+      assert.equal(migrations.rows.length, 28);
       await assertRecoveryRelations(pool);
     } finally {
       await pool.end();
@@ -137,6 +144,12 @@ test("the guarded legacy cutover preserves evidence in Recovery before retiring 
         [workspaceId, userId],
       );
 
+      const before = await countLegacyLedgerRows(pool);
+      assert.equal(before.status, "safely-migratable");
+      assert.equal(before.migratable.workspaces, 1);
+      assert.equal(before.migratable.commitments, 1);
+      assert.equal(before.blocked.connectorEvidence, 0);
+
       const migrated = await migrateLegacyRecovery(pool);
       assert.deepEqual(migrated, {
         status: "migrated",
@@ -201,6 +214,9 @@ test("the guarded legacy cutover preserves evidence in Recovery before retiring 
         decisionsMigrated: 0,
         remindersScheduled: 0,
       });
+      const after = await countLegacyLedgerRows(pool);
+      assert.equal(after.status, "clean");
+      assert.equal(after.legacyRows, 0);
     } finally {
       await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
       await pool.query(`delete from users where id = $1`, [userId]);
@@ -270,14 +286,15 @@ test("the real migration runner upgrades an existing 0022 database through Recov
     assert.deepEqual(result.applied, [
       { id: "0026_recovery_inbound_retention", mode: "applied-migration" },
       { id: "0027_gmail_forwarding_verification", mode: "applied-migration" },
+      { id: "0028_recovery_gmail_oauth_source", mode: "applied-migration" },
     ]);
 
     const verifyPool = createPool(connectionString);
     try {
       const migration = await verifyPool.query<{ id: string }>(
-        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification')`,
+        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source')`,
       );
-      assert.equal(migration.rowCount, 5);
+      assert.equal(migration.rowCount, 6);
       await assertRecoveryRelations(verifyPool);
 
       const preserved = await verifyPool.query<{
@@ -388,6 +405,243 @@ test("the real migration runner upgrades an existing 0022 database through Recov
       );
     } finally {
       await verifyPool.end();
+    }
+  });
+});
+
+test("a fresh Recovery install reports a clean legacy ledger", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("legacy_report_clean", async (connectionString) => {
+    runMigrations(connectionString);
+    const pool = createPool(connectionString);
+    try {
+      const report = await countLegacyLedgerRows(pool);
+      assert.equal(report.status, "clean");
+      assert.equal(report.legacyRows, 0);
+      assert.deepEqual(report.blocked, {
+        unsupportedSources: 0,
+        incompleteEvidence: 0,
+        itemsWithoutEvidence: 0,
+        unsupportedActions: 0,
+        transactions: 0,
+        connectorEvidence: 0,
+        legacyConnectedAccounts: 0,
+        actionCases: 0,
+        partialRecoveryRows: 0,
+        orphanedLegacyRows: 0,
+      });
+      assert.deepEqual(await migrateLegacyRecovery(pool), {
+        status: "already-clean",
+        workspacesMigrated: 0,
+        sourcesMigrated: 0,
+        commitmentsMigrated: 0,
+        evidenceMigrated: 0,
+        decisionsMigrated: 0,
+        remindersScheduled: 0,
+      });
+    } finally {
+      await pool.end();
+    }
+  });
+});
+
+test("the real migration runner upgrades 0027 through 0028 without dropping Recovery tables", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("recovery_0027_to_0028", async (connectionString) => {
+    const seedPool = createPool(connectionString);
+    try {
+      await seedSchemaThrough0022(seedPool);
+    } finally {
+      await seedPool.end();
+    }
+    const through0027 = runMigrations(connectionString, ["--through=0027_gmail_forwarding_verification"]);
+    assert.equal(through0027.applied.at(-1)?.id, "0027_gmail_forwarding_verification");
+    const mid = createPool(connectionString);
+    try {
+      const constraint = await mid.query<{ def: string }>(
+        `select pg_get_constraintdef(oid) as def
+         from pg_constraint
+         where conname = 'recovery_submissions_source_type_check'`,
+      );
+      assert.doesNotMatch(constraint.rows[0]?.def ?? "", /GMAIL_OAUTH/);
+    } finally {
+      await mid.end();
+    }
+    const rest = runMigrations(connectionString);
+    assert.deepEqual(rest.applied, [{ id: "0028_recovery_gmail_oauth_source", mode: "applied-migration" }]);
+    const pool = createPool(connectionString);
+    try {
+      const constraint = await pool.query<{ def: string }>(
+        `select pg_get_constraintdef(oid) as def
+         from pg_constraint
+         where conname = 'recovery_submissions_source_type_check'`,
+      );
+      assert.match(constraint.rows[0]?.def ?? "", /GMAIL_OAUTH/);
+      await assertRecoveryRelations(pool);
+    } finally {
+      await pool.end();
+    }
+  });
+});
+
+test("unsupported legacy shapes block cutover with exact counts and preserve every row", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("legacy_cutover_blocked", async (connectionString) => {
+    runMigrations(connectionString);
+    const pool = createPool(connectionString);
+    const userId = randomUUID();
+    const workspaceId = randomUUID();
+    const sourceId = randomUUID();
+    const recurringItemId = randomUUID();
+    try {
+      await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, `${userId}@legacy-blocked.test`]);
+      await pool.query(
+        `insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Blocked cutover')`,
+        [workspaceId, userId],
+      );
+      await pool.query(
+        `insert into data_sources (id, workspace_id, kind, display_name) values ($1, $2, 'gmail_receipt', 'Unsupported Gmail source')`,
+        [sourceId, workspaceId],
+      );
+      await pool.query(
+        `insert into recurring_items (
+           id, workspace_id, merchant, normalized_merchant, category, frequency,
+           currency, amount_min, amount_max, average_amount, monthly_cost,
+           annual_cost, confidence_score, status
+         ) values ($1, $2, 'Blocked Merchant', 'blocked merchant', 'Software', 'monthly',
+           'INR', 100, 100, 100, 100, 1200, 90, 'keep')`,
+        [recurringItemId, workspaceId],
+      );
+      await pool.query(
+        `insert into evidence_links (recurring_item_id, source_id, evidence_type, evidence_text, evidence_date, amount)
+         values ($1, $2, 'receipt', 'Blocked merchant charged INR 100.', current_date, 100.00)`,
+        [recurringItemId, sourceId],
+      );
+      await pool.query(
+        `insert into workspace_states (workspace_id, encrypted_snapshot, updated_by_user_id)
+         values ($1, '{}'::jsonb, $2)`,
+        [workspaceId, userId],
+      );
+      const report = await countLegacyLedgerRows(pool);
+      assert.equal(report.status, "blocked");
+      assert.equal(report.blocked.unsupportedSources, 1);
+      await assert.rejects(() => migrateLegacyRecovery(pool), (error: unknown) => {
+        assert.ok(error instanceof LegacyCutoverBlockedError);
+        assert.equal(error.blocked.unsupportedSources, 1);
+        assert.match(error.message, /unsupportedSources=1/);
+        assert.match(error.message, /were not deleted/);
+        return true;
+      });
+      const preserved = await pool.query<{ sources: string; items: string; states: string }>(
+        `select
+           (select count(*)::text from data_sources where id = $1) as sources,
+           (select count(*)::text from recurring_items where id = $2) as items,
+           (select count(*)::text from workspace_states where workspace_id = $3) as states`,
+        [sourceId, recurringItemId, workspaceId],
+      );
+      assert.deepEqual(preserved.rows[0], { sources: "1", items: "1", states: "1" });
+    } finally {
+      await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+      await pool.query(`delete from users where id = $1`, [userId]);
+      await pool.end();
+    }
+  });
+});
+
+test("record-level reconciliation failure preserves legacy rows", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("legacy_reconcile_fail", async (connectionString) => {
+    runMigrations(connectionString);
+    const pool = createPool(connectionString);
+    const userId = randomUUID();
+    const workspaceId = randomUUID();
+    const sourceId = randomUUID();
+    const recurringItemId = randomUUID();
+    const evidenceId = randomUUID();
+    try {
+      await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, `${userId}@legacy-reconcile.test`]);
+      await pool.query(
+        `insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Reconcile failure')`,
+        [workspaceId, userId],
+      );
+      await pool.query(
+        `insert into data_sources (id, workspace_id, kind, display_name) values ($1, $2, 'manual_entry', 'Legacy receipt')`,
+        [sourceId, workspaceId],
+      );
+      await pool.query(
+        `insert into recurring_items (
+           id, workspace_id, merchant, normalized_merchant, category, frequency,
+           currency, amount_min, amount_max, average_amount, monthly_cost,
+           annual_cost, confidence_score, status
+         ) values ($1, $2, 'Acme AI', 'acme ai', 'Software', 'monthly',
+           'INR', 100, 100, 100, 100, 1200, 92, 'watch')`,
+        [recurringItemId, workspaceId],
+      );
+      await pool.query(
+        `insert into evidence_links (
+           id, recurring_item_id, source_id, evidence_type, evidence_text, evidence_date, amount
+         ) values ($1, $2, $3, 'receipt', 'Acme AI invoice charged INR 100.', current_date, 100.00)`,
+        [evidenceId, recurringItemId, sourceId],
+      );
+      await pool.query(
+        `insert into workspace_states (workspace_id, encrypted_snapshot, updated_by_user_id)
+         values ($1, '{}'::jsonb, $2)`,
+        [workspaceId, userId],
+      );
+      await pool.query(
+        `insert into recovery_commitments (
+           id, workspace_id, identity_key, base_status, base_merchant, base_category,
+           base_cadence, base_currency, base_amount_minor, base_monthly_minor,
+           effective_status, effective_merchant, effective_cadence, effective_amount_minor,
+           effective_monthly_minor, confidence_score, confidence_reasons, recommended_decision,
+           recommendation_reason, risk_tags
+         ) values (
+           $1, $2, $3, 'ACTIVE', 'Acme AI', 'Software', 'MONTHLY', 'INR', 1, 1,
+           'ACTIVE', 'Acme AI', 'MONTHLY', 1, 1, 92, '[]'::jsonb, 'MONITOR',
+           'Wrong copy', array[]::text[]
+         )`,
+        [randomUUID(), workspaceId, `legacy:${recurringItemId}`],
+      );
+      const items = (await pool.query<LegacyItem>(
+        `select id, workspace_id, merchant, normalized_merchant, category,
+                frequency, currency, average_amount::text, monthly_cost::text,
+                next_expected_date::text, confidence_score, status,
+                recommendation_reason, risk_tags, first_detected_at
+         from recurring_items where id = $1`,
+        [recurringItemId],
+      )).rows;
+      const evidence = (await pool.query<LegacyEvidence>(
+        `select id, recurring_item_id, source_id, evidence_text, evidence_date::text, amount::text, created_at
+         from evidence_links where id = $1`,
+        [evidenceId],
+      )).rows;
+      const client = await pool.connect();
+      try {
+        await assert.rejects(
+          () => reconcileMigratedRecoveryRecords(client, items, evidence),
+          /Record-level Recovery reconciliation failed/,
+        );
+      } finally {
+        client.release();
+      }
+      const preserved = await pool.query<{ items: string }>(
+        `select count(*)::text as items from recurring_items where id = $1`,
+        [recurringItemId],
+      );
+      assert.equal(preserved.rows[0]?.items, "1");
+      const blocked = await countLegacyLedgerRows(pool);
+      assert.equal(blocked.status, "blocked");
+      assert.ok(blocked.blocked.partialRecoveryRows > 0);
+      await assert.rejects(() => migrateLegacyRecovery(pool), LegacyCutoverBlockedError);
+      assert.equal((await pool.query(`select count(*)::text as items from recurring_items where id = $1`, [recurringItemId])).rows[0]?.items, "1");
+    } finally {
+      await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+      await pool.query(`delete from users where id = $1`, [userId]);
+      await pool.end();
     }
   });
 });

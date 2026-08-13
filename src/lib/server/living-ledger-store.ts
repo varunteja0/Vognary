@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import type { CanonicalConnectorObservation, NormalizedConnectorSyncResult } from "@/lib/connector-evidence-normalizer";
 import { getDatabasePool } from "@/lib/server/database";
+import { refuseLegacyLedgerWrite } from "@/lib/server/legacy-ledger-freeze";
 import { recordProductEvent } from "@/lib/server/product-event-store";
 import { syncWorkspaceProofGraph } from "@/lib/server/proof-graph-store";
 import { scheduleRenewalAlertsForWorkspace } from "@/lib/server/renewal-alert-store";
@@ -34,6 +35,7 @@ type ConnectedAccountRow = {
 export async function materializeConnectorBatch(
   input: MaterializeConnectorBatchInput,
 ): Promise<MaterializeConnectorBatchResult> {
+  refuseLegacyLedgerWrite();
   const client = await getDatabasePool().connect();
 
   try {

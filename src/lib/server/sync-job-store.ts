@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import type { ConnectorEvidence } from "@/lib/connector-runtime";
 import { getDatabasePool, isDatabaseConfigured } from "@/lib/server/database";
+import { refuseLegacyLedgerWrite } from "@/lib/server/legacy-ledger-freeze";
 
 export type SyncJobStatus = "queued" | "running" | "succeeded" | "failed" | "paused" | "blocked";
 export type SyncJobType = "initial_sync" | "incremental_sync" | "backfill" | "webhook_replay" | "manual_refresh";
@@ -390,6 +391,7 @@ export async function persistConnectorEvidenceBatch(input: {
   syncRunId: string;
   evidence: ConnectorEvidence[];
 }) {
+  refuseLegacyLedgerWrite();
   assertDatabaseReadyForSyncJobs();
 
   for (const item of input.evidence) {

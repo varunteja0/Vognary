@@ -28,13 +28,13 @@ Prior-generation material lives only in `docs/archive/`. Treat it as history, no
 
 ## 1. One-line identity (every feature must serve this)
 
-> **The recurring-money audit that measures, never promises — the finance AI that cites or shuts up, built India-first.**
+> **The class-safe recurring autopilot that cites or shuts up — connect once, sign once, cancel supported discretionary subscriptions under explicit rules, India-first.**
 
 If a feature cannot be stated as a **proven** claim, it is not shippable copy and not shippable UI.
 
 **We are not:** a budget app, YNAB, CRED, Zylo, Rocket Money clone, generic AI money chat, or fake bank-sync dashboard.
 
-**We are:** evidence-first recurring commitments (subscriptions, UPI AutoPay, card e-mandates, SIPs, EMIs, insurance, SaaS, cloud, domains, app stores, utilities) with proof beside every rupee.
+**We are:** evidence-first recurring commitments with proof beside every rupee, and a standing mandate that may cancel **supported discretionary** subscriptions only. EMI, SIP, insurance, utilities, and cloud infrastructure are hard-blocked from autopilot execution.
 
 ---
 
@@ -52,7 +52,7 @@ If a feature cannot be stated as a **proven** claim, it is not shippable copy an
 
 **One-line strategy:**
 
-> Make one Indian founder say *“I didn’t know that was still renewing,”* collect payment for that truth, prove it again next month with evidence — **then** expand rails and AI.
+> After one connection and one standing mandate, cancel supported discretionary junk under the customer's rules, prove the debit is gone, and collect payment for that verified outcome.
 
 Scaffolding is necessary. **Scaffolding is not the building.**
 
@@ -61,15 +61,17 @@ Scaffolding is necessary. **Scaffolding is not the building.**
 ## 3. The only product loop that matters
 
 ```
-evidence in (paste / CSV-PDF / Gmail)
-        → audit finds every recurring charge
-        → assistant brief (renews / anomalous / kill)
-        → user decides (keep / watch / cancel / investigate)
-        → decision + outcome logged with proof
-        → (later) Verified Saving when debit stays gone
+passive evidence (paste / CSV / inbound mail; Gmail OAuth when proven)
+        → cited classification
+        → deterministic eligibility rules
+        → 48-hour veto
+        → supported execution (discretionary only)
+        → proof
+        → covered clean windows
+        → outcome billing
 ```
 
-**Any PR that does not raise this loop or unblock market proof is out of scope until Stage 0 exit.**
+**Any PR that does not raise this loop or unblock a private autopilot pilot is out of scope until Stage 0 exit.**
 
 ---
 
@@ -104,7 +106,7 @@ npm run build && npm run perf:budget
 | Production activation | 3.5 | `production:check --strict` green on prod |
 | Live connector depth | 4 | Gmail public-verified + ≥1 regulated rail |
 | Data / network moat | 3 | Opt-in merchant intelligence with n≥25 |
-| **Business validation** | **1.5** | Paid audits + retention + ARR path |
+| **Business validation** | **1.5** | Paid autopilot pilots + retention + ARR path |
 | **Distribution** | **1.5** | Artifact loop + CA loop without founder push |
 
 **Composite ≈ 1.5–2.** Agents optimize the **minimum**, not the average.
@@ -113,12 +115,13 @@ npm run build && npm run perf:budget
 
 | Metric | Day 30 | Day 90 | Kill / pivot if |
 | --- | ---: | ---: | --- |
-| Completed real audits | **10** | **40** | <5 by day 30 |
-| % with ≥1 “I didn’t know” finding | ≥50% | ≥60% | <30% |
-| Paid ₹999 (or cash-equivalent) | **3** | **15** | 0 after 20 valuable free audits |
-| Median time-to-first-insight | <3 min | <2 min | >8 min |
-| Corpus consented fixtures | **25** | **100** | <10 at day 60 |
-| D30 return / re-check | ≥40% paid | ≥55% | <20% |
+| Connected accounts with active mandates | **10** | **40** | <5 by day 30 |
+| Accounts with an eligible candidate | **5** | **15** | <2 by day 30 |
+| Supported actions with no post-mandate customer work | **3** | **10** | 0 after 10 connected |
+| Covered clean financial windows | **2** | **8** | 0 after 10 connected |
+| Actual payments of 20 real offers | **5** | **15** | 0 actual payments after 20 real offers |
+| Written pay intent (separate; does not satisfy the paid gate) | track | track | — |
+| D30 active-source-and-mandate retention | ≥40% | ≥60% | <20% |
 
 ---
 
@@ -127,8 +130,8 @@ npm run build && npm run perf:budget
 | Phase | Name | Goal | Gate to exit |
 | --- | --- | --- | --- |
 | **0** | Hygiene | One repo, one doc chain | **DONE** 2026-07-21 |
-| **A** | Market proof | 10 real audits, quotes, pay signal | Day-21 stop/go |
-| **B** | Loop undeniable | Product makes loop inevitable | e2e + real user <3 min |
+| **A** | Market proof | 10 operational autopilot pilots; paid gate is actual payment | Day-21 stop/go |
+| **B** | Loop undeniable | WP-A through WP-E lock the autopilot loop | e2e + real user <3 min |
 | **C** | Production min | Identity, monitor, backup, pay, email | activation rows READY |
 | **D** | Intelligence moat | Corpus 100, formats, first verified saving | corpus:strict green |
 | **E** | Distribution | Artifact + CA loops | organic inbound |
@@ -138,13 +141,13 @@ Detail:
 
 - **Phase A playbook:** [`docs/execution/phase-a-market-contact.md`](execution/phase-a-market-contact.md)
 - **Phase B architecture + agent tasks:** [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md)
-- **Product phases 1–4** (code loop) still tracked in CONTINUE-HERE; they are the **engineering slice of B**.
+- **Engineering slice of B:** WP-A through WP-E in [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md). Historical WP-B0…B8 are not the live roadmap.
 
 ### Attention allocation (founders + agents)
 
 | Bucket | Next 60 days | After PMF signal |
 | --- | ---: | ---: |
-| Users / audits / sales | **45%** | 25% |
+| Users / autopilot pilots / sales | **45%** | 25% |
 | Founder-ops (keys, legal, Google, pay) | **25%** | 15% |
 | Product on the loop only | **25%** | 35% |
 | Long-horizon (AA, platform) | **5%** | 25% |
@@ -189,7 +192,7 @@ Agents **must refuse** or redirect:
 | UI | Brief-first home; progressive disclosure; tokens from `globals.css` |
 | Connectors | Honesty states only; registry ≠ live coverage |
 | Money | Server-owned prices; signed webhooks only; fail closed |
-| Data | Prefer living ledger / graph over growing the 5.4k-line monolith |
+| Data | Prefer Recovery (`src/lib/recovery`) as the sole financial authority. Living ledger is frozen read-only. |
 
 ### 8.3 Monolith policy
 
@@ -214,7 +217,7 @@ You are not hired to impress with architecture. You are hired to:
 2. **Never lie** about money or connectors.  
 3. **Prefer boring, tested paths** over clever new systems.  
 4. **Ask the founder** only for external ops (keys, legal, Google, Razorpay, Setu).  
-5. When unsure, choose the option that produces **a completed human audit this week**.
+5. When unsure, choose the option that produces **a protected, zero-chore discretionary cancellation this week**.
 
 ---
 
@@ -222,7 +225,7 @@ You are not hired to impress with architecture. You are hired to:
 
 | Do | Don’t |
 | --- | --- |
-| Sell *proof of recurring commitments* | Sell “another budget app” |
+| Sell *verified discretionary cancellation with a 48-hour veto* | Sell “another budget app” or a spreadsheet replica |
 | Win the 10-minute pre-bank moment | Pretend full UPI/bank magic exists |
 | Name missing sources as a feature | Hide incompleteness like competitors |
 | Stay neutral (no credit/lending cross-sell) | Become CRED-shaped |
@@ -259,13 +262,13 @@ Agents may draft configs, checklists, and verification commands. Agents must **n
 
 | Day | Who | Work |
 | --- | --- | --- |
-| 1 | Founder | Message 20 pipeline leads (Phase A scripts) |
-| 1–2 | Agent | Phase B: landing honesty + brief-as-home wiring gaps |
-| 2–3 | Founder | Book 5 audits; agent: Gmail success moment path |
-| 3–5 | Both | Deliver audits; log CRM; extract corpus candidates |
-| 4–6 | Agent | UPI kill-list polish from statement path; e2e loop |
-| 5–7 | Founder | Identity + monitoring + AI key; agent: degrade-safe checks |
-| 7 | Founder | Scoreboard update; kill one non-loop idea |
+| 1 | Founder | Start Google restricted-scope verification / CASA; counsel review of standing-mandate agency |
+| 1–2 | Agent | WP-A Recovery evidence spine (this package) |
+| 2–3 | Founder | One real inbound receipt attestation; Razorpay/legal readiness |
+| 3–5 | Both | First operational autopilot pilots (connect + mandate), not paste-PDF audits |
+| 4–6 | Agent | WP-B class lock + shadow evaluator |
+| 5–7 | Founder | 10 connected accounts with active mandates |
+| 7 | Founder | Scoreboard update only with measured pilot evidence |
 
 Full 21-day grid: Phase A doc. Full engineering WPs: Phase B doc.
 
@@ -281,8 +284,8 @@ Full 21-day grid: Phase A doc. Full engineering WPs: Phase B doc.
 | Conflict with master-build-plan on AI/Twin APIs | master-build-plan Parts 3–5 win for *implementation law* |
 | Adding features outside A–B | **Forbidden** until Stage 0 metrics move |
 
-**Last strategic review:** 2026-07-21 founder assessment.  
-**Next allowed strategic rewrite:** after Day-21 stop/go with measured numbers only.
+**Last strategic review:** 2026-08-13 founder-authorized discretionary-autopilot pivot.
+**Next allowed strategic rewrite:** after the paid-20 gate with measured numbers only.
 
 ---
 

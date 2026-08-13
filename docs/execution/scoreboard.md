@@ -23,20 +23,21 @@
 
 | Metric | Day 0 | Day 30 target | Day 90 target | Current |
 | --- | ---: | ---: | ---: | ---: |
-| Completed real audits | 0 | 10 | 40 | |
-| % surprise finding | — | ≥50% | ≥60% | |
-| Paid / pay-intent | 0 | 3 paid | 15 paid | |
-| Median TTI (min) | — | <3 | <2 | |
-| Corpus fixtures | 0 | 25 | 100 | |
-| D30 return rate | — | ≥40% | ≥55% | |
+| Connected accounts with active mandates | 0 | 10 | 40 | |
+| Accounts with an eligible candidate | 0 | 5 | 15 | |
+| Supported actions with no post-mandate customer work | 0 | 3 | 10 | |
+| Covered clean financial windows | 0 | 2 | 8 | |
+| Actual payments of 20 real offers | 0 | 5 | 15 | |
+| Written pay intent (separate; not the paid gate) | 0 | track | track | |
+| D30 active-source-and-mandate retention | — | ≥40% | ≥60% | |
 
 ## Phase status
 
 | Phase | Status | Notes |
 | --- | --- | --- |
 | 0 Hygiene | DONE | 2026-07-21 |
-| A Market contact | ACTIVE | CRM + scripts ready; founder must message |
-| B Loop shipping | TECHNICAL GATE GREEN | Recovery browser loop passes desktop/mobile; real-human <3 min and final external proof remain |
+| A Market contact | ACTIVE | Private autopilot pilots; CRM still 0 connected/mandates/actual payments |
+| B Loop shipping | ACTIVE | Live roadmap is WP-A…WP-E. Historical Recovery browser loop remains measured; real-human <3 min still pending |
 | C Production min | ACTIVE | Provider/domain/deployment configuration is live; signed receipt, real Google, delivered reminder, and Customer #0 proof remain |
 | D Intelligence moat | PENDING | Needs corpus |
 | E Distribution | PENDING | After A signal |
