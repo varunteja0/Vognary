@@ -91,6 +91,16 @@ money first-class before anything else, and the world must work too.**
   absent; human F1/TTI, completed audits, surprise, pay intent, consented corpus,
   and D30 return remain unmeasured. Non-strict production endpoint health passes;
   Phase 10 and strict public activation remain NO-GO.
+- **Funnel measurement now exists (2026-08-13):** the Recovery loop previously
+  emitted no telemetry at all, so signups, activation, and return visits could
+  not be answered from data. `workspace.activated` (accepted evidence) and
+  `ledger.viewed` (Home read) are now emitted server-side, and `npm run funnel`
+  reports signups, daily active users, users active on 2+ days, and D7/D30
+  cohort return from counts only. Both event names were already in the
+  `product_events` CHECK constraint, so **no migration touches production**.
+  Verified live: a Customer #0 browser run emitted 3 `ledger.viewed` and 2
+  `workspace.activated` rows. There is still **no web analytics** on the
+  marketing pages, so visitor counts remain UNKNOWN.
 - **Recovery launch identity is Google OIDC only (2026-08-10):** the bearer
   magic-link UI is removed from the Recovery login path and server readiness is
   opt-in disabled unless `ENABLE_MAGIC_LINK_LOGIN=true`. Magic link is deferred
