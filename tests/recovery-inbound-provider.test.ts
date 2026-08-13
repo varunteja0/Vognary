@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { retrieveResendRawEmail } from "../src/lib/server/recovery-inbound-processor";
+import { RecoveryMaterializationError, RecoveryServiceError } from "../src/lib/server/recovery-api";
+import { materializationFailureCode, retrieveResendRawEmail } from "../src/lib/server/recovery-inbound-processor";
 
 const receiptInboxEnvironment = {
   ENABLE_RECEIPT_INBOX: "true",
@@ -21,6 +22,17 @@ test("inbound completion and retry updates are fenced by the claimed attempt gen
   assert.match(processor, /status = 'PROCESSING' and attempt_count = \$3/);
   assert.match(store, /eventRow\.status !== "PROCESSING" \|\| eventRow\.attempt_count !== input\.expectedAttemptCount/);
   assert.match(store, /status = 'PROCESSING' and attempt_count = \$6/);
+});
+
+test("materialization retry diagnostics expose only a bounded stage and Recovery code", () => {
+  const failure = new RecoveryMaterializationError(
+    "SOURCE_PERSISTENCE",
+    new RecoveryServiceError("SAVE_FAILED", "provider receipt secret"),
+  );
+  const code = materializationFailureCode(failure);
+  assert.equal(code, "MATERIALIZATION_SOURCE_PERSISTENCE_SAVE_FAILED");
+  assert.doesNotMatch(code, /provider|receipt|secret/i);
+  assert.equal(materializationFailureCode(new Error("provider receipt secret")), "MATERIALIZATION_FAILED");
 });
 
 test("Resend retrieval follows the documented raw download contract without forwarding credentials", async () => {

@@ -36,6 +36,7 @@ const otherCommitment: CommitmentSummaryDto = { ...commitment, id: "commitment-2
 const home: HomeProjectionDto = {
   workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 4 },
   generatedAt: "2026-08-09T10:00:00.000Z",
+  recentObservations: [],
   monthlyTotals: [],
   next30DayTotals: [],
   needsMe: [],

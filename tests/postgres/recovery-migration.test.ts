@@ -54,15 +54,15 @@ test("the real migration runner installs and records the Recovery receipt inbox 
 }, async () => {
   await withDisposableDatabase("recovery_fresh", async (connectionString) => {
     const result = runMigrations(connectionString);
-    assert.equal(result.applied.at(-1)?.id, "0026_recovery_inbound_retention");
+    assert.equal(result.applied.at(-1)?.id, "0027_gmail_forwarding_verification");
 
     const pool = createPool(connectionString);
     try {
       const migrations = await pool.query<{ id: string }>(
         `select id from schema_migrations order by id`,
       );
-      assert.equal(migrations.rows.at(-1)?.id, "0026_recovery_inbound_retention");
-      assert.equal(migrations.rows.length, 26);
+      assert.equal(migrations.rows.at(-1)?.id, "0027_gmail_forwarding_verification");
+      assert.equal(migrations.rows.length, 27);
       await assertRecoveryRelations(pool);
     } finally {
       await pool.end();
@@ -269,14 +269,15 @@ test("the real migration runner upgrades an existing 0022 database through Recov
     const result = runMigrations(connectionString);
     assert.deepEqual(result.applied, [
       { id: "0026_recovery_inbound_retention", mode: "applied-migration" },
+      { id: "0027_gmail_forwarding_verification", mode: "applied-migration" },
     ]);
 
     const verifyPool = createPool(connectionString);
     try {
       const migration = await verifyPool.query<{ id: string }>(
-        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention')`,
+        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification')`,
       );
-      assert.equal(migration.rowCount, 4);
+      assert.equal(migration.rowCount, 5);
       await assertRecoveryRelations(verifyPool);
 
       const preserved = await verifyPool.query<{

@@ -41,11 +41,15 @@ export function RecoveryAddEvidence({
         <h3 id="recovery-paste-heading" className="font-display text-xl font-semibold text-(--ink) sm:text-2xl">
           {variant === "EMPTY_WORKSPACE" ? "Paste your first receipt" : "Paste a receipt or invoice"}
         </h3>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
-          {variant === "EMPTY_WORKSPACE"
-            ? "Add at least 2 receipts from the same recurring service, now or as they arrive, to help Vognary infer its pattern. Each receipt should show the merchant, amount, and charge date."
-            : "Paste the receipt text exactly as you received it. It is stored as evidence and never edited."}
-        </p>
+        {variant === "EMPTY_WORKSPACE" ? (
+          <ol className="mt-4 grid max-w-2xl gap-2 text-sm leading-6 text-(--muted)">
+            <li><strong className="text-(--ink-soft)">1.</strong> Paste 2-3 billing emails or invoices.</li>
+            <li><strong className="text-(--ink-soft)">2.</strong> Use the same service twice so Vognary can test a cadence.</li>
+            <li><strong className="text-(--ink-soft)">3.</strong> See monthly burn, the next expected charge, and one decision when the receipts support them.</li>
+          </ol>
+        ) : (
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Paste the receipt text exactly as you received it. It is stored as evidence and never edited.</p>
+        )}
 
         <label htmlFor="recovery-receipt-input" className="field-label mt-4 block">Receipt or invoice text</label>
         <textarea

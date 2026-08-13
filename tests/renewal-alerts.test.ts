@@ -82,6 +82,16 @@ test("renewal email HTML escapes provider-controlled merchant text and avoids fi
   assert.match(message.text, /date may change/i);
 });
 
+test("reminder UI never presents eligibility or preference state as delivery proof", () => {
+  const home = source("src/app/workspace/recovery/recovery-home.tsx");
+  const profile = source("src/app/profile/profile-sections.tsx");
+
+  assert.match(home, /Eligible for an opt-in reminder/);
+  assert.doesNotMatch(home, /Reminder active|Vognary emails you/);
+  assert.match(profile, /When enabled, a Monday digest is scheduled/);
+  assert.doesNotMatch(profile, /Sent on Monday/);
+});
+
 test("renewal scheduling and delivery source enforce opt-in, idempotency, bounded retries, and payload minimization", () => {
   const migration = source("infra/postgres/migrations/0006_renewal_alerts.sql");
   const digestMigration = source("infra/postgres/migrations/0022_weekly_digest.sql");

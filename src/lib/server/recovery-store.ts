@@ -34,6 +34,7 @@ import {
   toMoneyDto,
   type CanonicalCommitmentRecord,
   type RecoveryCoverageSource,
+  type RecoveryObservationRecord,
 } from "@/lib/recovery/domain";
 import {
   extractObservedReceipt,
@@ -54,7 +55,13 @@ import {
 } from "@/lib/recurring-audit";
 import { getDatabasePool } from "@/lib/server/database";
 import { recoveryEvidenceFingerprint } from "@/lib/recovery/evidence-fingerprint";
-import { RecoveryServiceError, hashRecoveryRequest, normalizeForwardedEmailMaterializationRequest } from "@/lib/server/recovery-api";
+import {
+  RecoveryMaterializationError,
+  RecoveryServiceError,
+  hashRecoveryRequest,
+  normalizeForwardedEmailMaterializationRequest,
+  type RecoveryMaterializationStage,
+} from "@/lib/server/recovery-api";
 import { scheduleRenewalAlertsForWorkspace } from "@/lib/server/renewal-alert-store";
 import { encryptSecret } from "@/lib/server/token-vault";
 
@@ -283,6 +290,7 @@ export async function materializeForwardedEmailEvidence(input: {
   const currencyHint = input.currencyHint ?? null;
   const requestHash = hashRecoveryRequest({ operation, providerEventId: input.providerEventId, currencyHint, request });
   const now = input.now ?? new Date();
+  let stage: RecoveryMaterializationStage = "EVENT_VALIDATION";
   try {
     await client.query("begin");
     await lockRecoveryWorkspace(client, input.workspaceId);
@@ -305,6 +313,7 @@ export async function materializeForwardedEmailEvidence(input: {
       requestHash,
     );
     if (replay) {
+      stage = "COMMIT";
       await client.query("commit");
       return { ...replay.response, workspaceVersion: replay.workspaceVersion, replayed: true };
     }
@@ -315,6 +324,7 @@ export async function materializeForwardedEmailEvidence(input: {
     const workspace = await client.query(`select 1 from workspaces where id = $1 for share`, [input.workspaceId]);
     if (!workspace.rows[0]) throw new RecoveryServiceError("NOT_FOUND");
     const state = await ensureWorkspaceState(client, input.workspaceId);
+    stage = "SUBMISSION";
     const submission = await client.query<{ id: string; ingested_at: Date }>(
       `insert into recovery_submissions (
          workspace_id, submitted_by_user_id, source_type, inbound_event_id
@@ -325,6 +335,7 @@ export async function materializeForwardedEmailEvidence(input: {
     const submissionRow = submission.rows[0];
     if (!submissionRow) throw new RecoveryServiceError("SAVE_FAILED");
 
+    stage = "SOURCE_PERSISTENCE";
     const materialized = await persistSubmissionSources(client, {
       workspaceId: input.workspaceId,
       submissionId: submissionRow.id,
@@ -342,11 +353,15 @@ export async function materializeForwardedEmailEvidence(input: {
     let workspaceVersion = Number(state.version);
     if (materialized.acceptedSourceIds.length) {
       const before = await loadCommitmentRecords(client, input.workspaceId);
+      stage = "REANALYSIS";
       const audit = await analyzePersistedEvidence(client, input.workspaceId, now);
+      stage = "COMMITMENT_UPSERT";
       await upsertCanonicalCommitments(client, input.workspaceId, audit.recurringItems);
+      stage = "EVIDENCE_LINKING";
       await linkCanonicalEvidence(client, input.workspaceId, audit.recurringItems);
       const after = await loadCommitmentRecords(client, input.workspaceId);
       const nextVersion = workspaceVersion + 1;
+      stage = "CHANGE_PERSISTENCE";
       const changes = state.baseline_version === null
         ? []
         : await persistChanges(client, input.workspaceId, workspaceVersion, nextVersion, before, after, {
@@ -354,6 +369,7 @@ export async function materializeForwardedEmailEvidence(input: {
             submissionId: submissionRow.id,
             sourceIds: materialized.acceptedSourceIds,
           }, now);
+      stage = "VERSION_ADVANCE";
       workspaceVersion = await advanceWorkspaceVersion(client, {
         workspaceId: input.workspaceId,
         actorUserId: null,
@@ -361,6 +377,7 @@ export async function materializeForwardedEmailEvidence(input: {
         mutationKind: "EVIDENCE",
         changes,
       });
+      stage = "ALERT_SCHEDULING";
       await scheduleRenewalAlertsForWorkspace(input.workspaceId, client);
     }
 
@@ -376,8 +393,10 @@ export async function materializeForwardedEmailEvidence(input: {
       [input.workspaceId],
     )).rows[0]?.total ?? 0);
     const response = { submission: submissionDto, commitmentTotal };
+    stage = "IDEMPOTENCY";
     await writeIdempotent(client, input.workspaceId, idempotencyKey, operation, requestHash, response, workspaceVersion);
     const accepted = materialized.acceptedEvidenceCount > 0;
+    stage = "EVENT_COMPLETION";
     const completedEvent = await client.query(
       `update recovery_inbound_events
          set status = $3, processing_started_at = null,
@@ -389,17 +408,19 @@ export async function materializeForwardedEmailEvidence(input: {
     if (completedEvent.rowCount !== 1) {
       throw new RecoveryServiceError("CONFLICT", "Receipt processing lease changed before completion.");
     }
+    stage = "AUDIT";
     await writeRecoveryAudit(client, input.workspaceId, null, "recovery.forwarded-email.materialized", submissionRow.id, {
       actorKind: "system",
       provider: "resend",
       acceptedEvidenceCount: materialized.acceptedEvidenceCount,
       workspaceVersion,
     });
+    stage = "COMMIT";
     await client.query("commit");
     return { ...response, workspaceVersion, replayed: false };
   } catch (error) {
     await client.query("rollback").catch(() => undefined);
-    throw normalizeStoreError(error);
+    throw new RecoveryMaterializationError(stage, normalizeStoreError(error));
   } finally {
     client.release();
   }
@@ -1722,6 +1743,7 @@ async function loadHome(
   const version = Number(state?.version ?? 0);
   const changed = await loadChanged(client, membership.workspace_id, state, version);
   const commitments = await loadCommitmentRecords(client, membership.workspace_id);
+  const observations = await loadRecentObservationRecords(client, membership.workspace_id);
   const sources = await loadCoverageSources(client, membership.workspace_id);
   return buildHomeProjection({
     workspace: {
@@ -1732,9 +1754,29 @@ async function loadHome(
     },
     generatedAt,
     commitments,
+    observations,
     sources,
     changed,
   });
+}
+
+async function loadRecentObservationRecords(client: PoolClient, workspaceId: string): Promise<RecoveryObservationRecord[]> {
+  const result = await client.query<Pick<EvidenceRow, "id" | "merchant" | "amount_minor" | "currency" | "evidence_date">>(
+    `select evidence.id, evidence.merchant, evidence.amount_minor,
+            evidence.currency, evidence.evidence_date
+     from recovery_evidence evidence
+     where evidence.workspace_id = $1
+     order by evidence.created_at desc, evidence.id desc
+     limit 3`,
+    [workspaceId],
+  );
+  return result.rows.map((row) => ({
+    evidenceId: row.id,
+    merchant: row.merchant || null,
+    amountMinor: row.amount_minor === null ? null : BigInt(normalizeMinorUnits(row.amount_minor)),
+    currency: row.currency,
+    date: toDateOnly(row.evidence_date),
+  }));
 }
 
 async function loadChanged(

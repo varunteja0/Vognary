@@ -7,6 +7,7 @@ import { AuthRequiredBlock, LoadingBlock, StateBlock } from "./recovery-states";
 import type { LoadState } from "./state";
 
 export function RecoverySources({
+  receiptInboxPubliclyAvailable,
   receiptInbox,
   sourceStatus,
   pendingAction,
@@ -18,6 +19,7 @@ export function RecoverySources({
   manualFallbackOpen,
   onManualFallbackToggle,
 }: {
+  receiptInboxPubliclyAvailable: boolean;
   receiptInbox: ReceiptInboxStatusDto | null;
   sourceStatus: LoadState;
   pendingAction: "PROVISION" | "ROTATE" | "REVOKE" | null;
@@ -42,6 +44,17 @@ export function RecoverySources({
     }
   }
 
+  if (!receiptInboxPubliclyAvailable) {
+    return (
+      <div className="grid gap-3">
+        <p className="border-y border-line px-1 py-3 text-sm leading-6 text-(--muted)">
+          <strong className="text-(--ink-soft)">Manual evidence only.</strong> Receipt forwarding is not available yet. Nothing is connected, and Vognary does not access your inbox.
+        </p>
+        {manualFallback}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-5">
       <section aria-labelledby="receipt-inbox-heading" className="panel p-4 sm:p-6">
@@ -50,6 +63,36 @@ export function RecoverySources({
         <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
           Vognary never accesses or scans your inbox. Messages sent to that private address are processed as receipt evidence; keep the address private and forward only billing mail you want Vognary to review.
         </p>
+
+        {receiptInbox?.gmailVerification ? (
+          <div className="mt-5">
+            <StateBlock
+              eyebrow="Gmail is waiting for you"
+              title="Confirm forwarding in Gmail to finish setup"
+              detail="Gmail sent a confirmation request to your Vognary receipt address. Gmail forwards nothing until it is confirmed."
+              tone="caution"
+            >
+              <div className="grid gap-3">
+                {receiptInbox.gmailVerification.code ? (
+                  <p className="text-sm leading-6 text-(--ink)">
+                    Confirmation code: <span className="font-mono font-semibold">{receiptInbox.gmailVerification.code}</span>
+                    {" "}— paste this into Gmail&apos;s Forwarding settings.
+                  </p>
+                ) : null}
+                {receiptInbox.gmailVerification.verificationUrl ? (
+                  <a
+                    href={receiptInbox.gmailVerification.verificationUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="btn btn-sm btn-primary justify-self-start"
+                  >
+                    Confirm forwarding with Google
+                  </a>
+                ) : null}
+              </div>
+            </StateBlock>
+          </div>
+        ) : null}
 
         {sourceStatus.kind === "AUTH_REQUIRED" ? (
           <div className="mt-5"><AuthRequiredBlock /></div>

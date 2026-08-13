@@ -10,9 +10,9 @@
 | Wedge sharpness | 8 | 2026-07-21 | Strategy review |
 | Intelligence engine | 6 | 2026-07-21 | Engines strong; corpus empty |
 | Trust & honesty | 9 | 2026-07-21 | Claims CI + fail-closed design |
-| Product UX | 7.5 | 2026-08-11 | Receipt-address-first empty Home; 76 desktop/mobile browser scenarios exercised with axe (one dev cold-start miss passed unchanged on rerun); real-human <3 min remains unmeasured |
-| Backend readiness | 9 | 2026-08-11 | Recovery v1: 557/557 unit, 41/41 PostgreSQL from fresh schema through 0026, realistic repeated-receipt inference, build/perf green |
-| Production activation | 5.5 | 2026-08-11 | Clean 0026 cutover and exact-main deployment proven; Google identity, cron routes, Resend sending/receiving domain, and canonical webhook configured; real Google, signed receipt/PDF, delivered reminder, and Customer #0 still unproven |
+| Product UX | 7.5 | 2026-08-12 | Recovery closeout browser matrix passes desktop/mobile with axe; real-human <3 min remains unmeasured |
+| Backend readiness | 9 | 2026-08-12 | Recovery v1: 571/571 unit/source-contract tests, 42/42 PostgreSQL tests, realistic repeated-receipt inference, build/perf green |
+| Production activation | 5.5 | 2026-08-12 | Exact CI-green closeout SHA deployed; backend/migrations/Google/rate limiting/monitoring delivery pass; encrypted production restore rehearsal matched checksum and Recovery counts, but durable backup storage, successful inbox materialization/replay, reminder delivery, payment, and human Customer #0 remain unproven |
 | Live connector depth | 4 | 2026-07-21 | Registry ≠ live |
 | Data / network moat | 3 | 2026-07-21 | No network data yet |
 | Business validation | 1.5 | 2026-07-21 | Pipeline not asked — founder Phase A |

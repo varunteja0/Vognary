@@ -51,6 +51,35 @@ export class RecoveryServiceError extends Error {
   }
 }
 
+export const recoveryMaterializationStages = [
+  "EVENT_VALIDATION",
+  "SUBMISSION",
+  "SOURCE_PERSISTENCE",
+  "REANALYSIS",
+  "COMMITMENT_UPSERT",
+  "EVIDENCE_LINKING",
+  "CHANGE_PERSISTENCE",
+  "VERSION_ADVANCE",
+  "ALERT_SCHEDULING",
+  "IDEMPOTENCY",
+  "EVENT_COMPLETION",
+  "AUDIT",
+  "COMMIT",
+] as const;
+
+export type RecoveryMaterializationStage = (typeof recoveryMaterializationStages)[number];
+
+export class RecoveryMaterializationError extends RecoveryServiceError {
+  constructor(readonly stage: RecoveryMaterializationStage, cause: RecoveryServiceError) {
+    super(cause.code, undefined, {
+      retryable: cause.retryable,
+      currentVersion: cause.currentVersion,
+      retryAfterSeconds: cause.retryAfterSeconds,
+    });
+    this.name = "RecoveryMaterializationError";
+  }
+}
+
 export function createRecoveryRequestId() {
   return randomUUID();
 }

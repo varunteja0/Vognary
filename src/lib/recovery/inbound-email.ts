@@ -18,18 +18,55 @@ type ForwardedReceiptText = {
   text: string;
 };
 
+/** Gmail will not forward anything until this challenge is answered by the user. */
+export type GmailForwardingVerification = {
+  code: string | null;
+  verificationUrl: string | null;
+};
+
 export type ForwardedEmailExtraction = {
   texts: ForwardedReceiptText[];
   skippedAttachments: string[];
   currencyHint: ReceiptCurrencyHint | null;
+  gmailVerification: GmailForwardingVerification | null;
 };
 
 export async function extractForwardedReceiptTexts(raw: string | Uint8Array): Promise<ForwardedEmailExtraction> {
   if (byteLength(raw) > forwardedEmailMaxMimeBytes) throw new Error("Forwarded email is too large to process.");
-  const extraction: ForwardedEmailExtraction = { texts: [], skippedAttachments: [], currencyHint: null };
+  const extraction: ForwardedEmailExtraction = {
+    texts: [],
+    skippedAttachments: [],
+    currencyHint: null,
+    gmailVerification: null,
+  };
   await extractMime(raw, 0, extraction, new Set(), { pdfs: 0 });
+  if (extraction.gmailVerification) return extraction;
   extraction.currencyHint = inferReceiptCurrencyHint(extraction.texts.map((item) => item.text));
   return extraction;
+}
+
+// Only mail whose envelope sender is exactly google.com may raise this challenge,
+// so a lookalike domain cannot trick a user into confirming someone else's forward.
+function detectGmailForwardingVerification(
+  senderAddress: string | undefined,
+  subject: string | undefined,
+  body: string,
+): GmailForwardingVerification | null {
+  const domain = senderAddress?.toLowerCase().trim().split("@")[1] ?? "";
+  if (domain !== "google.com") return null;
+
+  const subjectText = subject ?? "";
+  const looksLikeChallenge = /forwarding confirmation/i.test(subjectText)
+    || /mail-settings\.google\.com\/mail\//i.test(body);
+  if (!looksLikeChallenge) return null;
+
+  const verificationUrl = body.match(/https:\/\/mail-settings\.google\.com\/mail\/[^\s"'<>]+/i)?.[0] ?? null;
+  const code = body.match(/confirmation code:?\s*(\d{6,12})/i)?.[1]
+    ?? subjectText.match(/\(#(\d{6,12})\)/)?.[1]
+    ?? null;
+  if (!code && !verificationUrl) return null;
+
+  return { code, verificationUrl };
 }
 
 async function extractMime(
@@ -38,8 +75,7 @@ async function extractMime(
   extraction: ForwardedEmailExtraction,
   seen: Set<string>,
   budget: { pdfs: number },
-) {
-  if (depth > maxNestedEmailDepth || extraction.texts.length >= recoveryLimits.maxReceiptSnippets) return;
+) {  if (depth > maxNestedEmailDepth || extraction.texts.length >= recoveryLimits.maxReceiptSnippets) return;
   if (byteLength(raw) > forwardedEmailMaxMimeBytes) throw new Error("Forwarded email is too large to process.");
 
   const parsed = await PostalMime.parse(raw, {
@@ -51,6 +87,13 @@ async function extractMime(
   });
   const plainText = parsed.text?.replace(/\r\n?/g, "\n").trim()
     || htmlReceiptText(parsed.html ?? "");
+  if (depth === 0) {
+    const verification = detectGmailForwardingVerification(parsed.from?.address, parsed.subject, plainText);
+    if (verification) {
+      extraction.gmailVerification = verification;
+      return;
+    }
+  }
   if (plainText) addText(plainText, depth, extraction, seen);
 
   for (const attachment of parsed.attachments) {

@@ -89,7 +89,7 @@ async function readRecoverySnapshot(transport: RecoveryTransport): Promise<Recov
 // The signed-in Recovery workspace. It owns transport, drafts, selection, dialogs,
 // focus, and pending-mutation state. Every money, date, cadence, confidence, and
 // ordering fact on screen is the server's, rendered as published.
-export default function RecoveryWorkspaceClient() {
+export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable }: { receiptInboxPubliclyAvailable: boolean }) {
   const [state, dispatch] = useReducer(recoveryReducer, initialRecoveryState);
   const transport = useMemo(() => createRecoveryTransport(), []);
   const [correctionError, setCorrectionError] = useState<string | null>(null);
@@ -122,11 +122,12 @@ export default function RecoveryWorkspaceClient() {
   }, [transport]);
 
   const loadSources = useCallback(async () => {
+    if (!receiptInboxPubliclyAvailable) return;
     dispatch({ type: "SOURCES_REQUESTED" });
     const result = await transport.sources();
     if (result.ok) dispatch({ type: "SOURCES_LOADED", receiptInbox: result.data, meta: result.meta });
     else dispatch({ type: "SOURCES_FAILED", failure: result });
-  }, [transport]);
+  }, [receiptInboxPubliclyAvailable, transport]);
 
   useEffect(() => {
     const update = () => dispatch({ type: "NETWORK_CHANGED", online: navigator.onLine });
@@ -450,7 +451,7 @@ export default function RecoveryWorkspaceClient() {
     dispatch({ type: "COMMITMENT_SELECTED", commitmentId });
   }
 
-  function inspectEvidence(commitmentId: string, evidenceId: string, buttonId: string) {
+  function inspectEvidence(commitmentId: string | null, evidenceId: string, buttonId: string) {
     setInspectingEvidence(true);
     setInspectedEvidence(null);
     setInspectedEvidenceFailure(null);
@@ -594,7 +595,7 @@ export default function RecoveryWorkspaceClient() {
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2.5">
             <VognaryMark size={24} />
-            <h1 className="font-display text-lg font-semibold text-(--ink)">Your subscriptions</h1>
+            <h1 className="font-display text-lg font-semibold text-(--ink)">Your renewal review</h1>
           </div>
           <div className="flex items-center gap-2">
             <p className="hidden font-data text-xs text-(--muted) sm:block">
@@ -718,6 +719,7 @@ export default function RecoveryWorkspaceClient() {
     if (state.view === "ADD_EVIDENCE") {
       return (
         <RecoverySources
+          receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable}
           receiptInbox={state.receiptInbox}
           sourceStatus={state.sourceStatus}
           pendingAction={state.pendingSourceAction}
@@ -755,6 +757,8 @@ export default function RecoveryWorkspaceClient() {
     return state.home ? (
       <RecoveryHome
         home={state.home}
+        commitmentTotal={state.commitmentTotal}
+        receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable}
         onOpenCommitment={openCommitment}
         onInspectEvidence={inspectEvidence}
         onAddEvidence={() => {

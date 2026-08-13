@@ -148,6 +148,13 @@ export type EvidenceDto = {
   confidence: ConfidenceDto;
 };
 
+export type SavedObservationDto = {
+  evidenceId: string;
+  merchant: string | null;
+  amount: MoneyDto | null;
+  date: string | null;
+};
+
 export type DecisionDto = {
   value: Decision;
   decidedAt: string;
@@ -277,6 +284,7 @@ export type HomeChangedDto =
 export type HomeProjectionDto = {
   workspace: WorkspaceDto;
   generatedAt: string;
+  recentObservations: readonly SavedObservationDto[];
   monthlyTotals: readonly ProjectionTotalDto[];
   next30DayTotals: readonly ProjectionTotalDto[];
   needsMe: readonly AttentionItemDto[];
@@ -325,12 +333,19 @@ export type ReceiptInboxAliasDto = {
   revokedAt: string | null;
 };
 
+export type GmailForwardingVerificationDto = {
+  code: string | null;
+  verificationUrl: string | null;
+  receivedAt: string;
+};
+
 export type ReceiptInboxStatusDto = {
   state: ReceiptInboxUpdateState;
   alias: ReceiptInboxAliasDto | null;
   lastReceivedAt: string | null;
   lastProcessedAt: string | null;
   lastFailureCode: string | null;
+  gmailVerification?: GmailForwardingVerificationDto | null;
 };
 
 export type EvidenceIngestRequest =

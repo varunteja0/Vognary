@@ -65,7 +65,7 @@ export type CorrectionDraft = {
 };
 
 export type RecoveryDialog =
-  | { kind: "EVIDENCE_INSPECTOR"; commitmentId: string; evidenceId: string }
+  | { kind: "EVIDENCE_INSPECTOR"; commitmentId: string | null; evidenceId: string }
   | { kind: "CORRECTION"; commitmentId: string; field: CorrectionField };
 
 export type PendingMutation =

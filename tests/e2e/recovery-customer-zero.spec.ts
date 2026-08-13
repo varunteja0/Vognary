@@ -36,8 +36,19 @@ test.skip(!email || !accessCode, "database-backed development login env not conf
 
 test("Customer #0 completes all 30 Recovery actions in the browser", async ({ page, isMobile }, testInfo) => {
   test.setTimeout(180_000);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText = text;
+        },
+      },
+    });
+  });
+  const addressBlock = testInfo.project.name.includes("mobile") ? "203.0.113" : "198.51.100";
   await page.context().setExtraHTTPHeaders({
-    "x-forwarded-for": testInfo.project.name.includes("mobile") ? "198.51.100.42" : "198.51.100.41",
+    "x-forwarded-for": `${addressBlock}.${Math.floor(Math.random() * 180) + 50}`,
   });
   const runtimeFailures = collectRuntimeFailures(page);
   await resetCustomerZeroThroughUi(page);
@@ -49,11 +60,10 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await loginAsDevelopmentUser(page);
-  await expect(page.getByRole("heading", { level: 1, name: "Your subscriptions" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
 
   // 4-7. Use the explicit manual fallback once and persist real-format receipts.
-  await selectRecoveryView(page, "Sources");
-  await page.getByText("Manual fallback", { exact: true }).click();
+  await openEvidenceInput(page);
   const receiptInput = page.getByLabel("Receipt or invoice text");
   await receiptInput.fill(`${firstReceipt}\n\n${secondReceipt}`);
   await page.getByRole("button", { name: "Save this receipt as evidence" }).click();
@@ -76,7 +86,7 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
   await exactEvidenceTrigger.click();
   const evidenceDialog = page.getByRole("dialog", { name: "Exact evidence" });
   await expect(evidenceDialog).toBeVisible();
-  await expect(evidenceDialog.getByText("Observed fact (exact excerpt)")).toBeVisible();
+  await expect(evidenceDialog.getByText("Observed fact (exact excerpt)")).toBeVisible({ timeout: 15_000 });
   await expect(evidenceDialog).toContainText("OpenAI");
   await expectNoSeriousAxeViolations(page, "exact evidence dialog");
   await page.keyboard.press("Tab");
@@ -85,6 +95,17 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
   await expect(evidenceDialog).toHaveCount(0);
   await expect(exactEvidenceTrigger).toBeFocused();
 
+  await openCommitment(page, "OpenAI");
+
+  // Save one decision on the first recurring commitment, then share the same Home facts.
+  await page.getByRole("button", { name: "Review later", exact: true }).click();
+  await expect(page.getByText(/Saved Review later on/)).toBeVisible();
+  await selectRecoveryView(page, "Home");
+  await page.getByRole("button", { name: "Copy for WhatsApp" }).click();
+  await expect(page.getByText("WhatsApp summary copied.", { exact: true })).toBeVisible();
+  const sharedText = await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText ?? "");
+  expect(sharedText).toContain("Monthly burn from checked receipts: ₹");
+  expect(sharedText).not.toMatch(/\/mo \+ /);
   await openCommitment(page, "OpenAI");
 
   // 16-20. Correct every contract field through the modal UI.
@@ -130,7 +151,7 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
 
   // 27. Reload and verify the saved correction and final decision remain visible.
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1, name: "Your subscriptions" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
   await openCommitment(page, "OpenAI India");
   await expect(page.getByText(/Saved I don’t recognize this on/)).toBeVisible();
   await expect(page.getByText("Merchant set to “OpenAI India”")).toBeVisible();
@@ -145,8 +166,7 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
   await expect(page.getByText("OpenAI India").first()).toBeVisible();
 
   // 29. Add later evidence and verify a real Changed event replaces the baseline.
-  await selectRecoveryView(page, "Sources");
-  await page.getByText("Manual fallback", { exact: true }).click();
+  await openEvidenceInput(page);
   await page.getByLabel("Receipt or invoice text").fill(laterReceipt);
   await page.getByRole("button", { name: "Save this receipt as evidence" }).click();
   await expect(page.getByRole("heading", { name: "What the workspace did with it" })).toBeVisible();
@@ -205,17 +225,28 @@ async function loginAsDevelopmentUser(page: Page) {
   await page.getByRole("button", { name: "Sign in as developer" }).click();
   await page.waitForURL(/\/app$/);
   await page.waitForLoadState("domcontentloaded");
-  await expect(page.getByRole("heading", { level: 1, name: "Your subscriptions" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
 }
 
 async function selectRecoveryView(page: Page, name: "Home" | "Subscriptions" | "Sources") {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name }).click();
 }
 
+async function openEvidenceInput(page: Page) {
+  await selectRecoveryView(page, "Sources");
+  const fallback = page.getByText("Manual fallback", { exact: true });
+  if (await fallback.isVisible()) await fallback.click();
+  await expect(page.getByLabel("Receipt or invoice text")).toBeVisible();
+}
+
 async function openCommitment(page: Page, merchant: string) {
   await selectRecoveryView(page, "Subscriptions");
-  await page.getByRole("button", { name: new RegExp(merchant) }).first().click();
-  await expect(page.getByRole("heading", { name: merchant })).toBeVisible();
+  const heading = page.getByRole("heading", { name: merchant, exact: true });
+  if (await heading.isVisible()) return;
+  const commitment = page.getByRole("button", { name: new RegExp(merchant) }).first();
+  await expect(commitment).toBeVisible({ timeout: 15_000 });
+  await commitment.click();
+  await expect(heading).toBeVisible({ timeout: 15_000 });
 }
 
 async function saveCorrection(

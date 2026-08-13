@@ -35,10 +35,20 @@ export function extractReceiptCandidates(messages: string[], currencyHint: Recei
 
 // One pasted blob usually holds several receipts separated by blank lines.
 export function splitReceiptSnippets(text: string): string[] {
-  return text
+  const snippets = text
     .split(/\n\s*\n/)
     .map((snippet) => snippet.trim())
     .filter(Boolean);
+  if (snippets.length < 2 || snippets.some(hasBoundedReceiptFields)) return snippets;
+
+  const completeReceipt = snippets.join("\n\n");
+  return hasBoundedReceiptFields(completeReceipt) ? [completeReceipt] : snippets;
+}
+
+function hasBoundedReceiptFields(value: string) {
+  // The forced hint is used only to find document boundaries. Actual extraction
+  // still rejects an ambiguous bare dollar unless the source proves its currency.
+  return Boolean(extractReceiptCandidate(value, "USD") || extractObservedReceipt(value, "USD"));
 }
 
 // Convert pasted receipt text into recurring-audit inputs so pasted evidence

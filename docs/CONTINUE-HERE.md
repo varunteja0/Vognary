@@ -1,4 +1,4 @@
-# CONTINUE HERE — live handoff (2026-08-11)
+# CONTINUE HERE — live handoff (2026-08-12)
 
 > **New chat — mandatory order:**
 > 1. [`docs/THE-LAW.md`](THE-LAW.md) — **supreme company + agent directive** (read first)
@@ -27,31 +27,80 @@ money first-class before anything else, and the world must work too.**
   default to India.
 - Honesty invariant holds everywhere: name a rail only at its proven `*_STATUS`.
 
-## 1. Where things stand (verified 2026-08-11)
+## 1. Where things stand (verified 2026-08-12)
 
-- **Recovery v1 launch implementation is locally green (verified 2026-08-11):**
+- **Recovery v1 launch implementation is locally green (verified 2026-08-12):**
   branch `recovery/v1` has one canonical signed path under
   `src/app/workspace/recovery/**` + `src/lib/recovery/**` + Recovery APIs +
   migration `0023`. Guest evidence survives authentication; Changed provenance,
   repeatable-read version coherence, decimal-safe bigint money, exact evidence
   addressing, canonical export/delete, deterministic-only file provenance, PII
   redaction, resource ceilings, and hot-query indexes are enforced. Realistic
-  merchant + amount + charge-date receipts now persist as observations; one does
-  not fabricate recurrence, while two matching charges infer cadence through the
-  existing engine. Empty Home now leads with the private receipt address when it
-  is actually available and keeps manual evidence as the fallback. Evidence:
-  **557/557 unit/source-contract tests**, **41/41 PostgreSQL tests** from a fresh
-  schema through migrations `0024`–`0026`, and all **76 browser scenarios**
-  exercised across desktop/mobile (one 5-second dev cold-start miss in the full
-  run; the unchanged mobile Customer #0 test passed **1/1** immediately on rerun),
-  with no serious/critical axe violations. Lint, typecheck, claims, tokens, build,
-  and performance budgets pass. Production now has a clean Recovery cutover
+  merchant + amount + charge-date receipts now persist as observations; one
+  receipt publishes its saved merchant, amount, date, exact evidence, and honest
+  WhatsApp text without fabricating recurrence, while two matching charges infer
+  cadence through the existing engine. Empty Home uses a three-step manual path
+  unless the receipt inbox is publicly attested; Changed appears before attention;
+  currencies remain separate; reminder eligibility never claims delivery.
+  Evidence: **571/571 unit/source-contract tests**, **42/42 PostgreSQL tests**,
+  and the applicable closeout browser matrix **46/46** across desktop/mobile
+  (**44** landing/login/first-value/Home/state scenarios + **2** real-route/
+  PostgreSQL Customer #0 scenarios), with no serious/critical axe violations.
+  Lint has zero errors (8 pre-existing navigation warnings); typecheck, claims,
+  tokens, build, and performance budgets pass. Production now has a clean Recovery cutover
   through `0026`, an exact-main-SHA deployment, Google identity configuration,
   daily reminder/retention cron routes, and a verified Resend sending + receiving
   domain with the canonical `email.received` webhook. The provider is configured,
   but receipt-inbox launch attestations remain deliberately blank until a real
   signed event proves processing, replay, and retention. Real Google/session,
-  real receipt/PDF processing, delivered reminder, and Customer #0 remain to prove.
+  real receipt/PDF processing, delivered reminder, and a human-timed Customer #0
+  remain to prove. Scoreboard human metric cells remain blank because no completed-
+  audit, surprise, pay-intent, TTI, corpus, or return evidence was supplied in this run.
+- **Local F1 was impossible until 2026-08-12 and is now unblocked.** The closeout
+  work was 28 uncommitted files on one laptop; it is now committed and pushed as
+  `9cbccf0` + `6531c0b` on `recovery/v1`. Separately, `.env.local` had no
+  `ENABLE_DEVELOPMENT_LOGIN` / `DEVELOPMENT_LOGIN_EMAIL` /
+  `DEVELOPMENT_LOGIN_ACCESS_CODE`, and no local Google client, so **no one could
+  sign in locally at all** — which is why `recovery_submissions` was 0 and every
+  signed-in browser journey silently skipped on this machine (CI always had the
+  code, so CI counts were real). Development login is now configured locally
+  (gitignored; hard-disabled when `NODE_ENV=production`). `.env.local` still
+  points `DATABASE_URL` at `localhost:5432` for the `docker compose` path, so
+  when using the standalone Postgres on `55432` start the server as:
+  `DATABASE_URL='postgres://vognary@127.0.0.1:55432/vognary' POSTGRES_SSL=false npm run dev -- --hostname 127.0.0.1 --port 3101`.
+  Customer #0 then passes live on that server: **desktop and mobile, 30 actions
+  each, real routes and real PostgreSQL**. Human TTI is still unmeasured.
+- **Production closeout candidate is live, but public growth remains blocked
+  (verified 2026-08-12):** `www.vognary.com` now serves exact CI-green SHA
+  `2eda24d5d88e4d3e0727d823905d9aba9fdcb0fd`; the closeout landing/login copy,
+  `/api/health`, identity-only Google start contract, retired `410` routes,
+  persistent backend, migrations through `0026`, and shared rate limiting pass.
+  The invalid production `DATABASE_URL` placeholder was replaced by a verified
+  Neon pooled URL. `INTERNAL_SYNC_SECRET` is synchronized across Vercel, GitHub
+  Actions, and the gitignored local operator file; a protected Sentry test
+  returned `status=delivered`, and a protected retention dry run selected all 4
+  workspaces with zero failed executions. A read-only encrypted backup of the
+  PostgreSQL 18.4 production database restored into disposable PostgreSQL 18.4
+  with matching checksum, all 17 core tables, and exact Recovery row counts; all
+  copied data and the temporary key were then destroyed. That rehearsal does
+  **not** make backups READY because no persistent founder-held key or durable
+  object-storage copy exists. Receipt inbox remains NOT CLAIMED: production has
+  3 signed-event records, but 2 are terminal `PARSE_FAILED`, 1 remains
+  `MATERIALIZATION_FAILED`, and zero evidence rows have `PROVIDER_RECEIVED`
+  provenance. Delivered reminders/digests remain 0; Razorpay and legal proof are
+  absent; human F1/TTI, completed audits, surprise, pay intent, consented corpus,
+  and D30 return remain unmeasured. Non-strict production endpoint health passes;
+  Phase 10 and strict public activation remain NO-GO.
+- **Funnel measurement now exists (2026-08-13):** the Recovery loop previously
+  emitted no telemetry at all, so signups, activation, and return visits could
+  not be answered from data. `workspace.activated` (accepted evidence) and
+  `ledger.viewed` (Home read) are now emitted server-side, and `npm run funnel`
+  reports signups, daily active users, users active on 2+ days, and D7/D30
+  cohort return from counts only. Both event names were already in the
+  `product_events` CHECK constraint, so **no migration touches production**.
+  Verified live: a Customer #0 browser run emitted 3 `ledger.viewed` and 2
+  `workspace.activated` rows. There is still **no web analytics** on the
+  marketing pages, so visitor counts remain UNKNOWN.
 - **Recovery launch identity is Google OIDC only (2026-08-10):** the bearer
   magic-link UI is removed from the Recovery login path and server readiness is
   opt-in disabled unless `ENABLE_MAGIC_LINK_LOGIN=true`. Magic link is deferred
@@ -118,6 +167,10 @@ money first-class before anything else, and the world must work too.**
 
 **Company sequence (THE-LAW):** Phase **A** market proof + Phase **B** loop shipping run **in parallel** now.
 Live CRM: `docs/execution/private-audit-crm.csv` · Scoreboard: `docs/execution/scoreboard.md` · Field memory (people/threads/learnings): `docs/execution/people-conversation-learning.md`
+
+**Pre-public retention execution (agents):** [`docs/execution/pre-public-retention-wp.md`](execution/pre-public-retention-wp.md) — WP-R0…R8 under Phase A/B. Not a new strategy. Code order: one product story → first-value &lt;3 min → beat spreadsheet (changed-since) → passive inbox honesty → Phase A instruments. Founder still owns Customer #0, pay, keys, go/no-go.
+
+**Ultimate closeout run (craft 10/10 + founder gates):** [`docs/execution/ultimate-closeout-run.md`](execution/ultimate-closeout-run.md) — paste prompt for SOL; closes critic defects D1–D10; company metrics require founder F1–F5 (never invent).
 
 The one product loop: **evidence in (paste/upload/Gmail) → audit finds every
 recurring charge → assistant brief → user decides → decision + outcome logged with proof.**

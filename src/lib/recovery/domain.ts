@@ -42,10 +42,19 @@ export type RecoveryCoverageSource = {
   evidenceCount: number;
 };
 
+export type RecoveryObservationRecord = {
+  evidenceId: string;
+  merchant: string | null;
+  amountMinor: bigint | null;
+  currency: string | null;
+  date: string | null;
+};
+
 export type HomeProjectionInput = {
   workspace: WorkspaceDto;
   generatedAt?: Date;
   commitments: readonly CanonicalCommitmentRecord[];
+  observations?: readonly RecoveryObservationRecord[];
   sources: readonly RecoveryCoverageSource[];
   changed: HomeChangedDto;
 };
@@ -86,6 +95,14 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
   return {
     workspace: input.workspace,
     generatedAt: generatedAt.toISOString(),
+    recentObservations: (input.observations ?? []).slice(0, 3).map((observation) => ({
+      evidenceId: observation.evidenceId,
+      merchant: observation.merchant?.trim() || null,
+      amount: observation.amountMinor !== null && observation.currency
+        ? toMoneyDto(observation.amountMinor, observation.currency)
+        : null,
+      date: observation.date,
+    })),
     monthlyTotals,
     next30DayTotals,
     needsMe: active.flatMap((commitment) => buildAttention(commitment, today)),

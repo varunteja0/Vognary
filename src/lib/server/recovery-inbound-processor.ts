@@ -3,8 +3,10 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { extractForwardedReceiptTexts, forwardedEmailMaxMimeBytes } from "@/lib/recovery/inbound-email";
 import { getDatabasePool } from "@/lib/server/database";
+import { RecoveryMaterializationError } from "@/lib/server/recovery-api";
 import {
   getReceiptInboxConfiguration,
+  recordGmailForwardingVerification,
   resolveReceiptInboxAlias,
 } from "@/lib/server/recovery-inbound-store";
 import {
@@ -66,6 +68,15 @@ export async function processResendReceivedEvent(
     return { status: marked ? "ignored" : "duplicate" };
   }
   const receipts = extraction.texts;
+  if (extraction.gmailVerification) {
+    await recordGmailForwardingVerification({
+      workspaceId: reservation.workspaceId,
+      aliasId: alias.aliasId,
+      verification: extraction.gmailVerification,
+    }).catch(() => undefined);
+    const marked = await markTerminalFailure(reservation, "GMAIL_VERIFICATION_PENDING");
+    return { status: marked ? "ignored" : "duplicate" };
+  }
   if (!receipts.length) {
     const marked = await markTerminalFailure(
       reservation,
@@ -87,12 +98,18 @@ export async function processResendReceivedEvent(
       ? { status: "processed" }
       : { status: "ignored" };
   } catch (error) {
-    const released = await releaseForRetry(reservation, "MATERIALIZATION_FAILED");
+    const released = await releaseForRetry(reservation, materializationFailureCode(error));
     if (!released) return { status: "duplicate" };
     throw error instanceof ResendInboundRetryableError
       ? error
       : new ResendInboundRetryableError("Receipt materialization failed.");
   }
+}
+
+export function materializationFailureCode(error: unknown) {
+  return error instanceof RecoveryMaterializationError
+    ? `MATERIALIZATION_${error.stage}_${error.code}`
+    : "MATERIALIZATION_FAILED";
 }
 
 async function findExistingInboundEvent(event: ResendReceivedEvent) {
