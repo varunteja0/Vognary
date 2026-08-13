@@ -64,6 +64,36 @@ export function RecoverySources({
           Vognary never accesses or scans your inbox. Messages sent to that private address are processed as receipt evidence; keep the address private and forward only billing mail you want Vognary to review.
         </p>
 
+        {receiptInbox?.gmailVerification ? (
+          <div className="mt-5">
+            <StateBlock
+              eyebrow="Gmail is waiting for you"
+              title="Confirm forwarding in Gmail to finish setup"
+              detail="Gmail sent a confirmation request to your Vognary receipt address. Gmail forwards nothing until it is confirmed."
+              tone="caution"
+            >
+              <div className="grid gap-3">
+                {receiptInbox.gmailVerification.code ? (
+                  <p className="text-sm leading-6 text-(--ink)">
+                    Confirmation code: <span className="font-mono font-semibold">{receiptInbox.gmailVerification.code}</span>
+                    {" "}— paste this into Gmail&apos;s Forwarding settings.
+                  </p>
+                ) : null}
+                {receiptInbox.gmailVerification.verificationUrl ? (
+                  <a
+                    href={receiptInbox.gmailVerification.verificationUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="btn btn-sm btn-primary justify-self-start"
+                  >
+                    Confirm forwarding with Google
+                  </a>
+                ) : null}
+              </div>
+            </StateBlock>
+          </div>
+        ) : null}
+
         {sourceStatus.kind === "AUTH_REQUIRED" ? (
           <div className="mt-5"><AuthRequiredBlock /></div>
         ) : sourceStatus.kind === "FAILED" && receiptInbox ? (

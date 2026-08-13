@@ -29,6 +29,7 @@ export const productionFeatureMigrations = [
   "0024_recovery_inbound_receipts",
   "0025_recovery_renewal_alerts",
   "0026_recovery_inbound_retention",
+  "0027_gmail_forwarding_verification",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];

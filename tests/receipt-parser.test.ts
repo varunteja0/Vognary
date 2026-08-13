@@ -20,6 +20,19 @@ test("a receipt that states no cadence is still kept as one observed charge", ()
   assert.equal(observed.observedDate, "2026-07-06");
 });
 
+test("keeps one visually spaced receipt together for bounded observation", () => {
+  const receipt = [
+    "OpenAI",
+    "ChatGPT Plus subscription",
+    "Amount: INR 1,999.00",
+    "Charged on 6 July 2026",
+  ].join("\n\n");
+
+  const snippets = splitReceiptSnippets(receipt);
+  assert.equal(snippets.length, 1);
+  assert.equal(extractObservedReceipt(snippets[0])?.merchant, "OpenAI");
+});
+
 test("an observed receipt still needs a merchant, an amount, and a real charge date", () => {
   assert.equal(extractObservedReceipt("OpenAI ChatGPT Plus subscription. Amount: INR 1,999.00"), null);
   assert.equal(extractObservedReceipt("Amount: INR 1,999.00 charged on 6 July 2026"), null);

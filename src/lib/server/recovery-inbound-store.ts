@@ -34,6 +34,9 @@ type ActiveAliasRow = {
   created_at: Date;
   rotated_at: null;
   revoked_at: null;
+  gmail_verification_code: string | null;
+  gmail_verification_url: string | null;
+  gmail_verification_received_at: Date | null;
 };
 
 type MembershipRow = {
@@ -418,7 +421,8 @@ async function insertAlias(client: PoolClient, input: {
 async function readActiveAlias(client: PoolClient, workspaceId: string) {
   const result = await client.query<ActiveAliasRow>(
     `select id, workspace_id, connected_account_id, encrypted_display,
-            status, created_at, rotated_at, revoked_at
+            status, created_at, rotated_at, revoked_at,
+            gmail_verification_code, gmail_verification_url, gmail_verification_received_at
      from recovery_inbound_aliases
      where workspace_id = $1 and status = 'ACTIVE'
      limit 1`,
@@ -431,7 +435,8 @@ async function readAliasById(client: PoolClient, workspaceId: string, aliasId: s
   if (!aliasId) return null;
   const result = await client.query<ActiveAliasRow>(
     `select id, workspace_id, connected_account_id, encrypted_display,
-            status, created_at, rotated_at, revoked_at
+            status, created_at, rotated_at, revoked_at,
+            gmail_verification_code, gmail_verification_url, gmail_verification_received_at
      from recovery_inbound_aliases
      where workspace_id = $1 and id = $2 and status = 'ACTIVE'
      limit 1`,
@@ -473,6 +478,7 @@ async function readReceiptInboxStatusWithClient(client: PoolClient, workspaceId:
       lastReceivedAt: latest?.received_at.toISOString() ?? null,
       lastProcessedAt: latest?.processed_at?.toISOString() ?? null,
       lastFailureCode: latest?.error_code ?? null,
+      gmailVerification: gmailVerificationDto(active),
     };
   }
 
@@ -489,11 +495,44 @@ async function readReceiptInboxStatusWithClient(client: PoolClient, workspaceId:
     lastReceivedAt: latest?.received_at.toISOString() ?? null,
     lastProcessedAt: latest?.processed_at?.toISOString() ?? null,
     lastFailureCode: latest?.error_code ?? null,
+    gmailVerification: null,
   };
 }
 
+function gmailVerificationDto(alias: ActiveAliasRow) {
+  if (!alias.gmail_verification_received_at) return null;
+  return {
+    code: alias.gmail_verification_code,
+    verificationUrl: alias.gmail_verification_url,
+    receivedAt: alias.gmail_verification_received_at.toISOString(),
+  };
+}
+
+/** Google only sends this once per request, so the newest challenge replaces the old one. */
+export async function recordGmailForwardingVerification(input: {
+  workspaceId: string;
+  aliasId: string;
+  verification: { code: string | null; verificationUrl: string | null };
+}) {
+  await getDatabasePool().query(
+    `update recovery_inbound_aliases
+       set gmail_verification_code = $3,
+         gmail_verification_url = $4,
+         gmail_verification_received_at = now()
+     where workspace_id = $1 and id = $2 and status = 'ACTIVE'`,
+    [input.workspaceId, input.aliasId, input.verification.code, input.verification.verificationUrl],
+  );
+}
+
 function statusFromActiveAlias(alias: ActiveAliasRow): ReceiptInboxStatusDto {
-  return { state: "WAITING", alias: aliasDto(alias), lastReceivedAt: null, lastProcessedAt: null, lastFailureCode: null };
+  return {
+    state: "WAITING",
+    alias: aliasDto(alias),
+    lastReceivedAt: null,
+    lastProcessedAt: null,
+    lastFailureCode: null,
+    gmailVerification: gmailVerificationDto(alias),
+  };
 }
 
 function aliasDto(alias: ActiveAliasRow) {

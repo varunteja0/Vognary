@@ -333,12 +333,19 @@ export type ReceiptInboxAliasDto = {
   revokedAt: string | null;
 };
 
+export type GmailForwardingVerificationDto = {
+  code: string | null;
+  verificationUrl: string | null;
+  receivedAt: string;
+};
+
 export type ReceiptInboxStatusDto = {
   state: ReceiptInboxUpdateState;
   alias: ReceiptInboxAliasDto | null;
   lastReceivedAt: string | null;
   lastProcessedAt: string | null;
   lastFailureCode: string | null;
+  gmailVerification?: GmailForwardingVerificationDto | null;
 };
 
 export type EvidenceIngestRequest =

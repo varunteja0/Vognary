@@ -360,7 +360,7 @@ test("two realistic receipt observations infer one canonical monthly subscriptio
         kind: "RECEIPT_PASTE",
         receipts: [{
           clientRef: "openai-july",
-          text: "OpenAI ChatGPT Plus subscription\nAmount: INR 1,999.00\nCharged on 6 July 2026",
+          text: "OpenAI\n\nChatGPT Plus subscription\n\nAmount: INR 1,999.00\n\nCharged on 6 July 2026",
         }],
       },
       now: new Date("2026-08-09T10:00:00.000Z"),
