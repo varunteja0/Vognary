@@ -59,3 +59,39 @@ This version has breaking changes — APIs, conventions, and file structure may 
 [ ] Implement; tests; gate chain
 [ ] Update CONTINUE-HERE / docs/execution/scoreboard.md if phase evidence changed
 ```
+
+## Cursor Cloud specific instructions
+
+Single Next.js 16 app (`vognary-web`). Standard commands live in `README.md` and
+`package.json` `scripts`; only the non-obvious cloud gotchas are below.
+
+- **Node version is enforced.** `.npmrc` sets `engine-strict=true` and `engines`
+  requires Node `>=22.22.2 <23` (`.nvmrc` pins `22.23.2`). The VM ships a system
+  `/exec-daemon/node` (22.14.0) that fails engine-strict, so `~/.bashrc` has been
+  set up to prepend the nvm-managed `v22.23.2` bin to `PATH`. Any new shell already
+  resolves the correct `node`/`npm`; if you ever see `EBADENGINE`, run
+  `nvm use 22.23.2` (or `nvm install 22.23.2`) before npm commands.
+- **Run the app:** `npm run dev` (Turbopack, http://localhost:3000). Liveness:
+  `curl http://localhost:3000/api/health`. The guest audit loop needs **no**
+  external services — `POST /api/audit` and the deterministic engine work with zero
+  env. `npm run build` also succeeds with no env.
+- **PostgreSQL** is installed natively (not Docker — Docker is absent). Start it with
+  `sudo pg_ctlcluster 16 main start`. Role/DB `vognary`/`vognary`/`vognary` on
+  `127.0.0.1:5432`; the role has `CREATEDB` (required — the `test:postgres`
+  migration tests spin up disposable databases). Connection string:
+  `postgres://vognary:vognary@127.0.0.1:5432/vognary` with `POSTGRES_SSL=false`.
+  `docker compose up` is an equivalent alternative but not needed here.
+- **Signed-in / DB-backed features need dev secrets** (same values as
+  `docker-compose.yml`): `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (64 hex chars),
+  `INTERNAL_SYNC_SECRET`, `CRON_SECRET`, `ALLOW_IN_MEMORY_RATE_LIMITS=true`, plus
+  `DATABASE_URL`/`POSTGRES_SSL`. Apply schema/migrations before use:
+  `DATABASE_URL=... POSTGRES_SSL=false npm run db:apply-schema`.
+- **Development (code) login** for browsing `/app` without Google: set
+  `ENABLE_DEVELOPMENT_LOGIN=true` (must be the literal string `true`, not `1`) with
+  `DEVELOPMENT_LOGIN_EMAIL` + `DEVELOPMENT_LOGIN_ACCESS_CODE`. `/app` redirects to
+  `/login` when unauthenticated; the code-login form is hidden under the
+  **"Other ways to sign in"** disclosure on `/login`. Google OAuth is the only other
+  identity and requires founder-provisioned credentials.
+- **Tests:** `npm test` (unit) must run with `DATABASE_URL` **unset**.
+  `npm run test:postgres` needs `DATABASE_URL` + the dev secrets above and a running
+  Postgres with a `CREATEDB` role.
