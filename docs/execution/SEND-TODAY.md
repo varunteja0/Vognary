@@ -1,4 +1,6 @@
-# SEND TODAY — copy-paste only (no thinking)
+# SEND TODAY — historical pre-autopilot outreach (retired 2026-08-13)
+
+> **Historical; retired by the 2026-08-13 autopilot pivot.** Live Phase A scripts live in [`phase-a-market-contact.md`](phase-a-market-contact.md). Do not treat this queue as the current product offer. Preserve the measured send record below; do not rewrite it as new pilot evidence.
 
 You send. Nothing auto-sends. Mark CRM after each send.
 

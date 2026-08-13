@@ -1,300 +1,215 @@
-# Phase B — Loop product shipping (agent architecture guide)
+# Phase B — Autopilot loop shipping (WP-A through WP-E)
 
-> **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md)  
-> **Companion product phases:** CONTINUE-HERE Phases 1–4 (engineering slice of this phase)  
-> **UI/AI WPs:** `docs/execution-plan-ui-ai-quality.md`  
-> **AI/Twin implementation law:** `docs/master-build-plan.md` Parts 3–5  
+> **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md)
+> **Live state:** [`docs/CONTINUE-HERE.md`](../CONTINUE-HERE.md)
+> **Market proof:** [`phase-a-market-contact.md`](phase-a-market-contact.md)
+> **UI/AI implementation law (historical, still binding for tokens/AI):** `docs/execution-plan-ui-ai-quality.md` and `docs/master-build-plan.md` Parts 3–5
 
-**Goal:** Make the core loop inevitable in the product so market audits (Phase A) feel magical, not manual.
+**Goal:** Make the locked autopilot loop inevitable so private pilots (Phase A) are wrap-care, not a spreadsheet.
 
 ```
-evidence in → recurring audit → assistant brief → decide → log outcome with proof
+passive evidence
+  → cited classification
+  → deterministic eligibility
+  → versioned standing mandate
+  → delivered 48-hour veto notice
+  → supported discretionary execution
+  → execution proof
+  → financially covered clean windows
+  → customer-safe billing
 ```
+
+The customer connects once and signs once. They are contacted only for vetoes and genuine exceptions.
+
+Historical WP-B0…B8 (landing honesty, guest first-value, assistant brief, UPI kill-list, monolith extraction) shipped the pre-autopilot Recovery loop. They are **not** the live roadmap. Do not reopen them as parallel work.
 
 ---
 
-## 0. Target experience (definition of “undeniable”)
+## 0. Locked product invariants
 
-| Step | User sees | Max time | Primary files / routes |
-| --- | --- | --- | --- |
-| 1. Enter | Clear CTA; no fake results | 10s | `src/app/page.tsx`, guest path |
-| 2. Evidence | Paste / upload / Gmail | 60–90s | ingest, guest-audit, Gmail OAuth |
-| 3. Insight | Monthly burn + next debit + 1 action | **<3 min total** | engines + brief |
-| 4. Brief home | Signed-in default = what needs attention | instant | `assistant-brief*`, `/app` |
-| 5. Decide | keep / watch / cancel / investigate | 30s | decisions API + UI |
-| 6. India win | UPI mandate kill-list from statement alone | same session | `mandate-killlist*` |
-| 7. Proof | Export / verify path honest | 30s | audit-pack, `/verify` |
-
-**Release claim:** only after e2e covers the loop and Phase A shows humans complete it.
+1. Recovery is the only active financial authority.
+2. AI cites evidence or produces no financial claim.
+3. Only `discretionary-subscription` can become executable.
+4. A protected signal always overrides a discretionary signal.
+5. Receipts prove recurrence and merchant facts; they do not prove that a subscription is unwanted.
+6. Cancellation preference comes only from the signed deterministic rule pack.
+7. Every eligible action receives a successfully delivered 48-hour notice.
+8. Silence after that notice authorizes only what the user already mandated.
+9. Veto or mandate revocation before execution withdraws queued cases immediately.
+10. Password, OTP, login, UPI-app, or bank-confirmation requirements create an exception.
+11. Gmail, AA, Razorpay, legal authority, and notification delivery remain fail-closed until genuinely ready.
+12. No public “cancelled” or “saved” claim without the corresponding proof.
 
 ---
 
-## 1. Architecture map (agents plan from this — do not redesign)
+## 1. Architecture map (do not redesign)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  UI                                                             │
-│  page.tsx (landing) → /app guest | signed-in workspace shell    │
-│  workspace/assistant-brief-panel.tsx  ← DEFAULT HOME            │
-│  workspace/mandate-killlist-panel.tsx                           │
-│  vognary-mvp-client.tsx (LEGACY MONOLITH — extract, don’t grow) │
+│  Recovery workspace: watching / mandate / veto / exceptions /   │
+│  recent actions / proof receipts. Cited drill-downs remain.     │
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
 │  API                                                            │
-│  POST /api/audit  POST /api/ingest                              │
-│  GET  /api/workspaces/current/brief                             │
-│  POST /api/workspaces/current/ask                               │
-│  GET  /api/workspaces/current/mandate-killlist (or equiv)       │
-│  connectors / Gmail OAuth / decisions / outcomes                │
+│  Recovery evidence · standing mandate · candidates · veto       │
+│  notice delivery · execution workers · verification · billing   │
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
 │  Deterministic fact engines (SOLE SOURCE OF MONEY TRUTH)        │
-│  receipt-parser → recurring-audit → renewal-timeline            │
-│  suggested-cuts · mandate-killlist · assistant-brief            │
-│  proof-graph · proof-questions · verified-savings               │
-│  twin/{project,runway,whatif}                                   │
+│  receipt-parser → recurring-audit → classification snapshot     │
+│  eligibility evaluator (shadow in WP-B; execute in WP-C)        │
+│  covered-window verification → fee ledger                       │
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
 │  AI (optional, fail-closed)  src/lib/server/ai/*                │
-│  extract (schema) · reconcile · narrate · citations             │
 │  validateCited MUST pass or output discarded                    │
-│  inert without ANTHROPIC_API_KEY                                │
+│  AI never decides unused / junk                                 │
 └────────────────────────────┬────────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────────┐
 │  Persistence                                                    │
-│  living-ledger-store · proof-graph-store · workspace snapshots  │
-│  decision / outcome stores · connector token vault              │
+│  recovery-store · recovery ingestion envelope                   │
+│  living-ledger writes FROZEN · proof-graph read-only legacy     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Design rules when adding code
 
-1. **Facts never originate in the LLM.**  
-2. **New UI** prefers `src/app/workspace/*` panels, not more monolith lines.  
-3. **Honesty states** from `getConnectorHonesty` / connector registry — no “connected” without proof.  
-4. **INR default**; multi-currency explicit.  
-5. **Tests first** for engine changes.  
+1. **Facts never originate in the LLM.**
+2. **New UI** prefers `src/app/workspace/recovery/*`.
+3. **Honesty states** from readiness helpers — no “connected” without proof.
+4. **INR default**; multi-currency explicit.
+5. **Tests first** for engine changes.
+6. **One isolated worktree per WP** from merged `origin/main`. No stacked PRs.
 
 ---
 
-## 2. Work packages for agents (ordered)
+## 2. Work packages (ordered; one PR each)
 
-Execute in order. Each WP = one branch from `main`, one PR.
+Execute in order. Never begin the next WP before the previous PR is merged into `origin/main`.
 
-### WP-B0 — Baseline integrity (do first if dirty)
+### WP-A — Recovery-only evidence spine
 
-- [ ] `npm run lint && npm run typecheck && npm run claims:check && npm run tokens:check && npm test`  
-- [ ] Confirm token gate + brand checks exist  
-- [ ] Note any failing e2e; fix only loop blockers  
-
-**Done when:** green local gate chain.
-
-### WP-B1 — Landing honesty (CONTINUE Phase 1)
-
-**Problem:** Sample ledger numbers can read as real user results.
+**Scoreboard row:** backend readiness / live-connector honesty. **Loop step:** passive evidence.
 
 **Do:**
 
-- Label sample audit as **illustrative / sample** in UI copy  
-- Ensure no unlabeled “results” that look measured  
-- Guest connect card uses honesty helpers, not “linked” language  
+- Canonical Recovery ingestion envelope before a PostgreSQL client
+- Envelope is authoritative for source type, provenance, idempotency, capture time, coverage, and consent reference
+- Paste, CSV, and forwarded email share that boundary
+- `GMAIL_OAUTH` reserved and rejected; Gmail HTTP stays 410
+- Inventory and freeze production-reachable legacy writers
+- Count/report: clean / safely migratable / blocked with exact counts
+- Idempotent Recovery migration with record-level reconciliation; never delete unsupported rows
 
-**Files (likely):** `src/app/page.tsx`, guest connect components, claims corpus if copy moves to checked docs  
+**Done when:** gates including disposable PostgreSQL are green and reviewers have signed the same head SHA.
 
-**Tests:** claims:check; optional Playwright landing assertion  
+### WP-B — Class lock, standing mandate, shadow engine
 
-**Done when:** founder cannot mistake sample for live personal totals.
+**Do:** versioned standing mandates; Recovery action candidates; type- and database-level executable-class restrictions; create/read/revoke/list/veto APIs; workspace-version preconditions; RBAC; audit; privacy export/deletion. Evaluator runs in **shadow mode only** and never executes.
 
-### WP-B2 — Time-to-first-insight path
+A candidate is eligible only when the mandate is active; class is high-confidence discretionary-subscription; no protected or conflicting evidence; recurrence has two dated occurrences or explicit provider subscription/renewal evidence; cadence/amount/currency/next debit are stable; amount is inside both ceilings; route is operator-supported; no KEEP / exclusion / prior veto / stale evidence / contradictory update; notice can be delivered.
 
-**Do:**
+Tests must exhaustively prove every protected class fails closed, including mixed/conflicting categories and adversarial strings. AI must never decide that a service is “unused” or “junk.”
 
-- Guest paste → visible burn + next debit + one action without login  
-- Remove dead ends / extra chapter noise on first run  
-- One primary onboarding path (not three competing CTAs)  
+### WP-C — Notice, executor, exceptions, user experience
 
-**Files:** `guest-audit-client.tsx`, `instant-audit*`, `first-action.ts`, workspace entry  
+**Do:** idempotent state machine `notice-queued → authorized-by-rule → in-progress → provider-pending → executed → verifying → verified` with terminal exits `vetoed, revoked, exception, failed, disputed`. Notice delivery is recorded and must succeed before the 48-hour clock starts. Production clocks cannot be shortened. Replace list-first Recovery home with watching, mandate, veto countdowns, exceptions, recent actions, and proof receipts. Mobile/desktop/accessibility E2E for the happy path plus veto, revocation, notice failure, protected item, changed evidence, duplicate worker, and exception flows.
 
-**Tests:** `tests/e2e/first-value-path.spec.ts`, `landing-instant-audit.spec.ts`  
+Password, OTP, login, UPI-app confirmation, bank scraping, or unknown paths become exceptions. Deep links are exception assistance, not successful autopilot. Operators cannot mark a saving verified.
 
-**Done when:** cold user <3 min to a proven number on mobile + desktop.
+### WP-D — Verified savings and customer-safe billing
 
-### WP-B3 — Gmail success moment
+**Do:** rebuild verification on Recovery evidence only. Merchant confirmation proves execution, not financial savings. Gmail or receipt silence is not financial proof. Covered statement/regulated source must span the expected debit window. Per-window saving = `max(0, proven baseline debit − observed debit)`. Missing coverage is “verification pending,” not zero and not saved.
 
-**Do:**
+Locked pricing: monitoring ₹999/month; outcome 15% of verified savings; monitoring credits against the outcome fee; first-year retained charge `min(max(M, 15% × S), 33% × S)`; refund/credit `max(0, M − earned charge)`; zero verified savings means zero retained first-year charge. Razorpay charging stays disabled until founder-controlled Razorpay, tax, legal, privacy, and operations gates are approved.
 
-- OAuth callback lands `/app?connected=gmail` (or equivalent)  
-- Surface “here’s what we found” from first sync / import  
-- Honest empty state if zero receipts  
+### WP-E — Passive rails, operations, security, private-pilot readiness
 
-**Files:** Gmail callback routes under `src/app/api/integrations/gmail/*`, workspace hydration  
-
-**Tests:** source-route / e2e with mocked OAuth where possible; manual proof with test user when credentials exist  
-
-**Done when:** connected user never lands on a blank dense dashboard without explanation.
-
-### WP-B4 — Assistant brief as default signed-in home
-
-**Do:**
-
-- Default `/app` view = assistant brief (renewals, anomalies, kill candidates)  
-- API: `GET /api/workspaces/current/brief` backed by `assistant-brief.ts` + store  
-- Ledger / advanced chapters are drill-downs  
-
-**Files:**  
-- `src/lib/assistant-brief.ts`  
-- `src/lib/server/assistant-brief-store.ts`  
-- `src/app/workspace/assistant-brief-panel.tsx`  
-- shell / `vognary-mvp-client.tsx` only as thin integration  
-
-**Tests:** `tests/assistant-brief.test.ts` + e2e signed-in first value  
-
-**Done when:** signed-in users can act without scrolling a wall of panels.
-
-### WP-B5 — UPI mandate kill-list (India-first win)
-
-**Do:**
-
-- Statement/paste path surfaces UPI/AUTOPAY/MANDATE/EMI/SIP/NACH items  
-- Per-PSP cancellation guidance (honest, manual where no API)  
-- Works **today** without AA partner  
-
-**Files:**  
-- `src/lib/mandate-killlist.ts`  
-- `src/lib/server/mandate-killlist-store.ts`  
-- `src/app/workspace/mandate-killlist-panel.tsx`  
-- API route if not complete  
-
-**Tests:** `tests/mandate-killlist.test.ts` + statement fixture  
-
-**Done when:** one real Indian statement produces a usable kill-list without partner rails.
-
-### WP-B6 — AI live path (blocked on founder key)
-
-**Do only after** `ANTHROPIC_API_KEY` + `AI_MONTHLY_BUDGET_INR` in env contract:
-
-- Ingest AI fallback for parser rejects → reconcile totals → confidence-capped  
-- `/ask` compiles to bounded queries; narrate with `validateCited`  
-- Degrade cleanly when key/budget missing  
-
-**Files:** `src/lib/server/ai/*` — follow master-build-plan Part 3  
-
-**Tests:** `tests/ai-guardrail.test.ts`, `ai-live-layer.test.ts`  
-
-**Done when:** no code path can render uncited money claims.
-
-### WP-B7 — Monolith extraction (quiet window)
-
-**Do:**
-
-- Move shells into `src/app/workspace/*`  
-- Target: route shell <300 lines; panels isolated  
-- Remove `WP4_DEFERRED` only when tokenized  
-
-**Forbidden during this WP:** redesign visual system; new product features  
-
-**Done when:** new features do not require editing the 5k-line file.
-
-### WP-B8 — Full-loop e2e + no-demo release checklist
-
-**Do:**
-
-- Playwright: guest insight → sign-in → brief → decision → export  
-- Extend `check-release-gate.mjs` no-demo checks  
-- Corpus progress visible even if below 100  
-
-**Done when:** Phase B exit gate green and founder can demo without lying.
+**Do:** Recovery-native Gmail OAuth (never the legacy materializer), kept disabled until Google restricted-scope verification/CASA is genuinely approved. Forwarding remains a private-pilot bridge. No AA production access without a regulated FIU contract. No third-party UPI mandate cancellation without a proven contractual API. Threat model, audit logs without PII, metrics, alerts, dead-letter visibility, SLOs, backup/restore, rollback, privacy export/deletion across new tables. Keep the global execution switch off until legal/operations readiness and the real shadow gate pass.
 
 ---
 
-## 3. File ownership map (avoid collisions)
+## 3. File ownership map
 
 | Area | Prefer editing | Avoid |
 | --- | --- | --- |
-| Brief logic | `assistant-brief.ts`, store, panel | reinventing ranking in UI |
-| Mandate | `mandate-killlist.ts`, panel | hardcoding PSP copy in 10 places |
-| Recurrence truth | `recurring-audit.ts` | AI inventing cadence |
-| Timeline | `renewal-timeline.ts` | Date.now hacks in components |
-| AI | `server/ai/*` only | client-side LLM keys |
-| Connectors | `connectors.ts`, adapters | claiming live without honesty state |
-| Money format | `lib/format.ts` | ad-hoc `₹` strings |
+| Ingestion | `src/lib/recovery/ingestion-envelope.ts`, `recovery-store.ts` | Reviving living-ledger writes |
+| Mandate / candidates | `src/lib/recovery/*` (WP-B+) | AI deciding junk/unused |
+| Execution | WP-C registry allowlist | Password/OTP/login paths as success |
+| Verification / fees | WP-D Recovery evidence | Billing missing coverage as ₹0 saved |
+| Gmail | WP-E Recovery-native OAuth | Legacy Gmail adapter |
+| Money format | `lib/format.ts` | Ad-hoc `₹` strings |
 
 ---
 
-## 4. Parallelism rules for multi-agent / Fable
+## 4. Parallelism rules
 
 | Safe parallel | Must serialize |
 | --- | --- |
-| WP-B1 landing honesty ∥ WP-B5 kill-list engine tests | Monolith extractions touching same lines |
-| Docs-only CRM work (Phase A) ∥ WP-B2 | Gmail OAuth + session binding changes |
-| AI unit tests with mocks ∥ brief UI | Live AI + ingest materialization |
+| Phase A CRM hygiene (founder) ∥ current WP implementation | Two writers on Recovery |
+| Reviewers (Codex/Opus) on a frozen SHA | Starting WP-n+1 before WP-n merges |
 
-**Always:** separate git worktrees; PR against `main`; rebase/fresh branch each WP.
+**Always:** separate git worktrees; PR against `main`; one owner.
 
 ---
 
-## 5. Verification commands (Phase B)
+## 5. Verification commands
 
 ```bash
-# unit + honesty
+git diff --check
 npm run lint
 npm run typecheck
 npm run claims:check
 npm run tokens:check
 npm test
-
-# build + perf
+# disposable local PostgreSQL only — never production
+DATABASE_URL='postgres://…' POSTGRES_SSL=false npm run test:postgres
 npm run build
 npm run perf:budget
-
-# browser (loop)
-npm run test:e2e
-
-# when DB available
-DATABASE_URL='…' POSTGRES_SSL=false npm run test:postgres
-
-# production claims only against real deploy
-npm run production:check -- https://www.vognary.com
 ```
+
+Do not claim a WP merge-ready while PostgreSQL is untested. Do not land temporary worktree paths in CONTINUE-HERE.
 
 ---
 
-## 6. Out of scope until Phase B exit + Phase A GO
+## 6. Out of scope until the matching WP and external gate
 
-- Merchant intelligence network  
-- New SaaS connectors beyond fixing Gmail path  
-- Platform API consumers  
-- Design-system rewrite  
-- Concierge verified-savings marketing  
-- AA production code (onboarding paperwork OK)  
+- Merchant intelligence network
+- Public Gmail OAuth before CASA/verification
+- AA production code (onboarding paperwork OK)
+- Design-system rewrite
+- Platform API consumers
+- Real Razorpay charging before founder-controlled gates
+- Counting written pay intent as paid
+- Raising business-validation score from code completion
 
 ---
 
 ## 7. Agent implementation prompt (copy into new sessions)
 
 ```text
-You are implementing Vognary Phase B under docs/THE-LAW.md.
-Read: docs/THE-LAW.md → docs/CONTINUE-HERE.md → docs/execution/phase-b-loop-shipping.md.
-Raise the product loop only. No new plans. No uncited AI. India-first INR defaults.
-Worktree from main. Failing test first for engines. PR against main.
-Start at the lowest incomplete WP-B0…B8. State scoreboard row + files before coding.
+You are implementing Vognary Autopilot under docs/THE-LAW.md.
+Read: docs/THE-LAW.md → docs/CONTINUE-HERE.md → docs/execution/phase-a-market-contact.md → docs/execution/phase-b-loop-shipping.md.
+Raise the locked autopilot loop only. No new plans. No uncited AI. India-first INR defaults.
+Worktree from merged origin/main. Failing test first for engines. PR against main.
+Start at the lowest incomplete WP-A…WP-E. State scoreboard row + files before coding.
+Never begin the next WP before the previous PR is merged.
 ```
 
 ---
 
-## 8. Exit criteria (Phase B complete)
+## 8. Exit criteria (Phase B engineering complete)
 
-- [ ] Sample/landing cannot be mistaken for live results  
-- [ ] Guest <3 min to insight (measured in e2e + 3 real humans)  
-- [ ] Signed-in default = assistant brief  
-- [ ] Gmail path has success moment when credentials exist (honest otherwise)  
-- [ ] UPI kill-list works from statement  
-- [ ] AI either off-with-grace or live-with-citations (never half-lying)  
-- [ ] Full-loop e2e green  
-- [ ] CONTINUE-HERE phases 1–3 marked with evidence links  
+- [ ] WP-A through WP-E merged with Codex + Opus review on the same final head SHA
+- [ ] Every agent-controlled acceptance criterion green
+- [ ] Gmail / AA / Razorpay / legal / notice delivery still fail-closed until genuinely ready
+- [ ] Private-pilot product readiness remains BLOCKED until deployment, legal, notice, operations, and shadow gates are real
+- [ ] Public launch remains BLOCKED until pilot metrics exist
+- [ ] Company/business validation remains the measured scoreboard value
 
-Then: prioritize Phase C production activation (founder-ops) + continue Phase A volume.
+Then: founder-ops for activation gates. Do not convert blockers into fake READY.

@@ -53,8 +53,13 @@ import {
   type RecurringItem,
   type StatementSource,
 } from "@/lib/recurring-audit";
-import { getDatabasePool } from "@/lib/server/database";
 import { recoveryEvidenceFingerprint } from "@/lib/recovery/evidence-fingerprint";
+import {
+  RecoveryCaptureNotReadyError,
+  buildRecoveryIngestionEnvelope,
+  type RecoveryIngestionEnvelope,
+} from "@/lib/recovery/ingestion-envelope";
+import { getDatabasePool } from "@/lib/server/database";
 import {
   RecoveryMaterializationError,
   RecoveryServiceError,
@@ -284,12 +289,20 @@ export async function materializeForwardedEmailEvidence(input: {
   replayed: boolean;
 }> {
   const request = normalizeForwardedEmailMaterializationRequest(input.request);
-  const client = await getDatabasePool().connect();
   const operation = "recovery.materialize-forwarded-email";
   const idempotencyKey = `forwarded-email:${sha256(`RESEND\0${input.providerEventId}`)}`;
   const currencyHint = input.currencyHint ?? null;
   const requestHash = hashRecoveryRequest({ operation, providerEventId: input.providerEventId, currencyHint, request });
-  const now = input.now ?? new Date();
+  const envelope = buildRecoveryIngestionEnvelope({
+    workspaceId: input.workspaceId,
+    sourceType: "FORWARDED_EMAIL",
+    idempotencyKey,
+    requestHash,
+    capturedAt: (input.now ?? new Date()).toISOString(),
+    consentReference: input.inboundEventId,
+  });
+  const client = await getDatabasePool().connect();
+  const now = new Date(envelope.capturedAt);
   let stage: RecoveryMaterializationStage = "EVENT_VALIDATION";
   try {
     await client.query("begin");
@@ -307,10 +320,10 @@ export async function materializeForwardedEmailEvidence(input: {
     }
     const replay = await readIdempotent<{ submission: EvidenceSubmissionDto; commitmentTotal: number }>(
       client,
-      input.workspaceId,
-      idempotencyKey,
+      envelope.workspaceId,
+      envelope.idempotencyKey,
       operation,
-      requestHash,
+      envelope.requestHash,
     );
     if (replay) {
       stage = "COMMIT";
@@ -327,20 +340,20 @@ export async function materializeForwardedEmailEvidence(input: {
     stage = "SUBMISSION";
     const submission = await client.query<{ id: string; ingested_at: Date }>(
       `insert into recovery_submissions (
-         workspace_id, submitted_by_user_id, source_type, inbound_event_id
-       ) values ($1, null, 'FORWARDED_EMAIL', $2)
+         workspace_id, submitted_by_user_id, source_type, inbound_event_id, ingested_at
+       ) values ($1, null, $2, $3, $4)
        returning id, ingested_at`,
-      [input.workspaceId, input.inboundEventId],
+      [envelope.workspaceId, envelope.sourceType, envelope.consentReference, envelope.capturedAt],
     );
     const submissionRow = submission.rows[0];
     if (!submissionRow) throw new RecoveryServiceError("SAVE_FAILED");
 
     stage = "SOURCE_PERSISTENCE";
     const materialized = await persistSubmissionSources(client, {
-      workspaceId: input.workspaceId,
+      workspaceId: envelope.workspaceId,
       submissionId: submissionRow.id,
       request,
-      now,
+      envelope,
       currencyHint,
     });
     await client.query(
@@ -383,7 +396,7 @@ export async function materializeForwardedEmailEvidence(input: {
 
     const submissionDto: EvidenceSubmissionDto = {
       id: submissionRow.id,
-      type: "FORWARDED_EMAIL",
+      type: envelope.sourceType,
       ingestedAt: submissionRow.ingested_at.toISOString(),
       acceptedEvidenceCount: materialized.acceptedEvidenceCount,
       results: materialized.results,
@@ -394,7 +407,7 @@ export async function materializeForwardedEmailEvidence(input: {
     )).rows[0]?.total ?? 0);
     const response = { submission: submissionDto, commitmentTotal };
     stage = "IDEMPOTENCY";
-    await writeIdempotent(client, input.workspaceId, idempotencyKey, operation, requestHash, response, workspaceVersion);
+    await writeIdempotent(client, envelope.workspaceId, envelope.idempotencyKey, operation, envelope.requestHash, response, workspaceVersion);
     const accepted = materialized.acceptedEvidenceCount > 0;
     stage = "EVENT_COMPLETION";
     const completedEvent = await client.query(
@@ -565,15 +578,22 @@ export async function submitRecoveryEvidence(input: {
   request: EvidenceIngestRequest;
   now?: Date;
 }): Promise<{ data: SubmitEvidenceResponse["data"]; workspaceVersion: number; replayed: boolean }> {
-  const client = await getDatabasePool().connect();
   const operation = "recovery.submit-evidence";
   const requestHash = hashRecoveryRequest({ operation, request: input.request });
-  const now = input.now ?? new Date();
+  const envelope = buildRecoveryIngestionEnvelope({
+    workspaceId: input.workspaceId,
+    sourceType: input.request.kind,
+    idempotencyKey: input.idempotencyKey,
+    requestHash,
+    capturedAt: (input.now ?? new Date()).toISOString(),
+  });
+  const client = await getDatabasePool().connect();
+  const now = new Date(envelope.capturedAt);
   try {
     await client.query("begin");
     await lockRecoveryWorkspace(client, input.workspaceId);
     const membership = await assertRecoveryRole(client, input.actorUserId, input.workspaceId, "member");
-    const replay = await readIdempotent<SubmitEvidenceResponse["data"]>(client, input.workspaceId, input.idempotencyKey, operation, requestHash);
+    const replay = await readIdempotent<SubmitEvidenceResponse["data"]>(client, envelope.workspaceId, envelope.idempotencyKey, operation, envelope.requestHash);
     if (replay) {
       await client.query("commit");
       return { data: replay.response, workspaceVersion: replay.workspaceVersion, replayed: true };
@@ -582,19 +602,19 @@ export async function submitRecoveryEvidence(input: {
     assertWorkspaceVersion(state, input.expectedVersion);
 
     const submission = await client.query<{ id: string; ingested_at: Date }>(
-      `insert into recovery_submissions (workspace_id, submitted_by_user_id, source_type)
-       values ($1, $2, $3)
+      `insert into recovery_submissions (workspace_id, submitted_by_user_id, source_type, ingested_at)
+       values ($1, $2, $3, $4)
        returning id, ingested_at`,
-      [input.workspaceId, input.actorUserId, input.request.kind],
+      [envelope.workspaceId, input.actorUserId, envelope.sourceType, envelope.capturedAt],
     );
     const submissionRow = submission.rows[0];
     if (!submissionRow) throw new RecoveryServiceError("SAVE_FAILED");
 
     const materialized = await persistSubmissionSources(client, {
-      workspaceId: input.workspaceId,
+      workspaceId: envelope.workspaceId,
       submissionId: submissionRow.id,
       request: input.request,
-      now,
+      envelope,
     });
     await client.query(
       `update recovery_submissions
@@ -635,7 +655,7 @@ export async function submitRecoveryEvidence(input: {
     const data: SubmitEvidenceResponse["data"] = {
       submission: {
         id: submissionRow.id,
-        type: input.request.kind,
+        type: envelope.sourceType,
         ingestedAt: submissionRow.ingested_at.toISOString(),
         acceptedEvidenceCount: materialized.acceptedEvidenceCount,
         results: materialized.results,
@@ -644,9 +664,9 @@ export async function submitRecoveryEvidence(input: {
       commitments,
       commitmentTotal: commitments.length,
     };
-    await writeIdempotent(client, input.workspaceId, input.idempotencyKey, operation, requestHash, data, workspaceVersion);
-    await writeRecoveryAudit(client, input.workspaceId, input.actorUserId, "recovery.evidence.submitted", submissionRow.id, {
-      sourceType: input.request.kind,
+    await writeIdempotent(client, envelope.workspaceId, envelope.idempotencyKey, operation, envelope.requestHash, data, workspaceVersion);
+    await writeRecoveryAudit(client, envelope.workspaceId, input.actorUserId, "recovery.evidence.submitted", submissionRow.id, {
+      sourceType: envelope.sourceType,
       acceptedEvidenceCount: materialized.acceptedEvidenceCount,
       rejectedCount: materialized.results.filter((result) => result.status === "REJECTED").length,
       workspaceVersion,
@@ -913,9 +933,10 @@ async function persistSubmissionSources(client: PoolClient, input: {
   workspaceId: string;
   submissionId: string;
   request: EvidenceIngestRequest | ForwardedEmailMaterializationRequest;
-  now: Date;
+  envelope: RecoveryIngestionEnvelope;
   currencyHint?: ReceiptCurrencyHint | null;
 }) {
+  const capturedAt = new Date(input.envelope.capturedAt);
   const existingEvidence = await client.query<{ total: string }>(
     `select count(*)::text as total from recovery_evidence where workspace_id = $1`,
     [input.workspaceId],
@@ -925,16 +946,16 @@ async function persistSubmissionSources(client: PoolClient, input: {
   const results: EvidenceSubmissionDto["results"][number][] = [];
   const acceptedSourceIds: string[] = [];
   let acceptedEvidenceCount = 0;
-  const entries = input.request.kind === "CSV_IMPORT"
-    ? input.request.sources.map((source) => ({ clientRef: source.clientRef, text: source.text }))
-    : input.request.receipts.map((receipt) => ({ clientRef: receipt.clientRef, text: receipt.text }));
+  const receiptSource = input.envelope.sourceType !== "CSV_IMPORT";
+  const entries = input.envelope.sourceType === "CSV_IMPORT"
+    ? (input.request as Extract<EvidenceIngestRequest, { kind: "CSV_IMPORT" }>).sources.map((source) => ({ clientRef: source.clientRef, text: source.text }))
+    : (input.request as Exclude<EvidenceIngestRequest, { kind: "CSV_IMPORT" }> | ForwardedEmailMaterializationRequest).receipts.map((receipt) => ({ clientRef: receipt.clientRef, text: receipt.text }));
 
   for (const entry of entries) {
     const storedClientRef = `client-${sha256(entry.clientRef).slice(0, 16)}`;
-    const receiptSource = input.request.kind !== "CSV_IMPORT";
     const contentHash = sha256(`${receiptSource ? "RECEIPT" : "CSV_IMPORT"}\0${entry.text}`);
     const duplicateHashes = receiptSource
-      ? [contentHash, sha256(`RECEIPT_PASTE\0${entry.text}`), sha256(`FORWARDED_EMAIL\0${entry.text}`)]
+      ? [contentHash, sha256(`RECEIPT_PASTE\0${entry.text}`), sha256(`FORWARDED_EMAIL\0${entry.text}`), sha256(`GMAIL_OAUTH\0${entry.text}`)]
       : [contentHash];
     const duplicate = await client.query(
       `select 1 from recovery_sources where workspace_id = $1 and content_hash = any($2::text[]) limit 1`,
@@ -951,9 +972,9 @@ async function persistSubmissionSources(client: PoolClient, input: {
     }
 
     const sourceId = randomUUID();
-    const storedLabel = input.request.kind === "RECEIPT_PASTE"
+    const storedLabel = input.envelope.sourceType === "RECEIPT_PASTE"
       ? "Pasted receipt"
-      : input.request.kind === "FORWARDED_EMAIL"
+      : input.envelope.sourceType === "FORWARDED_EMAIL"
         ? "Forwarded email"
         : "Imported statement";
     const sourceName = sourceEngineName(sourceId);
@@ -963,11 +984,11 @@ async function persistSubmissionSources(client: PoolClient, input: {
           sourceId,
           sourceName,
           input.submissionId,
-          input.now,
-          input.request.kind === "FORWARDED_EMAIL" ? "PROVIDER_RECEIVED" : "USER_SUBMITTED",
-          input.request.kind === "FORWARDED_EMAIL" ? input.currencyHint ?? null : null,
+          capturedAt,
+          input.envelope.provenanceKind,
+          input.envelope.sourceType === "FORWARDED_EMAIL" ? input.currencyHint ?? null : null,
         )
-      : extractCsvEvidence(entry.text, sourceId, sourceName, input.submissionId, input.now);
+      : extractCsvEvidence(entry.text, sourceId, sourceName, input.submissionId, capturedAt);
     if (!extracted.length) {
       results.push({
         clientRef: storedClientRef,
@@ -1005,22 +1026,41 @@ async function persistSubmissionSources(client: PoolClient, input: {
         sourceId,
         input.workspaceId,
         input.submissionId,
-        input.request.kind,
+        input.envelope.sourceType,
         storedClientRef,
         storedLabel,
         contentHash,
         JSON.stringify({ encrypted: true, payload: encrypted }),
-        dates[0] ?? null,
-        dates.at(-1) ?? null,
-        input.now,
+        input.envelope.coverageStart ?? dates[0] ?? null,
+        input.envelope.coverageEnd ?? dates.at(-1) ?? null,
+        input.envelope.capturedAt,
       ],
     );
-    for (const evidence of novelEvidence) await insertExtractedEvidence(client, input.workspaceId, evidence);
+    for (const evidence of novelEvidence) {
+      evidence.provenanceKind = input.envelope.provenanceKind;
+      evidence.provenanceReference = evidenceProvenanceReference(
+        input.envelope,
+        input.submissionId,
+        sourceId,
+        evidence.rowNumber,
+      );
+      await insertExtractedEvidence(client, input.workspaceId, evidence);
+    }
     acceptedSourceIds.push(sourceId);
     acceptedEvidenceCount += novelEvidence.length;
     results.push({ clientRef: storedClientRef, status: "ACCEPTED", code: null, message: null });
   }
   return { results, acceptedSourceIds, acceptedEvidenceCount };
+}
+
+function evidenceProvenanceReference(
+  envelope: RecoveryIngestionEnvelope,
+  submissionId: string,
+  sourceId: string,
+  rowNumber: number,
+) {
+  const base = `${submissionId}:${sourceId}:${rowNumber}`;
+  return envelope.consentReference ? `${envelope.consentReference}:${base}` : base;
 }
 
 async function filterNovelReceiptEvidence(client: PoolClient, workspaceId: string, evidenceRows: readonly ExtractedEvidence[]) {
@@ -2198,6 +2238,9 @@ async function writeRecoveryAudit(
 
 function normalizeStoreError(error: unknown) {
   if (error instanceof RecoveryServiceError) return error;
+  if (error instanceof RecoveryCaptureNotReadyError) {
+    return new RecoveryServiceError("FEATURE_UNAVAILABLE", error.message);
+  }
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
   if (["ECONNREFUSED", "57P01", "57P02", "57P03", "08001", "08006"].includes(code)) {
     return new RecoveryServiceError("DATABASE_UNAVAILABLE", undefined, { retryable: true });

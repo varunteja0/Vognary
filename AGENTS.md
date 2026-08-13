@@ -2,40 +2,33 @@
 
 ## 0. Read order (do this before writing code or plans)
 
-1. **[`docs/THE-LAW.md`](docs/THE-LAW.md)** — company + product + agent supreme directive  
-2. **[`docs/CONTINUE-HERE.md`](docs/CONTINUE-HERE.md)** — live handoff (what is true *this week*)  
-3. **[`docs/execution/phase-a-market-contact.md`](docs/execution/phase-a-market-contact.md)** — if work touches audits, GTM, CRM, outreach  
-4. **[`docs/execution/phase-b-loop-shipping.md`](docs/execution/phase-b-loop-shipping.md)** — if work touches the product loop  
-5. Then only as needed: `docs/execution-plan-ui-ai-quality.md`, `docs/master-build-plan.md`, production runbooks  
+1. **[`docs/THE-LAW.md`](docs/THE-LAW.md)** — company + product + agent supreme directive
+2. **[`docs/CONTINUE-HERE.md`](docs/CONTINUE-HERE.md)** — live handoff (what is true *this week*)
+3. **[`docs/execution/phase-a-market-contact.md`](docs/execution/phase-a-market-contact.md)** — if work touches audits, GTM, CRM, outreach
+4. **[`docs/execution/phase-b-loop-shipping.md`](docs/execution/phase-b-loop-shipping.md)** — if work touches the product loop
+5. Then only as needed: `docs/execution-plan-ui-ai-quality.md`, `docs/master-build-plan.md`, production runbooks
 
-**If THE-LAW conflicts with older docs:** THE-LAW wins on strategy. CONTINUE-HERE wins on live branch/env state.  
+**If THE-LAW conflicts with older docs:** THE-LAW wins on strategy. CONTINUE-HERE wins on live branch/env state.
 **Do not** create new master/leap/perfection plans. Update scoreboard evidence or CONTINUE-HERE status only.
 
 ## 1. What we are building
 
-Evidence-first **recurring-money audit**, India-first, honesty-enforced.  
-Loop: evidence in → find recurring → assistant brief → user decides → outcome with proof.  
+Evidence-first **recurring-money autopilot**, India-first, honesty-enforced.
+Loop: passive evidence → cited classification → deterministic rules → 48h veto → supported discretionary execution → proof → covered clean windows → outcome billing.
 AI must **cite or shut up**. Never invent amounts, merchants, or connector liveness.
 
 ## 2. Working rules
 
-- Isolated **git worktree** per work package from fresh `main`; PR against `main`; no stacked PRs, except for the founder-authorized Recovery v1 exception below
-- Path with spaces: quote `"/Users/varunteja/Desktop/CVT Group/Vognary"`  
-- Before merge: `lint` · `typecheck` · `claims:check` · `tokens:check` · `test` · then `build` · `perf:budget`  
-- Engine changes: **failing test first**  
-- Prefer `src/app/workspace/*` over growing `vognary-mvp-client.tsx`  
-- Founder-only ops: API keys, Google verification, Razorpay, legal, Setu — agents prepare, never fake READY  
+- Isolated **git worktree** per work package from fresh `main`; PR against `main`; no stacked PRs. The Recovery v1 same-checkout exception has **ended**.
+- Path with spaces: quote `"/Users/varunteja/Desktop/CVT Group/Vognary"`
+- Before merge: `lint` · `typecheck` · `claims:check` · `tokens:check` · `test` · disposable `test:postgres` when the WP touches migrations/stores · then `build` · `perf:budget`
+- Engine changes: **failing test first**
+- Prefer `src/app/workspace/*` over growing `vognary-mvp-client.tsx`
+- Founder-only ops: API keys, Google verification, Razorpay, legal, Setu — agents prepare, never fake READY
 
-### Recovery v1 same-checkout exception — founder-authorized 2026-08-09
+### Recovery v1 same-checkout exception — ENDED
 
-- `recovery/v1` uses the original repository only.
-- Two sibling Copilot chats may edit the same checked-out branch concurrently.
-- They obey the frozen SOL/OPUS ownership map.
-- No child creates a clone, worktree, branch, stash, merge, rebase, checkout, or copied repository.
-- No file has simultaneous writers.
-- SOL is Git owner.
-- OPUS performs no Git-state mutations.
-- This exception ends when Recovery v1 reaches `main`.
+Recovery v1 is on `main`. Do not revive same-checkout dual-write. One isolated worktree per WP from `origin/main`.
 
 ## 3. Hard stops
 
@@ -55,7 +48,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 [ ] Read docs/THE-LAW.md
 [ ] Read docs/CONTINUE-HERE.md
 [ ] State scoreboard row + loop step this task raises
-[ ] List files; open worktree from main unless the Recovery v1 same-checkout exception applies
+[ ] List files; open an isolated worktree from fresh origin/main
 [ ] Implement; tests; gate chain
 [ ] Update CONTINUE-HERE / docs/execution/scoreboard.md if phase evidence changed
 ```

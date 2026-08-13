@@ -1,4 +1,4 @@
-# CONTINUE HERE — live handoff (2026-08-12)
+# CONTINUE HERE — live handoff (2026-08-13)
 
 > **New chat — mandatory order:**
 > 1. [`docs/THE-LAW.md`](THE-LAW.md) — **supreme company + agent directive** (read first)
@@ -27,10 +27,13 @@ money first-class before anything else, and the world must work too.**
   default to India.
 - Honesty invariant holds everywhere: name a rail only at its proven `*_STATUS`.
 
-## 1. Where things stand (verified 2026-08-12)
+## 1. Where things stand (verified 2026-08-13)
 
-- **Recovery v1 launch implementation is locally green (verified 2026-08-12):**
-  branch `recovery/v1` has one canonical signed path under
+- **WP-A (2026-08-13, gates run on disposable local PostgreSQL; not merge-ready until CI + Codex/Opus on the same head SHA):** founder-authorized discretionary-autopilot pivot. Stage 0 is private autopilot pilots, not free paste audits. Recovery is the sole active ingestion authority. Paste / CSV / forwarded email share one canonical Recovery envelope constructed before a PostgreSQL client. `GMAIL_OAUTH` is reserved and fail-closed even if Google verification env is set. Legacy living-ledger and `connector_evidence` writes throw before PostgreSQL. Count/report is `clean` / `safely-migratable` / `blocked`. Evidence: **584/584** unit tests, **46/46** PostgreSQL tests, lint 0 errors (8 pre-existing warnings), typecheck, claims, tokens, build, and performance budgets passed. Do not invent scoreboard wins; business validation remains **1.5**.
+- **Recovery v1 is on `main` (PR #31).** The Recovery v1 same-checkout exception has **ended**. New work uses one isolated worktree per WP from fresh `origin/main`. No stacked PRs. Temporary worktree paths are not live instructions.
+- **Active engineering roadmap:** WP-A through WP-E in [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md). Historical WP-B0…B8 shipped the pre-autopilot Recovery loop and are not the live roadmap. Pre-public-retention and ultimate-closeout packets are archived (historical; retired by the 2026-08-13 autopilot pivot).
+- **Recovery v1 launch implementation was locally green (verified 2026-08-12, historical):**
+  branch `recovery/v1` (now merged) has one canonical signed path under
   `src/app/workspace/recovery/**` + `src/lib/recovery/**` + Recovery APIs +
   migration `0023`. Guest evidence survives authentication; Changed provenance,
   repeatable-read version coherence, decimal-safe bigint money, exact evidence
@@ -106,14 +109,7 @@ money first-class before anything else, and the world must work too.**
   opt-in disabled unless `ENABLE_MAGIC_LINK_LOGIN=true`. Magic link is deferred
   until verification is bound to browser intent/challenge; it is not launch
   proof and production activation now requires `google-ready`.
-- **Working directory:** `/Users/varunteja/Desktop/CVT Group/Vognary` — the space
-  in "CVT Group" means paths must always be quoted. This is now the **only**
-  worktree; the orphaned `Vognary-gate-trust/` + `Vognary-program/` dirs (dead
-  worktrees of a deleted clone) were removed with founder approval.
-- **Active branch:** `recovery/v1` in the original checkout under the
-  founder-authorized same-checkout exception; it is the only worktree. No agent
-  may create a branch, worktree, clone, stash, merge, or rebase until Recovery v1
-  reaches `main`.
+- **Quote paths** that contain the space in "CVT Group". Isolated worktree per WP from `origin/main`.
 - **`main`/origin is fully landed through PR #9**: Twin engine (`src/lib/twin/*`),
   RunwayStrip, AI cite-or-shut-up spine + live layer (`src/lib/server/ai/*`).
 - **AI models decision (live in code):** `AI_MODELS` in `src/lib/server/ai/models.ts`
@@ -165,34 +161,31 @@ money first-class before anything else, and the world must work too.**
 
 ## 2. THE PLAN — company phases (THE-LAW) + product phases (engineering)
 
-**Company sequence (THE-LAW):** Phase **A** market proof + Phase **B** loop shipping run **in parallel** now.
-Live CRM: `docs/execution/private-audit-crm.csv` · Scoreboard: `docs/execution/scoreboard.md` · Field memory (people/threads/learnings): `docs/execution/people-conversation-learning.md`
+**Company sequence (THE-LAW):** Phase **A** private autopilot pilots + Phase **B** WP-A through WP-E run **in parallel** now.
+Live CRM template: `docs/execution/private-autopilot-pilot-crm.csv.example` · Scoreboard: `docs/execution/scoreboard.md` · Historical field memory (not new pilot evidence): `docs/execution/people-conversation-learning.md`
 
-**Pre-public retention execution (agents):** [`docs/execution/pre-public-retention-wp.md`](execution/pre-public-retention-wp.md) — WP-R0…R8 under Phase A/B. Not a new strategy. Code order: one product story → first-value &lt;3 min → beat spreadsheet (changed-since) → passive inbox honesty → Phase A instruments. Founder still owns Customer #0, pay, keys, go/no-go.
-
-**Ultimate closeout run (craft 10/10 + founder gates):** [`docs/execution/ultimate-closeout-run.md`](execution/ultimate-closeout-run.md) — paste prompt for SOL; closes critic defects D1–D10; company metrics require founder F1–F5 (never invent).
-
-The one product loop: **evidence in (paste/upload/Gmail) → audit finds every
-recurring charge → assistant brief → user decides → decision + outcome logged with proof.**
+The one product loop: **passive evidence → cited classification → deterministic eligibility → versioned standing mandate → delivered 48-hour veto notice → supported discretionary execution → execution proof → financially covered clean windows → customer-safe billing.**
 
 ### 2a. Company phases (from THE-LAW)
 
 | Phase | What | Status |
 |---|---|---|
 | **0** | Repo hygiene | **DONE 2026-07-21** |
-| **A** | Market contact: 10 audits, CRM, outreach, report template | **ACTIVE** — `docs/execution/phase-a-market-contact.md` |
-| **B** | Loop shipping: WP-B0…B8 architecture for agents | **TECHNICAL GATE GREEN; PRODUCTION PROOF ACTIVE** — automated Customer #0 passes; real-human <3 min evidence still pending |
+| **A** | Private autopilot pilots: connect, mandate, notice, execution, covered windows, **actual payment** | **ACTIVE** — `docs/execution/phase-a-market-contact.md` |
+| **B** | Autopilot loop: WP-A through WP-E | **ACTIVE** — WP-A in progress; historical Recovery Customer #0 remains measured; real-human <3 min still pending |
 | **C–F** | Production min → moat → distribution → platform | PENDING / blocked until A–B signal |
 
-### 2b. Product engineering phases (code loop)
+### 2b. Product engineering work packages (live)
 
-| Phase | What | Status |
+| WP | What | Status |
 |---|---|---|
-| **0** | Repo hygiene: worktree corpses deleted, junk cleared, 14 branches pruned, docs collapsed, eslint hardened | **DONE 2026-07-21** |
-| **1** | Loop undeniable: Gmail → `/app?gmail=` + celebration; landing sample labelled; guest first-result first; token gate; honest Gmail card | **largely DONE 2026-07-21** · WP-B1…B3 |
-| **2** | Wire the brain: AI key + budget env; ingest AI PDF assist (fail-closed); `/api/ai/status`; **assistant brief** default home; kill-list on home; monolith decomposition underway (5442→5305) | **code DONE; live AI blocked on founder key** · WP-B4,B6,B7 |
-| **3** | India-first: UPI mandate kill-list from statements (panel + engine); corpus still founder-ops | **engine+UI DONE; corpus pending** · WP-B5 |
-| **4** | Full-loop e2e (`loop-brief-killlist` + first-value) + no-demo release gate | **e2e added; release:gate still ops** · WP-B8 |
+| **A** | Recovery-only ingestion envelope; freeze legacy writes; Gmail OAuth reserved | **IN PROGRESS** on `feat/autopilot-wp-a`. Disposable PostgreSQL gates passed (**584/584** unit, **46/46** PostgreSQL). Merge waits for CI + Codex/Opus on the same head SHA. |
+| **B** | Class lock, standing mandate, shadow evaluator (never executes) | **NOT STARTED** — wait for WP-A merge |
+| **C** | Notice, executor, exceptions, Recovery home | **NOT STARTED** |
+| **D** | Verified savings + customer-safe billing (Razorpay still fail-closed) | **NOT STARTED** |
+| **E** | Recovery-native Gmail, ops, security, private-pilot readiness | **NOT STARTED** |
+
+Historical pre-autopilot WP-B0…B8 (landing honesty, guest first-value, assistant brief, UPI kill-list, monolith extraction, loop e2e) shipped on Recovery v1. Treat them as measured history, not the next task.
 
 **What NOT to do:** no new plan documents (THE-LAW is the plan); no features outside the loop before B exit; no design-system rewrite; no uncited AI; no Setu/Razorpay code ahead of provisioning; no `/app` route restructure during decomposition; nothing outside this repo.
 
@@ -321,25 +314,16 @@ if (import.meta.url === `file://${process.argv[1]}`) await main();
 
 ## 4. Worktree rule
 
-### Recovery v1 same-checkout exception — founder-authorized 2026-08-09
+### Recovery v1 same-checkout exception — ENDED 2026-08-13
 
-- `recovery/v1` uses the original repository only.
-- Two sibling Copilot chats may edit the same checked-out branch concurrently.
-- They obey the frozen SOL/OPUS ownership map.
-- No child creates a clone, worktree, branch, stash, merge, rebase, checkout, or copied repository.
-- No file has simultaneous writers.
-- SOL is Git owner.
-- OPUS performs no Git-state mutations.
-- This exception ends when Recovery v1 reaches `main`.
-
-For all other work, use **one isolated git worktree per work item**:
+Recovery v1 is on `main`. Same-checkout dual-write is forbidden. Use **one isolated git worktree per work item**:
 
 ```sh
 cd "/Users/varunteja/Desktop/CVT Group/Vognary"
 git fetch origin
-git worktree add "../vognary-p1" -b feat/phase-1-loop origin/main
+git worktree add "../vognary-wp-next" -b feat/autopilot-wp-next origin/main
 # …build, verify, commit, push, PR against main…
-git worktree remove "../vognary-p1"
+git worktree remove "../vognary-wp-next"
 ```
 
 Never run `git checkout` in a worktree another agent is using.
@@ -349,7 +333,9 @@ Never run `git checkout` in a worktree another agent is using.
 - **Tests:** `node --conditions=react-server --import=tsx --test tests/*.test.ts`.
   **Clear `DATABASE_URL`** for local smoke (`unset DATABASE_URL`).
 - **Gate chain before any merge:** `eslint → tsc --noEmit → claims:check →
-  tokens:check → test → build → perf:budget`.
+  tokens:check → test →` disposable `test:postgres` for migration/store WPs `→
+  build → perf:budget`. Never claim “locally green” while PostgreSQL is untested.
+  Never use production PostgreSQL.
 - **`AGENTS.md`: this is a *modified* Next.js** — read
   `node_modules/next/dist/docs/` before writing route/server-component code.
 - **Honesty gate is real:** `scripts/check-public-claims.mjs` fails the build on

@@ -1,76 +1,96 @@
-# Phase A — Market contact kit (21 days)
+# Phase A — Private autopilot pilots (21 days)
 
-> **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md)  
-> **Goal:** Prove humans care and will pay. Not more product features.  
-> **Owner:** Founder primary; agents support with CRM hygiene, report generation, redaction helpers, copy polish.  
+> **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md)
+> **Goal:** Prove humans will connect once, sign a standing mandate, and pay for zero-chore discretionary cancellation. Not more product features. Not free paste audits.
+> **Owner:** Founder primary; agents support CRM hygiene, redaction helpers, and copy polish.
 > **Exit:** Day-21 stop/go using THE-LAW scoreboard metrics.
-> **Live field memory (people, threads, learnings, scripts):** [`people-conversation-learning.md`](people-conversation-learning.md) — read before new outreach; append same day.
+> **Historical field memory (pre-autopilot paste-audit campaign):** [`people-conversation-learning.md`](people-conversation-learning.md) — read as history; do not rewrite those quotes as new pilot evidence.
 
 ---
 
 ## 0. Success / stop criteria
 
+Actual payment and written pay intent are **separate metrics**. The paid 5/20 gate requires **actual payment**. Written pay intent is research signal only.
+
 ### Go (continue building loop + activation)
 
-- ≥10 completed real audits with redacted evidence  
-- ≥50% have at least one “I didn’t know / forgot this was renewing” finding  
-- ≥3 paid ₹999 **or** hard verbal/written commitment to pay after free batch  
-- ≥15 consented corpus fixtures stored (private; never commit PII to git)  
-- Repeated unsolicited ask for “do this every month”
+- ≥10 connected accounts with active standing mandates
+- ≥5 produce an eligible discretionary candidate
+- ≥3 supported actions complete with **no post-mandate customer work**
+- ≥2 reach a covered clean financial window
+- ≥5 **actual payments** of 20 real ₹999/month + verified-savings offers
+- Zero protected-class, unauthorized, or premature executions
+- Median operator effort below 15 minutes on handled cases
 
 ### Stop / rework offer
 
-- People refuse even redacted evidence after clear privacy pitch  
-- Findings feel obvious / zero surprise  
-- Praise for idea but zero pay intent after 20 valuable free audits  
+- People refuse even redacted evidence after a clear privacy pitch
+- Findings feel obvious / zero surprise
+- **0 actual payments** after 20 real autopilot offers (written intent does not save this gate)
 - Users only care if full bank/UPI auto-magic exists (wedge may be wrong timing)
+- Any protected-class or unauthorized execution
 
 ---
 
 ## 1. CRM schema (canonical)
 
-**Working file:** `docs/archive/private-audit-pipeline.csv`  
-**Better path (create when editing):** `docs/execution/private-audit-crm.csv`  
-Agents: never invent “completed” statuses. Founder owns Status transitions.
+**Working file (gitignored; may contain PII):** `docs/execution/private-autopilot-pilot-crm.csv`
+**Committed headers:** [`private-autopilot-pilot-crm.csv.example`](private-autopilot-pilot-crm.csv.example)
+**Historical paste-audit CRM (gitignored; not new pilot evidence):** `docs/execution/private-audit-crm.csv`
+
+Agents: never invent “connected”, “mandate accepted”, “paid”, or “verified saving” statuses. Founder owns status transitions.
 
 ### Required columns
 
 | Column | Type | Values / notes |
 | --- | --- | --- |
-| `id` | string | `C01`, `C02`, … stable |
-| `name` | string | Person |
-| `company` | string | |
-| `segment` | enum | `funded-startup` \| `freelancer` \| `solo-founder` \| `smb` \| `household` \| `ca-client` |
-| `contact` | url/email | LinkedIn URL or email |
-| `channel` | enum | `linkedin-dm` \| `linkedin-post` \| `email` \| `whatsapp` \| `referral` \| `inbound` \| `x-public` \| `x-dm` \| `peerlist` |
-| `source` | string | How found |
-| `asked_at` | date | First outreach ISO date |
+| `id` | string | `P01`, `P02`, … stable |
+| `connected_account_at` | datetime | First proven connected evidence source |
+| `mandate_accepted_at` | datetime | Signed standing mandate |
+| `mandate_terms_version` | string | Exact terms version on the signed text |
+| `candidate_discovered_at` | datetime | First eligible discretionary candidate |
+| `notice_delivered_at` | datetime | 48-hour veto notice **successfully delivered** |
+| `veto_at` | datetime | User veto before execution |
+| `exception_at` | datetime | Password / OTP / login / UPI-app / bank-confirmation / unknown path |
+| `supported_execution_at` | datetime | Merchant API, authenticated support/agency, or equivalent supported channel |
+| `post_mandate_customer_work_minutes` | number | Minutes the customer spent after signing. Zero is the product promise. |
+| `verification_coverage` | enum | `covered` \| `pending` \| `missing` |
+| `clean_window_at` | datetime | Covered window with no baseline debit |
+| `verified_saving_minor` | integer | Exact minor units; empty until covered proof |
+| `verified_saving_currency` | char(3) | Usually `INR` |
+| `actual_payment_at` | datetime | Money received. **Required for the paid gate.** |
+| `actual_payment_amount_inr` | number | Gross collected |
+| `written_pay_intent_at` | datetime | Written intent only. **Does not satisfy the paid gate.** |
+| `refund_at` | datetime | |
+| `refund_amount_inr` | number | |
+| `operator_minutes` | number | Internal effort on this workspace |
 | `status` | enum | see below |
-| `audit_booked_at` | date | |
-| `files_received` | bool | |
-| `audit_completed_at` | date | |
-| `monthly_recurring_found_inr` | number | |
-| `avoidable_monthly_found_inr` | number | |
-| `surprise_quote` | text | Verbatim |
-| `paid` | enum | `no` \| `intent` \| `yes-999` \| `refunded` |
-| `objection` | text | |
-| `next_follow_up` | date | |
-| `corpus_consent` | enum | `no` \| `asked` \| `yes-redacted` |
 | `notes` | text | |
 
 ### Status machine (use exactly)
 
 ```
-not-asked → asked → replied → booked → files-in → audit-done → paid|closed-lost
-                ↘ no-reply (after 2 nudges)
-                ↘ declined
+not-contacted
+  → connected
+  → mandate-accepted
+  → candidate-found
+  → notice-delivered
+      → silence-authorized
+      → vetoed
+      → exception
+  → supported-execution
+  → verifying
+  → clean-window
+  → paid | refunded | closed-lost
 ```
+
+Veto or mandate revocation returns queued cases to withdrawn immediately. Exceptions are not “supported execution.”
 
 ### Minimum weekly CRM hygiene
 
-- Every outreach updates `asked_at` + `status` same day  
-- Every completed audit fills money fields + `surprise_quote`  
-- Friday: export counts for THE-LAW scoreboard  
+- Same day: `connected_account_at` / `mandate_accepted_at` / `notice_delivered_at`
+- Separate columns for `actual_payment_at` and `written_pay_intent_at`
+- Friday: export counts for THE-LAW scoreboard — never mix intent into paid
 
 ---
 
@@ -78,40 +98,40 @@ not-asked → asked → replied → booked → files-in → audit-done → paid|
 
 **Priority 1 — Beachhead**
 
-- India-based founders / freelancers with AI + SaaS + cloud stacks  
-- Funded startups (pre-seed/seed) with 5–30 tool stack  
-- People who publicly complain about burn / subscriptions  
+- India-based founders / freelancers with AI + SaaS + cloud stacks who will connect a real mailbox or statement source
+- People who already said a spreadsheet still surprises them
+- People willing to sign a standing mandate with a 48-hour veto
 
 **Priority 2**
 
-- Fractional CFOs / CAs (channel pilots later in Phase E)  
-- Indie hackers with multi-currency tools  
+- Fractional CFOs / CAs (channel pilots later in Phase E)
+- Indie hackers with multi-currency tools
 
 **Deprioritize for Phase A**
 
-- Enterprise procurement  
-- Users who only want fully automated bank sync day-one  
-- Anyone requesting credit products  
+- Enterprise procurement
+- Users who only want fully automated bank sync day-one
+- Anyone requesting credit products
+- Anyone asking Vognary to auto-stop EMI, SIP, insurance, utilities, or cloud infrastructure
 
 ---
 
 ## 3. Outreach scripts (copy-paste)
+
+These replace the free paste-audit scripts. Do not offer a free PDF audit as the product.
 
 ### 3.1 LinkedIn / cold DM (first touch)
 
 ```text
 Hi {Name} — quick one.
 
-I run private recurring-burn audits for founders (AI/SaaS/cloud + UPI/card mandates).
-Most people know revenue and runway; almost nobody has one evidence-backed list of what renews next.
+Vognary is a private autopilot for recurring money: connect once, sign a standing mandate, and we cancel supported discretionary subscriptions under your rules after a 48-hour veto.
 
-Offer this week: free redacted audit (no bank passwords). You paste receipts / statement exports / mandate screenshots.
-You get: monthly burn, next 45-day renewals, top 3 actions, missing-source checklist.
+We do not auto-touch EMI, SIP, insurance, utilities, or cloud infrastructure. No bank passwords, OTPs, or CVV.
 
-If useful, the one-time assisted audit is ₹999 (no auto-renew). Happy to do yours free in this batch.
+Private-pilot offer this week: connect a real source, sign the mandate, and we run in shadow then supported execution only. Monitoring is ₹999/month, credited against 15% of verified savings, capped at 33% of verified savings in year one.
 
-Intake: https://www.vognary.com/private-audit?src=dm
-Or reply with a good time for a 20-min share-screen.
+If you want in, reply “pilot” and I’ll send the intake.
 
 — {Your name}, Vognary
 ```
@@ -119,95 +139,80 @@ Or reply with a good time for a 20-min share-screen.
 ### 3.2 Follow-up (day 3, if no reply)
 
 ```text
-Looping once — still holding 2 free audit slots this week.
-Even a redacted CSV or 3 receipt screenshots is enough to show whether this is useful.
-No pressure if timing is off.
+Looping once — still holding 2 private-pilot slots this week.
+Connect + signed mandate is the whole ask. Silence after the 48-hour notice authorizes only what you already signed.
 ```
 
 ### 3.3 Follow-up (day 7)
 
 ```text
-Closing this batch Friday. If you want the free recurring-burn report, reply “audit” and I’ll send the short intake.
+Closing this pilot batch Friday. Reply “pilot” if you want the standing-mandate path; otherwise I’ll close the thread.
 ```
 
 ### 3.4 After they agree
 
 ```text
-Perfect. Three options (pick one):
+Perfect. Three things, in order:
 
-1) Self-serve: https://www.vognary.com/private-audit?src=dm
-2) Fast path: paste 2–5 receipts here (redact account numbers)
-3) Share-screen 20 min — we import together
+1) Connect a real evidence source (paste/CSV now; forwarded email if the inbox is attested; Gmail OAuth only after Google verification).
+2) Read and sign the standing mandate (per-action ceiling + rolling 30-day ceiling + 48-hour veto).
+3) We contact you only for vetoes and genuine exceptions.
 
 I never need passwords, OTPs, or CVV.
-After the report, I’ll ask if we can keep a fully redacted fixture for parser quality (optional, consent-only).
 ```
 
 ### 3.5 LinkedIn public post (air cover)
 
 ```text
-Running 10 private recurring-burn audits this week for founders and freelancers.
+Running a private autopilot pilot: connect once, sign once, 48-hour veto, then Vognary cancels only supported discretionary junk.
 
-People know salary / revenue / runway.
-They rarely know what quietly renews across SaaS, AI, cloud, domains, Play/App Store, UPI AutoPay, card mandates, EMIs, SIPs, insurance, and email receipts.
+Not a spreadsheet. Not a free paste audit. EMI / SIP / insurance stay blocked.
 
-Vognary turns that into an evidence-backed report:
-• monthly recurring burn
-• next debits (45 days)
-• avoidable / watch items
-• missing sources named honestly
-• proof beside every recommendation
-
-Redact sensitive details. No bank passwords.
-
-Intake: https://www.vognary.com/private-audit?src=li-post
+₹999/month monitoring, credited against 15% of verified savings, first-year cap 33%.
 ```
 
 ### 3.6 WhatsApp short
 
 ```text
-Free founder audit this week: what renews next across UPI/SaaS/AI/cloud.
-Redacted OK. No passwords.
-Link: https://www.vognary.com/private-audit?src=wa
+Private autopilot pilot: connect + signed mandate. 48h veto. Discretionary only. No passwords.
+Reply “pilot” if you want in.
 ```
 
-### 3.7 After free audit → pay ask
+### 3.7 After a real offer → pay ask (actual payment)
 
 ```text
-Here’s your report (attached / link).
+Here’s what the mandate covered this cycle.
 
-Summary: ₹{monthly}/mo recurring · ₹{avoidable}/mo look avoidable or watch · next big debit {date}.
+Connected: {source} · Eligible candidates: {n} · Notices delivered: {n} · Executions: {n} · Clean windows: {n} · Verified saving: ₹{verified} (only if coverage exists).
 
-If this was worth it, the one-time assisted audit product is ₹999 (no subscription) once checkout is live — or you can pay that amount manually and I’ll invoice.
+Monitoring is ₹999/month. Outcome fee is 15% of verified savings, with monitoring credited, first-year retained charge capped at 33% of verified savings. Zero verified savings means zero retained first-year charge.
 
-Either way: would a monthly refresh be useful? (research only — not a product promise yet)
+If you want to continue, pay the monitoring invoice. Written “I’ll pay” is recorded separately and does not count as paid.
 ```
 
 ---
 
-## 4. Audit delivery standard (every audit identical)
+## 4. Pilot delivery standard (every pilot identical)
 
-Use template: [`docs/templates/audit-report-template.md`](../templates/audit-report-template.md)
+Do **not** use the old free-audit report as the product. The product is the autopilot loop.
 
 ### Delivery checklist (agent or founder)
 
-1. Ingest evidence via guest `/app` or signed-in workspace  
-2. Confirm currency separation (never sum USD into INR silently)  
-3. Capture: monthly burn, annual run-rate, count of commitments  
-4. Rank top 3 actions with **evidence citations**  
-5. List missing sources (UPI / Gmail / statements / SaaS) honestly  
-6. 45-day renewal timeline highlights  
-7. Export pack (JSON + PDF/CSV if available)  
-8. Fill CRM money + surprise quote fields same day  
-9. Ask corpus consent with redaction  
-10. No claim of bank linking or AI certainty beyond proof  
+1. Connected account with a proven Recovery source
+2. Standing mandate accepted (hash, actor, terms version, ceilings, 48h notice)
+3. Candidates classified with citations; protected classes fail closed
+4. 48-hour notice delivered before any clock starts
+5. Silence / veto / exception recorded
+6. Supported execution only on the allowlist; password/OTP/login/UPI-app/bank paths become exceptions
+7. Post-mandate customer work minutes logged (target: 0)
+8. Verification coverage named honestly (`covered` / `pending` / `missing`)
+9. Clean window and verified saving only with covered financial proof
+10. Actual payment vs written intent recorded in separate CRM columns
 
 ### Time budget
 
-- Prep: 10 min  
-- Live session: 20 min  
-- Write-up: 20 min  
-- **Total ≤ 50 min** per audit in Phase A  
+- Operator median: **< 15 minutes** per handled case
+- Customer after mandate: **0 minutes** except vetoes and genuine exceptions
 
 ---
 
@@ -223,15 +228,15 @@ Repo only holds: `corpus/manifest.example.yaml` + redacted fixtures when consent
 Optional: can we keep a fully redacted version of this statement/receipt for parser tests?
 We strip account numbers, names, phone, full card numbers, addresses.
 Only merchant patterns, amounts, and dates remain.
-You can say no — the audit still stands.
+You can say no — the pilot still stands.
 ```
 
 ### Redaction minimum
 
-- Account numbers → last 4 only or `XXXX`  
-- Names / phones / emails → remove  
-- Addresses → remove  
-- Full UPI IDs → mask  
+- Account numbers → last 4 only or `XXXX`
+- Names / phones / emails → remove
+- Addresses → remove
+- Full UPI IDs → mask
 
 When 25+ fixtures exist: run `npm run corpus` and track precision/recall toward THE-LAW targets.
 
@@ -241,17 +246,13 @@ When 25+ fixtures exist: run `npm run corpus` and track precision/recall toward 
 
 | Day | Founder | Agent support |
 | ---: | --- | --- |
-| 1 | Create/update CRM; message 10 leads | Ensure private-audit + guest audit paths work locally |
-| 2 | Message 10 more; post LinkedIn air cover | Fix any intake/export bugs found |
-| 3 | Book calls; send after-agree script | Prepare report template fills from sample |
-| 4 | Deliver audit 1–2 | Help generate pack; CRM fields |
-| 5 | Deliver audit 3–4 | Same |
-| 6 | Nudge non-replies | Landing honesty if users confuse sample ledger |
-| 7 | Scoreboard Friday | Update CONTINUE-HERE if product gaps found |
-| 8–10 | Audits 5–7; first pay asks | Loop product gaps from user friction only |
-| 11–14 | Audits 8–10; corpus consent drive | Corpus tooling / redaction checklist |
-| 15–18 | Follow-ups; convert intent→paid | Billing runbook support (no fake READY) |
-| 19–20 | Second-touch re-audits for 2 users | Diff / review quality |
+| 1 | Create/update autopilot CRM; start Google CASA / counsel review | WP-A Recovery evidence spine |
+| 2 | Message 10 ICP leads with the mandate pitch | Fix connect / mandate blockers only |
+| 3 | Message 10 more; no free-audit offer | Shadow evaluator prep (WP-B, after WP-A merges) |
+| 4–7 | Get 3 connected + mandate | Notice / exception honesty |
+| 8–14 | 10 connected + mandate; first eligible candidates | Do not execute until shadow + legal gates |
+| 15–18 | Convert written intent → **actual payment** | Billing remains fail-closed until Razorpay/legal READY |
+| 19–20 | Covered-window review for anyone executed | Verification pending if coverage is missing |
 | 21 | **STOP/GO** with metrics only | Write measured scoreboard into THE-LAW §5 if founder asks |
 
 ---
@@ -260,11 +261,12 @@ When 25+ fixtures exist: run `npm run corpus` and track precision/recall toward 
 
 | Allowed | Forbidden |
 | --- | --- |
-| Draft outreach variants in founder voice | Spamming contacts without founder approval |
-| Fill report templates from product export | Inventing surprise quotes or paid status |
+| Draft outreach in founder voice | Spamming contacts without founder approval |
+| Fill CRM from proven product events | Inventing payments, savings, or READY rails |
 | Build redaction helpers / export UX | Putting PII in git, issues, or logs |
-| Fix blockers that stop an audit mid-flight | New features “to impress” prospects |
-| Track metrics tables | Declaring PMF without numbers |
+| Fix blockers that stop a pilot mid-flight | Reviving free paste-audit volume as the wedge |
+| Track the columns in §1 | Counting written pay intent as paid |
+| | Auto-executing EMI, debt, SIP, insurance, utilities, cloud, or conflicted items |
 
 ---
 
@@ -272,15 +274,22 @@ When 25+ fixtures exist: run `npm run corpus` and track precision/recall toward 
 
 ```text
 Date:
-Completed audits:
-% with surprise finding:
-Paid / pay-intent count:
-Corpus fixtures:
-Median time-to-insight:
-Top 3 objections:
-Top 3 feature requests (only if repeated):
+Connected accounts with active mandates:
+Eligible candidates:
+Notices delivered:
+Vetoes:
+Exceptions:
+Supported executions (no post-mandate customer work):
+Verification coverage pending / covered / missing:
+Clean windows:
+Verified savings (currency + minor units):
+Actual payments (count / amount):
+Written pay intents (count; separate; not the paid gate):
+Refunds:
+Median operator minutes:
+Safety incidents:
 Decision: GO / STOP / REWORK OFFER
 Evidence links (CRM rows):
 ```
 
-Copy result into `docs/CONTINUE-HERE.md` under a short “Phase A result” note when decided.
+Copy result into `docs/CONTINUE-HERE.md` under a short “Phase A result” note when decided. Empty cells mean unmeasured.

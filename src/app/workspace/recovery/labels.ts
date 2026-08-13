@@ -57,6 +57,7 @@ export const sourceLabels: Record<SourceType, string> = {
   RECEIPT_PASTE: "Pasted receipt",
   CSV_IMPORT: "Imported statement file",
   FORWARDED_EMAIL: "Forwarded email",
+  GMAIL_OAUTH: "Gmail (not yet proven)",
 };
 
 export const commitmentStatusLabels: Record<CommitmentStatus, string> = {

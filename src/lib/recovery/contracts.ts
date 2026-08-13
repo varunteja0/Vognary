@@ -13,7 +13,7 @@ export const cadences = [
 ] as const;
 export type Cadence = (typeof cadences)[number];
 
-export const sourceTypes = ["RECEIPT_PASTE", "CSV_IMPORT", "FORWARDED_EMAIL"] as const;
+export const sourceTypes = ["RECEIPT_PASTE", "CSV_IMPORT", "FORWARDED_EMAIL", "GMAIL_OAUTH"] as const;
 export type SourceType = (typeof sourceTypes)[number];
 
 export const receiptInboxAliasStates = ["ACTIVE", "ROTATED", "REVOKED"] as const;

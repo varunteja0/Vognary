@@ -1,5 +1,8 @@
 # Ultimate closeout run — craft 10/10 + company floor exit
 
+> **Historical; retired by the 2026-08-13 autopilot pivot.**
+> Do not execute this packet. Live instructions are [`docs/THE-LAW.md`](../THE-LAW.md), [`docs/CONTINUE-HERE.md`](../CONTINUE-HERE.md), and WP-A through WP-E in [`docs/execution/phase-b-loop-shipping.md`](../execution/phase-b-loop-shipping.md). Preserve the measured closeout facts below; do not rewrite them as new pilot evidence.
+
 > **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md)  
 > **Live state:** [`docs/CONTINUE-HERE.md`](../CONTINUE-HERE.md)  
 > **Prior packet:** [`pre-public-retention-wp.md`](pre-public-retention-wp.md)  
@@ -11,7 +14,7 @@
 | --- | --- |
 | Code / UX craft of the loop → **10/10** | **Yes**, if the agent finishes every WP below with green gates |
 | Company composite (min-row) → **10/10** | **No** — needs real humans, pay, corpus, live rails proof over days/weeks |
-| Business validation → **10/10** | **No** without ≥10 real audits + paid signal (founder) |
+| Business validation → **10/10** | **No** without ≥10 connected+mandate autopilot pilots + paid signal (founder) |
 | “Users love it / best in market / PMF” | **Forbidden** until measured |
 
 **What this run *can* deliver if executed fully:**
@@ -193,13 +196,8 @@ payments, surprise quotes, inbox READY, reminders delivered, or TTI.
 ## 0. IDENTITY AND LAW
 
 You are SOL on Vognary.
-Repo: "/Users/varunteja/Desktop/CVT Group/Vognary"  (ALWAYS quote paths with spaces)
-Branch: recovery/v1 only.
-Recovery v1 same-checkout exception ACTIVE:
-- NO clone, worktree, new branch, stash, merge, rebase, checkout
-- No simultaneous writers on the same file
-- Git: [FOUNDER FILL: "You MAY commit on recovery/v1 when U8 is green" OR "diff only, no commit"]
-- OPUS if concurrent: no git mutations; respect file ownership map
+Repo: quote paths that contain the space in "CVT Group".
+Active work is isolated worktrees from `origin/main`. Recovery v1 same-checkout exception has **ended**.
 
 Mandatory read order BEFORE any edit:
 1. docs/THE-LAW.md

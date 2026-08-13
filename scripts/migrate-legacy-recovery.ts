@@ -1,13 +1,14 @@
 import pg from "pg";
 
-import { migrateLegacyRecovery } from "./lib/migrate-legacy-recovery";
+import { countLegacyLedgerRows, migrateLegacyRecovery } from "./lib/migrate-legacy-recovery";
 
 async function main() {
   const { Pool } = pg;
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error("DATABASE_URL is required for legacy Recovery migration.");
-  if (!process.argv.includes("--confirm")) {
-    throw new Error("Refusing to migrate legacy production authority without --confirm.");
+  const reportOnly = process.argv.includes("--report");
+  if (!reportOnly && !process.argv.includes("--confirm")) {
+    throw new Error("Refusing to migrate legacy production authority without --confirm. Use --report to count rows.");
   }
 
   const pool = new Pool({
@@ -19,8 +20,19 @@ async function main() {
   });
 
   try {
+    if (reportOnly) {
+      const report = await countLegacyLedgerRows(pool);
+      console.log(JSON.stringify(report, null, 2));
+      if (report.status !== "clean") process.exitCode = 2;
+      return;
+    }
+    const before = await countLegacyLedgerRows(pool);
     const result = await migrateLegacyRecovery(pool);
-    console.log(JSON.stringify(result, null, 2));
+    const after = await countLegacyLedgerRows(pool);
+    console.log(JSON.stringify({ before, result, after }, null, 2));
+    if (after.status !== "clean") {
+      throw new Error(`Zero-difference reconciliation failed: ${after.legacyRows} legacy rows remain.`);
+    }
   } finally {
     await pool.end();
   }

@@ -103,6 +103,37 @@ test("Recovery v1 persists the canonical Customer #0 lifecycle with isolation an
       [workspaceId],
     );
     assert.doesNotMatch(`${redactedJson.rows[0].results}${redactedJson.rows[0].replay}`, /someone@okhdfcbank|Alice Example|12 Lake Road|Hyderabad/i);
+    const envelope = await pool.query<{
+      submission_source_type: string;
+      source_source_type: string;
+      ingested_at: Date;
+      source_ingested_at: Date;
+      provenance_kind: string;
+      provenance_reference: string;
+    }>(
+      `select
+         submission.source_type as submission_source_type,
+         source.source_type as source_source_type,
+         submission.ingested_at,
+         source.ingested_at as source_ingested_at,
+         evidence.provenance_kind,
+         evidence.provenance_reference
+       from recovery_submissions submission
+       join recovery_sources source
+         on source.workspace_id = submission.workspace_id and source.submission_id = submission.id
+       join recovery_evidence evidence
+         on evidence.workspace_id = source.workspace_id and evidence.source_id = source.id
+       where submission.workspace_id = $1
+       order by submission.ingested_at asc
+       limit 1`,
+      [workspaceId],
+    );
+    assert.equal(envelope.rows[0]?.submission_source_type, "RECEIPT_PASTE");
+    assert.equal(envelope.rows[0]?.source_source_type, "RECEIPT_PASTE");
+    assert.equal(envelope.rows[0]?.ingested_at.toISOString(), "2026-08-09T10:00:00.000Z");
+    assert.equal(envelope.rows[0]?.source_ingested_at.toISOString(), "2026-08-09T10:00:00.000Z");
+    assert.equal(envelope.rows[0]?.provenance_kind, "USER_SUBMITTED");
+    assert.match(envelope.rows[0]?.provenance_reference ?? "", /^[0-9a-f-]+:[0-9a-f-]+:1$/i);
 
     const replay = await submitRecoveryEvidence({
       workspaceId,
@@ -496,6 +527,28 @@ test("Recovery persists JPY, KWD, and PostgreSQL-bigint corrections without JS-n
       now: new Date("2026-08-09T10:00:00.000Z"),
     });
     assert.equal(submitted.workspaceVersion, 1);
+    const csvEnvelope = await pool.query<{
+      source_type: string;
+      ingested_at: Date;
+      provenance_kind: string;
+      coverage_start: string;
+      coverage_end: string;
+    }>(
+      `select source.source_type, source.ingested_at, evidence.provenance_kind,
+              source.coverage_start::text, source.coverage_end::text
+       from recovery_sources source
+       join recovery_evidence evidence
+         on evidence.workspace_id = source.workspace_id and evidence.source_id = source.id
+       where source.workspace_id = $1
+       order by evidence.created_at asc
+       limit 1`,
+      [workspaceId],
+    );
+    assert.equal(csvEnvelope.rows[0]?.source_type, "CSV_IMPORT");
+    assert.equal(csvEnvelope.rows[0]?.ingested_at.toISOString(), "2026-08-09T10:00:00.000Z");
+    assert.equal(csvEnvelope.rows[0]?.provenance_kind, "USER_SUBMITTED");
+    assert.equal(csvEnvelope.rows[0]?.coverage_start, "2026-06-01");
+    assert.equal(csvEnvelope.rows[0]?.coverage_end, "2026-07-02");
     const listed = await listRecoveryCommitments({ workspaceId, actorUserId: ownerUserId, limit: 10 });
     assert.equal(listed.total, 2);
     const jpy = listed.items.find((item) => item.amount.currency === "JPY");

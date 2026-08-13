@@ -4,6 +4,7 @@ import test from "node:test";
 
 const migration = readFileSync(new URL("../infra/postgres/migrations/0023_recovery_v1.sql", import.meta.url), "utf8");
 const inboundMigration = readFileSync(new URL("../infra/postgres/migrations/0024_recovery_inbound_receipts.sql", import.meta.url), "utf8");
+const gmailOauthMigration = readFileSync(new URL("../infra/postgres/migrations/0028_recovery_gmail_oauth_source.sql", import.meta.url), "utf8");
 const schema = readFileSync(new URL("../infra/postgres/schema.sql", import.meta.url), "utf8");
 
 const recoveryTables = [
@@ -51,7 +52,7 @@ test("Recovery inbound receipts add HMAC-only routing and replay-safe provider e
     assert.match(schema, new RegExp(`create table if not exists ${table}\\b`, "i"));
   }
   for (const sql of [inboundMigration, schema]) {
-    assert.match(sql, /source_type in \('RECEIPT_PASTE', 'CSV_IMPORT', 'FORWARDED_EMAIL'\)/i);
+    assert.match(sql, /source_type in \('RECEIPT_PASTE', 'CSV_IMPORT', 'FORWARDED_EMAIL'/i);
     assert.match(sql, /provenance_kind in \('USER_SUBMITTED', 'PROVIDER_RECEIVED'\)/i);
     assert.match(sql, /alias_hmac char\(64\)/i);
     assert.match(sql, /encrypted_display jsonb/i);
@@ -100,4 +101,11 @@ test("Recovery inbound aliases cannot cross workspace ownership boundaries", () 
       /replaced_by_id uuid\s+references recovery_inbound_aliases\(id\)|foreign key \(replaced_by_id\)\s+references recovery_inbound_aliases\(id\)/i,
     );
   }
+});
+
+test("Gmail OAuth is reserved on Recovery sources without reviving living-ledger writes", () => {
+  for (const sql of [gmailOauthMigration, schema]) {
+    assert.match(sql, /source_type in \('RECEIPT_PASTE', 'CSV_IMPORT', 'FORWARDED_EMAIL', 'GMAIL_OAUTH'\)/i);
+  }
+  assert.doesNotMatch(gmailOauthMigration, /connector_evidence|living.ledger|gmail-readonly-adapter/i);
 });
