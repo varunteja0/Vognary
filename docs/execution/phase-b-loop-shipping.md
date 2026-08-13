@@ -108,6 +108,8 @@ Execute in order. Never begin the next WP before the previous PR is merged into 
 
 **Done when:** gates including disposable PostgreSQL are green and reviewers have signed the same head SHA.
 
+**Status (2026-08-13):** Merged as PR #32 at `2e3c776` before required Codex/Opus gates completed. WP-A.1 (legacy tenant integrity) is the required corrective PR; do not start WP-B until it merges.
+
 ### WP-B — Class lock, standing mandate, shadow engine
 
 **Do:** versioned standing mandates; Recovery action candidates; type- and database-level executable-class restrictions; create/read/revoke/list/veto APIs; workspace-version preconditions; RBAC; audit; privacy export/deletion. Evaluator runs in **shadow mode only** and never executes.

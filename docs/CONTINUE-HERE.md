@@ -29,7 +29,8 @@ money first-class before anything else, and the world must work too.**
 
 ## 1. Where things stand (verified 2026-08-13)
 
-- **WP-A (2026-08-13, gates run on disposable local PostgreSQL; not merge-ready until CI + Codex/Opus on the same head SHA):** founder-authorized discretionary-autopilot pivot. Stage 0 is private autopilot pilots, not free paste audits. Recovery is the sole active ingestion authority. Paste / CSV / forwarded email share one canonical Recovery envelope constructed before a PostgreSQL client. `GMAIL_OAUTH` is reserved and fail-closed even if Google verification env is set. Legacy living-ledger and `connector_evidence` writes throw before PostgreSQL. Count/report is `clean` / `safely-migratable` / `blocked`. Evidence: **584/584** unit tests, **46/46** PostgreSQL tests, lint 0 errors (8 pre-existing warnings), typecheck, claims, tokens, build, and performance budgets passed. Do not invent scoreboard wins; business validation remains **1.5**.
+- **WP-A merged (PR #32, `2e3c776`, 2026-08-13).** Recovery is the sole active ingestion authority. Paste / CSV / forwarded email share one canonical Recovery envelope. `GMAIL_OAUTH` is reserved and fail-closed. Legacy living-ledger and `connector_evidence` writes throw before PostgreSQL. Count/report is `clean` / `safely-migratable` / `blocked`. Required Codex/Opus review on the merge SHA was not completed before merge.
+- **WP-A.1 (legacy tenant integrity, this branch, not merged):** PR #32 could silently rehome `commitment_decisions.workspace_id` onto the related recurring item workspace, and copy `evidence_links` whose `source_id` belongs to another workspace. Cutover now counts those relationships as blockers, fails before any ownership rewrite, and adds tenant-safe composite keys/FKs plus an evidence-link guard. Existing mismatched rows are left untouched. Local gates on disposable PostgreSQL: **585/585** unit, **52/52** PostgreSQL, lint 0 errors (8 pre-existing warnings), typecheck, claims, tokens, build, and performance budgets passed. WP-B stays blocked until this PR merges with CI + Codex + Opus on the same head SHA. Do not invent scoreboard wins; business validation remains **1.5**.
 - **Recovery v1 is on `main` (PR #31).** The Recovery v1 same-checkout exception has **ended**. New work uses one isolated worktree per WP from fresh `origin/main`. No stacked PRs. Temporary worktree paths are not live instructions.
 - **Active engineering roadmap:** WP-A through WP-E in [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md). Historical WP-B0…B8 shipped the pre-autopilot Recovery loop and are not the live roadmap. Pre-public-retention and ultimate-closeout packets are archived (historical; retired by the 2026-08-13 autopilot pivot).
 - **Recovery v1 launch implementation was locally green (verified 2026-08-12, historical):**
@@ -172,15 +173,16 @@ The one product loop: **passive evidence → cited classification → determinis
 |---|---|---|
 | **0** | Repo hygiene | **DONE 2026-07-21** |
 | **A** | Private autopilot pilots: connect, mandate, notice, execution, covered windows, **actual payment** | **ACTIVE** — `docs/execution/phase-a-market-contact.md` |
-| **B** | Autopilot loop: WP-A through WP-E | **ACTIVE** — WP-A in progress; historical Recovery Customer #0 remains measured; real-human <3 min still pending |
+| **B** | Autopilot loop: WP-A through WP-E | **ACTIVE** — WP-A merged; WP-A.1 tenant integrity in review; historical Recovery Customer #0 remains measured; real-human <3 min still pending |
 | **C–F** | Production min → moat → distribution → platform | PENDING / blocked until A–B signal |
 
 ### 2b. Product engineering work packages (live)
 
 | WP | What | Status |
 |---|---|---|
-| **A** | Recovery-only ingestion envelope; freeze legacy writes; Gmail OAuth reserved | **IN PROGRESS** on `feat/autopilot-wp-a`. Disposable PostgreSQL gates passed (**584/584** unit, **46/46** PostgreSQL). Merge waits for CI + Codex/Opus on the same head SHA. |
-| **B** | Class lock, standing mandate, shadow evaluator (never executes) | **NOT STARTED** — wait for WP-A merge |
+| **A** | Recovery-only ingestion envelope; freeze legacy writes; Gmail OAuth reserved | **MERGED** PR #32 at `2e3c776`. Required Codex/Opus gates were not completed before merge. |
+| **A.1** | Refuse cross-workspace decision/evidence rehoming; preserve original tenant ownership | **IN REVIEW** on `fix/autopilot-wp-a1-tenant-integrity`. Not merged. WP-B waits for this PR. |
+| **B** | Class lock, standing mandate, shadow evaluator (never executes) | **NOT STARTED** — wait for WP-A.1 merge |
 | **C** | Notice, executor, exceptions, Recovery home | **NOT STARTED** |
 | **D** | Verified savings + customer-safe billing (Razorpay still fail-closed) | **NOT STARTED** |
 | **E** | Recovery-native Gmail, ops, security, private-pilot readiness | **NOT STARTED** |

@@ -14,7 +14,23 @@ import {
   reconcileMigratedRecoveryRecords,
   type LegacyEvidence,
   type LegacyItem,
+  type LegacyLedgerBlockerCounts,
 } from "../../scripts/lib/migrate-legacy-recovery";
+
+const zeroLegacyBlockers: LegacyLedgerBlockerCounts = {
+  unsupportedSources: 0,
+  incompleteEvidence: 0,
+  itemsWithoutEvidence: 0,
+  unsupportedActions: 0,
+  transactions: 0,
+  connectorEvidence: 0,
+  legacyConnectedAccounts: 0,
+  actionCases: 0,
+  partialRecoveryRows: 0,
+  orphanedLegacyRows: 0,
+  crossWorkspaceDecisions: 0,
+  crossWorkspaceEvidence: 0,
+};
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const databaseUrl = process.env.DATABASE_URL;
@@ -61,16 +77,25 @@ test("the real migration runner installs and records the Recovery receipt inbox 
 }, async () => {
   await withDisposableDatabase("recovery_fresh", async (connectionString) => {
     const result = runMigrations(connectionString);
-    assert.equal(result.applied.at(-1)?.id, "0028_recovery_gmail_oauth_source");
+    assert.equal(result.applied.at(-1)?.id, "0029_legacy_tenant_integrity");
 
     const pool = createPool(connectionString);
     try {
       const migrations = await pool.query<{ id: string }>(
         `select id from schema_migrations order by id`,
       );
-      assert.equal(migrations.rows.at(-1)?.id, "0028_recovery_gmail_oauth_source");
-      assert.equal(migrations.rows.length, 28);
+      assert.equal(migrations.rows.at(-1)?.id, "0029_legacy_tenant_integrity");
+      assert.equal(migrations.rows.length, 29);
       await assertRecoveryRelations(pool);
+      const integrity = await pool.query<{ conname: string | null; trigger: string | null }>(
+        `select
+           (select conname from pg_constraint where conname = 'commitment_decisions_workspace_recurring_item_fkey') as conname,
+           (select tgname from pg_trigger where tgname = 'evidence_links_tenant_workspace_guard') as trigger`,
+      );
+      assert.deepEqual(integrity.rows[0], {
+        conname: "commitment_decisions_workspace_recurring_item_fkey",
+        trigger: "evidence_links_tenant_workspace_guard",
+      });
     } finally {
       await pool.end();
     }
@@ -287,14 +312,15 @@ test("the real migration runner upgrades an existing 0022 database through Recov
       { id: "0026_recovery_inbound_retention", mode: "applied-migration" },
       { id: "0027_gmail_forwarding_verification", mode: "applied-migration" },
       { id: "0028_recovery_gmail_oauth_source", mode: "applied-migration" },
+      { id: "0029_legacy_tenant_integrity", mode: "applied-migration" },
     ]);
 
     const verifyPool = createPool(connectionString);
     try {
       const migration = await verifyPool.query<{ id: string }>(
-        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source')`,
+        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source', '0029_legacy_tenant_integrity')`,
       );
-      assert.equal(migration.rowCount, 6);
+      assert.equal(migration.rowCount, 7);
       await assertRecoveryRelations(verifyPool);
 
       const preserved = await verifyPool.query<{
@@ -419,18 +445,7 @@ test("a fresh Recovery install reports a clean legacy ledger", {
       const report = await countLegacyLedgerRows(pool);
       assert.equal(report.status, "clean");
       assert.equal(report.legacyRows, 0);
-      assert.deepEqual(report.blocked, {
-        unsupportedSources: 0,
-        incompleteEvidence: 0,
-        itemsWithoutEvidence: 0,
-        unsupportedActions: 0,
-        transactions: 0,
-        connectorEvidence: 0,
-        legacyConnectedAccounts: 0,
-        actionCases: 0,
-        partialRecoveryRows: 0,
-        orphanedLegacyRows: 0,
-      });
+      assert.deepEqual(report.blocked, zeroLegacyBlockers);
       assert.deepEqual(await migrateLegacyRecovery(pool), {
         status: "already-clean",
         workspacesMigrated: 0,
@@ -470,7 +485,10 @@ test("the real migration runner upgrades 0027 through 0028 without dropping Reco
       await mid.end();
     }
     const rest = runMigrations(connectionString);
-    assert.deepEqual(rest.applied, [{ id: "0028_recovery_gmail_oauth_source", mode: "applied-migration" }]);
+    assert.deepEqual(rest.applied, [
+      { id: "0028_recovery_gmail_oauth_source", mode: "applied-migration" },
+      { id: "0029_legacy_tenant_integrity", mode: "applied-migration" },
+    ]);
     const pool = createPool(connectionString);
     try {
       const constraint = await pool.query<{ def: string }>(
@@ -641,6 +659,311 @@ test("record-level reconciliation failure preserves legacy rows", {
     } finally {
       await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
       await pool.query(`delete from users where id = $1`, [userId]);
+      await pool.end();
+    }
+  });
+});
+
+test("a decision workspace that differs from its recurring item blocks cutover without rehoming ownership", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("legacy_decision_workspace_mismatch", async (connectionString) => {
+    await installSchemaThrough0028(connectionString);
+    const pool = createPool(connectionString);
+    const tenants = twoTenants();
+    try {
+      await seedTenants(pool, tenants);
+      await seedManualLedger(pool, {
+        userId: tenants.ownerA,
+        workspaceId: tenants.workspaceA,
+        sourceId: tenants.sourceA,
+        itemId: tenants.itemA,
+        merchant: "Decision Tenant A",
+        decisionWorkspaceId: tenants.workspaceB,
+      });
+      await seedWorkspaceState(pool, tenants.workspaceB, tenants.ownerB);
+
+      const report = await countLegacyLedgerRows(pool);
+      assert.equal(report.status, "blocked");
+      assert.equal(report.blocked.crossWorkspaceDecisions, 1);
+      assert.equal(report.blocked.crossWorkspaceEvidence, 0);
+      await assertCutoverBlockedWithoutRehome(pool, tenants, {
+        decisionWorkspaceId: tenants.workspaceB,
+        itemWorkspaceId: tenants.workspaceA,
+        sourceWorkspaceId: tenants.workspaceA,
+        evidenceSourceId: tenants.sourceA,
+      });
+    } finally {
+      await pool.query(`delete from workspaces where id = any($1::uuid[])`, [[tenants.workspaceA, tenants.workspaceB]]);
+      await pool.query(`delete from users where id = any($1::uuid[])`, [[tenants.ownerA, tenants.ownerB]]);
+      await pool.end();
+    }
+  });
+});
+
+test("an evidence source workspace that differs from its destination item blocks cutover without rehoming ownership", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("legacy_evidence_workspace_mismatch", async (connectionString) => {
+    await installSchemaThrough0028(connectionString);
+    const pool = createPool(connectionString);
+    const tenants = twoTenants();
+    try {
+      await seedTenants(pool, tenants);
+      await pool.query(
+        `insert into data_sources (id, workspace_id, kind, display_name, coverage_start_at, coverage_end_at)
+         values ($1, $2, 'manual_entry', 'Evidence Tenant B source', now() - interval '30 days', now())`,
+        [tenants.sourceB, tenants.workspaceB],
+      );
+      await seedManualLedger(pool, {
+        userId: tenants.ownerA,
+        workspaceId: tenants.workspaceA,
+        sourceId: tenants.sourceA,
+        itemId: tenants.itemA,
+        merchant: "Evidence Tenant A",
+        evidenceSourceId: tenants.sourceB,
+      });
+      await seedWorkspaceState(pool, tenants.workspaceB, tenants.ownerB);
+
+      const report = await countLegacyLedgerRows(pool);
+      assert.equal(report.status, "blocked");
+      assert.equal(report.blocked.crossWorkspaceEvidence, 1);
+      assert.equal(report.blocked.crossWorkspaceDecisions, 0);
+      await assertCutoverBlockedWithoutRehome(pool, tenants, {
+        decisionWorkspaceId: tenants.workspaceA,
+        itemWorkspaceId: tenants.workspaceA,
+        sourceWorkspaceId: tenants.workspaceB,
+        evidenceSourceId: tenants.sourceB,
+      });
+    } finally {
+      await pool.query(`delete from workspaces where id = any($1::uuid[])`, [[tenants.workspaceA, tenants.workspaceB]]);
+      await pool.query(`delete from users where id = any($1::uuid[])`, [[tenants.ownerA, tenants.ownerB]]);
+      await pool.end();
+    }
+  });
+});
+
+test("cross-workspace evidence and decision relationships block cutover and preserve every original tenant row", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("legacy_cross_workspace_relations", async (connectionString) => {
+    await installSchemaThrough0028(connectionString);
+    const pool = createPool(connectionString);
+    const tenants = twoTenants();
+    try {
+      await seedTenants(pool, tenants);
+      await pool.query(
+        `insert into data_sources (id, workspace_id, kind, display_name, coverage_start_at, coverage_end_at)
+         values ($1, $2, 'manual_entry', 'Mixed Tenant B source', now() - interval '30 days', now())`,
+        [tenants.sourceB, tenants.workspaceB],
+      );
+      await seedManualLedger(pool, {
+        userId: tenants.ownerA,
+        workspaceId: tenants.workspaceA,
+        sourceId: tenants.sourceA,
+        itemId: tenants.itemA,
+        merchant: "Mixed Tenant A",
+        decisionWorkspaceId: tenants.workspaceB,
+        evidenceSourceId: tenants.sourceB,
+      });
+      await seedWorkspaceState(pool, tenants.workspaceB, tenants.ownerB);
+
+      const report = await countLegacyLedgerRows(pool);
+      assert.equal(report.status, "blocked");
+      assert.equal(report.blocked.crossWorkspaceDecisions, 1);
+      assert.equal(report.blocked.crossWorkspaceEvidence, 1);
+      await assertCutoverBlockedWithoutRehome(pool, tenants, {
+        decisionWorkspaceId: tenants.workspaceB,
+        itemWorkspaceId: tenants.workspaceA,
+        sourceWorkspaceId: tenants.workspaceB,
+        evidenceSourceId: tenants.sourceB,
+      });
+    } finally {
+      await pool.query(`delete from workspaces where id = any($1::uuid[])`, [[tenants.workspaceA, tenants.workspaceB]]);
+      await pool.query(`delete from users where id = any($1::uuid[])`, [[tenants.ownerA, tenants.ownerB]]);
+      await pool.end();
+    }
+  });
+});
+
+test("valid same-workspace evidence and decisions migrate into the original tenant and stay isolated", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("legacy_same_workspace_isolation", async (connectionString) => {
+    runMigrations(connectionString);
+    const pool = createPool(connectionString);
+    const tenants = twoTenants();
+    try {
+      await seedTenants(pool, tenants);
+      await seedManualLedger(pool, {
+        userId: tenants.ownerA,
+        workspaceId: tenants.workspaceA,
+        sourceId: tenants.sourceA,
+        itemId: tenants.itemA,
+        merchant: "Isolated Tenant A",
+      });
+      await seedManualLedger(pool, {
+        userId: tenants.ownerB,
+        workspaceId: tenants.workspaceB,
+        sourceId: tenants.sourceB,
+        itemId: tenants.itemB,
+        merchant: "Isolated Tenant B",
+      });
+
+      const before = await countLegacyLedgerRows(pool);
+      assert.equal(before.status, "safely-migratable");
+      assert.deepEqual(before.blocked, zeroLegacyBlockers);
+
+      const migrated = await migrateLegacyRecovery(pool);
+      assert.equal(migrated.status, "migrated");
+      assert.equal(migrated.workspacesMigrated, 2);
+      assert.equal(migrated.commitmentsMigrated, 2);
+      assert.equal(migrated.evidenceMigrated, 2);
+      assert.equal(migrated.decisionsMigrated, 2);
+
+      const isolated = await pool.query<{
+        a_commitments: string;
+        b_commitments: string;
+        crossed_evidence: string;
+        crossed_decisions: string;
+        a_decision: string;
+        b_decision: string;
+      }>(
+        `select
+           (select count(*)::text from recovery_commitments where workspace_id = $1) as a_commitments,
+           (select count(*)::text from recovery_commitments where workspace_id = $2) as b_commitments,
+           (select count(*)::text
+            from recovery_evidence evidence
+            join recovery_sources source on source.id = evidence.source_id
+            where evidence.workspace_id <> source.workspace_id) as crossed_evidence,
+           (select count(*)::text
+            from recovery_decisions decision
+            join recovery_commitments commitment
+              on commitment.id = decision.commitment_id
+             and commitment.workspace_id <> decision.workspace_id) as crossed_decisions,
+           (select decision.workspace_id::text
+            from recovery_decisions decision
+            join recovery_commitments commitment on commitment.id = decision.commitment_id
+            where commitment.identity_key = $3) as a_decision,
+           (select decision.workspace_id::text
+            from recovery_decisions decision
+            join recovery_commitments commitment on commitment.id = decision.commitment_id
+            where commitment.identity_key = $4) as b_decision`,
+        [tenants.workspaceA, tenants.workspaceB, `legacy:${tenants.itemA}`, `legacy:${tenants.itemB}`],
+      );
+      assert.deepEqual(isolated.rows[0], {
+        a_commitments: "1",
+        b_commitments: "1",
+        crossed_evidence: "0",
+        crossed_decisions: "0",
+        a_decision: tenants.workspaceA,
+        b_decision: tenants.workspaceB,
+      });
+    } finally {
+      await pool.query(`delete from workspaces where id = any($1::uuid[])`, [[tenants.workspaceA, tenants.workspaceB]]);
+      await pool.query(`delete from users where id = any($1::uuid[])`, [[tenants.ownerA, tenants.ownerB]]);
+      await pool.end();
+    }
+  });
+});
+
+test("the latest schema rejects new cross-workspace decision and evidence writes", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("legacy_tenant_write_guard", async (connectionString) => {
+    runMigrations(connectionString);
+    const pool = createPool(connectionString);
+    const tenants = twoTenants();
+    try {
+      await seedTenants(pool, tenants);
+      await seedManualLedger(pool, {
+        userId: tenants.ownerA,
+        workspaceId: tenants.workspaceA,
+        sourceId: tenants.sourceA,
+        itemId: tenants.itemA,
+        merchant: "Guarded Tenant A",
+      });
+      await pool.query(
+        `insert into data_sources (id, workspace_id, kind, display_name)
+         values ($1, $2, 'manual_entry', 'Guarded Tenant B source')`,
+        [tenants.sourceB, tenants.workspaceB],
+      );
+      await assert.rejects(
+        () => pool.query(
+          `insert into commitment_decisions (workspace_id, recurring_item_id, decided_by_user_id, action)
+           values ($1, $2, $3, 'keep')`,
+          [tenants.workspaceB, tenants.itemA, tenants.ownerB],
+        ),
+        /commitment_decisions_workspace_recurring_item_fkey|violates foreign key constraint/i,
+      );
+      await assert.rejects(
+        () => pool.query(
+          `insert into evidence_links (
+             recurring_item_id, source_id, evidence_type, evidence_text, evidence_date, amount
+           ) values ($1, $2, 'receipt', 'Cross-workspace evidence', current_date, 100.00)`,
+          [tenants.itemA, tenants.sourceB],
+        ),
+        /Evidence source workspace must match the recurring item workspace/i,
+      );
+      const preserved = await pool.query<{ decisions: string; evidence: string }>(
+        `select
+           (select count(*)::text from commitment_decisions where recurring_item_id = $1) as decisions,
+           (select count(*)::text from evidence_links where recurring_item_id = $1) as evidence`,
+        [tenants.itemA],
+      );
+      assert.deepEqual(preserved.rows[0], { decisions: "1", evidence: "1" });
+    } finally {
+      await pool.query(`delete from workspaces where id = any($1::uuid[])`, [[tenants.workspaceA, tenants.workspaceB]]);
+      await pool.query(`delete from users where id = any($1::uuid[])`, [[tenants.ownerA, tenants.ownerB]]);
+      await pool.end();
+    }
+  });
+});
+
+test("0029 installs over historical cross-workspace rows without rewriting ownership", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("legacy_tenant_upgrade_dirty", async (connectionString) => {
+    await installSchemaThrough0028(connectionString);
+    const pool = createPool(connectionString);
+    const tenants = twoTenants();
+    try {
+      await seedTenants(pool, tenants);
+      await seedManualLedger(pool, {
+        userId: tenants.ownerA,
+        workspaceId: tenants.workspaceA,
+        sourceId: tenants.sourceA,
+        itemId: tenants.itemA,
+        merchant: "Upgrade Tenant A",
+        decisionWorkspaceId: tenants.workspaceB,
+      });
+      await seedWorkspaceState(pool, tenants.workspaceB, tenants.ownerB);
+
+      const applied = runMigrations(connectionString);
+      assert.deepEqual(applied.applied, [{ id: "0029_legacy_tenant_integrity", mode: "applied-migration" }]);
+
+      const ownership = await pool.query<{ decision_workspace: string; item_workspace: string }>(
+        `select
+           (select workspace_id::text from commitment_decisions where recurring_item_id = $1) as decision_workspace,
+           (select workspace_id::text from recurring_items where id = $1) as item_workspace`,
+        [tenants.itemA],
+      );
+      assert.deepEqual(ownership.rows[0], {
+        decision_workspace: tenants.workspaceB,
+        item_workspace: tenants.workspaceA,
+      });
+      const report = await countLegacyLedgerRows(pool);
+      assert.equal(report.status, "blocked");
+      assert.equal(report.blocked.crossWorkspaceDecisions, 1);
+      await assertCutoverBlockedWithoutRehome(pool, tenants, {
+        decisionWorkspaceId: tenants.workspaceB,
+        itemWorkspaceId: tenants.workspaceA,
+        sourceWorkspaceId: tenants.workspaceA,
+        evidenceSourceId: tenants.sourceA,
+      });
+    } finally {
+      await pool.query(`delete from workspaces where id = any($1::uuid[])`, [[tenants.workspaceA, tenants.workspaceB]]);
+      await pool.query(`delete from users where id = any($1::uuid[])`, [[tenants.ownerA, tenants.ownerB]]);
       await pool.end();
     }
   });
@@ -824,4 +1147,155 @@ function quoteIdentifier(value: string) {
 
 function checksum(value: string) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+type TenantPair = {
+  ownerA: string;
+  ownerB: string;
+  workspaceA: string;
+  workspaceB: string;
+  sourceA: string;
+  sourceB: string;
+  itemA: string;
+  itemB: string;
+};
+
+function twoTenants(): TenantPair {
+  return {
+    ownerA: randomUUID(),
+    ownerB: randomUUID(),
+    workspaceA: randomUUID(),
+    workspaceB: randomUUID(),
+    sourceA: randomUUID(),
+    sourceB: randomUUID(),
+    itemA: randomUUID(),
+    itemB: randomUUID(),
+  };
+}
+
+async function installSchemaThrough0028(connectionString: string) {
+  const seedPool = createPool(connectionString);
+  try {
+    await seedSchemaThrough0022(seedPool);
+  } finally {
+    await seedPool.end();
+  }
+  runMigrations(connectionString, ["--through=0028_recovery_gmail_oauth_source"]);
+}
+
+async function seedTenants(pool: Pool, tenants: TenantPair) {
+  await pool.query(
+    `insert into users (id, email) values ($1, $2), ($3, $4)`,
+    [tenants.ownerA, `${tenants.ownerA}@tenant-a.test`, tenants.ownerB, `${tenants.ownerB}@tenant-b.test`],
+  );
+  await pool.query(
+    `insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Tenant A'), ($3, $4, 'Tenant B')`,
+    [tenants.workspaceA, tenants.ownerA, tenants.workspaceB, tenants.ownerB],
+  );
+}
+
+async function seedWorkspaceState(pool: Pool, workspaceId: string, userId: string) {
+  await pool.query(
+    `insert into workspace_states (workspace_id, encrypted_snapshot, updated_by_user_id)
+     values ($1, '{}'::jsonb, $2)`,
+    [workspaceId, userId],
+  );
+}
+
+async function seedManualLedger(
+  pool: Pool,
+  seed: {
+    userId: string;
+    workspaceId: string;
+    sourceId: string;
+    itemId: string;
+    merchant: string;
+    decisionWorkspaceId?: string;
+    evidenceSourceId?: string;
+  },
+) {
+  await pool.query(
+    `insert into data_sources (
+       id, workspace_id, kind, display_name, coverage_start_at, coverage_end_at
+     ) values ($1, $2, 'manual_entry', $3, now() - interval '30 days', now())`,
+    [seed.sourceId, seed.workspaceId, `${seed.merchant} source`],
+  );
+  await pool.query(
+    `insert into recurring_items (
+       id, workspace_id, merchant, normalized_merchant, category, frequency,
+       currency, amount_min, amount_max, average_amount, monthly_cost,
+       annual_cost, last_charge_date, next_expected_date, confidence_score,
+       status, recommendation_reason, risk_tags
+     ) values (
+       $1, $2, $3, $4, 'Software', 'monthly', 'INR',
+       100.00, 100.00, 100.00, 100.00, 1200.00,
+       current_date - 10, current_date + 20, 92, 'watch',
+       'Review before renewal.', array['renewal-soon']::text[]
+     )`,
+    [seed.itemId, seed.workspaceId, seed.merchant, seed.merchant.toLowerCase()],
+  );
+  await pool.query(
+    `insert into evidence_links (
+       recurring_item_id, source_id, evidence_type, evidence_text, evidence_date, amount
+     ) values ($1, $2, 'receipt', $3, current_date - 10, 100.00)`,
+    [seed.itemId, seed.evidenceSourceId ?? seed.sourceId, `${seed.merchant} charged INR 100.`],
+  );
+  await pool.query(
+    `insert into commitment_decisions (workspace_id, recurring_item_id, decided_by_user_id, action)
+     values ($1, $2, $3, 'watch')`,
+    [seed.decisionWorkspaceId ?? seed.workspaceId, seed.itemId, seed.userId],
+  );
+  await seedWorkspaceState(pool, seed.workspaceId, seed.userId);
+}
+
+async function assertCutoverBlockedWithoutRehome(
+  pool: Pool,
+  tenants: TenantPair,
+  expected: {
+    decisionWorkspaceId: string;
+    itemWorkspaceId: string;
+    sourceWorkspaceId: string;
+    evidenceSourceId: string;
+  },
+) {
+  await assert.rejects(() => migrateLegacyRecovery(pool), (error: unknown) => {
+    assert.ok(error instanceof LegacyCutoverBlockedError);
+    assert.match(error.message, /were not deleted/);
+    assert.ok(
+      error.blocked.crossWorkspaceDecisions > 0 || error.blocked.crossWorkspaceEvidence > 0,
+      "cutover must name the cross-workspace relationship that blocked it",
+    );
+    return true;
+  });
+  const preserved = await pool.query<{
+    decision_workspace: string;
+    item_workspace: string;
+    source_workspace: string;
+    recovery_decisions: string;
+    recovery_commitments: string;
+    recovery_evidence: string;
+    items: string;
+    evidence_links: string;
+  }>(
+    `select
+       (select workspace_id::text from commitment_decisions where recurring_item_id = $1) as decision_workspace,
+       (select workspace_id::text from recurring_items where id = $1) as item_workspace,
+       (select workspace_id::text from data_sources where id = $2) as source_workspace,
+       (select count(*)::text from recovery_decisions) as recovery_decisions,
+       (select count(*)::text from recovery_commitments) as recovery_commitments,
+       (select count(*)::text from recovery_evidence) as recovery_evidence,
+       (select count(*)::text from recurring_items where id = $1) as items,
+       (select count(*)::text from evidence_links where recurring_item_id = $1) as evidence_links`,
+    [tenants.itemA, expected.evidenceSourceId],
+  );
+  assert.deepEqual(preserved.rows[0], {
+    decision_workspace: expected.decisionWorkspaceId,
+    item_workspace: expected.itemWorkspaceId,
+    source_workspace: expected.sourceWorkspaceId,
+    recovery_decisions: "0",
+    recovery_commitments: "0",
+    recovery_evidence: "0",
+    items: "1",
+    evidence_links: "1",
+  });
 }

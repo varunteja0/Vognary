@@ -300,7 +300,8 @@ create table data_sources (
   coverage_completeness text not null default 'partial' check (coverage_completeness in ('partial', 'complete')),
   freshness_status text not null default 'unknown' check (freshness_status in ('unknown', 'fresh', 'stale', 'error')),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, id)
 );
 
 create unique index data_sources_workspace_state_external_idx
@@ -483,7 +484,8 @@ create table recurring_items (
   recommendation_reason text,
   risk_tags text[] not null default '{}',
   first_detected_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, id)
 );
 
 create index recurring_items_workspace_next_idx on recurring_items(workspace_id, next_expected_date);
@@ -1743,3 +1745,62 @@ alter table recovery_inbound_events
 alter table recovery_inbound_events
   add constraint recovery_inbound_events_processing_lease_check
   check ((status = 'PROCESSING') = (processing_started_at is not null));
+
+-- Tenant integrity for legacy ledger relations. These constraints stay after
+-- the Recovery v1 boundary so synthetic 0022 fixtures can still represent
+-- historical cross-workspace rows that cutover must refuse rather than rehome.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'data_sources'::regclass
+      and conname = 'data_sources_workspace_id_id_key'
+  ) then
+    alter table data_sources
+      add constraint data_sources_workspace_id_id_key unique (workspace_id, id);
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'recurring_items'::regclass
+      and conname = 'recurring_items_workspace_id_id_key'
+  ) then
+    alter table recurring_items
+      add constraint recurring_items_workspace_id_id_key unique (workspace_id, id);
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'commitment_decisions'::regclass
+      and conname = 'commitment_decisions_workspace_recurring_item_fkey'
+  ) then
+    alter table commitment_decisions
+      add constraint commitment_decisions_workspace_recurring_item_fkey
+      foreign key (workspace_id, recurring_item_id)
+      references recurring_items(workspace_id, id);
+  end if;
+end
+$$;
+
+create or replace function reject_cross_workspace_evidence_link()
+returns trigger
+language plpgsql
+as $$
+declare
+  item_workspace uuid;
+  source_workspace uuid;
+begin
+  if new.source_id is null then
+    return new;
+  end if;
+  select workspace_id into item_workspace from recurring_items where id = new.recurring_item_id;
+  select workspace_id into source_workspace from data_sources where id = new.source_id;
+  if item_workspace is null or source_workspace is null or source_workspace <> item_workspace then
+    raise exception 'Evidence source workspace must match the recurring item workspace.' using errcode = '23503';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists evidence_links_tenant_workspace_guard on evidence_links;
+create trigger evidence_links_tenant_workspace_guard
+  before insert or update of recurring_item_id, source_id on evidence_links
+  for each row execute function reject_cross_workspace_evidence_link();
