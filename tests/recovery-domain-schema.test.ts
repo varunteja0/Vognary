@@ -5,6 +5,7 @@ import test from "node:test";
 const migration = readFileSync(new URL("../infra/postgres/migrations/0023_recovery_v1.sql", import.meta.url), "utf8");
 const inboundMigration = readFileSync(new URL("../infra/postgres/migrations/0024_recovery_inbound_receipts.sql", import.meta.url), "utf8");
 const gmailOauthMigration = readFileSync(new URL("../infra/postgres/migrations/0028_recovery_gmail_oauth_source.sql", import.meta.url), "utf8");
+const tenantIntegrityMigration = readFileSync(new URL("../infra/postgres/migrations/0029_legacy_tenant_integrity.sql", import.meta.url), "utf8");
 const schema = readFileSync(new URL("../infra/postgres/schema.sql", import.meta.url), "utf8");
 
 const recoveryTables = [
@@ -108,4 +109,24 @@ test("Gmail OAuth is reserved on Recovery sources without reviving living-ledger
     assert.match(sql, /source_type in \('RECEIPT_PASTE', 'CSV_IMPORT', 'FORWARDED_EMAIL', 'GMAIL_OAUTH'\)/i);
   }
   assert.doesNotMatch(gmailOauthMigration, /connector_evidence|living.ledger|gmail-readonly-adapter/i);
+});
+
+test("legacy tenant integrity refuses cross-workspace relations without rewriting ownership", () => {
+  const recoveryMarker = "\n-- Recovery v1:";
+  const markerIndex = schema.indexOf(recoveryMarker);
+  assert.ok(markerIndex > 0);
+  const schemaThrough0022 = schema.slice(0, markerIndex);
+  assert.doesNotMatch(schemaThrough0022, /commitment_decisions_workspace_recurring_item_fkey/);
+  assert.doesNotMatch(schemaThrough0022, /reject_cross_workspace_evidence_link/);
+  assert.doesNotMatch(schemaThrough0022, /evidence_links_tenant_workspace_guard/);
+
+  assert.match(tenantIntegrityMigration, /not valid/i);
+  assert.doesNotMatch(tenantIntegrityMigration, /update commitment_decisions|update evidence_links|set workspace_id/i);
+  for (const sql of [tenantIntegrityMigration, schema]) {
+    assert.match(sql, /data_sources_workspace_id_id_key/);
+    assert.match(sql, /recurring_items_workspace_id_id_key/);
+    assert.match(sql, /commitment_decisions_workspace_recurring_item_fkey/);
+    assert.match(sql, /reject_cross_workspace_evidence_link/);
+    assert.match(sql, /Evidence source workspace must match the recurring item workspace/);
+  }
 });

@@ -81,6 +81,8 @@ export type LegacyLedgerBlockerCounts = {
   actionCases: number;
   partialRecoveryRows: number;
   orphanedLegacyRows: number;
+  crossWorkspaceDecisions: number;
+  crossWorkspaceEvidence: number;
 };
 
 export type LegacyLedgerMigratableCounts = {
@@ -148,6 +150,8 @@ export async function countLegacyLedgerRows(pool: Pool | PoolClient): Promise<Le
     action_cases: number;
     partial_recovery_rows: number;
     orphaned_legacy_rows: number;
+    cross_workspace_decisions: number;
+    cross_workspace_evidence: number;
   }>(
     `select
        ((select count(*) from workspace_states)
@@ -192,7 +196,14 @@ export async function countLegacyLedgerRows(pool: Pool | PoolClient): Promise<Le
        ((select count(*) from recurring_items item
          where not exists (select 1 from workspace_states state where state.workspace_id = item.workspace_id))
          + (select count(*) from data_sources source
-         where not exists (select 1 from workspace_states state where state.workspace_id = source.workspace_id)))::int as orphaned_legacy_rows`,
+         where not exists (select 1 from workspace_states state where state.workspace_id = source.workspace_id)))::int as orphaned_legacy_rows,
+       (select count(*)::int from commitment_decisions decision
+         join recurring_items item on item.id = decision.recurring_item_id
+         where decision.workspace_id <> item.workspace_id) as cross_workspace_decisions,
+       (select count(*)::int from evidence_links link
+         join recurring_items item on item.id = link.recurring_item_id
+         join data_sources source on source.id = link.source_id
+         where source.workspace_id <> item.workspace_id) as cross_workspace_evidence`,
   );
   const row = result.rows[0];
   const blocked: LegacyLedgerBlockerCounts = {
@@ -206,6 +217,8 @@ export async function countLegacyLedgerRows(pool: Pool | PoolClient): Promise<Le
     actionCases: row?.action_cases ?? 0,
     partialRecoveryRows: row?.partial_recovery_rows ?? 0,
     orphanedLegacyRows: row?.orphaned_legacy_rows ?? 0,
+    crossWorkspaceDecisions: row?.cross_workspace_decisions ?? 0,
+    crossWorkspaceEvidence: row?.cross_workspace_evidence ?? 0,
   };
   const migratable: LegacyLedgerMigratableCounts = {
     workspaces: row?.migratable_workspaces ?? 0,
@@ -280,6 +293,7 @@ export async function migrateLegacyRecovery(pool: Pool): Promise<LegacyRecoveryM
               link.evidence_date::text, link.amount::text, link.created_at
        from evidence_links link
        join recurring_items item on item.id = link.recurring_item_id
+       join data_sources source on source.id = link.source_id and source.workspace_id = item.workspace_id
        where item.workspace_id = any($1::uuid[])
        order by item.workspace_id, link.created_at, link.id`,
       [workspaceIds],
@@ -288,7 +302,9 @@ export async function migrateLegacyRecovery(pool: Pool): Promise<LegacyRecoveryM
       `select decision.recurring_item_id, decision.decided_by_user_id,
               decision.action, decision.decided_at, decision.updated_at
        from commitment_decisions decision
-       join recurring_items item on item.id = decision.recurring_item_id
+       join recurring_items item
+         on item.id = decision.recurring_item_id
+        and item.workspace_id = decision.workspace_id
        where item.workspace_id = any($1::uuid[])
        order by item.workspace_id, decision.decided_at`,
       [workspaceIds],
@@ -582,6 +598,8 @@ async function assertMigrationPreconditions(client: PoolClient, workspaceIds: st
     legacy_connected_accounts: number;
     action_cases: number;
     partial_recovery_rows: number;
+    cross_workspace_decisions: number;
+    cross_workspace_evidence: number;
   }>(
     `select
        (select count(*)::int from data_sources
@@ -607,7 +625,16 @@ async function assertMigrationPreconditions(client: PoolClient, workspaceIds: st
          + (select count(*) from recovery_submissions where workspace_id = any($1::uuid[]))
          + (select count(*) from recovery_sources where workspace_id = any($1::uuid[]))
          + (select count(*) from recovery_commitments where workspace_id = any($1::uuid[]))
-         + (select count(*) from recovery_evidence where workspace_id = any($1::uuid[])))::int as partial_recovery_rows`,
+         + (select count(*) from recovery_evidence where workspace_id = any($1::uuid[])))::int as partial_recovery_rows,
+       (select count(*)::int from commitment_decisions decision
+         join recurring_items item on item.id = decision.recurring_item_id
+         where decision.workspace_id <> item.workspace_id
+           and (item.workspace_id = any($1::uuid[]) or decision.workspace_id = any($1::uuid[]))) as cross_workspace_decisions,
+       (select count(*)::int from evidence_links link
+         join recurring_items item on item.id = link.recurring_item_id
+         join data_sources source on source.id = link.source_id
+         where source.workspace_id <> item.workspace_id
+           and (item.workspace_id = any($1::uuid[]) or source.workspace_id = any($1::uuid[]))) as cross_workspace_evidence`,
     [workspaceIds],
   );
   const state = result.rows[0]!;
@@ -622,6 +649,8 @@ async function assertMigrationPreconditions(client: PoolClient, workspaceIds: st
     actionCases: state.action_cases,
     partialRecoveryRows: state.partial_recovery_rows,
     orphanedLegacyRows: 0,
+    crossWorkspaceDecisions: state.cross_workspace_decisions,
+    crossWorkspaceEvidence: state.cross_workspace_evidence,
   };
   if (Object.values(blocked).some((count) => count > 0)) {
     throw new LegacyCutoverBlockedError(blocked);
