@@ -76,7 +76,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
-    "lighthouse": "^12.6.1",
+    "lighthouse": "^13.4.1",
     "tsx": "^4.23.0",
     "typescript": "^5",
     "yaml": "^2.9.0"
