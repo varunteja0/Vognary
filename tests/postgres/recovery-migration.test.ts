@@ -1011,6 +1011,49 @@ test("a valid evidence link cannot become cross-workspace by updating data_sourc
   });
 });
 
+test("0029 still lets a no-decision recurring item be reassigned into a cross-workspace evidence link", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("legacy_item_reassign_without_0030", async (connectionString) => {
+    const applied = await installSchemaThrough0029(connectionString);
+    assert.deepEqual(applied.applied, [{ id: "0029_legacy_tenant_integrity", mode: "applied-migration" }]);
+    const pool = createPool(connectionString);
+    const tenants = twoTenants();
+    try {
+      await seedTenants(pool, tenants);
+      await seedManualLedger(pool, {
+        userId: tenants.ownerA,
+        workspaceId: tenants.workspaceA,
+        sourceId: tenants.sourceA,
+        itemId: tenants.itemA,
+        merchant: "No-decision Item Tenant A",
+        includeDecision: false,
+      });
+      await assertNoDecisionChild(pool, tenants.itemA);
+      assert.equal(await countCrossWorkspaceEvidence(pool), "0");
+      await pool.query(
+        `update recurring_items set workspace_id = $1 where id = $2`,
+        [tenants.workspaceB, tenants.itemA],
+      );
+      assert.equal(await countCrossWorkspaceEvidence(pool), "1");
+      const ownership = await pool.query<{ item_workspace: string; source_workspace: string }>(
+        `select
+           (select workspace_id::text from recurring_items where id = $1) as item_workspace,
+           (select workspace_id::text from data_sources where id = $2) as source_workspace`,
+        [tenants.itemA, tenants.sourceA],
+      );
+      assert.deepEqual(ownership.rows[0], {
+        item_workspace: tenants.workspaceB,
+        source_workspace: tenants.workspaceA,
+      });
+    } finally {
+      await pool.query(`delete from workspaces where id = any($1::uuid[])`, [[tenants.workspaceA, tenants.workspaceB]]);
+      await pool.query(`delete from users where id = any($1::uuid[])`, [[tenants.ownerA, tenants.ownerB]]);
+      await pool.end();
+    }
+  });
+});
+
 test("a valid evidence link cannot become cross-workspace by updating recurring_items.workspace_id", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
@@ -1026,7 +1069,9 @@ test("a valid evidence link cannot become cross-workspace by updating recurring_
         sourceId: tenants.sourceA,
         itemId: tenants.itemA,
         merchant: "Immutable Item Tenant A",
+        includeDecision: false,
       });
+      await assertNoDecisionChild(pool, tenants.itemA);
       await assert.rejects(
         () => pool.query(
           `update recurring_items set workspace_id = $1 where id = $2`,
@@ -1212,7 +1257,9 @@ test("concurrent update and insert ordering cannot produce a cross-workspace evi
         sourceId: tenants.sourceA,
         itemId: tenants.itemA,
         merchant: "Concurrent Tenant A",
+        includeDecision: false,
       });
+      await assertNoDecisionChild(pool, tenants.itemA);
       await inserter.query("set lock_timeout = '15s'");
       await mover.query("set lock_timeout = '15s'");
       const moverPid = (await mover.query<{ pid: number }>("select pg_backend_pid() as pid")).rows[0]?.pid;
@@ -1475,6 +1522,11 @@ async function installSchemaThrough0028(connectionString: string) {
   runMigrations(connectionString, ["--through=0028_recovery_gmail_oauth_source"]);
 }
 
+async function installSchemaThrough0029(connectionString: string) {
+  await installSchemaThrough0028(connectionString);
+  return runMigrations(connectionString, ["--through=0029_legacy_tenant_integrity"]);
+}
+
 async function seedTenants(pool: Pool, tenants: TenantPair) {
   await pool.query(
     `insert into users (id, email) values ($1, $2), ($3, $4)`,
@@ -1531,6 +1583,7 @@ async function seedManualLedger(
     merchant: string;
     decisionWorkspaceId?: string;
     evidenceSourceId?: string;
+    includeDecision?: boolean;
   },
 ) {
   await pool.query(
@@ -1559,12 +1612,22 @@ async function seedManualLedger(
      ) values ($1, $2, 'receipt', $3, current_date - 10, 100.00)`,
     [seed.itemId, seed.evidenceSourceId ?? seed.sourceId, `${seed.merchant} charged INR 100.`],
   );
-  await pool.query(
-    `insert into commitment_decisions (workspace_id, recurring_item_id, decided_by_user_id, action)
-     values ($1, $2, $3, 'watch')`,
-    [seed.decisionWorkspaceId ?? seed.workspaceId, seed.itemId, seed.userId],
-  );
+  if (seed.includeDecision !== false) {
+    await pool.query(
+      `insert into commitment_decisions (workspace_id, recurring_item_id, decided_by_user_id, action)
+       values ($1, $2, $3, 'watch')`,
+      [seed.decisionWorkspaceId ?? seed.workspaceId, seed.itemId, seed.userId],
+    );
+  }
   await seedWorkspaceState(pool, seed.workspaceId, seed.userId);
+}
+
+async function assertNoDecisionChild(pool: Pool, itemId: string) {
+  const result = await pool.query<{ decisions: string }>(
+    `select count(*)::text as decisions from commitment_decisions where recurring_item_id = $1`,
+    [itemId],
+  );
+  assert.equal(result.rows[0]?.decisions, "0");
 }
 
 async function assertCutoverBlockedWithoutRehome(

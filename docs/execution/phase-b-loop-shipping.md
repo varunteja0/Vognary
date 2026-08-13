@@ -120,7 +120,7 @@ Refuse cross-workspace decision/evidence rehoming. Leave historical mismatched r
 
 A valid same-workspace evidence link must not become cross-workspace by later updating `data_sources.workspace_id` or `recurring_items.workspace_id`. Additive migration `0030_legacy_tenant_ownership_immutable` rejects an actual workspace change on those frozen tables. No-op same-workspace updates remain permitted. Historical dirty rows stay untouched.
 
-**Status (2026-08-13):** Required. Do not start WP-B until this PR merges with CI green plus real Codex and real Opus on the exact head SHA. A missing, failed, or rate-limited review is not approval.
+**Status (2026-08-13):** Required. Codex review of `06d3e28` is **NOT APPROVED** (item-reassignment fixture was masked by a decision FK). Do not start WP-B until this PR merges with CI green plus real Codex and real Opus on the exact new head SHA. A missing, failed, or rate-limited review is not approval.
 
 ### WP-B — Class lock, standing mandate, shadow engine
 
