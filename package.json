@@ -25,6 +25,7 @@
     "receipt-corpus": "node --conditions=react-server --import=tsx scripts/check-receipt-corpus.ts",
     "receipt-corpus:strict": "node --conditions=react-server --import=tsx scripts/check-receipt-corpus.ts --strict",
     "claims:check": "node scripts/check-public-claims.mjs",
+    "funnel": "node scripts/report-funnel.mjs",
     "research:check": "node scripts/check-research-content-pack.mjs",
     "brand:build": "node scripts/generate-brand-assets.mjs",
     "brand:check": "node scripts/check-brand-assets.mjs",

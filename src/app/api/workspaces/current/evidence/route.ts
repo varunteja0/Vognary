@@ -6,6 +6,7 @@ import {
   recoveryFailureResponse,
   recoverySuccessResponse,
 } from "@/lib/server/recovery-api";
+import { recordProductEvent } from "@/lib/server/product-event-store";
 import { readRecoveryJson, runRecoveryRoute } from "@/lib/server/recovery-route";
 import { submitRecoveryEvidence } from "@/lib/server/recovery-store";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
@@ -29,6 +30,19 @@ export async function POST(request: Request) {
       request: body,
       ...preconditions,
     });
+    if (!result.replayed && result.data.submission.acceptedEvidenceCount > 0) {
+      await recordProductEvent({
+        workspaceId: session.workspaceId,
+        userId: session.userId,
+        eventName: "workspace.activated",
+        source: "workspace-api",
+        status: "succeeded",
+        metrics: {
+          evidenceWritten: result.data.submission.acceptedEvidenceCount,
+          commitmentsTouched: result.data.commitments.length,
+        },
+      }).catch(() => undefined);
+    }
     return recoverySuccessResponse(result.data, requestId, result.workspaceVersion, result.replayed ? 200 : 201);
   });
 }
