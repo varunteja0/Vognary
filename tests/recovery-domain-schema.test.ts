@@ -6,6 +6,7 @@ const migration = readFileSync(new URL("../infra/postgres/migrations/0023_recove
 const inboundMigration = readFileSync(new URL("../infra/postgres/migrations/0024_recovery_inbound_receipts.sql", import.meta.url), "utf8");
 const gmailOauthMigration = readFileSync(new URL("../infra/postgres/migrations/0028_recovery_gmail_oauth_source.sql", import.meta.url), "utf8");
 const tenantIntegrityMigration = readFileSync(new URL("../infra/postgres/migrations/0029_legacy_tenant_integrity.sql", import.meta.url), "utf8");
+const tenantOwnershipMigration = readFileSync(new URL("../infra/postgres/migrations/0030_legacy_tenant_ownership_immutable.sql", import.meta.url), "utf8");
 const schema = readFileSync(new URL("../infra/postgres/schema.sql", import.meta.url), "utf8");
 
 const recoveryTables = [
@@ -128,5 +129,25 @@ test("legacy tenant integrity refuses cross-workspace relations without rewritin
     assert.match(sql, /commitment_decisions_workspace_recurring_item_fkey/);
     assert.match(sql, /reject_cross_workspace_evidence_link/);
     assert.match(sql, /Evidence source workspace must match the recurring item workspace/);
+  }
+});
+
+test("legacy workspace ownership is immutable without rewriting historical rows", () => {
+  const recoveryMarker = "\n-- Recovery v1:";
+  const markerIndex = schema.indexOf(recoveryMarker);
+  assert.ok(markerIndex > 0);
+  const schemaThrough0022 = schema.slice(0, markerIndex);
+  assert.doesNotMatch(schemaThrough0022, /reject_legacy_workspace_reassignment/);
+  assert.doesNotMatch(schemaThrough0022, /data_sources_workspace_immutable/);
+  assert.doesNotMatch(schemaThrough0022, /recurring_items_workspace_immutable/);
+
+  assert.doesNotMatch(tenantOwnershipMigration, /update data_sources|update recurring_items|set workspace_id/i);
+  for (const sql of [tenantOwnershipMigration, schema]) {
+    assert.match(sql, /reject_legacy_workspace_reassignment/);
+    assert.match(sql, /data_sources_workspace_immutable/);
+    assert.match(sql, /recurring_items_workspace_immutable/);
+    assert.match(sql, /Legacy workspace ownership is immutable/);
+    assert.match(sql, /before update of workspace_id on data_sources/i);
+    assert.match(sql, /before update of workspace_id on recurring_items/i);
   }
 });
