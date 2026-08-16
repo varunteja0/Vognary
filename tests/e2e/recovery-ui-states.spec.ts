@@ -20,6 +20,7 @@ const emptyHome: HomeProjectionDto = {
   generatedAt: "2026-08-09T10:00:00.000Z",
   recentObservations: [],
   monthlyTotals: [],
+  annualizedEstimateTotals: [],
   next30DayTotals: [],
   needsMe: [],
   changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 4, items: [] },
@@ -33,6 +34,8 @@ const emptyHome: HomeProjectionDto = {
     coverageEnd: null,
     limitations: ["No evidence has been submitted."],
   },
+  activeCommitmentCount: 0,
+  reviewItemCount: 0,
 };
 
 const oneObservationHome: HomeProjectionDto = {
@@ -65,6 +68,15 @@ async function signIn(page: Page) {
 }
 
 async function mockEmptyWorkspace(page: Page, home = emptyHome) {
+  const activationCalls: string[] = [];
+  await page.route("**/api/workspaces/current/activation", (route) => {
+    activationCalls.push(route.request().method());
+    return route.fulfill({
+      status: 202,
+      contentType: "application/json",
+      body: JSON.stringify({ data: { recorded: false, id: null }, meta }),
+    });
+  });
   await page.route("**/api/workspaces/current/brief", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: home, meta }) }),
   );
@@ -99,6 +111,7 @@ async function mockEmptyWorkspace(page: Page, home = emptyHome) {
       }),
     }),
   );
+  return { activationCalls };
 }
 
 async function openManualFallback(page: Page) {
@@ -110,18 +123,19 @@ async function openManualFallback(page: Page) {
 
 test("an empty workspace offers exactly one obvious receipt-paste action", async ({ page }) => {
   await signIn(page);
-  await mockEmptyWorkspace(page);
+  const { activationCalls } = await mockEmptyWorkspace(page);
   await page.goto("/app");
   await openManualFallback(page);
 
   await expect(page.getByRole("heading", { name: "Paste your first receipt" })).toBeVisible();
   await expect(page.getByText("Paste 2-3 billing emails or invoices.")).toBeVisible();
   await expect(page.getByText("Use the same service twice so Vognary can test a cadence.")).toBeVisible();
-  await expect(page.getByText(/See monthly burn, the next expected charge, and one decision/)).toBeVisible();
+  await expect(page.getByText(/See monthly burn, an annualized estimate, the next expected charge, and one decision/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Save this receipt as evidence" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save this receipt as evidence" })).toBeDisabled();
   await expect(page.getByText("Import a statement file instead (fallback)")).toBeVisible();
   await expect(page.getByRole("button", { name: /connect|Gmail|bank account/i })).toHaveCount(0);
+  expect(activationCalls).toEqual([]);
 });
 
 test("one observed charge asks for a matching receipt instead of rendering an all-clear", async ({ page }) => {
@@ -136,7 +150,7 @@ test("one observed charge asks for a matching receipt instead of rendering an al
     });
   });
   await signIn(page);
-  await mockEmptyWorkspace(page, oneObservationHome);
+  const { activationCalls } = await mockEmptyWorkspace(page, oneObservationHome);
   await page.goto("/app");
 
   const observed = page.getByRole("region", { name: "Build a recurring pattern" });
@@ -166,6 +180,7 @@ test("one observed charge asks for a matching receipt instead of rendering an al
   await observed.getByRole("button", { name: "Add a matching receipt" }).click();
   await expect(page.getByRole("heading", { name: "Sources" })).toBeVisible();
   await expect(page.getByLabel("Receipt or invoice text")).toBeVisible();
+  expect(activationCalls).toEqual([]);
 });
 
 async function expectNoSeriousAxeViolations(page: Page, label: string) {

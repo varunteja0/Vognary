@@ -12,10 +12,14 @@ const home: HomeProjectionDto = {
   generatedAt: "2026-08-12T09:00:00.000Z",
   recentObservations: [],
   monthlyTotals: [
-    { amount: inr, commitmentIds: ["commitment-1"], evidenceIds: ["evidence-1"] },
-    { amount: usd, commitmentIds: ["commitment-2"], evidenceIds: ["evidence-2"] },
+    { amount: inr, commitmentIds: ["commitment-1"], evidenceIds: ["evidence-1"], provenance: "RECEIPT", correctionIds: [] },
+    { amount: usd, commitmentIds: ["commitment-2"], evidenceIds: ["evidence-2"], provenance: "RECEIPT", correctionIds: [] },
   ],
-  next30DayTotals: [{ amount: inr, commitmentIds: ["commitment-1"], evidenceIds: ["evidence-1"] }],
+  annualizedEstimateTotals: [
+    { amount: { currency: "INR", minor: "2398800", exponent: 2, display: "₹23,988.00" }, commitmentIds: ["commitment-1"], evidenceIds: ["evidence-1"], provenance: "RECEIPT", correctionIds: [] },
+    { amount: { currency: "USD", minor: "24000", exponent: 2, display: "$240.00" }, commitmentIds: ["commitment-2"], evidenceIds: ["evidence-2"], provenance: "RECEIPT", correctionIds: [] },
+  ],
+  next30DayTotals: [{ amount: inr, commitmentIds: ["commitment-1"], evidenceIds: ["evidence-1"], provenance: "RECEIPT", correctionIds: [] }],
   needsMe: [{
     id: "attention-1",
     commitmentId: "commitment-1",
@@ -62,6 +66,8 @@ const home: HomeProjectionDto = {
     coverageEnd: "2026-08-12",
     limitations: ["Only submitted receipts are covered."],
   },
+  activeCommitmentCount: 2,
+  reviewItemCount: 1,
 };
 
 test("Recovery share text projects server facts without combining currencies", () => {
@@ -70,6 +76,10 @@ test("Recovery share text projects server facts without combining currencies", (
   assert.match(text, /Monthly burn by currency from checked receipts:/);
   assert.match(text, /INR: ₹1,999\.00\/mo\./);
   assert.match(text, /USD: \$20\.00\/mo\./);
+  assert.match(text, /Annualized estimate by currency \(12 × cited monthly equivalent, not a historical yearly total\):/);
+  assert.match(text, /INR: ₹23,988\.00\/yr\./);
+  assert.match(text, /USD: \$240\.00\/yr\./);
+  assert.match(text, /Active commitments: 2\. Needs review: 1\./);
   assert.match(text, /Currencies stay separate; no exchange rate was invented\./);
   assert.match(text, /Changed since last visit: OpenAI — Amount changed\./);
   assert.match(text, /Next expected charge: OpenAI · ₹1,999\.00 · 18 Aug 2026 \(in 6 days\)\./);
@@ -78,14 +88,75 @@ test("Recovery share text projects server facts without combining currencies", (
   assert.doesNotMatch(text, /₹3,999|converted|approximately|₹1,999\.00\/mo \+ \$20\.00\/mo/i);
 });
 
+test("Recovery share text names a saved correction when the monthly total is not receipt-only", () => {
+  const text = renderRecoveryShareText({
+    ...home,
+    monthlyTotals: [{
+      ...home.monthlyTotals[0],
+      provenance: "USER_CORRECTED",
+      correctionIds: ["correction-amount-1"],
+    }],
+    annualizedEstimateTotals: [{
+      ...home.annualizedEstimateTotals[0],
+      provenance: "USER_CORRECTED",
+      correctionIds: ["correction-amount-1"],
+    }],
+    next30DayTotals: [{
+      ...home.next30DayTotals[0],
+      provenance: "USER_CORRECTED",
+      correctionIds: ["correction-amount-1"],
+    }],
+  });
+
+  assert.match(text, /Monthly burn including a saved correction: ₹1,999\.00\/mo\./);
+  assert.doesNotMatch(text, /Monthly burn from checked receipts/);
+  assert.match(text, /INR monthly total includes a saved correction/);
+  assert.doesNotMatch(text, /INR monthly total includes a saved correction[\s\S]*INR monthly total includes a saved correction/);
+});
+
+test("Recovery share text names a saved correction on the annualized estimate when that total is corrected", () => {
+  const text = renderRecoveryShareText({
+    ...home,
+    monthlyTotals: [{
+      ...home.monthlyTotals[0],
+      provenance: "USER_CORRECTED",
+      correctionIds: ["correction-amount-1"],
+    }],
+    annualizedEstimateTotals: [{
+      ...home.annualizedEstimateTotals[0],
+      provenance: "USER_CORRECTED",
+      correctionIds: ["correction-amount-1"],
+    }],
+  });
+
+  assert.match(text, /INR annualized estimate includes a saved correction/);
+});
+
+test("Recovery share text does not call mixed-currency totals receipt-only when one currency is corrected", () => {
+  const text = renderRecoveryShareText({
+    ...home,
+    monthlyTotals: [
+      { ...home.monthlyTotals[0], provenance: "USER_CORRECTED", correctionIds: ["correction-amount-1"] },
+      home.monthlyTotals[1],
+    ],
+  });
+
+  assert.match(text, /Monthly burn by currency, including a saved correction:/);
+  assert.doesNotMatch(text, /Monthly burn by currency from checked receipts:/);
+  assert.match(text, /INR monthly total includes a saved correction/);
+});
+
 test("Recovery share text names a saved first observation without calling it recurring", () => {
   const text = renderRecoveryShareText({
     ...home,
     recentObservations: [{ evidenceId: "evidence-once-1", merchant: "Figma", amount: inr, date: "2026-08-08" }],
     monthlyTotals: [],
+    annualizedEstimateTotals: [],
     next30DayTotals: [],
     next: [],
     needsMe: [],
+    activeCommitmentCount: 0,
+    reviewItemCount: 0,
     changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 1, items: [] },
     coverage: {
       state: "BASELINE_ONLY",
@@ -100,6 +171,7 @@ test("Recovery share text names a saved first observation without calling it rec
 
   assert.match(text, /Saved receipt observation \(not yet recurring\): Figma · ₹1,999\.00 · 8 Aug 2026\./);
   assert.match(text, /No monthly recurring total is published from these receipts\./);
+  assert.doesNotMatch(text, /Annualized estimate|\/yr\./);
   assert.doesNotMatch(text, /Figma.*\/mo|Figma.*renews|savings?|money saved/i);
 });
 

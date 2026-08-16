@@ -687,7 +687,125 @@ async function buildAccessExport(client: PoolClient, input: {
                  processed_at as "processedAt"
           from recovery_inbound_events where workspace_id = $1
           order by received_at asc, id asc limit $2
-        ) record) as inbound_events`,
+        ) record) as inbound_events,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, version, status, terms_version as "termsVersion",
+                 signed_text_hash as "signedTextHash", currency,
+                 per_action_ceiling_minor::text as "perActionCeilingMinor",
+                 rolling_30d_ceiling_minor::text as "rolling30dCeilingMinor",
+                 veto_window_hours as "vetoWindowHours",
+                 signed_at as "signedAt", revoked_at as "revokedAt"
+          from recovery_standing_mandates where workspace_id = $1
+          order by version asc limit $2
+        ) record) as standing_mandates,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, commitment_id as "commitmentId", eligibility, status,
+                 ineligible_reasons as "ineligibleReasons", provider_id as "providerId",
+                 amount_minor::text as "amountMinor", currency,
+                 notice_delivered_at as "noticeDeliveredAt",
+                 veto_deadline_at as "vetoDeadlineAt", exception_code as "exceptionCode"
+          from recovery_action_candidates where workspace_id = $1
+          order by created_at asc, id asc limit $2
+        ) record) as action_candidates,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select candidate_id as "candidateId", status, expected_debit_date as "expectedDebitDate",
+                 saving_minor::text as "savingMinor"
+          from recovery_covered_windows where workspace_id = $1
+          order by expected_debit_date asc limit $2
+        ) record) as covered_windows,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select period_start as "periodStart", period_end as "periodEnd",
+                 monitoring_minor::text as "monitoringMinor",
+                 verified_saving_minor::text as "verifiedSavingMinor",
+                 retained_minor::text as "retainedMinor",
+                 razorpay_charge_status as "razorpayChargeStatus"
+          from recovery_fee_ledger where workspace_id = $1
+          order by period_end desc limit $2
+        ) record) as fee_ledger,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select anchor_date as "anchorDate", created_at as "createdAt"
+          from recovery_billing_year_anchors where workspace_id = $1
+          limit $2
+        ) record) as billing_year_anchors,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select mandate_id as "mandateId", kind, created_at as "createdAt"
+          from recovery_standing_mandate_events where workspace_id = $1
+          order by created_at asc limit $2
+        ) record) as mandate_events,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, commitment_id as "commitmentId", commitment_class as "commitmentClass",
+                 protected_override as "protectedOverride", cited_category as "citedCategory",
+                 confidence_score as "confidenceScore", created_at as "createdAt"
+          from recovery_classification_snapshots where workspace_id = $1
+          order by created_at asc, id asc limit $2
+        ) record) as classification_snapshots,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select candidate_id as "candidateId", previous_status as "previousStatus", status,
+                 actor_kind as "actorKind", reason_code as "reasonCode", created_at as "createdAt"
+          from recovery_candidate_events where workspace_id = $1
+          order by created_at asc limit $2
+        ) record) as candidate_events,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select candidate_id as "candidateId", channel, delivery_status as "deliveryStatus",
+                 delivered_at as "deliveredAt", veto_token_hash as "vetoTokenHash",
+                 veto_expires_at as "vetoExpiresAt", notice_body_hash as "noticeBodyHash",
+                 frozen_at as "frozenAt", created_at as "createdAt"
+          from recovery_veto_notices where workspace_id = $1
+          order by created_at asc limit $2
+        ) record) as veto_notices,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select candidate_id as "candidateId", attempt_no as "attemptNo", status, outcome,
+                 operator_minutes::text as "operatorMinutes", proof_kind as "proofKind",
+                 proof_reference_hash as "proofReferenceHash", created_at as "createdAt"
+          from recovery_execution_attempts where workspace_id = $1
+          order by created_at asc limit $2
+        ) record) as execution_attempts,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select candidate_id as "candidateId", outcome, operator_minutes::text as "operatorMinutes",
+                 proof_kind as "proofKind", attempt_no as "attemptNo", created_at as "createdAt"
+          from recovery_executions where workspace_id = $1
+          order by created_at asc limit $2
+        ) record) as executions,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select candidate_id as "candidateId", minutes::text, outcome, created_at as "createdAt"
+          from recovery_operator_actions where workspace_id = $1
+          order by created_at asc limit $2
+        ) record) as operator_actions,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select candidate_id as "candidateId", event_type as "eventType", occurred_at as "occurredAt",
+                 encode(decode(payload_hash, 'hex'), 'hex') as "noticeFingerprint"
+          from recovery_notice_delivery_events where workspace_id = $1
+          order by created_at asc limit $2
+        ) record) as notice_delivery_events,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select kind, last_error_code as "lastErrorCode", attempt_count as "attemptCount",
+                 created_at as "createdAt"
+          from recovery_autopilot_dead_letters where workspace_id = $1
+          order by created_at asc limit $2
+        ) record) as dead_letters,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select disable.provider_id as "providerId", disable.disabled,
+                 disable.updated_at as "updatedAt"
+          from recovery_provider_disables disable
+          where disable.provider_id in (
+            select distinct candidate.provider_id
+            from recovery_action_candidates candidate
+            where candidate.workspace_id = $1 and candidate.provider_id is not null
+          )
+          order by disable.provider_id
+          limit $2
+        ) record) as provider_controls,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select started_at as "startedAt", recorded_at as "recordedAt"
+          from recovery_connected_mandate_cohort where workspace_id = $1
+          limit $2
+        ) record) as connected_mandate_cohort,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select source_id as "sourceId", disconnected_at as "disconnectedAt",
+                 reconnected_at as "reconnectedAt"
+          from recovery_source_disconnections where workspace_id = $1
+          order by disconnected_at asc, source_id asc limit $2
+        ) record) as source_disconnections`,
       [input.workspaceId, exportRowLimits.recoveryRecords + 1],
     ),
     query<{
@@ -1179,6 +1297,23 @@ async function buildAccessExport(client: PoolClient, input: {
     recovery.changes,
     recovery.inbound_aliases,
     recovery.inbound_events,
+    recovery.standing_mandates,
+    recovery.action_candidates,
+    recovery.covered_windows,
+    recovery.fee_ledger,
+    recovery.billing_year_anchors,
+    recovery.mandate_events,
+    recovery.classification_snapshots,
+    recovery.candidate_events,
+    recovery.veto_notices,
+    recovery.execution_attempts,
+    recovery.executions,
+    recovery.operator_actions,
+    recovery.notice_delivery_events,
+    recovery.dead_letters,
+    recovery.provider_controls,
+    recovery.connected_mandate_cohort,
+    recovery.source_disconnections,
   ]) {
     assertWithinExportLimit("recoveryRecords", records.length);
   }
@@ -1317,6 +1452,23 @@ async function buildAccessExport(client: PoolClient, input: {
       changes: recovery.changes,
       inboundAliases: recovery.inbound_aliases,
       inboundEvents: recovery.inbound_events,
+      standingMandates: recovery.standing_mandates,
+      actionCandidates: recovery.action_candidates,
+      coveredWindows: recovery.covered_windows,
+      feeLedger: recovery.fee_ledger,
+      billingYearAnchors: recovery.billing_year_anchors,
+      mandateEvents: recovery.mandate_events,
+      classificationSnapshots: recovery.classification_snapshots,
+      candidateEvents: recovery.candidate_events,
+      vetoNotices: recovery.veto_notices,
+      executionAttempts: recovery.execution_attempts,
+      executions: recovery.executions,
+      operatorActions: recovery.operator_actions,
+      noticeDeliveryEvents: recovery.notice_delivery_events,
+      deadLetters: recovery.dead_letters,
+      providerControls: recovery.provider_controls,
+      connectedMandateCohort: recovery.connected_mandate_cohort,
+      sourceDisconnections: recovery.source_disconnections,
     },
     productEvents: productEventResult.rows.map((row) => ({
       id: row.id,
@@ -1889,6 +2041,23 @@ type RecoveryExportRow = {
   changes: Array<Record<string, unknown>>;
   inbound_aliases: Array<Record<string, unknown>>;
   inbound_events: Array<Record<string, unknown>>;
+  standing_mandates: Array<Record<string, unknown>>;
+  action_candidates: Array<Record<string, unknown>>;
+  covered_windows: Array<Record<string, unknown>>;
+  fee_ledger: Array<Record<string, unknown>>;
+  billing_year_anchors: Array<Record<string, unknown>>;
+  mandate_events: Array<Record<string, unknown>>;
+  classification_snapshots: Array<Record<string, unknown>>;
+  candidate_events: Array<Record<string, unknown>>;
+  veto_notices: Array<Record<string, unknown>>;
+  execution_attempts: Array<Record<string, unknown>>;
+  executions: Array<Record<string, unknown>>;
+  operator_actions: Array<Record<string, unknown>>;
+  notice_delivery_events: Array<Record<string, unknown>>;
+  dead_letters: Array<Record<string, unknown>>;
+  provider_controls: Array<Record<string, unknown>>;
+  connected_mandate_cohort: Array<Record<string, unknown>>;
+  source_disconnections: Array<Record<string, unknown>>;
 };
 
 type ConsentExportRow = {

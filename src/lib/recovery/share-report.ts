@@ -3,15 +3,45 @@ import type { ChangeItemDto, HomeProjectionDto } from "./contracts";
 export function renderRecoveryShareText(home: HomeProjectionDto): string {
   const lines = ["Vognary renewal review"];
   if (home.monthlyTotals.length === 1) {
-    lines.push(`Monthly burn from checked receipts: ${home.monthlyTotals[0].amount.display}/mo.`);
+    lines.push(home.monthlyTotals[0].provenance === "RECEIPT"
+      ? `Monthly burn from checked receipts: ${home.monthlyTotals[0].amount.display}/mo.`
+      : `Monthly burn including a saved correction: ${home.monthlyTotals[0].amount.display}/mo.`);
   } else if (home.monthlyTotals.length > 1) {
-    lines.push("Monthly burn by currency from checked receipts:");
+    const receiptOnly = home.monthlyTotals.every((total) => total.provenance === "RECEIPT");
+    lines.push(receiptOnly
+      ? "Monthly burn by currency from checked receipts:"
+      : "Monthly burn by currency, including a saved correction:");
     for (const total of home.monthlyTotals) {
       lines.push(`${total.amount.currency}: ${total.amount.display}/mo.`);
     }
     lines.push("Currencies stay separate; no exchange rate was invented.");
   } else {
     lines.push("No monthly recurring total is published from these receipts.");
+  }
+
+  for (const total of home.monthlyTotals) {
+    if (total.provenance === "USER_CORRECTED") {
+      lines.push(`${total.amount.currency} monthly total includes a saved correction.`);
+    }
+  }
+
+  if (home.annualizedEstimateTotals.length === 1) {
+    lines.push(`Annualized estimate (12 × cited monthly equivalent, not a historical yearly total): ${home.annualizedEstimateTotals[0].amount.display}/yr.`);
+  } else if (home.annualizedEstimateTotals.length > 1) {
+    lines.push("Annualized estimate by currency (12 × cited monthly equivalent, not a historical yearly total):");
+    for (const total of home.annualizedEstimateTotals) {
+      lines.push(`${total.amount.currency}: ${total.amount.display}/yr.`);
+    }
+  }
+
+  for (const total of home.annualizedEstimateTotals) {
+    if (total.provenance === "USER_CORRECTED") {
+      lines.push(`${total.amount.currency} annualized estimate includes a saved correction.`);
+    }
+  }
+
+  if (home.activeCommitmentCount > 0 || home.reviewItemCount > 0) {
+    lines.push(`Active commitments: ${home.activeCommitmentCount.toLocaleString("en-IN")}. Needs review: ${home.reviewItemCount.toLocaleString("en-IN")}.`);
   }
 
   if (!home.monthlyTotals.length && home.recentObservations.length) {

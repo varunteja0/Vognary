@@ -10,8 +10,8 @@
 | Wedge sharpness | 8 | 2026-07-21 | Strategy review |
 | Intelligence engine | 6 | 2026-07-21 | Engines strong; corpus empty |
 | Trust & honesty | 9 | 2026-07-21 | Claims CI + fail-closed design |
-| Product UX | 7.5 | 2026-08-12 | Recovery closeout browser matrix passes desktop/mobile with axe; real-human <3 min remains unmeasured |
-| Backend readiness | 9 | 2026-08-12 | Recovery v1: 571/571 unit/source-contract tests, 42/42 PostgreSQL tests, realistic repeated-receipt inference, build/perf green |
+| Product UX | 7.5 | 2026-08-15 | Cited first-value Home + fail-closed Autopilot UI: Playwright 70/70 desktop/mobile (Customer #0, Home/states, veto, axe, overflow). Real-human <3 min remains unmeasured |
+| Backend readiness | 8 | 2026-07-21 | SLOs met in production |
 | Production activation | 5.5 | 2026-08-12 | Exact CI-green closeout SHA deployed; backend/migrations/Google/rate limiting/monitoring delivery pass; encrypted production restore rehearsal matched checksum and Recovery counts, but durable backup storage, successful inbox materialization/replay, reminder delivery, payment, and human Customer #0 remain unproven |
 | Live connector depth | 4 | 2026-07-21 | Registry ≠ live |
 | Data / network moat | 3 | 2026-07-21 | No network data yet |
@@ -36,8 +36,8 @@
 | Phase | Status | Notes |
 | --- | --- | --- |
 | 0 Hygiene | DONE | 2026-07-21 |
-| A Market contact | ACTIVE | Private autopilot pilots; CRM still 0 connected/mandates/actual payments |
-| B Loop shipping | ACTIVE | Live roadmap is WP-A…WP-E. Historical Recovery browser loop remains measured; real-human <3 min still pending |
+| A Market contact | ACTIVE | Private autopilot pilots; gitignored CRM has 20 sourced-target rows; funnel 20→5→2→1→1 defined; conversations/connected/mandate/paid remain 0; nothing sent |
+| B Loop shipping | ACTIVE | WP-A.2 is on `main` (PR #34). Autopilot integrity work is on `feat/autopilot-loop` through additive 0044. Local gates 2026-08-16: unit 656/656, serialized postgres 110/110, Playwright 60/60, lighthouse passed with `VERCEL=` unset. WP-C–E are not complete. No live receipt/notice/provider/payment evidence. No measured scoreboard raise |
 | C Production min | ACTIVE | Provider/domain/deployment configuration is live; signed receipt, real Google, delivered reminder, and Customer #0 proof remain |
 | D Intelligence moat | PENDING | Needs corpus |
 | E Distribution | PENDING | After A signal |

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { publicOffer } from "@/lib/public-offer";
+import { isAutopilotExecutionEnabled, isAutopilotNoticeChannelReady, isAutopilotNoticeEnabled } from "@/lib/recovery/autopilot-switch";
 import { getDatabasePool } from "@/lib/server/database";
 
 export const productionFeatureMigrations = [
@@ -33,6 +34,20 @@ export const productionFeatureMigrations = [
   "0028_recovery_gmail_oauth_source",
   "0029_legacy_tenant_integrity",
   "0030_legacy_tenant_ownership_immutable",
+  "0031_autopilot_loop",
+  "0032_autopilot_proof_integrity",
+  "0033_autopilot_integrity",
+  "0034_autopilot_repair",
+  "0035_autopilot_codex_repair",
+  "0036_autopilot_notice_hold",
+  "0037_autopilot_clock_integrity",
+  "0038_autopilot_reconcile_integrity",
+  "0039_autopilot_frozen_notice_integrity",
+  "0040_autopilot_review_integrity",
+  "0041_workspace_activation_integrity",
+  "0042_workspace_activation_semantic_reset",
+  "0043_workspace_activation_semantic_version",
+  "0044_autopilot_audit_immutability",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];
@@ -58,6 +73,16 @@ export function getUnconfiguredFeatureReadiness() {
       migrationId: "0023_recovery_v1" as const,
       legacyRows: null,
       recoveryWorkspaces: null,
+    },
+    autopilot: {
+      status: "database-not-configured" as const,
+      migrationId: "0040_autopilot_review_integrity" as const,
+      executionEnabled: false,
+      noticeEnabled: false,
+      noticeDelivery: "off" as const,
+      gmailOauthReady: false,
+      razorpayChargeStatus: "FAIL_CLOSED" as const,
+      provenProviderRoutes: 0,
     },
   };
 }
@@ -93,12 +118,13 @@ export async function checkFeatureReadiness() {
       proofGraph: { ...unavailable.proofGraph, status: "migration-ledger-unavailable" as const },
       verifiedOutcomes: { ...unavailable.verifiedOutcomes, status: "migration-ledger-unavailable" as const },
       recoveryV1: { ...unavailable.recoveryV1, status: "migration-ledger-unavailable" as const },
+      autopilot: { ...unavailable.autopilot, status: "migration-ledger-unavailable" as const },
     };
   }
 
   const appliedMigrations = productionFeatureMigrations.filter((id) => applied.has(id));
   const missingMigrations = productionFeatureMigrations.filter((id) => !applied.has(id));
-  const [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes, recoveryV1] = await Promise.all([
+  const [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes, recoveryV1, autopilot] = await Promise.all([
     checkPrivacyLifecycle(applied),
     checkRenewalAlerts(applied),
     checkCommitmentDecisions(applied),
@@ -108,8 +134,9 @@ export async function checkFeatureReadiness() {
     checkProofGraph(applied),
     checkVerifiedOutcomes(applied),
     checkRecoveryV1(applied),
+    checkAutopilot(applied),
   ]);
-  const capabilityQueryFailed = [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes, recoveryV1]
+  const capabilityQueryFailed = [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes, recoveryV1, autopilot]
     .some((feature) => feature.status === "schema-query-failed");
 
   return {
@@ -132,7 +159,83 @@ export async function checkFeatureReadiness() {
     proofGraph,
     verifiedOutcomes,
     recoveryV1,
+    autopilot,
   };
+}
+
+async function checkAutopilot(applied: Set<string>) {
+  const migrationId = "0040_autopilot_review_integrity" as const;
+  const executionEnabled = isAutopilotExecutionEnabled();
+  const noticeEnabled = isAutopilotNoticeEnabled();
+  const noticeChannel = isAutopilotNoticeChannelReady();
+  const mailerReady = Boolean(process.env.RESEND_API_KEY?.trim() && process.env.RESEND_FROM_EMAIL?.trim() && process.env.RESEND_NOTICE_WEBHOOK_SECRET?.trim() && process.env.AUTOPILOT_VETO_TOKEN_SECRET?.trim());
+  const gmailOauthReady = process.env.GOOGLE_OAUTH_VERIFICATION_COMPLETE === "true"
+    && process.env.GOOGLE_RESTRICTED_SCOPE_CASA_STATUS === "approved";
+  if (!applied.has(migrationId)) {
+    return {
+      status: "migration-pending" as const,
+      migrationId,
+      executionEnabled: false,
+      noticeEnabled: false,
+      noticeDelivery: "off" as const,
+      gmailOauthReady: false,
+      razorpayChargeStatus: "FAIL_CLOSED" as const,
+      provenProviderRoutes: 0,
+    };
+  }
+  try {
+    const schema = await getDatabasePool().query<{ ready: boolean }>(
+      `select
+         to_regclass('public.recovery_shadow_gate_snapshots') is not null
+         and to_regclass('public.recovery_execution_attempts') is not null
+         and to_regclass('public.recovery_fee_ledger') is not null
+         and to_regclass('public.recovery_billing_year_anchors') is not null
+         and to_regclass('public.recovery_veto_notices') is not null
+         and to_regclass('public.recovery_notice_pending_events') is not null
+         and to_regclass('public.recovery_connected_mandate_cohort') is not null
+         and to_regclass('public.recovery_source_disconnections') is not null as ready`,
+    );
+    if (!schema.rows[0]?.ready) {
+      return {
+        status: "schema-query-failed" as const,
+        migrationId,
+        executionEnabled: false,
+        noticeEnabled: false,
+        noticeDelivery: "off" as const,
+        gmailOauthReady: false,
+        razorpayChargeStatus: "FAIL_CLOSED" as const,
+        provenProviderRoutes: 0,
+      };
+    }
+    const noticeDelivery = !noticeEnabled
+      ? "off" as const
+      : !noticeChannel
+        ? "channel-not-ready" as const
+        : !mailerReady
+          ? "credentials-missing" as const
+          : "adapter-ready-delivery-unproven" as const;
+    return {
+      status: executionEnabled ? "schema-ready-switch-on-unproven" as const : "schema-ready-execution-off" as const,
+      migrationId,
+      executionEnabled,
+      noticeEnabled,
+      noticeDelivery,
+      gmailOauthReady,
+      razorpayChargeStatus: "FAIL_CLOSED" as const,
+      provenProviderRoutes: 0,
+    };
+  } catch {
+    return {
+      status: "schema-query-failed" as const,
+      migrationId,
+      executionEnabled: false,
+      noticeEnabled: false,
+      noticeDelivery: "off" as const,
+      gmailOauthReady: false,
+      razorpayChargeStatus: "FAIL_CLOSED" as const,
+      provenProviderRoutes: 0,
+    };
+  }
 }
 
 async function checkRecoveryV1(applied: Set<string>) {

@@ -183,11 +183,13 @@ const workspaceQueries: RetentionQuery[] = [
     previewSql: `select count(*)::text as count from (
       select id from product_events
       where workspace_id = $1 and occurred_at < $2
+        and not (event_name = 'workspace.activated' and activation_semantic_version is not distinct from 1)
       order by occurred_at asc limit $3
     ) candidates`,
     executeSql: `with candidates as (
       select id from product_events
       where workspace_id = $1 and occurred_at < $2
+        and not (event_name = 'workspace.activated' and activation_semantic_version is not distinct from 1)
       order by occurred_at asc limit $3 for update skip locked
     ), affected as (
       delete from product_events item using candidates

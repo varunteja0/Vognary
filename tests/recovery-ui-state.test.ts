@@ -38,11 +38,14 @@ const home: HomeProjectionDto = {
   generatedAt: "2026-08-09T10:00:00.000Z",
   recentObservations: [],
   monthlyTotals: [],
+  annualizedEstimateTotals: [],
   next30DayTotals: [],
   needsMe: [],
   changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 4, items: [] },
   next: [],
   coverage: { state: "BASELINE_ONLY", sourceCount: 1, evidenceCount: 1, lastEvidenceAt: null, coverageStart: null, coverageEnd: null, limitations: [] },
+  activeCommitmentCount: 0,
+  reviewItemCount: 0,
 };
 
 const detail: CommitmentDetailDto = {

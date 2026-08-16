@@ -1,351 +1,73 @@
-# CONTINUE HERE — live handoff (2026-08-13)
+# CONTINUE HERE — live handoff (2026-08-16)
 
-> **New chat — mandatory order:**
-> 1. [`docs/THE-LAW.md`](THE-LAW.md) — **supreme company + agent directive** (read first)
-> 2. **This file** — live branch/env/state only
-> 3. [`docs/execution/phase-a-market-contact.md`](execution/phase-a-market-contact.md) — market proof kit
-> 4. [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md) — loop product WPs
-> 5. Then `docs/execution-plan-ui-ai-quality.md` / `docs/master-build-plan.md` as needed
->
-> A founder assessment (2026-07-21) is codified as THE-LAW. This file is **live state**,
-> not a competing strategy. Prior-generation plans live in `docs/archive/` — do not resurrect them.
+> Read [`docs/THE-LAW.md`](THE-LAW.md) first. This file is **live state only**.
+> Market: [`docs/execution/phase-a-market-contact.md`](execution/phase-a-market-contact.md).
+> Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
+> History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
----
+## 1. Exact checkout
 
-## 0. Prime directive — INDIA-FIRST, world-second (both required)
+- Folder: `/Users/varunteja/Desktop/CVT Group/Vognary`
+- Branch: `feat/autopilot-loop` from `1542dda` (PR #34)
+- Do **not** `git worktree add ../vognary-*`, clone a sibling, or redo WP-A.
+- Parked copies: `.fallow/` (gitignored)
+- Founder authorized the safety commit and push of this branch. Do **not** open a PR until asked.
 
-The founder is in India. **Every surface must let an Indian track their recurring
-money first-class before anything else, and the world must work too.**
+## 2. What is merged on `main`
 
-- **India-first, concretely:** default currency **₹ (INR)**; Indian number
-  formatting (`formatMoney` in `@/lib/format`); Indian recurring rails first-class —
-  **UPI AutoPay mandates, card e-mandates, SIPs, EMIs, EPF, Play/App Store India
-  receipts, Indian bank-statement formats**; copy that names Indian rails by name.
-  The deterministic engines already understand these (`recurring-audit.ts`,
-  `renewal-timeline.ts`); the UI must surface them prominently.
-- **World-second:** multi-currency works, but as explicit opt-in; components
-  default to India.
-- Honesty invariant holds everywhere: name a rail only at its proven `*_STATUS`.
+- WP-A PR #32 `2e3c776` · WP-A.1 PR #33 `d84e778` · WP-A.2 PR #34 `1542dda`
+- Recovery v1 PR #31. Public landing is still the audit generation.
+- Composite scoreboard remains **1.5**. Do not invent mandates, payments, or reviewer approvals.
 
-## 1. Where things stand (verified 2026-08-13)
+## 3. What is uncommitted on this branch
 
-- **WP-A merged (PR #32, `2e3c776`, 2026-08-13).** Recovery is the sole active ingestion authority. Paste / CSV / forwarded email share one canonical Recovery envelope. `GMAIL_OAUTH` is reserved and fail-closed. Legacy living-ledger and `connector_evidence` writes throw before PostgreSQL. Count/report is `clean` / `safely-migratable` / `blocked`. Required Codex/Opus review on the merge SHA was not completed before merge.
-- **WP-A.1 merged unexpectedly (PR #33, `d84e778`, 2026-08-13).** Landed as `origin/main` SHA `d84e7789ba2f6983ad7288d098869c2161a075d3` before CI/Codex/Opus gates. Codex review of `ad65d055` is **NOT APPROVED**. Do not revert PR #33; fix forward.
-- **WP-A.2 (immutable legacy workspace ownership, this branch):** A valid same-workspace `evidence_links` row can still become cross-workspace if `data_sources.workspace_id` or `recurring_items.workspace_id` is updated afterward, because the 0029 trigger only fires on the link row. Additive migration `0030_legacy_tenant_ownership_immutable` rejects an actual `workspace_id` change on those frozen tables and leaves historical dirty rows untouched as cutover blockers. Codex review of frozen SHA `06d3e2831976dc9e72303dc751c2eb31bb2bd799` is **NOT APPROVED**: the item-reassignment tests were masked by a `commitment_decisions` child that `0029`'s composite FK already blocks. The fixture now seeds source + item + evidence with **no decision child**, proves `0029` can create one cross-workspace evidence row, and proves `0030` rejects the move and leaves zero. Local gates on disposable PostgreSQL: **586/586** unit, **59/59** PostgreSQL, lint 0 errors (8 pre-existing warnings), typecheck, claims, tokens, build, and performance budgets passed. Scoreboard row raised: none measured; business validation remains **1.5**. Loop step: decision/outcome proof with structural tenant isolation. WP-B remains blocked until this PR merges with CI green plus real Codex and real Opus on the exact new head SHA. A missing, failed, or rate-limited review is not approval.
-- **Recovery v1 is on `main` (PR #31).** The Recovery v1 same-checkout exception has **ended**. New work uses one isolated worktree per WP from fresh `origin/main`. No stacked PRs. Temporary worktree paths are not live instructions.
-- **Active engineering roadmap:** WP-A through WP-E in [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md). Historical WP-B0…B8 shipped the pre-autopilot Recovery loop and are not the live roadmap. Pre-public-retention and ultimate-closeout packets are archived (historical; retired by the 2026-08-13 autopilot pivot).
-- **Recovery v1 launch implementation was locally green (verified 2026-08-12, historical):**
-  branch `recovery/v1` (now merged) has one canonical signed path under
-  `src/app/workspace/recovery/**` + `src/lib/recovery/**` + Recovery APIs +
-  migration `0023`. Guest evidence survives authentication; Changed provenance,
-  repeatable-read version coherence, decimal-safe bigint money, exact evidence
-  addressing, canonical export/delete, deterministic-only file provenance, PII
-  redaction, resource ceilings, and hot-query indexes are enforced. Realistic
-  merchant + amount + charge-date receipts now persist as observations; one
-  receipt publishes its saved merchant, amount, date, exact evidence, and honest
-  WhatsApp text without fabricating recurrence, while two matching charges infer
-  cadence through the existing engine. Empty Home uses a three-step manual path
-  unless the receipt inbox is publicly attested; Changed appears before attention;
-  currencies remain separate; reminder eligibility never claims delivery.
-  Evidence: **571/571 unit/source-contract tests**, **42/42 PostgreSQL tests**,
-  and the applicable closeout browser matrix **46/46** across desktop/mobile
-  (**44** landing/login/first-value/Home/state scenarios + **2** real-route/
-  PostgreSQL Customer #0 scenarios), with no serious/critical axe violations.
-  Lint has zero errors (8 pre-existing navigation warnings); typecheck, claims,
-  tokens, build, and performance budgets pass. Production now has a clean Recovery cutover
-  through `0026`, an exact-main-SHA deployment, Google identity configuration,
-  daily reminder/retention cron routes, and a verified Resend sending + receiving
-  domain with the canonical `email.received` webhook. The provider is configured,
-  but receipt-inbox launch attestations remain deliberately blank until a real
-  signed event proves processing, replay, and retention. Real Google/session,
-  real receipt/PDF processing, delivered reminder, and a human-timed Customer #0
-  remain to prove. Scoreboard human metric cells remain blank because no completed-
-  audit, surprise, pay-intent, TTI, corpus, or return evidence was supplied in this run.
-- **Local F1 was impossible until 2026-08-12 and is now unblocked.** The closeout
-  work was 28 uncommitted files on one laptop; it is now committed and pushed as
-  `9cbccf0` + `6531c0b` on `recovery/v1`. Separately, `.env.local` had no
-  `ENABLE_DEVELOPMENT_LOGIN` / `DEVELOPMENT_LOGIN_EMAIL` /
-  `DEVELOPMENT_LOGIN_ACCESS_CODE`, and no local Google client, so **no one could
-  sign in locally at all** — which is why `recovery_submissions` was 0 and every
-  signed-in browser journey silently skipped on this machine (CI always had the
-  code, so CI counts were real). Development login is now configured locally
-  (gitignored; hard-disabled when `NODE_ENV=production`). `.env.local` still
-  points `DATABASE_URL` at `localhost:5432` for the `docker compose` path, so
-  when using the standalone Postgres on `55432` start the server as:
-  `DATABASE_URL='postgres://vognary@127.0.0.1:55432/vognary' POSTGRES_SSL=false npm run dev -- --hostname 127.0.0.1 --port 3101`.
-  Customer #0 then passes live on that server: **desktop and mobile, 30 actions
-  each, real routes and real PostgreSQL**. Human TTI is still unmeasured.
-- **Production closeout candidate is live, but public growth remains blocked
-  (verified 2026-08-12):** `www.vognary.com` now serves exact CI-green SHA
-  `2eda24d5d88e4d3e0727d823905d9aba9fdcb0fd`; the closeout landing/login copy,
-  `/api/health`, identity-only Google start contract, retired `410` routes,
-  persistent backend, migrations through `0026`, and shared rate limiting pass.
-  The invalid production `DATABASE_URL` placeholder was replaced by a verified
-  Neon pooled URL. `INTERNAL_SYNC_SECRET` is synchronized across Vercel, GitHub
-  Actions, and the gitignored local operator file; a protected Sentry test
-  returned `status=delivered`, and a protected retention dry run selected all 4
-  workspaces with zero failed executions. A read-only encrypted backup of the
-  PostgreSQL 18.4 production database restored into disposable PostgreSQL 18.4
-  with matching checksum, all 17 core tables, and exact Recovery row counts; all
-  copied data and the temporary key were then destroyed. That rehearsal does
-  **not** make backups READY because no persistent founder-held key or durable
-  object-storage copy exists. Receipt inbox remains NOT CLAIMED: production has
-  3 signed-event records, but 2 are terminal `PARSE_FAILED`, 1 remains
-  `MATERIALIZATION_FAILED`, and zero evidence rows have `PROVIDER_RECEIVED`
-  provenance. Delivered reminders/digests remain 0; Razorpay and legal proof are
-  absent; human F1/TTI, completed audits, surprise, pay intent, consented corpus,
-  and D30 return remain unmeasured. Non-strict production endpoint health passes;
-  Phase 10 and strict public activation remain NO-GO.
-- **Funnel measurement now exists (2026-08-13):** the Recovery loop previously
-  emitted no telemetry at all, so signups, activation, and return visits could
-  not be answered from data. `workspace.activated` (accepted evidence) and
-  `ledger.viewed` (Home read) are now emitted server-side, and `npm run funnel`
-  reports signups, daily active users, users active on 2+ days, and D7/D30
-  cohort return from counts only. Both event names were already in the
-  `product_events` CHECK constraint, so **no migration touches production**.
-  Verified live: a Customer #0 browser run emitted 3 `ledger.viewed` and 2
-  `workspace.activated` rows. There is still **no web analytics** on the
-  marketing pages, so visitor counts remain UNKNOWN.
-- **Recovery launch identity is Google OIDC only (2026-08-10):** the bearer
-  magic-link UI is removed from the Recovery login path and server readiness is
-  opt-in disabled unless `ENABLE_MAGIC_LINK_LOGIN=true`. Magic link is deferred
-  until verification is bound to browser intent/challenge; it is not launch
-  proof and production activation now requires `google-ready`.
-- **Quote paths** that contain the space in "CVT Group". Isolated worktree per WP from `origin/main`.
-- **`main`/origin is fully landed through PR #9**: Twin engine (`src/lib/twin/*`),
-  RunwayStrip, AI cite-or-shut-up spine + live layer (`src/lib/server/ai/*`).
-- **AI models decision (live in code):** `AI_MODELS` in `src/lib/server/ai/models.ts`
-  = `{ extraction: "claude-haiku-4-5", reasoning: "claude-sonnet-5" }`.
-  Dependency-injected, **inert until `ANTHROPIC_API_KEY` is set** (founder has
-  committed to providing it — see founder-ops).
-- **Monolith decomposition (WP-B7) underway, measured:** `vognary-mvp-client.tsx`
-  is **5305 lines** (was 5442). Shared foundation now lives under
-  `src/app/workspace/*`: `format.ts` (`formatCurrency`/`formatMinorCurrency`,
-  India-first, now unit-tested in `tests/workspace-format.test.ts`),
-  `statusStyles` in `primitives.tsx`, and `ledger-panels.tsx`
-  (`RecurringGraph` + `PriorityActionPanel`). Extraction was byte-identical JSX
-  re-imported into the shell — zero visual change; all gates green. Next clean
-  targets are token-clean pure panels (`ConfirmDialog`, `ProofDisclosure`,
-  duplicate/review panels); the renewal panels need their inline `eyebrow`
-  `fontSize` literals tokenised first (they trip the token gate once un-deferred).
-- **Audit delivery path shipped (guest), measured:** new deterministic engine
-  `src/lib/audit-report.ts` (`buildAuditReport` + `renderAuditReportText`) composes
-  the existing brief + kill-list + summary engines into ONE copy-ready plain-text
-  report — monthly burn (₹, foreign kept separate), next renewals, top actions,
-  UPI/NACH mandates to stop at the source, and an honest "floor, not ceiling"
-  coverage note. Wired into `guest-audit-client.tsx` as a **"Deliver this audit"**
-  card (Copy report / Download .txt / Preview). This is the founder's Phase-A
-  hand-off: paste a prospect's receipts → copy the report → send in WhatsApp/email.
-  Cite-or-shut-up: every figure traces to the deterministic audit; no invented
-  amounts. Tests: `tests/audit-report.test.ts` + extended
-  `tests/e2e/loop-brief-killlist.spec.ts` (report region asserted, desktop+mobile).
-- **Signed-in delivery + WhatsApp-short version shipped, measured:** the SAME
-  engine now backs the signed-in workspace. `renderAuditReportShareText` adds a
-  chat-length projection (burn + next debit + top move + mandate count + honest
-  cite line) — pure projection, no new money math. Monolith
-  `vognary-mvp-client.tsx` exposes `copyAuditReport` / `copyShareReport` /
-  `downloadAuditReport` (built with the workspace's real `userActions`, so top
-  moves reflect the user's keep/cancel decisions) via the command palette and the
-  Home overview export row (**"Copy report"** / **"Copy for WhatsApp"**). Guest
-  surface gained the matching "Copy for WhatsApp" button. Tests:
-  `tests/audit-report.test.ts` (7, incl. share-text + honest-degrade); guest
-  e2e asserts both buttons (desktop+mobile). **Signed-in UI is NOT
-  browser-verifiable here** (needs Postgres; no Docker) — it is verified by
-  typecheck + `next build` bundling the chunk + a `signed-in-first-value.spec.ts`
-  assertion (`Copy report` / `Copy for WhatsApp` on Home) that **skips** without
-  dev-login env. **Founder to confirm the signed-in path**, run:
-  `ENABLE_DEVELOPMENT_LOGIN=1 DEVELOPMENT_LOGIN_EMAIL=founder@vognary.test`
-  `DEVELOPMENT_LOGIN_ACCESS_CODE=local-dev-code-123 DATABASE_URL=<pg> npm run dev`
-  then `PLAYWRIGHT_EXTERNAL_SERVER=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000`
-  `VOGNARY_E2E_DEV_LOGIN_EMAIL=founder@vognary.test`
-  `VOGNARY_E2E_DEV_LOGIN_CODE=local-dev-code-123 npm run test:e2e -- signed-in-first-value`.
-- **Never stack PRs**; branch every work item from fresh `main`, PR against `main`.
+Fail-closed Autopilot **engineering candidate**, not a live product. WP-C–E are **not** complete. Additive 0040 version-tags frozen notice hashes: genuine 0037 rows retry through the real store using their legacy hash, while new freezes use the tags-and-payload-version hash. Frozen notice identity is immutable on UPDATE and direct DELETE; whole-workspace privacy erasure still cascades. A candidate is current only when its classification snapshot is the latest for that commitment. Funnel, queue, authorization, execution, and reconnect restoration share that check. Reconnect re-runs evaluation and can restore an eligible candidate only to safe `SHADOW`; it never revives prior notice or authorization state. Exact recorded execution replay returns before evaluating gates for a new side effect, so a lost-response retry remains exact after source disconnection. Queued candidates still withdraw when **any cited snapshot evidence source** is disconnected, even if an unrelated workspace source remains. Connected-mandate / D30 / cohort still use workspace-level current-source SQL. 0038 still reconciles stale pending notice events that match an ACCEPTED `provider_message_id` and keeps one production-safe proven-id resolver. 0037 still restores 0023 evidence immutability (workspace-erasure only), keeps `recovery_connected_mandate_cohort` insert-once, and requires the persisted candidate clock plus a currently DELIVERED notice before authorization or execution. Invalid token coverage writes `NOTICE_TOKEN_COVERAGE_INVALID` instead of a silent DELIVERED row. Access export includes cohort and source-disconnection metadata and still excludes raw notice bodies, signed tokens, and extra PII. User-uploaded CSV is not regulated coverage. Honest EXCEPTION can be recorded while execution is off. Billing periods that cross the customer anniversary fail closed.
 
-## 2. THE PLAN — company phases (THE-LAW) + product phases (engineering)
+Integrity-repair gates measured on this checkout (2026-08-16, after 0044): `git diff --check` · lint 0 errors (8 pre-existing warnings) · typecheck · claims · research · brand · tokens · unit **656/656** (`DATABASE_URL` unset) · serialized `test:postgres` **110/110** (`--test-concurrency=1` because fee-period exclusion, inbox revocation, consent withdraw, and activation uniqueness share locks/indexes) · `VERCEL=` standalone build · perf:budget · `VERCEL=` perf:lighthouse (landing LCP 1229 / a11y 100; `/login?next=/app` LCP 1977 / perf 99 / a11y 100; `/verify` LCP 781 / a11y 100) · Playwright **60/60** desktop+mobile (Customer #0, Home/states, veto, landing, first-value, axe, overflow) · `npm audit --audit-level=high` 0 vulnerabilities. Disposable rehearsal: 0030 facts survive 0031–0044; unmarked `workspace.activated` inserts fail closed after 0043; fee DELETE is blocked while the workspace exists; `pg_dump`/`pg_restore` of a disposable 0044 database restored 44 migrations. Production was not modified. Composite remains **1.5**. Code cannot raise business validation.
 
-**Company sequence (THE-LAW):** Phase **A** private autopilot pilots + Phase **B** WP-A through WP-E run **in parallel** now.
-Live CRM template: `docs/execution/private-autopilot-pilot-crm.csv.example` · Scoreboard: `docs/execution/scoreboard.md` · Historical field memory (not new pilot evidence): `docs/execution/people-conversation-learning.md`
+First-value slice (uncommitted): Home publishes server-side `annualizedEstimateTotals` (12 × cited monthly equivalent; omit a currency when that product exceeds PostgreSQL bigint or the display bound), `activeCommitmentCount`, and `reviewItemCount`. Money totals bind provenance per fact: next-date corrections mark next-30 only; cadence corrections mark monthly/annualized; amount corrections mark every affected money total. Copy names a saved correction when those totals are corrected. An active mandate still shows a compact spend strip above exception-only Autopilot home, including “No recurring amount yet.” `workspace.activated` records only from authenticated CSRF-protected `POST /api/workspaces/current/activation` after the cited metric component actually renders, and only with active `product-analytics-opt-in`. The client returns distinct outcomes (`recorded`, `already-recorded`, `deferred-no-consent`, `deferred-no-picture`, `deferred-auth`, `retry-exhausted`) and latches `sessionStorage` only for `recorded` / `already-recorded`. HTTP 202 / 401 / 403 stop the current attempt but stay eligible after consent or authentication changes. A consented Home without a cited picture returns `deferred-no-picture` (HTTP 200) and does not record activation. An active mandate still publishes the upcoming timeline and names non-current coverage (`STALE` / `PARTIAL` / `BASELINE_ONLY`) on the spend strip. A PROCESSING inbound event with no live `alias_id` is `IGNORED` / `ALIAS_REVOKED` and cannot persist evidence. Account deletion revokes the departing user's receipt-inbox consent (alias + in-flight leases) before withdrawing consent rows. `AUTOPILOT_TEST_NOTICE_PERSIST_CRASH` is ignored in `NODE_ENV=production`. Honest EXCEPTION records `LOGIN_REQUIRED` / OTP / phone / UPI / bank / unknown codes when the operator supplies that reason. Silence authorization re-checks a currently DELIVERED notice and the persisted clock on the UPDATE. A persisted local loop test covers cited Home → mandate → queued notice → delivered 48h clock → classification-stale execute block → veto → honest exception → PENDING covered window → zero retained fee. In-flight activation is per-workspace. Transient 500/offline failures retry a bounded number of times. The server re-reads and qualifies Home; it never trusts client totals. Evidence POST and brief GET do not activate. Additive `0041_workspace_activation_integrity` keeps one non-null workspace activation row (`ON CONFLICT DO NOTHING`). Additive `0042_workspace_activation_semantic_reset` purges historically untrustworthy activation rows that 0041 would have preserved. Additive `0043_workspace_activation_semantic_version` requires `activation_semantic_version = 1` on `workspace.activated` and deletes unmarked rows, so an old writer cannot reinsert an invalid activation after reset. Production rollout: apply 0041–0043 first, then deploy the writer that supplies the marker. Never deploy that writer before 0043. Rolling overlap is fail-closed. A consented cited Home then records exactly one. Receipt revocation invalidates `RECEIVED` and `PROCESSING` leases and re-checks live alias, account, and consent inside reservation and materialization, so a genuinely in-flight retrieval cannot persist evidence after revoke. Withdrawing `receipt-inbox-ingest` through `/api/privacy/consents` uses the same canonical revocation transaction (alias → connected account → consent → inbound event), and only when that consent is currently attached to the active inbox account. An already-withdrawn or superseded consent DELETE is idempotent and does not revoke a later reconnect alias. Status treats withdrawn consent as revoked. Reconnect mints a new consent and alias and never returns the stale address. Withdrawing `standing-mandate-autopilot` revokes the ACTIVE mandate in the same transaction; a later signed mandate is not revoked by a stale grant. Queue/authorize/execute also require current standing-mandate consent, so a SQL-withdrawn consent with a still-ACTIVE mandate cannot start notices. A forwarded receipt that only infers “Monthly billing” is `PROVIDER_RECEIVED` but not `CITED_RENEWAL`. A later `email.delivered` cannot start the 48h clock after bounce/fail/complaint. Mandate rolling-30d ceilings sum only the mandate currency. Fee invoices without an explicit currency fail closed when the period is empty or mixed. Additive `0044_autopilot_audit_immutability` blocks direct DELETE of fee rows, billing-year anchors, and version-1 `workspace.activated` while the workspace exists; whole-workspace erasure still works. Retention skips version-1 activations. Rotate invalidates in-flight leases on the old alias, treats `ROTATED` as not live, and clears Gmail verification codes. Receipt-forwarding code is fail-closed locally; production `ENABLE_RECEIPT_INBOX` stays unset/false. This is not live inbound-source proof.
 
-The one product loop: **passive evidence → cited classification → deterministic eligibility → versioned standing mandate → delivered 48-hour veto notice → supported discretionary execution → execution proof → financially covered clean windows → customer-safe billing.**
+| WP | Honest status |
+| --- | --- |
+| B | Mandate, class lock (incl. Devanagari tokens), shadow evaluator, APIs. Next-debit stability is derived from cited recurrence, not historical `evidence_date` existence. Catalog merchants remain **hypotheses**. |
+| C | Notices freeze from, to, subject, text, token hash, tags, payload version, hash version, and idempotency key before provider send. After `frozen_at`, PostgreSQL rejects payload mutation and direct deletion (0040); delivery status still advances and whole-workspace erasure still works. A genuine frozen 0037 row retries through the real store instead of becoming permanently unsendable. Retrying one idempotency key after a deploy keeps the persisted tags. Unmatched tagged Autopilot webhooks stay pending (HTTP 503) until `provider_message_id` is persisted, then apply automatically — including when `expireUnboundNoticeEvents` later matches an ACCEPTED notice. Untagged events are ignored. Delivery does not start the 48h clock unless the signed veto token remains valid through the veto deadline; invalid coverage dead-letters `NOTICE_TOKEN_COVERAGE_INVALID`. Authorization and execution require the persisted candidate clock, the latest classification snapshot, cited current sources, and a currently DELIVERED notice. Retries outside Resend's 24-hour idempotency window fail closed. Ordering uses Resend `created_at`; `email.delivery_delayed` is accepted. Resend mailer adapter exists and defaults **OFF**. Execution requires `Idempotency-Key`, attempts/operation keys, and re-reads gates inside the locked transaction; an exact recorded replay returns before new-effect gates. Honest EXCEPTION can be recorded while execution is disabled. **No founder-proven provider route. Execution switch off.** |
+| D | Covered windows inspect the derived debit window (expected−1 through expected+3), do not collapse distinct same-day same-amount debits, and never treat user-uploaded CSV as regulated coverage. Fee periods that cross the customer billing anniversary fail closed. Fee periods are enforced non-overlapping per workspace+currency by PostgreSQL `btree_gist` exclusion, with an immutability trigger that also locks `year_start` / `finalized_at`. First-year billing uses a persisted 12-month customer anchor. Invoices are replay-safe on `inputs_hash`. Razorpay stays **FAIL_CLOSED**. |
+| E | Funnel counts connected active mandates and distinct currently eligible accounts from the candidate's cited snapshot. Eligible accounts require every cited evidence source to be currently connected **and** the candidate classification snapshot to be latest; D30 and connected-mandate counts still use workspace-level current-source SQL. `currentlyEligibleAccounts` is 0 unless notice switches are on and a catalog-proven zero-work provider id is present; test-env allowlists cannot activate production; reporting cannot inject proven IDs. Disabled providers are excluded. D30 uses insert-once `recovery_connected_mandate_cohort` (UPDATE/DELETE blocked except whole-workspace erasure). Source disconnection is a separate authorized fact (`POST .../sources/{id}/disconnect` and reconnect); evidence stays immutable. Disconnect before sign inserts no cohort and does not raise connected shadow counts. Disconnect after cohort keeps the D30 denominator and drops returned/connected/eligible counts. Reconnect evaluates the latest facts before restoring an eligible candidate to safe `SHADOW`; stale notice/authorization state is never revived. Missing cohort table reports D30 as unmeasured. Shadow gate 10/5/0 hashes cited facts. Gmail OAuth remains reserved until Google verification/CASA. |
 
-### 2a. Company phases (from THE-LAW)
+## 4. Current P0
 
-| Phase | What | Status |
-|---|---|---|
-| **0** | Repo hygiene | **DONE 2026-07-21** |
-| **A** | Private autopilot pilots: connect, mandate, notice, execution, covered windows, **actual payment** | **ACTIVE** — `docs/execution/phase-a-market-contact.md` |
-| **B** | Autopilot loop: WP-A through WP-E | **ACTIVE** — WP-A and WP-A.1 merged; WP-A.2 tenant ownership in review; WP-B blocked; historical Recovery Customer #0 remains measured; real-human <3 min still pending |
-| **C–F** | Production min → moat → distribution → platform | PENDING / blocked until A–B signal |
+Prove one real zero-chore provider route, then one India customer through mandate → delivered veto → supported cancel or honest exception → covered-window proof.
 
-### 2b. Product engineering work packages (live)
+Until that exists, do not call WP-C–E complete and do not merge.
 
-| WP | What | Status |
-|---|---|---|
-| **A** | Recovery-only ingestion envelope; freeze legacy writes; Gmail OAuth reserved | **MERGED** PR #32 at `2e3c776`. Required Codex/Opus gates were not completed before merge. |
-| **A.1** | Refuse cross-workspace decision/evidence rehoming; preserve original tenant ownership | **MERGED unexpectedly** as PR #33 at `d84e778` before CI/Codex/Opus gates. Codex review of `ad65d055` is **NOT APPROVED**. Do not revert. |
-| **A.2** | Make frozen legacy `workspace_id` immutable (`0030`); do not rewrite historical dirty rows | **IN REVIEW** on `fix/autopilot-wp-a2-tenant-ownership`. WP-B waits for this PR. |
-| **B** | Class lock, standing mandate, shadow evaluator (never executes) | **NOT STARTED** — wait for WP-A.2 merge with CI + real Codex + real Opus on the exact SHA |
-| **C** | Notice, executor, exceptions, Recovery home | **NOT STARTED** |
-| **D** | Verified savings + customer-safe billing (Razorpay still fail-closed) | **NOT STARTED** |
-| **E** | Recovery-native Gmail, ops, security, private-pilot readiness | **NOT STARTED** |
+## 5. Next command / gate
 
-Historical pre-autopilot WP-B0…B8 (landing honesty, guest first-value, assistant brief, UPI kill-list, monolith extraction, loop e2e) shipped on Recovery v1. Treat them as measured history, not the next task.
-
-**What NOT to do:** no new plan documents (THE-LAW is the plan); no features outside the loop before B exit; no design-system rewrite; no uncited AI; no Setu/Razorpay code ahead of provisioning; no `/app` route restructure during decomposition; nothing outside this repo.
-
-**Founder-ops (only Varun):** ①~~delete orphaned dirs~~ done ② `ANTHROPIC_API_KEY`
-+ ₹ cap — committed this week ③ Google restricted-scope verification for
-`gmail.readonly` — start now, weeks of lead time ④ 10–20 redacted real Indian
-statements for `corpus/` ⑤ Setu AA onboarding — start now ⑥ Razorpay activation
-per `docs/billing-activation-runbook.md` ⑦ Resend domain + key ⑧ review tag
-`archive/mentor-scorecard`.
-
-## 3. Token gate — ready to build (lands in Phase 1)
-
-Create `scripts/check-design-tokens.mjs` with exactly the scanner below, add
-`"tokens:check": "node scripts/check-design-tokens.mjs"` to `package.json`,
-insert into `ci` after `brand:check`, add unit test
-`tests/design-tokens-gate.test.ts` importing `scanContent`.
-
-Design rationale (learned from the real code — do not lose):
-- Match **complete** hex only with `(?![\w-])` boundary — else `href="#add-source"`
-  false-positives as `#add` (`src/app/sources/source-health-client.tsx:136`).
-- **Legit exceptions:** `global-error.tsx` renders when `globals.css` failed to
-  load → literal hex unavoidable; `login-client.tsx` uses Google's mandated brand
-  colors for the "G".
-- **Quarantine, don't ignore:** `vognary-mvp-client.tsx` is `WP4_DEFERRED` (one
-  explicit dated entry) so the gate is green today and blocks *new* fragility.
-
-```js
-import { readFile, readdir } from "node:fs/promises";
-import { resolve } from "node:path";
-
-const root = process.cwd();
-const SRC = "src";
-
-// Files that legitimately carry literal colours/dimensions, exempt in full:
-// image specs (the value IS the pixel), brand-mark geometry, and the error
-// boundary that renders when globals.css itself failed to load.
-export const ALLOWED_FILES = new Set([
-  "src/app/apple-icon.tsx",
-  "src/app/icon.tsx",
-  "src/app/opengraph-image.tsx",
-  "src/app/twitter-image.tsx",
-  "src/app/brand.tsx",
-  "src/app/brand/page.tsx",
-  "src/app/character.tsx", // Nakul mongoose brand-mark geometry
-  "src/app/global-error.tsx", // renders WITHOUT globals.css — cannot use var(--x)
-  "src/app/pwa/startup/[size]/route.tsx", // PWA splash image spec
-]);
-
-// The 281 KB monolith is quarantined here until Phase-2 decomposition. NOT a
-// blanket ignore — one explicit dated file; any *new* file is fully enforced.
-// TODO(Phase-2): decompose vognary-mvp-client.tsx, tokenise, delete this.
-export const WP4_DEFERRED = new Set(["src/app/vognary-mvp-client.tsx"]);
-
-// Narrowly-scoped literal exceptions with a stated reason.
-export const KNOWN_EXCEPTIONS = [
-  {
-    file: "src/app/login/login-client.tsx",
-    pattern: /#4285F4|#34A853|#FBBC05|#EA4335/,
-    reason: "Google brand 'G' logo — exact colours mandated by Google brand guidelines",
-  },
-];
-
-// A COMPLETE css hex colour: #RGB, #RGBA, #RRGGBB, or #RRGGBBAA. The trailing
-// (?![\w-]) boundary stops href="#add-source" matching as #add.
-const HEX = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![\w-])/g;
-// Raw colour functions. color-mix( is excluded — it composes tokens.
-const COLOR_FN = /\b(?:rgba?|hsla?)\(/g;
-// Inline style block + a dimension literal (quoted px/rem/em) inside it. var(--x),
-// template strings, and unitless ratios (lineHeight: 1.2) are left alone.
-const STYLE_BLOCK = /style=\{\{[^}]*\}\}/g;
-const DIM_LITERAL = /([A-Za-z]+)\s*:\s*(['"])\s*-?\d*\.?\d+(?:px|rem|em)\s*\2/g;
-
-const isExcepted = (relPath, text) =>
-  KNOWN_EXCEPTIONS.some((ex) => ex.file === relPath && ex.pattern.test(text));
-const lineOf = (content, index) => content.slice(0, index).split("\n").length;
-
-// Pure scanner — exported so the unit test can assert against synthetic fixtures.
-export function scanContent(relPath, content) {
-  if (ALLOWED_FILES.has(relPath) || WP4_DEFERRED.has(relPath)) return [];
-  const violations = [];
-  content.split("\n").forEach((line, i) => {
-    for (const m of line.matchAll(HEX)) {
-      if (isExcepted(relPath, m[0])) continue;
-      violations.push({ file: relPath, line: i + 1, rule: "raw-hex-color", text: m[0] });
-    }
-    for (const m of line.matchAll(COLOR_FN)) {
-      violations.push({ file: relPath, line: i + 1, rule: "raw-color-function", text: `${m[0]}…)` });
-    }
-  });
-  for (const block of content.matchAll(STYLE_BLOCK)) {
-    for (const dim of block[0].matchAll(DIM_LITERAL)) {
-      violations.push({ file: relPath, line: lineOf(content, block.index), rule: "inline-dimension-literal", text: dim[0].trim() });
-    }
-  }
-  return violations;
-}
-
-async function collectTsxFiles(dir) {
-  const entries = await readdir(resolve(root, dir), { recursive: true });
-  return entries.filter((n) => n.endsWith(".tsx")).map((n) => `${dir}/${n}`);
-}
-
-async function main() {
-  const files = await collectTsxFiles(SRC);
-  const violations = [];
-  for (const file of files) violations.push(...scanContent(file, await readFile(resolve(root, file), "utf8")));
-  if (violations.length) {
-    console.error("Design-token check failed — replace literals with tokens from globals.css:\n" +
-      violations.map((v) => `- ${v.file}:${v.line} [${v.rule}] ${v.text}`).join("\n"));
-    process.exit(1);
-  }
-  console.log(`Design-token check passed for ${files.length} components (${WP4_DEFERRED.size} deferred, ${ALLOWED_FILES.size} image/brand exempt).`);
-}
-if (import.meta.url === `file://${process.argv[1]}`) await main();
-```
-
-**Burn-down map** (promote to real tokens, don't relocate literals):
-
-| Literal | Where | Fix |
-|---|---|---|
-| `#17130a` (ink on gold) | `globals.css:304,459` + `command-palette.tsx`, `workspace-shell.tsx` | Promote to **`--ink-on-gold: #17130a`** in `:root`; replace all usages incl. the two inside `globals.css` |
-| `rgba(243,234,214,0.04)` ×4 | `private-audit-client.tsx` | New token **`--dossier-fill`** |
-| `var(--green, #2e7d32)` | `billing-return-client.tsx:132` | `--green` is undefined → use the real **`--verdict`** token |
-| `fontSize: "0.58rem"` inline | front-door (`page.tsx`) + others | Add **`.eyebrow-xs`** modifier in CSS (`.eyebrow` is `0.72rem`) |
-| ~62 inline styles in monolith | `vognary-mvp-client.tsx` | Deferred via `WP4_DEFERRED` until Phase-2 decomposition |
-
-## 4. Worktree rule
-
-### Recovery v1 same-checkout exception — ENDED 2026-08-13
-
-Recovery v1 is on `main`. Same-checkout dual-write is forbidden. Use **one isolated git worktree per work item**:
-
-```sh
+```bash
 cd "/Users/varunteja/Desktop/CVT Group/Vognary"
-git fetch origin
-git worktree add "../vognary-wp-next" -b feat/autopilot-wp-next origin/main
-# …build, verify, commit, push, PR against main…
-git worktree remove "../vognary-wp-next"
+npm run lint && npm run typecheck && npm run claims:check && npm run tokens:check && npm test
+DATABASE_URL='postgres://…' POSTGRES_SSL=false npm run test:postgres
+ENABLE_DEVELOPMENT_LOGIN=true DEVELOPMENT_LOGIN_EMAIL=… DEVELOPMENT_LOGIN_ACCESS_CODE=… \
+  VOGNARY_E2E_DEV_LOGIN_EMAIL=… VOGNARY_E2E_DEV_LOGIN_CODE=… \
+  npm run test:e2e -- recovery-customer-zero recovery-ui-home recovery-ui-states
+VERCEL= npm run build && npm run perf:budget && VERCEL= npm run perf:lighthouse
 ```
 
-Never run `git checkout` in a worktree another agent is using.
+Quote the path. `DATABASE_URL` must be unset for `npm test`. Do not commit development-login values. `NODE_ENV=production` disables code login.
 
-## 5. Environment & gotchas (verified)
+## 6. Founder-only
 
-- **Tests:** `node --conditions=react-server --import=tsx --test tests/*.test.ts`.
-  **Clear `DATABASE_URL`** for local smoke (`unset DATABASE_URL`).
-- **Gate chain before any merge:** `eslint → tsc --noEmit → claims:check →
-  tokens:check → test →` disposable `test:postgres` for migration/store WPs `→
-  build → perf:budget`. Never claim “locally green” while PostgreSQL is untested.
-  Never use production PostgreSQL.
-- **`AGENTS.md`: this is a *modified* Next.js** — read
-  `node_modules/next/dist/docs/` before writing route/server-component code.
-- **Honesty gate is real:** `scripts/check-public-claims.mjs` fails the build on
-  over-claims; merchants are *watched*, sources *connected*.
-- **AI is inert until keyed:** needs founder's `ANTHROPIC_API_KEY` + monthly ₹
-  cap; degrades to deterministic-only without them.
-- **CI-referenced docs (never archive):** `docs/platform-api.md`
-  (`check-public-claims.mjs`), `docs/research-content-pack-2026-07-16.md`
-  (`check-research-content-pack.mjs`).
+- Phase A: 10 real ICP conversations. CRM is gitignored `docs/execution/private-autopilot-pilot-crm.csv` (sourced targets, not qualified prospects). Agents must not invent connected / mandate / paid. First 10 public-identity checks (2026-08-15) and founder-approval drafts live in gitignored `docs/execution/private-autopilot-outreach-draft.md`. Nothing sent.
+- Counsel / provider-authority validation for one merchant route. ChatGPT and Notion public help pages are login self-service, not zero-customer-work evidence.
+- Provision verified sending domain + Resend notice credentials + a real delivered webhook. Queueing is not delivery.
+- Google verification/CASA before public Gmail. Forwarding remains the private-pilot bridge.
+- Razorpay + tax/legal/privacy before live charges. Webhook must validate the raw body.
+- Do not wait for Gmail or Razorpay to start shadow conversations.
+
+## 7. Ops (fail-closed)
+
+- **Kill switches:** `AUTOPILOT_EXECUTION_ENABLED`, `AUTOPILOT_NOTICE_ENABLED`, `AUTOPILOT_NOTICE_CHANNEL_READY` default off. Only the literal string `true` enables them. Blank env is NOT READY.
+- **Rollback:** leave the three switches false, keep `RESEND_NOTICE_WEBHOOK_SECRET` / `AUTOPILOT_VETO_TOKEN_SECRET` unset, redeploy. Do not drop 0033, 0034, 0035, 0036, 0037, 0038, 0039, 0040, 0041, 0042, 0043, or 0044. Emergency provider disable is founder/internal-operator only: `POST /api/internal/autopilot/providers/{id}/disable` with `INTERNAL_SYNC_SECRET`. Tenant admins cannot globally disable a provider.
+- **SLOs (alert when breached after go-live, not before):** notice queue age > 15m; delivery failure rate > 5%; veto path 5xx; authorization without delivered+elapsed 48h; attempt latency > 2m; protected leakage > 0; verification pending > 7d; fee insert conflict/failure. Dead letters: `recovery_autopilot_dead_letters`.
+- **Threat model:** signed veto token is capability-bearing; mandate/veto/operator/notice webhook/provider attempt/proof/fee/refund/kill-switch are privileged. No signed text, raw proof, or message bodies in product events.
+- **Backup:** restore drill counts include Autopilot tables through `0040_autopilot_review_integrity` plus veto notices, classification snapshots, executions, provider disables, and inbound alias/event/replay-key tables. Workspace activation uniqueness is additive `0041`; semantic reset `0042`; semantic-version marker `0043`; audit-row DELETE lock `0044_autopilot_audit_immutability`. Do not drop them. A disposable `pg_dump`/`pg_restore` through 0044 was rehearsed locally; encrypted production backup remains founder-owned.
+- **Autopilot scheduler:** `GET /api/internal/autopilot/due/run` is CRON_SECRET-gated. It is **not** in `vercel.json` (Hobby two-cron cap: renewal alerts + retention). Notices/execution still no-op unless those switches are the literal string `true`.

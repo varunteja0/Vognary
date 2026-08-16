@@ -92,6 +92,23 @@ export type PrivacyExportDocument = {
     changes: Array<Record<string, unknown>>;
     inboundAliases: Array<Record<string, unknown>>;
     inboundEvents: Array<Record<string, unknown>>;
+    standingMandates: Array<Record<string, unknown>>;
+    actionCandidates: Array<Record<string, unknown>>;
+    coveredWindows: Array<Record<string, unknown>>;
+    feeLedger: Array<Record<string, unknown>>;
+    billingYearAnchors: Array<Record<string, unknown>>;
+    mandateEvents: Array<Record<string, unknown>>;
+    classificationSnapshots: Array<Record<string, unknown>>;
+    candidateEvents: Array<Record<string, unknown>>;
+    vetoNotices: Array<Record<string, unknown>>;
+    executionAttempts: Array<Record<string, unknown>>;
+    executions: Array<Record<string, unknown>>;
+    operatorActions: Array<Record<string, unknown>>;
+    noticeDeliveryEvents: Array<Record<string, unknown>>;
+    deadLetters: Array<Record<string, unknown>>;
+    providerControls: Array<Record<string, unknown>>;
+    connectedMandateCohort: Array<Record<string, unknown>>;
+    sourceDisconnections: Array<Record<string, unknown>>;
   };
   productEvents: Array<Record<string, unknown>>;
   renewalAlertPreferences: Array<Record<string, unknown>>;
@@ -294,6 +311,7 @@ export function buildPrivacyExportDocument(input: Omit<PrivacyExportDocument, "e
       "Connector secrets and encrypted token material",
       "Raw connector and webhook payload bodies",
       "Raw Recovery evidence bodies, idempotency keys, and replay payloads",
+      "Signed standing-mandate text, raw provider proof, and provider message contents",
       "Receipt inbox addresses, alias HMACs, encrypted alias material, and provider replay identifiers",
       "Internal payload hashes, storage keys, and monitoring delivery details",
       "Data belonging only to other workspaces or users",

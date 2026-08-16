@@ -22,6 +22,10 @@ import {
   type RecoveryMutationHeaders,
   type RecoverySessionResponse,
   type WorkspaceVersionTag,
+  type StandingMandateDto,
+  type AutopilotCandidateDto,
+  type AutopilotAttemptDto,
+  type AutopilotDeadLetterDto,
 } from "@/lib/recovery/contracts";
 
 // The only place the Recovery frontend talks to the server. It never derives a
@@ -156,6 +160,13 @@ export function createRecoveryTransport(fetchImpl?: FetchLike) {
 
     home: () => call<HomeProjectionDto>(doFetch, recoveryEndpoints.home.path),
 
+    recordWorkspaceActivation: () =>
+      call<{ recorded: boolean; id: string | null; outcome: "recorded" | "already-recorded" | "deferred-no-consent" }>(doFetch, recoveryEndpoints.recordWorkspaceActivation.path, {
+        method: recoveryEndpoints.recordWorkspaceActivation.method,
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      }),
+
     evidence: (evidenceId: string) =>
       call<EvidenceDto>(doFetch, recoveryEndpoints.evidence(evidenceId).path),
 
@@ -216,6 +227,49 @@ export function createRecoveryTransport(fetchImpl?: FetchLike) {
         recoveryEndpoints.reverseCorrection(commitmentId, correctionId).path,
         { method: recoveryEndpoints.reverseCorrection(commitmentId, correctionId).method, headers: mutationHeaders(context) },
       ),
+
+    standingMandate: () => call<StandingMandateDto | null>(doFetch, recoveryEndpoints.standingMandate.path),
+
+    signStandingMandate: (context: MutationContext) =>
+      call<StandingMandateDto>(doFetch, recoveryEndpoints.signStandingMandate.path, {
+        method: recoveryEndpoints.signStandingMandate.method,
+        headers: mutationHeaders(context),
+        body: JSON.stringify({ accepted: true }),
+      }),
+
+    revokeStandingMandate: (context: MutationContext) =>
+      call<StandingMandateDto>(doFetch, recoveryEndpoints.revokeStandingMandate.path, {
+        method: recoveryEndpoints.revokeStandingMandate.method,
+        headers: mutationHeaders(context),
+      }),
+
+    autopilotCandidates: () =>
+      call<{ items: readonly AutopilotCandidateDto[] }>(doFetch, recoveryEndpoints.autopilotCandidates.path),
+
+    vetoAutopilotCandidate: (candidateId: string, context: MutationContext) =>
+      call<AutopilotCandidateDto>(doFetch, recoveryEndpoints.vetoAutopilotCandidate(candidateId).path, {
+        method: recoveryEndpoints.vetoAutopilotCandidate(candidateId).method,
+        headers: mutationHeaders(context),
+      }),
+
+    autopilotAttempts: (candidateId: string) =>
+      call<{ items: readonly AutopilotAttemptDto[] }>(doFetch, recoveryEndpoints.autopilotAttempts(candidateId).path),
+
+    disableAutopilotProvider: (providerId: string, reason: string, context: MutationContext) =>
+      call<{ providerId: string; disabled: true }>(doFetch, recoveryEndpoints.disableAutopilotProvider(providerId).path, {
+        method: recoveryEndpoints.disableAutopilotProvider(providerId).method,
+        headers: mutationHeaders(context),
+        body: JSON.stringify({ reason }),
+      }),
+
+    autopilotDeadLetters: () =>
+      call<{ items: readonly AutopilotDeadLetterDto[] }>(doFetch, recoveryEndpoints.autopilotDeadLetters.path),
+
+    replayAutopilotDeadLetter: (deadLetterId: string, context: MutationContext) =>
+      call<{ id: string; replayed: boolean; reason?: string }>(doFetch, recoveryEndpoints.replayAutopilotDeadLetter(deadLetterId).path, {
+        method: recoveryEndpoints.replayAutopilotDeadLetter(deadLetterId).method,
+        headers: mutationHeaders(context),
+      }),
 
     prepareImport: (files: readonly File[]) => {
       const body = new FormData();

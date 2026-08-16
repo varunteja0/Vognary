@@ -26,6 +26,7 @@ import { RecoveryCommitments, type CommitmentsHandlers } from "./recovery-commit
 import { RecoveryDialog } from "./recovery-dialog";
 import { CorrectionForm, EvidenceInspector } from "./recovery-evidence-panels";
 import { RecoveryHome } from "./recovery-home";
+import { RecoveryMandate } from "./recovery-mandate";
 import { RecoverySources } from "./recovery-sources";
 import { AuthRequiredBlock, FailureBlock, LoadingBlock, OfflineBlock, StateBlock } from "./recovery-states";
 import {
@@ -39,6 +40,7 @@ import {
   type RecoveryView,
 } from "./state";
 import { clientFailureReference, createRecoveryTransport, type RecoveryTransport, type TransportFailure } from "./transport";
+import { recordCitedPictureActivationWithRetry, workspaceActivationGate } from "./activation-attempt";
 
 const newIdempotencyKey = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `recovery-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -128,6 +130,12 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     if (result.ok) dispatch({ type: "SOURCES_LOADED", receiptInbox: result.data, meta: result.meta });
     else dispatch({ type: "SOURCES_FAILED", failure: result });
   }, [receiptInboxPubliclyAvailable, transport]);
+
+  const recordCitedPictureActivation = useCallback((workspaceId: string) => {
+    workspaceActivationGate.request(workspaceId, () => recordCitedPictureActivationWithRetry({
+      record: () => transport.recordWorkspaceActivation(),
+    }));
+  }, [transport]);
 
   useEffect(() => {
     const update = () => dispatch({ type: "NETWORK_CHANGED", online: navigator.onLine });
@@ -557,6 +565,42 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     else dispatch({ type: "SOURCE_ACTION_FAILED", failure: result });
   }
 
+  async function signMandate() {
+    if (state.workspaceVersion === null) return;
+    const idempotencyKey = newIdempotencyKey();
+    dispatch({ type: "MANDATE_STARTED", action: "SIGN", idempotencyKey });
+    const result = await transport.signStandingMandate({ workspaceVersion: state.workspaceVersion, idempotencyKey });
+    if (!result.ok) {
+      dispatch({ type: "MUTATION_FAILED", failure: result });
+      return;
+    }
+    await loadSnapshot();
+  }
+
+  async function revokeMandate() {
+    if (state.workspaceVersion === null) return;
+    const idempotencyKey = newIdempotencyKey();
+    dispatch({ type: "MANDATE_STARTED", action: "REVOKE", idempotencyKey });
+    const result = await transport.revokeStandingMandate({ workspaceVersion: state.workspaceVersion, idempotencyKey });
+    if (!result.ok) {
+      dispatch({ type: "MUTATION_FAILED", failure: result });
+      return;
+    }
+    await loadSnapshot();
+  }
+
+  async function vetoCandidate(candidateId: string) {
+    if (state.workspaceVersion === null) return;
+    const idempotencyKey = newIdempotencyKey();
+    dispatch({ type: "VETO_STARTED", candidateId, idempotencyKey });
+    const result = await transport.vetoAutopilotCandidate(candidateId, { workspaceVersion: state.workspaceVersion, idempotencyKey });
+    if (!result.ok) {
+      dispatch({ type: "MUTATION_FAILED", failure: result });
+      return;
+    }
+    await loadSnapshot();
+  }
+
   async function loadMoreCommitments() {
     if (!state.commitmentsCursor || loadingMoreCommitments) return;
     setLoadingMoreCommitments(true);
@@ -615,7 +659,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         </header>
 
         <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 py-2 sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
-          <ul className="grid grid-cols-3 gap-1 sm:flex sm:gap-2">
+          <ul className="grid grid-cols-4 gap-1 sm:flex sm:gap-2">
             {recoveryViews.map((view) => (
               <li key={view} className="min-w-0">
                 <button
@@ -754,6 +798,25 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
       return <RecoveryCommitments state={state} handlers={commitmentsHandlers} />;
     }
 
+    if (state.view === "MANDATE") {
+      return (
+        <RecoveryMandate
+          mandate={state.home?.autopilot?.mandate ?? null}
+          executionEnabled={state.home?.autopilot?.executionEnabled ?? false}
+          noticeEnabled={state.home?.autopilot?.noticeEnabled ?? false}
+          pending={state.pending?.kind === "MANDATE_SIGN" || state.pending?.kind === "MANDATE_REVOKE"}
+          online={state.online}
+          canSign={state.home?.workspace.role === "owner"}
+          canOperate={state.home?.workspace.role === "owner" || state.home?.workspace.role === "admin"}
+          handled={state.home?.autopilot?.handled ?? []}
+          needsHelp={state.home?.autopilot?.needsHelp ?? []}
+          attempts={state.home?.autopilot?.attempts ?? []}
+          onSign={() => void signMandate()}
+          onRevoke={() => void revokeMandate()}
+        />
+      );
+    }
+
     return state.home ? (
       <RecoveryHome
         home={state.home}
@@ -769,6 +832,9 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         sourceStatus={state.sourceStatus}
         pendingSourceAction={state.pendingSourceAction}
         onProvisionReceiptInbox={() => void updateReceiptInbox("PROVISION")}
+        onVeto={(candidateId) => void vetoCandidate(candidateId)}
+        pendingVetoId={state.pending?.kind === "CANDIDATE_VETO" ? state.pending.candidateId : null}
+        onCitedPictureRendered={recordCitedPictureActivation}
       />
     ) : (
       <LoadingBlock label="Opening your saved workspace…" />

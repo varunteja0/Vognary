@@ -10,6 +10,7 @@ import type {
   CoverageState,
   Decision,
   EvidenceProvenanceKind,
+  ProjectionAmountProvenance,
   RecoveryErrorCode,
   SourceType,
 } from "@/lib/recovery/contracts";
@@ -135,6 +136,11 @@ export const coverageMeanings: Record<CoverageState, string> = {
 export const provenanceLabels: Record<EvidenceProvenanceKind, string> = {
   USER_SUBMITTED: "You submitted this evidence",
   PROVIDER_RECEIVED: "Received through your Vognary receipt address",
+};
+
+export const projectionAmountProvenanceLabels: Record<ProjectionAmountProvenance, string> = {
+  RECEIPT: "From checked receipts only.",
+  USER_CORRECTED: "Includes a saved correction.",
 };
 
 export const errorCopy: Record<RecoveryErrorCode, { title: string; detail: string }> = {

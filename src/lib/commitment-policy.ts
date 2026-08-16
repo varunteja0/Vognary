@@ -160,18 +160,44 @@ const policies: Record<CommitmentClass, CommitmentPolicy> = {
   },
 };
 
-const categoryRules: Array<{ pattern: RegExp; class: CommitmentClass }> = [
-  { pattern: /\b(?:debt|loan|emi|mortgage|instal+l?ment|repayment)\b/i, class: "debt-emi" },
-  { pattern: /\b(?:insurance|policy premium|coverage premium)\b/i, class: "insurance" },
-  { pattern: /\b(?:investments?|sip|mutual fund|pension contribution)\b/i, class: "investment-sip" },
-  { pattern: /\b(?:utilities?|telecom|electricity|water|gas|broadband|internet|mobile|phone)\b/i, class: "utility" },
-  { pattern: /\b(?:cloud hosting|cloud infrastructure|infrastructure usage|compute usage|api usage|ai usage|usage costs?)\b/i, class: "usage-based-cloud" },
-  { pattern: /\b(?:subscription|saas|streaming|ai tools?|developer tools?|creative tools?|design tools?|productivity|app store|social tools?|entertainment)\b/i, class: "discretionary-subscription" },
+const protectedCategoryRules: Array<{
+  pattern: RegExp;
+  scripts: readonly string[];
+  class: Exclude<CommitmentClass, "discretionary-subscription">;
+}> = [
+  { pattern: /\b(?:debt|loan|emi|mortgage|instal+l?ment|repayment|nach|ecs|autopay)\b/i, scripts: ["ऑटोपे", "एमी"], class: "debt-emi" },
+  { pattern: /\b(?:insurance|policy premium|coverage premium|lic)\b/i, scripts: [], class: "insurance" },
+  { pattern: /\b(?:investments?|sip|mutual fund|pension contribution)\b/i, scripts: ["एसआईपी"], class: "investment-sip" },
+  { pattern: /\b(?:utilities?|telecom|electricity|water|gas|broadband|internet|mobile|phone)\b/i, scripts: [], class: "utility" },
+  {
+    pattern: /\b(?:aws|gcp|azure|vercel|cloudflare|cloud hosting|cloud infrastructure|infrastructure usage|compute usage|api usage|ai usage|usage costs?)\b/i,
+    scripts: [],
+    class: "usage-based-cloud",
+  },
 ];
 
-export function classifyCommitment(category: string): CommitmentClass {
-  const normalized = category.trim();
-  return categoryRules.find((rule) => rule.pattern.test(normalized))?.class ?? "contractual-other";
+const discretionaryCategoryRule = {
+  pattern: /\b(?:subscription|saas|streaming|ai tools?|developer tools?|creative tools?|design tools?|productivity|app store|social tools?|entertainment)\b/i,
+};
+
+export const executableCommitmentClass = "discretionary-subscription" as const satisfies CommitmentClass;
+
+export function isProtectedCommitmentClass(commitmentClass: CommitmentClass): boolean {
+  return commitmentClass !== executableCommitmentClass;
+}
+
+function matchesProtectedRule(haystack: string, rule: (typeof protectedCategoryRules)[number]): boolean {
+  if (rule.pattern.test(haystack)) return true;
+  return rule.scripts.some((token) => haystack.includes(token));
+}
+
+export function classifyCommitment(...texts: readonly string[]): CommitmentClass {
+  const normalized = texts.map((value) => value.trim()).filter(Boolean).join(" ").trim();
+  if (!normalized) return "contractual-other";
+  const protectedHit = protectedCategoryRules.find((rule) => matchesProtectedRule(normalized, rule));
+  if (protectedHit) return protectedHit.class;
+  if (discretionaryCategoryRule.pattern.test(normalized)) return "discretionary-subscription";
+  return "contractual-other";
 }
 
 export function getCommitmentPolicy(category: string): CommitmentPolicy {

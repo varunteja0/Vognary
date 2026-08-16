@@ -13,6 +13,7 @@ import { upsertWorkspaceCommitmentDecision } from "../../src/lib/server/commitme
 import { getDatabasePool } from "../../src/lib/server/database";
 import { authorizeWorkspaceActionCase, createWorkspaceActionCase } from "../../src/lib/server/outcome-case-store";
 import { outcomeOffer } from "../../src/lib/outcome-cases";
+import { disconnectRecoverySource, signStandingMandate } from "../../src/lib/server/recovery-autopilot-store";
 import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
@@ -145,7 +146,7 @@ test("privacy export includes held product data and excludes all credential mate
               (current_date - 1)::text as charged_on_3,
               (current_date + 30)::text as renews_on`,
     )).rows[0]!;
-    await submitRecoveryEvidence({
+    const submitted = await submitRecoveryEvidence({
       workspaceId,
       actorUserId: userId,
       expectedVersion: 0,
@@ -169,6 +170,24 @@ test("privacy export includes held product data and excludes all credential mate
       },
       now: new Date(),
     });
+    const signed = await signStandingMandate({
+      workspaceId,
+      actorUserId: userId,
+      expectedVersion: submitted.workspaceVersion,
+      idempotencyKey: `privacy-mandate:${randomUUID()}`,
+    });
+    const source = await pool.query<{ id: string }>(
+      `select id::text from recovery_sources where workspace_id = $1 order by ingested_at asc limit 1`,
+      [workspaceId],
+    );
+    assert.ok(source.rows[0]?.id);
+    await disconnectRecoverySource({
+      workspaceId,
+      actorUserId: userId,
+      sourceId: source.rows[0]!.id,
+      expectedVersion: signed.workspaceVersion,
+      idempotencyKey: `privacy-disconnect:${randomUUID()}`,
+    });
 
     const request = await createAccessExportRequest({ workspaceId, actorUserId: userId });
     const downloaded = await downloadAccessExport({ requestId: request.id, workspaceId, actorUserId: userId });
@@ -182,8 +201,26 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.workspaceState.revision, 1);
     assert.equal(document.workspaceState.state.reviewCompletedAt, "2026-07-11T01:00:00.000Z");
     assert.equal(document.workspaceState.state.statementSources[0].text.includes("NETFLIX"), true);
-    assert.equal(document.recovery.workspaceState.version, "1");
-    assert.equal(document.recovery.versions.length, 1);
+    assert.equal(Number(document.recovery.workspaceState.version) >= 3, true);
+    assert.ok(document.recovery.versions.length >= 3);
+    assert.equal(document.recovery.connectedMandateCohort.length, 1);
+    assert.ok(document.recovery.connectedMandateCohort[0].startedAt);
+    assert.ok(document.recovery.connectedMandateCohort[0].recordedAt);
+    assert.equal(document.recovery.sourceDisconnections.length, 1);
+    assert.equal(document.recovery.sourceDisconnections[0].sourceId, source.rows[0]!.id);
+    assert.ok(document.recovery.sourceDisconnections[0].disconnectedAt);
+    assert.equal(document.recovery.sourceDisconnections[0].reconnectedAt, null);
+    assert.ok(Array.isArray(document.recovery.standingMandates));
+    assert.equal(document.recovery.standingMandates.length, 1);
+    assert.equal("signedText" in document.recovery.standingMandates[0], false);
+    for (const notice of document.recovery.vetoNotices) {
+      assert.equal("text" in notice, false);
+      assert.equal("from" in notice, false);
+      assert.equal("to" in notice, false);
+      assert.equal("subject" in notice, false);
+      assert.equal("tags" in notice, false);
+      assert.equal("token" in notice, false);
+    }
     assert.equal(document.recovery.submissions.length, 1);
     assert.equal(document.recovery.sources.length, 3);
     assert.equal(document.recovery.sources.every((source: { rawEvidenceRetained: boolean }) => source.rawEvidenceRetained), true);
@@ -195,7 +232,11 @@ test("privacy export includes held product data and excludes all credential mate
     assert.doesNotMatch(JSON.stringify(document.recovery), /contentHash|fingerprint/i);
     assert.equal(document.recovery.commitmentEvidence.length, 3);
     assert.equal(document.recovery.decisions.length, 0);
-    assert.equal(document.productEvents.length, 1);
+    assert.ok(document.productEvents.some((event: { eventName: string }) => event.eventName === "review.completed"));
+    assert.ok(
+      document.productEvents.length >= 1,
+      "held product events remain in the export; Autopilot ingest may add privacy-safe source.connected rows",
+    );
     assert.equal(document.renewalAlertPreferences.length, 1);
     assert.equal(document.renewalAlertPreferences[0].weeklyDigestEnabled, true);
     assert.ok(document.renewalAlertDeliveries.length >= 1);
@@ -239,10 +280,16 @@ test("privacy export includes held product data and excludes all credential mate
       "secret_ref",
       "raw_row",
       "payload_hash",
+      "notice_text",
+      "notice_from_email",
+      "notice_to_email",
+      "notice_subject",
+      "notice_tags",
       rawEvidenceTail,
     ]) {
       assert.equal(downloaded.serialized.includes(forbidden), false, `${forbidden} must not enter the export`);
     }
+    assert.doesNotMatch(downloaded.serialized, /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\./);
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
     await pool.query(`delete from consent_grants where user_id = $1`, [userId]);

@@ -87,6 +87,51 @@ export async function withdrawConsentGrant(input: { id: string; userId: string; 
   const client = await getDatabasePool().connect();
   try {
     await client.query("begin");
+    const owned = await client.query<{
+      id: string;
+      purpose: string;
+      workspace_id: string | null;
+      resource_key: string | null;
+      withdrawn_at: Date | null;
+    }>(
+      `select id, purpose, workspace_id, resource_key, withdrawn_at
+       from consent_grants
+       where id = $1
+         and (
+           user_id = $2
+           or lower(subject_email) = lower($3)
+         )`,
+      [input.id, input.userId, input.email],
+    );
+    if (!owned.rows[0]) {
+      await client.query("rollback");
+      return false;
+    }
+    const grant = owned.rows[0];
+    if (grant.purpose === "standing-mandate-autopilot" && grant.withdrawn_at === null) {
+      const workspaceId = grant.workspace_id ?? input.workspaceId ?? null;
+      if (workspaceId) {
+        const { revokeActiveStandingMandateForConsentWithdrawal } = await import("@/lib/server/recovery-autopilot-store");
+        await revokeActiveStandingMandateForConsentWithdrawal(client, {
+          workspaceId,
+          actorUserId: input.userId,
+          consentId: grant.id,
+          resourceKey: grant.resource_key,
+        });
+      }
+    }
+    if (grant.purpose === "receipt-inbox-ingest" && grant.withdrawn_at === null) {
+      const workspaceId = grant.workspace_id ?? input.workspaceId ?? null;
+      if (workspaceId) {
+        await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [`receipt-inbox:${workspaceId}`]);
+        const { applyReceiptInboxRevocation } = await import("@/lib/server/recovery-inbound-store");
+        await applyReceiptInboxRevocation(client, {
+          workspaceId,
+          actorUserId: input.userId,
+          consentId: grant.id,
+        });
+      }
+    }
     const result = await client.query<{ id: string; purpose: string }>(
       `update consent_grants
        set withdrawn_at = coalesce(withdrawn_at, now())

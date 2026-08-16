@@ -116,6 +116,14 @@ test("Recovery HTTP routes enforce session, version, replay, isolation, and safe
     assert.equal(firstPayload.meta.workspaceVersion, 1);
     assert.equal(firstPayload.data.home.changed.state, "NO_PRIOR_BASELINE");
     assert.deepEqual(firstPayload.data.home.changed.items, []);
+    assert.equal(firstPayload.data.home.activeCommitmentCount, 1);
+    assert.deepEqual(firstPayload.data.home.annualizedEstimateTotals.map((total) => [total.amount.currency, total.amount.minor]), [["INR", "2398800"]]);
+    assert.equal(firstPayload.data.home.monthlyTotals[0]?.provenance, "RECEIPT");
+    const activationCount = async () => Number((await pool.query<{ n: string }>(
+      `select count(*)::text as n from product_events where workspace_id = $1 and event_name = 'workspace.activated'`,
+      [workspaceId],
+    )).rows[0]?.n ?? 0);
+    assert.equal(await activationCount(), 0);
 
     const replay = await submitEvidence(firstRequest());
     assert.equal(replay.status, 200);
@@ -138,6 +146,9 @@ test("Recovery HTTP routes enforce session, version, replay, isolation, and safe
     assert.equal(home.status, 200);
     const homePayload = await home.json() as ApiSuccess<HomeProjectionDto>;
     assert.equal(homePayload.data.workspace.version, 1);
+    assert.equal(homePayload.data.activeCommitmentCount, 1);
+    assert.equal(homePayload.data.monthlyTotals[0]?.provenance, "RECEIPT");
+    assert.equal(await activationCount(), 0);
 
     const list = await listCommitments(authenticatedRequest("/api/workspaces/current/commitments?limit=1", cookieHeader));
     assert.equal(list.status, 200);
@@ -200,6 +211,11 @@ test("Recovery HTTP routes enforce session, version, replay, isolation, and safe
     assert.equal(correction.status, 201);
     const correctionPayload = await correction.json() as ApiSuccess<{ correction: { id: string }; commitment: { amount: { minor: number } } }>;
     assert.equal(correctionPayload.data.commitment.amount.minor, "175000");
+    const correctedHome = await getHome(authenticatedRequest("/api/workspaces/current/brief", cookieHeader));
+    const correctedHomePayload = await correctedHome.json() as ApiSuccess<HomeProjectionDto>;
+    assert.equal(correctedHomePayload.data.monthlyTotals[0]?.provenance, "USER_CORRECTED");
+    assert.equal(correctedHomePayload.data.monthlyTotals[0]?.correctionIds[0], correctionPayload.data.correction.id);
+    assert.equal(await activationCount(), 0);
 
     const decision = await putDecision(new Request(`${baseUrl}/api/workspaces/current/decisions`, {
       method: "PUT",
@@ -224,6 +240,8 @@ test("Recovery HTTP routes enforce session, version, replay, isolation, and safe
     ), { params: Promise.resolve({ commitmentId, correctionId: correctionPayload.data.correction.id }) });
     assert.equal(reversed.status, 200);
     assert.equal((await reversed.json() as ApiSuccess<{ correction: { status: string } }>).data.correction.status, "REVERSED");
+    const reversedHome = await getHome(authenticatedRequest("/api/workspaces/current/brief", cookieHeader));
+    assert.equal((await reversedHome.json() as ApiSuccess<HomeProjectionDto>).data.monthlyTotals[0]?.provenance, "RECEIPT");
 
     const stale = await putDecision(new Request(`${baseUrl}/api/workspaces/current/decisions`, {
       method: "PUT",
@@ -239,6 +257,61 @@ test("Recovery HTTP routes enforce session, version, replay, isolation, and safe
     await pool.query(`delete from users where id = any($1::uuid[])`, [[ownerUserId, otherUserId]]);
   }
 });
+
+test("saving one observed receipt does not activate a workspace without a cited recurring picture", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const pool = getDatabasePool();
+  const ownerUserId = randomUUID();
+  const workspaceId = randomUUID();
+  const suffix = randomUUID().slice(0, 8);
+
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [ownerUserId, `recovery-activation-${suffix}@example.test`]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Activation workspace')`, [workspaceId, ownerUserId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, ownerUserId]);
+
+  try {
+    const cookie = await createSessionCookie({ userId: ownerUserId, workspaceId });
+    const cookieHeader = `${cookie.name}=${encodeURIComponent(cookie.value)}`;
+    const first = await submitEvidence(new Request(`${baseUrl}/api/workspaces/current/evidence`, {
+      method: "POST",
+      headers: {
+        cookie: cookieHeader,
+        origin: baseUrl,
+        "content-type": "application/json",
+        "idempotency-key": `activation-first-${suffix}`,
+        "if-match": '"workspace:0"',
+      },
+      body: JSON.stringify({
+        kind: "RECEIPT_PASTE",
+        receipts: [{
+          clientRef: "activation-openai-july",
+          text: "OpenAI\n\nChatGPT Plus subscription\n\nAmount: INR 1,999.00\n\nCharged on 6 July 2026",
+        }],
+      }),
+    }));
+    assert.equal(first.status, 201);
+    const firstPayload = await first.json() as ApiSuccess<{ home: HomeProjectionDto }>;
+    assert.equal(firstPayload.data.home.activeCommitmentCount, 0);
+    assert.equal(hasCitedPicture(firstPayload.data.home), false);
+    const activationCount = async () => Number((await pool.query<{ n: string }>(
+      `select count(*)::text as n from product_events where workspace_id = $1 and event_name = 'workspace.activated'`,
+      [workspaceId],
+    )).rows[0]?.n ?? 0);
+    assert.equal(await activationCount(), 0);
+
+    const home = await getHome(authenticatedRequest("/api/workspaces/current/brief", cookieHeader));
+    assert.equal(home.status, 200);
+    assert.equal(await activationCount(), 0);
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [ownerUserId]);
+  }
+});
+
+function hasCitedPicture(home: HomeProjectionDto) {
+  return home.activeCommitmentCount > 0 && home.monthlyTotals.length > 0;
+}
 
 function authenticatedRequest(path: string, cookie: string) {
   return new Request(`${baseUrl}${path}`, { headers: { cookie } });

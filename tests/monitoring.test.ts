@@ -8,6 +8,10 @@ test("monitoring paths discard query strings and fragments", () => {
     "/api/auth/magic-link/verify",
   );
   assert.equal(sanitizeMonitoringPath("/api/auth/google/callback?code=secret&state=secret"), "/api/auth/google/callback");
+  const vetoToken = "eyJhbGciOiJIUzI1NiJ9.capability.signature";
+  assert.equal(sanitizeMonitoringPath(`/api/autopilot/veto/${vetoToken}`), "/api/autopilot/veto/[REDACTED_VETO_TOKEN]");
+  assert.equal(sanitizeMonitoringPath(`/autopilot/veto/${vetoToken}`), "/autopilot/veto/[REDACTED_VETO_TOKEN]");
+  assert.equal(sanitizeMonitoringPath(`/api/autopilot/veto/${vetoToken}`).includes(vetoToken), false);
 });
 
 test("monitoring text removes credentials, database URLs, and email addresses", () => {

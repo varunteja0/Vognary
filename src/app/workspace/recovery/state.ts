@@ -21,13 +21,14 @@ import type { FailureOrigin, ResponseMeta, TransportFailure } from "./transport"
 // (draft input, selection, dialogs, focus, pending mutation, rollback metadata).
 // It never derives recurrence, totals, confidence, ordering, or exposure.
 
-export const recoveryViews = ["HOME", "COMMITMENTS", "ADD_EVIDENCE"] as const;
+export const recoveryViews = ["HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"] as const;
 export type RecoveryView = (typeof recoveryViews)[number];
 
 export const recoveryViewLabels: Record<RecoveryView, string> = {
   HOME: "Home",
   COMMITMENTS: "Subscriptions",
   ADD_EVIDENCE: "Sources",
+  MANDATE: "Mandate",
 };
 
 export type RecoveryFailure = { error: RecoveryError; origin: FailureOrigin };
@@ -72,7 +73,10 @@ export type PendingMutation =
   | { kind: "EVIDENCE"; idempotencyKey: string }
   | { kind: "DECISION"; idempotencyKey: string; commitmentId: string; decision: Decision; previous: DecisionDto | null }
   | { kind: "CORRECTION"; idempotencyKey: string; commitmentId: string; field: CorrectionField }
-  | { kind: "CORRECTION_REVERSAL"; idempotencyKey: string; commitmentId: string; correctionId: string };
+  | { kind: "CORRECTION_REVERSAL"; idempotencyKey: string; commitmentId: string; correctionId: string }
+  | { kind: "MANDATE_SIGN"; idempotencyKey: string }
+  | { kind: "MANDATE_REVOKE"; idempotencyKey: string }
+  | { kind: "CANDIDATE_VETO"; idempotencyKey: string; candidateId: string };
 
 export type RollbackNotice = { mutation: PendingMutation; failure: RecoveryFailure };
 
@@ -191,7 +195,9 @@ export type RecoveryAction =
   | { type: "CORRECTION_REVERSAL_STARTED"; commitmentId: string; correctionId: string; idempotencyKey: string }
   | { type: "CORRECTION_SAVED"; detail: CommitmentDetailDto; home: HomeProjectionDto; meta: ResponseMeta }
   | { type: "MUTATION_FAILED"; failure: TransportFailure }
-  | { type: "ROLLBACK_DISMISSED" };
+  | { type: "ROLLBACK_DISMISSED" }
+  | { type: "MANDATE_STARTED"; action: "SIGN" | "REVOKE"; idempotencyKey: string }
+  | { type: "VETO_STARTED"; candidateId: string; idempotencyKey: string };
 
 const authRequired = (failure: TransportFailure) => failure.error.code === "AUTH_REQUIRED";
 const needsReload = (failure: TransportFailure) => failure.error.code === "STALE_STATE" || failure.error.code === "CONFLICT";
@@ -565,6 +571,22 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
 
     case "ROLLBACK_DISMISSED":
       return { ...state, rollback: null };
+
+    case "MANDATE_STARTED":
+      return {
+        ...state,
+        pending: { kind: action.action === "SIGN" ? "MANDATE_SIGN" : "MANDATE_REVOKE", idempotencyKey: action.idempotencyKey },
+        rollback: null,
+        announcement: action.action === "SIGN" ? "Saving the standing mandate…" : "Revoking the standing mandate…",
+      };
+
+    case "VETO_STARTED":
+      return {
+        ...state,
+        pending: { kind: "CANDIDATE_VETO", idempotencyKey: action.idempotencyKey, candidateId: action.candidateId },
+        rollback: null,
+        announcement: "Recording the veto…",
+      };
   }
 }
 

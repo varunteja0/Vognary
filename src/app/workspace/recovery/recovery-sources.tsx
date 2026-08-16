@@ -237,7 +237,9 @@ function ReceiptInboxState({ status }: { status: ReceiptInboxStatusDto }) {
     FAILED: {
       eyebrow: "Needs another receipt",
       title: "Vognary could not prove a renewal",
-      detail: "The email arrived, but no receipt could be read from it. Forward one that shows the service name, amount, and date in the message or as a PDF invoice. Scans and screenshots cannot be read.",
+      detail: status.lastFailureCode
+        ? `The email arrived, but no receipt could be read from it (${status.lastFailureCode}). Forward one that shows the service name, amount, and date in the message or as a PDF invoice. Scans and screenshots cannot be read.`
+        : "The email arrived, but no receipt could be read from it. Forward one that shows the service name, amount, and date in the message or as a PDF invoice. Scans and screenshots cannot be read.",
       tone: "caution" as const,
     },
   };

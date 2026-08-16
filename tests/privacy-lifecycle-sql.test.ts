@@ -31,6 +31,7 @@ test("retention predicates preserve manual rows and dead-letter stale verified w
   assert.match(source, /recoveryInboundEventsDeleted/);
   assert.match(source, /delete from recovery_inbound_events item using candidates/);
   assert.match(source, /status in \('PROCESSED', 'IGNORED', 'TERMINAL_FAILED'\)/);
+  assert.match(source, /event_name = 'workspace.activated' and activation_semantic_version is not distinct from 1/);
   assert.doesNotMatch(source, /status in \([^)]*'RECEIVED'[^)]*\)[\s\S]{0,200}delete from recovery_inbound_events/);
 });
 
@@ -53,7 +54,6 @@ test("privacy export SQL excludes raw rows, secret material, and arbitrary conne
     "encrypted_payload",
     "secret_ref",
     "raw_row",
-    "payload_hash",
     "merchant_raw",
     "external_id",
     "ca.metadata",
@@ -77,6 +77,13 @@ test("privacy export SQL excludes raw rows, secret material, and arbitrary conne
   assert.match(exportSection, /from recovery_changes/);
   assert.doesNotMatch(exportSection, /select[^;]*raw_evidence/);
   assert.doesNotMatch(exportSection, /from recovery_idempotency_keys/);
+  assert.match(exportSection, /as "noticeFingerprint"/);
+  assert.doesNotMatch(exportSection, /as "payloadHash"/);
+  assert.match(exportSection, /as provider_controls/);
+  assert.match(exportSection, /connected_mandate_cohort/);
+  assert.match(exportSection, /source_disconnections/);
+  assert.doesNotMatch(exportSection, /signed_text[^\n_]/);
+  assert.doesNotMatch(exportSection, /notice_text|notice_from_email|notice_to_email|notice_subject|notice_tags/);
 });
 
 test("privacy migration carries bounded policy, coherent request, and allowlisted run constraints", () => {

@@ -51,6 +51,20 @@ test("feature readiness checks every persistent capability migration with bounde
     "0028_recovery_gmail_oauth_source",
     "0029_legacy_tenant_integrity",
     "0030_legacy_tenant_ownership_immutable",
+    "0031_autopilot_loop",
+    "0032_autopilot_proof_integrity",
+    "0033_autopilot_integrity",
+    "0034_autopilot_repair",
+    "0035_autopilot_codex_repair",
+    "0036_autopilot_notice_hold",
+    "0037_autopilot_clock_integrity",
+    "0038_autopilot_reconcile_integrity",
+    "0039_autopilot_frozen_notice_integrity",
+    "0040_autopilot_review_integrity",
+    "0041_workspace_activation_integrity",
+    "0042_workspace_activation_semantic_reset",
+    "0043_workspace_activation_semantic_version",
+    "0044_autopilot_audit_immutability",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -151,9 +165,18 @@ test("restore drills require Recovery v1 and report restored Recovery state", ()
     "recovery_decisions",
     "recovery_changes",
     "recovery_idempotency_keys",
+    "recovery_inbound_aliases",
+    "recovery_inbound_events",
+    "recovery_inbound_replay_keys",
+    "recovery_standing_mandates",
+    "recovery_autopilot_dead_letters",
+    "recovery_source_disconnections",
   ]) {
     assert.match(restore, new RegExp(`"${relation}"`));
   }
+  assert.match(recoveryVerification, /inbound_aliases/);
+  assert.match(recoveryVerification, /inbound_events/);
+  assert.match(recoveryVerification, /inbound_replay_keys/);
   assert.match(backup, /readRecoveryBackupVerification/);
   assert.match(recoveryVerification, /requiredRecoveryMigration = "0023_recovery_v1"/);
   assert.match(recoveryVerification, /from schema_migrations/);

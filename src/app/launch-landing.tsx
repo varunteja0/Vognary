@@ -23,7 +23,7 @@ export default function LaunchLanding({
   receiptInboxAvailable?: boolean;
 }) {
   const primaryHref = "/login?next=/app";
-  const primaryLabel = "Get started";
+  const primaryLabel = "Find my recurring spend";
   return (
     <main id="ledger-main" className="relative overflow-hidden px-4 pb-12 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">

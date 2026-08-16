@@ -36,6 +36,9 @@ import {
   type RecoveryCoverageSource,
   type RecoveryObservationRecord,
 } from "@/lib/recovery/domain";
+import { loadAutopilotHome, refreshAutopilotCandidates } from "@/lib/server/recovery-autopilot-store";
+import { recordProductEvent } from "@/lib/server/product-event-store";
+import { lockReceiptInboxAuthority } from "@/lib/server/recovery-inbound-store";
 import {
   extractObservedReceipt,
   extractReceiptCandidates,
@@ -282,6 +285,7 @@ export async function materializeForwardedEmailEvidence(input: {
   currencyHint?: ReceiptCurrencyHint | null;
   request: ForwardedEmailMaterializationRequest;
   now?: Date;
+  afterAuthorityInspection?: () => Promise<void>;
 }): Promise<{
   submission: EvidenceSubmissionDto;
   commitmentTotal: number;
@@ -307,8 +311,37 @@ export async function materializeForwardedEmailEvidence(input: {
   try {
     await client.query("begin");
     await lockRecoveryWorkspace(client, input.workspaceId);
-    const event = await client.query<{ status: string; svix_id: string; provider: string; attempt_count: number }>(
-      `select status, svix_id, provider, attempt_count
+    const inspectAuthority = async () => {
+      const eventHint = await client.query<{ alias_id: string | null }>(
+        `select alias_id
+         from recovery_inbound_events
+         where id = $1 and workspace_id = $2`,
+        [input.inboundEventId, input.workspaceId],
+      );
+      if (!eventHint.rows[0]) throw new RecoveryServiceError("NOT_FOUND");
+      return eventHint.rows[0].alias_id
+        ? await lockReceiptInboxAuthority(client, {
+          workspaceId: input.workspaceId,
+          aliasId: eventHint.rows[0].alias_id,
+        })
+        : { live: false, aliasStatus: null };
+    };
+    let authority = await inspectAuthority();
+    if (input.afterAuthorityInspection) {
+      await client.query("rollback");
+      await input.afterAuthorityInspection();
+      await client.query("begin");
+      await lockRecoveryWorkspace(client, input.workspaceId);
+      authority = await inspectAuthority();
+    }
+    const event = await client.query<{
+      status: string;
+      svix_id: string;
+      provider: string;
+      attempt_count: number;
+      alias_id: string | null;
+    }>(
+      `select status, svix_id, provider, attempt_count, alias_id
        from recovery_inbound_events
        where id = $1 and workspace_id = $2
        for update`,
@@ -332,6 +365,33 @@ export async function materializeForwardedEmailEvidence(input: {
     }
     if (eventRow.status !== "PROCESSING" || eventRow.attempt_count !== input.expectedAttemptCount) {
       throw new RecoveryServiceError("CONFLICT", "Receipt processing lease changed before materialization.");
+    }
+    if (!authority.live) {
+      const ignored = await client.query(
+        `update recovery_inbound_events
+           set status = 'IGNORED', processing_started_at = null,
+             processed_at = $3, error_code = 'ALIAS_REVOKED'
+         where id = $1 and workspace_id = $2
+           and status = 'PROCESSING' and attempt_count = $4`,
+        [input.inboundEventId, input.workspaceId, now, input.expectedAttemptCount],
+      );
+      if (ignored.rowCount !== 1) {
+        throw new RecoveryServiceError("CONFLICT", "Receipt processing lease changed before revocation.");
+      }
+      stage = "COMMIT";
+      await client.query("commit");
+      return {
+        submission: {
+          id: input.inboundEventId,
+          type: "FORWARDED_EMAIL",
+          ingestedAt: now.toISOString(),
+          acceptedEvidenceCount: 0,
+          results: [],
+        },
+        commitmentTotal: 0,
+        workspaceVersion: 0,
+        replayed: false,
+      };
     }
 
     const workspace = await client.query(`select 1 from workspaces where id = $1 for share`, [input.workspaceId]);
@@ -649,6 +709,7 @@ export async function submitRecoveryEvidence(input: {
       await scheduleRenewalAlertsForWorkspace(input.workspaceId, client);
     }
 
+    await refreshAutopilotCandidates(client, input.workspaceId);
     const currentState = await readWorkspaceState(client, input.workspaceId);
     const home = await loadHome(client, membership, now, currentState ?? state);
     const commitments = (await loadCommitmentRows(client, input.workspaceId)).map(toCommitmentSummary);
@@ -752,6 +813,7 @@ export async function putRecoveryDecision(input: {
       changes: [],
     });
     await scheduleRenewalAlertsForWorkspace(input.workspaceId, client);
+    await refreshAutopilotCandidates(client, input.workspaceId);
     const updated = await getCommitmentRow(client, input.workspaceId, input.request.commitmentId);
     if (!updated || !decision.rows[0]) throw new RecoveryServiceError("SAVE_FAILED");
     const data: PutDecisionMutationData = {
@@ -903,6 +965,7 @@ async function mutateCorrection(input: {
       changes,
     });
     await scheduleRenewalAlertsForWorkspace(input.workspaceId, client);
+    await refreshAutopilotCandidates(client, input.workspaceId);
     const updated = await getCommitmentRow(client, input.workspaceId, input.commitmentId);
     if (!updated) throw new RecoveryServiceError("SAVE_FAILED");
     const data: CorrectionMutationData = {
@@ -1036,6 +1099,12 @@ async function persistSubmissionSources(client: PoolClient, input: {
         input.envelope.capturedAt,
       ],
     );
+    await recordProductEvent({
+      workspaceId: input.workspaceId,
+      eventName: "source.connected",
+      source: "workspace-api",
+      status: "succeeded",
+    }, client);
     for (const evidence of novelEvidence) {
       evidence.provenanceKind = input.envelope.provenanceKind;
       evidence.provenanceReference = evidenceProvenanceReference(
@@ -1785,7 +1854,7 @@ async function loadHome(
   const commitments = await loadCommitmentRecords(client, membership.workspace_id);
   const observations = await loadRecentObservationRecords(client, membership.workspace_id);
   const sources = await loadCoverageSources(client, membership.workspace_id);
-  return buildHomeProjection({
+  const home = buildHomeProjection({
     workspace: {
       id: membership.workspace_id,
       name: membership.workspace_name,
@@ -1798,6 +1867,10 @@ async function loadHome(
     sources,
     changed,
   });
+  return {
+    ...home,
+    autopilot: await loadAutopilotHome(client, membership.workspace_id),
+  };
 }
 
 async function loadRecentObservationRecords(client: PoolClient, workspaceId: string): Promise<RecoveryObservationRecord[]> {
@@ -1848,6 +1921,7 @@ async function loadChanged(
 
 async function loadCommitmentRecords(client: PoolClient, workspaceId: string): Promise<CanonicalCommitmentRecord[]> {
   const rows = await loadCommitmentRows(client, workspaceId);
+  const correctionMap = await loadActiveCorrectionMap(client, workspaceId);
   return rows.map((row) => {
     const evidenceIds = asNonEmpty(row.evidence_ids);
     return {
@@ -1872,6 +1946,9 @@ async function loadCommitmentRecords(client: PoolClient, workspaceId: string): P
         updatedAt: row.decision_updated_at.toISOString(),
       } : null,
       evidenceIds,
+      factCorrections: (correctionMap.get(row.id) ?? [])
+        .filter((correction) => correction.field !== "MERCHANT")
+        .map((correction) => ({ id: correction.id, field: correction.field, status: correction.status })),
       updatedAt: row.updated_at.toISOString(),
     };
   });

@@ -13,7 +13,7 @@ test("the first-value path leads into the product with assisted audit as a secon
   await page.goto("/");
 
   const primary = page.locator("section").filter({ has: page.getByRole("heading", { name: "Know what’s renewing before you pay for it." }) })
-    .getByRole("link", { name: "Get started", exact: true });
+    .getByRole("link", { name: "Find my recurring spend", exact: true });
   await expect(primary).toBeVisible();
   await expect(primary).toHaveAttribute("href", "/login?next=/app");
   await primary.click();
@@ -152,6 +152,7 @@ function collectRuntimeFailures(page: Page) {
     const url = new URL(request.url());
     if (error === "net::ERR_ABORTED" && request.method() === "GET" && url.searchParams.has("_rsc")) return;
     if (error === "net::ERR_ABORTED" && request.method() === "GET" && url.pathname === "/api/checkout") return;
+    if (error === "net::ERR_ABORTED" && request.method() === "GET" && url.pathname === "/api/auth/session") return;
     failures.push(`request: ${request.url()} ${error}`);
   });
   return failures;

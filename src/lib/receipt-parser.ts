@@ -242,6 +242,10 @@ function inferObservedDate(message: string) {
   return parseLooseCalendarDate(chargeDate[1]);
 }
 
+export function receiptNextDateIsExplicit(message: string): boolean {
+  return explicitNextDatePattern.test(message);
+}
+
 function inferNextDate(message: string, frequency: ManualRecurringInput["frequency"]): string | null {
   const explicitDate = message.match(explicitNextDatePattern);
   if (explicitDate) {

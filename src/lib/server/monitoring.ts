@@ -250,10 +250,14 @@ export function sanitizeMonitoringPath(rawPath: string) {
   if (!rawPath) return "/";
   try {
     const parsed = new URL(rawPath, "https://monitoring.invalid");
-    return redactMonitoringText(parsed.pathname || "/");
+    return redactVetoTokenPath(redactMonitoringText(parsed.pathname || "/"));
   } catch {
-    return redactMonitoringText(rawPath.split(/[?#]/, 1)[0] || "/");
+    return redactVetoTokenPath(redactMonitoringText(rawPath.split(/[?#]/, 1)[0] || "/"));
   }
+}
+
+function redactVetoTokenPath(pathname: string) {
+  return pathname.replace(/^((?:\/api)?\/autopilot\/veto\/)[^/]+/i, "$1[REDACTED_VETO_TOKEN]");
 }
 
 export function sanitizeMonitoringValue(value: unknown, depth = 0): unknown {

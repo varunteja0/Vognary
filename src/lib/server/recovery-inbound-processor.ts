@@ -6,6 +6,7 @@ import { getDatabasePool } from "@/lib/server/database";
 import { RecoveryMaterializationError } from "@/lib/server/recovery-api";
 import {
   getReceiptInboxConfiguration,
+  lockReceiptInboxAuthority,
   recordGmailForwardingVerification,
   resolveReceiptInboxAlias,
 } from "@/lib/server/recovery-inbound-store";
@@ -17,6 +18,7 @@ import { materializeForwardedEmailEvidence } from "@/lib/server/recovery-store";
 
 type ProcessorDependencies = {
   retrieveRawEmail?: (emailId: string) => Promise<string | Uint8Array>;
+  afterAuthorityInspection?: () => Promise<void>;
 };
 
 type ReservedEvent = {
@@ -93,6 +95,7 @@ export async function processResendReceivedEvent(
       expectedAttemptCount: reservation.attemptCount,
       currencyHint: extraction.currencyHint,
       request: { kind: "FORWARDED_EMAIL", receipts },
+      afterAuthorityInspection: dependencies.afterAuthorityInspection,
     });
     return materialized.submission.acceptedEvidenceCount > 0
       ? { status: "processed" }
@@ -113,15 +116,17 @@ export function materializationFailureCode(error: unknown) {
 }
 
 async function findExistingInboundEvent(event: ResendReceivedEvent) {
-  const result = await getDatabasePool().query<{ workspace_id: string; alias_id: string | null }>(
-    `select workspace_id, alias_id
-     from recovery_inbound_events
-     where provider = 'RESEND' and (svix_id = $1 or provider_email_id = $2)
+  const result = await getDatabasePool().query<{ workspace_id: string; alias_id: string | null; alias_status: string | null }>(
+    `select event.workspace_id, event.alias_id, alias.status as alias_status
+     from recovery_inbound_events event
+     left join recovery_inbound_aliases alias on alias.id = event.alias_id
+     where event.provider = 'RESEND' and (event.svix_id = $1 or event.provider_email_id = $2)
      limit 1`,
     [event.svixId, event.emailId],
   );
   const row = result.rows[0];
-  return row?.alias_id ? { workspaceId: row.workspace_id, aliasId: row.alias_id } : null;
+  if (!row?.alias_id || row.alias_status !== "ACTIVE") return null;
+  return { workspaceId: row.workspace_id, aliasId: row.alias_id };
 }
 
 async function reserveInboundEvent(
@@ -131,6 +136,15 @@ async function reserveInboundEvent(
   const client = await getDatabasePool().connect();
   try {
     await client.query("begin");
+    const authority = await lockReceiptInboxAuthority(client, {
+      workspaceId: alias.workspaceId,
+      aliasId: alias.aliasId,
+    });
+    if (!authority.live) {
+      await client.query("rollback");
+      return null;
+    }
+
     const existing = (await client.query<{
       id: string;
       workspace_id: string;

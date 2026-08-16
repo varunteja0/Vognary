@@ -179,6 +179,19 @@ test("receipt inbox transport uses exact source paths and preserves server state
   }
 });
 
+test("workspace activation is a CSRF POST that sends no client totals", async () => {
+  const { calls, fetchImpl } = recorder(() =>
+    json({ data: { recorded: true, id: "event-1" }, meta: { requestId: "request-activation", workspaceVersion: 4 } }, 201),
+  );
+  const result = await createRecoveryTransport(fetchImpl).recordWorkspaceActivation();
+
+  assert.equal(result.ok, true);
+  assert.equal(calls[0].path, "/api/workspaces/current/activation");
+  assert.equal(calls[0].init?.method, "POST");
+  assert.equal(calls[0].init?.body, "{}");
+  assert.doesNotMatch(String(calls[0].init?.body), /monthlyTotals|annualizedEstimateTotals|activeCommitmentCount/);
+});
+
 test("session and file preparation use their unwrapped contract responses", async () => {
   const sessionPayload = { authenticated: true, configuration: { status: "ready", cookieName: "vognary_session" }, session: { userId: "user-1", email: "founder@example.com", workspaceId: "workspace-1", expiresAt: "2026-08-16T10:00:00.000Z" } };
   const session = await createRecoveryTransport(recorder(() => json(sessionPayload)).fetchImpl).session();

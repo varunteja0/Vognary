@@ -9,6 +9,8 @@ const publicSurfaces = [
   "src/app/workspace/recovery/recovery-home.tsx",
   "src/app/workspace/recovery/recovery-commitments.tsx",
   "src/app/workspace/recovery/recovery-sources.tsx",
+  "src/app/workspace/recovery/recovery-mandate.tsx",
+  "src/app/workspace/recovery/recovery-autopilot-home.tsx",
   "src/app/profile/profile-client.tsx",
   "src/app/profile/profile-sections.tsx",
   "src/app/login/login-client.tsx",

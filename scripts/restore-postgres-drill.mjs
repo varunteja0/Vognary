@@ -138,6 +138,21 @@ async function verifyRestoredSchema(connectionString) {
       "recovery_decisions",
       "recovery_changes",
       "recovery_idempotency_keys",
+      "recovery_standing_mandates",
+      "recovery_action_candidates",
+      "recovery_covered_windows",
+      "recovery_fee_ledger",
+      "recovery_execution_attempts",
+      "recovery_shadow_gate_snapshots",
+      "recovery_notice_delivery_events",
+      "recovery_autopilot_dead_letters",
+      "recovery_billing_year_anchors",
+      "recovery_notice_pending_events",
+      "recovery_connected_mandate_cohort",
+      "recovery_source_disconnections",
+      "recovery_inbound_aliases",
+      "recovery_inbound_events",
+      "recovery_inbound_replay_keys",
     ];
     const result = await pool.query(
       `select table_name
