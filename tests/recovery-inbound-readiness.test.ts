@@ -9,7 +9,7 @@ import {
 } from "../src/lib/server/recovery-inbound-store";
 
 test("receipt forwarding readiness includes the complete cutover ledger without counting its own account as legacy", () => {
-  assert.deepEqual(productionFeatureMigrations.slice(-8), [
+  assert.deepEqual(productionFeatureMigrations.slice(-22), [
     "0023_recovery_v1",
     "0024_recovery_inbound_receipts",
     "0025_recovery_renewal_alerts",
@@ -18,6 +18,20 @@ test("receipt forwarding readiness includes the complete cutover ledger without 
     "0028_recovery_gmail_oauth_source",
     "0029_legacy_tenant_integrity",
     "0030_legacy_tenant_ownership_immutable",
+    "0031_autopilot_loop",
+    "0032_autopilot_proof_integrity",
+    "0033_autopilot_integrity",
+    "0034_autopilot_repair",
+    "0035_autopilot_codex_repair",
+    "0036_autopilot_notice_hold",
+    "0037_autopilot_clock_integrity",
+    "0038_autopilot_reconcile_integrity",
+    "0039_autopilot_frozen_notice_integrity",
+    "0040_autopilot_review_integrity",
+    "0041_workspace_activation_integrity",
+    "0042_workspace_activation_semantic_reset",
+    "0043_workspace_activation_semantic_version",
+    "0044_autopilot_audit_immutability",
   ]);
   const source = readFileSync("src/lib/server/feature-readiness.ts", "utf8");
   assert.match(source, /metadata ->> 'ledgerAuthority'[\s\S]*<> 'RECOVERY_V1'/);

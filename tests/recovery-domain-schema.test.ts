@@ -151,3 +151,123 @@ test("legacy workspace ownership is immutable without rewriting historical rows"
     assert.match(sql, /before update of workspace_id on recurring_items/i);
   }
 });
+
+test("autopilot loop schema is additive and consolidated for fresh databases", () => {
+  const migration = readFileSync(new URL("../infra/postgres/migrations/0031_autopilot_loop.sql", import.meta.url), "utf8");
+  for (const table of [
+    "recovery_standing_mandates",
+    "recovery_action_candidates",
+    "recovery_veto_notices",
+    "recovery_executions",
+    "recovery_covered_windows",
+    "recovery_fee_ledger",
+  ]) {
+    assert.match(migration, new RegExp(`create table if not exists ${table}\\b`, "i"));
+    assert.match(schema, new RegExp(`create table if not exists ${table}\\b`, "i"));
+  }
+  assert.match(migration, /eligibility <> 'ELIGIBLE' or commitment_class = 'discretionary-subscription'/);
+  assert.match(schema, /eligibility <> 'ELIGIBLE' or commitment_class = 'discretionary-subscription'/);
+  assert.match(migration, /razorpay_charge_status text not null default 'FAIL_CLOSED'/);
+  assert.match(schema, /'MANDATE', 'CANDIDATE'/);
+  const proofMigration = readFileSync(new URL("../infra/postgres/migrations/0032_autopilot_proof_integrity.sql", import.meta.url), "utf8");
+  assert.match(proofMigration, /recovery_covered_windows_source_fk/);
+  assert.match(proofMigration, /recovery_fee_ledger_workspace_currency_period_key/);
+  const integrityMigration = readFileSync(new URL("../infra/postgres/migrations/0033_autopilot_integrity.sql", import.meta.url), "utf8");
+  const repairMigration = readFileSync(new URL("../infra/postgres/migrations/0034_autopilot_repair.sql", import.meta.url), "utf8");
+  const codexRepairMigration = readFileSync(new URL("../infra/postgres/migrations/0035_autopilot_codex_repair.sql", import.meta.url), "utf8");
+  assert.match(integrityMigration, /recovery_fee_ledger_no_overlap/);
+  assert.match(integrityMigration, /recovery_execution_attempts/);
+  assert.match(integrityMigration, /recovery_shadow_gate_snapshots/);
+  assert.match(integrityMigration, /on delete cascade/);
+  assert.match(repairMigration, /alter column finalized_at set default now\(\)/);
+  assert.match(repairMigration, /new.year_start is distinct from old.year_start/);
+  assert.match(repairMigration, /email.delivery_delayed/);
+  assert.match(repairMigration, /recovery_billing_year_anchors/);
+  assert.match(schema, /recovery_covered_windows_source_fk/);
+  assert.match(schema, /recovery_fee_ledger_workspace_currency_period_key/);
+  assert.match(schema, /recovery_fee_ledger_no_overlap/);
+  assert.match(schema, /finalized_at timestamptz not null default now\(\)/);
+  assert.match(schema, /new.year_start is distinct from old.year_start/);
+  assert.match(schema, /recovery_billing_year_anchors/);
+  const noticeHoldMigration = readFileSync(new URL("../infra/postgres/migrations/0036_autopilot_notice_hold.sql", import.meta.url), "utf8");
+  assert.match(codexRepairMigration, /veto_expires_at/);
+  assert.match(codexRepairMigration, /notice_body_hash/);
+  assert.match(schema, /veto_expires_at timestamptz/);
+  assert.match(schema, /notice_body_hash char\(64\)/);
+  assert.match(noticeHoldMigration, /recovery_notice_pending_events/);
+  assert.match(noticeHoldMigration, /recovery_connected_mandate_cohort/);
+  assert.match(noticeHoldMigration, /notice_from_email/);
+  assert.match(noticeHoldMigration, /recovery_sources/);
+  assert.match(schema, /recovery_notice_pending_events/);
+  assert.match(schema, /recovery_connected_mandate_cohort/);
+  assert.match(schema, /notice_from_email text/);
+  const clockIntegrityMigration = readFileSync(new URL("../infra/postgres/migrations/0037_autopilot_clock_integrity.sql", import.meta.url), "utf8");
+  assert.match(clockIntegrityMigration, /reject_recovery_evidence_mutation/);
+  assert.match(clockIntegrityMigration, /reject_recovery_cohort_mutation/);
+  assert.match(clockIntegrityMigration, /recovery_source_disconnections/);
+  assert.match(clockIntegrityMigration, /not exists \(select 1 from workspaces where id = old.workspace_id\)/);
+  assert.doesNotMatch(clockIntegrityMigration, /or not exists \(\s*select 1 from recovery_sources/);
+  assert.match(schema, /reject_recovery_cohort_mutation/);
+  assert.match(schema, /recovery_source_disconnections/);
+  const reconcileMigration = readFileSync(new URL("../infra/postgres/migrations/0038_autopilot_reconcile_integrity.sql", import.meta.url), "utf8");
+  assert.match(reconcileMigration, /notice_tags/);
+  assert.match(reconcileMigration, /notice_payload_version/);
+  assert.match(reconcileMigration, /reconnected_at/);
+  assert.doesNotMatch(reconcileMigration, /create or replace function reject_recovery_evidence_mutation/);
+  assert.match(schema, /notice_tags jsonb/);
+  assert.match(schema, /notice_payload_version integer/);
+  assert.match(schema, /reconnected_at timestamptz/);
+  const frozenNoticeMigration = readFileSync(new URL("../infra/postgres/migrations/0039_autopilot_frozen_notice_integrity.sql", import.meta.url), "utf8");
+  assert.match(frozenNoticeMigration, /reject_recovery_frozen_notice_mutation/);
+  assert.match(frozenNoticeMigration, /old.frozen_at is not null/);
+  assert.match(frozenNoticeMigration, /notice_from_email/);
+  assert.match(frozenNoticeMigration, /notice_tags/);
+  assert.match(frozenNoticeMigration, /notice_payload_version/);
+  assert.match(frozenNoticeMigration, /notice_body_hash/);
+  assert.match(frozenNoticeMigration, /veto_token_hash/);
+  assert.match(frozenNoticeMigration, /veto_expires_at/);
+  assert.match(frozenNoticeMigration, /frozen_at/);
+  assert.doesNotMatch(frozenNoticeMigration, /delivery_status is distinct from old.delivery_status/);
+  assert.doesNotMatch(reconcileMigration, /reject_recovery_frozen_notice_mutation/);
+  assert.doesNotMatch(clockIntegrityMigration, /reject_recovery_frozen_notice_mutation/);
+  const reviewIntegrityMigration = readFileSync(new URL("../infra/postgres/migrations/0040_autopilot_review_integrity.sql", import.meta.url), "utf8");
+  assert.match(reviewIntegrityMigration, /notice_hash_version/);
+  assert.match(reviewIntegrityMigration, /before update or delete/i);
+  assert.match(reviewIntegrityMigration, /Frozen notice cannot be deleted directly/i);
+  assert.match(reviewIntegrityMigration, /exists \(select 1 from workspaces where id = old.workspace_id\)/);
+  assert.match(schema, /reject_recovery_frozen_notice_mutation/);
+  assert.match(schema, /notice_hash_version smallint/);
+  assert.match(schema, /frozen notice payload cannot be mutated/i);
+  const activationIntegrityMigration = readFileSync(new URL("../infra/postgres/migrations/0041_workspace_activation_integrity.sql", import.meta.url), "utf8");
+  assert.match(activationIntegrityMigration, /product_events_workspace_activated_once_idx/);
+  assert.match(activationIntegrityMigration, /event_name = 'workspace.activated'/);
+  assert.match(activationIntegrityMigration, /workspace_id is not null/);
+  assert.match(activationIntegrityMigration, /row_number\(\) over/i);
+  assert.match(activationIntegrityMigration, /create unique index/i);
+  assert.doesNotMatch(activationIntegrityMigration, /drop table|truncate/i);
+  const activationResetMigration = readFileSync(new URL("../infra/postgres/migrations/0042_workspace_activation_semantic_reset.sql", import.meta.url), "utf8");
+  assert.match(activationResetMigration, /delete from product_events/i);
+  assert.match(activationResetMigration, /event_name = 'workspace.activated'/);
+  assert.doesNotMatch(activationResetMigration, /drop index|drop table|truncate/i);
+  const activationMarkerMigration = readFileSync(new URL("../infra/postgres/migrations/0043_workspace_activation_semantic_version.sql", import.meta.url), "utf8");
+  assert.match(activationMarkerMigration, /activation_semantic_version/);
+  assert.match(activationMarkerMigration, /is not distinct from 1/);
+  assert.match(activationMarkerMigration, /product_events_workspace_activated_semantic_version_check/);
+  assert.match(activationMarkerMigration, /delete from product_events/i);
+  assert.match(activationMarkerMigration, /event_name = 'workspace.activated'/);
+  assert.doesNotMatch(activationMarkerMigration, /drop index|drop table|truncate/i);
+  assert.doesNotMatch(activationMarkerMigration, /0042_workspace_activation_semantic_reset/);
+  const auditImmutabilityMigration = readFileSync(new URL("../infra/postgres/migrations/0044_autopilot_audit_immutability.sql", import.meta.url), "utf8");
+  assert.match(auditImmutabilityMigration, /before update or delete on recovery_fee_ledger/i);
+  assert.match(auditImmutabilityMigration, /Finalized fee ledger rows cannot be deleted directly/);
+  assert.match(auditImmutabilityMigration, /before update or delete on recovery_billing_year_anchors/i);
+  assert.match(auditImmutabilityMigration, /Workspace activation cannot be deleted directly/);
+  assert.doesNotMatch(auditImmutabilityMigration, /drop table|truncate/i);
+  assert.match(schema, /recovery_fee_ledger_immutable/);
+  assert.match(schema, /before update or delete on recovery_fee_ledger/i);
+  assert.match(schema, /product_events_workspace_activated_immutable/);
+  assert.match(schema, /product_events_workspace_activated_once_idx/);
+  assert.match(schema, /event_name = 'workspace.activated' and workspace_id is not null/);
+  assert.match(schema, /activation_semantic_version/);
+  assert.match(schema, /product_events_workspace_activated_semantic_version_check/);
+});

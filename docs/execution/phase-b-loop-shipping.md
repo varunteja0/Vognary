@@ -84,13 +84,13 @@ Historical WP-B0…B8 (landing honesty, guest first-value, assistant brief, UPI 
 3. **Honesty states** from readiness helpers — no “connected” without proof.
 4. **INR default**; multi-currency explicit.
 5. **Tests first** for engine changes.
-6. **One isolated worktree per WP** from merged `origin/main`. No stacked PRs.
+6. **Live checkout:** stay in this repository on the CONTINUE-HERE branch (`feat/autopilot-loop`). Isolated-worktree-per-WP is superseded until that branch lands. Do not redo merged WP-A.
 
 ---
 
-## 2. Work packages (ordered; one PR each)
+## 2. Work packages (ordered)
 
-Execute in order. Never begin the next WP before the previous PR is merged into `origin/main`.
+Default process is one PR per WP. **Founder override (2026-08-14):** WP-B through WP-E continue on one branch, `feat/autopilot-loop`, in this repository folder so chats do not spawn isolated copies. Do not restart WP-A.
 
 ### WP-A — Recovery-only evidence spine
 
@@ -120,7 +120,7 @@ Refuse cross-workspace decision/evidence rehoming. Leave historical mismatched r
 
 A valid same-workspace evidence link must not become cross-workspace by later updating `data_sources.workspace_id` or `recurring_items.workspace_id`. Additive migration `0030_legacy_tenant_ownership_immutable` rejects an actual workspace change on those frozen tables. No-op same-workspace updates remain permitted. Historical dirty rows stay untouched.
 
-**Status (2026-08-13):** Required. Codex review of `06d3e28` is **NOT APPROVED** (item-reassignment fixture was masked by a decision FK). Do not start WP-B until this PR merges with CI green plus real Codex and real Opus on the exact new head SHA. A missing, failed, or rate-limited review is not approval.
+**Status (2026-08-14):** Merged as PR #34 at `1542dda`. Do not redo. WP-B continues on `feat/autopilot-loop` in this folder. Isolated worktrees are suspended while CONTINUE-HERE names that branch.
 
 ### WP-B — Class lock, standing mandate, shadow engine
 
@@ -129,6 +129,8 @@ A valid same-workspace evidence link must not become cross-workspace by later up
 A candidate is eligible only when the mandate is active; class is high-confidence discretionary-subscription; no protected or conflicting evidence; recurrence has two dated occurrences or explicit provider subscription/renewal evidence; cadence/amount/currency/next debit are stable; amount is inside both ceilings; route is operator-supported; no KEEP / exclusion / prior veto / stale evidence / contradictory update; notice can be delivered.
 
 Tests must exhaustively prove every protected class fails closed, including mixed/conflicting categories and adversarial strings. AI must never decide that a service is “unused” or “junk.”
+
+**Status (2026-08-14):** In progress on `feat/autopilot-loop`. Shadow-only. Not merge-ready.
 
 ### WP-C — Notice, executor, exceptions, user experience
 
@@ -166,9 +168,9 @@ Locked pricing: monitoring ₹999/month; outcome 15% of verified savings; monito
 | Safe parallel | Must serialize |
 | --- | --- |
 | Phase A CRM hygiene (founder) ∥ current WP implementation | Two writers on Recovery |
-| Reviewers (Codex/Opus) on a frozen SHA | Starting WP-n+1 before WP-n merges |
+| Reviewers (Codex/Opus) on a frozen SHA | Two chats inventing sibling folders for the same WP |
 
-**Always:** separate git worktrees; PR against `main`; one owner.
+**Always:** PR against `main`; one Git owner. While CONTINUE-HERE names `feat/autopilot-loop`, serialize in this folder — no `../vognary-*` worktrees.
 
 ---
 
@@ -210,9 +212,8 @@ Do not claim a WP merge-ready while PostgreSQL is untested. Do not land temporar
 You are implementing Vognary Autopilot under docs/THE-LAW.md.
 Read: docs/THE-LAW.md → docs/CONTINUE-HERE.md → docs/execution/phase-a-market-contact.md → docs/execution/phase-b-loop-shipping.md.
 Raise the locked autopilot loop only. No new plans. No uncited AI. India-first INR defaults.
-Worktree from merged origin/main. Failing test first for engines. PR against main.
-Start at the lowest incomplete WP-A…WP-E. State scoreboard row + files before coding.
-Never begin the next WP before the previous PR is merged.
+Stay in this repo folder on feat/autopilot-loop. Do not create ../vognary-* folders. Failing test first for engines. PR against main.
+Continue WP-B–E on the named branch. Do not redo merged WP-A / PR #34.
 ```
 
 ---

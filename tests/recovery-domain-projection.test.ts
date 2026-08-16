@@ -6,6 +6,7 @@ import {
   buildHomeProjection,
   currencyExponent,
   decimalToMinorUnits,
+  hasCitedRecurringSpendPicture,
   minorUnitsToDecimal,
   toMoneyDto,
   type CanonicalCommitmentRecord,
@@ -60,6 +61,7 @@ const commitments: CanonicalCommitmentRecord[] = [
     riskTags: ["renews soon"],
     decision: null,
     evidenceIds: ["evidence-inr-1", "evidence-inr-2"],
+    factCorrections: [],
     updatedAt: now.toISOString(),
   },
   {
@@ -84,6 +86,7 @@ const commitments: CanonicalCommitmentRecord[] = [
       updatedAt: "2026-08-08T10:00:00.000Z",
     },
     evidenceIds: ["evidence-usd-1"],
+    factCorrections: [],
     updatedAt: now.toISOString(),
   },
   {
@@ -104,6 +107,7 @@ const commitments: CanonicalCommitmentRecord[] = [
     riskTags: [],
     decision: null,
     evidenceIds: ["evidence-once-1"],
+    factCorrections: [],
     updatedAt: now.toISOString(),
   },
 ];
@@ -133,6 +137,18 @@ test("Recovery home is an honest first baseline and keeps currency totals separa
     ["INR", "199900"],
     ["USD", "833"],
   ]);
+  assert.deepEqual(home.annualizedEstimateTotals.map((total) => [total.amount.currency, total.amount.minor]), [
+    ["INR", "2398800"],
+    ["USD", "9996"],
+  ]);
+  assert.equal(home.annualizedEstimateTotals[0]?.amount.display, "₹23,988.00");
+  assert.deepEqual(home.monthlyTotals.map((total) => [total.provenance, total.correctionIds]), [
+    ["RECEIPT", []],
+    ["RECEIPT", []],
+  ]);
+  assert.equal(home.activeCommitmentCount, 2);
+  assert.equal(home.reviewItemCount, 1);
+  assert.equal(hasCitedRecurringSpendPicture(home), true);
   assert.deepEqual(home.next30DayTotals.map((total) => [total.amount.currency, total.amount.minor]), [["INR", "199900"]]);
   assert.equal(home.needsMe.some((item) => item.commitmentId === "commitment-inr"), true);
   assert.equal(home.needsMe.some((item) => item.commitmentId === "commitment-ignored"), false);
@@ -169,8 +185,166 @@ test("Recovery home publishes saved observation facts without fabricating recurr
     date: "2026-08-08",
   }]);
   assert.deepEqual(home.monthlyTotals, []);
+  assert.deepEqual(home.annualizedEstimateTotals, []);
+  assert.equal(home.activeCommitmentCount, 0);
+  assert.equal(home.reviewItemCount, 0);
+  assert.equal(hasCitedRecurringSpendPicture(home), false);
   assert.deepEqual(home.next, []);
   assert.deepEqual(home.needsMe, []);
+});
+
+test("a representable monthly total stays on Home when the annualized estimate exceeds the display bound", () => {
+  const overflowingMonthly = BigInt("768614336404564651");
+  const home = buildHomeProjection({
+    workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
+    generatedAt: now,
+    commitments: [{
+      ...commitments[0],
+      monthlyEquivalentMinor: overflowingMonthly,
+    }],
+    sources: [{
+      id: "source-1",
+      ingestedAt: now.toISOString(),
+      coverageStart: "2026-07-01",
+      coverageEnd: "2026-08-09",
+      evidenceCount: 2,
+    }],
+    changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 1, items: [] },
+  });
+
+  assert.equal(home.monthlyTotals[0]?.amount.minor, overflowingMonthly.toString());
+  assert.equal(home.monthlyTotals[0]?.provenance, "RECEIPT");
+  assert.deepEqual(home.annualizedEstimateTotals, []);
+  assert.equal(home.activeCommitmentCount, 1);
+  assert.equal(hasCitedRecurringSpendPicture(home), true);
+});
+
+test("Home stays usable when 12 × monthly fits PostgreSQL bigint but exceeds the Intl display bound", () => {
+  const monthly = BigInt("80000000000000000");
+  const home = buildHomeProjection({
+    workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
+    generatedAt: now,
+    commitments: [{
+      ...commitments[0],
+      monthlyEquivalentMinor: monthly,
+    }],
+    sources: [],
+    changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 1, items: [] },
+  });
+
+  assert.equal(home.monthlyTotals[0]?.amount.minor, monthly.toString());
+  assert.deepEqual(home.annualizedEstimateTotals, []);
+});
+
+test("projection totals cite user-correction provenance only for the facts that correction changed", () => {
+  const sources = [] as const;
+  const changed = { state: "NO_PRIOR_BASELINE" as const, fromVersion: null, toVersion: 1, items: [] as const };
+  const workspace = { id: "workspace-1", name: "Founder workspace", role: "owner" as const, version: 1 };
+
+  const nextDateHome = buildHomeProjection({
+    workspace,
+    generatedAt: now,
+    commitments: [{ ...commitments[0], factCorrections: [{ id: "correction-date-1", field: "NEXT_EXPECTED_DATE" }] }],
+    sources,
+    changed,
+  });
+  assert.equal(nextDateHome.monthlyTotals[0]?.provenance, "RECEIPT");
+  assert.deepEqual(nextDateHome.monthlyTotals[0]?.correctionIds, []);
+  assert.equal(nextDateHome.annualizedEstimateTotals[0]?.provenance, "RECEIPT");
+  assert.equal(nextDateHome.next30DayTotals[0]?.provenance, "USER_CORRECTED");
+  assert.deepEqual(nextDateHome.next30DayTotals[0]?.correctionIds, ["correction-date-1"]);
+
+  const cadenceHome = buildHomeProjection({
+    workspace,
+    generatedAt: now,
+    commitments: [{ ...commitments[0], factCorrections: [{ id: "correction-cadence-1", field: "CADENCE" }] }],
+    sources,
+    changed,
+  });
+  assert.equal(cadenceHome.monthlyTotals[0]?.provenance, "USER_CORRECTED");
+  assert.equal(cadenceHome.annualizedEstimateTotals[0]?.provenance, "USER_CORRECTED");
+  assert.deepEqual(cadenceHome.monthlyTotals[0]?.correctionIds, ["correction-cadence-1"]);
+  assert.equal(cadenceHome.next30DayTotals[0]?.provenance, "RECEIPT");
+  assert.deepEqual(cadenceHome.next30DayTotals[0]?.correctionIds, []);
+
+  const amountHome = buildHomeProjection({
+    workspace,
+    generatedAt: now,
+    commitments: [
+      { ...commitments[0], factCorrections: [{ id: "correction-amount-1", field: "AMOUNT" }] },
+      commitments[1],
+    ],
+    sources,
+    changed,
+  });
+  const inr = amountHome.monthlyTotals.find((total) => total.amount.currency === "INR");
+  const usd = amountHome.monthlyTotals.find((total) => total.amount.currency === "USD");
+  assert.equal(inr?.provenance, "USER_CORRECTED");
+  assert.deepEqual(inr?.correctionIds, ["correction-amount-1"]);
+  assert.equal(usd?.provenance, "RECEIPT");
+  assert.deepEqual(usd?.correctionIds, []);
+  assert.equal(amountHome.annualizedEstimateTotals.find((total) => total.amount.currency === "INR")?.provenance, "USER_CORRECTED");
+  assert.equal(amountHome.next30DayTotals[0]?.provenance, "USER_CORRECTED");
+  assert.deepEqual(amountHome.next30DayTotals[0]?.correctionIds, ["correction-amount-1"]);
+
+  const merchantHome = buildHomeProjection({
+    workspace,
+    generatedAt: now,
+    commitments: [{ ...commitments[0], factCorrections: [{ id: "correction-merchant-1", field: "MERCHANT" }] }],
+    sources,
+    changed,
+  });
+  assert.equal(merchantHome.monthlyTotals[0]?.provenance, "RECEIPT");
+  assert.equal(merchantHome.next30DayTotals[0]?.provenance, "RECEIPT");
+
+  const recurringHome = buildHomeProjection({
+    workspace,
+    generatedAt: now,
+    commitments: [
+      { ...commitments[0], factCorrections: [{ id: "correction-recurring-1", field: "IS_RECURRING" }] },
+      commitments[1],
+    ],
+    sources,
+    changed,
+  });
+  assert.equal(recurringHome.monthlyTotals.find((total) => total.amount.currency === "INR")?.provenance, "USER_CORRECTED");
+  assert.deepEqual(recurringHome.monthlyTotals.find((total) => total.amount.currency === "INR")?.correctionIds, ["correction-recurring-1"]);
+  assert.equal(recurringHome.annualizedEstimateTotals.find((total) => total.amount.currency === "INR")?.provenance, "USER_CORRECTED");
+  assert.equal(recurringHome.next30DayTotals[0]?.provenance, "USER_CORRECTED");
+  assert.deepEqual(recurringHome.next30DayTotals[0]?.correctionIds, ["correction-recurring-1"]);
+  assert.equal(recurringHome.monthlyTotals.find((total) => total.amount.currency === "USD")?.provenance, "RECEIPT");
+
+  const reversedHome = buildHomeProjection({
+    workspace,
+    generatedAt: now,
+    commitments: [{
+      ...commitments[0],
+      factCorrections: [{ id: "correction-amount-reversed", field: "AMOUNT", status: "REVERSED" }],
+    }],
+    sources,
+    changed,
+  });
+  assert.equal(reversedHome.monthlyTotals[0]?.provenance, "RECEIPT");
+  assert.deepEqual(reversedHome.monthlyTotals[0]?.correctionIds, []);
+  assert.equal(reversedHome.annualizedEstimateTotals[0]?.provenance, "RECEIPT");
+  assert.equal(reversedHome.next30DayTotals[0]?.provenance, "RECEIPT");
+
+  const supersededHome = buildHomeProjection({
+    workspace,
+    generatedAt: now,
+    commitments: [{
+      ...commitments[0],
+      factCorrections: [
+        { id: "correction-amount-old", field: "AMOUNT", status: "SUPERSEDED" },
+        { id: "correction-amount-new", field: "AMOUNT", status: "ACTIVE" },
+      ],
+    }],
+    sources,
+    changed,
+  });
+  assert.equal(supersededHome.monthlyTotals[0]?.provenance, "USER_CORRECTED");
+  assert.deepEqual(supersededHome.monthlyTotals[0]?.correctionIds, ["correction-amount-new"]);
+  assert.deepEqual(supersededHome.next30DayTotals[0]?.correctionIds, ["correction-amount-new"]);
 });
 
 test("upcoming items require reminder confidence and suppress KEEP decisions", () => {

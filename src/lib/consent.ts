@@ -11,6 +11,7 @@ export const consentPurposes = [
   "product-analytics-opt-in",
   "product-research-contact",
   "renewal-alerts",
+  "standing-mandate-autopilot",
 ] as const;
 
 export type ConsentPurpose = typeof consentPurposes[number];

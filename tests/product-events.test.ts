@@ -73,6 +73,27 @@ test("anonymous funnel ingestion is rejected until a separate legal basis and co
   assert.equal(response.status, 401);
 });
 
+test("client product-event ingest cannot mark a workspace activated", () => {
+  const route = readFileSync(new URL("../src/app/api/product-events/route.ts", import.meta.url), "utf8");
+  const evidenceRoute = readFileSync(new URL("../src/app/api/workspaces/current/evidence/route.ts", import.meta.url), "utf8");
+  const briefRoute = readFileSync(new URL("../src/app/api/workspaces/current/brief/route.ts", import.meta.url), "utf8");
+  const activationRoute = readFileSync(new URL("../src/app/api/workspaces/current/activation/route.ts", import.meta.url), "utf8");
+  const store = readFileSync(new URL("../src/lib/server/product-event-store.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(route, /"workspace.activated"/);
+  assert.doesNotMatch(evidenceRoute, /recordWorkspaceActivationOnce|hasCitedRecurringSpendPicture/);
+  assert.doesNotMatch(briefRoute, /recordWorkspaceActivationOnce|hasCitedRecurringSpendPicture/);
+  assert.match(activationRoute, /hasActiveConsentGrant/);
+  assert.match(activationRoute, /product-analytics-opt-in/);
+  assert.match(activationRoute, /hasCitedRecurringSpendPicture/);
+  assert.match(activationRoute, /getRecoveryHome/);
+  assert.match(activationRoute, /rejectCrossSiteMutation/);
+  assert.match(activationRoute, /recordWorkspaceActivationOnce/);
+  assert.doesNotMatch(activationRoute, /readRecoveryJson|request\.json/);
+  assert.match(store, /on conflict \(workspace_id\) where event_name = 'workspace.activated' and workspace_id is not null/i);
+  assert.match(store, /activation_semantic_version/i);
+  assert.match(store, /do nothing/i);
+});
+
 test("guest clients do not automatically transmit first-session analytics", () => {
   const guest = readFileSync(new URL("../src/app/guest-audit-client.tsx", import.meta.url), "utf8");
   const privateAudit = readFileSync(new URL("../src/app/private-audit/private-audit-client.tsx", import.meta.url), "utf8");

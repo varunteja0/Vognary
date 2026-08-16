@@ -7,6 +7,7 @@ import { listWorkspacesForUser } from "@/lib/server/workspace-store";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 import { revokeConnectorCredentialAtProvider } from "@/lib/server/connector-provider-revocation";
+import { applyReceiptInboxRevocation } from "@/lib/server/recovery-inbound-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -346,6 +347,24 @@ async function deleteUserData(userId: string, email: string) {
         checkoutId: row.checkout_session_id,
         status: row.status,
       })));
+    }
+    const inboxConsents = await client.query<{ id: string; workspace_id: string }>(
+      `select id, workspace_id
+       from consent_grants
+       where purpose = 'receipt-inbox-ingest'
+         and withdrawn_at is null
+         and workspace_id is not null
+         and (user_id = $1 or lower(subject_email) = lower($2))
+       for update`,
+      [userId, email],
+    );
+    for (const grant of inboxConsents.rows) {
+      await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [`receipt-inbox:${grant.workspace_id}`]);
+      await applyReceiptInboxRevocation(client, {
+        workspaceId: grant.workspace_id,
+        actorUserId: userId,
+        consentId: grant.id,
+      });
     }
     const waitlistResult = await client.query(`delete from waitlist_leads where lower(email) = lower($1)`, [email]);
     const auditLeadResult = await client.query(`delete from private_audit_leads where lower(email) = lower($1)`, [email]);

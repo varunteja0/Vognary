@@ -11,7 +11,6 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const clientEventNames = new Set([
-  "workspace.activated",
   "ledger.viewed",
   "review.action_recorded",
   "review.completed",

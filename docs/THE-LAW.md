@@ -1,6 +1,6 @@
 # THE LAW — Vognary company, product, and agent directive
 
-> **Status:** CANONICAL. Effective 2026-07-21.  
+> **Status:** CANONICAL. Effective 2026-07-21. Live checkout process: CONTINUE-HERE.
 > **Audience:** every human, every agent, every model (including Fable / top-tier coding models).  
 > **Priority:** This file outranks all other plans when they conflict.  
 > **If you are a new agent session:** read this file **first**, then the chain in §0.2. Do not invent a parallel strategy.
@@ -77,7 +77,7 @@ passive evidence (paste / CSV / inbound mail; Gmail OAuth when proven)
 
 ## 4. Five invariants (non-negotiable code law)
 
-1. **Isolated worktree per work package** from freshest `main`. Never dirty-edit over another agent.
+1. **One live checkout.** Default is an isolated worktree from freshest `main`. If CONTINUE-HERE names a same-repo branch, stay in this folder and do **not** spawn `../vognary-*` copies. Never dirty-edit the same file as another agent.
 2. **Brand is fixed:** Nakul the mongoose, Fraunces display, graphite/gold. Deepen, never swap.
 3. **Honesty is machine-enforced.** Merchants are *watched*, never *linked*; rails/sources use *connect* voice. `scripts/check-public-claims.mjs` fails the build. Blank env → “Not yet proven.”
 4. **Scoring is minimum-row.** Before building: *does this raise the lowest scoreboard row?*
@@ -180,7 +180,7 @@ Agents **must refuse** or redirect:
 2. State which **loop step** it improves.  
 3. List **files** you will touch (prefer existing modules).  
 4. Write or cite the **failing test** for engine changes.  
-5. Confirm worktree from fresh `main`, PR against `main`, **no stacked PRs**.
+5. Confirm the CONTINUE-HERE checkout (this folder / named branch). Do not create sibling worktrees while that override is live. PR against `main`.
 
 ### 8.2 Architecture rules when designing
 

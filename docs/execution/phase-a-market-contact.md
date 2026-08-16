@@ -30,11 +30,33 @@ Actual payment and written pay intent are **separate metrics**. The paid 5/20 ga
 - Users only care if full bank/UPI auto-magic exists (wedge may be wrong timing)
 - Any protected-class or unauthorized execution
 
+### Measurable funnel (do not mark ahead of events)
+
+This is the only private-pilot conversion sequence agents may count. Empty cells and `not-contacted` mean unmeasured, not failure.
+
+```text
+20 sourced targets
+  → 5 conversations
+  → 2 connected sources plus standing mandates
+  → 1 financially meaningful cited aha
+  → 1 explicit payment ask
+```
+
+| Step | Current (2026-08-15) | Rule |
+| --- | ---: | --- |
+| Sourced targets in gitignored CRM | 20 | Direct public sources only; no invented spend or identity |
+| Conversations | 0 | Founder-confirmed reply or call. Drafts are not conversations. |
+| Connected sources + mandates | 0 | Both events on the same workspace |
+| Financially meaningful cited aha | 0 | Customer sees an unexpected cited commitment from their evidence |
+| Explicit payment ask | 0 | Founder asked; `actual_payment_at` stays blank until money arrives |
+
+Do **not** mark contacted, replied, activated, paid, or referred. Five founder-approval drafts live in gitignored `docs/execution/private-autopilot-outreach-draft.md`. Nothing sent.
+
 ---
 
 ## 1. CRM schema (canonical)
 
-**Working file (gitignored; may contain PII):** `docs/execution/private-autopilot-pilot-crm.csv`
+**Working file (gitignored; may contain PII):** `docs/execution/private-autopilot-pilot-crm.csv` — sourced targets, not qualified prospects.
 **Committed headers:** [`private-autopilot-pilot-crm.csv.example`](private-autopilot-pilot-crm.csv.example)
 **Historical paste-audit CRM (gitignored; not new pilot evidence):** `docs/execution/private-audit-crm.csv`
 
@@ -293,3 +315,61 @@ Evidence links (CRM rows):
 ```
 
 Copy result into `docs/CONTINUE-HERE.md` under a short “Phase A result” note when decided. Empty cells mean unmeasured.
+
+---
+
+## 9. 15-minute behavioral interview (do not treat as qualification)
+
+Use after a sourced target replies “pilot” or agrees to a call. This is **not** a sales demo and does **not** mark the CRM row qualified. Keep every outcome column blank until the matching event exists.
+
+**Clock (15:00)**
+
+| Min | Ask | Why |
+| ---: | --- | --- |
+| 0–2 | How do you currently know what will debit next week? | Beachhead: founder/tiny-team recurring-money ops, not a budget-app user |
+| 2–5 | Tell me about the last time a recurring charge surprised you. What evidence did you have? | First aha is a **cited unexpected commitment**, not a dashboard |
+| 5–8 | If something cancelled a discretionary tool under a rule you signed, with 48 hours to veto, what would you need to trust it? | Class-safe private Autopilot wedge; EMI/SIP/insurance/utilities/cloud stay blocked |
+| 8–11 | Walk through the last time you tried to cancel something. Login, OTP, phone, or a support email? | Zero post-mandate customer work; login/OTP paths are exceptions, not supported execution |
+| 11–13 | Would you connect a real mailbox/statement and sign a standing mandate this week, or only look at a public audit? | Public audit claims stay unchanged; the offer is connect + mandate, not a free PDF |
+| 13–15 | What would make you pay ₹999 monitoring credited against 15% of verified savings — and what would make you walk? | Actual payment vs written intent stay separate |
+
+**Hard stops during the call**
+
+- Do not invent amounts, merchants, or connector liveness
+- Do not offer a free paste-audit PDF as the product
+- Do not promise Gmail OAuth, Razorpay charges, or a proven provider route
+- Do not call the person a qualified prospect; they remain a sourced target until CRM events exist
+
+**After the call (same day)**
+
+- Append a redacted note to the gitignored CRM `notes` cell
+- Leave `connected_account_at` / `mandate_accepted_at` / `actual_payment_at` blank unless those events happened
+- Status stays `not-contacted` until founder records a real transition
+
+---
+
+## 10. Live-onboarding checklist (private Autopilot path)
+
+Run only after the human agrees to the standing-mandate path. Same loop for every pilot. Empty cells mean unmeasured.
+
+```text
+Pilot id:
+Date:
+Operator:
+
+[ ] Identity matches the sourced public URL used for outreach (no assumed spend)
+[ ] Privacy pitch given; no bank passwords, OTPs, or CVV requested
+[ ] Real evidence source connected (paste/CSV now; forwarding if inbox attested)
+[ ] Standing mandate signed (terms version, ceilings, 48h veto) — record mandate_accepted_at
+[ ] Candidates classified with citations; protected classes fail closed
+[ ] 48-hour veto notice queued; clock starts only on DELIVERED + valid token coverage
+[ ] Silence / veto / exception recorded honestly
+[ ] Supported execution only on a founder-proven zero-chore route; otherwise EXCEPTION
+[ ] Post-mandate customer work minutes logged (target 0)
+[ ] Verification coverage named: covered / pending / missing
+[ ] Clean window + verified saving only with covered financial proof
+[ ] Pay ask uses actual_payment_at; written intent in a separate column
+[ ] Corpus consent asked; redaction minimum applied if yes
+```
+
+Do not tick boxes in git. Copy a filled sheet into the gitignored CRM notes after the session.

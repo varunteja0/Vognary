@@ -124,8 +124,15 @@ const home = {
   workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
   generatedAt: "2026-08-09T10:00:00.000Z",
   recentObservations: [{ evidenceId: evidence.id, merchant: commitment.merchant, amount: money, date: evidence.date }],
-  monthlyTotals: [{ amount: money, commitmentIds: [commitment.id], evidenceIds: [evidence.id] }],
-  next30DayTotals: [{ amount: money, commitmentIds: [commitment.id], evidenceIds: [evidence.id] }],
+  monthlyTotals: [{ amount: money, commitmentIds: [commitment.id], evidenceIds: [evidence.id], provenance: "RECEIPT", correctionIds: [] }],
+  annualizedEstimateTotals: [{
+    amount: { currency: "INR", minor: "2398800", exponent: 2, display: "₹23,988.00" },
+    commitmentIds: [commitment.id],
+    evidenceIds: [evidence.id],
+    provenance: "RECEIPT",
+    correctionIds: [],
+  }],
+  next30DayTotals: [{ amount: money, commitmentIds: [commitment.id], evidenceIds: [evidence.id], provenance: "RECEIPT", correctionIds: [] }],
   needsMe: [{
     id: "attention-1",
     commitmentId: commitment.id,
@@ -158,6 +165,8 @@ const home = {
     coverageEnd: "2026-07-06",
     limitations: ["No prior persisted baseline exists."],
   },
+  activeCommitmentCount: 1,
+  reviewItemCount: 1,
 } as const satisfies HomeProjectionDto;
 
 const detail = {
@@ -279,6 +288,7 @@ test("Recovery v1 freezes endpoint methods and paths without database vocabulary
   assert.deepEqual(recoveryEndpoints.logout, { method: "POST", path: "/api/auth/logout" });
   assert.deepEqual(recoveryEndpoints.submitEvidence, { method: "POST", path: "/api/workspaces/current/evidence" });
   assert.deepEqual(recoveryEndpoints.home, { method: "GET", path: "/api/workspaces/current/brief" });
+  assert.deepEqual(recoveryEndpoints.recordWorkspaceActivation, { method: "POST", path: "/api/workspaces/current/activation" });
   assert.deepEqual(recoveryEndpoints.evidence("evidence 1"), { method: "GET", path: "/api/workspaces/current/evidence/evidence%201" });
   assert.deepEqual(recoveryEndpoints.commitments, { method: "GET", path: "/api/workspaces/current/commitments" });
   assert.deepEqual(recoveryEndpoints.commitment("commitment 1"), { method: "GET", path: "/api/workspaces/current/commitments/commitment%201" });
@@ -290,10 +300,21 @@ test("Recovery v1 freezes endpoint methods and paths without database vocabulary
   assert.deepEqual(recoveryEndpoints.receiptInbox, { method: "POST", path: "/api/workspaces/current/sources/receipt-inbox" });
   assert.deepEqual(recoveryEndpoints.rotateReceiptInbox, { method: "POST", path: "/api/workspaces/current/sources/receipt-inbox/rotate" });
   assert.deepEqual(recoveryEndpoints.revokeReceiptInbox, { method: "DELETE", path: "/api/workspaces/current/sources/receipt-inbox" });
+  assert.deepEqual(recoveryEndpoints.standingMandate, { method: "GET", path: "/api/workspaces/current/standing-mandate" });
+  assert.deepEqual(recoveryEndpoints.signStandingMandate, { method: "POST", path: "/api/workspaces/current/standing-mandate" });
+  assert.deepEqual(recoveryEndpoints.revokeStandingMandate, { method: "DELETE", path: "/api/workspaces/current/standing-mandate" });
+  assert.deepEqual(recoveryEndpoints.autopilotCandidates, { method: "GET", path: "/api/workspaces/current/autopilot/candidates" });
+  assert.deepEqual(recoveryEndpoints.vetoAutopilotCandidate("candidate 1"), { method: "POST", path: "/api/workspaces/current/autopilot/candidates/candidate%201/veto" });
+  assert.deepEqual(recoveryEndpoints.autopilotAttempts("candidate 1"), { method: "GET", path: "/api/workspaces/current/autopilot/candidates/candidate%201/attempts" });
+  assert.deepEqual(recoveryEndpoints.disableAutopilotProvider("openai"), { method: "POST", path: "/api/workspaces/current/autopilot/providers/openai/disable" });
+  assert.deepEqual(recoveryEndpoints.autopilotDeadLetters, { method: "GET", path: "/api/workspaces/current/autopilot/dead-letters" });
+  assert.deepEqual(recoveryEndpoints.replayAutopilotDeadLetter("letter 1"), { method: "POST", path: "/api/workspaces/current/autopilot/dead-letters/letter%201/replay" });
+  assert.deepEqual(recoveryEndpoints.disconnectRecoverySource("source 1"), { method: "POST", path: "/api/workspaces/current/autopilot/sources/source%201/disconnect" });
+  assert.deepEqual(recoveryEndpoints.reconnectRecoverySource("source 1"), { method: "POST", path: "/api/workspaces/current/autopilot/sources/source%201/reconnect" });
 
   const sourceText = readFileSync(new URL("../src/lib/recovery/contracts.ts", import.meta.url), "utf8");
   assert.doesNotMatch(sourceText, /from ["'](?:pg|server-only|@\/lib\/server)/);
-  assert.doesNotMatch(sourceText, /workspace_states|recurring_items|evidence_links|commitment_decisions|sql|exception|stack|cause/i);
+  assert.doesNotMatch(sourceText, /workspace_states|recurring_items|evidence_links|commitment_decisions|sql|\bexception\b|stack|cause/i);
   assert.doesNotMatch(sourceText, /\b(?:any|unknown)\b/);
 });
 
@@ -322,6 +343,7 @@ test("Recovery v1 freezes bounded immutable evidence and typed endpoint payload 
     logout: true,
     submitEvidence: true,
     home: true,
+    recordWorkspaceActivation: true,
     evidence: true,
     commitments: true,
     commitment: true,
@@ -333,6 +355,17 @@ test("Recovery v1 freezes bounded immutable evidence and typed endpoint payload 
     receiptInbox: true,
     rotateReceiptInbox: true,
     revokeReceiptInbox: true,
+    standingMandate: true,
+    signStandingMandate: true,
+    revokeStandingMandate: true,
+    autopilotCandidates: true,
+    vetoAutopilotCandidate: true,
+    autopilotAttempts: true,
+    disableAutopilotProvider: true,
+    autopilotDeadLetters: true,
+    replayAutopilotDeadLetter: true,
+    disconnectRecoverySource: true,
+    reconnectRecoverySource: true,
   } satisfies Record<keyof typeof recoveryEndpoints & keyof RecoveryEndpointContracts, true>;
   assert.deepEqual(Object.keys(endpointWitness), Object.keys(recoveryEndpoints));
 

@@ -12,6 +12,22 @@ export const productEventNames = [
   "billing.checkout_started",
   "billing.payment_settled",
   "billing.payment_refunded",
+  "mandate.signed",
+  "mandate.revoked",
+  "candidate.evaluated",
+  "candidate.vetoed",
+  "candidate.authorized",
+  "notice.queued",
+  "notice.delivered",
+  "notice.failed",
+  "execution.started",
+  "execution.completed",
+  "execution.failed",
+  "exception.opened",
+  "window.verified",
+  "verification.pending",
+  "invoice.created",
+  "source.connected",
 ] as const;
 
 export const productEventSources = ["sync-runner", "living-ledger", "workspace-api", "product-ui"] as const;

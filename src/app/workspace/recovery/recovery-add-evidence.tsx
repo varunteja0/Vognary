@@ -45,7 +45,7 @@ export function RecoveryAddEvidence({
           <ol className="mt-4 grid max-w-2xl gap-2 text-sm leading-6 text-(--muted)">
             <li><strong className="text-(--ink-soft)">1.</strong> Paste 2-3 billing emails or invoices.</li>
             <li><strong className="text-(--ink-soft)">2.</strong> Use the same service twice so Vognary can test a cadence.</li>
-            <li><strong className="text-(--ink-soft)">3.</strong> See monthly burn, the next expected charge, and one decision when the receipts support them.</li>
+            <li><strong className="text-(--ink-soft)">3.</strong> See monthly burn, an annualized estimate, the next expected charge, and one decision when the receipts support them.</li>
           </ol>
         ) : (
           <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Paste the receipt text exactly as you received it. It is stored as evidence and never edited.</p>

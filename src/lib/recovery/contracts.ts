@@ -46,6 +46,9 @@ export type CoverageState = (typeof coverageStates)[number];
 export const evidenceProvenanceKinds = ["USER_SUBMITTED", "PROVIDER_RECEIVED"] as const;
 export type EvidenceProvenanceKind = (typeof evidenceProvenanceKinds)[number];
 
+export const projectionAmountProvenances = ["RECEIPT", "USER_CORRECTED"] as const;
+export type ProjectionAmountProvenance = (typeof projectionAmountProvenances)[number];
+
 export const recoveryErrorCodes = [
   "AUTH_REQUIRED",
   "FORBIDDEN",
@@ -107,6 +110,8 @@ export type ProjectionTotalDto = {
   amount: MoneyDto;
   commitmentIds: NonEmptyIds;
   evidenceIds: NonEmptyIds;
+  provenance: ProjectionAmountProvenance;
+  correctionIds: readonly string[];
 };
 
 export type ConfidenceDto = {
@@ -281,16 +286,108 @@ export type HomeChangedDto =
       items: readonly ChangeItemDto[];
     };
 
+export type StandingMandateDto = {
+  id: string;
+  version: number;
+  status: "ACTIVE" | "REVOKED";
+  termsVersion: string;
+  signedText: string;
+  signedTextHash: string;
+  currency: string;
+  perActionCeilingMinor: string;
+  rolling30dCeilingMinor: string;
+  vetoWindowHours: 48;
+  signedAt: string;
+  revokedAt: string | null;
+};
+
+export type AutopilotCandidateDto = {
+  id: string;
+  commitmentId: string;
+  merchant: string;
+  eligibility: "ELIGIBLE" | "INELIGIBLE" | "PROTECTED" | "UNSUPPORTED_ROUTE";
+  status: string;
+  reasons: readonly string[];
+  providerId: string | null;
+  amount: MoneyDto;
+  noticeDeliveredAt: string | null;
+  vetoDeadlineAt: string | null;
+  exceptionCode: string | null;
+};
+
+export type AutopilotAttemptDto = {
+  attemptNo: number;
+  operationKey: string;
+  status: string;
+  outcome: string | null;
+  operatorMinutes: string | null;
+  proofKind: string | null;
+  proofReferenceHash: string | null;
+  failureReason: string | null;
+  createdAt: string;
+};
+
+export type AutopilotDeadLetterDto = {
+  id: string;
+  kind: "NOTICE" | "EXECUTION" | "WEBHOOK" | "INVOICE";
+  candidateId: string | null;
+  lastErrorCode: string;
+  attemptCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RecoverySourceDisconnectionDto = {
+  sourceId: string;
+  disconnectedAt: string;
+  reconnectedAt: string | null;
+  withdrawnCandidateIds: readonly string[];
+};
+
+export type AutopilotWindowDto = {
+  candidateId: string;
+  status: "PENDING" | "COVERED_CLEAN" | "NOT_ELIMINATED" | "MISSING_COVERAGE";
+  expectedDebitDate: string;
+  savingMinor: string | null;
+};
+
+export type AutopilotFeeDto = {
+  monitoringMinor: string;
+  verifiedSavingMinor: string;
+  outcomeFeeMinor: string;
+  retainedMinor: string;
+  refundCreditMinor: string;
+  additionalChargeMinor: string;
+  chargeStatus: "FAIL_CLOSED" | "INVOICE_ONLY" | "CHARGED" | "REFUNDED";
+};
+
+export type AutopilotHomeDto = {
+  executionEnabled: boolean;
+  noticeEnabled: boolean;
+  mandate: StandingMandateDto | null;
+  watching: readonly AutopilotCandidateDto[];
+  inVeto: readonly AutopilotCandidateDto[];
+  handled: readonly AutopilotCandidateDto[];
+  needsHelp: readonly AutopilotCandidateDto[];
+  proof: readonly AutopilotWindowDto[];
+  fees: AutopilotFeeDto | null;
+  attempts: readonly AutopilotAttemptDto[];
+};
+
 export type HomeProjectionDto = {
   workspace: WorkspaceDto;
   generatedAt: string;
   recentObservations: readonly SavedObservationDto[];
   monthlyTotals: readonly ProjectionTotalDto[];
+  annualizedEstimateTotals: readonly ProjectionTotalDto[];
   next30DayTotals: readonly ProjectionTotalDto[];
   needsMe: readonly AttentionItemDto[];
   changed: HomeChangedDto;
   next: readonly UpcomingItemDto[];
   coverage: CoverageDto;
+  activeCommitmentCount: number;
+  reviewItemCount: number;
+  autopilot?: AutopilotHomeDto;
 };
 
 export type RecoverySessionResponse =
@@ -503,6 +600,7 @@ export type RecoveryEndpointContracts = {
   logout: { ownership: "RECOVERY_V1"; request: never; response: LogoutResponse | ApiFailure; headers: never };
   submitEvidence: { ownership: "RECOVERY_V1"; request: EvidenceIngestRequest; response: SubmitEvidenceResponse | ApiFailure; headers: RecoveryMutationHeaders };
   home: { ownership: "RECOVERY_V1"; request: never; response: GetHomeResponse | ApiFailure; headers: never };
+  recordWorkspaceActivation: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<{ recorded: boolean; id: string | null; outcome: "recorded" | "already-recorded" | "deferred-no-consent" }> | ApiFailure; headers: never };
   evidence: { ownership: "RECOVERY_V1"; request: never; response: GetEvidenceResponse | ApiFailure; headers: never };
   commitments: { ownership: "RECOVERY_V1"; request: ListCommitmentsQuery; response: ListCommitmentsResponse | ApiFailure; headers: never };
   commitment: { ownership: "RECOVERY_V1"; request: GetCommitmentQuery; response: GetCommitmentResponse | ApiFailure; headers: never };
@@ -514,6 +612,17 @@ export type RecoveryEndpointContracts = {
   receiptInbox: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<ReceiptInboxStatusDto> | ApiFailure; headers: never };
   rotateReceiptInbox: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<ReceiptInboxStatusDto> | ApiFailure; headers: ReceiptInboxRotationHeaders };
   revokeReceiptInbox: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<ReceiptInboxStatusDto> | ApiFailure; headers: never };
+  standingMandate: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<StandingMandateDto | null> | ApiFailure; headers: never };
+  signStandingMandate: { ownership: "RECOVERY_V1"; request: { accepted: true }; response: ApiSuccess<StandingMandateDto> | ApiFailure; headers: RecoveryMutationHeaders };
+  revokeStandingMandate: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<StandingMandateDto> | ApiFailure; headers: RecoveryMutationHeaders };
+  autopilotCandidates: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<{ items: readonly AutopilotCandidateDto[] }> | ApiFailure; headers: never };
+  vetoAutopilotCandidate: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<AutopilotCandidateDto> | ApiFailure; headers: RecoveryMutationHeaders };
+  autopilotAttempts: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<{ items: readonly AutopilotAttemptDto[] }> | ApiFailure; headers: never };
+  disableAutopilotProvider: { ownership: "RECOVERY_V1"; request: { reason?: string }; response: ApiSuccess<{ providerId: string; disabled: true }> | ApiFailure; headers: RecoveryMutationHeaders };
+  autopilotDeadLetters: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<{ items: readonly AutopilotDeadLetterDto[] }> | ApiFailure; headers: never };
+  replayAutopilotDeadLetter: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<{ id: string; replayed: boolean; reason?: string }> | ApiFailure; headers: RecoveryMutationHeaders };
+  disconnectRecoverySource: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<RecoverySourceDisconnectionDto> | ApiFailure; headers: RecoveryMutationHeaders };
+  reconnectRecoverySource: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<RecoverySourceDisconnectionDto> | ApiFailure; headers: RecoveryMutationHeaders };
 };
 
 const encodePathSegment = (value: string) => encodeURIComponent(value);
@@ -526,6 +635,7 @@ export const recoveryEndpoints = {
   logout: { method: "POST", path: "/api/auth/logout" },
   submitEvidence: { method: "POST", path: "/api/workspaces/current/evidence" },
   home: { method: "GET", path: "/api/workspaces/current/brief" },
+  recordWorkspaceActivation: { method: "POST" as const, path: "/api/workspaces/current/activation" },
   evidence: (evidenceId: string) => ({
     method: "GET" as const,
     path: `/api/workspaces/current/evidence/${encodePathSegment(evidenceId)}`,
@@ -549,4 +659,33 @@ export const recoveryEndpoints = {
   receiptInbox: { method: "POST", path: "/api/workspaces/current/sources/receipt-inbox" },
   rotateReceiptInbox: { method: "POST", path: "/api/workspaces/current/sources/receipt-inbox/rotate" },
   revokeReceiptInbox: { method: "DELETE", path: "/api/workspaces/current/sources/receipt-inbox" },
+  standingMandate: { method: "GET", path: "/api/workspaces/current/standing-mandate" },
+  signStandingMandate: { method: "POST", path: "/api/workspaces/current/standing-mandate" },
+  revokeStandingMandate: { method: "DELETE", path: "/api/workspaces/current/standing-mandate" },
+  autopilotCandidates: { method: "GET", path: "/api/workspaces/current/autopilot/candidates" },
+  vetoAutopilotCandidate: (candidateId: string) => ({
+    method: "POST" as const,
+    path: `/api/workspaces/current/autopilot/candidates/${encodePathSegment(candidateId)}/veto`,
+  }),
+  autopilotAttempts: (candidateId: string) => ({
+    method: "GET" as const,
+    path: `/api/workspaces/current/autopilot/candidates/${encodePathSegment(candidateId)}/attempts`,
+  }),
+  disableAutopilotProvider: (providerId: string) => ({
+    method: "POST" as const,
+    path: `/api/workspaces/current/autopilot/providers/${encodePathSegment(providerId)}/disable`,
+  }),
+  autopilotDeadLetters: { method: "GET" as const, path: "/api/workspaces/current/autopilot/dead-letters" },
+  replayAutopilotDeadLetter: (deadLetterId: string) => ({
+    method: "POST" as const,
+    path: `/api/workspaces/current/autopilot/dead-letters/${encodePathSegment(deadLetterId)}/replay`,
+  }),
+  disconnectRecoverySource: (sourceId: string) => ({
+    method: "POST" as const,
+    path: `/api/workspaces/current/autopilot/sources/${encodePathSegment(sourceId)}/disconnect`,
+  }),
+  reconnectRecoverySource: (sourceId: string) => ({
+    method: "POST" as const,
+    path: `/api/workspaces/current/autopilot/sources/${encodePathSegment(sourceId)}/reconnect`,
+  }),
 } as const;

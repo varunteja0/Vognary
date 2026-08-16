@@ -50,6 +50,7 @@ export async function GET(request: Request) {
     capabilities: {
       schema: features.schema,
       recoveryV1: features.recoveryV1,
+      autopilot: features.autopilot,
       privacyLifecycle: features.privacyLifecycle,
       renewalAlerts: features.renewalAlerts,
       commitmentDecisions: features.commitmentDecisions,

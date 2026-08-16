@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AttentionItemDto, ChangeItemDto, HomeProjectionDto, ProjectionTotalDto, ReceiptInboxStatusDto, UpcomingItemDto } from "@/lib/recovery/contracts";
+import { hasCitedRecurringSpendPicture } from "@/lib/recovery/domain";
 import { renderRecoveryShareText } from "@/lib/recovery/share-report";
+import { RecoveryAutopilotHome } from "./recovery-autopilot-home";
 import {
   attentionReasonLabels,
   cadenceLabels,
@@ -11,6 +13,9 @@ import {
   decisionLabels,
   formatDay,
   formatMoment,
+  coverageLabels,
+  coverageMeanings,
+  projectionAmountProvenanceLabels,
   priorityLabels,
 } from "./labels";
 import { ConfidenceBadge, MoneyValue, StateBlock } from "./recovery-states";
@@ -32,6 +37,9 @@ export function RecoveryHome({
   sourceStatus,
   pendingSourceAction,
   onProvisionReceiptInbox,
+  onVeto,
+  pendingVetoId,
+  onCitedPictureRendered,
 }: {
   home: HomeProjectionDto;
   commitmentTotal: number;
@@ -43,6 +51,9 @@ export function RecoveryHome({
   sourceStatus: LoadState;
   pendingSourceAction: "PROVISION" | "ROTATE" | "REVOKE" | null;
   onProvisionReceiptInbox: () => void;
+  onVeto?: (candidateId: string) => void;
+  pendingVetoId?: string | null;
+  onCitedPictureRendered?: (workspaceId: string) => void;
 }) {
   const [shareStatus, setShareStatus] = useState("");
 
@@ -53,6 +64,21 @@ export function RecoveryHome({
     } catch {
       setShareStatus("Could not copy automatically. Try again from a browser that allows clipboard access.");
     }
+  }
+
+  if (home.autopilot?.mandate?.status === "ACTIVE") {
+    return (
+      <div className="grid gap-5">
+        <RecoveryFirstValueMetrics home={home} compact onCitedPictureRendered={onCitedPictureRendered} />
+        <UpcomingTimeline home={home} compact onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />
+        <RecoveryAutopilotHome
+          autopilot={home.autopilot}
+          onAddEvidence={onAddEvidence}
+          onVeto={onVeto ?? (() => undefined)}
+          pendingVetoId={pendingVetoId ?? null}
+        />
+      </div>
+    );
   }
 
   if (home.coverage.evidenceCount > 0 && commitmentTotal === 0) {
@@ -78,19 +104,7 @@ export function RecoveryHome({
 
   return (
     <div className="grid gap-5">
-      {home.monthlyTotals.length || home.next30DayTotals.length ? (
-        <section aria-label="Software spend" className="panel p-4 sm:p-5">
-          <div className="grid gap-5 sm:grid-cols-2">
-            <TotalBlock label="Monthly software spend" totals={home.monthlyTotals} empty="No recurring amount yet" />
-            <TotalBlock label="Next 30 days" totals={home.next30DayTotals} empty="Nothing expected in the next 30 days" />
-          </div>
-          {home.monthlyTotals.length > 1 || home.next30DayTotals.length > 1 ? (
-            <p className="mt-4 text-xs leading-5 text-(--muted)">
-              Currencies stay separate because Vognary does not invent an exchange rate.
-            </p>
-          ) : null}
-        </section>
-      ) : null}
+      <RecoveryFirstValueMetrics home={home} onCitedPictureRendered={onCitedPictureRendered} />
 
       {home.changed.state === "COMPARED" ? (
         <section aria-labelledby="recovery-changed" className="panel border-ochre p-4 sm:p-5">
@@ -133,20 +147,7 @@ export function RecoveryHome({
         </div>
       </section>
 
-      <section aria-labelledby="recovery-next" className="panel p-4 sm:p-5">
-        <h3 id="recovery-next" className="font-display text-xl font-semibold text-(--ink)">Coming up</h3>
-        <div className="mt-4 grid gap-3">
-          {home.next.length ? (
-            home.next.map((item) => <UpcomingRow key={`${item.commitmentId}-${item.date}`} item={item} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />)
-          ) : (
-            <StateBlock
-              eyebrow="No expected dates"
-              title="Nothing is scheduled from your receipts"
-              detail="Vognary shows an expected charge only when a receipt supports a date."
-            />
-          )}
-        </div>
-      </section>
+      <UpcomingTimeline home={home} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />
 
       <section aria-labelledby="recovery-receipts" className="grid gap-3 border-t border-line px-1 pt-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -169,6 +170,91 @@ export function RecoveryHome({
 }
 
 const firstValueStory = "Start with the billing receipts you already have. Vognary shows what renews next when the receipts support it, what needs attention, and the receipt behind each claim.";
+
+function RecoveryFirstValueMetrics({
+  home,
+  compact = false,
+  onCitedPictureRendered,
+}: {
+  home: HomeProjectionDto;
+  compact?: boolean;
+  onCitedPictureRendered?: (workspaceId: string) => void;
+}) {
+  const hasPicture = hasCitedRecurringSpendPicture(home);
+  const omittedAnnualized = home.monthlyTotals.some(
+    (total) => !home.annualizedEstimateTotals.some((annualized) => annualized.amount.currency === total.amount.currency),
+  );
+
+  useEffect(() => {
+    if (!hasPicture) return;
+    onCitedPictureRendered?.(home.workspace.id);
+  }, [hasPicture, home.workspace.id, onCitedPictureRendered]);
+
+  return (
+    <section aria-label="Software spend" className={compact ? "panel p-3 sm:p-4" : "panel p-4 sm:p-5"}>
+      <div className={`grid gap-5 ${compact ? "sm:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
+        <TotalBlock label="Monthly software spend" totals={home.monthlyTotals} empty="No recurring amount yet" compact={compact} />
+        <TotalBlock label="Annualized estimate" totals={home.annualizedEstimateTotals} empty="No annualized estimate yet" compact={compact} />
+        <TotalBlock label="Next 30 days" totals={home.next30DayTotals} empty="Nothing expected in the next 30 days" compact={compact} />
+      </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <CountBlock label="Active commitments" count={home.activeCommitmentCount} compact={compact} />
+        <CountBlock label="Needs review" count={home.reviewItemCount} compact={compact} />
+      </div>
+      {omittedAnnualized ? (
+        <p className="mt-4 text-xs leading-5 text-(--muted)">
+          An annualized estimate is not published when 12 × the cited monthly equivalent exceeds what Vognary can display.
+        </p>
+      ) : home.annualizedEstimateTotals.length ? (
+        <p className="mt-4 text-xs leading-5 text-(--muted)">
+          {home.annualizedEstimateTotals.some((total) => total.provenance === "USER_CORRECTED")
+            ? "Annualized estimate is 12 × the cited monthly equivalent, including a saved correction. It is not a historical yearly total."
+            : "Annualized estimate is 12 × the cited monthly equivalent from receipts. It is not a historical yearly total."}
+        </p>
+      ) : null}
+      {home.monthlyTotals.length > 1 || home.annualizedEstimateTotals.length > 1 || home.next30DayTotals.length > 1 ? (
+        <p className="mt-2 text-xs leading-5 text-(--muted)">
+          Currencies stay separate because Vognary does not invent an exchange rate.
+        </p>
+      ) : null}
+      {home.coverage.state !== "CURRENT" ? (
+        <p className="mt-2 text-xs leading-5 text-(--muted)" data-coverage-state={home.coverage.state}>
+          {coverageLabels[home.coverage.state]}. {coverageMeanings[home.coverage.state]}
+          {home.coverage.limitations[0] ? ` ${home.coverage.limitations[0]}` : ""}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function UpcomingTimeline({
+  home,
+  compact = false,
+  onOpenCommitment,
+  onInspectEvidence,
+}: {
+  home: HomeProjectionDto;
+  compact?: boolean;
+  onOpenCommitment: (commitmentId: string) => void;
+  onInspectEvidence: InspectEvidence;
+}) {
+  return (
+    <section aria-labelledby="recovery-next" className={compact ? "panel p-3 sm:p-4" : "panel p-4 sm:p-5"}>
+      <h3 id="recovery-next" className={`font-display font-semibold text-(--ink) ${compact ? "text-lg" : "text-xl"}`}>Coming up</h3>
+      <div className="mt-4 grid gap-3">
+        {home.next.length ? (
+          home.next.map((item) => <UpcomingRow key={`${item.commitmentId}-${item.date}`} item={item} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />)
+        ) : (
+          <StateBlock
+            eyebrow="No expected dates"
+            title="Nothing is scheduled from your receipts"
+            detail="Vognary shows an expected charge only when a receipt supports a date."
+          />
+        )}
+      </div>
+    </section>
+  );
+}
 
 function FirstObservationHome({
   home,
@@ -339,19 +425,44 @@ function EmptyRecoveryHome({
   );
 }
 
-function TotalBlock({ label, totals, empty }: { label: string; totals: readonly ProjectionTotalDto[]; empty: string }) {
+function TotalBlock({
+  label,
+  totals,
+  empty,
+  compact = false,
+}: {
+  label: string;
+  totals: readonly ProjectionTotalDto[];
+  empty: string;
+  compact?: boolean;
+}) {
   return (
     <div>
       <p className="eyebrow eyebrow-xs">{label}</p>
       {totals.length ? (
-        <div className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1">
+        <div className="mt-2 grid gap-2">
           {totals.map((total) => (
-            <MoneyValue key={total.amount.currency} amount={total.amount} className="text-3xl font-semibold text-(--ink)" />
+            <div key={total.amount.currency}>
+              <MoneyValue
+                amount={total.amount}
+                className={`${compact ? "text-2xl" : "text-3xl"} font-semibold text-(--ink)`}
+              />
+              <p className="mt-1 text-xs leading-5 text-(--muted)">{projectionAmountProvenanceLabels[total.provenance]}</p>
+            </div>
           ))}
         </div>
       ) : (
         <p className="mt-2 font-data text-sm text-(--muted)">{empty}</p>
       )}
+    </div>
+  );
+}
+
+function CountBlock({ label, count, compact = false }: { label: string; count: number; compact?: boolean }) {
+  return (
+    <div>
+      <p className="eyebrow eyebrow-xs">{label}</p>
+      <p className={`mt-2 font-data ${compact ? "text-2xl" : "text-3xl"} font-semibold text-(--ink)`}>{count.toLocaleString("en-IN")}</p>
     </div>
   );
 }

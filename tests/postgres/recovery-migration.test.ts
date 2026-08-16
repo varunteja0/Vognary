@@ -49,6 +49,22 @@ const recoveryRelations = [
   "recovery_idempotency_keys",
   "recovery_inbound_aliases",
   "recovery_inbound_events",
+  "recovery_standing_mandates",
+  "recovery_action_candidates",
+  "recovery_covered_windows",
+  "recovery_fee_ledger",
+  "recovery_execution_attempts",
+  "recovery_shadow_gate_snapshots",
+  "recovery_notice_delivery_events",
+  "recovery_notice_pending_events",
+  "recovery_connected_mandate_cohort",
+  "recovery_source_disconnections",
+  "recovery_autopilot_dead_letters",
+  "recovery_billing_year_anchors",
+  "recovery_veto_notices",
+  "recovery_classification_snapshots",
+  "recovery_executions",
+  "recovery_provider_disables",
 ] as const;
 
 test("a targeted migration refuses a fresh database before creating schema or ledger state", {
@@ -77,15 +93,15 @@ test("the real migration runner installs and records the Recovery receipt inbox 
 }, async () => {
   await withDisposableDatabase("recovery_fresh", async (connectionString) => {
     const result = runMigrations(connectionString);
-    assert.equal(result.applied.at(-1)?.id, "0030_legacy_tenant_ownership_immutable");
+      assert.equal(result.applied.at(-1)?.id, "0044_autopilot_audit_immutability");
 
     const pool = createPool(connectionString);
     try {
       const migrations = await pool.query<{ id: string }>(
         `select id from schema_migrations order by id`,
       );
-      assert.equal(migrations.rows.at(-1)?.id, "0030_legacy_tenant_ownership_immutable");
-      assert.equal(migrations.rows.length, 30);
+      assert.equal(migrations.rows.at(-1)?.id, "0044_autopilot_audit_immutability");
+      assert.equal(migrations.rows.length, 44);
       await assertRecoveryRelations(pool);
       const integrity = await pool.query<{ conname: string | null; trigger: string | null }>(
         `select
@@ -314,14 +330,28 @@ test("the real migration runner upgrades an existing 0022 database through Recov
       { id: "0028_recovery_gmail_oauth_source", mode: "applied-migration" },
       { id: "0029_legacy_tenant_integrity", mode: "applied-migration" },
       { id: "0030_legacy_tenant_ownership_immutable", mode: "applied-migration" },
+      { id: "0031_autopilot_loop", mode: "applied-migration" },
+      { id: "0032_autopilot_proof_integrity", mode: "applied-migration" },
+      { id: "0033_autopilot_integrity", mode: "applied-migration" },
+      { id: "0034_autopilot_repair", mode: "applied-migration" },
+      { id: "0035_autopilot_codex_repair", mode: "applied-migration" },
+      { id: "0036_autopilot_notice_hold", mode: "applied-migration" },
+      { id: "0037_autopilot_clock_integrity", mode: "applied-migration" },
+      { id: "0038_autopilot_reconcile_integrity", mode: "applied-migration" },
+      { id: "0039_autopilot_frozen_notice_integrity", mode: "applied-migration" },
+      { id: "0040_autopilot_review_integrity", mode: "applied-migration" },
+      { id: "0041_workspace_activation_integrity", mode: "applied-migration" },
+      { id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" },
+      { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
+      { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
     ]);
 
     const verifyPool = createPool(connectionString);
     try {
       const migration = await verifyPool.query<{ id: string }>(
-        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source', '0029_legacy_tenant_integrity', '0030_legacy_tenant_ownership_immutable')`,
+        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source', '0029_legacy_tenant_integrity', '0030_legacy_tenant_ownership_immutable', '0031_autopilot_loop', '0032_autopilot_proof_integrity', '0033_autopilot_integrity', '0034_autopilot_repair', '0035_autopilot_codex_repair', '0036_autopilot_notice_hold', '0037_autopilot_clock_integrity', '0038_autopilot_reconcile_integrity', '0039_autopilot_frozen_notice_integrity', '0040_autopilot_review_integrity', '0041_workspace_activation_integrity', '0042_workspace_activation_semantic_reset', '0043_workspace_activation_semantic_version', '0044_autopilot_audit_immutability')`,
       );
-      assert.equal(migration.rowCount, 8);
+      assert.equal(migration.rowCount, 22);
       await assertRecoveryRelations(verifyPool);
 
       const preserved = await verifyPool.query<{
@@ -490,6 +520,20 @@ test("the real migration runner upgrades 0027 through 0028 without dropping Reco
       { id: "0028_recovery_gmail_oauth_source", mode: "applied-migration" },
       { id: "0029_legacy_tenant_integrity", mode: "applied-migration" },
       { id: "0030_legacy_tenant_ownership_immutable", mode: "applied-migration" },
+      { id: "0031_autopilot_loop", mode: "applied-migration" },
+      { id: "0032_autopilot_proof_integrity", mode: "applied-migration" },
+      { id: "0033_autopilot_integrity", mode: "applied-migration" },
+      { id: "0034_autopilot_repair", mode: "applied-migration" },
+      { id: "0035_autopilot_codex_repair", mode: "applied-migration" },
+      { id: "0036_autopilot_notice_hold", mode: "applied-migration" },
+      { id: "0037_autopilot_clock_integrity", mode: "applied-migration" },
+      { id: "0038_autopilot_reconcile_integrity", mode: "applied-migration" },
+      { id: "0039_autopilot_frozen_notice_integrity", mode: "applied-migration" },
+      { id: "0040_autopilot_review_integrity", mode: "applied-migration" },
+      { id: "0041_workspace_activation_integrity", mode: "applied-migration" },
+      { id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" },
+      { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
+      { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -945,6 +989,20 @@ test("0029 installs over historical cross-workspace rows without rewriting owner
       assert.deepEqual(applied.applied, [
         { id: "0029_legacy_tenant_integrity", mode: "applied-migration" },
         { id: "0030_legacy_tenant_ownership_immutable", mode: "applied-migration" },
+        { id: "0031_autopilot_loop", mode: "applied-migration" },
+        { id: "0032_autopilot_proof_integrity", mode: "applied-migration" },
+        { id: "0033_autopilot_integrity", mode: "applied-migration" },
+      { id: "0034_autopilot_repair", mode: "applied-migration" },
+      { id: "0035_autopilot_codex_repair", mode: "applied-migration" },
+      { id: "0036_autopilot_notice_hold", mode: "applied-migration" },
+      { id: "0037_autopilot_clock_integrity", mode: "applied-migration" },
+      { id: "0038_autopilot_reconcile_integrity", mode: "applied-migration" },
+      { id: "0039_autopilot_frozen_notice_integrity", mode: "applied-migration" },
+      { id: "0040_autopilot_review_integrity", mode: "applied-migration" },
+      { id: "0041_workspace_activation_integrity", mode: "applied-migration" },
+      { id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" },
+      { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
+      { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{ decision_workspace: string; item_workspace: string }>(
@@ -1165,6 +1223,20 @@ test("0030 leaves historical cross-workspace rows untouched and they remain cuto
       assert.deepEqual(applied.applied, [
         { id: "0029_legacy_tenant_integrity", mode: "applied-migration" },
         { id: "0030_legacy_tenant_ownership_immutable", mode: "applied-migration" },
+        { id: "0031_autopilot_loop", mode: "applied-migration" },
+        { id: "0032_autopilot_proof_integrity", mode: "applied-migration" },
+        { id: "0033_autopilot_integrity", mode: "applied-migration" },
+      { id: "0034_autopilot_repair", mode: "applied-migration" },
+      { id: "0035_autopilot_codex_repair", mode: "applied-migration" },
+      { id: "0036_autopilot_notice_hold", mode: "applied-migration" },
+      { id: "0037_autopilot_clock_integrity", mode: "applied-migration" },
+      { id: "0038_autopilot_reconcile_integrity", mode: "applied-migration" },
+      { id: "0039_autopilot_frozen_notice_integrity", mode: "applied-migration" },
+      { id: "0040_autopilot_review_integrity", mode: "applied-migration" },
+      { id: "0041_workspace_activation_integrity", mode: "applied-migration" },
+      { id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" },
+      { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
+      { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{
@@ -1304,6 +1376,651 @@ test("concurrent update and insert ordering cannot produce a cross-workspace evi
       await pool.query(`delete from workspaces where id = any($1::uuid[])`, [[tenants.workspaceA, tenants.workspaceB]]);
       await pool.query(`delete from users where id = any($1::uuid[])`, [[tenants.ownerA, tenants.ownerB]]);
       await pool.end();
+    }
+  });
+});
+
+test("upgrading from 0030 through 0033 cannot insert fee rows until 0034 sets finalized_at default", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("autopilot_fee_upgrade", async (connectionString) => {
+    const seedPool = createPool(connectionString);
+    try {
+      await seedSchemaThrough0022(seedPool);
+    } finally {
+      await seedPool.end();
+    }
+    runMigrations(connectionString, ["--through=0030_legacy_tenant_ownership_immutable"]);
+    const through0033 = runMigrations(connectionString, ["--through=0033_autopilot_integrity"]);
+    assert.equal(through0033.applied.at(-1)?.id, "0033_autopilot_integrity");
+    const mid = createPool(connectionString);
+    const userId = randomUUID();
+    const workspaceId = randomUUID();
+    try {
+      await mid.query(`insert into users (id, email) values ($1, $2)`, [userId, `${userId}@fee-upgrade.test`]);
+      await mid.query(
+        `insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Fee upgrade')`,
+        [workspaceId, userId],
+      );
+      await assert.rejects(
+        mid.query(
+          `insert into recovery_fee_ledger (
+             workspace_id, period_start, period_end, currency, monitoring_minor, verified_saving_minor,
+             outcome_fee_minor, retained_minor, refund_credit_minor, additional_charge_minor,
+             razorpay_charge_status, inputs_hash, year_start
+           ) values ($1, '2026-08-01', '2026-08-31', 'INR', 1, 0, 0, 0, 0, 0, 'FAIL_CLOSED', $2, '2026-08-15')`,
+          [workspaceId, "b".repeat(64)],
+        ),
+        /finalized_at/i,
+      );
+    } finally {
+      await mid.end();
+    }
+    const rest = runMigrations(connectionString);
+    assert.deepEqual(rest.applied, [
+      { id: "0034_autopilot_repair", mode: "applied-migration" },
+      { id: "0035_autopilot_codex_repair", mode: "applied-migration" },
+      { id: "0036_autopilot_notice_hold", mode: "applied-migration" },
+      { id: "0037_autopilot_clock_integrity", mode: "applied-migration" },
+      { id: "0038_autopilot_reconcile_integrity", mode: "applied-migration" },
+      { id: "0039_autopilot_frozen_notice_integrity", mode: "applied-migration" },
+      { id: "0040_autopilot_review_integrity", mode: "applied-migration" },
+      { id: "0041_workspace_activation_integrity", mode: "applied-migration" },
+      { id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" },
+      { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
+      { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
+    ]);
+    const pool = createPool(connectionString);
+    try {
+      await pool.query(
+        `insert into recovery_fee_ledger (
+           workspace_id, period_start, period_end, currency, monitoring_minor, verified_saving_minor,
+           outcome_fee_minor, retained_minor, refund_credit_minor, additional_charge_minor,
+           razorpay_charge_status, inputs_hash, year_start
+         ) values ($1, '2026-08-01', '2026-08-31', 'INR', 1, 0, 0, 0, 0, 0, 'FAIL_CLOSED', $2, '2026-08-15')`,
+        [workspaceId, "b".repeat(64)],
+      );
+      const stored = await pool.query<{ finalized: string | null; default_value: string | null }>(
+        `select finalized_at::text as finalized,
+                (select column_default from information_schema.columns
+                 where table_name = 'recovery_fee_ledger' and column_name = 'finalized_at') as default_value
+         from recovery_fee_ledger where workspace_id = $1`,
+        [workspaceId],
+      );
+      assert.ok(stored.rows[0]?.finalized);
+      assert.match(stored.rows[0]?.default_value ?? "", /now\(\)/);
+      await assert.rejects(
+        pool.query(`update recovery_fee_ledger set year_start = '2026-01-01' where workspace_id = $1`, [workspaceId]),
+        /cannot be mutated/i,
+      );
+    } finally {
+      await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+      await pool.query(`delete from users where id = $1`, [userId]);
+      await pool.end();
+    }
+  });
+});
+
+test("upgrading a genuinely frozen 0037 notice retries through the real store and stays immutable after 0040", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("autopilot_frozen_notice_upgrade", async (connectionString) => {
+    const seedPool = createPool(connectionString);
+    try {
+      await seedSchemaThrough0022(seedPool);
+    } finally {
+      await seedPool.end();
+    }
+    runMigrations(connectionString, ["--through=0037_autopilot_clock_integrity"]);
+    const mid = createPool(connectionString);
+    const ids = {
+      userId: randomUUID(),
+      workspaceId: randomUUID(),
+      submissionId: randomUUID(),
+      sourceId: randomUUID(),
+      evidenceId: randomUUID(),
+      commitmentId: randomUUID(),
+      mandateId: randomUUID(),
+      snapshotId: randomUUID(),
+      candidateId: randomUUID(),
+    };
+    const fromEmail = "notices@vognary.test";
+    const toEmail = "owner@upgrade.test";
+    const subject = "Vognary Autopilot notice";
+    const text = "OpenAI will be cancelled unless you veto within 48 hours.";
+    const bodyHash = createHash("sha256").update(`${fromEmail}\0${toEmail}\0${subject}\0${text}`).digest("hex");
+    try {
+      await mid.query(`insert into users (id, email) values ($1, $2)`, [ids.userId, `${ids.userId}@frozen-upgrade.test`]);
+      await mid.query(
+        `insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Frozen notice upgrade')`,
+        [ids.workspaceId, ids.userId],
+      );
+      await mid.query(
+        `insert into recovery_submissions (id, workspace_id, source_type, accepted_evidence_count)
+         values ($1, $2, 'RECEIPT_PASTE', 1)`,
+        [ids.submissionId, ids.workspaceId],
+      );
+      await mid.query(
+        `insert into recovery_sources (
+           id, workspace_id, submission_id, source_type, client_ref, label, content_hash, raw_evidence
+         ) values ($1, $2, $3, 'RECEIPT_PASTE', 'openai-july', 'Pasted receipt', $4, '{}'::jsonb)`,
+        [ids.sourceId, ids.workspaceId, ids.submissionId, "a".repeat(64)],
+      );
+      await mid.query(
+        `insert into recovery_evidence (
+           id, workspace_id, source_id, fingerprint, evidence_kind, row_number, excerpt, merchant,
+           normalized_merchant, category, provenance_reference, confidence_state
+         ) values ($1, $2, $3, $4, 'RECEIPT', 1, 'OpenAI charged INR 1999', 'OpenAI', 'openai',
+           'Software', 'paste:openai-july', 'HIGH')`,
+        [ids.evidenceId, ids.workspaceId, ids.sourceId, "b".repeat(64)],
+      );
+      await mid.query(
+        `insert into recovery_commitments (
+           id, workspace_id, identity_key, base_status, base_merchant, base_category, base_cadence,
+           base_currency, base_amount_minor, base_monthly_minor, effective_status, effective_merchant,
+           effective_cadence, effective_amount_minor, effective_monthly_minor, confidence_score,
+           recommended_decision, recommendation_reason
+         ) values ($1, $2, 'openai-upgrade', 'ACTIVE', 'OpenAI', 'Software', 'MONTHLY', 'INR', 1999, 1999,
+           'ACTIVE', 'OpenAI', 'MONTHLY', 1999, 1999, 90, 'CANCEL', 'Cited unexpected OpenAI debit.')`,
+        [ids.commitmentId, ids.workspaceId],
+      );
+      await mid.query(
+        `insert into recovery_standing_mandates (
+           id, workspace_id, version, status, terms_version, signed_text, signed_text_hash,
+           per_action_ceiling_minor, rolling_30d_ceiling_minor, signed_by_user_id
+         ) values ($1, $2, 1, 'ACTIVE', 'mandate-v1',
+           'Standing mandate signed for frozen notice upgrade fixture. Forty plus characters.',
+           $3, 500000, 1500000, $4)`,
+        [ids.mandateId, ids.workspaceId, "c".repeat(64), ids.userId],
+      );
+      await mid.query(
+        `insert into recovery_classification_snapshots (
+           id, workspace_id, commitment_id, commitment_class, protected_override, cited_category,
+           confidence_score, evidence_ids
+         ) values ($1, $2, $3, 'discretionary-subscription', false, 'Software', 90, ARRAY[$4::uuid])`,
+        [ids.snapshotId, ids.workspaceId, ids.commitmentId, ids.evidenceId],
+      );
+      await mid.query(
+        `insert into recovery_action_candidates (
+           id, workspace_id, commitment_id, mandate_id, mandate_version, classification_snapshot_id,
+           commitment_class, eligibility, status, amount_minor, currency
+         ) values ($1, $2, $3, $4, 1, $5, 'discretionary-subscription', 'ELIGIBLE', 'NOTICE_QUEUED', 1999, 'INR')`,
+        [ids.candidateId, ids.workspaceId, ids.commitmentId, ids.mandateId, ids.snapshotId],
+      );
+      await mid.query(
+        `insert into recovery_veto_notices (
+           workspace_id, candidate_id, channel, delivery_status, notice_from_email, notice_to_email,
+           notice_subject, notice_text, notice_body_hash, veto_token_hash, veto_expires_at, frozen_at
+         ) values ($1, $2, 'EMAIL', 'QUEUED', $3, $4, $5, $6, $7, $8, now() + interval '48 hours', now())`,
+        [ids.workspaceId, ids.candidateId, fromEmail, toEmail, subject, text, bodyHash, "d".repeat(64)],
+      );
+      const at0037 = await mid.query<{
+        notice_from_email: string;
+        notice_subject: string;
+        notice_text: string;
+      }>(
+        `select notice_from_email, notice_subject, notice_text
+         from recovery_veto_notices where workspace_id = $1`,
+        [ids.workspaceId],
+      );
+      assert.deepEqual(at0037.rows[0], {
+        notice_from_email: fromEmail,
+        notice_subject: subject,
+        notice_text: text,
+      });
+    } finally {
+      await mid.end();
+    }
+    const rest = runMigrations(connectionString);
+    assert.deepEqual(rest.applied, [
+      { id: "0038_autopilot_reconcile_integrity", mode: "applied-migration" },
+      { id: "0039_autopilot_frozen_notice_integrity", mode: "applied-migration" },
+      { id: "0040_autopilot_review_integrity", mode: "applied-migration" },
+      { id: "0041_workspace_activation_integrity", mode: "applied-migration" },
+      { id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" },
+      { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
+      { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
+    ]);
+    const retryOutput = execFileSync(
+      process.execPath,
+      [
+        "--conditions=react-server",
+        "--import=tsx",
+        "tests/helpers/retry-frozen-autopilot-notice.ts",
+        ids.workspaceId,
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          DATABASE_URL: connectionString,
+          POSTGRES_SSL: "false",
+          AUTOPILOT_NOTICE_ENABLED: "true",
+          AUTOPILOT_NOTICE_CHANNEL_READY: "true",
+          AUTOPILOT_TEST_ADAPTER: "true",
+          AUTOPILOT_VETO_TOKEN_SECRET: "upgrade-veto-signing-secret-32bytes!!",
+          RESEND_FROM_EMAIL: fromEmail,
+        },
+      },
+    );
+    const retried = JSON.parse(retryOutput.trim()) as {
+      accepted: number;
+    };
+    assert.equal(retried.accepted, 1);
+    const pool = createPool(connectionString);
+    try {
+      const upgraded = await pool.query<{
+        notice_from_email: string;
+        notice_to_email: string;
+        notice_subject: string;
+        notice_text: string;
+        notice_tags: unknown;
+        notice_payload_version: number;
+      }>(
+        `select notice_from_email, notice_to_email, notice_subject, notice_text, notice_tags, notice_payload_version
+         from recovery_veto_notices where workspace_id = $1`,
+        [ids.workspaceId],
+      );
+      assert.equal(upgraded.rows[0]?.notice_from_email, fromEmail);
+      assert.equal(upgraded.rows[0]?.notice_to_email, toEmail);
+      assert.equal(upgraded.rows[0]?.notice_subject, subject);
+      assert.equal(upgraded.rows[0]?.notice_text, text);
+      assert.equal(upgraded.rows[0]?.notice_payload_version, 1);
+      assert.ok(Array.isArray(upgraded.rows[0]?.notice_tags));
+      await assert.rejects(
+        pool.query(`update recovery_veto_notices set notice_text = 'mutated after 0039' where workspace_id = $1`, [ids.workspaceId]),
+        /frozen notice payload cannot be mutated/i,
+      );
+      await assert.rejects(
+        pool.query(
+          `update recovery_veto_notices set notice_tags = $2::jsonb where workspace_id = $1`,
+          [ids.workspaceId, JSON.stringify([{ name: "vognary", value: "mutated-after-upgrade" }])],
+        ),
+        /frozen notice payload cannot be mutated/i,
+      );
+      const afterDelivery = await pool.query<{ notice_text: string; delivery_status: string }>(
+        `select notice_text, delivery_status from recovery_veto_notices where workspace_id = $1`,
+        [ids.workspaceId],
+      );
+      assert.equal(afterDelivery.rows[0]?.notice_text, text);
+      assert.equal(afterDelivery.rows[0]?.delivery_status, "ACCEPTED");
+      await assert.rejects(
+        pool.query(`delete from recovery_veto_notices where workspace_id = $1`, [ids.workspaceId]),
+        /Frozen notice cannot be deleted directly/i,
+      );
+    } finally {
+      await pool.query(`delete from workspaces where id = $1`, [ids.workspaceId]);
+      await pool.query(`delete from users where id = $1`, [ids.userId]);
+      await pool.end();
+    }
+  });
+});
+
+test("0042 purges legacy workspace.activated rows that 0041 would have preserved, then a consented cited Home records exactly one", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("workspace_activation_semantic_reset", async (connectionString) => {
+    const seedPool = createPool(connectionString);
+    try {
+      await seedSchemaThrough0022(seedPool);
+    } finally {
+      await seedPool.end();
+    }
+
+    runMigrations(connectionString, ["--through=0040_autopilot_review_integrity"]);
+    const mid = createPool(connectionString);
+    const userId = randomUUID();
+    const workspaceId = randomUUID();
+    const email = `activation-reset-${userId.slice(0, 8)}@example.test`;
+    const activationCount = async (pool: typeof mid) => Number((await pool.query<{ n: string }>(
+      `select count(*)::text as n from product_events where workspace_id = $1 and event_name = 'workspace.activated'`,
+      [workspaceId],
+    )).rows[0]?.n ?? 0);
+    const unrelatedCount = async (pool: typeof mid) => Number((await pool.query<{ n: string }>(
+      `select count(*)::text as n from product_events where workspace_id = $1 and event_name = 'ledger.viewed'`,
+      [workspaceId],
+    )).rows[0]?.n ?? 0);
+
+    try {
+      await mid.query(`drop index if exists product_events_workspace_activated_once_idx`);
+      await mid.query(`insert into users (id, email) values ($1, $2)`, [userId, email]);
+      await mid.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Legacy activation')`, [workspaceId, userId]);
+      await mid.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+      await mid.query(
+        `insert into product_events (workspace_id, user_id, event_name, source, status, occurred_at, metrics)
+         values
+           ($1, $2, 'workspace.activated', 'workspace-api', 'succeeded', '2026-07-01T00:00:00.000Z', '{}'::jsonb),
+           ($1, $2, 'workspace.activated', 'workspace-api', 'succeeded', '2026-07-02T00:00:00.000Z', '{}'::jsonb),
+           ($1, $2, 'ledger.viewed', 'workspace-api', 'succeeded', '2026-07-03T00:00:00.000Z', '{}'::jsonb)`,
+        [workspaceId, userId],
+      );
+      assert.equal(await activationCount(mid), 2);
+      assert.equal(await unrelatedCount(mid), 1);
+    } finally {
+      await mid.end();
+    }
+
+    const through0041 = runMigrations(connectionString, ["--through=0041_workspace_activation_integrity"]);
+    assert.deepEqual(through0041.applied, [{ id: "0041_workspace_activation_integrity", mode: "applied-migration" }]);
+    const after0041 = createPool(connectionString);
+    try {
+      assert.equal(await activationCount(after0041), 1);
+      assert.equal(await unrelatedCount(after0041), 1);
+      const index = await after0041.query<{ indexdef: string }>(
+        `select indexdef from pg_indexes where indexname = 'product_events_workspace_activated_once_idx'`,
+      );
+      assert.match(index.rows[0]?.indexdef ?? "", /unique/i);
+    } finally {
+      await after0041.end();
+    }
+
+    const rest = runMigrations(connectionString, ["--through=0042_workspace_activation_semantic_reset"]);
+    assert.deepEqual(rest.applied, [{ id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" }]);
+    const after0042 = createPool(connectionString);
+    try {
+      assert.equal(await activationCount(after0042), 0);
+      assert.equal(await unrelatedCount(after0042), 1);
+    } finally {
+      await after0042.end();
+    }
+
+    const marker = runMigrations(connectionString);
+    assert.deepEqual(marker.applied, [
+      { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
+      { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
+    ]);
+
+    const helperOutput = execFileSync(
+      process.execPath,
+      [
+        "--conditions=react-server",
+        "--import=tsx",
+        "tests/helpers/qualify-workspace-activation.ts",
+        workspaceId,
+        userId,
+        email,
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          DATABASE_URL: connectionString,
+          POSTGRES_SSL: "false",
+          SESSION_SECRET: process.env.SESSION_SECRET || "activation-reset-session-secret-at-least-32-bytes",
+          ALLOW_IN_MEMORY_RATE_LIMITS: process.env.ALLOW_IN_MEMORY_RATE_LIMITS || "true",
+        },
+      },
+    );
+    const lastJsonLine = helperOutput.trim().split("\n").filter((line) => line.startsWith("{")).at(-1);
+    const qualified = JSON.parse(lastJsonLine ?? "null") as {
+      recorded: boolean;
+      activeCommitmentCount: number;
+      concurrentStatuses: number[];
+    };
+    assert.equal(qualified.recorded, true);
+    assert.equal(qualified.activeCommitmentCount, 1);
+    assert.equal(qualified.concurrentStatuses.length, 8);
+    assert.ok(qualified.concurrentStatuses.every((status) => status === 200));
+
+    const finalPool = createPool(connectionString);
+    try {
+      assert.equal(await activationCount(finalPool), 1);
+      assert.equal(await unrelatedCount(finalPool), 1);
+    } finally {
+      await finalPool.query(`delete from workspaces where id = $1`, [workspaceId]);
+      await finalPool.query(`delete from users where id = $1`, [userId]);
+      await finalPool.end();
+    }
+  });
+});
+
+test("0043 requires a semantic-version marker so old-style activations cannot be reinserted after reset", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("workspace_activation_semantic_version", async (connectionString) => {
+    const seedPool = createPool(connectionString);
+    try {
+      await seedSchemaThrough0022(seedPool);
+    } finally {
+      await seedPool.end();
+    }
+
+    runMigrations(connectionString, ["--through=0042_workspace_activation_semantic_reset"]);
+    const before = createPool(connectionString);
+    const userId = randomUUID();
+    const workspaceId = randomUUID();
+    const email = `activation-marker-${userId.slice(0, 8)}@example.test`;
+    const activationCount = async (pool: typeof before) => Number((await pool.query<{ n: string }>(
+      `select count(*)::text as n from product_events where workspace_id = $1 and event_name = 'workspace.activated'`,
+      [workspaceId],
+    )).rows[0]?.n ?? 0);
+
+    try {
+      await before.query(`insert into users (id, email) values ($1, $2)`, [userId, email]);
+      await before.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Marker activation')`, [workspaceId, userId]);
+      await before.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+      await before.query(
+        `insert into product_events (workspace_id, user_id, event_name, source, status, occurred_at, metrics)
+         values ($1, $2, 'workspace.activated', 'workspace-api', 'succeeded', '2026-07-01T00:00:00.000Z', '{}'::jsonb)`,
+        [workspaceId, userId],
+      );
+      assert.equal(await activationCount(before), 1);
+    } finally {
+      await before.end();
+    }
+
+    const applied = runMigrations(connectionString);
+    assert.deepEqual(applied.applied, [
+      { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
+      { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
+    ]);
+
+    const after = createPool(connectionString);
+    try {
+      assert.equal(await activationCount(after), 0);
+      await assert.rejects(
+        () => after.query(
+          `insert into product_events (workspace_id, user_id, event_name, source, status, metrics)
+           values ($1, $2, 'workspace.activated', 'workspace-api', 'succeeded', '{}'::jsonb)`,
+          [workspaceId, userId],
+        ),
+        /activation_semantic_version|semantic version|check/i,
+      );
+      assert.equal(await activationCount(after), 0);
+    } finally {
+      await after.end();
+    }
+
+    const helperOutput = execFileSync(
+      process.execPath,
+      [
+        "--conditions=react-server",
+        "--import=tsx",
+        "tests/helpers/qualify-workspace-activation.ts",
+        workspaceId,
+        userId,
+        email,
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          DATABASE_URL: connectionString,
+          POSTGRES_SSL: "false",
+          SESSION_SECRET: process.env.SESSION_SECRET || "activation-marker-session-secret-at-least-32-bytes",
+          ALLOW_IN_MEMORY_RATE_LIMITS: process.env.ALLOW_IN_MEMORY_RATE_LIMITS || "true",
+        },
+      },
+    );
+    const lastJsonLine = helperOutput.trim().split("\n").filter((line) => line.startsWith("{")).at(-1);
+    const qualified = JSON.parse(lastJsonLine ?? "null") as {
+      recorded: boolean;
+      activeCommitmentCount: number;
+      concurrentStatuses: number[];
+    };
+    assert.equal(qualified.recorded, true);
+    assert.equal(qualified.activeCommitmentCount, 1);
+    assert.equal(qualified.concurrentStatuses.length, 8);
+    assert.ok(qualified.concurrentStatuses.every((status) => status === 200));
+
+    const finalPool = createPool(connectionString);
+    try {
+      assert.equal(await activationCount(finalPool), 1);
+      const marker = await finalPool.query<{ version: number | null }>(
+        `select activation_semantic_version as version
+         from product_events
+         where workspace_id = $1 and event_name = 'workspace.activated'`,
+        [workspaceId],
+      );
+      assert.equal(marker.rows[0]?.version, 1);
+      await assert.rejects(
+        () => finalPool.query(
+          `insert into product_events (workspace_id, user_id, event_name, source, status, metrics)
+           values ($1, $2, 'workspace.activated', 'workspace-api', 'succeeded', '{}'::jsonb)`,
+          [workspaceId, userId],
+        ),
+        /activation_semantic_version|semantic version|check|unique|duplicate/i,
+      );
+    } finally {
+      await finalPool.query(`delete from workspaces where id = $1`, [workspaceId]);
+      await finalPool.query(`delete from users where id = $1`, [userId]);
+      await finalPool.end();
+    }
+  });
+});
+
+test("production-upgrade rehearsal from 0030 preserves Recovery facts through 0044 and fail-closes old activation writes", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("autopilot_upgrade_rehearsal", async (connectionString) => {
+    const seedPool = createPool(connectionString);
+    try {
+      await seedSchemaThrough0022(seedPool);
+    } finally {
+      await seedPool.end();
+    }
+    runMigrations(connectionString, ["--through=0030_legacy_tenant_ownership_immutable"]);
+    const before = createPool(connectionString);
+    const userId = randomUUID();
+    const workspaceId = randomUUID();
+    const submissionId = randomUUID();
+    const sourceId = randomUUID();
+    const evidenceId = randomUUID();
+    const commitmentId = randomUUID();
+    const email = `rehearsal-${userId.slice(0, 8)}@example.test`;
+    try {
+      await before.query(`insert into users (id, email) values ($1, $2)`, [userId, email]);
+      await before.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Upgrade rehearsal')`, [workspaceId, userId]);
+      await before.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+      await before.query(
+        `insert into consent_grants (workspace_id, user_id, subject_email, purpose, notice_version, source)
+         values ($1, $2, $3, 'product-analytics-opt-in', 'rehearsal', 'rehearsal')`,
+        [workspaceId, userId, email],
+      );
+      await before.query(
+        `insert into recovery_submissions (id, workspace_id, source_type, accepted_evidence_count)
+         values ($1, $2, 'RECEIPT_PASTE', 1)`,
+        [submissionId, workspaceId],
+      );
+      await before.query(
+        `insert into recovery_sources (
+           id, workspace_id, submission_id, source_type, client_ref, label, content_hash, raw_evidence
+         ) values ($1, $2, $3, 'RECEIPT_PASTE', 'openai-rehearsal', 'Pasted receipt', $4, '{}'::jsonb)`,
+        [sourceId, workspaceId, submissionId, "a".repeat(64)],
+      );
+      await before.query(
+        `insert into recovery_evidence (
+           id, workspace_id, source_id, fingerprint, evidence_kind, row_number, excerpt, merchant,
+           normalized_merchant, category, provenance_reference, confidence_state
+         ) values ($1, $2, $3, $4, 'RECEIPT', 1, 'OpenAI charged INR 1999', 'OpenAI', 'openai',
+           'Software', 'paste:openai-rehearsal', 'HIGH')`,
+        [evidenceId, workspaceId, sourceId, "b".repeat(64)],
+      );
+      await before.query(
+        `insert into recovery_commitments (
+           id, workspace_id, identity_key, base_status, base_merchant, base_category, base_cadence,
+           base_currency, base_amount_minor, base_monthly_minor, effective_status, effective_merchant,
+           effective_cadence, effective_amount_minor, effective_monthly_minor, confidence_score,
+           recommended_decision, recommendation_reason
+         ) values ($1, $2, 'openai-rehearsal', 'ACTIVE', 'OpenAI', 'Software', 'MONTHLY', 'INR', 1999, 1999,
+           'ACTIVE', 'OpenAI', 'MONTHLY', 1999, 1999, 90, 'KEEP', 'Cited OpenAI debit.')`,
+        [commitmentId, workspaceId],
+      );
+      await before.query(
+        `insert into product_events (workspace_id, user_id, event_name, source, status, metrics)
+         values ($1, $2, 'ledger.viewed', 'product-ui', 'succeeded', '{}'::jsonb)`,
+        [workspaceId, userId],
+      );
+      const beforeCounts = await before.query<{ evidence: string; commitments: string; consents: string; events: string }>(
+        `select
+           (select count(*)::text from recovery_evidence where workspace_id = $1) as evidence,
+           (select count(*)::text from recovery_commitments where workspace_id = $1) as commitments,
+           (select count(*)::text from consent_grants where workspace_id = $1) as consents,
+           (select count(*)::text from product_events where workspace_id = $1) as events`,
+        [workspaceId],
+      );
+      assert.deepEqual(beforeCounts.rows[0], { evidence: "1", commitments: "1", consents: "1", events: "1" });
+    } finally {
+      await before.end();
+    }
+
+    const applied = runMigrations(connectionString);
+    assert.deepEqual(applied.applied.map((row) => row.id), [
+      "0031_autopilot_loop",
+      "0032_autopilot_proof_integrity",
+      "0033_autopilot_integrity",
+      "0034_autopilot_repair",
+      "0035_autopilot_codex_repair",
+      "0036_autopilot_notice_hold",
+      "0037_autopilot_clock_integrity",
+      "0038_autopilot_reconcile_integrity",
+      "0039_autopilot_frozen_notice_integrity",
+      "0040_autopilot_review_integrity",
+      "0041_workspace_activation_integrity",
+      "0042_workspace_activation_semantic_reset",
+      "0043_workspace_activation_semantic_version",
+      "0044_autopilot_audit_immutability",
+    ]);
+
+    const after = createPool(connectionString);
+    try {
+      const afterCounts = await after.query<{ evidence: string; commitments: string; consents: string; events: string }>(
+        `select
+           (select count(*)::text from recovery_evidence where workspace_id = $1) as evidence,
+           (select count(*)::text from recovery_commitments where workspace_id = $1) as commitments,
+           (select count(*)::text from consent_grants where workspace_id = $1) as consents,
+           (select count(*)::text from product_events where workspace_id = $1) as events`,
+        [workspaceId],
+      );
+      assert.deepEqual(afterCounts.rows[0], { evidence: "1", commitments: "1", consents: "1", events: "1" });
+      await assert.rejects(
+        () => after.query(
+          `insert into product_events (workspace_id, user_id, event_name, source, status, metrics)
+           values ($1, $2, 'workspace.activated', 'workspace-api', 'succeeded', '{}'::jsonb)`,
+          [workspaceId, userId],
+        ),
+        /activation_semantic_version|semantic version|check/i,
+      );
+      await after.query(
+        `insert into recovery_fee_ledger (
+           workspace_id, period_start, period_end, currency, monitoring_minor, verified_saving_minor,
+           outcome_fee_minor, retained_minor, refund_credit_minor, additional_charge_minor,
+           razorpay_charge_status, inputs_hash, year_start
+         ) values ($1, '2026-08-01', '2026-08-31', 'INR', 0, 0, 0, 0, 0, 0, 'FAIL_CLOSED', $2, '2026-08-01')`,
+        [workspaceId, "c".repeat(64)],
+      );
+      await assert.rejects(
+        after.query(`delete from recovery_fee_ledger where workspace_id = $1`, [workspaceId]),
+        /cannot be deleted directly/i,
+      );
+      await assertRecoveryRelations(after);
+    } finally {
+      await after.query(`delete from workspaces where id = $1`, [workspaceId]).catch(() => undefined);
+      await after.query(`delete from users where id = $1`, [userId]).catch(() => undefined);
+      await after.end();
     }
   });
 });

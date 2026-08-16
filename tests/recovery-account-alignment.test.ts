@@ -28,6 +28,8 @@ test("privacy export includes receipt inbox lifecycle without routing capabiliti
   assert.match(privacyStore, /as inbound_events/);
   assert.match(privacyStore, /inboundAliases: recovery\.inbound_aliases/);
   assert.match(privacyStore, /inboundEvents: recovery\.inbound_events/);
+  assert.match(privacyStore, /as standing_mandates/);
+  assert.match(privacyStore, /standingMandates: recovery\.standing_mandates/);
   const aliasProjection = privacyStore.match(/select id, connected_account_id[\s\S]*?from recovery_inbound_aliases/)?.[0] ?? "";
   const eventProjection = privacyStore.match(/select id, provider, event_type[\s\S]*?from recovery_inbound_events/)?.[0] ?? "";
   assert.doesNotMatch(aliasProjection, /alias_hmac|encrypted_display|hmac_key_id/);
@@ -43,4 +45,16 @@ test("every receipt-account deletion path uses canonical alias revocation even a
   const revokeFunction = receiptStore.slice(receiptStore.indexOf("export async function revokeReceiptInbox"), receiptStore.indexOf("export async function getReceiptInboxStatus"));
   assert.doesNotMatch(revokeFunction, /requireReceiptInboxConfiguration/);
   assert.match(revokeFunction, /status = 'REVOKED'/);
+  assert.match(revokeFunction, /ALIAS_REVOKED/);
+  assert.match(revokeFunction, /status in \('RECEIVED', 'PROCESSING'\)/);
+});
+
+test("account deletion revokes the departing user's receipt inbox before withdrawing consents", () => {
+  const deletion = profileRoute.slice(profileRoute.indexOf("async function deleteUserData"));
+  assert.match(deletion, /applyReceiptInboxRevocation/);
+  assert.match(deletion, /receipt-inbox-ingest/);
+  const revokeIndex = deletion.indexOf("applyReceiptInboxRevocation");
+  const withdrawIndex = deletion.indexOf("update consent_grants");
+  assert.ok(revokeIndex >= 0 && withdrawIndex > revokeIndex, "Inbox revocation must run before consent rows are withdrawn.");
+  assert.match(deletion, /receipt-inbox:\$\{/);
 });

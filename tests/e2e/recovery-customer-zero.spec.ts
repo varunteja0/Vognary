@@ -34,7 +34,7 @@ const laterReceipt = [
 
 test.skip(!email || !accessCode, "database-backed development login env not configured");
 
-test("Customer #0 completes all 30 Recovery actions in the browser", async ({ page, isMobile }, testInfo) => {
+test("Customer #0 completes the Recovery and fail-closed mandate journey in the browser", async ({ page, isMobile }, testInfo) => {
   test.setTimeout(180_000);
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", {
@@ -76,6 +76,12 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toBeVisible();
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("From checked receipts only.").first()).toBeVisible();
+  await expect(page.getByText("Annualized estimate", { exact: true })).toBeVisible();
+  await expect(page.getByText(/It is not a historical yearly total/)).toBeVisible();
+  await expect(page.getByText("Active commitments")).toBeVisible();
+  await expect(page.getByText("Needs review")).toBeVisible();
   await expect(page.getByText("OpenAI").first()).toBeVisible();
   await expectNoSeriousAxeViolations(page, "Recovery Home baseline");
   await expectNoHorizontalOverflow(page);
@@ -105,6 +111,7 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
   await expect(page.getByText("WhatsApp summary copied.", { exact: true })).toBeVisible();
   const sharedText = await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText ?? "");
   expect(sharedText).toContain("Monthly burn from checked receipts: ₹");
+  expect(sharedText).toMatch(/Annualized estimate \(12 × cited monthly equivalent, not a historical yearly total\): ₹/);
   expect(sharedText).not.toMatch(/\/mo \+ /);
   await openCommitment(page, "OpenAI");
 
@@ -175,7 +182,28 @@ test("Customer #0 completes all 30 Recovery actions in the browser", async ({ pa
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toBeVisible();
   await expect(page.getByText("Amount changed").first()).toBeVisible();
 
-  // 30. Exercise canonical export and canonical deletion through Account settings.
+  // 30. Sign the real standing mandate, verify the fail-closed Autopilot home,
+  // persist it across reload, then revoke it through the same browser/API path.
+  await selectRecoveryView(page, "Mandate");
+  await expect(page.getByText("No standing mandate is signed")).toBeVisible();
+  await page.getByRole("button", { name: "I accept this standing mandate" }).click();
+  await expect(page.getByText("This workspace has an active standing mandate")).toBeVisible();
+  await expect(page.getByText("Off — veto notices are not sent")).toBeVisible();
+  await expect(page.getByText("Off — no cancellation is executed")).toBeVisible();
+
+  await page.reload();
+  await selectRecoveryView(page, "Mandate");
+  await expect(page.getByText("This workspace has an active standing mandate")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await selectRecoveryView(page, "Home");
+  await expect(page.getByText("Exception-only home")).toBeVisible();
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText(/Execution is switched off, so nothing is cancelled from here/)).toBeVisible();
+  await selectRecoveryView(page, "Mandate");
+  await page.getByRole("button", { name: "Revoke this mandate" }).click();
+  await expect(page.getByText("No standing mandate is signed")).toBeVisible();
+
+  // 31. Exercise canonical export and canonical deletion through Account settings.
   await page.getByRole("link", { name: new RegExp(`Account for ${email}`) }).click();
   await expect(page).toHaveURL(/\/profile$/);
   await page.getByText("Privacy", { exact: true }).click();
@@ -228,7 +256,7 @@ async function loginAsDevelopmentUser(page: Page) {
   await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
 }
 
-async function selectRecoveryView(page: Page, name: "Home" | "Subscriptions" | "Sources") {
+async function selectRecoveryView(page: Page, name: "Home" | "Subscriptions" | "Sources" | "Mandate") {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name }).click();
 }
 

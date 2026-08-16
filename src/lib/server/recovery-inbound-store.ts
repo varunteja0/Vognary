@@ -164,6 +164,7 @@ export async function provisionReceiptInbox(input: { workspaceId: string; actorU
   return mutateReceiptInbox(input, async (client, actor) => {
     const existing = await readActiveAlias(client, input.workspaceId);
     if (existing) return statusFromActiveAlias(existing);
+    await applyReceiptInboxRevocation(client, input);
 
     const consent = await recordConsentGrant({
       workspaceId: input.workspaceId,
@@ -237,10 +238,12 @@ export async function rotateReceiptInbox(input: {
     await client.query(
       `update recovery_inbound_aliases
        set status = 'ROTATED', encrypted_display = null, encryption_key_fingerprint = null,
-           rotated_at = now()
+           gmail_verification_code = null, gmail_verification_url = null,
+           gmail_verification_received_at = null, rotated_at = now()
        where workspace_id = $1 and id = $2 and status = 'ACTIVE'`,
       [input.workspaceId, active.id],
     );
+    await invalidateInboundLeases(client, input.workspaceId, active.id);
     const next = await insertAlias(client, {
       aliasId: nextAliasId,
       workspaceId: input.workspaceId,
@@ -271,33 +274,94 @@ export async function rotateReceiptInbox(input: {
 
 export async function revokeReceiptInbox(input: { workspaceId: string; actorUserId: string }): Promise<ReceiptInboxStatusDto> {
   return mutateReceiptInbox(input, async (client) => {
-    const active = await readActiveAlias(client, input.workspaceId);
-    if (!active) return readReceiptInboxStatusWithClient(client, input.workspaceId);
+    await applyReceiptInboxRevocation(client, input);
+    return readReceiptInboxStatusWithClient(client, input.workspaceId);
+  });
+}
 
+export async function applyReceiptInboxRevocation(
+  client: PoolClient,
+  input: { workspaceId: string; actorUserId: string; consentId?: string },
+): Promise<void> {
+  const active = await client.query<{ id: string; connected_account_id: string }>(
+    `select id, connected_account_id
+     from recovery_inbound_aliases
+     where workspace_id = $1 and status = 'ACTIVE'
+     limit 1
+     for update`,
+    [input.workspaceId],
+  );
+  const alias = active.rows[0];
+  if (!alias) {
+    if (!input.consentId) await invalidateInboundLeases(client, input.workspaceId);
+    return;
+  }
+
+  const account = await client.query<{ id: string; consent_grant_id: string | null }>(
+    `select id, consent_grant_id
+     from connected_accounts
+     where workspace_id = $1 and id = $2
+     for update`,
+    [input.workspaceId, alias.connected_account_id],
+  );
+  const accountRow = account.rows[0];
+  if (input.consentId && accountRow?.consent_grant_id !== input.consentId) {
+    return;
+  }
+  if (accountRow?.consent_grant_id) {
     await client.query(
-      `update recovery_inbound_aliases
-       set status = 'REVOKED', encrypted_display = null, encryption_key_fingerprint = null,
-           revoked_at = now()
-       where workspace_id = $1 and id = $2 and status = 'ACTIVE'`,
-      [input.workspaceId, active.id],
+      `select id from consent_grants where id = $1 for update`,
+      [accountRow.consent_grant_id],
     );
-    await client.query(
-      `update connected_accounts
-       set status = 'revoked', updated_at = now()
-       where workspace_id = $1 and id = $2`,
-      [input.workspaceId, active.connected_account_id],
-    );
+  }
+
+  await client.query(
+    `update recovery_inbound_aliases
+     set status = 'REVOKED', encrypted_display = null, encryption_key_fingerprint = null,
+         gmail_verification_code = null, gmail_verification_url = null,
+         gmail_verification_received_at = null, revoked_at = now()
+     where workspace_id = $1 and id = $2 and status = 'ACTIVE'`,
+    [input.workspaceId, alias.id],
+  );
+  await client.query(
+    `update connected_accounts
+     set status = 'revoked', updated_at = now()
+     where workspace_id = $1 and id = $2`,
+    [input.workspaceId, alias.connected_account_id],
+  );
+  if (accountRow?.consent_grant_id) {
     await client.query(
       `update consent_grants
        set withdrawn_at = coalesce(withdrawn_at, now())
-       where workspace_id = $1
-         and id = (select consent_grant_id from connected_accounts where id = $2)
-         and withdrawn_at is null`,
-      [input.workspaceId, active.connected_account_id],
+       where id = $1 and withdrawn_at is null`,
+      [accountRow.consent_grant_id],
     );
-    await writeAudit(client, input.workspaceId, input.actorUserId, "recovery.receipt-inbox.revoked", active.id);
-    return { state: "REVOKED", alias: null, lastReceivedAt: null, lastProcessedAt: null, lastFailureCode: null };
-  });
+  }
+  await invalidateInboundLeases(client, input.workspaceId);
+  await writeAudit(client, input.workspaceId, input.actorUserId, "recovery.receipt-inbox.revoked", alias.id);
+}
+
+async function invalidateInboundLeases(client: PoolClient, workspaceId: string, aliasId?: string) {
+  await client.query(
+    `select id
+     from recovery_inbound_events
+     where workspace_id = $1
+       and status in ('RECEIVED', 'PROCESSING')
+       and ($2::uuid is null or alias_id = $2)
+     for update`,
+    [workspaceId, aliasId ?? null],
+  );
+  await client.query(
+    `update recovery_inbound_events
+     set status = 'IGNORED',
+         processing_started_at = null,
+         error_code = 'ALIAS_REVOKED',
+         processed_at = now()
+     where workspace_id = $1
+       and status in ('RECEIVED', 'PROCESSING')
+       and ($2::uuid is null or alias_id = $2)`,
+    [workspaceId, aliasId ?? null],
+  );
 }
 
 export async function getReceiptInboxStatus(input: { workspaceId: string; actorUserId: string }): Promise<ReceiptInboxStatusDto> {
@@ -329,9 +393,16 @@ export async function resolveReceiptInboxAlias(address: string): Promise<{ works
   }
   const aliasHmac = hmacAddress(canonical, configuration);
   const result = await getDatabasePool().query<{ workspace_id: string; id: string }>(
-    `select workspace_id, id
-     from recovery_inbound_aliases
-     where hmac_key_id = $1 and alias_hmac = $2 and status = 'ACTIVE'
+    `select alias.workspace_id, alias.id
+     from recovery_inbound_aliases alias
+     join connected_accounts account
+       on account.workspace_id = alias.workspace_id
+      and account.id = alias.connected_account_id
+     join consent_grants consent
+       on consent.id = account.consent_grant_id
+     where alias.hmac_key_id = $1 and alias.alias_hmac = $2 and alias.status = 'ACTIVE'
+       and account.status = 'active'
+       and consent.withdrawn_at is null
      limit 1`,
     [configuration.hmacKeyId, aliasHmac],
   );
@@ -418,13 +489,60 @@ async function insertAlias(client: PoolClient, input: {
   return row;
 }
 
+export async function lockReceiptInboxAuthority(
+  client: PoolClient,
+  input: { workspaceId: string; aliasId: string },
+): Promise<{ live: boolean; aliasStatus: string | null }> {
+  const result = await client.query<{
+    alias_status: string;
+    account_status: string;
+    consent_id: string | null;
+    withdrawn_at: Date | null;
+  }>(
+    `select alias.status as alias_status,
+            account.status as account_status,
+            consent.id::text as consent_id,
+            consent.withdrawn_at
+     from recovery_inbound_aliases alias
+     join connected_accounts account
+       on account.workspace_id = alias.workspace_id
+      and account.id = alias.connected_account_id
+     left join consent_grants consent
+       on consent.id = account.consent_grant_id
+     where alias.workspace_id = $1 and alias.id = $2
+     for update of alias, account`,
+    [input.workspaceId, input.aliasId],
+  );
+  const row = result.rows[0];
+  if (!row) return { live: false, aliasStatus: null };
+  if (row.consent_id) {
+    const consent = await client.query<{ withdrawn_at: Date | null }>(
+      `select withdrawn_at from consent_grants where id = $1 for update`,
+      [row.consent_id],
+    );
+    row.withdrawn_at = consent.rows[0]?.withdrawn_at ?? row.withdrawn_at;
+  }
+  const live = row.alias_status === "ACTIVE"
+    && row.account_status === "active"
+    && row.consent_id !== null
+    && row.withdrawn_at === null;
+  return { live, aliasStatus: row.alias_status };
+}
+
 async function readActiveAlias(client: PoolClient, workspaceId: string) {
   const result = await client.query<ActiveAliasRow>(
-    `select id, workspace_id, connected_account_id, encrypted_display,
-            status, created_at, rotated_at, revoked_at,
-            gmail_verification_code, gmail_verification_url, gmail_verification_received_at
-     from recovery_inbound_aliases
-     where workspace_id = $1 and status = 'ACTIVE'
+    `select alias.id, alias.workspace_id, alias.connected_account_id, alias.encrypted_display,
+            alias.status, alias.created_at, alias.rotated_at, alias.revoked_at,
+            alias.gmail_verification_code, alias.gmail_verification_url, alias.gmail_verification_received_at
+     from recovery_inbound_aliases alias
+     join connected_accounts account
+       on account.workspace_id = alias.workspace_id
+      and account.id = alias.connected_account_id
+     join consent_grants consent
+       on consent.id = account.consent_grant_id
+     where alias.workspace_id = $1 and alias.status = 'ACTIVE'
+       and account.status = 'active'
+       and consent.withdrawn_at is null
      limit 1`,
     [workspaceId],
   );
@@ -434,11 +552,18 @@ async function readActiveAlias(client: PoolClient, workspaceId: string) {
 async function readAliasById(client: PoolClient, workspaceId: string, aliasId: string) {
   if (!aliasId) return null;
   const result = await client.query<ActiveAliasRow>(
-    `select id, workspace_id, connected_account_id, encrypted_display,
-            status, created_at, rotated_at, revoked_at,
-            gmail_verification_code, gmail_verification_url, gmail_verification_received_at
-     from recovery_inbound_aliases
-     where workspace_id = $1 and id = $2 and status = 'ACTIVE'
+    `select alias.id, alias.workspace_id, alias.connected_account_id, alias.encrypted_display,
+            alias.status, alias.created_at, alias.rotated_at, alias.revoked_at,
+            alias.gmail_verification_code, alias.gmail_verification_url, alias.gmail_verification_received_at
+     from recovery_inbound_aliases alias
+     join connected_accounts account
+       on account.workspace_id = alias.workspace_id
+      and account.id = alias.connected_account_id
+     join consent_grants consent
+       on consent.id = account.consent_grant_id
+     where alias.workspace_id = $1 and alias.id = $2 and alias.status = 'ACTIVE'
+       and account.status = 'active'
+       and consent.withdrawn_at is null
      limit 1`,
     [workspaceId, aliasId],
   );
@@ -485,7 +610,10 @@ async function readReceiptInboxStatusWithClient(client: PoolClient, workspaceId:
   const revoked = await client.query<{ revoked: boolean }>(
     `select exists (
        select 1 from recovery_inbound_aliases
-       where workspace_id = $1 and status = 'REVOKED'
+       where workspace_id = $1
+     ) or exists (
+       select 1 from consent_grants
+       where workspace_id = $1 and purpose = 'receipt-inbox-ingest'
      ) as revoked`,
     [workspaceId],
   );

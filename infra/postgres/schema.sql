@@ -637,7 +637,23 @@ create table product_events (
     'private_audit.requested',
     'billing.checkout_started',
     'billing.payment_settled',
-    'billing.payment_refunded'
+    'billing.payment_refunded',
+    'mandate.signed',
+    'mandate.revoked',
+    'candidate.evaluated',
+    'candidate.vetoed',
+    'candidate.authorized',
+    'notice.queued',
+    'notice.delivered',
+    'notice.failed',
+    'execution.started',
+    'execution.completed',
+    'execution.failed',
+    'exception.opened',
+    'window.verified',
+    'verification.pending',
+    'invoice.created',
+    'source.connected'
   )),
   occurred_at timestamptz not null default now(),
   source text not null check (source in ('sync-runner', 'living-ledger', 'workspace-api', 'product-ui')),
@@ -663,6 +679,9 @@ create table product_events (
 
 create index product_events_workspace_occurred_idx on product_events(workspace_id, occurred_at desc);
 create index product_events_name_occurred_idx on product_events(event_name, occurred_at desc);
+create unique index product_events_workspace_activated_once_idx
+  on product_events (workspace_id)
+  where event_name = 'workspace.activated' and workspace_id is not null;
 
 create table consent_grants (
   id uuid primary key default gen_random_uuid(),
@@ -1224,7 +1243,7 @@ create table if not exists recovery_workspace_versions (
   workspace_id uuid not null references workspaces(id) on delete cascade,
   version bigint not null check (version > 0),
   actor_user_id uuid references users(id) on delete set null,
-  mutation_kind text not null check (mutation_kind in ('EVIDENCE', 'CORRECTION', 'CORRECTION_REVERSAL', 'DECISION')),
+  mutation_kind text not null check (mutation_kind in ('EVIDENCE', 'CORRECTION', 'CORRECTION_REVERSAL', 'DECISION', 'MANDATE', 'CANDIDATE')),
   changed_state text not null check (changed_state in ('NO_PRIOR_BASELINE', 'COMPARED')),
   from_version bigint check (from_version is null or from_version >= 0),
   snapshot jsonb not null check (jsonb_typeof(snapshot) = 'object'),
@@ -1826,3 +1845,521 @@ drop trigger if exists recurring_items_workspace_immutable on recurring_items;
 create trigger recurring_items_workspace_immutable
   before update of workspace_id on recurring_items
   for each row execute function reject_legacy_workspace_reassignment();
+
+-- Autopilot loop (standing mandate, shadow candidates, notices, proof, fees).
+-- Execution remains fail-closed in application code until founder switches pass.
+create table if not exists recovery_standing_mandates (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  version integer not null check (version > 0),
+  status text not null check (status in ('ACTIVE', 'REVOKED')),
+  terms_version text not null check (length(btrim(terms_version)) between 8 and 120),
+  signed_text text not null check (length(btrim(signed_text)) between 40 and 8000),
+  signed_text_hash char(64) not null check (signed_text_hash ~ '^[0-9a-f]{64}$'),
+  currency char(3) not null default 'INR' check (currency ~ '^[A-Z]{3}$'),
+  per_action_ceiling_minor bigint not null check (per_action_ceiling_minor > 0),
+  rolling_30d_ceiling_minor bigint not null check (rolling_30d_ceiling_minor > 0),
+  veto_window_hours integer not null default 48 check (veto_window_hours = 48),
+  signed_by_user_id uuid not null references users(id) on delete restrict,
+  signed_at timestamptz not null default now(),
+  revoked_at timestamptz,
+  revoked_by_user_id uuid references users(id) on delete set null,
+  unique (workspace_id, id),
+  unique (workspace_id, version),
+  check (rolling_30d_ceiling_minor >= per_action_ceiling_minor),
+  check (
+    (status = 'ACTIVE' and revoked_at is null and revoked_by_user_id is null)
+    or (status = 'REVOKED' and revoked_at is not null)
+  )
+);
+
+create unique index if not exists recovery_standing_mandates_active_idx
+  on recovery_standing_mandates(workspace_id) where status = 'ACTIVE';
+
+create table if not exists recovery_billing_year_anchors (
+  workspace_id uuid primary key references workspaces(id) on delete cascade,
+  anchor_date date not null,
+  created_at timestamptz not null default now()
+);
+
+create or replace function recovery_billing_year_anchors_reject_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'DELETE' then
+    if exists (select 1 from workspaces where id = old.workspace_id) then
+      raise exception 'Billing-year anchors cannot be deleted directly.';
+    end if;
+    return old;
+  end if;
+  if tg_op = 'UPDATE' and (
+    new.anchor_date is distinct from old.anchor_date
+    or new.workspace_id is distinct from old.workspace_id
+  ) then
+    raise exception 'Billing-year anchors cannot be mutated.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists recovery_billing_year_anchors_immutable on recovery_billing_year_anchors;
+create trigger recovery_billing_year_anchors_immutable
+  before update or delete on recovery_billing_year_anchors
+  for each row execute function recovery_billing_year_anchors_reject_mutation();
+
+create table if not exists recovery_standing_mandate_events (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null,
+  mandate_id uuid not null,
+  kind text not null check (kind in ('SIGNED', 'REVOKED')),
+  actor_user_id uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  foreign key (workspace_id, mandate_id)
+    references recovery_standing_mandates(workspace_id, id) on delete cascade
+);
+
+create table if not exists recovery_classification_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null,
+  commitment_id uuid not null,
+  commitment_class text not null check (commitment_class in (
+    'discretionary-subscription', 'usage-based-cloud', 'debt-emi',
+    'insurance', 'investment-sip', 'utility', 'contractual-other'
+  )),
+  protected_override boolean not null,
+  cited_category text not null check (length(btrim(cited_category)) between 1 and 120),
+  cited_merchant text,
+  confidence_score integer not null check (confidence_score between 0 and 100),
+  evidence_ids uuid[] not null check (cardinality(evidence_ids) > 0),
+  created_at timestamptz not null default now(),
+  foreign key (workspace_id, commitment_id)
+    references recovery_commitments(workspace_id, id) on delete cascade
+);
+
+create table if not exists recovery_action_candidates (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null,
+  commitment_id uuid not null,
+  mandate_id uuid not null,
+  mandate_version integer not null check (mandate_version > 0),
+  classification_snapshot_id uuid not null references recovery_classification_snapshots(id) on delete restrict,
+  commitment_class text not null check (commitment_class in (
+    'discretionary-subscription', 'usage-based-cloud', 'debt-emi',
+    'insurance', 'investment-sip', 'utility', 'contractual-other'
+  )),
+  eligibility text not null check (eligibility in ('ELIGIBLE', 'INELIGIBLE', 'PROTECTED', 'UNSUPPORTED_ROUTE')),
+  ineligible_reasons text[] not null default '{}',
+  status text not null check (status in (
+    'SHADOW', 'NOTICE_QUEUED', 'AUTHORIZED_BY_RULE', 'IN_PROGRESS', 'PROVIDER_PENDING',
+    'EXECUTED', 'VERIFYING', 'VERIFIED', 'VETOED', 'REVOKED', 'EXCEPTION', 'FAILED', 'DISPUTED', 'WITHDRAWN'
+  )),
+  provider_id text,
+  amount_minor bigint not null check (amount_minor >= 0),
+  currency char(3) not null check (currency ~ '^[A-Z]{3}$'),
+  notice_delivered_at timestamptz,
+  veto_deadline_at timestamptz,
+  exception_code text,
+  next_debit_date date,
+  next_debit_inputs_hash char(64),
+  next_debit_reason text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, id),
+  unique (workspace_id, commitment_id, mandate_id, mandate_version),
+  foreign key (workspace_id, commitment_id)
+    references recovery_commitments(workspace_id, id) on delete cascade,
+  foreign key (workspace_id, mandate_id)
+    references recovery_standing_mandates(workspace_id, id) on delete cascade,
+  check (eligibility <> 'ELIGIBLE' or commitment_class = 'discretionary-subscription'),
+  check (status = 'SHADOW' or eligibility = 'ELIGIBLE' or status in ('VETOED', 'REVOKED', 'WITHDRAWN', 'EXCEPTION')),
+  check (veto_deadline_at is null or notice_delivered_at is not null)
+);
+
+create index if not exists recovery_action_candidates_workspace_status_idx
+  on recovery_action_candidates(workspace_id, status, updated_at desc);
+
+create table if not exists recovery_candidate_events (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null,
+  candidate_id uuid not null,
+  previous_status text,
+  status text not null,
+  actor_kind text not null check (actor_kind in ('CUSTOMER', 'OPERATOR', 'SYSTEM')),
+  actor_user_id uuid references users(id) on delete set null,
+  reason_code text not null,
+  created_at timestamptz not null default now(),
+  foreign key (workspace_id, candidate_id)
+    references recovery_action_candidates(workspace_id, id) on delete cascade
+);
+
+create table if not exists recovery_veto_notices (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null,
+  candidate_id uuid not null,
+  channel text not null check (channel = 'EMAIL'),
+  delivery_status text not null check (delivery_status in ('QUEUED', 'ACCEPTED', 'DELIVERED', 'DELAYED', 'BOUNCED', 'FAILED', 'COMPLAINED')),
+  delivered_at timestamptz,
+  provider_message_id text,
+  provider_timestamp timestamptz,
+  veto_token_hash char(64),
+  veto_expires_at timestamptz,
+  notice_body_hash char(64) check (notice_body_hash is null or notice_body_hash ~ '^[0-9a-f]{64}$'),
+  notice_from_email text,
+  notice_to_email text,
+  notice_subject text,
+  notice_text text,
+  notice_tags jsonb not null default '[{"name":"vognary","value":"autopilot-notice"}]'::jsonb
+    check (jsonb_typeof(notice_tags) = 'array'),
+  notice_payload_version integer not null default 1 check (notice_payload_version >= 1),
+  notice_hash_version smallint not null default 2 check (notice_hash_version in (1, 2)),
+  frozen_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (workspace_id, candidate_id),
+  foreign key (workspace_id, candidate_id)
+    references recovery_action_candidates(workspace_id, id) on delete cascade,
+  check (delivery_status <> 'DELIVERED' or delivered_at is not null)
+);
+
+create unique index if not exists recovery_veto_notices_provider_message_id_idx
+  on recovery_veto_notices (provider_message_id)
+  where provider_message_id is not null;
+
+create or replace function reject_recovery_frozen_notice_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'DELETE' then
+    if old.frozen_at is not null
+      and exists (select 1 from workspaces where id = old.workspace_id)
+    then
+      raise exception 'Frozen notice cannot be deleted directly.';
+    end if;
+    return old;
+  end if;
+
+  if old.frozen_at is not null and (
+    new.id is distinct from old.id
+    or new.workspace_id is distinct from old.workspace_id
+    or new.candidate_id is distinct from old.candidate_id
+    or new.channel is distinct from old.channel
+    or new.created_at is distinct from old.created_at
+    or new.notice_from_email is distinct from old.notice_from_email
+    or new.notice_to_email is distinct from old.notice_to_email
+    or new.notice_subject is distinct from old.notice_subject
+    or new.notice_text is distinct from old.notice_text
+    or new.notice_tags is distinct from old.notice_tags
+    or new.notice_payload_version is distinct from old.notice_payload_version
+    or new.notice_hash_version is distinct from old.notice_hash_version
+    or new.notice_body_hash is distinct from old.notice_body_hash
+    or new.veto_token_hash is distinct from old.veto_token_hash
+    or new.veto_expires_at is distinct from old.veto_expires_at
+    or new.frozen_at is distinct from old.frozen_at
+  ) then
+    raise exception 'Frozen notice payload cannot be mutated.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists recovery_veto_notices_frozen_immutable on recovery_veto_notices;
+create trigger recovery_veto_notices_frozen_immutable
+  before update or delete on recovery_veto_notices
+  for each row execute function reject_recovery_frozen_notice_mutation();
+
+create table if not exists recovery_notice_pending_events (
+  provider_event_id text primary key check (length(btrim(provider_event_id)) between 8 and 200),
+  event_type text not null check (event_type in (
+    'email.sent', 'email.delivered', 'email.delayed', 'email.delivery_delayed',
+    'email.bounced', 'email.failed', 'email.complained'
+  )),
+  provider_message_id text not null check (length(btrim(provider_message_id)) >= 8),
+  occurred_at timestamptz not null,
+  payload_hash char(64) not null check (payload_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists recovery_notice_pending_events_message_idx
+  on recovery_notice_pending_events (provider_message_id);
+
+create table if not exists recovery_connected_mandate_cohort (
+  workspace_id uuid primary key references workspaces(id) on delete cascade,
+  started_at timestamptz not null,
+  recorded_at timestamptz not null default now()
+);
+
+create or replace function reject_recovery_cohort_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'DELETE'
+    and not exists (select 1 from workspaces where id = old.workspace_id)
+  then
+    return old;
+  end if;
+  raise exception 'Connected-mandate cohort is immutable.' using errcode = '55000';
+end;
+$$;
+
+drop trigger if exists recovery_cohort_immutable_trigger on recovery_connected_mandate_cohort;
+create trigger recovery_cohort_immutable_trigger
+  before update or delete on recovery_connected_mandate_cohort
+  for each row execute function reject_recovery_cohort_mutation();
+
+create table if not exists recovery_source_disconnections (
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  source_id uuid not null,
+  disconnected_at timestamptz not null default now(),
+  reconnected_at timestamptz,
+  primary key (workspace_id, source_id),
+  foreign key (workspace_id, source_id)
+    references recovery_sources(workspace_id, id) on delete cascade
+);
+
+create table if not exists recovery_executions (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null,
+  candidate_id uuid not null,
+  provider_id text not null,
+  route text not null,
+  actor_kind text not null check (actor_kind in ('OPERATOR', 'SYSTEM')),
+  actor_user_id uuid references users(id) on delete set null,
+  operator_minutes numeric(8, 2) check (operator_minutes is null or operator_minutes >= 0),
+  outcome text not null check (outcome in ('EXECUTED', 'EXCEPTION', 'FAILED')),
+  proof_kind text,
+  proof_reference text,
+  failure_reason text,
+  attempt_id uuid,
+  attempt_no integer not null default 1,
+  operation_key text,
+  created_at timestamptz not null default now(),
+  unique (workspace_id, candidate_id, attempt_no),
+  foreign key (workspace_id, candidate_id)
+    references recovery_action_candidates(workspace_id, id) on delete cascade,
+  check (outcome <> 'EXECUTED' or (proof_kind is not null and proof_reference is not null))
+);
+
+create unique index if not exists recovery_executions_one_success_idx
+  on recovery_executions (workspace_id, candidate_id)
+  where outcome = 'EXECUTED';
+
+create table if not exists recovery_execution_attempts (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null,
+  candidate_id uuid not null,
+  attempt_no integer not null check (attempt_no > 0),
+  operation_key text not null unique check (length(btrim(operation_key)) between 16 and 200),
+  idempotency_key text check (idempotency_key is null or length(btrim(idempotency_key)) between 8 and 160),
+  request_hash char(64) not null check (request_hash ~ '^[0-9a-f]{64}$'),
+  actor_user_id uuid references users(id) on delete set null,
+  provider_id text not null,
+  outcome text check (outcome in ('EXECUTED', 'EXCEPTION', 'FAILED')),
+  status text not null check (status in ('PENDING', 'AUTHORIZED', 'PROVIDER_CALLED', 'RECORDED', 'FAILED', 'EXCEPTION')),
+  proof_kind text,
+  proof_reference_hash char(64) check (proof_reference_hash is null or proof_reference_hash ~ '^[0-9a-f]{64}$'),
+  failure_reason text,
+  operator_minutes numeric(8, 2) check (operator_minutes is null or operator_minutes >= 0),
+  created_at timestamptz not null default now(),
+  unique (workspace_id, id),
+  unique (workspace_id, candidate_id, attempt_no),
+  foreign key (workspace_id, candidate_id)
+    references recovery_action_candidates(workspace_id, id) on delete cascade
+);
+
+create unique index if not exists recovery_execution_attempts_idempotency_idx
+  on recovery_execution_attempts (workspace_id, idempotency_key)
+  where idempotency_key is not null;
+
+create table if not exists recovery_operator_actions (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null,
+  candidate_id uuid not null,
+  actor_user_id uuid not null references users(id) on delete restrict,
+  minutes numeric(8, 2) not null check (minutes >= 0),
+  outcome text not null check (outcome in ('EXECUTED', 'EXCEPTION', 'FAILED')),
+  failure_reason text,
+  created_at timestamptz not null default now(),
+  foreign key (workspace_id, candidate_id)
+    references recovery_action_candidates(workspace_id, id) on delete cascade
+);
+
+create table if not exists recovery_covered_windows (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null,
+  candidate_id uuid not null,
+  coverage_source_id uuid,
+  window_start date not null,
+  window_end date not null,
+  expected_debit_date date not null,
+  baseline_debit_minor bigint not null check (baseline_debit_minor >= 0),
+  observed_debit_minor bigint check (observed_debit_minor is null or observed_debit_minor >= 0),
+  saving_minor bigint check (saving_minor is null or saving_minor >= 0),
+  status text not null check (status in ('PENDING', 'COVERED_CLEAN', 'NOT_ELIMINATED', 'MISSING_COVERAGE')),
+  currency char(3) not null check (currency ~ '^[A-Z]{3}$'),
+  inputs_hash char(64),
+  commitment_id uuid,
+  created_at timestamptz not null default now(),
+  unique (workspace_id, candidate_id, expected_debit_date),
+  foreign key (workspace_id, candidate_id)
+    references recovery_action_candidates(workspace_id, id) on delete cascade,
+  constraint recovery_covered_windows_source_fk
+    foreign key (workspace_id, coverage_source_id)
+    references recovery_sources(workspace_id, id) on delete cascade,
+  check (status in ('PENDING', 'MISSING_COVERAGE') or saving_minor is not null),
+  check (window_start <= window_end)
+);
+
+create extension if not exists btree_gist;
+
+create table if not exists recovery_fee_ledger (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  period_start date not null,
+  period_end date not null,
+  currency char(3) not null default 'INR' check (currency ~ '^[A-Z]{3}$'),
+  monitoring_minor bigint not null check (monitoring_minor >= 0),
+  verified_saving_minor bigint not null check (verified_saving_minor >= 0),
+  outcome_fee_minor bigint not null check (outcome_fee_minor >= 0),
+  retained_minor bigint not null check (retained_minor >= 0),
+  refund_credit_minor bigint not null check (refund_credit_minor >= 0),
+  additional_charge_minor bigint not null check (additional_charge_minor >= 0),
+  razorpay_charge_status text not null default 'FAIL_CLOSED'
+    check (razorpay_charge_status in ('FAIL_CLOSED', 'INVOICE_ONLY', 'CHARGED', 'REFUNDED')),
+  inputs_hash char(64) not null check (inputs_hash ~ '^[0-9a-f]{64}$'),
+  year_start date not null,
+  finalized_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  constraint recovery_fee_ledger_workspace_currency_period_key
+    unique (workspace_id, currency, period_start, period_end),
+  constraint recovery_fee_ledger_period_order check (period_start <= period_end),
+  constraint recovery_fee_ledger_no_overlap
+    exclude using gist (
+      workspace_id with =,
+      currency with =,
+      daterange(period_start, period_end, '[]') with &&
+    )
+);
+
+create or replace function recovery_fee_ledger_reject_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'DELETE' then
+    if exists (select 1 from workspaces where id = old.workspace_id) then
+      raise exception 'Finalized fee ledger rows cannot be deleted directly.';
+    end if;
+    return old;
+  end if;
+  if tg_op = 'UPDATE' and (
+    new.monitoring_minor is distinct from old.monitoring_minor
+    or new.verified_saving_minor is distinct from old.verified_saving_minor
+    or new.outcome_fee_minor is distinct from old.outcome_fee_minor
+    or new.retained_minor is distinct from old.retained_minor
+    or new.refund_credit_minor is distinct from old.refund_credit_minor
+    or new.additional_charge_minor is distinct from old.additional_charge_minor
+    or new.currency is distinct from old.currency
+    or new.period_start is distinct from old.period_start
+    or new.period_end is distinct from old.period_end
+    or new.inputs_hash is distinct from old.inputs_hash
+    or new.workspace_id is distinct from old.workspace_id
+    or new.year_start is distinct from old.year_start
+    or new.finalized_at is distinct from old.finalized_at
+  ) then
+    raise exception 'Finalized fee ledger rows cannot be mutated.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists recovery_fee_ledger_immutable on recovery_fee_ledger;
+create trigger recovery_fee_ledger_immutable
+  before update or delete on recovery_fee_ledger
+  for each row execute function recovery_fee_ledger_reject_mutation();
+
+create table if not exists recovery_shadow_gate_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  measured_at timestamptz not null default now(),
+  connected_mandates integer not null check (connected_mandates >= 0),
+  eligible_candidates integer not null check (eligible_candidates >= 0),
+  protected_leakage integer not null check (protected_leakage >= 0),
+  passed boolean not null,
+  evidence jsonb not null default '{}'::jsonb,
+  snapshot_hash char(64) not null check (snapshot_hash ~ '^[0-9a-f]{64}$')
+);
+
+create table if not exists recovery_notice_delivery_events (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null,
+  candidate_id uuid not null,
+  provider_event_id text not null check (length(btrim(provider_event_id)) between 8 and 200),
+  event_type text not null check (event_type in (
+    'email.sent', 'email.delivered', 'email.delayed', 'email.delivery_delayed',
+    'email.bounced', 'email.failed', 'email.complained'
+  )),
+  provider_message_id text,
+  occurred_at timestamptz not null,
+  payload_hash char(64) not null check (payload_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now(),
+  unique (provider_event_id),
+  foreign key (workspace_id, candidate_id)
+    references recovery_action_candidates(workspace_id, id) on delete cascade
+);
+
+create table if not exists recovery_autopilot_dead_letters (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('NOTICE', 'EXECUTION', 'WEBHOOK', 'INVOICE')),
+  workspace_id uuid references workspaces(id) on delete cascade,
+  candidate_id uuid,
+  payload_hash char(64) not null check (payload_hash ~ '^[0-9a-f]{64}$'),
+  last_error_code text not null check (length(btrim(last_error_code)) between 3 and 80),
+  attempt_count integer not null default 0 check (attempt_count >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists recovery_provider_disables (
+  provider_id text primary key check (length(btrim(provider_id)) between 2 and 80),
+  disabled boolean not null default true,
+  reason text not null check (length(btrim(reason)) between 3 and 240),
+  updated_at timestamptz not null default now()
+);
+
+-- 0043: keep this after the Recovery v1 boundary so the synthetic 0022 seed
+-- can still insert historically unmarked workspace.activated rows.
+alter table product_events
+  add column if not exists activation_semantic_version smallint;
+alter table product_events
+  drop constraint if exists product_events_workspace_activated_semantic_version_check;
+alter table product_events
+  add constraint product_events_workspace_activated_semantic_version_check
+  check (
+    (event_name = 'workspace.activated' and activation_semantic_version is not distinct from 1)
+    or (event_name <> 'workspace.activated' and activation_semantic_version is null)
+  );
+
+-- 0044: audit-row immutability. Direct DELETE of fees, billing anchors, and
+-- version-1 activations is forbidden while the workspace still exists.
+create or replace function reject_workspace_activation_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'DELETE'
+    and old.event_name = 'workspace.activated'
+    and old.activation_semantic_version is not distinct from 1
+    and old.workspace_id is not null
+    and exists (select 1 from workspaces where id = old.workspace_id)
+  then
+    raise exception 'Workspace activation cannot be deleted directly.';
+  end if;
+  return old;
+end;
+$$;
+
+drop trigger if exists product_events_workspace_activated_immutable on product_events;
+create trigger product_events_workspace_activated_immutable
+  before delete on product_events
+  for each row execute function reject_workspace_activation_mutation();

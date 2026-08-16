@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 /**
  * Recovery v1 workspace — mocked-contract UI journey.
@@ -85,8 +86,15 @@ const detail = {
 const home = {
   workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 4 },
   generatedAt: "2026-08-09T10:00:00.000Z",
-  monthlyTotals: [{ amount: money, commitmentIds: ["commitment-1"], evidenceIds: ["evidence-1"] }],
-  next30DayTotals: [{ amount: money, commitmentIds: ["commitment-1"], evidenceIds: ["evidence-1"] }],
+  monthlyTotals: [{ amount: money, commitmentIds: ["commitment-1"], evidenceIds: ["evidence-1"], provenance: "RECEIPT", correctionIds: [] }],
+  annualizedEstimateTotals: [{
+    amount: { currency: "INR", minor: "2398800", exponent: 2, display: "₹23,988.00" },
+    commitmentIds: ["commitment-1"],
+    evidenceIds: ["evidence-1"],
+    provenance: "RECEIPT",
+    correctionIds: [],
+  }],
+  next30DayTotals: [{ amount: money, commitmentIds: ["commitment-1"], evidenceIds: ["evidence-1"], provenance: "RECEIPT", correctionIds: [] }],
   needsMe: [
     {
       id: "attention-1",
@@ -123,6 +131,8 @@ const home = {
     coverageEnd: "2026-07-06",
     limitations: ["Only pasted receipts are covered."],
   },
+  activeCommitmentCount: 1,
+  reviewItemCount: 1,
 };
 
 const meta = { requestId: "request-e2e", workspaceVersion: 4 };
@@ -132,9 +142,18 @@ type DecisionOutcome = { ok: true } | { ok: false; status: number; body: unknown
 async function mockRecoveryApi(page: Page, options: { decision?: DecisionOutcome } = {}) {
   let currentDetail: Record<string, unknown> = detail;
   let currentMeta = meta;
+  const activationCalls: string[] = [];
   await page.route("**/api/workspaces/current/brief", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: home, meta }) }),
   );
+  await page.route("**/api/workspaces/current/activation", (route) => {
+    activationCalls.push(route.request().method());
+    return route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({ data: { recorded: true, id: "event-1", outcome: "recorded" }, meta: currentMeta }),
+    });
+  });
   await page.route("**/api/workspaces/current/evidence/*", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: evidence, meta: currentMeta }) }),
   );
@@ -166,6 +185,7 @@ async function mockRecoveryApi(page: Page, options: { decision?: DecisionOutcome
       }),
     });
   });
+  return { activationCalls };
 }
 
 async function signIn(page: Page) {
@@ -190,14 +210,14 @@ test("home renders attention, upcoming charges, and receipt freshness without in
     });
   });
   await signIn(page);
-  await mockRecoveryApi(page);
+  const { activationCalls } = await mockRecoveryApi(page);
   await page.goto("/app");
 
   await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 
   const nav = page.getByRole("navigation", { name: "Primary" });
-  for (const label of ["Home", "Subscriptions", "Sources"]) {
+  for (const label of ["Home", "Subscriptions", "Sources", "Mandate"]) {
     await expect(nav.getByRole("button", { name: label })).toBeVisible();
   }
   await expect(page.getByRole("link", { name: `Account for ${email}` })).toHaveAttribute("href", "/profile");
@@ -207,7 +227,15 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
 
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect.poll(() => activationCalls.length).toBe(1);
+  await expect(page.getByText("From checked receipts only.").first()).toBeVisible();
   await expect(page.getByText("₹1,999.00").first()).toBeVisible();
+  await expect(page.getByText("₹23,988.00")).toBeVisible();
+  await expect(page.getByText("Annualized estimate", { exact: true })).toBeVisible();
+  await expect(page.getByText(/It is not a historical yearly total/)).toBeVisible();
+  await expect(page.getByText("Active commitments")).toBeVisible();
+  await expect(page.getByText("Needs review")).toBeVisible();
   await expect(page.getByText("Confirm OpenAI")).toBeVisible();
   await expect(page.getByText("Low confidence")).toBeVisible();
   await expect(page.getByText("6 Aug 2026 · in 3 days")).toBeVisible();
@@ -217,6 +245,7 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await page.getByRole("button", { name: "Copy for WhatsApp" }).click();
   await expect(page.getByText("WhatsApp summary copied.", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText)).toContain("Monthly burn from checked receipts: ₹1,999.00/mo.");
+  expect(await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText)).toContain("Annualized estimate (12 × cited monthly equivalent, not a historical yearly total): ₹23,988.00/yr.");
 
   await expect(page.getByText(/connect|sync your bank|Gmail/i)).toHaveCount(0);
 });
@@ -377,4 +406,284 @@ test("the workspace stays usable and keyboard-reachable on a small screen", asyn
   await commitmentsTab.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { level: 2, name: "Subscriptions" })).toBeFocused();
+});
+
+test("Mandate tab shows the frozen terms and does not claim execution is live", async ({ page }) => {
+  await signIn(page);
+  await mockRecoveryApi(page);
+  await page.goto("/app");
+
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" }).click();
+  await expect(page.getByText("No standing mandate is signed")).toBeVisible();
+  await expect(page.getByText(/No merchant cancellation route is proven yet/)).toBeVisible();
+  await expect(page.getByText("Off — no cancellation is executed")).toBeVisible();
+  await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Emergency disable" })).toHaveCount(0);
+});
+
+test("exception-only Autopilot home is honest on desktop and mobile and has no serious axe issues", async ({ page }) => {
+  const autopilotHome = {
+    ...home,
+    autopilot: {
+      executionEnabled: false,
+      noticeEnabled: false,
+      mandate: {
+        id: "mandate-1",
+        version: 1,
+        status: "ACTIVE",
+        termsVersion: "standing-mandate-v1",
+        signedText: "Standing mandate terms for the e2e fixture.",
+        signedTextHash: "a".repeat(64),
+        currency: "INR",
+        perActionCeilingMinor: "500000",
+        rolling30dCeilingMinor: "2000000",
+        vetoWindowHours: 48,
+        signedAt: "2026-08-09T10:00:00.000Z",
+        revokedAt: null,
+      },
+      watching: [],
+      inVeto: [],
+      handled: [],
+      needsHelp: [],
+      proof: [{ candidateId: "candidate-1", status: "PENDING", expectedDebitDate: "2026-09-06", savingMinor: null }],
+      fees: null,
+      attempts: [],
+    },
+  };
+  await signIn(page);
+  await mockRecoveryApi(page);
+  await page.route("**/api/workspaces/current/brief", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: autopilotHome, meta }) }),
+  );
+  await page.goto("/app");
+
+  for (const name of ["Watching", "Veto window", "Handled for you", "Needs your help", "Proof and savings", "Fees and refunds", "Mandate"]) {
+    await expect(page.getByRole("heading", { name })).toBeVisible();
+  }
+  await expect(page.getByText("Exception-only home")).toBeVisible();
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("From checked receipts only.").first()).toBeVisible();
+  await expect(page.getByText("No recurring amount yet")).toHaveCount(0);
+  await expect(page.getByText("missing coverage is not a ₹0 saving", { exact: false })).toBeVisible();
+  await expect(page.getByText("Fee collection stays fail-closed")).toBeVisible();
+  await expect(page.getByText("This is not a connected, cancelled, saved, or paid state.")).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+
+  const desktopAxe = await new AxeBuilder({ page }).analyze();
+  expect(desktopAxe.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical")).toEqual([]);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  expect(overflow).toBe(false);
+  const mobileAxe = await new AxeBuilder({ page }).analyze();
+  expect(mobileAxe.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical")).toEqual([]);
+});
+
+test("an active mandate still shows the spend strip when no recurring amount is cited", async ({ page }) => {
+  const autopilotHome = {
+    ...home,
+    monthlyTotals: [],
+    annualizedEstimateTotals: [],
+    next30DayTotals: [],
+    activeCommitmentCount: 0,
+    reviewItemCount: 0,
+    autopilot: {
+      executionEnabled: false,
+      noticeEnabled: false,
+      mandate: {
+        id: "mandate-1",
+        version: 1,
+        status: "ACTIVE",
+        termsVersion: "standing-mandate-v1",
+        signedText: "Standing mandate terms for the e2e fixture.",
+        signedTextHash: "a".repeat(64),
+        currency: "INR",
+        perActionCeilingMinor: "500000",
+        rolling30dCeilingMinor: "2000000",
+        vetoWindowHours: 48,
+        signedAt: "2026-08-09T10:00:00.000Z",
+        revokedAt: null,
+      },
+      watching: [],
+      inVeto: [],
+      handled: [],
+      needsHelp: [],
+      proof: [],
+      fees: null,
+      attempts: [],
+    },
+  };
+  await signIn(page);
+  await mockRecoveryApi(page);
+  await page.route("**/api/workspaces/current/brief", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: autopilotHome, meta }) }),
+  );
+  await page.goto("/app");
+
+  await expect(page.getByText("Exception-only home")).toBeVisible();
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("No recurring amount yet")).toBeVisible();
+  await expect(page.getByText("Annualized estimate", { exact: true })).toBeVisible();
+  await expect(page.getByText("Active commitments")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
+  await expect(page.getByText("Baseline only")).toBeVisible();
+});
+
+test("Home posts activation only after a cited recurring-spend picture actually renders", async ({ page }) => {
+  const emptyHome = {
+    ...home,
+    monthlyTotals: [],
+    annualizedEstimateTotals: [],
+    next30DayTotals: [],
+    needsMe: [],
+    next: [],
+    recentObservations: [],
+    activeCommitmentCount: 0,
+    reviewItemCount: 0,
+    coverage: {
+      state: "NO_EVIDENCE",
+      sourceCount: 0,
+      evidenceCount: 0,
+      lastEvidenceAt: null,
+      coverageStart: null,
+      coverageEnd: null,
+      limitations: ["No evidence has been submitted."],
+    },
+  };
+  const activationCalls: string[] = [];
+  await page.route("**/api/workspaces/current/activation", (route) => {
+    activationCalls.push(route.request().method());
+    return route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({ data: { recorded: true, id: "event-1", outcome: "recorded" }, meta }),
+    });
+  });
+  await page.route("**/api/workspaces/current/brief", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: emptyHome, meta }) }),
+  );
+  await page.route("**/api/workspaces/current/commitments**", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { items: [], total: 0, nextCursor: null }, meta }) }),
+  );
+
+  await signIn(page);
+  await expect(page.getByRole("heading", { level: 2, name: "Home" })).toBeVisible();
+  await expect(page.getByText("Monthly software spend")).toHaveCount(0);
+  expect(activationCalls).toEqual([]);
+
+  await page.goto("about:blank");
+  await page.route("**/api/workspaces/current/brief", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: home, meta }) }),
+  );
+  await page.route("**/api/workspaces/current/commitments**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = path.endsWith("/commitments")
+      ? { data: { items: [commitment], total: 1, nextCursor: null }, meta }
+      : { data: detail, meta };
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
+  await page.goto("/app");
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect.poll(() => activationCalls.length).toBe(1);
+  await page.reload();
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  expect(activationCalls).toHaveLength(1);
+});
+
+test("Home records activation after analytics opt-in on a tab that previously received 202", async ({ page }) => {
+  let consented = false;
+  const activationCalls: Array<{ status: number }> = [];
+  await page.route("**/api/workspaces/current/activation", (route) => {
+    const status = consented ? 201 : 202;
+    activationCalls.push({ status });
+    return route.fulfill({
+      status,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: consented
+          ? { recorded: true, id: "event-1", outcome: "recorded" }
+          : { recorded: false, id: null, outcome: "deferred-no-consent" },
+        meta,
+      }),
+    });
+  });
+  await page.route("**/api/workspaces/current/brief", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: home, meta }) }),
+  );
+  await page.route("**/api/workspaces/current/commitments**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = path.endsWith("/commitments")
+      ? { data: { items: [commitment], total: 1, nextCursor: null }, meta }
+      : { data: detail, meta };
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
+
+  await signIn(page);
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect.poll(() => activationCalls.length).toBe(1);
+  expect(activationCalls[0]).toEqual({ status: 202 });
+  expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
+
+  consented = true;
+  await page.goto("/app");
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect.poll(() => activationCalls.length).toBe(2);
+  expect(activationCalls[1]).toEqual({ status: 201 });
+  expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBe("1");
+
+  await page.reload();
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  expect(activationCalls).toHaveLength(2);
+});
+
+test("Home records activation after a 401 once the tab can authenticate again", async ({ page }) => {
+  let authenticated = false;
+  const activationCalls: Array<{ status: number }> = [];
+  await page.route("**/api/workspaces/current/activation", (route) => {
+    if (!authenticated) {
+      activationCalls.push({ status: 401 });
+      return route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: { code: "AUTH_REQUIRED", message: "Sign in to continue.", retryable: false, requestId: "request-e2e" },
+        }),
+      });
+    }
+    activationCalls.push({ status: 201 });
+    return route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({ data: { recorded: true, id: "event-1", outcome: "recorded" }, meta }),
+    });
+  });
+  await page.route("**/api/workspaces/current/brief", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: home, meta }) }),
+  );
+  await page.route("**/api/workspaces/current/commitments**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const body = path.endsWith("/commitments")
+      ? { data: { items: [commitment], total: 1, nextCursor: null }, meta }
+      : { data: detail, meta };
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
+
+  await signIn(page);
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect.poll(() => activationCalls.length).toBe(1);
+  expect(activationCalls[0]).toEqual({ status: 401 });
+  expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
+
+  authenticated = true;
+  await page.goto("/app");
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect.poll(() => activationCalls.length).toBe(2);
+  expect(activationCalls[1]).toEqual({ status: 201 });
+
+  await page.reload();
+  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  expect(activationCalls).toHaveLength(2);
 });

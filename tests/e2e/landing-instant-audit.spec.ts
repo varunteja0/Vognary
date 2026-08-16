@@ -9,7 +9,7 @@ test("the landing sends every visitor to the product without claiming forwarding
   await expect(heading).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
 
-  const getStarted = hero.getByRole("link", { name: "Get started", exact: true });
+  const getStarted = hero.getByRole("link", { name: "Find my recurring spend", exact: true });
   const signIn = page.getByRole("navigation", { name: "Public" }).getByRole("link", { name: "Sign in", exact: true });
   await expect(getStarted).toHaveAttribute("href", "/login?next=/app");
   await expect(signIn).toHaveAttribute("href", "/login?next=/app");
@@ -35,7 +35,7 @@ test("the mobile landing keeps the primary action visible without overflow", asy
   await page.goto("/");
 
   const heading = page.getByRole("heading", { level: 1, name: "Know what’s renewing before you pay for it." });
-  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Get started", exact: true });
+  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Find my recurring spend", exact: true });
   await expect(getStarted).toBeVisible();
   const actionBottom = await getStarted.evaluate((element) => element.getBoundingClientRect().bottom);
   const metrics = await page.evaluate(() => ({

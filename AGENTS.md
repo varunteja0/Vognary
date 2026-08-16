@@ -19,16 +19,16 @@ AI must **cite or shut up**. Never invent amounts, merchants, or connector liven
 
 ## 2. Working rules
 
-- Isolated **git worktree** per work package from fresh `main`; PR against `main`; no stacked PRs. The Recovery v1 same-checkout exception has **ended**.
+- **Live checkout (founder override, 2026-08-14):** stay in `"/Users/varunteja/Desktop/CVT Group/Vognary"` on `feat/autopilot-loop`. Do **not** `git worktree add ../vognary-*`, do not clone a sibling folder, and do not redo merged WP-A / PR #34. Parked copies belong in `.fallow/` (gitignored). Isolated-worktree-per-WP resumes only after CONTINUE-HERE names it again.
 - Path with spaces: quote `"/Users/varunteja/Desktop/CVT Group/Vognary"`
 - Before merge: `lint` · `typecheck` · `claims:check` · `tokens:check` · `test` · disposable `test:postgres` when the WP touches migrations/stores · then `build` · `perf:budget`
 - Engine changes: **failing test first**
 - Prefer `src/app/workspace/*` over growing `vognary-mvp-client.tsx`
 - Founder-only ops: API keys, Google verification, Razorpay, legal, Setu — agents prepare, never fake READY
 
-### Recovery v1 same-checkout exception — ENDED
+### Autopilot loop — same-repo sequential branch
 
-Recovery v1 is on `main`. Do not revive same-checkout dual-write. One isolated worktree per WP from `origin/main`.
+WP-B–E continue on `feat/autopilot-loop` in this folder. One Git owner. No sibling worktrees. Do not invent Codex/Opus approvals.
 
 ## 3. Hard stops
 
@@ -48,7 +48,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 [ ] Read docs/THE-LAW.md
 [ ] Read docs/CONTINUE-HERE.md
 [ ] State scoreboard row + loop step this task raises
-[ ] List files; open an isolated worktree from fresh origin/main
+[ ] List files; stay in this repo folder on the CONTINUE-HERE branch (`feat/autopilot-loop`). Do not create sibling folders.
 [ ] Implement; tests; gate chain
 [ ] Update CONTINUE-HERE / docs/execution/scoreboard.md if phase evidence changed
 ```

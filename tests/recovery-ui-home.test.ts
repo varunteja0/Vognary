@@ -12,6 +12,7 @@ import {
   coverageStates,
   decisions,
   evidenceProvenanceKinds,
+  projectionAmountProvenances,
   recoveryErrorCodes,
   sourceTypes,
 } from "../src/lib/recovery/contracts";
@@ -32,6 +33,7 @@ import {
   errorCopy,
   formatDay,
   formatMoment,
+  projectionAmountProvenanceLabels,
   provenanceLabels,
   sourceLabels,
 } from "../src/app/workspace/recovery/labels";
@@ -72,6 +74,7 @@ test("every contract enum has presentation copy, so a contract change cannot ren
     [coverageStates, coverageLabels],
     [coverageStates, coverageMeanings],
     [evidenceProvenanceKinds, provenanceLabels],
+    [projectionAmountProvenances, projectionAmountProvenanceLabels],
     [recoveryErrorCodes, errorCopy],
   ];
   for (const [values, map] of cases) {
@@ -80,9 +83,9 @@ test("every contract enum has presentation copy, so a contract change cannot ren
   }
 });
 
-test("primary navigation is exactly Home, Subscriptions, Sources, with Account outside the tabs", () => {
-  assert.deepEqual([...recoveryViews], ["HOME", "COMMITMENTS", "ADD_EVIDENCE"]);
-  assert.deepEqual(Object.values(recoveryViewLabels), ["Home", "Subscriptions", "Sources"]);
+test("primary navigation is Home, Subscriptions, Sources, and Mandate, with Account outside the tabs", () => {
+  assert.deepEqual([...recoveryViews], ["HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
+  assert.deepEqual(Object.values(recoveryViewLabels), ["Home", "Subscriptions", "Sources", "Mandate"]);
   assert.match(clientSource, /<nav aria-label="Primary"/);
   assert.match(clientSource, /aria-current=\{state\.view === view \? "page" : undefined\}/);
   assert.match(clientSource, /href="\/profile"/);
@@ -105,6 +108,47 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   for (const heading of ["Needs attention", "Since your last visit", "Coming up", "Receipts checked"]) {
     assert.ok(homeSource.includes(heading), `home must render ${heading}`);
   }
+  for (const label of ["Monthly software spend", "Annualized estimate", "Next 30 days", "Active commitments", "Needs review"]) {
+    assert.ok(homeSource.includes(label), `home must render ${label}`);
+  }
+  assert.match(homeSource, /home\.annualizedEstimateTotals/);
+  assert.match(homeSource, /home\.activeCommitmentCount/);
+  assert.match(homeSource, /home\.reviewItemCount/);
+  assert.match(homeSource, /12 × the cited monthly equivalent from receipts\. It is not a historical yearly total\./);
+  assert.match(homeSource, /12 × the cited monthly equivalent, including a saved correction\. It is not a historical yearly total\./);
+  assert.match(homeSource, /projectionAmountProvenanceLabels\[total\.provenance\]/);
+  assert.equal(projectionAmountProvenanceLabels.RECEIPT, "From checked receipts only.");
+  assert.equal(projectionAmountProvenanceLabels.USER_CORRECTED, "Includes a saved correction.");
+  assert.match(homeSource, /onCitedPictureRendered/);
+  assert.match(homeSource, /hasCitedRecurringSpendPicture/);
+  assert.match(clientSource, /recordCitedPictureActivationWithRetry/);
+  assert.match(clientSource, /workspaceActivationGate\.request\(workspaceId/);
+  assert.doesNotMatch(clientSource, /activationAttemptedRef/);
+  assert.match(clientSource, /onCitedPictureRendered=/);
+  assert.doesNotMatch(addEvidenceSource, /recordWorkspaceActivation|onCitedPictureRendered/);
+  assert.doesNotMatch(sourcesSource, /recordWorkspaceActivation|onCitedPictureRendered/);
+  assert.match(homeSource, /RecoveryFirstValueMetrics/);
+  assert.ok(
+    homeSource.indexOf("<RecoveryFirstValueMetrics") < homeSource.indexOf("<RecoveryAutopilotHome"),
+    "cited spend metrics must render above the exception-only Autopilot home",
+  );
+  assert.match(homeSource, /coverageLabels\[home\.coverage\.state\]/);
+  assert.match(homeSource, /coverageMeanings\[home\.coverage\.state\]/);
+  const mandateBranch = homeSource.slice(
+    homeSource.indexOf("home.autopilot?.mandate?.status === \"ACTIVE\""),
+    homeSource.indexOf("if (home.coverage.evidenceCount > 0 && commitmentTotal === 0)"),
+  );
+  assert.match(mandateBranch, /UpcomingTimeline/);
+  assert.match(mandateBranch, /home=\{home\}/);
+  assert.match(homeSource, /Coming up/);
+  assert.match(homeSource, /home\.next/);
+  const metricsFn = homeSource.slice(homeSource.indexOf("function RecoveryFirstValueMetrics"));
+  assert.match(metricsFn, /empty="No recurring amount yet"/);
+  assert.doesNotMatch(
+    metricsFn,
+    /if \(!hasTotals\) return null/,
+    "an active mandate must still publish Monthly software spend when no recurring amount is cited",
+  );
   assert.match(homeSource, /home\.changed\.state === "COMPARED"/);
   assert.doesNotMatch(homeSource, /WHAT NEEDS ME\?|WHAT CHANGED\?|WHAT HAPPENS NEXT\?|COVERAGE/);
   assert.doesNotMatch(homeSource, /TotalsStrip|Server totals|Compared version|No prior baseline/);
@@ -164,7 +208,7 @@ test("one observation is coached toward a second matching receipt instead of ren
   for (const step of [
     "Paste 2-3 billing emails or invoices",
     "Use the same service twice",
-    "See monthly burn, the next expected charge, and one decision",
+    "See monthly burn, an annualized estimate, the next expected charge, and one decision",
   ]) {
     assert.ok(addEvidenceSource.includes(step), `first-value guide must render ${step}`);
   }

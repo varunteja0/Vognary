@@ -30,6 +30,7 @@ const eslintConfig = defineConfig([
     // nested checkouts would otherwise flood CI with false errors).
     "**/.next/**",
     "**/node_modules/**",
+    ".fallow/**",
   ]),
 ]);
 

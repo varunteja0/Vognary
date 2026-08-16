@@ -9,9 +9,17 @@ import type {
   WorkspaceDto,
   Cadence,
   CommitmentStatus,
+  CorrectionField,
+  CorrectionStatus,
 } from "./contracts";
 
 const dayMs = 24 * 60 * 60 * 1_000;
+
+export type CommitmentFactCorrection = {
+  id: string;
+  field: CorrectionField;
+  status?: CorrectionStatus;
+};
 
 export type CanonicalCommitmentRecord = {
   id: string;
@@ -31,8 +39,12 @@ export type CanonicalCommitmentRecord = {
   riskTags: readonly string[];
   decision: DecisionDto | null;
   evidenceIds: readonly [string, ...string[]];
+  factCorrections: readonly CommitmentFactCorrection[];
   updatedAt: string;
 };
+
+const monthlyTotalCorrectionFields = new Set<CorrectionField>(["AMOUNT", "CADENCE", "IS_RECURRING"]);
+const next30DayTotalCorrectionFields = new Set<CorrectionField>(["AMOUNT", "NEXT_EXPECTED_DATE", "IS_RECURRING"]);
 
 export type RecoveryCoverageSource = {
   id: string;
@@ -67,12 +79,12 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
   const generatedAt = input.generatedAt ?? new Date();
   const today = dateOnly(generatedAt);
   const active = input.commitments.filter((commitment) => commitment.status === "ACTIVE");
-  const monthlyTotals = buildTotals(active, (commitment) => commitment.monthlyEquivalentMinor);
+  const monthlyTotals = buildTotals(active, (commitment) => commitment.monthlyEquivalentMinor, monthlyTotalCorrectionFields);
   const next30DayCommitments = active.filter((commitment) => {
     const days = commitment.nextExpectedDate ? daysBetween(today, commitment.nextExpectedDate) : null;
     return days !== null && days >= 0 && days <= 30;
   });
-  const next30DayTotals = buildTotals(next30DayCommitments, (commitment) => commitment.amountMinor);
+  const next30DayTotals = buildTotals(next30DayCommitments, (commitment) => commitment.amountMinor, next30DayTotalCorrectionFields);
 
   const next = active
     .filter((commitment) => commitment.nextExpectedDate && daysBetween(today, commitment.nextExpectedDate) !== null)
@@ -92,6 +104,8 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
       evidenceIds: commitment.evidenceIds,
     }));
 
+  const needsMe = active.flatMap((commitment) => buildAttention(commitment, today));
+
   return {
     workspace: input.workspace,
     generatedAt: generatedAt.toISOString(),
@@ -104,12 +118,19 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
       date: observation.date,
     })),
     monthlyTotals,
+    annualizedEstimateTotals: buildAnnualizedEstimateTotals(monthlyTotals),
     next30DayTotals,
-    needsMe: active.flatMap((commitment) => buildAttention(commitment, today)),
+    needsMe,
     changed: input.changed,
     next,
     coverage: buildCoverage(input.sources, input.changed.state, generatedAt),
+    activeCommitmentCount: active.length,
+    reviewItemCount: needsMe.length,
   };
+}
+
+export function hasCitedRecurringSpendPicture(home: Pick<HomeProjectionDto, "activeCommitmentCount" | "monthlyTotals">) {
+  return home.activeCommitmentCount > 0 && home.monthlyTotals.length > 0;
 }
 
 export function assertReconstructibleChanges(items: readonly ChangeItemDto[]) {
@@ -127,6 +148,7 @@ export function assertReconstructibleChanges(items: readonly ChangeItemDto[]) {
 }
 
 const postgresBigintMax = BigInt("9223372036854775807");
+const displayMajorMax = BigInt(Number.MAX_SAFE_INTEGER);
 
 export function currencyExponent(currency: string) {
   const normalizedCurrency = currency.trim().toUpperCase();
@@ -190,25 +212,63 @@ export function toMoneyDto(value: string | bigint, currency: string): MoneyDto {
   };
 }
 
+function tryAnnualizedMoney(monthly: bigint, currency: string): MoneyDto | null {
+  const months = BigInt(12);
+  if (monthly > postgresBigintMax / months) return null;
+  const annualized = monthly * months;
+  const exponent = currencyExponent(currency);
+  const factor = BigInt(10) ** BigInt(exponent);
+  if (annualized / factor > displayMajorMax) return null;
+  try {
+    return toMoneyDto(annualized, currency);
+  } catch {
+    return null;
+  }
+}
+
+function buildAnnualizedEstimateTotals(monthlyTotals: readonly ProjectionTotalDto[]): ProjectionTotalDto[] {
+  return monthlyTotals.flatMap((total) => {
+    const annualized = tryAnnualizedMoney(BigInt(total.amount.minor), total.amount.currency);
+    return annualized ? [{ ...total, amount: annualized }] : [];
+  });
+}
+
+function correctionIdsFor(
+  commitment: CanonicalCommitmentRecord,
+  fields: ReadonlySet<CorrectionField>,
+) {
+  return commitment.factCorrections
+    .filter((correction) => (correction.status ?? "ACTIVE") === "ACTIVE")
+    .filter((correction) => fields.has(correction.field))
+    .map((correction) => correction.id);
+}
+
 function buildTotals(
   commitments: readonly CanonicalCommitmentRecord[],
   amountOf: (commitment: CanonicalCommitmentRecord) => bigint,
+  fields: ReadonlySet<CorrectionField>,
 ): ProjectionTotalDto[] {
-  const totals = new Map<string, { minor: bigint; commitmentIds: string[]; evidenceIds: string[] }>();
+  const totals = new Map<string, { minor: bigint; commitmentIds: string[]; evidenceIds: string[]; correctionIds: string[] }>();
   for (const commitment of commitments) {
-    const current = totals.get(commitment.currency) ?? { minor: BigInt(0), commitmentIds: [], evidenceIds: [] };
+    const current = totals.get(commitment.currency) ?? { minor: BigInt(0), commitmentIds: [], evidenceIds: [], correctionIds: [] };
     current.minor += amountOf(commitment);
     current.commitmentIds.push(commitment.id);
     current.evidenceIds.push(...commitment.evidenceIds);
+    current.correctionIds.push(...correctionIdsFor(commitment, fields));
     totals.set(commitment.currency, current);
   }
   return [...totals.entries()]
     .sort(([left], [right]) => left === "INR" ? -1 : right === "INR" ? 1 : left.localeCompare(right))
-    .map(([currency, total]) => ({
-      amount: toMoneyDto(total.minor, currency),
-      commitmentIds: asNonEmpty(unique(total.commitmentIds)),
-      evidenceIds: asNonEmpty(unique(total.evidenceIds)),
-    }));
+    .map(([currency, total]) => {
+      const correctionIds = unique(total.correctionIds);
+      return {
+        amount: toMoneyDto(total.minor, currency),
+        commitmentIds: asNonEmpty(unique(total.commitmentIds)),
+        evidenceIds: asNonEmpty(unique(total.evidenceIds)),
+        provenance: correctionIds.length ? "USER_CORRECTED" as const : "RECEIPT" as const,
+        correctionIds,
+      };
+    });
 }
 
 function buildAttention(commitment: CanonicalCommitmentRecord, today: string): HomeProjectionDto["needsMe"] {

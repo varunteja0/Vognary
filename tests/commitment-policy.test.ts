@@ -47,6 +47,28 @@ test("protected financial classes never allow generic cancel or downgrade action
   assert.equal(isCommitmentActionAllowed("AI tools", "downgrade"), true);
 });
 
+test("a protected signal always overrides a discretionary regex, including adversarial mixes", () => {
+  const cases: Array<[string, CommitmentClass]> = [
+    ["AWS subscription", "usage-based-cloud"],
+    ["Vercel SaaS hosting cloud infrastructure", "usage-based-cloud"],
+    ["insurance SaaS", "insurance"],
+    ["LIC insurance policy premium subscription", "insurance"],
+    ["HDFC loan EMI autopay subscription", "debt-emi"],
+    ["Zerodha SIP mutual fund subscription", "investment-sip"],
+    ["Airtel broadband utility subscription", "utility"],
+    ["OpenAI ChatGPT subscription", "discretionary-subscription"],
+    ["OpenAI ऑटोपे subscription", "debt-emi"],
+    ["HDFC एमी", "debt-emi"],
+    ["Zerodha एसआईपी", "investment-sip"],
+    ["Notion SaaS", "discretionary-subscription"],
+    ["", "contractual-other"],
+    ["₹1,999", "contractual-other"],
+  ];
+  for (const [category, expected] of cases) {
+    assert.equal(classifyCommitment(category), expected, category);
+  }
+});
+
 test("high-cost protected commitments receive class-safe review language", () => {
   const cases = [
     {

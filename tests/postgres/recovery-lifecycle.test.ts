@@ -404,6 +404,9 @@ test("two realistic receipt observations infer one canonical monthly subscriptio
     assert.equal(first.data.home.recentObservations[0]?.amount?.minor, "199900");
     assert.equal(first.data.home.recentObservations[0]?.amount?.currency, "INR");
     assert.equal(first.data.home.recentObservations[0]?.date, "2026-07-06");
+    assert.equal(first.data.home.activeCommitmentCount, 0);
+    assert.deepEqual(first.data.home.annualizedEstimateTotals, []);
+    assert.equal(first.data.home.reviewItemCount, 0);
 
     const second = await submitRecoveryEvidence({
       workspaceId,
@@ -427,6 +430,10 @@ test("two realistic receipt observations infer one canonical monthly subscriptio
     assert.equal(second.data.commitments[0]?.amount.minor, "199900");
     assert.equal(second.data.commitments[0]?.evidenceCount, 2);
     assert.equal(second.data.commitments[0]?.nextExpectedDate, "2026-09-06");
+    assert.equal(second.data.home.activeCommitmentCount, 1);
+    assert.equal(second.data.home.reviewItemCount > 0, true);
+    assert.deepEqual(second.data.home.monthlyTotals.map((total) => [total.amount.currency, total.amount.minor]), [["INR", "199900"]]);
+    assert.deepEqual(second.data.home.annualizedEstimateTotals.map((total) => [total.amount.currency, total.amount.minor, total.amount.display]), [["INR", "2398800", "₹23,988.00"]]);
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
     await pool.query(`delete from users where id = $1`, [ownerUserId]);
