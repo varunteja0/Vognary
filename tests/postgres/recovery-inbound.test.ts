@@ -1392,6 +1392,101 @@ test("a forwarded receipt that only infers a next date is not a cited provider r
   }
 });
 
+test("forwarded evidence refreshes an active mandate candidate without a manual evaluator run", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const restoreEnvironment = setEnvironment({
+    ...receiptInboxEnvironment,
+    AUTOPILOT_TEST_ADAPTER: "true",
+    AUTOPILOT_TEST_PROVEN_PROVIDER_IDS: "openai",
+    AUTOPILOT_NOTICE_ENABLED: "true",
+    AUTOPILOT_NOTICE_CHANNEL_READY: "true",
+    AUTOPILOT_VETO_TOKEN_SECRET: "forwarded-refresh-veto-secret-at-least-32-bytes",
+    RESEND_FROM_EMAIL: "notices@vognary.test",
+  });
+  const pool = getDatabasePool();
+  const userId = randomUUID();
+  const workspaceId = randomUUID();
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, `forward-refresh-${randomUUID().slice(0, 8)}@example.test`]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Forward refresh workspace')`, [workspaceId, userId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+  try {
+    const inbox = await provisionReceiptInbox({ workspaceId, actorUserId: userId });
+    const address = inbox.alias!.address;
+    const deliver = (suffix: string, body: string) => processResendReceivedEvent({
+      svixId: `msg_${suffix}_${randomUUID()}`,
+      emailId: `email_${suffix}_${randomUUID()}`,
+      recipient: address,
+      createdAt: `2026-08-${suffix === "july" ? "10" : "11"}T12:00:00.000Z`,
+      payloadHash: (suffix === "july" ? "ab" : "cd").repeat(32),
+    }, {
+      retrieveRawEmail: async () => [
+        "From: billing@example.test",
+        `To: ${address}`,
+        "Subject: OpenAI receipt",
+        "Content-Type: text/plain; charset=utf-8",
+        "",
+        body,
+      ].join("\r\n"),
+    });
+
+    assert.deepEqual(await deliver("july", "OpenAI subscription charged INR 1,999 on 6 July 2026. Renews monthly on 6 August 2026."), { status: "processed" });
+    const version = await pool.query<{ version: string }>(
+      `select version::text from recovery_workspace_states where workspace_id = $1`,
+      [workspaceId],
+    );
+    await pool.query(`update recovery_commitments set confidence_score = 90 where workspace_id = $1`, [workspaceId]);
+    await signStandingMandate({
+      workspaceId,
+      actorUserId: userId,
+      expectedVersion: Number(version.rows[0]?.version ?? 0),
+      idempotencyKey: `forward-refresh-sign-${randomUUID()}`,
+    });
+    const before = await pool.query<{ id: string; classification_snapshot_id: string; status: string }>(
+      `select id::text, classification_snapshot_id::text, status
+       from recovery_action_candidates where workspace_id = $1`,
+      [workspaceId],
+    );
+    assert.ok(before.rows[0]);
+    assert.equal(before.rows[0]?.status, "SHADOW");
+
+    assert.deepEqual(await deliver("august", "OpenAI subscription charged INR 1,999 on 6 August 2026. Renews monthly on 6 September 2026."), { status: "processed" });
+    const after = await pool.query<{
+      id: string;
+      classification_snapshot_id: string;
+      latest_snapshot_id: string;
+      snapshot_count: string;
+      status: string;
+    }>(
+      `select candidate.id::text, candidate.classification_snapshot_id::text,
+              latest.id::text as latest_snapshot_id,
+              (select count(*)::text from recovery_classification_snapshots snapshot
+               where snapshot.workspace_id = candidate.workspace_id
+                 and snapshot.commitment_id = candidate.commitment_id) as snapshot_count,
+              candidate.status
+       from recovery_action_candidates candidate
+       join lateral (
+         select id from recovery_classification_snapshots snapshot
+         where snapshot.workspace_id = candidate.workspace_id
+           and snapshot.commitment_id = candidate.commitment_id
+         order by snapshot.created_at desc, snapshot.id desc
+         limit 1
+       ) latest on true
+       where candidate.workspace_id = $1`,
+      [workspaceId],
+    );
+    assert.equal(after.rows[0]?.id, before.rows[0]?.id);
+    assert.notEqual(after.rows[0]?.classification_snapshot_id, before.rows[0]?.classification_snapshot_id);
+    assert.equal(after.rows[0]?.classification_snapshot_id, after.rows[0]?.latest_snapshot_id);
+    assert.equal(after.rows[0]?.snapshot_count, "2");
+    assert.equal(after.rows[0]?.status, "SHADOW");
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [userId]);
+    restoreEnvironment();
+  }
+});
+
 async function activeAliasId(workspaceId: string) {
   const result = await getDatabasePool().query<{ id: string }>(
     `select id from recovery_inbound_aliases where workspace_id = $1 and status = 'ACTIVE'`,

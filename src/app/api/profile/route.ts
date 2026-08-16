@@ -8,6 +8,7 @@ import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError 
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 import { revokeConnectorCredentialAtProvider } from "@/lib/server/connector-provider-revocation";
 import { applyReceiptInboxRevocation } from "@/lib/server/recovery-inbound-store";
+import { lockAutopilotAuthorityGate } from "@/lib/server/recovery-autopilot-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -309,6 +310,27 @@ async function deleteUserData(userId: string, email: string) {
   const client = await getDatabasePool().connect();
   try {
     await client.query("begin");
+    await lockAutopilotAuthorityGate(client);
+    const lockWorkspaces = await client.query<{ workspace_id: string }>(
+      `select workspace_id
+       from (
+         select id as workspace_id
+         from workspaces
+         where owner_user_id = $1
+         union
+         select workspace_id
+         from consent_grants
+         where purpose = 'receipt-inbox-ingest'
+           and withdrawn_at is null
+           and workspace_id is not null
+           and (user_id = $1 or lower(subject_email) = lower($2))
+       ) affected
+       order by workspace_id`,
+      [userId, email],
+    );
+    for (const { workspace_id: workspaceId } of lockWorkspaces.rows) {
+      await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [`receipt-inbox:${workspaceId}`]);
+    }
     await client.query(`select id from users where id = $1 for update`, [userId]);
     await client.query(`select id from workspaces where owner_user_id = $1 for update`, [userId]);
     await client.query(
@@ -359,7 +381,6 @@ async function deleteUserData(userId: string, email: string) {
       [userId, email],
     );
     for (const grant of inboxConsents.rows) {
-      await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [`receipt-inbox:${grant.workspace_id}`]);
       await applyReceiptInboxRevocation(client, {
         workspaceId: grant.workspace_id,
         actorUserId: userId,

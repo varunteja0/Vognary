@@ -68,6 +68,7 @@ const home: HomeProjectionDto = {
   },
   activeCommitmentCount: 2,
   reviewItemCount: 1,
+  evidenceSources: [],
 };
 
 test("Recovery share text projects server facts without combining currencies", () => {

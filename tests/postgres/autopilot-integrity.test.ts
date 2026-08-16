@@ -16,6 +16,7 @@ import {
   replayAutopilotDeadLetter,
   revokeStandingMandate,
   sendQueuedAutopilotNotices,
+  setAutopilotNoticeSendInterleaveForTests,
   signStandingMandate,
   vetoAutopilotCandidate,
 } from "../../src/lib/server/recovery-autopilot-store";
@@ -168,13 +169,15 @@ test("fee periods are non-overlapping at the database boundary, including concur
       currency: "INR",
     });
     assert.equal(adjacent.replayed, false);
-    const usd = await invoiceWorkspacePeriod({
-      workspaceId,
-      periodStart: "2026-01-01",
-      periodEnd: "2026-01-31",
-      currency: "USD",
-    });
-    assert.equal(usd.currency, "USD");
+    await assert.rejects(
+      invoiceWorkspacePeriod({
+        workspaceId,
+        periodStart: "2026-01-01",
+        periodEnd: "2026-01-31",
+        currency: "USD",
+      }),
+      /INR pricing only/i,
+    );
     const other = await seedWorkspace();
     try {
       const otherInvoice = await invoiceWorkspacePeriod({
@@ -229,6 +232,188 @@ test("fee periods are non-overlapping at the database boundary, including concur
         [workspaceId],
       ),
       /cannot be mutated/i,
+    );
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [ownerUserId]);
+  }
+});
+
+test("explicit currency invoices stay separate in a mixed-currency period", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const { pool, ownerUserId, workspaceId, suffix } = await seedWorkspace();
+  try {
+    const version = await submitMerchantReceipts({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: 0,
+      suffix: `${suffix}-mixed-fees`,
+      merchant: "OpenAI",
+      now: new Date("2026-08-09T10:00:00.000Z"),
+    });
+    await signStandingMandate({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: version,
+      idempotencyKey: `mixed-fees-sign-${suffix}`,
+    });
+    const candidate = await pool.query<{ id: string }>(
+      `select id::text from recovery_action_candidates where workspace_id = $1`,
+      [workspaceId],
+    );
+    assert.ok(candidate.rows[0]);
+    await pool.query(
+      `insert into recovery_covered_windows (
+         workspace_id, candidate_id, window_start, window_end, expected_debit_date,
+         baseline_debit_minor, observed_debit_minor, saving_minor, status, currency
+       ) values
+         ($1, $2, '2026-01-05', '2026-01-09', '2026-01-06', 199900, 0, 199900, 'COVERED_CLEAN', 'INR'),
+         ($1, $2, '2026-01-06', '2026-01-10', '2026-01-07', 2000, 0, 2000, 'COVERED_CLEAN', 'USD')`,
+      [workspaceId, candidate.rows[0]!.id],
+    );
+    await assert.rejects(
+      invoiceWorkspacePeriod({ workspaceId, periodStart: "2026-01-01", periodEnd: "2026-01-31" }),
+      /explicit currency/i,
+    );
+    const verificationClient = await pool.connect();
+    let inr: Awaited<ReturnType<typeof invoiceWorkspacePeriod>>;
+    try {
+      await verificationClient.query("begin");
+      await verificationClient.query(
+        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`recovery:${workspaceId}`],
+      );
+      await verificationClient.query(
+        `update recovery_covered_windows set saving_minor = 199800
+         where workspace_id = $1 and currency = 'INR'`,
+        [workspaceId],
+      );
+      let invoiceFinished = false;
+      const invoicePromise = invoiceWorkspacePeriod({
+        workspaceId,
+        periodStart: "2026-01-01",
+        periodEnd: "2026-01-31",
+        currency: "INR",
+      });
+      void invoicePromise.then(() => { invoiceFinished = true; });
+      let waiting = false;
+      for (let attempt = 0; attempt < 100 && !waiting; attempt += 1) {
+        const locks = await pool.query<{ waiting: number }>(
+          `select count(*)::int as waiting from pg_locks where locktype = 'advisory' and not granted`,
+        );
+        waiting = (locks.rows[0]?.waiting ?? 0) > 0;
+        if (!waiting) await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+      assert.equal(waiting, true, "invoicing must wait for in-flight covered-window verification");
+      assert.equal(invoiceFinished, false);
+      await verificationClient.query("commit");
+      inr = await invoicePromise;
+    } catch (error) {
+      await verificationClient.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      verificationClient.release();
+    }
+    assert.equal(inr.currency, "INR");
+    assert.equal(inr.verifiedSavingMinor, BigInt(199800));
+    await assert.rejects(
+      pool.query(
+        `update recovery_covered_windows set saving_minor = saving_minor - 1
+         where workspace_id = $1 and currency = 'INR'`,
+        [workspaceId],
+      ),
+      /Billed covered windows cannot be mutated/i,
+    );
+    await assert.rejects(
+      pool.query(
+        `delete from recovery_covered_windows where workspace_id = $1 and currency = 'INR'`,
+        [workspaceId],
+      ),
+      /Billed covered windows cannot be mutated/i,
+    );
+    await assert.rejects(
+      pool.query(
+        `insert into recovery_covered_windows (
+           workspace_id, candidate_id, window_start, window_end, expected_debit_date,
+           baseline_debit_minor, observed_debit_minor, saving_minor, status, currency
+         ) values ($1, $2, '2026-01-07', '2026-01-11', '2026-01-08', 199900, 0, 199900, 'COVERED_CLEAN', 'INR')`,
+        [workspaceId, candidate.rows[0]!.id],
+      ),
+      /Billed covered windows cannot be mutated/i,
+    );
+
+    await pool.query(
+      `insert into recovery_covered_windows (
+         workspace_id, candidate_id, window_start, window_end, expected_debit_date,
+         baseline_debit_minor, observed_debit_minor, saving_minor, status, currency
+       ) values ($1, $2, '2026-02-04', '2026-02-08', '2026-02-06', 199900, 0, 199900, 'COVERED_CLEAN', 'INR')`,
+      [workspaceId, candidate.rows[0]!.id],
+    );
+    const feeLockClient = await pool.connect();
+    try {
+      await feeLockClient.query("begin");
+      await feeLockClient.query(
+        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`fee:${workspaceId}:INR`],
+      );
+      const februaryInvoice = invoiceWorkspacePeriod({
+        workspaceId,
+        periodStart: "2026-02-01",
+        periodEnd: "2026-02-28",
+        currency: "INR",
+      });
+      let invoiceWaiting = false;
+      for (let attempt = 0; attempt < 100 && !invoiceWaiting; attempt += 1) {
+        const locks = await pool.query<{ waiting: number }>(
+          `select count(*)::int as waiting from pg_locks where locktype = 'advisory' and not granted`,
+        );
+        invoiceWaiting = (locks.rows[0]?.waiting ?? 0) > 0;
+        if (!invoiceWaiting) await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+      assert.equal(invoiceWaiting, true, "invoicing must hold workspace authority while waiting for its fee lock");
+
+      let insertFinished = false;
+      const racedInsert = pool.query(
+        `insert into recovery_covered_windows (
+           workspace_id, candidate_id, window_start, window_end, expected_debit_date,
+           baseline_debit_minor, observed_debit_minor, saving_minor, status, currency
+         ) values ($1, $2, '2026-02-05', '2026-02-09', '2026-02-07', 199900, 0, 199900, 'COVERED_CLEAN', 'INR')`,
+        [workspaceId, candidate.rows[0]!.id],
+      ).then(
+        () => ({ inserted: true as const, error: null }),
+        (error: unknown) => ({ inserted: false as const, error }),
+      );
+      void racedInsert.then(() => { insertFinished = true; });
+      let bothWaiting = false;
+      for (let attempt = 0; attempt < 100 && !bothWaiting; attempt += 1) {
+        const locks = await pool.query<{ waiting: number }>(
+          `select count(*)::int as waiting from pg_locks where locktype = 'advisory' and not granted`,
+        );
+        bothWaiting = (locks.rows[0]?.waiting ?? 0) >= 2;
+        if (!bothWaiting) await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+      assert.equal(bothWaiting, true, "covered-window inserts must wait behind in-flight invoicing");
+      assert.equal(insertFinished, false);
+      await feeLockClient.query("commit");
+      await februaryInvoice;
+      const raced = await racedInsert;
+      assert.equal(raced.inserted, false);
+      assert.match(String(raced.error), /Billed covered windows cannot be mutated/i);
+    } catch (error) {
+      await feeLockClient.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      feeLockClient.release();
+    }
+    await assert.rejects(
+      invoiceWorkspacePeriod({
+        workspaceId,
+        periodStart: "2026-01-01",
+        periodEnd: "2026-01-31",
+        currency: "USD",
+      }),
+      /INR pricing only/i,
     );
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
@@ -498,15 +683,24 @@ test("a single pasted receipt cannot invent a next debit, and mixed protected fa
     assert.notEqual(candidate.rows[0]?.next_debit_reason, "CITED_RENEWAL");
     assert.notEqual(candidate.rows[0]?.eligibility, "ELIGIBLE");
     if (candidate.rows[0]) {
-      await pool.query(
-        `update recovery_classification_snapshots
-         set cited_category = 'Insurance', cited_merchant = 'LIC'
-         where workspace_id = $1`,
+      const insurance = await pool.query<{ id: string }>(
+        `insert into recovery_classification_snapshots (
+           workspace_id, commitment_id, commitment_class, protected_override, cited_category,
+           cited_merchant, confidence_score, evidence_ids
+         )
+         select workspace_id, commitment_id, 'insurance', true, 'Insurance', 'LIC', confidence_score, evidence_ids
+         from recovery_classification_snapshots
+         where workspace_id = $1
+         order by created_at desc, id desc
+         limit 1
+         returning id`,
         [workspaceId],
       );
       await pool.query(
-        `update recovery_action_candidates set eligibility = 'ELIGIBLE' where workspace_id = $1`,
-        [workspaceId],
+        `update recovery_action_candidates
+         set classification_snapshot_id = $2, eligibility = 'ELIGIBLE'
+         where workspace_id = $1`,
+        [workspaceId, insurance.rows[0]!.id],
       );
       const gate = await measureShadowGate();
       assert.ok(gate.protectedLeakage >= 1);
@@ -630,9 +824,24 @@ test("two eligible candidates in one workspace count once; changed cited facts i
       [workspaceId],
     );
     assert.ok(Number(cloneCount.rows[0]?.n) >= 1);
-    await pool.query(
-      `update recovery_classification_snapshots set cited_category = 'Insurance', cited_merchant = 'LIC' where workspace_id = $1`,
+    const insurance = await pool.query<{ id: string; commitment_id: string }>(
+      `insert into recovery_classification_snapshots (
+         workspace_id, commitment_id, commitment_class, protected_override, cited_category,
+         cited_merchant, confidence_score, evidence_ids
+       )
+       select workspace_id, commitment_id, 'insurance', true, 'Insurance', 'LIC', confidence_score, evidence_ids
+       from recovery_classification_snapshots
+       where workspace_id = $1
+       order by created_at desc, id desc
+       limit 1
+       returning id, commitment_id`,
       [workspaceId],
+    );
+    await pool.query(
+      `update recovery_action_candidates
+       set classification_snapshot_id = $2
+       where workspace_id = $1 and commitment_id = $3`,
+      [workspaceId, insurance.rows[0]!.id, insurance.rows[0]!.commitment_id],
     );
     const afterChange = await measureShadowGate();
     assert.notEqual(afterChange.snapshotHash, beforeChange.snapshotHash);
@@ -1694,9 +1903,12 @@ test("D30 connected-mandate cohort keeps revoked workspaces in the denominator",
     const seededOld = await queryAutopilotFunnel(pool);
     assert.equal(seededOld.d30ConnectedRetention.eligibleWorkspaces, baselineEligible + 1);
     assert.equal(seededOld.d30ConnectedRetention.returned, baselineReturned + 1);
-    await pool.query(
-      `update recovery_standing_mandates set signed_at = now() - interval '40 days' where workspace_id = $1`,
-      [workspaceId],
+    await assert.rejects(
+      () => pool.query(
+        `update recovery_standing_mandates set signed_at = now() - interval '40 days' where workspace_id = $1`,
+        [workspaceId],
+      ),
+      /Standing mandate terms cannot be mutated/i,
     );
     await pool.query(
       `update recovery_sources set ingested_at = now() - interval '40 days' where workspace_id = $1`,
@@ -1765,9 +1977,12 @@ test("D30 connected-mandate cohort keeps revoked workspaces in the denominator",
         expectedVersion: 0,
         idempotencyKey: `integrity-d30-unsigned-source-${disconnected.suffix}`,
       });
-      await pool.query(
-        `update recovery_standing_mandates set signed_at = now() - interval '40 days' where workspace_id = $1`,
-        [disconnected.workspaceId],
+      await assert.rejects(
+        () => pool.query(
+          `update recovery_standing_mandates set signed_at = now() - interval '40 days' where workspace_id = $1`,
+          [disconnected.workspaceId],
+        ),
+        /Standing mandate terms cannot be mutated/i,
       );
       const afterNeverConnected = await queryAutopilotFunnel(pool);
       assert.equal(afterNeverConnected.d30ConnectedRetention.eligibleWorkspaces, afterResign.d30ConnectedRetention.eligibleWorkspaces);
@@ -2973,9 +3188,9 @@ test("withdrawing standing-mandate consent revokes the mandate and cannot revoke
     });
     await pool.query(
       `update recovery_standing_mandates
-       set status = 'REVOKED', revoked_at = now()
+       set status = 'REVOKED', revoked_at = now(), revoked_by_user_id = $3
        where workspace_id = $1 and id = $2`,
-      [workspaceId, resigned.mandate.id],
+      [workspaceId, resigned.mandate.id, ownerUserId],
     );
     const third = await signStandingMandate({
       workspaceId,
@@ -3242,6 +3457,626 @@ test("a later delivered webhook cannot start the veto clock after bounce", {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
     await pool.query(`delete from users where id = $1`, [ownerUserId]);
   }
+});
+
+async function withAutopilotNoticeEnv(run: () => Promise<void>) {
+  const previous = {
+    execution: process.env.AUTOPILOT_EXECUTION_ENABLED,
+    notice: process.env.AUTOPILOT_NOTICE_ENABLED,
+    channel: process.env.AUTOPILOT_NOTICE_CHANNEL_READY,
+    adapter: process.env.AUTOPILOT_TEST_ADAPTER,
+    secret: process.env.AUTOPILOT_VETO_TOKEN_SECRET,
+    proven: process.env.AUTOPILOT_TEST_PROVEN_PROVIDER_IDS,
+    from: process.env.RESEND_FROM_EMAIL,
+  };
+  process.env.AUTOPILOT_EXECUTION_ENABLED = "true";
+  process.env.AUTOPILOT_NOTICE_ENABLED = "true";
+  process.env.AUTOPILOT_NOTICE_CHANNEL_READY = "true";
+  process.env.AUTOPILOT_TEST_ADAPTER = "true";
+  process.env.AUTOPILOT_VETO_TOKEN_SECRET = "veto-signing-secret-for-tests-32bytes!!";
+  process.env.AUTOPILOT_TEST_PROVEN_PROVIDER_IDS = "openai";
+  process.env.RESEND_FROM_EMAIL = "notices@vognary.test";
+  drainAutopilotTestNoticeSends();
+  try {
+    await run();
+  } finally {
+    setAutopilotNoticeSendInterleaveForTests(null);
+    drainAutopilotTestNoticeSends();
+    if (previous.execution === undefined) delete process.env.AUTOPILOT_EXECUTION_ENABLED;
+    else process.env.AUTOPILOT_EXECUTION_ENABLED = previous.execution;
+    if (previous.notice === undefined) delete process.env.AUTOPILOT_NOTICE_ENABLED;
+    else process.env.AUTOPILOT_NOTICE_ENABLED = previous.notice;
+    if (previous.channel === undefined) delete process.env.AUTOPILOT_NOTICE_CHANNEL_READY;
+    else process.env.AUTOPILOT_NOTICE_CHANNEL_READY = previous.channel;
+    if (previous.adapter === undefined) delete process.env.AUTOPILOT_TEST_ADAPTER;
+    else process.env.AUTOPILOT_TEST_ADAPTER = previous.adapter;
+    if (previous.secret === undefined) delete process.env.AUTOPILOT_VETO_TOKEN_SECRET;
+    else process.env.AUTOPILOT_VETO_TOKEN_SECRET = previous.secret;
+    if (previous.proven === undefined) delete process.env.AUTOPILOT_TEST_PROVEN_PROVIDER_IDS;
+    else process.env.AUTOPILOT_TEST_PROVEN_PROVIDER_IDS = previous.proven;
+    if (previous.from === undefined) delete process.env.RESEND_FROM_EMAIL;
+    else process.env.RESEND_FROM_EMAIL = previous.from;
+  }
+}
+
+test("a same-timestamp complaint, bounce, or failure takes precedence over an earlier delivered event", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withAutopilotNoticeEnv(async () => {
+    for (const type of ["email.complained", "email.bounced", "email.failed"] as const) {
+      const { pool, ownerUserId, workspaceId, suffix } = await seedWorkspace();
+      try {
+        const version = await submitMerchantReceipts({
+          workspaceId,
+          actorUserId: ownerUserId,
+          expectedVersion: 0,
+          suffix: `${suffix}-${type}`,
+          merchant: "OpenAI",
+          now: new Date("2026-08-09T10:00:00.000Z"),
+        });
+        await pool.query(`update recovery_commitments set confidence_score = 90 where workspace_id = $1`, [workspaceId]);
+        await signStandingMandate({
+          workspaceId,
+          actorUserId: ownerUserId,
+          expectedVersion: version,
+          idempotencyKey: `same-t-sign-${suffix}-${type}`,
+        });
+        await queueDueNotices(new Date("2026-08-24T00:00:00.000Z"));
+        const notice = await pool.query<{ candidate_id: string; provider_message_id: string | null }>(
+          `select candidate_id::text, provider_message_id from recovery_veto_notices where workspace_id = $1`,
+          [workspaceId],
+        );
+        assert.ok(notice.rows[0]?.provider_message_id);
+        const occurredAt = "2026-08-24T00:05:00.000Z";
+        const delivered = await applyAutopilotNoticeEvent({
+          providerEventId: `svix-same-t-delivered-${suffix}-${type}`,
+          type: "email.delivered",
+          providerMessageId: notice.rows[0]!.provider_message_id!,
+          occurredAt,
+          payloadHash: createHash("sha256").update(`same-t-delivered-${suffix}-${type}`).digest("hex"),
+          tagged: true,
+        });
+        assert.equal(delivered.status, "applied");
+        const terminal = await applyAutopilotNoticeEvent({
+          providerEventId: `svix-same-t-terminal-${suffix}-${type}`,
+          type,
+          providerMessageId: notice.rows[0]!.provider_message_id!,
+          occurredAt,
+          payloadHash: createHash("sha256").update(`same-t-terminal-${suffix}-${type}`).digest("hex"),
+          tagged: true,
+        });
+        assert.equal(terminal.status, "applied");
+        const clock = await pool.query<{
+          delivery_status: string;
+          delivered_at: Date | null;
+          veto_deadline_at: Date | null;
+        }>(
+          `select notice.delivery_status, candidate.notice_delivered_at as delivered_at, candidate.veto_deadline_at
+           from recovery_veto_notices notice
+           join recovery_action_candidates candidate
+             on candidate.workspace_id = notice.workspace_id and candidate.id = notice.candidate_id
+           where notice.workspace_id = $1`,
+          [workspaceId],
+        );
+        const expectedStatus = type === "email.complained" ? "COMPLAINED" : type === "email.bounced" ? "BOUNCED" : "FAILED";
+        assert.equal(clock.rows[0]?.delivery_status, expectedStatus);
+        assert.equal(clock.rows[0]?.delivered_at, null);
+        assert.equal(clock.rows[0]?.veto_deadline_at, null);
+        const authorized = await authorizeSilentCases(new Date("2026-08-26T12:00:00.000Z"));
+        assert.equal(authorized.authorized, 0);
+      } finally {
+        await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+        await pool.query(`delete from users where id = $1`, [ownerUserId]);
+      }
+    }
+  });
+});
+
+test("signed mandates and Autopilot audit facts reject illegal mutation while the workspace exists", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const { pool, ownerUserId, workspaceId, suffix } = await seedWorkspace();
+  try {
+    const version = await submitMerchantReceipts({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: 0,
+      suffix,
+      merchant: "OpenAI",
+      now: new Date("2026-08-09T10:00:00.000Z"),
+    });
+    await pool.query(`update recovery_commitments set confidence_score = 90 where workspace_id = $1`, [workspaceId]);
+    const signed = await signStandingMandate({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: version,
+      idempotencyKey: `mandate-immut-${suffix}`,
+    });
+    await assert.rejects(
+      pool.query(
+        `update recovery_standing_mandates
+         set signed_text = 'Tampered standing-mandate terms that still satisfy the length check.'
+         where workspace_id = $1`,
+        [workspaceId],
+      ),
+      /Standing mandate terms cannot be mutated/i,
+    );
+    await assert.rejects(
+      pool.query(`update recovery_standing_mandates set per_action_ceiling_minor = 1 where workspace_id = $1`, [workspaceId]),
+      /Standing mandate terms cannot be mutated/i,
+    );
+    await assert.rejects(
+      pool.query(`delete from recovery_standing_mandates where workspace_id = $1`, [workspaceId]),
+      /cannot be deleted while the workspace exists/i,
+    );
+    await revokeStandingMandate({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: signed.workspaceVersion,
+      idempotencyKey: `mandate-immut-revoke-${suffix}`,
+    });
+    const revoked = await pool.query<{ status: string }>(
+      `select status from recovery_standing_mandates where workspace_id = $1`,
+      [workspaceId],
+    );
+    assert.equal(revoked.rows[0]?.status, "REVOKED");
+    await assert.rejects(
+      pool.query(`update recovery_standing_mandates set status = 'ACTIVE' where workspace_id = $1`, [workspaceId]),
+      /Revoked standing mandates cannot be mutated/i,
+    );
+
+    await assert.rejects(
+      pool.query(`update recovery_classification_snapshots set cited_category = 'Insurance' where workspace_id = $1`, [workspaceId]),
+      /cannot be updated/i,
+    );
+    await assert.rejects(
+      pool.query(`delete from recovery_classification_snapshots where workspace_id = $1`, [workspaceId]),
+      /cannot be deleted while the workspace exists/i,
+    );
+    await assert.rejects(
+      pool.query(`update recovery_standing_mandate_events set kind = 'REVOKED' where workspace_id = $1`, [workspaceId]),
+      /cannot be updated/i,
+    );
+    const candidate = await pool.query<{ id: string }>(
+      `select id::text from recovery_action_candidates where workspace_id = $1 limit 1`,
+      [workspaceId],
+    );
+    assert.ok(candidate.rows[0]);
+    await pool.query(
+      `insert into recovery_candidate_events (workspace_id, candidate_id, previous_status, status, actor_kind, reason_code)
+       values ($1, $2, null, 'SHADOW', 'SYSTEM', 'immutability-fixture')`,
+      [workspaceId, candidate.rows[0]!.id],
+    );
+    await assert.rejects(
+      pool.query(`update recovery_candidate_events set reason_code = 'tampered' where workspace_id = $1`, [workspaceId]),
+      /cannot be updated/i,
+    );
+    await assert.rejects(
+      pool.query(`delete from recovery_candidate_events where workspace_id = $1`, [workspaceId]),
+      /cannot be deleted while the workspace exists/i,
+    );
+
+    await pool.query(
+      `insert into recovery_fee_ledger (
+         workspace_id, period_start, period_end, currency, monitoring_minor, verified_saving_minor,
+         outcome_fee_minor, retained_minor, refund_credit_minor, additional_charge_minor,
+         razorpay_charge_status, inputs_hash, year_start
+       ) values ($1, '2026-08-01', '2026-08-31', 'INR', 0, 0, 0, 0, 0, 0, 'FAIL_CLOSED', $2, '2026-08-01')`,
+      [workspaceId, "d".repeat(64)],
+    );
+    await assert.rejects(
+      pool.query(`update recovery_fee_ledger set razorpay_charge_status = 'CHARGED' where workspace_id = $1`, [workspaceId]),
+      /cannot be mutated/i,
+    );
+    const attempt = await pool.query<{ id: string }>(
+      `insert into recovery_execution_attempts (
+         workspace_id, candidate_id, attempt_no, operation_key, request_hash, provider_id, status
+       ) values ($1, $2, 1, $3, $4, 'openai', 'PENDING')
+       returning id::text`,
+      [workspaceId, candidate.rows[0]!.id, `op-immut-${suffix}-xxxxxxxx`, "e".repeat(64)],
+    );
+    await pool.query(
+      `update recovery_execution_attempts set status = 'AUTHORIZED' where id = $1`,
+      [attempt.rows[0]!.id],
+    );
+    await pool.query(
+      `update recovery_execution_attempts set status = 'FAILED', failure_reason = 'provider-timeout' where id = $1`,
+      [attempt.rows[0]!.id],
+    );
+    await assert.rejects(
+      pool.query(`update recovery_execution_attempts set status = 'AUTHORIZED' where id = $1`, [attempt.rows[0]!.id]),
+      /Terminal execution attempts cannot be mutated/i,
+    );
+    await assert.rejects(
+      pool.query(`delete from recovery_execution_attempts where workspace_id = $1`, [workspaceId]),
+      /cannot be deleted while the workspace exists/i,
+    );
+    await pool.query(
+      `insert into recovery_operator_actions (workspace_id, candidate_id, actor_user_id, minutes, outcome)
+       values ($1, $2, $3, 1, 'EXCEPTION')`,
+      [workspaceId, candidate.rows[0]!.id, ownerUserId],
+    );
+    await assert.rejects(
+      pool.query(`update recovery_operator_actions set minutes = 9 where workspace_id = $1`, [workspaceId]),
+      /cannot be updated/i,
+    );
+    await pool.query(
+      `insert into recovery_executions (
+         workspace_id, candidate_id, provider_id, route, actor_kind, outcome, attempt_no
+       ) values ($1, $2, 'openai', 'unsupported', 'OPERATOR', 'EXCEPTION', 1)`,
+      [workspaceId, candidate.rows[0]!.id],
+    );
+    await assert.rejects(
+      pool.query(`update recovery_executions set outcome = 'FAILED' where workspace_id = $1`, [workspaceId]),
+      /cannot be updated/i,
+    );
+
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    const leftover = await pool.query<{ mandates: string; snapshots: string; attempts: string }>(
+      `select
+         (select count(*)::text from recovery_standing_mandates where workspace_id = $1) as mandates,
+         (select count(*)::text from recovery_classification_snapshots where workspace_id = $1) as snapshots,
+         (select count(*)::text from recovery_execution_attempts where workspace_id = $1) as attempts`,
+      [workspaceId],
+    );
+    assert.deepEqual(leftover.rows[0], { mandates: "0", snapshots: "0", attempts: "0" });
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]).catch(() => undefined);
+    await pool.query(`delete from users where id = $1`, [ownerUserId]);
+  }
+});
+
+test("a newly signed mandate keeps historical mandate terms on the prior version", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const { pool, ownerUserId, workspaceId, suffix } = await seedWorkspace();
+  try {
+    const historicalText = "Historical standing-mandate terms without published monetary ceilings.";
+    await pool.query(
+      `insert into recovery_standing_mandates (
+         workspace_id, version, status, terms_version, signed_text, signed_text_hash,
+         currency, per_action_ceiling_minor, rolling_30d_ceiling_minor, veto_window_hours,
+         signed_by_user_id, signed_at, revoked_at, revoked_by_user_id
+       ) values ($1, 1, 'REVOKED', 'standing-mandate-v1', $2, $3, 'INR', 500000, 2000000, 48, $4, now() - interval '30 days', now() - interval '10 days', $4)`,
+      [workspaceId, historicalText, "a".repeat(64), ownerUserId],
+    );
+    const version = await submitMerchantReceipts({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: 0,
+      suffix,
+      merchant: "OpenAI",
+      now: new Date("2026-08-09T10:00:00.000Z"),
+    });
+    await pool.query(`update recovery_commitments set confidence_score = 90 where workspace_id = $1`, [workspaceId]);
+    const signed = await signStandingMandate({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: version,
+      idempotencyKey: `historical-terms-${suffix}`,
+    });
+    assert.equal(signed.mandate.termsVersion, "standing-mandate-2026-08-16");
+    assert.match(signed.mandate.signedText, /INR ₹50,000 per action/);
+    assert.match(signed.mandate.signedText, /INR ₹2,00,000 rolling 30-day ceiling/);
+    const historical = await pool.query<{ terms_version: string; signed_text: string; signed_text_hash: string }>(
+      `select terms_version, signed_text, signed_text_hash from recovery_standing_mandates where workspace_id = $1 and version = 1`,
+      [workspaceId],
+    );
+    assert.equal(historical.rows[0]?.terms_version, "standing-mandate-v1");
+    assert.equal(historical.rows[0]?.signed_text, historicalText);
+    assert.equal(historical.rows[0]?.signed_text_hash, "a".repeat(64));
+    assert.notEqual(signed.mandate.signedTextHash, historical.rows[0]?.signed_text_hash);
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [ownerUserId]);
+  }
+});
+
+test("obsolete queued notices are not sent after mandate revoke, source disconnect, or newer classification", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withAutopilotNoticeEnv(async () => {
+    const cases = [
+      { phase: "after-select" as const, kind: "revoke" as const },
+      { phase: "after-freeze" as const, kind: "disconnect" as const },
+      { phase: "after-select" as const, kind: "classification" as const },
+      { phase: "after-freeze" as const, kind: "provider" as const },
+      { phase: "after-freeze" as const, kind: "currency" as const },
+      { phase: "after-freeze" as const, kind: "provider-proof" as const },
+    ];
+    for (const { phase, kind } of cases) {
+      const { pool, ownerUserId, workspaceId, suffix } = await seedWorkspace();
+      try {
+        const version = await submitMerchantReceipts({
+          workspaceId,
+          actorUserId: ownerUserId,
+          expectedVersion: 0,
+          suffix: `${suffix}-${phase}-${kind}`,
+          merchant: "OpenAI",
+          now: new Date("2026-08-09T10:00:00.000Z"),
+        });
+        await pool.query(`update recovery_commitments set confidence_score = 90 where workspace_id = $1`, [workspaceId]);
+        const signed = await signStandingMandate({
+          workspaceId,
+          actorUserId: ownerUserId,
+          expectedVersion: version,
+          idempotencyKey: `obsolete-sign-${suffix}-${phase}-${kind}`,
+        });
+        process.env.AUTOPILOT_NOTICE_CHANNEL_READY = "false";
+        await queueDueNotices(new Date("2026-08-24T00:00:00.000Z"));
+        process.env.AUTOPILOT_NOTICE_CHANNEL_READY = "true";
+        drainAutopilotTestNoticeSends();
+        setAutopilotNoticeSendInterleaveForTests(async (hookPhase, input) => {
+          if (hookPhase !== phase) return;
+          if (kind === "revoke") {
+            await revokeStandingMandate({
+              workspaceId: input.workspaceId,
+              actorUserId: ownerUserId,
+              expectedVersion: signed.workspaceVersion,
+              idempotencyKey: `obsolete-revoke-${suffix}-${phase}`,
+            });
+            return;
+          }
+          if (kind === "disconnect") {
+            const source = await pool.query<{ id: string }>(
+              `select id::text from recovery_sources where workspace_id = $1 limit 1`,
+              [workspaceId],
+            );
+            await disconnectRecoverySource({
+              workspaceId,
+              actorUserId: ownerUserId,
+              sourceId: source.rows[0]!.id,
+              expectedVersion: signed.workspaceVersion,
+              idempotencyKey: `obsolete-disconnect-${suffix}-${phase}`,
+            });
+            return;
+          }
+          if (kind === "classification") {
+            const insurance = await pool.query<{ id: string; commitment_id: string }>(
+              `insert into recovery_classification_snapshots (
+                 workspace_id, commitment_id, commitment_class, protected_override, cited_category,
+                 cited_merchant, confidence_score, evidence_ids
+               )
+               select workspace_id, commitment_id, 'insurance', true, 'Insurance', 'LIC', confidence_score, evidence_ids
+               from recovery_classification_snapshots
+               where workspace_id = $1
+               order by created_at desc, id desc
+               limit 1
+               returning id, commitment_id`,
+              [workspaceId],
+            );
+            await pool.query(
+              `update recovery_action_candidates
+               set classification_snapshot_id = $2
+               where workspace_id = $1 and commitment_id = $3`,
+              [workspaceId, insurance.rows[0]!.id, insurance.rows[0]!.commitment_id],
+            );
+            return;
+          }
+          if (kind === "currency") {
+            await pool.query(
+              `update recovery_action_candidates set currency = 'USD' where workspace_id = $1`,
+              [workspaceId],
+            );
+            return;
+          }
+          if (kind === "provider-proof") {
+            process.env.AUTOPILOT_TEST_PROVEN_PROVIDER_IDS = "";
+            return;
+          }
+          await pool.query(
+            `insert into recovery_provider_disables (provider_id, disabled, reason)
+             values ('openai', true, 'obsolete-notice-test')
+             on conflict (provider_id) do update set disabled = true, reason = excluded.reason`,
+          );
+        });
+        const accepted = await sendQueuedAutopilotNotices(new Date("2026-08-24T00:01:00.000Z"), { workspaceId });
+        assert.equal(accepted, 0);
+        const sent = drainAutopilotTestNoticeSends();
+        assert.equal(sent.length, 0);
+        const clock = await pool.query<{ notice_delivered_at: Date | null; veto_deadline_at: Date | null }>(
+          `select notice_delivered_at, veto_deadline_at from recovery_action_candidates where workspace_id = $1`,
+          [workspaceId],
+        );
+        assert.equal(clock.rows[0]?.notice_delivered_at, null);
+        assert.equal(clock.rows[0]?.veto_deadline_at, null);
+      } finally {
+        setAutopilotNoticeSendInterleaveForTests(null);
+        await pool.query(`delete from recovery_provider_disables where provider_id = 'openai' and reason = 'obsolete-notice-test'`).catch(() => undefined);
+        await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+        await pool.query(`delete from users where id = $1`, [ownerUserId]);
+      }
+    }
+  });
+});
+
+test("concurrent notice workers call the provider once", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withAutopilotNoticeEnv(async () => {
+    const { pool, ownerUserId, workspaceId, suffix } = await seedWorkspace();
+    try {
+      const version = await submitMerchantReceipts({
+        workspaceId,
+        actorUserId: ownerUserId,
+        expectedVersion: 0,
+        suffix: `${suffix}-duplicate-worker`,
+        merchant: "OpenAI",
+        now: new Date("2026-08-09T10:00:00.000Z"),
+      });
+      await pool.query(`update recovery_commitments set confidence_score = 90 where workspace_id = $1`, [workspaceId]);
+      await signStandingMandate({
+        workspaceId,
+        actorUserId: ownerUserId,
+        expectedVersion: version,
+        idempotencyKey: `duplicate-worker-sign-${suffix}`,
+      });
+      process.env.AUTOPILOT_NOTICE_CHANNEL_READY = "false";
+      await queueDueNotices(new Date("2026-08-24T00:00:00.000Z"));
+      process.env.AUTOPILOT_NOTICE_CHANNEL_READY = "true";
+      drainAutopilotTestNoticeSends();
+
+      const accepted = await Promise.all([
+        sendQueuedAutopilotNotices(new Date("2026-08-24T00:01:00.000Z"), { workspaceId }),
+        sendQueuedAutopilotNotices(new Date("2026-08-24T00:01:00.000Z"), { workspaceId }),
+      ]);
+      assert.equal(accepted.reduce((total, count) => total + count, 0), 1);
+      assert.equal(drainAutopilotTestNoticeSends().length, 1);
+      const notice = await pool.query<{ delivery_status: string; provider_message_id: string | null }>(
+        `select delivery_status, provider_message_id from recovery_veto_notices where workspace_id = $1`,
+        [workspaceId],
+      );
+      assert.equal(notice.rows[0]?.delivery_status, "ACCEPTED");
+      assert.ok(notice.rows[0]?.provider_message_id);
+    } finally {
+      await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+      await pool.query(`delete from users where id = $1`, [ownerUserId]);
+    }
+  });
+});
+
+test("notice send serializes with concurrent mandate revocation", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withAutopilotNoticeEnv(async () => {
+    const { pool, ownerUserId, workspaceId, suffix } = await seedWorkspace();
+    try {
+      const version = await submitMerchantReceipts({
+        workspaceId,
+        actorUserId: ownerUserId,
+        expectedVersion: 0,
+        suffix: `${suffix}-send-revoke-race`,
+        merchant: "OpenAI",
+        now: new Date("2026-08-09T10:00:00.000Z"),
+      });
+      await pool.query(`update recovery_commitments set confidence_score = 90 where workspace_id = $1`, [workspaceId]);
+      const signed = await signStandingMandate({
+        workspaceId,
+        actorUserId: ownerUserId,
+        expectedVersion: version,
+        idempotencyKey: `send-revoke-sign-${suffix}`,
+      });
+      process.env.AUTOPILOT_NOTICE_CHANNEL_READY = "false";
+      await queueDueNotices(new Date("2026-08-24T00:00:00.000Z"));
+      process.env.AUTOPILOT_NOTICE_CHANNEL_READY = "true";
+      drainAutopilotTestNoticeSends();
+
+      let revokeFinished = false;
+      let revokePromise: ReturnType<typeof revokeStandingMandate> | null = null;
+      setAutopilotNoticeSendInterleaveForTests(async (phase) => {
+        if (phase !== "after-authority") return;
+        revokePromise = revokeStandingMandate({
+          workspaceId,
+          actorUserId: ownerUserId,
+          expectedVersion: signed.workspaceVersion,
+          idempotencyKey: `send-revoke-race-${suffix}`,
+        });
+        void revokePromise.then(() => { revokeFinished = true; });
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        assert.equal(revokeFinished, false, "revocation must wait while the provider-send authority gate is held");
+      });
+
+      const accepted = await sendQueuedAutopilotNotices(new Date("2026-08-24T00:01:00.000Z"), { workspaceId });
+      assert.equal(accepted, 1);
+      assert.equal(drainAutopilotTestNoticeSends().length, 1);
+      assert.ok(revokePromise);
+      await revokePromise;
+      assert.equal(revokeFinished, true);
+      const candidate = await pool.query<{ status: string }>(
+        `select status from recovery_action_candidates where workspace_id = $1`,
+        [workspaceId],
+      );
+      assert.equal(candidate.rows[0]?.status, "REVOKED");
+    } finally {
+      setAutopilotNoticeSendInterleaveForTests(null);
+      await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+      await pool.query(`delete from users where id = $1`, [ownerUserId]);
+    }
+  });
+});
+
+test("notice send serializes with concurrent account deletion", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withAutopilotNoticeEnv(async () => {
+    const previous = {
+      sessionSecret: process.env.SESSION_SECRET,
+      inMemoryRateLimits: process.env.ALLOW_IN_MEMORY_RATE_LIMITS,
+    };
+    process.env.SESSION_SECRET = "profile-delete-race-session-secret-at-least-32-bytes";
+    process.env.ALLOW_IN_MEMORY_RATE_LIMITS = "true";
+    const { pool, ownerUserId, workspaceId, suffix } = await seedWorkspace();
+    try {
+      const version = await submitMerchantReceipts({
+        workspaceId,
+        actorUserId: ownerUserId,
+        expectedVersion: 0,
+        suffix: `${suffix}-send-delete-race`,
+        merchant: "OpenAI",
+        now: new Date("2026-08-09T10:00:00.000Z"),
+      });
+      await pool.query(`update recovery_commitments set confidence_score = 90 where workspace_id = $1`, [workspaceId]);
+      await signStandingMandate({
+        workspaceId,
+        actorUserId: ownerUserId,
+        expectedVersion: version,
+        idempotencyKey: `send-delete-sign-${suffix}`,
+      });
+      process.env.AUTOPILOT_NOTICE_CHANNEL_READY = "false";
+      await queueDueNotices(new Date("2026-08-24T00:00:00.000Z"));
+      process.env.AUTOPILOT_NOTICE_CHANNEL_READY = "true";
+      drainAutopilotTestNoticeSends();
+
+      const { NextRequest } = await import("next/server");
+      const { DELETE: deleteProfile } = await import("../../src/app/api/profile/route");
+      const { createSessionCookie } = await import("../../src/lib/server/session");
+      const cookie = await createSessionCookie({ userId: ownerUserId, workspaceId });
+      const deletion = { promise: null as Promise<Response> | null, finished: false };
+      setAutopilotNoticeSendInterleaveForTests(async (phase) => {
+        if (phase !== "after-authority") return;
+        deletion.promise = deleteProfile(new NextRequest("https://vognary.test/api/profile", {
+          method: "DELETE",
+          headers: {
+            cookie: `${cookie.name}=${encodeURIComponent(cookie.value)}`,
+            origin: "https://vognary.test",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ confirm: "DELETE MY VOGNARY DATA" }),
+        }));
+        void deletion.promise.then(() => { deletion.finished = true; });
+        let waiting = false;
+        for (let attempt = 0; attempt < 100 && !waiting; attempt += 1) {
+          const locks = await pool.query<{ waiting: number }>(
+            `select count(*)::int as waiting from pg_locks where locktype = 'advisory' and not granted`,
+          );
+          waiting = (locks.rows[0]?.waiting ?? 0) > 0;
+          if (!waiting) await new Promise<void>((resolve) => setImmediate(resolve));
+        }
+        assert.equal(waiting, true, "account deletion must wait on the notice-send authority gate");
+        assert.equal(deletion.finished, false);
+      });
+
+      const accepted = await sendQueuedAutopilotNotices(new Date("2026-08-24T00:01:00.000Z"), { workspaceId });
+      assert.equal(accepted, 1);
+      assert.equal(drainAutopilotTestNoticeSends().length, 1);
+      assert.ok(deletion.promise);
+      const response = await deletion.promise;
+      assert.equal(response.status, 200, await response.text());
+      assert.equal(deletion.finished, true);
+      assert.equal(Number((await pool.query<{ total: number }>(
+        `select count(*)::int as total from workspaces where id = $1`,
+        [workspaceId],
+      )).rows[0]?.total ?? -1), 0);
+    } finally {
+      setAutopilotNoticeSendInterleaveForTests(null);
+      await pool.query(`delete from workspaces where id = $1`, [workspaceId]).catch(() => undefined);
+      await pool.query(`delete from users where id = $1`, [ownerUserId]).catch(() => undefined);
+      if (previous.sessionSecret === undefined) delete process.env.SESSION_SECRET;
+      else process.env.SESSION_SECRET = previous.sessionSecret;
+      if (previous.inMemoryRateLimits === undefined) delete process.env.ALLOW_IN_MEMORY_RATE_LIMITS;
+      else process.env.ALLOW_IN_MEMORY_RATE_LIMITS = previous.inMemoryRateLimits;
+    }
+  });
 });
 
 function isImmutableEvidenceError(error: unknown) {

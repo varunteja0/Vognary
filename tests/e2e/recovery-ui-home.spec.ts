@@ -133,6 +133,7 @@ const home = {
   },
   activeCommitmentCount: 1,
   reviewItemCount: 1,
+  evidenceSources: [],
 };
 
 const meta = { requestId: "request-e2e", workspaceVersion: 4 };
@@ -142,12 +143,17 @@ type DecisionOutcome = { ok: true } | { ok: false; status: number; body: unknown
 async function mockRecoveryApi(page: Page, options: { decision?: DecisionOutcome } = {}) {
   let currentDetail: Record<string, unknown> = detail;
   let currentMeta = meta;
-  const activationCalls: string[] = [];
+  const activationResponses: number[] = [];
+  page.on("response", (response) => {
+    const request = response.request();
+    if (request.method() === "POST" && new URL(response.url()).pathname === "/api/workspaces/current/activation") {
+      activationResponses.push(response.status());
+    }
+  });
   await page.route("**/api/workspaces/current/brief", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: home, meta }) }),
   );
   await page.route("**/api/workspaces/current/activation", (route) => {
-    activationCalls.push(route.request().method());
     return route.fulfill({
       status: 201,
       contentType: "application/json",
@@ -185,7 +191,7 @@ async function mockRecoveryApi(page: Page, options: { decision?: DecisionOutcome
       }),
     });
   });
-  return { activationCalls };
+  return { activationResponses };
 }
 
 async function signIn(page: Page) {
@@ -210,7 +216,7 @@ test("home renders attention, upcoming charges, and receipt freshness without in
     });
   });
   await signIn(page);
-  const { activationCalls } = await mockRecoveryApi(page);
+  const { activationResponses } = await mockRecoveryApi(page);
   await page.goto("/app");
 
   await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
@@ -228,7 +234,8 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
 
   await expect(page.getByText("Monthly software spend")).toBeVisible();
-  await expect.poll(() => activationCalls.length).toBe(1);
+  await expect.poll(() => activationResponses.length).toBe(1);
+  expect(activationResponses).toEqual([201]);
   await expect(page.getByText("From checked receipts only.").first()).toBeVisible();
   await expect(page.getByText("₹1,999.00").first()).toBeVisible();
   await expect(page.getByText("₹23,988.00")).toBeVisible();
@@ -416,6 +423,9 @@ test("Mandate tab shows the frozen terms and does not claim execution is live", 
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" }).click();
   await expect(page.getByText("No standing mandate is signed")).toBeVisible();
   await expect(page.getByText(/No merchant cancellation route is proven yet/)).toBeVisible();
+  await expect(page.getByText(/INR ₹50,000 per action/)).toBeVisible();
+  await expect(page.getByText(/INR ₹2,00,000 rolling 30-day ceiling/)).toBeVisible();
+  await expect(page.getByText("Off — veto notices are not sent")).toBeVisible();
   await expect(page.getByText("Off — no cancellation is executed")).toBeVisible();
   await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Emergency disable" })).toHaveCount(0);
@@ -427,6 +437,14 @@ test("exception-only Autopilot home is honest on desktop and mobile and has no s
     autopilot: {
       executionEnabled: false,
       noticeEnabled: false,
+      noticeReadiness: {
+        featureSwitch: false,
+        channelReady: false,
+        credentialsPresent: false,
+        webhookReady: false,
+        deliveryProven: false,
+        state: "off",
+      },
       mandate: {
         id: "mandate-1",
         version: 1,
@@ -442,11 +460,12 @@ test("exception-only Autopilot home is honest on desktop and mobile and has no s
         revokedAt: null,
       },
       watching: [],
+      awaitingDelivery: [],
       inVeto: [],
       handled: [],
       needsHelp: [],
-      proof: [{ candidateId: "candidate-1", status: "PENDING", expectedDebitDate: "2026-09-06", savingMinor: null }],
-      fees: null,
+      proof: [{ candidateId: "candidate-1", status: "PENDING", expectedDebitDate: "2026-09-06", currency: "USD", saving: null }],
+      fees: [],
       attempts: [],
     },
   };
@@ -457,14 +476,14 @@ test("exception-only Autopilot home is honest on desktop and mobile and has no s
   );
   await page.goto("/app");
 
-  for (const name of ["Watching", "Veto window", "Handled for you", "Needs your help", "Proof and savings", "Fees and refunds", "Mandate"]) {
+  for (const name of ["Watching", "Delivery pending", "48-hour veto window", "Handled for you", "Needs your help", "Proof and savings", "Fees and refunds", "Mandate"]) {
     await expect(page.getByRole("heading", { name })).toBeVisible();
   }
   await expect(page.getByText("Exception-only home")).toBeVisible();
   await expect(page.getByText("Monthly software spend")).toBeVisible();
   await expect(page.getByText("From checked receipts only.").first()).toBeVisible();
   await expect(page.getByText("No recurring amount yet")).toHaveCount(0);
-  await expect(page.getByText("missing coverage is not a ₹0 saving", { exact: false })).toBeVisible();
+  await expect(page.getByText("missing USD coverage is not a zero saving", { exact: false })).toBeVisible();
   await expect(page.getByText("Fee collection stays fail-closed")).toBeVisible();
   await expect(page.getByText("This is not a connected, cancelled, saved, or paid state.")).toBeVisible();
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -490,6 +509,14 @@ test("an active mandate still shows the spend strip when no recurring amount is 
     autopilot: {
       executionEnabled: false,
       noticeEnabled: false,
+      noticeReadiness: {
+        featureSwitch: false,
+        channelReady: false,
+        credentialsPresent: false,
+        webhookReady: false,
+        deliveryProven: false,
+        state: "off",
+      },
       mandate: {
         id: "mandate-1",
         version: 1,
@@ -505,11 +532,12 @@ test("an active mandate still shows the spend strip when no recurring amount is 
         revokedAt: null,
       },
       watching: [],
+      awaitingDelivery: [],
       inVeto: [],
       handled: [],
       needsHelp: [],
       proof: [],
-      fees: null,
+      fees: [],
       attempts: [],
     },
   };
@@ -686,4 +714,203 @@ test("Home records activation after a 401 once the tab can authenticate again", 
   await expect(page.getByText("Monthly software spend")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(2);
+});
+
+const queuedCandidate = {
+  id: "candidate-queued",
+  commitmentId: "commitment-1",
+  merchant: "OpenAI",
+  eligibility: "ELIGIBLE",
+  status: "NOTICE_QUEUED",
+  reasons: [],
+  providerId: "openai",
+  amount: money,
+  noticeDeliveredAt: null,
+  vetoDeadlineAt: null,
+  noticeDeliveryStatus: "QUEUED",
+  tokenCoverageInvalid: false,
+  noticePresentation: { kind: "queued" as const },
+  exceptionCode: null,
+};
+
+const deliveredCandidate = {
+  ...queuedCandidate,
+  id: "candidate-delivered",
+  merchant: "Notion",
+  noticeDeliveredAt: "2026-08-24T00:05:00.000Z",
+  vetoDeadlineAt: "2026-08-26T00:05:00.000Z",
+  noticeDeliveryStatus: "DELIVERED",
+  noticePresentation: {
+    kind: "veto-window" as const,
+    deliveredAt: "2026-08-24T00:05:00.000Z",
+    vetoDeadlineAt: "2026-08-26T00:05:00.000Z",
+  },
+};
+
+const bouncedCandidate = {
+  ...queuedCandidate,
+  id: "candidate-bounced",
+  merchant: "Figma",
+  status: "EXCEPTION",
+  noticeDeliveryStatus: "BOUNCED",
+  noticePresentation: { kind: "bounced" as const },
+};
+
+test("notice states distinguish delivery pending from a delivered 48-hour clock", async ({ page }) => {
+  const usdSaving = { currency: "USD", minor: "1000", exponent: 2, display: "$10.00" };
+  const inrSaving = { currency: "INR", minor: "199900", exponent: 2, display: "₹1,999.00" };
+  const noticeHome = {
+    ...home,
+    autopilot: {
+      executionEnabled: false,
+      noticeEnabled: true,
+      noticeReadiness: {
+        featureSwitch: true,
+        channelReady: true,
+        credentialsPresent: true,
+        webhookReady: true,
+        deliveryProven: false,
+        state: "configured-unproven",
+      },
+      mandate: {
+        id: "mandate-1",
+        version: 1,
+        status: "ACTIVE",
+        termsVersion: "standing-mandate-2026-08-16",
+        signedText: "I authorize Vognary. Authority is limited to INR ₹50,000 per action and INR ₹2,00,000 rolling 30-day ceiling.",
+        signedTextHash: "a".repeat(64),
+        currency: "INR",
+        perActionCeilingMinor: "5000000",
+        rolling30dCeilingMinor: "20000000",
+        vetoWindowHours: 48,
+        signedAt: "2026-08-09T10:00:00.000Z",
+        revokedAt: null,
+      },
+      watching: [],
+      awaitingDelivery: [queuedCandidate],
+      inVeto: [deliveredCandidate],
+      handled: [],
+      needsHelp: [bouncedCandidate],
+      proof: [
+        { candidateId: "candidate-delivered", status: "COVERED_CLEAN", expectedDebitDate: "2026-09-06", currency: "INR", saving: inrSaving },
+        { candidateId: "candidate-usd", status: "COVERED_CLEAN", expectedDebitDate: "2026-09-07", currency: "USD", saving: usdSaving },
+      ],
+      fees: [{
+        currency: "INR",
+        monitoring: { currency: "INR", minor: "19900", exponent: 2, display: "₹199.00" },
+        verifiedSaving: inrSaving,
+        outcomeFee: { currency: "INR", minor: "0", exponent: 2, display: "₹0.00" },
+        retained: { currency: "INR", minor: "0", exponent: 2, display: "₹0.00" },
+        refundCredit: { currency: "INR", minor: "0", exponent: 2, display: "₹0.00" },
+        additionalCharge: { currency: "INR", minor: "0", exponent: 2, display: "₹0.00" },
+        chargeStatus: "FAIL_CLOSED",
+      }],
+      attempts: [],
+    },
+  };
+  await signIn(page);
+  await mockRecoveryApi(page);
+  await page.route("**/api/workspaces/current/brief", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: noticeHome, meta }) }),
+  );
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: "Delivery pending" })).toBeVisible();
+  await expect(page.getByText("Delivery is pending.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "48-hour veto window" })).toBeVisible();
+  await expect(page.getByText(/Delivered 2026-08-24T00:05:00.000Z/)).toBeVisible();
+  await expect(page.getByText(/Veto by 2026-08-26T00:05:00.000Z/)).toBeVisible();
+  await expect(page.getByText("Notice bounced. There is no active veto countdown.")).toBeVisible();
+  await expect(page.getByLabel("₹1,999.00 INR").first()).toBeVisible();
+  await expect(page.getByLabel("$10.00 USD")).toBeVisible();
+  await expect(page.getByText(/minor units/i)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Veto", exact: true })).toHaveCount(2);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(page.getByText("Delivery is pending.")).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  expect(overflow).toBe(false);
+});
+
+test("Sources tab disconnects cited Recovery sources without rotating the receipt alias", async ({ page }) => {
+  const sourcedHome = {
+    ...home,
+    evidenceSources: [{
+      id: "source-1",
+      kind: "RECEIPT_PASTE",
+      label: "Pasted OpenAI receipt",
+      cited: true,
+      status: "CONNECTED" as const,
+      disconnectedAt: null,
+      reconnectedAt: null,
+    }],
+  };
+  await signIn(page);
+  await mockRecoveryApi(page);
+  await page.route("**/api/workspaces/current/brief", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: sourcedHome, meta }) }),
+  );
+  const disconnectCalls: string[] = [];
+  await page.route("**/api/workspaces/current/autopilot/sources/*/disconnect", (route) => {
+    disconnectCalls.push(route.request().method());
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          sourceId: "source-1",
+          disconnectedAt: "2026-08-16T00:00:00.000Z",
+          reconnectedAt: null,
+          withdrawnCandidateIds: ["candidate-queued"],
+        },
+        meta: { requestId: "request-disconnect", workspaceVersion: 5 },
+      }),
+    });
+  });
+  const reconnectCalls: string[] = [];
+  await page.route("**/api/workspaces/current/autopilot/sources/*/reconnect", (route) => {
+    reconnectCalls.push(route.request().method());
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          sourceId: "source-1",
+          disconnectedAt: "2026-08-16T00:00:00.000Z",
+          reconnectedAt: "2026-08-16T00:05:00.000Z",
+          withdrawnCandidateIds: [],
+        },
+        meta: { requestId: "request-reconnect", workspaceVersion: 6 },
+      }),
+    });
+  });
+  await page.goto("/app");
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await expect(page.getByText("Pasted OpenAI receipt")).toBeVisible();
+  await expect(page.getByText("RECEIPT_PASTE · Connected · currently cited")).toBeVisible();
+  await expect(page.getByText(/does not rotate the receipt address/)).toBeVisible();
+  await page.getByRole("button", { name: "Disconnect source" }).click();
+  await expect.poll(() => disconnectCalls).toEqual(["POST"]);
+
+  await page.route("**/api/workspaces/current/brief", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          ...sourcedHome,
+          evidenceSources: [{
+            ...sourcedHome.evidenceSources[0],
+            status: "DISCONNECTED",
+            cited: false,
+            disconnectedAt: "2026-08-16T00:00:00.000Z",
+          }],
+        },
+        meta,
+      }),
+    }),
+  );
+  await page.reload();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await expect(page.getByText("RECEIPT_PASTE · Disconnected")).toBeVisible();
+  await page.getByRole("button", { name: "Reconnect source" }).click();
+  await expect.poll(() => reconnectCalls).toEqual(["POST"]);
 });

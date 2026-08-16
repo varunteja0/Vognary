@@ -26,6 +26,8 @@ import {
   type AutopilotCandidateDto,
   type AutopilotAttemptDto,
   type AutopilotDeadLetterDto,
+  type WorkspaceActivationWrite,
+  type RecoverySourceDisconnectionDto,
 } from "@/lib/recovery/contracts";
 
 // The only place the Recovery frontend talks to the server. It never derives a
@@ -161,7 +163,7 @@ export function createRecoveryTransport(fetchImpl?: FetchLike) {
     home: () => call<HomeProjectionDto>(doFetch, recoveryEndpoints.home.path),
 
     recordWorkspaceActivation: () =>
-      call<{ recorded: boolean; id: string | null; outcome: "recorded" | "already-recorded" | "deferred-no-consent" }>(doFetch, recoveryEndpoints.recordWorkspaceActivation.path, {
+      call<WorkspaceActivationWrite>(doFetch, recoveryEndpoints.recordWorkspaceActivation.path, {
         method: recoveryEndpoints.recordWorkspaceActivation.method,
         headers: { "Content-Type": "application/json" },
         body: "{}",
@@ -260,6 +262,18 @@ export function createRecoveryTransport(fetchImpl?: FetchLike) {
         method: recoveryEndpoints.disableAutopilotProvider(providerId).method,
         headers: mutationHeaders(context),
         body: JSON.stringify({ reason }),
+      }),
+
+    disconnectRecoverySource: (sourceId: string, context: MutationContext) =>
+      call<RecoverySourceDisconnectionDto>(doFetch, recoveryEndpoints.disconnectRecoverySource(sourceId).path, {
+        method: recoveryEndpoints.disconnectRecoverySource(sourceId).method,
+        headers: mutationHeaders(context),
+      }),
+
+    reconnectRecoverySource: (sourceId: string, context: MutationContext) =>
+      call<RecoverySourceDisconnectionDto>(doFetch, recoveryEndpoints.reconnectRecoverySource(sourceId).path, {
+        method: recoveryEndpoints.reconnectRecoverySource(sourceId).method,
+        headers: mutationHeaders(context),
       }),
 
     autopilotDeadLetters: () =>

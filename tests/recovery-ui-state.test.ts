@@ -46,6 +46,7 @@ const home: HomeProjectionDto = {
   coverage: { state: "BASELINE_ONLY", sourceCount: 1, evidenceCount: 1, lastEvidenceAt: null, coverageStart: null, coverageEnd: null, limitations: [] },
   activeCommitmentCount: 0,
   reviewItemCount: 0,
+  evidenceSources: [],
 };
 
 const detail: CommitmentDetailDto = {
@@ -276,6 +277,89 @@ test("stale and conflicting state force a reload instead of a silent guess", () 
     assert.equal(state.refreshRequired, true, `${code} must require a reload`);
     assert.equal(state.home, home, `${code} must not disturb the last server truth`);
   }
+});
+
+test("signing or revoking a mandate clears pending when the refreshed snapshot loads, including after failure", () => {
+  const signing = recoveryReducer(loaded(), {
+    type: "MANDATE_STARTED",
+    action: "SIGN",
+    idempotencyKey: "mandate-sign-1",
+  });
+  assert.equal(signing.pending?.kind, "MANDATE_SIGN");
+  const signed = recoveryReducer(signing, {
+    type: "SNAPSHOT_LOADED",
+    home: {
+      ...home,
+      autopilot: {
+        executionEnabled: false,
+        noticeEnabled: false,
+        noticeReadiness: {
+          featureSwitch: false,
+          channelReady: false,
+          credentialsPresent: false,
+          webhookReady: false,
+          deliveryProven: false,
+          state: "off",
+        },
+        mandate: {
+          id: "mandate-1",
+          version: 1,
+          status: "ACTIVE",
+          termsVersion: "standing-mandate-2026-08-16",
+          signedText: "signed",
+          signedTextHash: "a".repeat(64),
+          currency: "INR",
+          perActionCeilingMinor: "5000000",
+          rolling30dCeilingMinor: "20000000",
+          vetoWindowHours: 48,
+          signedAt: "2026-08-16T00:00:00.000Z",
+          revokedAt: null,
+        },
+        watching: [],
+        awaitingDelivery: [],
+        inVeto: [],
+        handled: [],
+        needsHelp: [],
+        proof: [],
+        fees: [],
+        attempts: [],
+      },
+    },
+    commitments: [commitment],
+    total: 1,
+    nextCursor: null,
+    meta,
+  });
+  assert.equal(signed.pending, null);
+
+  const revoking = recoveryReducer(signed, {
+    type: "MANDATE_STARTED",
+    action: "REVOKE",
+    idempotencyKey: "mandate-revoke-1",
+  });
+  assert.equal(revoking.pending?.kind, "MANDATE_REVOKE");
+  const revoked = recoveryReducer(revoking, {
+    type: "SNAPSHOT_LOADED",
+    home: { ...home, autopilot: signed.home?.autopilot ? { ...signed.home.autopilot, mandate: { ...signed.home.autopilot.mandate!, status: "REVOKED", revokedAt: "2026-08-16T01:00:00.000Z" } } : undefined },
+    commitments: [commitment],
+    total: 1,
+    nextCursor: null,
+    meta,
+  });
+  assert.equal(revoked.pending, null);
+
+  const failedSign = recoveryReducer(signing, {
+    type: "MUTATION_FAILED",
+    failure: failure({ code: "SAVE_FAILED", message: "Mandate was not saved.", retryable: true, requestId: "request-mandate-fail" }),
+  });
+  assert.equal(failedSign.pending, null);
+  assert.equal(failedSign.rollback?.mutation.kind, "MANDATE_SIGN");
+
+  const snapshotFailed = recoveryReducer(revoking, {
+    type: "SNAPSHOT_FAILED",
+    failure: failure({ code: "UNKNOWN", message: "Snapshot failed.", retryable: true, requestId: "request-snapshot-fail" }),
+  });
+  assert.equal(snapshotFailed.pending, null);
 });
 
 test("an auth failure moves the whole workspace into the signed-out state", () => {

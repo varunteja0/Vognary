@@ -26,6 +26,8 @@ test("Recovery money uses exact bigint-safe minor strings and explicit currency 
   assert.equal(minorUnitsToDecimal("199905", 2), "1999.05");
   assert.equal(minorUnitsToDecimal("1234", 3), "1.234");
 
+  assert.throws(() => toMoneyDto("199900", ""));
+  assert.throws(() => toMoneyDto("199900", "IN"));
   assert.deepEqual(toMoneyDto("199905", "INR"), {
     currency: "INR",
     minor: "199905",
@@ -34,6 +36,9 @@ test("Recovery money uses exact bigint-safe minor strings and explicit currency 
   });
   assert.equal(toMoneyDto("1999", "JPY").display, "JP¥1,999");
   assert.match(toMoneyDto("1234", "KWD").display, /1\.234/);
+  assert.match(toMoneyDto("150000000", "INR").display, /₹15,00,000\.00/);
+  assert.match(toMoneyDto("150000000", "USD").display, /\$1,500,000\.00/);
+  assert.doesNotMatch(toMoneyDto("150000000", "USD").display, /15,00,000/);
   const beyondJsSafeInteger = toMoneyDto("9007199254740993", "INR");
   assert.equal(beyondJsSafeInteger.minor, "9007199254740993");
   assert.equal(beyondJsSafeInteger.exponent, 2);
@@ -154,6 +159,7 @@ test("Recovery home is an honest first baseline and keeps currency totals separa
   assert.equal(home.needsMe.some((item) => item.commitmentId === "commitment-ignored"), false);
   assert.deepEqual(home.next.map((item) => item.commitmentId), ["commitment-inr", "commitment-usd"]);
   assert.equal(home.coverage.state, "BASELINE_ONLY");
+  assert.deepEqual(home.evidenceSources, []);
 });
 
 test("Recovery home publishes saved observation facts without fabricating recurrence", () => {

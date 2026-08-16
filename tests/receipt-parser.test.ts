@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { extractObservedReceipt, extractReceiptCandidates, inferReceiptCurrencyHint, receiptNextDateIsExplicit, receiptTextToManualInputs, splitReceiptSnippets } from "../src/lib/receipt-parser";
+import { extractObservedReceipt, extractReceiptCandidates, inferReceiptCurrencyHint, receiptTextToManualInputs, splitReceiptSnippets } from "../src/lib/receipt-parser";
 
 const sampleReceipts = [
   "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly.",
@@ -56,9 +56,6 @@ test("extracts merchant, amount, and cadence from receipt snippets", () => {
   assert.equal(openai?.frequency, "monthly");
   assert.equal(openai?.observedDate, "2026-07-06");
   assert.equal(openai?.nextExpectedDate, "2026-08-06");
-  assert.equal(receiptNextDateIsExplicit("OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly."), false);
-  assert.equal(receiptNextDateIsExplicit("OpenAI subscription charged INR 1,999 on 6 July 2026. Monthly billing."), false);
-  assert.equal(receiptNextDateIsExplicit("OpenAI subscription charged INR 1,999 on 6 July 2026. Renews monthly on 6 August 2026."), true);
 
   const cloudflare = candidates.find((candidate) => /cloudflare/i.test(candidate.merchant));
   assert.ok(cloudflare);

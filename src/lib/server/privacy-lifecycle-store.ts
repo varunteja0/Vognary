@@ -709,12 +709,13 @@ async function buildAccessExport(client: PoolClient, input: {
         ) record) as action_candidates,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
           select candidate_id as "candidateId", status, expected_debit_date as "expectedDebitDate",
-                 saving_minor::text as "savingMinor"
+               saving_minor::text as "savingMinor", currency
           from recovery_covered_windows where workspace_id = $1
           order by expected_debit_date asc limit $2
         ) record) as covered_windows,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
           select period_start as "periodStart", period_end as "periodEnd",
+               currency,
                  monitoring_minor::text as "monitoringMinor",
                  verified_saving_minor::text as "verifiedSavingMinor",
                  retained_minor::text as "retainedMinor",
@@ -747,16 +748,15 @@ async function buildAccessExport(client: PoolClient, input: {
         ) record) as candidate_events,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
           select candidate_id as "candidateId", channel, delivery_status as "deliveryStatus",
-                 delivered_at as "deliveredAt", veto_token_hash as "vetoTokenHash",
-                 veto_expires_at as "vetoExpiresAt", notice_body_hash as "noticeBodyHash",
+                 delivered_at as "deliveredAt",
+                 veto_expires_at as "vetoExpiresAt",
                  frozen_at as "frozenAt", created_at as "createdAt"
           from recovery_veto_notices where workspace_id = $1
           order by created_at asc limit $2
         ) record) as veto_notices,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
           select candidate_id as "candidateId", attempt_no as "attemptNo", status, outcome,
-                 operator_minutes::text as "operatorMinutes", proof_kind as "proofKind",
-                 proof_reference_hash as "proofReferenceHash", created_at as "createdAt"
+                 operator_minutes::text as "operatorMinutes", proof_kind as "proofKind", created_at as "createdAt"
           from recovery_execution_attempts where workspace_id = $1
           order by created_at asc limit $2
         ) record) as execution_attempts,
@@ -772,8 +772,7 @@ async function buildAccessExport(client: PoolClient, input: {
           order by created_at asc limit $2
         ) record) as operator_actions,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
-          select candidate_id as "candidateId", event_type as "eventType", occurred_at as "occurredAt",
-                 encode(decode(payload_hash, 'hex'), 'hex') as "noticeFingerprint"
+          select candidate_id as "candidateId", event_type as "eventType", occurred_at as "occurredAt"
           from recovery_notice_delivery_events where workspace_id = $1
           order by created_at asc limit $2
         ) record) as notice_delivery_events,

@@ -1,23 +1,12 @@
 "use client";
 
 import type { TransportResult } from "./transport";
+import type { WorkspaceActivationOutcome, WorkspaceActivationWrite } from "@/lib/recovery/workspace-activation";
 
 export const workspaceActivationRetryDelaysMs = [0, 250, 750] as const;
 export const workspaceActivationSettledStorageKeyPrefix = "vognary.workspace-activation.settled:";
 
-export type WorkspaceActivationWrite = {
-  recorded?: boolean;
-  id?: string | null;
-  outcome?: string;
-};
-
-export type WorkspaceActivationAttempt =
-  | "recorded"
-  | "already-recorded"
-  | "deferred-no-consent"
-  | "deferred-no-picture"
-  | "deferred-auth"
-  | "retry-exhausted";
+export type WorkspaceActivationAttempt = WorkspaceActivationOutcome;
 
 export type WorkspaceActivationStorage = {
   getItem(key: string): string | null;
@@ -31,13 +20,28 @@ export function isRetryableWorkspaceActivationFailure(
   return result.error.retryable;
 }
 
+function asWorkspaceActivationWrite(value: unknown): WorkspaceActivationWrite | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Partial<WorkspaceActivationWrite>;
+  if (typeof record.recorded !== "boolean") return null;
+  if (!(record.id === null || typeof record.id === "string")) return null;
+  if (
+    record.outcome !== "recorded"
+    && record.outcome !== "already-recorded"
+    && record.outcome !== "deferred-no-consent"
+    && record.outcome !== "deferred-no-picture"
+  ) {
+    return null;
+  }
+  return { recorded: record.recorded, id: record.id, outcome: record.outcome };
+}
+
 export function classifyWorkspaceActivationResult(
-  result: TransportResult<WorkspaceActivationWrite | unknown>,
+  result: TransportResult<unknown>,
 ): WorkspaceActivationAttempt | "retry" {
   if (result.ok) {
-    const data = result.data && typeof result.data === "object"
-      ? result.data as WorkspaceActivationWrite
-      : {};
+    const data = asWorkspaceActivationWrite(result.data);
+    if (!data) return "deferred-no-consent";
     if (data.outcome === "recorded" || data.recorded === true) return "recorded";
     if (data.outcome === "already-recorded") return "already-recorded";
     if (data.outcome === "deferred-no-consent") return "deferred-no-consent";

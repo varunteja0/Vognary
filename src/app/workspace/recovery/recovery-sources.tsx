@@ -1,16 +1,21 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import type { ReceiptInboxStatusDto } from "@/lib/recovery/contracts";
+import type { ReceiptInboxStatusDto, RecoveryEvidenceSourceDto } from "@/lib/recovery/contracts";
 import { formatMoment } from "./labels";
 import { AuthRequiredBlock, LoadingBlock, StateBlock } from "./recovery-states";
-import type { LoadState } from "./state";
+import type { LoadState, PendingMutation } from "./state";
 
 export function RecoverySources({
   receiptInboxPubliclyAvailable,
   receiptInbox,
   sourceStatus,
   pendingAction,
+  evidenceSources,
+  canManageEvidenceSources,
+  pendingMutation,
+  onDisconnectEvidenceSource,
+  onReconnectEvidenceSource,
   onProvision,
   onRotate,
   onRevoke,
@@ -23,6 +28,11 @@ export function RecoverySources({
   receiptInbox: ReceiptInboxStatusDto | null;
   sourceStatus: LoadState;
   pendingAction: "PROVISION" | "ROTATE" | "REVOKE" | null;
+  evidenceSources: readonly RecoveryEvidenceSourceDto[];
+  canManageEvidenceSources: boolean;
+  pendingMutation: PendingMutation | null;
+  onDisconnectEvidenceSource: (sourceId: string) => void;
+  onReconnectEvidenceSource: (sourceId: string) => void;
   onProvision: () => void;
   onRotate: () => void;
   onRevoke: () => void;
@@ -47,6 +57,13 @@ export function RecoverySources({
   if (!receiptInboxPubliclyAvailable) {
     return (
       <div className="grid gap-3">
+        <EvidenceSourceList
+          sources={evidenceSources}
+          canManage={canManageEvidenceSources}
+          pendingMutation={pendingMutation}
+          onDisconnect={onDisconnectEvidenceSource}
+          onReconnect={onReconnectEvidenceSource}
+        />
         <p className="border-y border-line px-1 py-3 text-sm leading-6 text-(--muted)">
           <strong className="text-(--ink-soft)">Manual evidence only.</strong> Receipt forwarding is not available yet. Nothing is connected, and Vognary does not access your inbox.
         </p>
@@ -57,6 +74,13 @@ export function RecoverySources({
 
   return (
     <div className="grid gap-5">
+      <EvidenceSourceList
+        sources={evidenceSources}
+        canManage={canManageEvidenceSources}
+        pendingMutation={pendingMutation}
+        onDisconnect={onDisconnectEvidenceSource}
+        onReconnect={onReconnectEvidenceSource}
+      />
       <section aria-labelledby="receipt-inbox-heading" className="panel p-4 sm:p-6">
         <p className="eyebrow eyebrow-xs text-ochre">Recommended source</p>
         <h3 id="receipt-inbox-heading" className="mt-3 font-display text-2xl font-semibold text-(--ink)">Your Vognary receipt address</h3>
@@ -199,6 +223,66 @@ export function RecoverySources({
         <div className="border-t border-line p-4 sm:p-6">{manualFallback}</div>
       </details>
     </div>
+  );
+}
+
+function EvidenceSourceList({
+  sources,
+  canManage,
+  pendingMutation,
+  onDisconnect,
+  onReconnect,
+}: {
+  sources: readonly RecoveryEvidenceSourceDto[];
+  canManage: boolean;
+  pendingMutation: PendingMutation | null;
+  onDisconnect: (sourceId: string) => void;
+  onReconnect: (sourceId: string) => void;
+}) {
+  const pendingSourceId = pendingMutation?.kind === "SOURCE_DISCONNECT" || pendingMutation?.kind === "SOURCE_RECONNECT"
+    ? pendingMutation.sourceId
+    : null;
+  return (
+    <section className="panel p-4 sm:p-6" aria-labelledby="recovery-evidence-sources">
+      <p className="eyebrow eyebrow-xs text-ochre">Cited Recovery sources</p>
+      <h3 id="recovery-evidence-sources" className="mt-3 font-display text-2xl font-semibold text-(--ink)">Evidence sources in this workspace</h3>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
+        These are the receipt and file sources currently cited for classification. Disconnecting a source stops it supporting future classification and withdraws affected queued Autopilot cases. It does not rotate the receipt address. Reconnect is explicit. An eligible case can return only to shadow watching. An old notice, 48-hour clock, or authorization is never restored.
+      </p>
+      {sources.length ? (
+        <ul className="mt-5 grid gap-3">
+          {sources.map((source) => {
+            const busy = pendingSourceId === source.id;
+            return (
+              <li key={source.id} className="rounded-2xl border border-line p-4">
+                <p className="font-medium text-(--ink)">{source.label}</p>
+                <p className="mt-1 text-sm text-(--muted)">
+                  {source.kind} · {source.status === "CONNECTED" ? "Connected" : "Disconnected"}
+                  {source.cited ? " · currently cited" : " · not in the current classification"}
+                </p>
+                {canManage ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {source.status === "CONNECTED" ? (
+                      <button type="button" className="btn btn-sm btn-ghost" disabled={busy} onClick={() => onDisconnect(source.id)}>
+                        {busy && pendingMutation?.kind === "SOURCE_DISCONNECT" ? "Disconnecting…" : "Disconnect source"}
+                      </button>
+                    ) : (
+                      <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => onReconnect(source.id)}>
+                        {busy && pendingMutation?.kind === "SOURCE_RECONNECT" ? "Reconnecting…" : "Reconnect source"}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-(--muted)">Only a workspace admin can disconnect or reconnect a source.</p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="mt-5 text-sm text-(--muted)">No Recovery evidence sources are on file yet.</p>
+      )}
+    </section>
   );
 }
 

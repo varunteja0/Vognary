@@ -249,6 +249,14 @@ test("Sources makes receipt forwarding primary and keeps manual evidence behind 
     assert.ok(sourcesSource.includes(copy), `Sources must render ${copy}`);
   }
   assert.match(clientSource, /<RecoverySources/);
+  assert.match(clientSource, /onDisconnectEvidenceSource/);
+  assert.match(clientSource, /onReconnectEvidenceSource/);
+  assert.match(sourcesSource, /Disconnect source/);
+  assert.match(sourcesSource, /Reconnect source/);
+  assert.match(sourcesSource, /stops it supporting future classification/);
+  assert.match(sourcesSource, /withdraws affected queued Autopilot cases/);
+  assert.match(sourcesSource, /does not rotate the receipt address/);
+  assert.match(sourcesSource, /old notice, 48-hour clock, or authorization is never restored/);
   assert.match(clientSource, /manualFallback=\{/);
   assert.match(clientSource, /window\.setInterval\(\(\) => void loadSources\(\), 10_000\)/);
   assert.match(clientSource, /state\.sourceStatus\.kind === "READY" && state\.refreshRequired[\s\S]*void loadSnapshot\(\)/);
@@ -256,6 +264,20 @@ test("Sources makes receipt forwarding primary and keeps manual evidence behind 
   assert.match(sourcesSource, /Source update failed/);
   assert.match(inboundStoreSource, /and \(\$2::uuid is null or alias_id = \$2\)/);
   assert.doesNotMatch(clientSource, /workspaceEmpty && state\.view === "HOME"/);
+});
+
+test("rollback notices name every failed authority action instead of calling it evidence", () => {
+  for (const label of [
+    "signing the standing mandate",
+    "revoking the standing mandate",
+    "vetoing that Autopilot case",
+    "disconnecting that evidence source",
+    "reconnecting that evidence source",
+  ]) {
+    assert.ok(clientSource.includes(label), `Rollback copy must name ${label}`);
+  }
+  assert.match(clientSource, /function rollbackAttemptLabel/);
+  assert.match(clientSource, /const exhaustive: never = mutation/);
 });
 
 test("money is only ever the server's own display string", () => {

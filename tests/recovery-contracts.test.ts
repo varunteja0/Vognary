@@ -167,6 +167,7 @@ const home = {
   },
   activeCommitmentCount: 1,
   reviewItemCount: 1,
+  evidenceSources: [],
 } as const satisfies HomeProjectionDto;
 
 const detail = {

@@ -126,6 +126,7 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
     coverage: buildCoverage(input.sources, input.changed.state, generatedAt),
     activeCommitmentCount: active.length,
     reviewItemCount: needsMe.length,
+    evidenceSources: [],
   };
 }
 
@@ -196,7 +197,8 @@ export function toMoneyDto(value: string | bigint, currency: string): MoneyDto {
   const amount = BigInt(minor);
   const factor = BigInt(10) ** BigInt(exponent);
   const fraction = exponent ? (amount % factor).toString().padStart(exponent, "0") : "";
-  const formatter = new Intl.NumberFormat("en-IN", {
+  const locale = normalizedCurrency === "INR" ? "en-IN" : normalizedCurrency === "USD" ? "en-US" : "en-GB";
+  const formatter = new Intl.NumberFormat(locale, {
     style: "currency",
     currency: normalizedCurrency,
     minimumFractionDigits: exponent,

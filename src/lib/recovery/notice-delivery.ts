@@ -71,7 +71,14 @@ export function applyNoticeDeliveryEvent(
   const incomingAt = eventOccurredAtMs(event.occurredAt);
   if (incomingAt === null) return current;
   const previousAt = current.lastEventOccurredAt ? eventOccurredAtMs(current.lastEventOccurredAt) : null;
-  if (previousAt !== null && incomingAt <= previousAt) return current;
+  if (previousAt !== null && incomingAt < previousAt) return current;
+  const incomingIsTerminal = event.type === "email.bounced"
+    || event.type === "email.failed"
+    || event.type === "email.complained";
+  if (previousAt !== null && incomingAt === previousAt) {
+    if (!incomingIsTerminal) return current;
+    if (terminalFailureStatuses.includes(current.status)) return current;
+  }
 
   if (event.type === "email.delivered") {
     if (terminalFailureStatuses.includes(current.status)) {

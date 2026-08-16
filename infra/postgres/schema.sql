@@ -2247,14 +2247,25 @@ returns trigger
 language plpgsql
 as $$
 begin
+  if tg_op = 'INSERT' then
+    if exists (select 1 from workspaces where id = new.workspace_id) then
+      perform pg_advisory_xact_lock(hashtextextended('recovery:' || new.workspace_id::text, 0));
+    end if;
+    return new;
+  end if;
+
   if tg_op = 'DELETE' then
     if exists (select 1 from workspaces where id = old.workspace_id) then
+      perform pg_advisory_xact_lock(hashtextextended('recovery:' || old.workspace_id::text, 0));
       raise exception 'Finalized fee ledger rows cannot be deleted directly.';
     end if;
     return old;
   end if;
-  if tg_op = 'UPDATE' and (
-    new.monitoring_minor is distinct from old.monitoring_minor
+
+  if exists (select 1 from workspaces where id = old.workspace_id) then
+    perform pg_advisory_xact_lock(hashtextextended('recovery:' || old.workspace_id::text, 0));
+  end if;
+  if new.monitoring_minor is distinct from old.monitoring_minor
     or new.verified_saving_minor is distinct from old.verified_saving_minor
     or new.outcome_fee_minor is distinct from old.outcome_fee_minor
     or new.retained_minor is distinct from old.retained_minor
@@ -2267,7 +2278,8 @@ begin
     or new.workspace_id is distinct from old.workspace_id
     or new.year_start is distinct from old.year_start
     or new.finalized_at is distinct from old.finalized_at
-  ) then
+    or new.razorpay_charge_status is distinct from old.razorpay_charge_status
+  then
     raise exception 'Finalized fee ledger rows cannot be mutated.';
   end if;
   return new;
@@ -2276,7 +2288,7 @@ $$;
 
 drop trigger if exists recovery_fee_ledger_immutable on recovery_fee_ledger;
 create trigger recovery_fee_ledger_immutable
-  before update or delete on recovery_fee_ledger
+  before insert or update or delete on recovery_fee_ledger
   for each row execute function recovery_fee_ledger_reject_mutation();
 
 create table if not exists recovery_shadow_gate_snapshots (
@@ -2363,3 +2375,243 @@ drop trigger if exists product_events_workspace_activated_immutable on product_e
 create trigger product_events_workspace_activated_immutable
   before delete on product_events
   for each row execute function reject_workspace_activation_mutation();
+
+-- 0045: tamper-evident mandates, append-only Autopilot audit facts,
+-- constrained execution-attempt transitions, frozen fee charge status.
+create or replace function recovery_standing_mandates_constrain_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'DELETE' then
+    if exists (select 1 from workspaces where id = old.workspace_id) then
+      raise exception 'Standing mandates cannot be deleted while the workspace exists.';
+    end if;
+    return old;
+  end if;
+
+  if new.id is distinct from old.id
+    or new.workspace_id is distinct from old.workspace_id
+    or new.version is distinct from old.version
+    or new.terms_version is distinct from old.terms_version
+    or new.signed_text is distinct from old.signed_text
+    or new.signed_text_hash is distinct from old.signed_text_hash
+    or new.currency is distinct from old.currency
+    or new.per_action_ceiling_minor is distinct from old.per_action_ceiling_minor
+    or new.rolling_30d_ceiling_minor is distinct from old.rolling_30d_ceiling_minor
+    or new.veto_window_hours is distinct from old.veto_window_hours
+    or new.signed_by_user_id is distinct from old.signed_by_user_id
+    or new.signed_at is distinct from old.signed_at
+  then
+    raise exception 'Standing mandate terms cannot be mutated.';
+  end if;
+
+  if old.status = 'REVOKED' then
+    raise exception 'Revoked standing mandates cannot be mutated.';
+  end if;
+
+  if old.status = 'ACTIVE' and new.status = 'ACTIVE' then
+    if new.revoked_at is distinct from old.revoked_at
+      or new.revoked_by_user_id is distinct from old.revoked_by_user_id
+    then
+      raise exception 'Standing mandate revoke fields cannot change while ACTIVE.';
+    end if;
+    return new;
+  end if;
+
+  if old.status = 'ACTIVE' and new.status = 'REVOKED' then
+    if new.revoked_at is null or new.revoked_by_user_id is null then
+      raise exception 'Standing mandate revoke requires a timestamp and revoking user.';
+    end if;
+    return new;
+  end if;
+
+  raise exception 'Standing mandate status transition is not allowed.';
+end;
+$$;
+
+drop trigger if exists recovery_standing_mandates_immutable on recovery_standing_mandates;
+create trigger recovery_standing_mandates_immutable
+  before update or delete on recovery_standing_mandates
+  for each row execute function recovery_standing_mandates_constrain_mutation();
+
+create or replace function recovery_audit_reject_direct_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'DELETE' then
+    if exists (select 1 from workspaces where id = old.workspace_id) then
+      raise exception '% cannot be deleted while the workspace exists.', tg_table_name;
+    end if;
+    return old;
+  end if;
+  raise exception '% cannot be updated.', tg_table_name;
+end;
+$$;
+
+drop trigger if exists recovery_classification_snapshots_immutable on recovery_classification_snapshots;
+create trigger recovery_classification_snapshots_immutable
+  before update or delete on recovery_classification_snapshots
+  for each row execute function recovery_audit_reject_direct_mutation();
+
+drop trigger if exists recovery_standing_mandate_events_immutable on recovery_standing_mandate_events;
+create trigger recovery_standing_mandate_events_immutable
+  before update or delete on recovery_standing_mandate_events
+  for each row execute function recovery_audit_reject_direct_mutation();
+
+drop trigger if exists recovery_candidate_events_immutable on recovery_candidate_events;
+create trigger recovery_candidate_events_immutable
+  before update or delete on recovery_candidate_events
+  for each row execute function recovery_audit_reject_direct_mutation();
+
+drop trigger if exists recovery_executions_immutable on recovery_executions;
+create trigger recovery_executions_immutable
+  before update or delete on recovery_executions
+  for each row execute function recovery_audit_reject_direct_mutation();
+
+drop trigger if exists recovery_operator_actions_immutable on recovery_operator_actions;
+create trigger recovery_operator_actions_immutable
+  before update or delete on recovery_operator_actions
+  for each row execute function recovery_audit_reject_direct_mutation();
+
+create or replace function recovery_execution_attempts_constrain_mutation()
+returns trigger
+language plpgsql
+as $$
+declare
+  legal boolean := false;
+begin
+  if tg_op = 'DELETE' then
+    if exists (select 1 from workspaces where id = old.workspace_id) then
+      raise exception 'Execution attempts cannot be deleted while the workspace exists.';
+    end if;
+    return old;
+  end if;
+
+  if new.id is distinct from old.id
+    or new.workspace_id is distinct from old.workspace_id
+    or new.candidate_id is distinct from old.candidate_id
+    or new.attempt_no is distinct from old.attempt_no
+    or new.operation_key is distinct from old.operation_key
+    or new.idempotency_key is distinct from old.idempotency_key
+    or new.request_hash is distinct from old.request_hash
+    or new.actor_user_id is distinct from old.actor_user_id
+    or new.provider_id is distinct from old.provider_id
+    or new.outcome is distinct from old.outcome
+    or new.proof_kind is distinct from old.proof_kind
+    or new.proof_reference_hash is distinct from old.proof_reference_hash
+    or new.operator_minutes is distinct from old.operator_minutes
+    or new.created_at is distinct from old.created_at
+  then
+    raise exception 'Execution attempt identity cannot be mutated.';
+  end if;
+
+  if old.status is not distinct from new.status then
+    if new.failure_reason is distinct from old.failure_reason then
+      raise exception 'Execution attempt status transition is not allowed.';
+    end if;
+    return new;
+  end if;
+
+  if old.status in ('RECORDED', 'FAILED', 'EXCEPTION') then
+    raise exception 'Terminal execution attempts cannot be mutated.';
+  end if;
+
+  legal :=
+    (old.status = 'PENDING' and new.status = 'AUTHORIZED')
+    or (old.status = 'AUTHORIZED' and new.status in ('PROVIDER_CALLED', 'FAILED', 'EXCEPTION'))
+    or (old.status = 'PROVIDER_CALLED' and new.status in ('RECORDED', 'FAILED', 'EXCEPTION'));
+
+  if not legal then
+    raise exception 'Execution attempt status transition is not allowed.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists recovery_execution_attempts_immutable on recovery_execution_attempts;
+create trigger recovery_execution_attempts_immutable
+  before update or delete on recovery_execution_attempts
+  for each row execute function recovery_execution_attempts_constrain_mutation();
+
+-- 0047: finalized fee periods reject new covered-window facts too.
+create or replace function recovery_covered_windows_constrain_billed_mutation()
+returns trigger
+language plpgsql
+as $$
+declare
+  locked_workspace_id uuid;
+begin
+  if tg_op = 'INSERT' then
+    if exists (select 1 from workspaces where id = new.workspace_id) then
+      perform pg_advisory_xact_lock(hashtextextended('recovery:' || new.workspace_id::text, 0));
+      if exists (
+        select 1
+        from recovery_fee_ledger fee
+        where fee.workspace_id = new.workspace_id
+          and fee.currency = new.currency
+          and new.expected_debit_date between fee.period_start and fee.period_end
+      ) then
+        raise exception 'Billed covered windows cannot be mutated.';
+      end if;
+    end if;
+    return new;
+  end if;
+
+  if tg_op = 'DELETE' then
+    if exists (select 1 from workspaces where id = old.workspace_id) then
+      perform pg_advisory_xact_lock(hashtextextended('recovery:' || old.workspace_id::text, 0));
+      if exists (
+        select 1
+        from recovery_fee_ledger fee
+        where fee.workspace_id = old.workspace_id
+          and fee.currency = old.currency
+          and old.expected_debit_date between fee.period_start and fee.period_end
+      ) then
+        raise exception 'Billed covered windows cannot be mutated.';
+      end if;
+    end if;
+    return old;
+  end if;
+
+  for locked_workspace_id in
+    select workspace.id
+    from workspaces workspace
+    where workspace.id in (old.workspace_id, new.workspace_id)
+    order by workspace.id
+  loop
+    perform pg_advisory_xact_lock(hashtextextended('recovery:' || locked_workspace_id::text, 0));
+  end loop;
+
+  if exists (select 1 from workspaces where id = old.workspace_id)
+    and exists (
+      select 1
+      from recovery_fee_ledger fee
+      where fee.workspace_id = old.workspace_id
+        and fee.currency = old.currency
+        and old.expected_debit_date between fee.period_start and fee.period_end
+    )
+  then
+    raise exception 'Billed covered windows cannot be mutated.';
+  end if;
+
+  if exists (select 1 from workspaces where id = new.workspace_id)
+    and exists (
+      select 1
+      from recovery_fee_ledger fee
+      where fee.workspace_id = new.workspace_id
+        and fee.currency = new.currency
+        and new.expected_debit_date between fee.period_start and fee.period_end
+    )
+  then
+    raise exception 'Billed covered windows cannot be mutated.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists recovery_covered_windows_billed_immutable on recovery_covered_windows;
+create trigger recovery_covered_windows_billed_immutable
+  before insert or update or delete on recovery_covered_windows
+  for each row execute function recovery_covered_windows_constrain_billed_mutation();

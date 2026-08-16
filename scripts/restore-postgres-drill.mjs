@@ -14,6 +14,7 @@ import {
 import {
   readRecoveryBackupVerification,
   recoveryBackupVerificationMatches,
+  requiredAutopilotAuditCountKeys,
 } from "./lib/recovery-backup-verification.mjs";
 
 const { Pool } = pg;
@@ -143,6 +144,11 @@ async function verifyRestoredSchema(connectionString) {
       "recovery_covered_windows",
       "recovery_fee_ledger",
       "recovery_execution_attempts",
+      "recovery_standing_mandate_events",
+      "recovery_candidate_events",
+      "recovery_operator_actions",
+      "recovery_classification_snapshots",
+      "recovery_executions",
       "recovery_shadow_gate_snapshots",
       "recovery_notice_delivery_events",
       "recovery_autopilot_dead_letters",
@@ -166,6 +172,12 @@ async function verifyRestoredSchema(connectionString) {
     if (missingTables.length) throw new Error(`Restore drill missing core tables: ${missingTables.join(", ")}`);
 
     const recoveryVerification = await readRecoveryBackupVerification(pool);
+    const missingAuditCounts = requiredAutopilotAuditCountKeys.filter(
+      (key) => recoveryVerification.recoveryWorkspaceCounts?.[key] == null,
+    );
+    if (missingAuditCounts.length) {
+      throw new Error(`Restore drill missing audit table counts: ${missingAuditCounts.join(", ")}`);
+    }
 
     return {
       coreTablesPresent: requiredTables,

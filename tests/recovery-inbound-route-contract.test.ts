@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { readReceiptInboxRotationHeaders } from "../src/app/api/workspaces/current/sources/receipt-inbox/rotate/route";
+import { readReceiptInboxRotationHeaders } from "../src/lib/server/receipt-inbox-rotation";
 import { RecoveryServiceError } from "../src/lib/server/recovery-api";
 
 const rotateUrl = "https://vognary.test/api/workspaces/current/sources/receipt-inbox/rotate";

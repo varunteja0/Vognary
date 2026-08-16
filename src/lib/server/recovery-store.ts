@@ -36,7 +36,12 @@ import {
   type RecoveryCoverageSource,
   type RecoveryObservationRecord,
 } from "@/lib/recovery/domain";
-import { loadAutopilotHome, refreshAutopilotCandidates } from "@/lib/server/recovery-autopilot-store";
+import {
+  loadAutopilotHome,
+  loadRecoveryEvidenceSources,
+  lockAutopilotAuthorityGate,
+  refreshAutopilotCandidates,
+} from "@/lib/server/recovery-autopilot-store";
 import { recordProductEvent } from "@/lib/server/product-event-store";
 import { lockReceiptInboxAuthority } from "@/lib/server/recovery-inbound-store";
 import {
@@ -310,6 +315,7 @@ export async function materializeForwardedEmailEvidence(input: {
   let stage: RecoveryMaterializationStage = "EVENT_VALIDATION";
   try {
     await client.query("begin");
+    await lockAutopilotAuthorityGate(client);
     await lockRecoveryWorkspace(client, input.workspaceId);
     const inspectAuthority = async () => {
       const eventHint = await client.query<{ alias_id: string | null }>(
@@ -331,6 +337,7 @@ export async function materializeForwardedEmailEvidence(input: {
       await client.query("rollback");
       await input.afterAuthorityInspection();
       await client.query("begin");
+      await lockAutopilotAuthorityGate(client);
       await lockRecoveryWorkspace(client, input.workspaceId);
       authority = await inspectAuthority();
     }
@@ -453,6 +460,8 @@ export async function materializeForwardedEmailEvidence(input: {
       stage = "ALERT_SCHEDULING";
       await scheduleRenewalAlertsForWorkspace(input.workspaceId, client);
     }
+
+    await refreshAutopilotCandidates(client, input.workspaceId);
 
     const submissionDto: EvidenceSubmissionDto = {
       id: submissionRow.id,
@@ -651,6 +660,7 @@ export async function submitRecoveryEvidence(input: {
   const now = new Date(envelope.capturedAt);
   try {
     await client.query("begin");
+    await lockAutopilotAuthorityGate(client);
     await lockRecoveryWorkspace(client, input.workspaceId);
     const membership = await assertRecoveryRole(client, input.actorUserId, input.workspaceId, "member");
     const replay = await readIdempotent<SubmitEvidenceResponse["data"]>(client, envelope.workspaceId, envelope.idempotencyKey, operation, envelope.requestHash);
@@ -784,6 +794,7 @@ export async function putRecoveryDecision(input: {
   const now = input.now ?? new Date();
   try {
     await client.query("begin");
+    await lockAutopilotAuthorityGate(client);
     await lockRecoveryWorkspace(client, input.workspaceId);
     const membership = await assertRecoveryRole(client, input.actorUserId, input.workspaceId, "member");
     const replay = await readIdempotent<PutDecisionMutationData>(client, input.workspaceId, input.idempotencyKey, operation, requestHash);
@@ -873,6 +884,7 @@ async function mutateCorrection(input: {
   const now = input.now ?? new Date();
   try {
     await client.query("begin");
+    await lockAutopilotAuthorityGate(client);
     await lockRecoveryWorkspace(client, input.workspaceId);
     const membership = await assertRecoveryRole(client, input.actorUserId, input.workspaceId, "member");
     const replay = await readIdempotent<CorrectionMutationData>(client, input.workspaceId, input.idempotencyKey, operation, requestHash);
@@ -1869,6 +1881,7 @@ async function loadHome(
   });
   return {
     ...home,
+    evidenceSources: await loadRecoveryEvidenceSources(client, membership.workspace_id),
     autopilot: await loadAutopilotHome(client, membership.workspace_id),
   };
 }

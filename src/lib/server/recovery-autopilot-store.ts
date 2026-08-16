@@ -5,7 +5,7 @@ import type { PoolClient } from "pg";
 import { getDatabasePool } from "@/lib/server/database";
 import { hashRecoveryRequest, RecoveryServiceError } from "@/lib/server/recovery-api";
 import { recordProductEvent } from "@/lib/server/product-event-store";
-import { canDeliverAutopilotNotice, isAutopilotExecutionEnabled, isAutopilotNoticeEnabled } from "@/lib/recovery/autopilot-switch";
+import { canDeliverAutopilotNotice, isAutopilotExecutionEnabled, isAutopilotNoticeChannelReady, isAutopilotNoticeEnabled } from "@/lib/recovery/autopilot-switch";
 import { evaluateEligibility } from "@/lib/recovery/eligibility";
 import { canTransitionCandidate, terminalCandidateStatuses, type CandidateStatus } from "@/lib/recovery/candidate-machine";
 import { evaluateCoveredWindowProof, debitObservationWindow } from "@/lib/recovery/covered-window";
@@ -40,7 +40,9 @@ import { toMoneyDto } from "@/lib/recovery/domain";
 import { deriveNextDebit } from "@/lib/recovery/next-debit";
 import { receiptNextDateIsExplicit } from "@/lib/receipt-parser";
 import { bindExecutionIdempotency, executionOperationKey, resolveExecutionReplay } from "@/lib/recovery/execution-idempotency";
-import { applyNoticeDeliveryEvent, noticeAuthorizesClock, productionVetoHours, vetoDeadlineFromDelivery, type NoticeDeliveryState, type NoticeProviderEventType } from "@/lib/recovery/notice-delivery";
+import { applyNoticeDeliveryEvent, noticeAuthorizesClock, productionVetoHours, vetoDeadlineFromDelivery, type NoticeDeliveryState, type NoticeDeliveryStatus, type NoticeProviderEventType } from "@/lib/recovery/notice-delivery";
+import { presentAutopilotNotice } from "@/lib/recovery/notice-presentation";
+import { describeAutopilotNoticeReadiness } from "@/lib/recovery/notice-readiness";
 import { classifyCommitment, isProtectedCommitmentClass } from "@/lib/commitment-policy";
 import {
   standingMandateSignedText,
@@ -56,7 +58,7 @@ import {
   lookupCatalogProviderById,
   lookupSupportedProviderById,
 } from "@/lib/recovery/provider-registry";
-import { canQueueDeliverableAutopilotNotice, sendAutopilotNotice, autopilotVetoTokenSecret, autopilotNoticeFromEmail } from "@/lib/server/autopilot-mailer";
+import { canQueueDeliverableAutopilotNotice, sendAutopilotNotice, autopilotVetoTokenSecret, autopilotNoticeFromEmail, autopilotNoticeWebhookSecret } from "@/lib/server/autopilot-mailer";
 import { verifyVetoToken } from "@/lib/recovery/veto-token";
 import type { Cadence } from "@/lib/recovery/contracts";
 import type {
@@ -65,6 +67,8 @@ import type {
   AutopilotFeeDto,
   AutopilotHomeDto,
   AutopilotWindowDto,
+  MoneyDto,
+  RecoveryEvidenceSourceDto,
   RecoverySourceDisconnectionDto,
   StandingMandateDto,
 } from "@/lib/recovery/contracts";
@@ -105,6 +109,8 @@ type CandidateRow = {
   notice_delivered_at: Date | null;
   veto_deadline_at: Date | null;
   exception_code: string | null;
+  delivery_status?: NoticeDeliveryStatus | null;
+  token_coverage_invalid?: boolean;
 };
 
 const roleRank = { viewer: 1, member: 2, admin: 3, owner: 4 } as const;
@@ -125,6 +131,21 @@ function liveNoticeAuthorization(row: {
 
 async function lockAutopilotShadowGate(client: PoolClient) {
   await client.query("select pg_advisory_xact_lock(hashtextextended('autopilot-shadow-gate', 0))");
+}
+
+export async function lockAutopilotAuthorityGate(client: PoolClient) {
+  await lockAutopilotShadowGate(client);
+}
+
+async function lockAutopilotNoticeSendGate(client: PoolClient) {
+  await client.query("select pg_advisory_lock(hashtextextended('autopilot-shadow-gate', 0))");
+}
+
+async function unlockAutopilotNoticeSendGate(client: PoolClient) {
+  const result = await client.query<{ unlocked: boolean }>(
+    "select pg_advisory_unlock(hashtextextended('autopilot-shadow-gate', 0)) as unlocked",
+  );
+  if (result.rows[0]?.unlocked !== true) throw new Error("Autopilot notice-send authority lock was not released.");
 }
 
 async function lockWorkspace(client: PoolClient, workspaceId: string) {
@@ -188,6 +209,10 @@ function toMandateDto(row: MandateRow): StandingMandateDto {
 }
 
 function toCandidateDto(row: CandidateRow): AutopilotCandidateDto {
+  const noticeDeliveredAt = row.notice_delivered_at?.toISOString() ?? null;
+  const vetoDeadlineAt = row.veto_deadline_at?.toISOString() ?? null;
+  const noticeDeliveryStatus = row.delivery_status ?? (row.status === "NOTICE_QUEUED" ? "QUEUED" : null);
+  const tokenCoverageInvalid = row.token_coverage_invalid ?? false;
   return {
     id: row.id,
     commitmentId: row.commitment_id,
@@ -197,10 +222,126 @@ function toCandidateDto(row: CandidateRow): AutopilotCandidateDto {
     reasons: row.ineligible_reasons,
     providerId: row.provider_id,
     amount: toMoneyDto(BigInt(row.amount_minor), row.currency),
-    noticeDeliveredAt: row.notice_delivered_at?.toISOString() ?? null,
-    vetoDeadlineAt: row.veto_deadline_at?.toISOString() ?? null,
+    noticeDeliveredAt,
+    vetoDeadlineAt,
+    noticeDeliveryStatus,
+    tokenCoverageInvalid,
+    noticePresentation: presentAutopilotNotice({
+      deliveryStatus: noticeDeliveryStatus,
+      noticeDeliveredAt,
+      vetoDeadlineAt,
+      tokenCoverageInvalid,
+    }),
     exceptionCode: row.exception_code,
   };
+}
+
+function requireMoneyDto(minor: string, currency: string | null | undefined, label: string): MoneyDto {
+  if (!currency?.trim()) throw new RecoveryServiceError("INVALID_EVIDENCE", `${label} is missing currency.`);
+  return toMoneyDto(minor, currency);
+}
+
+function optionalSavingDto(minor: string | null, currency: string | null | undefined): MoneyDto | null {
+  if (minor === null) return null;
+  return requireMoneyDto(minor, currency, "Covered-window saving");
+}
+
+function currentNoticeReadiness() {
+  const testAdapter = process.env.AUTOPILOT_TEST_ADAPTER === "true" && process.env.NODE_ENV !== "production";
+  return describeAutopilotNoticeReadiness({
+    featureSwitch: isAutopilotNoticeEnabled(),
+    channelReady: isAutopilotNoticeChannelReady(),
+    credentialsPresent: Boolean(autopilotVetoTokenSecret())
+      && (testAdapter || Boolean(process.env.RESEND_API_KEY?.trim() && autopilotNoticeFromEmail())),
+    webhookReady: testAdapter || Boolean(autopilotNoticeWebhookSecret()),
+    deliveryProven: false,
+  });
+}
+
+export type AutopilotNoticeSendInterleavePhase = "after-select" | "after-freeze" | "after-authority";
+
+type NoticeSendInterleave = (
+  phase: AutopilotNoticeSendInterleavePhase,
+  input: { workspaceId: string; candidateId: string },
+) => Promise<void>;
+
+let noticeSendInterleaveForTests: NoticeSendInterleave | null = null;
+
+export function setAutopilotNoticeSendInterleaveForTests(hook: NoticeSendInterleave | null) {
+  if (process.env.NODE_ENV === "production") return;
+  noticeSendInterleaveForTests = hook;
+}
+
+async function runNoticeSendInterleave(
+  phase: AutopilotNoticeSendInterleavePhase,
+  workspaceId: string,
+  candidateId: string,
+) {
+  if (process.env.NODE_ENV === "production" || !noticeSendInterleaveForTests) return;
+  await noticeSendInterleaveForTests(phase, { workspaceId, candidateId });
+}
+
+async function noticeAuthorityStillValid(
+  workspaceId: string,
+  candidateId: string,
+  queryable: Pick<PoolClient, "query"> = getDatabasePool(),
+) {
+  const result = await queryable.query<{
+    status: string;
+    eligibility: string;
+    candidate_class: string;
+    snapshot_class: string;
+    provider_id: string | null;
+    notice_delivery_status: string;
+    candidate_currency: string;
+    mandate_currency: string;
+    mandate_status: string;
+    consent_current: boolean;
+    sources_current: boolean;
+    classification_current: boolean;
+    provider_disabled: boolean;
+    cited_category: string;
+    cited_merchant: string | null;
+    protected_override: boolean;
+  }>(
+        `select candidate.status, candidate.eligibility,
+          candidate.commitment_class as candidate_class,
+          snapshot.commitment_class as snapshot_class,
+            candidate.provider_id, notice.delivery_status as notice_delivery_status,
+            candidate.currency as candidate_currency,
+          mandate.currency as mandate_currency, mandate.status as mandate_status,
+            (${standingMandateConsentExistsSql}) as consent_current,
+            (${candidateCitedSourcesCurrentSql}) as sources_current,
+            (${candidateClassificationCurrentSql}) as classification_current,
+            coalesce(disable.disabled, false) as provider_disabled,
+            snapshot.cited_category, snapshot.cited_merchant, snapshot.protected_override
+     from recovery_action_candidates candidate
+     join recovery_standing_mandates mandate
+       on mandate.workspace_id = candidate.workspace_id and mandate.id = candidate.mandate_id
+     join recovery_classification_snapshots snapshot
+       on snapshot.workspace_id = candidate.workspace_id
+      and snapshot.commitment_id = candidate.commitment_id
+      and snapshot.id = candidate.classification_snapshot_id
+     join recovery_veto_notices notice
+       on notice.workspace_id = candidate.workspace_id and notice.candidate_id = candidate.id
+     join workspaces workspace on workspace.id = candidate.workspace_id
+     left join recovery_provider_disables disable on disable.provider_id = candidate.provider_id
+     where candidate.workspace_id = $1 and candidate.id = $2`,
+    [workspaceId, candidateId],
+  );
+  const row = result.rows[0];
+  if (!row) return false;
+  if (row.status !== "NOTICE_QUEUED" || row.eligibility !== "ELIGIBLE") return false;
+  if (row.notice_delivery_status !== "QUEUED") return false;
+  if (row.candidate_class !== "discretionary-subscription" || row.snapshot_class !== "discretionary-subscription") return false;
+  if (row.candidate_currency !== row.mandate_currency) return false;
+  if (row.mandate_status !== "ACTIVE" || !row.consent_current) return false;
+  if (!row.sources_current || !row.classification_current || row.provider_disabled) return false;
+  const citedClass = classifyCommitment(row.cited_category, row.cited_merchant ?? "");
+  if (row.protected_override || citedClass !== "discretionary-subscription" || isProtectedCommitmentClass(citedClass)) return false;
+  const provider = row.provider_id ? lookupSupportedProviderById(row.provider_id) : null;
+  if (!provider || !isProviderRouteProven(provider)) return false;
+  return true;
 }
 
 export async function getStandingMandate(input: { workspaceId: string; actorUserId: string }) {
@@ -410,7 +551,7 @@ async function withdrawQueuedCandidatesForMissingSource(
   for (const row of queued.rows) {
     await client.query(
       `update recovery_action_candidates
-       set status = 'WITHDRAWN', updated_at = now()
+       set status = 'WITHDRAWN', notice_delivered_at = null, veto_deadline_at = null, updated_at = now()
        where workspace_id = $1 and id = $2`,
       [workspaceId, row.id],
     );
@@ -453,7 +594,7 @@ async function restoreCandidatesAfterSourceReconnect(
     const nextStatus = "SHADOW";
     await client.query(
       `update recovery_action_candidates
-       set status = $3, updated_at = now()
+       set status = $3, notice_delivered_at = null, veto_deadline_at = null, updated_at = now()
        where workspace_id = $1 and id = $2 and status = 'WITHDRAWN'`,
       [workspaceId, row.candidate_id, nextStatus],
     );
@@ -484,6 +625,7 @@ export async function revokeActiveStandingMandateForConsentWithdrawal(
   client: PoolClient,
   input: { workspaceId: string; actorUserId: string; consentId: string; resourceKey: string | null },
 ) {
+  await lockAutopilotAuthorityGate(client);
   await lockWorkspace(client, input.workspaceId);
   await client.query(`select id from consent_grants where id = $1 for update`, [input.consentId]);
   const active = await client.query<{ id: string }>(
@@ -749,13 +891,15 @@ export async function loadAutopilotHome(client: PoolClient, workspaceId: string)
     status: AutopilotWindowDto["status"];
     expected_debit_date: string;
     saving_minor: string | null;
+    currency: string;
   }>(
-    `select candidate_id, status, expected_debit_date::text, saving_minor::text
+    `select candidate_id, status, expected_debit_date::text, saving_minor::text, currency
      from recovery_covered_windows where workspace_id = $1
      order by expected_debit_date desc`,
     [workspaceId],
   );
   const fee = await client.query<{
+    currency: string;
     monitoring_minor: string;
     verified_saving_minor: string;
     outcome_fee_minor: string;
@@ -764,14 +908,14 @@ export async function loadAutopilotHome(client: PoolClient, workspaceId: string)
     additional_charge_minor: string;
     razorpay_charge_status: AutopilotFeeDto["chargeStatus"];
   }>(
-    `select monitoring_minor::text, verified_saving_minor::text, outcome_fee_minor::text,
+    `select distinct on (currency)
+            currency, monitoring_minor::text, verified_saving_minor::text, outcome_fee_minor::text,
             retained_minor::text, refund_credit_minor::text, additional_charge_minor::text,
             razorpay_charge_status
      from recovery_fee_ledger where workspace_id = $1
-     order by period_end desc limit 1`,
+     order by currency, period_end desc`,
     [workspaceId],
   );
-  const feeRow = fee.rows[0];
   const attempts = await client.query<{
     attempt_no: number;
     operation_key: string;
@@ -779,41 +923,66 @@ export async function loadAutopilotHome(client: PoolClient, workspaceId: string)
     outcome: string | null;
     operator_minutes: string | null;
     proof_kind: string | null;
-    proof_reference_hash: string | null;
     failure_reason: string | null;
     created_at: Date;
   }>(
     `select attempt_no, operation_key, status, outcome, operator_minutes::text, proof_kind,
-            proof_reference_hash, failure_reason, created_at
+            failure_reason, created_at
      from recovery_execution_attempts
      where workspace_id = $1
      order by created_at desc
      limit 20`,
     [workspaceId],
   );
+  const placed = new Set<string>();
+  const take = (predicate: (item: AutopilotCandidateDto) => boolean) => {
+    const selected = items.filter((item) => !placed.has(item.id) && predicate(item));
+    for (const item of selected) placed.add(item.id);
+    return selected;
+  };
+  const inVeto = take((item) => item.noticePresentation.kind === "veto-window");
+  const awaitingDelivery = take((item) =>
+    item.noticePresentation.kind === "queued"
+    || item.noticePresentation.kind === "accepted"
+    || item.noticePresentation.kind === "delayed"
+  );
+  const needsHelp = take((item) =>
+    item.status === "EXCEPTION"
+    || item.eligibility === "UNSUPPORTED_ROUTE"
+    || item.noticePresentation.kind === "bounced"
+    || item.noticePresentation.kind === "failed"
+    || item.noticePresentation.kind === "complained"
+    || item.noticePresentation.kind === "token-invalid"
+  );
+  const handled = take((item) => ["AUTHORIZED_BY_RULE", "IN_PROGRESS", "PROVIDER_PENDING", "EXECUTED", "VERIFYING", "VERIFIED"].includes(item.status));
+  const watching = take((item) => item.status === "SHADOW");
   return {
     executionEnabled: isAutopilotExecutionEnabled(),
     noticeEnabled: isAutopilotNoticeEnabled(),
+    noticeReadiness: currentNoticeReadiness(),
     mandate,
-    watching: items.filter((item) => item.status === "SHADOW"),
-    inVeto: items.filter((item) => item.status === "NOTICE_QUEUED"),
-    handled: items.filter((item) => ["AUTHORIZED_BY_RULE", "IN_PROGRESS", "PROVIDER_PENDING", "EXECUTED", "VERIFYING", "VERIFIED"].includes(item.status)),
-    needsHelp: items.filter((item) => item.status === "EXCEPTION" || item.eligibility === "UNSUPPORTED_ROUTE"),
+    watching,
+    awaitingDelivery,
+    inVeto,
+    handled,
+    needsHelp,
     proof: windows.rows.map((row) => ({
       candidateId: row.candidate_id,
       status: row.status,
       expectedDebitDate: row.expected_debit_date,
-      savingMinor: row.saving_minor,
+      currency: row.currency,
+      saving: optionalSavingDto(row.saving_minor, row.currency),
     })),
-    fees: feeRow ? {
-      monitoringMinor: feeRow.monitoring_minor,
-      verifiedSavingMinor: feeRow.verified_saving_minor,
-      outcomeFeeMinor: feeRow.outcome_fee_minor,
-      retainedMinor: feeRow.retained_minor,
-      refundCreditMinor: feeRow.refund_credit_minor,
-      additionalChargeMinor: feeRow.additional_charge_minor,
-      chargeStatus: feeRow.razorpay_charge_status,
-    } : null,
+    fees: fee.rows.map((row): AutopilotFeeDto => ({
+      currency: row.currency,
+      monitoring: requireMoneyDto(row.monitoring_minor, row.currency, "Fee monitoring"),
+      verifiedSaving: requireMoneyDto(row.verified_saving_minor, row.currency, "Fee verified saving"),
+      outcomeFee: requireMoneyDto(row.outcome_fee_minor, row.currency, "Fee outcome"),
+      retained: requireMoneyDto(row.retained_minor, row.currency, "Fee retained"),
+      refundCredit: requireMoneyDto(row.refund_credit_minor, row.currency, "Fee refund credit"),
+      additionalCharge: requireMoneyDto(row.additional_charge_minor, row.currency, "Fee additional charge"),
+      chargeStatus: row.razorpay_charge_status,
+    })),
     attempts: attempts.rows.map((row): AutopilotAttemptDto => ({
       attemptNo: row.attempt_no,
       operationKey: row.operation_key,
@@ -821,11 +990,63 @@ export async function loadAutopilotHome(client: PoolClient, workspaceId: string)
       outcome: row.outcome,
       operatorMinutes: row.operator_minutes,
       proofKind: row.proof_kind,
-      proofReferenceHash: row.proof_reference_hash,
       failureReason: row.failure_reason,
       createdAt: row.created_at.toISOString(),
     })),
   };
+}
+
+export async function loadRecoveryEvidenceSources(client: PoolClient, workspaceId: string): Promise<readonly RecoveryEvidenceSourceDto[]> {
+  const result = await client.query<{
+    id: string;
+    kind: string;
+    label: string;
+    cited: boolean;
+    status: "CONNECTED" | "DISCONNECTED";
+    disconnected_at: Date | null;
+    reconnected_at: Date | null;
+  }>(
+    `select source.id::text, source.source_type as kind, source.label,
+            exists (
+              select 1
+              from recovery_classification_snapshots snap
+              where snap.workspace_id = source.workspace_id
+                and snap.id = (
+                  select latest.id from recovery_classification_snapshots latest
+                  where latest.workspace_id = snap.workspace_id
+                    and latest.commitment_id = snap.commitment_id
+                  order by latest.created_at desc, latest.id desc
+                  limit 1
+                )
+                and exists (
+                  select 1 from unnest(snap.evidence_ids) as cited(id)
+                  join recovery_evidence evidence
+                    on evidence.workspace_id = snap.workspace_id and evidence.id = cited.id
+                  where evidence.source_id = source.id
+                )
+            ) as cited,
+            case
+              when disconnect.disconnected_at is not null and disconnect.reconnected_at is null
+              then 'DISCONNECTED'
+              else 'CONNECTED'
+            end as status,
+            disconnect.disconnected_at, disconnect.reconnected_at
+     from recovery_sources source
+     left join recovery_source_disconnections disconnect
+       on disconnect.workspace_id = source.workspace_id and disconnect.source_id = source.id
+     where source.workspace_id = $1
+     order by source.ingested_at asc, source.id asc`,
+    [workspaceId],
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    kind: row.kind,
+    label: row.label,
+    cited: row.cited,
+    status: row.status,
+    disconnectedAt: row.disconnected_at?.toISOString() ?? null,
+    reconnectedAt: row.reconnected_at?.toISOString() ?? null,
+  }));
 }
 
 export async function runShadowEvaluator(workspaceId: string) {
@@ -966,6 +1187,8 @@ export async function sendQueuedAutopilotNotices(
   );
   let accepted = 0;
   for (const row of queued.rows) {
+    await runNoticeSendInterleave("after-select", row.workspace_id, row.candidate_id);
+    if (!(await noticeAuthorityStillValid(row.workspace_id, row.candidate_id))) continue;
     if (row.frozen_at && !resendIdempotencyWindowOpen(row.frozen_at, now)) {
       await pool.query(
         `insert into recovery_autopilot_dead_letters (kind, workspace_id, candidate_id, payload_hash, last_error_code, attempt_count)
@@ -1115,26 +1338,33 @@ export async function sendQueuedAutopilotNotices(
       freezeClient.release();
     }
     if (!frozen) continue;
-    const send = await sendAutopilotNotice({
-      from: frozen.from,
-      to: frozen.to,
-      subject: frozen.subject,
-      text: frozen.text,
-      idempotencyKey: frozen.idempotencyKey,
-      tags: frozen.tags,
-    });
-    if (
-      process.env.NODE_ENV !== "production"
-      && process.env.AUTOPILOT_TEST_ADAPTER === "true"
-      && process.env.AUTOPILOT_TEST_NOTICE_PERSIST_CRASH === "true"
-    ) {
-      throw new Error("notice-persist-crash");
-    }
-    const client = await pool.connect();
+    await runNoticeSendInterleave("after-freeze", row.workspace_id, row.candidate_id);
+    const sendClient = await pool.connect();
+    let sendGateLocked = false;
+    let acceptedProviderMessageId: string | null = null;
     try {
-      await client.query("begin");
+      await lockAutopilotNoticeSendGate(sendClient);
+      sendGateLocked = true;
+      if (!(await noticeAuthorityStillValid(row.workspace_id, row.candidate_id, sendClient))) continue;
+      await runNoticeSendInterleave("after-authority", row.workspace_id, row.candidate_id);
+      const send = await sendAutopilotNotice({
+        from: frozen.from,
+        to: frozen.to,
+        subject: frozen.subject,
+        text: frozen.text,
+        idempotencyKey: frozen.idempotencyKey,
+        tags: frozen.tags,
+      });
+      if (
+        process.env.NODE_ENV !== "production"
+        && process.env.AUTOPILOT_TEST_ADAPTER === "true"
+        && process.env.AUTOPILOT_TEST_NOTICE_PERSIST_CRASH === "true"
+      ) {
+        throw new Error("notice-persist-crash");
+      }
+      await sendClient.query("begin");
       if (send.status !== "accepted") {
-        await client.query(
+        await sendClient.query(
           `insert into recovery_autopilot_dead_letters (kind, workspace_id, candidate_id, payload_hash, last_error_code, attempt_count)
            values ('NOTICE', $1, $2, $3, $4, 1)`,
           [
@@ -1144,25 +1374,36 @@ export async function sendQueuedAutopilotNotices(
             send.status === "rejected" ? send.errorCode : send.reason,
           ],
         );
-        await client.query("commit");
+        await sendClient.query("commit");
         continue;
       }
-      await client.query(
+      const updated = await sendClient.query(
         `update recovery_veto_notices
          set delivery_status = 'ACCEPTED', provider_message_id = $3
          where workspace_id = $1 and candidate_id = $2 and delivery_status = 'QUEUED'
-           and notice_body_hash = $4 and veto_token_hash = $5`,
+           and notice_body_hash = $4 and veto_token_hash = $5
+         returning id`,
         [row.workspace_id, row.candidate_id, send.providerMessageId, frozen.bodyHash, frozen.tokenHash],
       );
-      await client.query("commit");
-      accepted += 1;
+      await sendClient.query("commit");
+      const acceptedRows = updated.rowCount ?? 0;
+      accepted += acceptedRows;
+      if (acceptedRows > 0) acceptedProviderMessageId = send.providerMessageId;
     } catch (error) {
-      await client.query("rollback").catch(() => undefined);
+      await sendClient.query("rollback").catch(() => undefined);
       throw error;
     } finally {
-      client.release();
+      if (sendGateLocked) {
+        try {
+          await unlockAutopilotNoticeSendGate(sendClient);
+        } catch (error) {
+          sendClient.release(error instanceof Error ? error : true);
+          throw error;
+        }
+      }
+      sendClient.release();
     }
-    await applyPendingNoticeEvents(send.status === "accepted" ? send.providerMessageId : null);
+    await applyPendingNoticeEvents(acceptedProviderMessageId);
   }
   return accepted;
 }
@@ -2061,12 +2302,11 @@ export async function listExecutionAttempts(input: { workspaceId: string; actorU
       outcome: string | null;
       operator_minutes: string | null;
       proof_kind: string | null;
-      proof_reference_hash: string | null;
       failure_reason: string | null;
       created_at: Date;
     }>(
       `select attempt_no, operation_key, status, outcome, operator_minutes::text, proof_kind,
-              proof_reference_hash, failure_reason, created_at
+              failure_reason, created_at
        from recovery_execution_attempts
        where workspace_id = $1 and candidate_id = $2
        order by attempt_no asc`,
@@ -2083,7 +2323,6 @@ export async function listExecutionAttempts(input: { workspaceId: string; actorU
         outcome: row.outcome,
         operatorMinutes: row.operator_minutes,
         proofKind: row.proof_kind,
-        proofReferenceHash: row.proof_reference_hash,
         failureReason: row.failure_reason,
         createdAt: row.created_at.toISOString(),
       })),
@@ -2453,17 +2692,22 @@ export async function invoiceWorkspacePeriod(input: {
   const client = await getDatabasePool().connect();
   try {
     await client.query("begin");
+    await lockWorkspace(client, input.workspaceId);
     const currencies = await client.query<{ currency: string }>(
       `select distinct currency from recovery_covered_windows
        where workspace_id = $1 and status = 'COVERED_CLEAN'
          and expected_debit_date >= $2 and expected_debit_date <= $3`,
       [input.workspaceId, input.periodStart, input.periodEnd],
     );
-    const currency = input.currency ?? (currencies.rows.length === 1 ? currencies.rows[0]?.currency : null);
+    const requestedCurrency = input.currency?.trim().toUpperCase() || null;
+    const currency = requestedCurrency ?? (currencies.rows.length === 1 ? currencies.rows[0]?.currency : null);
     if (!currency) {
       throw new RecoveryServiceError("INVALID_EVIDENCE", "Fee invoices require an explicit currency.");
     }
-    if (currencies.rows.some((row) => row.currency !== currency)) {
+    if (currency !== "INR") {
+      throw new RecoveryServiceError("INVALID_EVIDENCE", "Fee invoices support INR pricing only until a cross-currency credit policy is approved.");
+    }
+    if (!requestedCurrency && currencies.rows.some((row) => row.currency !== currency)) {
       throw new RecoveryServiceError("INVALID_EVIDENCE", "Fee invoices cannot mix currencies.");
     }
     await client.query(
@@ -3094,11 +3338,21 @@ async function listCandidateDtos(client: PoolClient, workspaceId: string) {
   const result = await client.query<CandidateRow>(
     `select recovery_action_candidates.id, recovery_action_candidates.commitment_id,
             commitment.effective_merchant as merchant, eligibility, status, ineligible_reasons,
-            provider_id, amount_minor::text, currency, notice_delivered_at, veto_deadline_at, exception_code
+            provider_id, amount_minor::text, currency, notice_delivered_at, veto_deadline_at, exception_code,
+            notice.delivery_status,
+            exists (
+              select 1 from recovery_autopilot_dead_letters dead
+              where dead.workspace_id = recovery_action_candidates.workspace_id
+                and dead.candidate_id = recovery_action_candidates.id
+                and dead.last_error_code = 'NOTICE_TOKEN_COVERAGE_INVALID'
+            ) as token_coverage_invalid
      from recovery_action_candidates
      join recovery_commitments commitment
        on commitment.workspace_id = recovery_action_candidates.workspace_id
       and commitment.id = recovery_action_candidates.commitment_id
+     left join recovery_veto_notices notice
+       on notice.workspace_id = recovery_action_candidates.workspace_id
+      and notice.candidate_id = recovery_action_candidates.id
      where recovery_action_candidates.workspace_id = $1
      order by recovery_action_candidates.updated_at desc`,
     [workspaceId],

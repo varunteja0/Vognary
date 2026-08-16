@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 
 import { canDeliverAutopilotNotice, isAutopilotNoticeChannelReady, isAutopilotNoticeEnabled } from "@/lib/recovery/autopilot-switch";
+import { isVetoTokenSecretValid } from "@/lib/recovery/veto-token";
 
 const resendMessagesUrl = "https://api.resend.com/emails";
 
@@ -80,7 +81,8 @@ export function autopilotNoticeWebhookSecret(): string {
 }
 
 export function autopilotVetoTokenSecret(): string {
-  return (process.env.AUTOPILOT_VETO_TOKEN_SECRET ?? "").trim();
+  const secret = (process.env.AUTOPILOT_VETO_TOKEN_SECRET ?? "").trim();
+  return isVetoTokenSecretValid(secret) ? secret : "";
 }
 
 /** Production default is off. A test adapter must not become a live mailer. */

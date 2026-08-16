@@ -65,6 +65,9 @@ test("feature readiness checks every persistent capability migration with bounde
     "0042_workspace_activation_semantic_reset",
     "0043_workspace_activation_semantic_version",
     "0044_autopilot_audit_immutability",
+    "0045_autopilot_mandate_execution_immutability",
+    "0046_billed_window_immutability",
+    "0047_billed_window_insert_immutability",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -179,6 +182,11 @@ test("restore drills require Recovery v1 and report restored Recovery state", ()
   assert.match(recoveryVerification, /inbound_replay_keys/);
   assert.match(backup, /readRecoveryBackupVerification/);
   assert.match(recoveryVerification, /requiredRecoveryMigration = "0023_recovery_v1"/);
+  assert.match(recoveryVerification, /0045_autopilot_mandate_execution_immutability/);
+  assert.match(recoveryVerification, /0046_billed_window_immutability/);
+  assert.match(recoveryVerification, /0047_billed_window_insert_immutability/);
+  assert.match(recoveryVerification, /recovery_covered_windows_billed_immutable/);
+  assert.match(recoveryVerification, /from pg_trigger/);
   assert.match(recoveryVerification, /from schema_migrations/);
   assert.match(recoveryVerification, /recoveryWorkspaceCounts/);
   assert.match(restore, /manifest\.verification\?\.recoveryWorkspaceCounts/);

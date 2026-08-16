@@ -29,6 +29,7 @@ import { RecoveryHome } from "./recovery-home";
 import { RecoveryMandate } from "./recovery-mandate";
 import { RecoverySources } from "./recovery-sources";
 import { AuthRequiredBlock, FailureBlock, LoadingBlock, OfflineBlock, StateBlock } from "./recovery-states";
+import { offAutopilotNoticeReadiness } from "@/lib/recovery/notice-readiness";
 import {
   correctionPatchFromDraft,
   evidenceRequestFromDraft,
@@ -36,6 +37,7 @@ import {
   recoveryReducer,
   recoveryViewLabels,
   recoveryViews,
+  type PendingMutation,
   type RecoveryState,
   type RecoveryView,
 } from "./state";
@@ -601,6 +603,30 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     await loadSnapshot();
   }
 
+  async function disconnectEvidenceSource(sourceId: string) {
+    if (state.workspaceVersion === null) return;
+    const idempotencyKey = newIdempotencyKey();
+    dispatch({ type: "EVIDENCE_SOURCE_STARTED", action: "DISCONNECT", sourceId, idempotencyKey });
+    const result = await transport.disconnectRecoverySource(sourceId, { workspaceVersion: state.workspaceVersion, idempotencyKey });
+    if (!result.ok) {
+      dispatch({ type: "MUTATION_FAILED", failure: result });
+      return;
+    }
+    await loadSnapshot();
+  }
+
+  async function reconnectEvidenceSource(sourceId: string) {
+    if (state.workspaceVersion === null) return;
+    const idempotencyKey = newIdempotencyKey();
+    dispatch({ type: "EVIDENCE_SOURCE_STARTED", action: "RECONNECT", sourceId, idempotencyKey });
+    const result = await transport.reconnectRecoverySource(sourceId, { workspaceVersion: state.workspaceVersion, idempotencyKey });
+    if (!result.ok) {
+      dispatch({ type: "MUTATION_FAILED", failure: result });
+      return;
+    }
+    await loadSnapshot();
+  }
+
   async function loadMoreCommitments() {
     if (!state.commitmentsCursor || loadingMoreCommitments) return;
     setLoadingMoreCommitments(true);
@@ -767,6 +793,11 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           receiptInbox={state.receiptInbox}
           sourceStatus={state.sourceStatus}
           pendingAction={state.pendingSourceAction}
+          evidenceSources={state.home?.evidenceSources ?? []}
+          canManageEvidenceSources={state.home?.workspace.role === "owner" || state.home?.workspace.role === "admin"}
+          pendingMutation={state.pending}
+          onDisconnectEvidenceSource={(sourceId) => void disconnectEvidenceSource(sourceId)}
+          onReconnectEvidenceSource={(sourceId) => void reconnectEvidenceSource(sourceId)}
           onProvision={() => void updateReceiptInbox("PROVISION")}
           onRotate={() => void updateReceiptInbox("ROTATE")}
           onRevoke={() => void updateReceiptInbox("REVOKE")}
@@ -803,8 +834,8 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         <RecoveryMandate
           mandate={state.home?.autopilot?.mandate ?? null}
           executionEnabled={state.home?.autopilot?.executionEnabled ?? false}
-          noticeEnabled={state.home?.autopilot?.noticeEnabled ?? false}
-          pending={state.pending?.kind === "MANDATE_SIGN" || state.pending?.kind === "MANDATE_REVOKE"}
+          noticeReadiness={state.home?.autopilot?.noticeReadiness ?? offAutopilotNoticeReadiness}
+          pendingKind={state.pending?.kind === "MANDATE_SIGN" ? "SIGN" : state.pending?.kind === "MANDATE_REVOKE" ? "REVOKE" : null}
           online={state.online}
           canSign={state.home?.workspace.role === "owner"}
           canOperate={state.home?.workspace.role === "owner" || state.home?.workspace.role === "admin"}
@@ -877,14 +908,7 @@ function RollbackAlert({ state, onDismiss }: { state: RecoveryState; onDismiss: 
   const { mutation, failure } = rollback;
   const commitment = "commitmentId" in mutation ? state.commitments.find((item) => item.id === mutation.commitmentId) ?? null : null;
 
-  const attempted =
-    mutation.kind === "DECISION"
-      ? `“${decisionLabels[mutation.decision]}” for ${commitment?.merchant ?? "this commitment"}`
-      : mutation.kind === "CORRECTION"
-        ? `the ${correctionFieldLabels[mutation.field].toLowerCase()} correction`
-        : mutation.kind === "CORRECTION_REVERSAL"
-          ? "reversing that correction"
-          : "your evidence submission";
+  const attempted = rollbackAttemptLabel(mutation, commitment);
 
   const restored =
     mutation.kind === "DECISION"
@@ -905,4 +929,31 @@ function RollbackAlert({ state, onDismiss }: { state: RecoveryState; onDismiss: 
       <button type="button" onClick={onDismiss} className="btn btn-sm btn-ghost mt-3">Dismiss</button>
     </div>
   );
+}
+
+function rollbackAttemptLabel(mutation: PendingMutation, commitment: CommitmentSummaryDto | null) {
+  switch (mutation.kind) {
+    case "EVIDENCE":
+      return "your evidence submission";
+    case "DECISION":
+      return `“${decisionLabels[mutation.decision]}” for ${commitment?.merchant ?? "this commitment"}`;
+    case "CORRECTION":
+      return `the ${correctionFieldLabels[mutation.field].toLowerCase()} correction`;
+    case "CORRECTION_REVERSAL":
+      return "reversing that correction";
+    case "MANDATE_SIGN":
+      return "signing the standing mandate";
+    case "MANDATE_REVOKE":
+      return "revoking the standing mandate";
+    case "CANDIDATE_VETO":
+      return "vetoing that Autopilot case";
+    case "SOURCE_DISCONNECT":
+      return "disconnecting that evidence source";
+    case "SOURCE_RECONNECT":
+      return "reconnecting that evidence source";
+    default: {
+      const exhaustive: never = mutation;
+      return exhaustive;
+    }
+  }
 }

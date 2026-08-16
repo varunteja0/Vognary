@@ -217,12 +217,26 @@ const forbiddenExportKeys = new Set([
   "payloadhash",
   "contenthash",
   "fingerprint",
+  "noticefingerprint",
   "rawpayload",
   "rawrow",
   "storagekey",
   "keyfingerprint",
   "connectortokenrefs",
+  "vetotokenhash",
+  "vetotoken",
+  "noticebodyhash",
+  "proofreferencehash",
+  "proofreference",
 ]);
+
+const forbiddenExportSubstrings = [
+  "vetotoken",
+  "noticebodyhash",
+  "payloadhash",
+  "fingerprint",
+  "proofreference",
+] as const;
 
 export function normalizeRetentionPolicyPatch(
   input: unknown,
@@ -292,7 +306,12 @@ export function assertPrivacyExportExcludesSecrets(document: unknown) {
     if (!value || typeof value !== "object") return;
     for (const [key, entry] of Object.entries(value)) {
       const normalizedKey = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
-      if (forbiddenExportKeys.has(normalizedKey) || normalizedKey.endsWith("accesstoken") || normalizedKey.endsWith("refreshtoken")) {
+      if (
+        forbiddenExportKeys.has(normalizedKey)
+        || normalizedKey.endsWith("accesstoken")
+        || normalizedKey.endsWith("refreshtoken")
+        || forbiddenExportSubstrings.some((part) => normalizedKey.includes(part))
+      ) {
         throw new Error(`Privacy export contains forbidden field ${key}.`);
       }
       visit(entry);
