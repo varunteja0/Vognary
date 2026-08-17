@@ -3,6 +3,7 @@ export const requiredAutopilotIntegrityMigrations = [
   "0045_autopilot_mandate_execution_immutability",
   "0046_billed_window_immutability",
   "0047_billed_window_insert_immutability",
+  "0048_receipt_sender_provenance",
 ];
 export const requiredAutopilotIntegrityTriggers = [
   "product_events_workspace_activated_immutable",
@@ -13,6 +14,7 @@ export const requiredAutopilotIntegrityTriggers = [
   "recovery_execution_attempts_immutable",
   "recovery_executions_immutable",
   "recovery_fee_ledger_immutable",
+  "recovery_inbound_sender_assessments_immutable_trigger",
   "recovery_operator_actions_immutable",
   "recovery_standing_mandate_events_immutable",
   "recovery_standing_mandates_immutable",

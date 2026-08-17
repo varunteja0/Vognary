@@ -7,7 +7,7 @@ import { GET as getSources } from "../../src/app/api/workspaces/current/sources/
 import { DELETE as revokeSource, POST as provisionSource } from "../../src/app/api/workspaces/current/sources/receipt-inbox/route";
 import { POST as rotateSource } from "../../src/app/api/workspaces/current/sources/receipt-inbox/rotate/route";
 import { DELETE as deleteConnectedSource } from "../../src/app/api/workspaces/current/connectors/[accountId]/route";
-import type { ApiSuccess, ReceiptInboxStatusDto } from "../../src/lib/recovery/contracts";
+import type { ApiSuccess, ReceiptInboxStatusDto, SenderProvenanceDto } from "../../src/lib/recovery/contracts";
 import { getDatabasePool } from "../../src/lib/server/database";
 import { RecoveryServiceError } from "../../src/lib/server/recovery-api";
 import {
@@ -18,7 +18,7 @@ import {
   revokeReceiptInbox,
   rotateReceiptInbox,
 } from "../../src/lib/server/recovery-inbound-store";
-import { materializeForwardedEmailEvidence, submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
+import { materializeForwardedEmailEvidence, listKnownSenderDomains, submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
 import { processResendReceivedEvent } from "../../src/lib/server/recovery-inbound-processor";
 import { ResendInboundRetryableError } from "../../src/lib/server/recovery-inbound-webhook";
 import { getRecoveryCutoverStatus } from "../../src/lib/server/recovery-store";
@@ -1487,6 +1487,158 @@ test("forwarded evidence refreshes an active mandate candidate without a manual 
   }
 });
 
+test("sender provenance is retained per receipt and bounds what an unverified sender may claim", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const restoreEnvironment = setEnvironment(receiptInboxEnvironment);
+  const pool = getDatabasePool();
+  const userId = randomUUID();
+  const workspaceId = randomUUID();
+  await pool.query(`insert into users (id, email, display_name) values ($1, $2, 'Sender Trust Owner')`, [userId, `sender-trust-${randomUUID().slice(0, 8)}@example.test`]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Sender Trust Workspace')`, [workspaceId, userId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+  const inbox = await provisionReceiptInbox({ workspaceId, actorUserId: userId });
+  assert.ok(inbox.alias?.id);
+
+  const materialize = async (
+    text: string,
+    provenance: SenderProvenanceDto,
+  ) => {
+    const inboundEventId = randomUUID();
+    const providerEventId = `svix-${randomUUID()}`;
+    const providerEmailId = `email-${randomUUID()}`;
+    await pool.query(
+      `insert into recovery_inbound_events (
+         id, provider, svix_id, provider_email_id, workspace_id, alias_id,
+         event_type, payload_hash, status, processing_started_at, attempt_count
+       ) values ($1, 'RESEND', $2, $3, $4, $5, 'email.received', $6, 'PROCESSING', now(), 1)`,
+      [inboundEventId, providerEventId, providerEmailId, workspaceId, inbox.alias!.id, "b".repeat(64)],
+    );
+    return materializeForwardedEmailEvidence({
+      workspaceId,
+      inboundEventId,
+      providerEventId,
+      expectedAttemptCount: 1,
+      request: { kind: "FORWARDED_EMAIL", receipts: [{ clientRef: providerEmailId, text, provenance }] },
+      now: new Date("2026-08-10T12:00:00.000Z"),
+    });
+  };
+
+  try {
+    const verified = await materialize(
+      "Netflix charged INR 649 on 6 July 2026. Renews monthly on 6 August 2026.",
+      {
+        tier: "VERIFIED_SENDER",
+        fromAddress: "info@netflix.com",
+        fromDomain: "netflix.com",
+        displayName: "Netflix",
+        assertions: [{
+          chain: "AUTHENTICATION_RESULTS",
+          authority: "mx.google.com",
+          spf: "pass",
+          dkim: "pass",
+          dmarc: "pass",
+          dkimDomains: ["netflix.com"],
+          dmarcDomain: "netflix.com",
+        }],
+        signingDomains: ["netflix.com"],
+        trustedAuthority: "mx.google.com",
+        reasons: ["mx.google.com reported an aligned DKIM pass and DMARC pass for netflix.com."],
+      },
+    );
+    assert.equal(verified.submission.acceptedEvidenceCount, 1);
+
+    const unverified = await materialize(
+      "Notion charged INR 1,200 on 8 July 2026. Renews monthly on 8 August 2026.",
+      {
+        tier: "UNVERIFIED_SENDER",
+        fromAddress: "billing@notion-invoices.tld",
+        fromDomain: "notion-invoices.tld",
+        displayName: null,
+        assertions: [],
+        signingDomains: [],
+        trustedAuthority: null,
+        reasons: ["Nothing establishes notion-invoices.tld as the sender beyond the forwarded message itself."],
+      },
+    );
+    assert.equal(unverified.submission.acceptedEvidenceCount, 1);
+
+    const scores = await pool.query<{ merchant: string; confidence_score: number; confidence_reasons: string[] }>(
+      `select normalized_merchant as merchant, confidence_score, confidence_reasons
+       from recovery_evidence
+       where workspace_id = $1
+       order by created_at`,
+      [workspaceId],
+    );
+    const netflix = scores.rows.find((row) => /netflix/i.test(row.merchant));
+    const notion = scores.rows.find((row) => /notion/i.test(row.merchant));
+    assert.ok(netflix, "the verified sender receipt should persist evidence");
+    assert.ok(notion, "the unverified sender receipt should still persist evidence");
+    // Unknown transport keeps its evidence but can never carry a trusted claim.
+    assert.ok(notion.confidence_score <= 60, `unverified sender confidence was ${notion.confidence_score}`);
+    assert.ok(notion.confidence_score < netflix.confidence_score);
+    assert.ok(notion.confidence_reasons.some((reason) => /could not be established/i.test(reason)));
+
+    const assessments = await pool.query<{
+      trust_tier: string;
+      from_domain: string | null;
+      trusted_authority: string | null;
+      source_id: string | null;
+      signing_domains: string[];
+      assertions: unknown[];
+    }>(
+      `select trust_tier, from_domain, trusted_authority, source_id, signing_domains, assertions
+       from recovery_inbound_sender_assessments
+       where workspace_id = $1
+       order by assessed_at, id`,
+      [workspaceId],
+    );
+    assert.equal(assessments.rows.length, 2);
+    assert.deepEqual(assessments.rows.map((row) => row.trust_tier).sort(), ["UNVERIFIED_SENDER", "VERIFIED_SENDER"]);
+    const verifiedRow = assessments.rows.find((row) => row.trust_tier === "VERIFIED_SENDER");
+    assert.equal(verifiedRow?.trusted_authority, "mx.google.com");
+    assert.equal(verifiedRow?.from_domain, "netflix.com");
+    assert.deepEqual(verifiedRow?.signing_domains, ["netflix.com"]);
+    assert.equal(verifiedRow?.assertions.length, 1);
+    assert.ok(assessments.rows.every((row) => row.source_id));
+
+    // No secret routing token or raw address may leak into the retained record.
+    const serialized = JSON.stringify(assessments.rows);
+    assert.equal(serialized.includes(inbox.alias!.address.split("@")[0]), false);
+    assert.equal(serialized.includes("info@netflix.com"), false);
+
+    await assert.rejects(
+      pool.query(
+        `update recovery_inbound_sender_assessments set trust_tier = 'VERIFIED_SENDER' where workspace_id = $1`,
+        [workspaceId],
+      ),
+      /immutable/i,
+    );
+    await assert.rejects(
+      pool.query(`delete from recovery_inbound_sender_assessments where workspace_id = $1`, [workspaceId]),
+      /immutable/i,
+    );
+    await assert.rejects(
+      pool.query(
+        `insert into recovery_inbound_sender_assessments (
+           workspace_id, client_ref, trust_tier
+         ) values ($1, 'client-forged', 'VERIFIED_SENDER')`,
+        [workspaceId],
+      ),
+      /verified_needs_authority/i,
+    );
+
+    // Repetition is not evidence: an unverified domain must not promote itself
+    // into the known-sender history simply by sending again.
+    const known = await listKnownSenderDomains(workspaceId);
+    assert.deepEqual(known, ["netflix.com"]);
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [userId]);
+    restoreEnvironment();
+  }
+});
+
 async function activeAliasId(workspaceId: string) {
   const result = await getDatabasePool().query<{ id: string }>(
     `select id from recovery_inbound_aliases where workspace_id = $1 and status = 'ACTIVE'`,
@@ -1495,6 +1647,7 @@ async function activeAliasId(workspaceId: string) {
   assert.ok(result.rows[0]);
   return result.rows[0].id;
 }
+
 
 function setEnvironment(values: Record<string, string>) {
   const previous = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]]));

@@ -4,12 +4,18 @@ import {
   decisions,
   recoveryErrorStatusByCode,
   recoveryLimits,
+  senderAuthenticationResults,
+  senderTrustTiers,
   type ApiFailure,
   type CreateCorrectionRequest,
   type EvidenceIngestRequest,
   type ForwardedEmailMaterializationRequest,
   type PutDecisionRequest,
   type RecoveryErrorCode,
+  type SenderAuthenticationAssertionDto,
+  type SenderAuthenticationResult,
+  type SenderProvenanceDto,
+  type SenderTrustTier,
 } from "@/lib/recovery/contracts";
 import { normalizeMinorUnits } from "@/lib/recovery/domain";
 
@@ -134,7 +140,7 @@ export function normalizeForwardedEmailMaterializationRequest(value: unknown): F
   if (!Array.isArray(record.receipts) || !record.receipts.length || record.receipts.length > recoveryLimits.maxReceiptSnippets) {
     throw invalid(`receipts must contain 1 to ${recoveryLimits.maxReceiptSnippets} snippets.`);
   }
-  const receipts = record.receipts.map((entry, index) => normalizeReceipt(entry, index));
+  const receipts = record.receipts.map((entry, index) => normalizeForwardedReceipt(entry, index));
   const characters = receipts.reduce((total, receipt) => total + receipt.text.length, 0);
   if (characters > recoveryLimits.maxReceiptCharacters) throw tooLarge("Forwarded receipt evidence exceeds the character limit.");
   return { kind: "FORWARDED_EMAIL", receipts };
@@ -237,6 +243,88 @@ function normalizeReceipt(value: unknown, index: number) {
     clientRef: boundedText(record.clientRef, "clientRef", 1, 240),
     text: boundedText(record.text, "text", 1, recoveryLimits.maxReceiptCharacters, false),
   };
+}
+
+/**
+ * Sender provenance is derived from transport headers the ingestion pipeline
+ * observed itself. It is accepted only on the forwarded-email path, never on a
+ * user-submitted paste, so no caller can assert its own trust tier.
+ */
+function normalizeForwardedReceipt(value: unknown, index: number) {
+  const record = requireRecord(value, `Receipt ${index + 1}`);
+  rejectUnknown(record, new Set(["clientRef", "text", "provenance"]), `receipt ${index + 1}`);
+  return {
+    clientRef: boundedText(record.clientRef, "clientRef", 1, 240),
+    text: boundedText(record.text, "text", 1, recoveryLimits.maxReceiptCharacters, false),
+    ...(record.provenance === undefined ? {} : { provenance: normalizeSenderProvenance(record.provenance, index) }),
+  };
+}
+
+function normalizeSenderProvenance(value: unknown, index: number): SenderProvenanceDto {
+  const record = requireRecord(value, `Receipt ${index + 1} sender provenance`);
+  rejectUnknown(
+    record,
+    new Set(["tier", "fromAddress", "fromDomain", "displayName", "assertions", "signingDomains", "trustedAuthority", "reasons"]),
+    `receipt ${index + 1} sender provenance`,
+  );
+  if (typeof record.tier !== "string" || !senderTrustTiers.includes(record.tier as SenderTrustTier)) {
+    throw invalid(`receipt ${index + 1} sender provenance tier is not supported.`);
+  }
+  const tier = record.tier as SenderTrustTier;
+  const trustedAuthority = optionalBoundedText(record.trustedAuthority, "trustedAuthority", 253);
+  const fromDomain = optionalBoundedText(record.fromDomain, "fromDomain", 253);
+  if (tier === "VERIFIED_SENDER" && (!trustedAuthority || !fromDomain)) {
+    throw invalid(`receipt ${index + 1} cannot be verified without a named authority and sender domain.`);
+  }
+  return {
+    tier,
+    fromAddress: optionalBoundedText(record.fromAddress, "fromAddress", 320),
+    fromDomain,
+    displayName: optionalBoundedText(record.displayName, "displayName", 240),
+    assertions: boundedList(record.assertions, 12).map((entry, position) => normalizeSenderAssertion(entry, index, position)),
+    signingDomains: boundedList(record.signingDomains, 8).map((entry) => boundedText(entry, "signingDomains", 1, 253)),
+    trustedAuthority,
+    reasons: boundedList(record.reasons, 12).map((entry) => boundedText(entry, "reasons", 1, 500)),
+  };
+}
+
+function normalizeSenderAssertion(value: unknown, index: number, position: number): SenderAuthenticationAssertionDto {
+  const record = requireRecord(value, `Receipt ${index + 1} assertion ${position + 1}`);
+  rejectUnknown(
+    record,
+    new Set(["chain", "authority", "spf", "dkim", "dmarc", "dkimDomains", "dmarcDomain"]),
+    `receipt ${index + 1} assertion ${position + 1}`,
+  );
+  if (record.chain !== "AUTHENTICATION_RESULTS" && record.chain !== "ARC") {
+    throw invalid(`receipt ${index + 1} assertion ${position + 1} chain is not supported.`);
+  }
+  return {
+    chain: record.chain,
+    authority: boundedText(record.authority, "authority", 1, 253),
+    spf: normalizeSenderAuthenticationResult(record.spf, "spf"),
+    dkim: normalizeSenderAuthenticationResult(record.dkim, "dkim"),
+    dmarc: normalizeSenderAuthenticationResult(record.dmarc, "dmarc"),
+    dkimDomains: boundedList(record.dkimDomains, 8).map((entry) => boundedText(entry, "dkimDomains", 1, 253)),
+    dmarcDomain: optionalBoundedText(record.dmarcDomain, "dmarcDomain", 253),
+  };
+}
+
+function normalizeSenderAuthenticationResult(value: unknown, field: string) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string" || !senderAuthenticationResults.includes(value as SenderAuthenticationResult)) {
+    throw invalid(`${field} is not a supported authentication result.`);
+  }
+  return value as SenderAuthenticationResult;
+}
+
+function optionalBoundedText(value: unknown, field: string, maximum: number) {
+  return value === null || value === undefined ? null : boundedText(value, field, 1, maximum);
+}
+
+function boundedList(value: unknown, maximum: number): unknown[] {
+  if (value === null || value === undefined) return [];
+  if (!Array.isArray(value) || value.length > maximum) throw invalid(`A bounded list of at most ${maximum} entries is required.`);
+  return value;
 }
 
 function normalizeCsvSource(value: unknown, index: number) {

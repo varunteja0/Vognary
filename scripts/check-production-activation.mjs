@@ -425,8 +425,8 @@ function isFeatureMigrationsReady({ endpointPayloads }) {
   const capabilities = endpointPayloads.readiness?.capabilities;
   if (!capabilities) return undefined;
   return capabilities.schema?.status === "ready"
-    && capabilities.schema.required?.includes("0047_billed_window_insert_immutability") === true
-    && capabilities.schema.applied?.includes("0047_billed_window_insert_immutability") === true
+    && capabilities.schema.required?.includes("0048_receipt_sender_provenance") === true
+    && capabilities.schema.applied?.includes("0048_receipt_sender_provenance") === true
     && capabilities.privacyLifecycle?.status !== "schema-query-failed"
     && capabilities.renewalAlerts?.status !== "schema-query-failed"
     && capabilities.commitmentDecisions?.status !== "schema-query-failed"

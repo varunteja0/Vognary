@@ -14,7 +14,8 @@ import {
   ResendInboundRetryableError,
   type ResendReceivedEvent,
 } from "@/lib/server/recovery-inbound-webhook";
-import { materializeForwardedEmailEvidence } from "@/lib/server/recovery-store";
+import { listKnownSenderDomains, materializeForwardedEmailEvidence } from "@/lib/server/recovery-store";
+import { getReceiptInboxTrustedAuthorities } from "@/lib/server/receipt-inbox-sender-trust";
 
 type ProcessorDependencies = {
   retrieveRawEmail?: (emailId: string) => Promise<string | Uint8Array>;
@@ -62,9 +63,23 @@ export async function processResendReceivedEvent(
       : new ResendInboundRetryableError("Receipt provider retrieval failed.");
   }
 
+  // Kept outside the MIME block so storage trouble retries instead of being
+  // recorded as an unparseable message.
+  let knownSenderDomains: readonly string[];
+  try {
+    knownSenderDomains = await listKnownSenderDomains(reservation.workspaceId);
+  } catch {
+    const released = await releaseForRetry(reservation, "SENDER_HISTORY_UNAVAILABLE");
+    if (!released) return { status: "duplicate" };
+    throw new ResendInboundRetryableError("Receipt sender history is unavailable.");
+  }
+
   let extraction;
   try {
-    extraction = await extractForwardedReceiptTexts(raw);
+    extraction = await extractForwardedReceiptTexts(raw, {
+      trustedAuthorities: getReceiptInboxTrustedAuthorities(),
+      knownSenderDomains,
+    });
   } catch {
     const marked = await markTerminalFailure(reservation, "MIME_INVALID");
     return { status: marked ? "ignored" : "duplicate" };
@@ -94,7 +109,14 @@ export async function processResendReceivedEvent(
       providerEventId: event.svixId,
       expectedAttemptCount: reservation.attemptCount,
       currencyHint: extraction.currencyHint,
-      request: { kind: "FORWARDED_EMAIL", receipts },
+      request: {
+        kind: "FORWARDED_EMAIL",
+        receipts: receipts.map((receipt) => ({
+          clientRef: receipt.clientRef,
+          text: receipt.text,
+          provenance: receipt.provenance,
+        })),
+      },
       afterAuthorityInspection: dependencies.afterAuthorityInspection,
     });
     return materialized.submission.acceptedEvidenceCount > 0

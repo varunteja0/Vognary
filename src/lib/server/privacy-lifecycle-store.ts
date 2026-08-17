@@ -691,6 +691,14 @@ async function buildAccessExport(client: PoolClient, input: {
           order by received_at asc, id asc limit $2
         ) record) as inbound_events,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, source_id as "sourceId", trust_tier as "trustTier",
+                 from_domain as "fromDomain", trusted_authority as "trustedAuthority",
+                 assertions, signing_domains as "signingDomains", reasons,
+                 assessed_at as "assessedAt"
+          from recovery_inbound_sender_assessments where workspace_id = $1
+          order by assessed_at asc, id asc limit $2
+        ) record) as inbound_sender_assessments,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
           select id, version, status, terms_version as "termsVersion",
                  signed_text_hash as "signedTextHash", currency,
                  per_action_ceiling_minor::text as "perActionCeilingMinor",
@@ -1304,6 +1312,7 @@ async function buildAccessExport(client: PoolClient, input: {
     recovery.changes,
     recovery.inbound_aliases,
     recovery.inbound_events,
+    recovery.inbound_sender_assessments,
     recovery.standing_mandates,
     recovery.action_candidates,
     recovery.covered_windows,
@@ -1460,6 +1469,7 @@ async function buildAccessExport(client: PoolClient, input: {
       changes: recovery.changes,
       inboundAliases: recovery.inbound_aliases,
       inboundEvents: recovery.inbound_events,
+      inboundSenderAssessments: recovery.inbound_sender_assessments,
       standingMandates: recovery.standing_mandates,
       actionCandidates: recovery.action_candidates,
       coveredWindows: recovery.covered_windows,
@@ -2050,6 +2060,7 @@ type RecoveryExportRow = {
   changes: Array<Record<string, unknown>>;
   inbound_aliases: Array<Record<string, unknown>>;
   inbound_events: Array<Record<string, unknown>>;
+  inbound_sender_assessments: Array<Record<string, unknown>>;
   standing_mandates: Array<Record<string, unknown>>;
   action_candidates: Array<Record<string, unknown>>;
   covered_windows: Array<Record<string, unknown>>;

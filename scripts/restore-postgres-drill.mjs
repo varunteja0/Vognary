@@ -158,6 +158,7 @@ async function verifyRestoredSchema(connectionString) {
       "recovery_source_disconnections",
       "recovery_inbound_aliases",
       "recovery_inbound_events",
+      "recovery_inbound_sender_assessments",
       "recovery_inbound_replay_keys",
     ];
     const result = await pool.query(

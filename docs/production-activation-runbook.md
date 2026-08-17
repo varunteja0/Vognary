@@ -10,7 +10,7 @@ Do not show the forwarding-first landing or set any receipt-inbox operator flag 
 
 Stop immediately when any of these is true:
 
-- PostgreSQL migrations through `0047_billed_window_insert_immutability` are not applied.
+- PostgreSQL migrations through `0048_receipt_sender_provenance` are not applied.
 - A signed Resend event cannot produce one canonical Recovery submission.
 - Replaying that event creates another submission, source, evidence row, or commitment.
 - A raw provider address, alias token, message subject, body, or attachment appears in logs or privacy export.
@@ -41,14 +41,14 @@ DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-sche
 DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
 ```
 
-10. Query `schema_migrations` and verify the last row is `0047_billed_window_insert_immutability`.
+10. Query `schema_migrations` and verify the last row is `0048_receipt_sender_provenance`.
 11. Verify PostgreSQL contains `connector_sync_jobs_recovery_cutover_guard`, `connector_evidence_running_job_guard`, and `renewal_alert_deliveries_recovery_cutover_guard`. Require zero connector jobs in `queued`, `running`, `failed`, or `paused`, zero connector runs in `running`, and zero legacy renewal deliveries in `scheduled`, `sending`, or `failed`.
 12. Run the fresh and staged upgrade migration tests against disposable PostgreSQL 16. The upgrade test must prove `0024`/`0025` leave old work operational before deployment and `0026` later rejects a new legacy job, reminder, and connector-evidence write.
 
 Expected success:
 
 - `/api/readiness` reports `capabilities.schema.status = ready`.
-- `capabilities.schema.status` is `ready`, and `capabilities.schema.applied` ends at `0047_billed_window_insert_immutability`.
+- `capabilities.schema.status` is `ready`, and `capabilities.schema.applied` ends at `0048_receipt_sender_provenance`.
 - `capabilities.recoveryV1.status = schema-ready-clean-cutover`.
 
 Stop before `0026` if the retired SHA is not live or old workers have not drained. Keep forwarding disabled and stop activation if checksums differ, the additive phase does not stop exactly at `0025`, any cutover trigger is absent, a nonterminal legacy row remains, a fresh database fails, or an upgrade loses legacy rows.

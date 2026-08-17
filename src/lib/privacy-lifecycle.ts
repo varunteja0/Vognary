@@ -92,6 +92,7 @@ export type PrivacyExportDocument = {
     changes: Array<Record<string, unknown>>;
     inboundAliases: Array<Record<string, unknown>>;
     inboundEvents: Array<Record<string, unknown>>;
+    inboundSenderAssessments: Array<Record<string, unknown>>;
     standingMandates: Array<Record<string, unknown>>;
     actionCandidates: Array<Record<string, unknown>>;
     coveredWindows: Array<Record<string, unknown>>;

@@ -52,6 +52,7 @@ export const productionFeatureMigrations = [
   "0045_autopilot_mandate_execution_immutability",
   "0046_billed_window_immutability",
   "0047_billed_window_insert_immutability",
+  "0048_receipt_sender_provenance",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];
