@@ -65,3 +65,6 @@ docs/execution/private-autopilot-outreach-draft.md
 
 # Parked sibling worktrees moved into this repo. Never lint, typecheck, or commit them.
 .fallow/
+
+# transient local test capture
+test_output.log

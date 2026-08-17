@@ -76,7 +76,12 @@ RESEND_INBOUND_WEBHOOK_SECRET=<Svix signing secret>
 RESEND_RECEIVING_DOMAIN=<dedicated receiving subdomain>
 RECEIPT_INBOX_ALIAS_HMAC_SECRET=<32-byte secret encoded as hex or base64url>
 RECEIPT_INBOX_ALIAS_HMAC_KEY_ID=receipt-alias-v1
+RECEIPT_INBOX_TRUSTED_AUTH_AUTHORITIES=amazonses.com
 ```
+
+`RECEIPT_INBOX_TRUSTED_AUTH_AUTHORITIES` must name the authority the receiving provider itself writes, read from a real delivered message rather than assumed. Resend inbound is served by Amazon SES ingress and stamps `Authentication-Results: amazonses.com; spf=... dkim=... dmarc=...`, so `amazonses.com` is the only hop this deployment may quote. Do not add an authority such as `mx.google.com`: it appears only inside forwarded message content, which the forwarding party controls. Leaving the variable blank keeps `VERIFIED_SENDER` unreachable.
+
+Rotating `RECEIPT_INBOX_ALIAS_HMAC_SECRET` invalidates every existing alias lookup. Check `recovery_inbound_aliases` for `ACTIVE` rows before changing it, and rotate those aliases through the product if the secret must change.
 
 Before continuing, verify in the provider dashboard and DNS that the receiving domain is active. Do not infer this from environment variables.
 
