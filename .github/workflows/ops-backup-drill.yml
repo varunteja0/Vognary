@@ -2,12 +2,42 @@ name: Encrypted Backup Drill
 
 on:
   workflow_dispatch:
+    inputs:
+      verification_profile:
+        description: Exact database head the encrypted backup must verify
+        required: true
+        default: current
+        type: choice
+        options:
+          - current
+          - pre-0053
   schedule:
     - cron: "30 2 * * *"
+
+permissions:
+  contents: read
 
 jobs:
   backup:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: vognary_restore_drill
+          POSTGRES_DB: vognary_restore
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vognary_restore"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -17,10 +47,58 @@ jobs:
           node-version: "22.23.2"
           cache: npm
       - run: npm ci
+      - name: Resolve the production database without exposing credentials
+        run: |
+          node <<'NODE'
+          const { appendFileSync } = await import("node:fs");
+
+          const apiKey = process.env.NEON_API_KEY;
+          const projectId = process.env.NEON_PROJECT_ID;
+          if (!apiKey || !projectId) throw new Error("NEON_API_KEY and NEON_PROJECT_ID must be configured in GitHub.");
+          const base = `https://console.neon.tech/api/v2/projects/${encodeURIComponent(projectId)}`;
+          async function request(path, options = {}) {
+            const response = await fetch(`${base}${path}`, {
+              ...options,
+              headers: {
+                accept: "application/json",
+                authorization: `Bearer ${apiKey}`,
+                ...(options.body ? { "content-type": "application/json" } : {}),
+              },
+            });
+            if (!response.ok) throw new Error(`Neon API ${options.method ?? "GET"} ${path} failed with HTTP ${response.status}.`);
+            return response.json();
+          }
+          async function resolveDatabase(branchId) {
+            const databaseResponse = await request(`/branches/${encodeURIComponent(branchId)}/databases`);
+            const databases = databaseResponse.databases ?? [];
+            if (databases.length !== 1) throw new Error(`Expected one database on ${branchId}; found ${databases.length}.`);
+            const database = databases[0];
+            const query = new URLSearchParams({
+              branch_id: branchId,
+              database_name: database.name,
+              role_name: database.owner_name,
+              pooled: "false",
+            });
+            const connectionResponse = await request(`/connection_uri?${query}`);
+            const databaseUrl = connectionResponse.uri ?? connectionResponse.connection_uri;
+            if (!databaseUrl) throw new Error(`Neon returned no connection URI for ${branchId}.`);
+            return databaseUrl;
+          }
+
+          const projectResponse = await request("");
+          const branchResponse = await request("/branches?limit=100");
+          const primaryBranches = (branchResponse.branches ?? []).filter((branch) => branch.primary === true);
+          if (primaryBranches.length !== 1) throw new Error(`Expected one Neon primary branch; found ${primaryBranches.length}.`);
+          const primaryBranchId = projectResponse.project?.default_branch_id ?? primaryBranches[0].id;
+          const databaseUrl = await resolveDatabase(primaryBranchId);
+
+          console.log(`::add-mask::${databaseUrl}`);
+          appendFileSync(process.env.GITHUB_ENV, `DATABASE_URL<<VOGNARY_DATABASE_URL\n${databaseUrl}\nVOGNARY_DATABASE_URL\n`);
+          console.log("Resolved the production database from the default Neon branch.");
+          NODE
       - name: Preflight report
         run: npm run ops:preflight -- --report-only
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
           BACKUP_STORAGE_BUCKET: ${{ secrets.BACKUP_STORAGE_BUCKET }}
           S3_BUCKET: ${{ secrets.S3_BUCKET }}
@@ -39,7 +117,7 @@ jobs:
       - name: Create encrypted backup and upload to object storage
         run: npm run backup:postgres
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKUP_VERIFICATION_PROFILE: ${{ inputs.verification_profile || 'current' }}
           POSTGRES_SSL: "true"
           POSTGRES_CLIENT_MODE: docker
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
@@ -51,23 +129,19 @@ jobs:
           BACKUP_STORAGE_ACCESS_KEY_ID: ${{ secrets.BACKUP_STORAGE_ACCESS_KEY_ID }}
           BACKUP_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_STORAGE_SECRET_ACCESS_KEY }}
           BACKUP_STORAGE_PREFIX: ${{ vars.BACKUP_STORAGE_PREFIX }}
-      - name: Restore drill when disposable database is configured
+      - name: Restore the encrypted backup into disposable PostgreSQL 18
         run: |
-          if [ -z "$RESTORE_DATABASE_URL" ]; then
-            echo "RESTORE_DATABASE_URL is not configured; encrypted backup was created but restore drill was skipped."
-            exit 0
-          fi
           manifest="$(ls -t backups/postgres/*.manifest.json | head -1)"
           RESTORE_CONFIRM_DISPOSABLE=true npm run backup:restore-drill -- "$manifest"
         env:
-          RESTORE_DATABASE_URL: ${{ secrets.RESTORE_DATABASE_URL }}
+          RESTORE_DATABASE_URL: postgresql://postgres:vognary_restore_drill@127.0.0.1:5432/vognary_restore
           RESTORE_POSTGRES_SSL: "true"
           POSTGRES_CLIENT_MODE: docker
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: encrypted-postgres-backup
+          name: encrypted-postgres-backup-${{ inputs.verification_profile || 'current' }}
           path: backups/postgres/*
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 90

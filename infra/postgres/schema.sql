@@ -653,7 +653,15 @@ create table product_events (
     'window.verified',
     'verification.pending',
     'invoice.created',
-    'source.connected'
+    'source.connected',
+    'receipt_setup.started',
+    'receipt_setup.completed',
+    'receipt_forwarding.verified',
+    'receipt_backfill.completed',
+    'commitments.detected',
+    'correction.recorded',
+    'source.health_observed',
+    'workspace.returned'
   )),
   occurred_at timestamptz not null default now(),
   source text not null check (source in ('sync-runner', 'living-ledger', 'workspace-api', 'product-ui')),
@@ -666,7 +674,11 @@ create table product_events (
       'evidenceWritten',
       'transactionsWritten',
       'commitmentsTouched',
-      'usageObservationsWritten'
+      'usageObservationsWritten',
+      'commitmentsDetected',
+      'correctionsRecorded',
+      'healthySources',
+      'secondsToTrustworthyPicture'
     ]::text[]) = '{}'::jsonb)
     check (
       coalesce(jsonb_typeof(metrics -> 'recordsSeen') = 'number', true)
@@ -674,6 +686,10 @@ create table product_events (
       and coalesce(jsonb_typeof(metrics -> 'transactionsWritten') = 'number', true)
       and coalesce(jsonb_typeof(metrics -> 'commitmentsTouched') = 'number', true)
       and coalesce(jsonb_typeof(metrics -> 'usageObservationsWritten') = 'number', true)
+      and coalesce(jsonb_typeof(metrics -> 'commitmentsDetected') = 'number', true)
+      and coalesce(jsonb_typeof(metrics -> 'correctionsRecorded') = 'number', true)
+      and coalesce(jsonb_typeof(metrics -> 'healthySources') = 'number', true)
+      and coalesce(jsonb_typeof(metrics -> 'secondsToTrustworthyPicture') = 'number', true)
     )
 );
 
@@ -682,6 +698,16 @@ create index product_events_name_occurred_idx on product_events(event_name, occu
 create unique index product_events_workspace_activated_once_idx
   on product_events (workspace_id)
   where event_name = 'workspace.activated' and workspace_id is not null;
+create unique index product_events_phase_a_workspace_once_idx
+  on product_events(workspace_id, event_name)
+  where workspace_id is not null and event_name in (
+    'receipt_setup.started',
+    'receipt_setup.completed',
+    'receipt_forwarding.verified',
+    'receipt_backfill.completed',
+    'commitments.detected',
+    'workspace.returned'
+  );
 
 create table consent_grants (
   id uuid primary key default gen_random_uuid(),
@@ -1497,6 +1523,14 @@ create table if not exists recovery_inbound_aliases (
   created_at timestamptz not null default now(),
   rotated_at timestamptz,
   revoked_at timestamptz,
+  gmail_verification_code text
+    check (gmail_verification_code is null or gmail_verification_code ~ '^[0-9]{6,12}$'),
+  gmail_verification_url text
+    check (gmail_verification_url is null or gmail_verification_url like 'https://mail-settings.google.com/mail/%'),
+  gmail_verification_received_at timestamptz,
+  setup_completed_at timestamptz,
+  forwarding_verified_at timestamptz,
+  backfill_completed_at timestamptz,
   unique (hmac_key_id, alias_hmac),
   unique (workspace_id, id),
   foreign key (workspace_id, connected_account_id)
@@ -1507,8 +1541,54 @@ create table if not exists recovery_inbound_aliases (
     (status = 'ACTIVE' and rotated_at is null and revoked_at is null and encrypted_display is not null)
     or (status = 'ROTATED' and rotated_at is not null and revoked_at is null and encrypted_display is null)
     or (status = 'REVOKED' and revoked_at is not null and encrypted_display is null)
+  ),
+  constraint recovery_inbound_aliases_gmail_verification_check check (
+    (gmail_verification_received_at is null
+      and gmail_verification_code is null
+      and gmail_verification_url is null)
+    or (gmail_verification_received_at is not null
+      and (gmail_verification_code is not null or gmail_verification_url is not null))
+  ),
+  constraint recovery_inbound_aliases_phase_a_milestones_check check (
+    (setup_completed_at is null or setup_completed_at >= created_at)
+    and (forwarding_verified_at is null or (
+      setup_completed_at is not null
+      and forwarding_verified_at >= created_at
+    ))
+    and (backfill_completed_at is null or (
+      setup_completed_at is not null
+      and backfill_completed_at >= created_at
+    ))
   )
 );
+
+create or replace function reject_recovery_inbound_alias_milestone_rewrite()
+returns trigger
+language plpgsql
+as $$
+begin
+  if old.setup_completed_at is not null
+    and new.setup_completed_at is distinct from old.setup_completed_at
+  then
+    raise exception 'Receipt setup completion is immutable.' using errcode = '55000';
+  end if;
+  if old.forwarding_verified_at is not null
+    and new.forwarding_verified_at is distinct from old.forwarding_verified_at
+  then
+    raise exception 'Receipt forwarding verification is immutable.' using errcode = '55000';
+  end if;
+  if old.backfill_completed_at is not null
+    and new.backfill_completed_at is distinct from old.backfill_completed_at
+  then
+    raise exception 'Receipt backfill completion is immutable.' using errcode = '55000';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger recovery_inbound_alias_milestones_immutable
+  before update on recovery_inbound_aliases
+  for each row execute function reject_recovery_inbound_alias_milestone_rewrite();
 
 create unique index if not exists recovery_inbound_aliases_active_workspace_idx
   on recovery_inbound_aliases(workspace_id)

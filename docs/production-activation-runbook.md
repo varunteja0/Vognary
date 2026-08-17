@@ -10,7 +10,7 @@ Do not show the forwarding-first landing or set any receipt-inbox operator flag 
 
 Stop immediately when any of these is true:
 
-- PostgreSQL migrations through `0048_receipt_sender_provenance` are not applied.
+- PostgreSQL migrations through `0053_phase_a_receipt_activation` are not applied.
 - A signed Resend event cannot produce one canonical Recovery submission.
 - Replaying that event creates another submission, source, evidence row, or commitment.
 - A raw provider address, alias token, message subject, body, or attachment appears in logs or privacy export.
@@ -25,33 +25,29 @@ Rollback means setting `ENABLE_RECEIPT_INBOX=false`, clearing the four operator 
 1. Select Node `22.22.2` or a later `22.x` version allowed by `package.json`.
 2. Keep `ENABLE_RECEIPT_INBOX=false` and all four receipt-inbox operator evidence flags blank.
 3. Configure `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `SESSION_SECRET`, `INTERNAL_SYNC_SECRET`, and `CRON_SECRET` in the production deployment. `INTERNAL_SYNC_SECRET` and `CRON_SECRET` must be distinct values containing at least 32 UTF-8 bytes; shorter values fail closed as not configured. Generate each independently with `openssl rand -base64 32`. Never reuse either value as `SESSION_SECRET` or `TOKEN_ENCRYPTION_KEY`.
-4. Before deploying the candidate, apply only the additive Recovery inbox and reminder migrations. They are compatible with the old deployment and provide the columns the candidate uses:
-
-```bash
-DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema -- --through=0025_recovery_renewal_alerts
-```
-
-5. Verify `schema_migrations` ends at `0025_recovery_renewal_alerts`; do not continue if `0026` is already present unexpectedly.
-6. Deploy the exact candidate SHA. `vercel-build` intentionally compiles without mutating production schema.
-7. Verify the deployed SHA returns `410` for connector setup/sync/webhook routes, action-case routes, the legacy sync worker, and the legacy savings-verification worker. Verify the deployed cron configuration contains neither retired worker path.
-8. Record the deployment time in IST. Wait at least five minutes after the last old sync, reminder, or savings-verification invocation finishes. Stop if an old invocation is still running or a new legacy invocation starts.
-9. From a trusted operator terminal, apply the remaining contract migration:
+4. Verify the live `schema_migrations` ledger ends exactly at `0026_recovery_inbound_retention`. Production reached this cutover before this runbook revision; an earlier or later head is drift and must be explained before continuing.
+5. Verify the Recovery cutover guards exist and require zero connector jobs in `queued`, `running`, `failed`, or `paused`, zero connector runs in `running`, and zero legacy renewal deliveries in `scheduled`, `sending`, or `failed`.
+6. Dispatch **Encrypted Backup Drill** with profile `pre-0053`. Require a successful run from `main`, an unexpired `encrypted-postgres-backup-pre-0053` artifact, and a restore of that encrypted dump into disposable PostgreSQL 18. Record the Actions run ID in the restricted operator record; `apply-latest` refuses any run older than 24 hours. A Neon branch may be kept as an additional restore point, but it is not required and does not replace the encrypted drill.
+7. Deploy the exact candidate SHA, which must be `0053`-capable, while `ENABLE_RECEIPT_INBOX=false` and all four receipt-inbox operator evidence flags remain blank. `vercel-build` intentionally compiles without mutating production schema.
+8. Verify the deployed SHA returns `410` for connector setup/sync/webhook routes, action-case routes, the legacy sync worker, and the legacy savings-verification worker. Verify the deployed cron configuration contains neither retired worker path.
+9. Record the deployment time in IST. Wait at least five minutes after the last old sync, reminder, or savings-verification invocation finishes. Stop if an old invocation is still running or a new legacy invocation starts.
+10. From a trusted operator terminal, apply the additive chain from `0027` through the canonical head:
 
 ```bash
 DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
 ```
 
-10. Query `schema_migrations` and verify the last row is `0048_receipt_sender_provenance`.
-11. Verify PostgreSQL contains `connector_sync_jobs_recovery_cutover_guard`, `connector_evidence_running_job_guard`, and `renewal_alert_deliveries_recovery_cutover_guard`. Require zero connector jobs in `queued`, `running`, `failed`, or `paused`, zero connector runs in `running`, and zero legacy renewal deliveries in `scheduled`, `sending`, or `failed`.
-12. Run the fresh and staged upgrade migration tests against disposable PostgreSQL 16. The upgrade test must prove `0024`/`0025` leave old work operational before deployment and `0026` later rejects a new legacy job, reminder, and connector-evidence write.
+11. Query `schema_migrations` and verify the last row is `0053_phase_a_receipt_activation`.
+12. Verify PostgreSQL still contains the three cutover guards plus `recovery_inbound_alias_milestones_immutable`. Re-run the zero-nonterminal legacy queries from step 5.
+13. Run the fresh and staged upgrade migration tests against disposable PostgreSQL 16. The staged rehearsal must begin at the production resume point and end at `0053` without losing aliases, inbound events, Recovery evidence, commitments, corrections, or provenance.
 
 Expected success:
 
 - `/api/readiness` reports `capabilities.schema.status = ready`.
-- `capabilities.schema.status` is `ready`, and `capabilities.schema.applied` ends at `0048_receipt_sender_provenance`.
+- `capabilities.schema.status` is `ready`, and `capabilities.schema.applied` ends at `0053_phase_a_receipt_activation`.
 - `capabilities.recoveryV1.status = schema-ready-clean-cutover`.
 
-Stop before `0026` if the retired SHA is not live or old workers have not drained. Keep forwarding disabled and stop activation if checksums differ, the additive phase does not stop exactly at `0025`, any cutover trigger is absent, a nonterminal legacy row remains, a fresh database fails, or an upgrade loses legacy rows.
+Keep forwarding disabled and stop activation if the starting head is not exactly `0026`, the successful pre-`0053` backup/restore run is absent or stale, checksums differ, any cutover or milestone trigger is absent, a nonterminal legacy row remains, a fresh database fails, or an upgrade loses rows.
 
 ## Phase 2: Google Identity Only
 
@@ -188,7 +184,7 @@ Expected success:
 
 - Every endpoint probe passes.
 - `Recovery receipt inbox` is `READY`.
-- Feature migrations are `READY` through 0047.
+- Feature migrations are `READY` through `0053_phase_a_receipt_activation`.
 - Identity provider, persistent backend, shared rate limiting, privacy lifecycle, monitoring, backups, and any enabled billing/notification group are `READY`.
 - All retired connector endpoints return `410`.
 

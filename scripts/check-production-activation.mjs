@@ -81,7 +81,7 @@ const groups = [
   },
   {
     id: "feature-migrations",
-    label: "Feature migrations 0002 through 0052",
+    label: "Feature migrations 0002 through 0053",
     required: ["DATABASE_URL"],
     probe: isFeatureMigrationsReady,
     why: "Confirms the target database recorded every forward migration through the commitment graph and can query persistent capability schema.",
@@ -425,8 +425,8 @@ function isFeatureMigrationsReady({ endpointPayloads }) {
   const capabilities = endpointPayloads.readiness?.capabilities;
   if (!capabilities) return undefined;
   return capabilities.schema?.status === "ready"
-    && capabilities.schema.required?.includes("0052_recovery_correction_learning") === true
-    && capabilities.schema.applied?.includes("0052_recovery_correction_learning") === true
+    && capabilities.schema.required?.includes("0053_phase_a_receipt_activation") === true
+    && capabilities.schema.applied?.includes("0053_phase_a_receipt_activation") === true
     && capabilities.privacyLifecycle?.status !== "schema-query-failed"
     && capabilities.renewalAlerts?.status !== "schema-query-failed"
     && capabilities.commitmentDecisions?.status !== "schema-query-failed"

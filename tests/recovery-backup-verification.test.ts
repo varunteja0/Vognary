@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  pre0053IntegrityTriggers,
+  pre0053IntegrityMigrations,
   recoveryBackupVerificationMatches,
   requiredAutopilotAuditCountKeys,
   requiredAutopilotIntegrityMigrations,
@@ -11,6 +13,8 @@ import {
 
 function verification(auditFacts: Record<string, string> = {}) {
   return {
+    profile: "current",
+    migrationHead: "0053_phase_a_receipt_activation",
     requiredMigration: requiredRecoveryMigration,
     requiredIntegrityMigrations: [...requiredAutopilotIntegrityMigrations],
     integrityTriggers: [...requiredAutopilotIntegrityTriggers],
@@ -20,9 +24,44 @@ function verification(auditFacts: Record<string, string> = {}) {
   };
 }
 
-test("backup verification rejects matching manifests with zero Autopilot audit facts", () => {
+function pre0053Verification(counts: Record<string, string> = {}) {
+  return {
+    profile: "pre-0053",
+    migrationHead: "0026_recovery_inbound_retention",
+    requiredMigration: requiredRecoveryMigration,
+    requiredIntegrityMigrations: [...pre0053IntegrityMigrations],
+    integrityTriggers: [...pre0053IntegrityTriggers],
+    recoveryWorkspaceCounts: {
+      workspace_states: "0",
+      workspace_versions: "0",
+      submissions: "0",
+      sources: "0",
+      commitments: "0",
+      evidence: "0",
+      commitment_evidence: "0",
+      corrections: "0",
+      decisions: "0",
+      changes: "0",
+      idempotency_keys: "0",
+      inbound_aliases: "0",
+      inbound_events: "0",
+      inbound_replay_keys: "0",
+      ...counts,
+    },
+  };
+}
+
+test("pre-0053 verification accepts exact 0026 migrations, guards, and counts", () => {
+  const expected = pre0053Verification({ inbound_events: "3" });
+  const actual = pre0053Verification({ inbound_events: "3" });
+  assert.equal(recoveryBackupVerificationMatches(expected, actual), true);
+  actual.migrationHead = "0053_phase_a_receipt_activation";
+  assert.equal(recoveryBackupVerificationMatches(expected, actual), false);
+});
+
+test("backup verification accepts matching manifests with honestly empty Autopilot audit tables", () => {
   const empty = verification();
-  assert.equal(recoveryBackupVerificationMatches(empty, empty), false);
+  assert.equal(recoveryBackupVerificationMatches(empty, empty), true);
 });
 
 test("backup verification accepts matching manifests with persisted Autopilot audit facts", () => {

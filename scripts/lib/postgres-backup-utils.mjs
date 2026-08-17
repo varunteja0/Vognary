@@ -168,9 +168,13 @@ export async function runPostgresCommand(command, args, options = {}) {
 
   const volumes = options.volumes ?? [];
   const dockerEnvironment = postgresDockerEnvironment(options.env ?? process.env);
+  const localHostGateway = dockerEnvironment.PGHOST === "host.docker.internal"
+    ? ["--add-host", "host.docker.internal:host-gateway"]
+    : [];
   const dockerArgs = [
     "run",
     "--rm",
+    ...localHostGateway,
     ...volumes.flatMap((volume) => ["-v", `${volume.hostPath}:${volume.containerPath}`]),
     ...dockerEnvNames(dockerEnvironment).flatMap((name) => ["-e", name]),
     postgresClientImage,

@@ -14,6 +14,7 @@ import {
 import {
   readRecoveryBackupVerification,
   recoveryBackupVerificationMatches,
+  requiredRecoveryTablesForProfile,
   requiredAutopilotAuditCountKeys,
 } from "./lib/recovery-backup-verification.mjs";
 
@@ -128,38 +129,7 @@ async function verifyRestoredSchema(connectionString) {
       "connector_token_refs",
       "private_audit_leads",
       "connector_evidence",
-      "recovery_workspace_states",
-      "recovery_workspace_versions",
-      "recovery_submissions",
-      "recovery_sources",
-      "recovery_commitments",
-      "recovery_evidence",
-      "recovery_commitment_evidence",
-      "recovery_corrections",
-      "recovery_decisions",
-      "recovery_changes",
-      "recovery_idempotency_keys",
-      "recovery_standing_mandates",
-      "recovery_action_candidates",
-      "recovery_covered_windows",
-      "recovery_fee_ledger",
-      "recovery_execution_attempts",
-      "recovery_standing_mandate_events",
-      "recovery_candidate_events",
-      "recovery_operator_actions",
-      "recovery_classification_snapshots",
-      "recovery_executions",
-      "recovery_shadow_gate_snapshots",
-      "recovery_notice_delivery_events",
-      "recovery_autopilot_dead_letters",
-      "recovery_billing_year_anchors",
-      "recovery_notice_pending_events",
-      "recovery_connected_mandate_cohort",
-      "recovery_source_disconnections",
-      "recovery_inbound_aliases",
-      "recovery_inbound_events",
-      "recovery_inbound_sender_assessments",
-      "recovery_inbound_replay_keys",
+      ...requiredRecoveryTablesForProfile(manifest.verification?.profile),
     ];
     const result = await pool.query(
       `select table_name
@@ -172,12 +142,14 @@ async function verifyRestoredSchema(connectionString) {
     const missingTables = requiredTables.filter((tableName) => !restoredTables.has(tableName));
     if (missingTables.length) throw new Error(`Restore drill missing core tables: ${missingTables.join(", ")}`);
 
-    const recoveryVerification = await readRecoveryBackupVerification(pool);
-    const missingAuditCounts = requiredAutopilotAuditCountKeys.filter(
-      (key) => recoveryVerification.recoveryWorkspaceCounts?.[key] == null,
-    );
-    if (missingAuditCounts.length) {
-      throw new Error(`Restore drill missing audit table counts: ${missingAuditCounts.join(", ")}`);
+    const recoveryVerification = await readRecoveryBackupVerification(pool, manifest.verification?.profile);
+    if (manifest.verification?.profile === "current") {
+      const missingAuditCounts = requiredAutopilotAuditCountKeys.filter(
+        (key) => recoveryVerification.recoveryWorkspaceCounts?.[key] == null,
+      );
+      if (missingAuditCounts.length) {
+        throw new Error(`Restore drill missing audit table counts: ${missingAuditCounts.join(", ")}`);
+      }
     }
 
     return {

@@ -73,6 +73,7 @@ test("feature readiness checks every persistent capability migration with bounde
     "0050_recovery_commitment_lifecycle",
     "0051_recovery_change_signals",
     "0052_recovery_correction_learning",
+    "0053_phase_a_receipt_activation",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -118,6 +119,21 @@ test("CI executes the production schema against PostgreSQL before application ch
   assert.doesNotMatch(workflowSource, /signed-in-first-value|verified-savings-share|workspace-source-health|control-wiring-inventory|sample-workspace/);
 });
 
+test("production migration workflow requires a pre-0053 backup restore and exact live head", () => {
+  const workflow = read(".github/workflows/production-database-activation.yml");
+  assert.match(workflow, /apply-latest/);
+  assert.match(workflow, /APPLY_LATEST_PRODUCTION/);
+  assert.match(workflow, /backup_run_id/);
+  assert.match(workflow, /encrypted-postgres-backup-pre-0053/);
+  assert.match(workflow, /run\.conclusion !== "success"/);
+  assert.match(workflow, /ageMs > 24 \* 60 \* 60 \* 1000/);
+  assert.match(workflow, /state\.migration_head !== '0026_recovery_inbound_retention'/);
+  assert.match(workflow, /verification\.migration_head !== '0053_phase_a_receipt_activation'/);
+  assert.match(workflow, /recovery_inbound_alias_milestones_immutable/);
+  assert.doesNotMatch(workflow, /NEON_RESTORE_BRANCH_ID|backup\/pre-0053-/);
+  assert.doesNotMatch(workflow, /apply-0026|APPLY_0026_PRODUCTION/);
+});
+
 test("runtime and PostgreSQL tooling are pinned to one reproducible foundation", () => {
   const packageJson = JSON.parse(read("package.json")) as {
     engines?: { node?: string; npm?: string };
@@ -145,6 +161,15 @@ test("runtime and PostgreSQL tooling are pinned to one reproducible foundation",
   assert.match(backupWorkflow, new RegExp(`node-version: ["']?${nodeVersion}["']?`));
   assert.doesNotMatch(backupWorkflow, /apt-get install -y postgresql-client/);
   assert.equal((backupWorkflow.match(/POSTGRES_CLIENT_MODE: docker/g) ?? []).length, 2);
+  assert.match(backupWorkflow, /NEON_API_KEY/);
+  assert.match(backupWorkflow, /NEON_PROJECT_ID/);
+  assert.match(backupWorkflow, /verification_profile/);
+  assert.match(backupWorkflow, /pre-0053/);
+  assert.match(backupWorkflow, /BACKUP_VERIFICATION_PROFILE/);
+  assert.match(backupWorkflow, /postgres:18\.4@sha256:/);
+  assert.match(backupWorkflow, /vognary_restore_drill@127\.0\.0\.1:5432\/vognary_restore/);
+  assert.match(backupWorkflow, /retention-days: 90/);
+  assert.doesNotMatch(backupWorkflow, /secrets\.DATABASE_URL|secrets\.RESTORE_DATABASE_URL/);
   assert.doesNotMatch(backupWorkflow, /uses: actions\/(?:checkout|setup-node|upload-artifact)@v\d+/);
 
   const backupUtils = read("scripts/lib/postgres-backup-utils.mjs");
@@ -152,6 +177,7 @@ test("runtime and PostgreSQL tooling are pinned to one reproducible foundation",
   assert.match(backupUtils, /if \(!forceDocker && commandExists\(command\)\)/);
   assert.match(backupUtils, /export function postgresConnectionEnv/);
   assert.match(backupUtils, /export function postgresDockerEnvironment/);
+  assert.match(backupUtils, /host\.docker\.internal:host-gateway/);
   assert.match(read("scripts/backup-postgres.mjs"), /postgresConnectionEnv\(databaseUrl\)/);
   assert.match(read("scripts/restore-postgres-drill.mjs"), /postgresConnectionEnv\(restoreDatabaseUrl\)/);
   assert.match(read("scripts/restore-postgres-drill.mjs"), /"--dbname",[\s\S]*restoreConnectionEnv\.PGDATABASE/);
@@ -180,7 +206,7 @@ test("restore drills require Recovery v1 and report restored Recovery state", ()
     "recovery_autopilot_dead_letters",
     "recovery_source_disconnections",
   ]) {
-    assert.match(restore, new RegExp(`"${relation}"`));
+    assert.match(recoveryVerification, new RegExp(`"${relation}"`));
   }
   assert.match(recoveryVerification, /inbound_aliases/);
   assert.match(recoveryVerification, /inbound_events/);
@@ -196,8 +222,8 @@ test("restore drills require Recovery v1 and report restored Recovery state", ()
   assert.match(recoveryVerification, /recoveryWorkspaceCounts/);
   assert.match(restore, /manifest\.verification\?\.recoveryWorkspaceCounts/);
   assert.match(restore, /Recovery restore counts do not match the backup manifest/);
-  assert.match(restore, /commitment_evidence/);
-  assert.match(restore, /idempotency_keys/);
+  assert.match(recoveryVerification, /commitment_evidence/);
+  assert.match(recoveryVerification, /idempotency_keys/);
 });
 
 test("Vercel builds never race Recovery cutover migrations ahead of worker retirement", () => {
@@ -209,11 +235,12 @@ test("Vercel builds never race Recovery cutover migrations ahead of worker retir
   assert.equal(packageJson.scripts?.["vercel-build"], "node scripts/vercel-build.mjs");
   assert.doesNotMatch(build, /apply-postgres-schema|db:apply-schema/);
   assert.match(build, /\["run", "build"\]/);
-  assert.match(runbook, /db:apply-schema -- --through=0025_recovery_renewal_alerts/);
-  assert.match(runbook, /Verify `schema_migrations` ends at `0025_recovery_renewal_alerts`/);
+  assert.match(runbook, /ends exactly at `0026_recovery_inbound_retention`/);
+  assert.match(runbook, /encrypted-postgres-backup-pre-0053/);
   assert.match(runbook, /Deploy the exact candidate SHA/);
   assert.match(runbook, /Wait at least five minutes after the last old sync, reminder, or savings-verification invocation finishes/);
   assert.match(runbook, /DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema/);
+  assert.match(runbook, /last row is `0053_phase_a_receipt_activation`/);
 });
 
 test("CI browser journeys exercise the built Next.js production artifact", () => {
@@ -315,9 +342,9 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.match(source, /target activation evidence/);
   assert.match(source, /capabilities\?\.schema\?\.status === "ready"/);
   assert.match(source, /capabilities\.recoveryV1\?\.status === "schema-ready-clean-cutover"/);
-  assert.match(source, /Feature migrations 0002 through 0052/);
-  assert.match(source, /required\?\.includes\("0052_recovery_correction_learning"\)/);
-  assert.match(source, /applied\?\.includes\("0052_recovery_correction_learning"\)/);
+  assert.match(source, /Feature migrations 0002 through 0053/);
+  assert.match(source, /required\?\.includes\("0053_phase_a_receipt_activation"\)/);
+  assert.match(source, /applied\?\.includes\("0053_phase_a_receipt_activation"\)/);
   assert.match(source, /betaReady: endpointReport\.every\(\(item\) => item\.ok\)/);
   assert.match(source, /envReport\.filter\(\(item\) => item\.launchBlocking\)/);
   assert.match(source, /activationProfile = "receipt-forwarding"/);
@@ -381,5 +408,5 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.match(ci, /SMOKE_BASE_URL: http:\/\/127\.0\.0\.1:3000[\s\S]*SMOKE_ALLOW_UNCONFIGURED: "true"/);
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[410\]/);
-  assert.match(activation, /Feature migrations 0002 through 0052/);
+  assert.match(activation, /Feature migrations 0002 through 0053/);
 });

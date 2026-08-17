@@ -4,20 +4,25 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Inspect production or apply the final Recovery cutover migration
+        description: Inspect production, apply the canonical Phase A chain, or migrate legacy Recovery data
         required: true
         default: inspect
         type: choice
         options:
           - inspect
-          - apply-0026
+          - apply-latest
           - migrate-legacy
       confirmation:
-        description: Enter INSPECT_PRODUCTION, APPLY_0026_PRODUCTION, or MIGRATE_LEGACY_PRODUCTION
+        description: Enter INSPECT_PRODUCTION, APPLY_LATEST_PRODUCTION, or MIGRATE_LEGACY_PRODUCTION
         required: true
+        type: string
+      backup_run_id:
+        description: Successful pre-0053 Encrypted Backup Drill run ID; required for apply-latest
+        required: false
         type: string
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -38,17 +43,22 @@ jobs:
         env:
           OPERATION: ${{ inputs.operation }}
           CONFIRMATION: ${{ inputs.confirmation }}
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
         run: |
           set -euo pipefail
           expected=INSPECT_PRODUCTION
-          if [ "$OPERATION" = "apply-0026" ]; then
-            expected=APPLY_0026_PRODUCTION
+          if [ "$OPERATION" = "apply-latest" ]; then
+            expected=APPLY_LATEST_PRODUCTION
           fi
           if [ "$OPERATION" = "migrate-legacy" ]; then
             expected=MIGRATE_LEGACY_PRODUCTION
           fi
           if [ "$CONFIRMATION" != "$expected" ]; then
             echo "Confirmation does not match the selected operation." >&2
+            exit 1
+          fi
+          if [ "$OPERATION" = "apply-latest" ] && ! [[ "$BACKUP_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "apply-latest requires a numeric pre-0053 backup_run_id." >&2
             exit 1
           fi
 
@@ -60,6 +70,49 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - name: Verify the pre-migration encrypted backup and restore drill
+        if: inputs.operation == 'apply-latest'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          node <<'NODE'
+          const runId = process.env.BACKUP_RUN_ID;
+          const repository = process.env.REPOSITORY;
+          const token = process.env.GH_TOKEN;
+          async function github(path) {
+            const response = await fetch(`https://api.github.com/repos/${repository}${path}`, {
+              headers: {
+                accept: "application/vnd.github+json",
+                authorization: `Bearer ${token}`,
+                "x-github-api-version": "2022-11-28",
+              },
+            });
+            if (!response.ok) throw new Error(`GitHub API ${path} failed with HTTP ${response.status}.`);
+            return response.json();
+          }
+          const run = await github(`/actions/runs/${encodeURIComponent(runId)}`);
+          const ageMs = Date.now() - Date.parse(run.updated_at);
+          if (run.name !== "Encrypted Backup Drill"
+            || run.event !== "workflow_dispatch"
+            || run.head_branch !== "main"
+            || run.conclusion !== "success"
+            || !Number.isFinite(ageMs)
+            || ageMs < 0
+            || ageMs > 24 * 60 * 60 * 1000) {
+            throw new Error("The supplied backup run is not a successful main-branch drill from the last 24 hours.");
+          }
+          const artifacts = await github(`/actions/runs/${encodeURIComponent(runId)}/artifacts`);
+          const backup = (artifacts.artifacts ?? []).find((artifact) => (
+            artifact.name === "encrypted-postgres-backup-pre-0053"
+              && artifact.expired === false
+              && Number(artifact.size_in_bytes) > 0
+          ));
+          if (!backup) throw new Error("The backup run has no unexpired encrypted-postgres-backup-pre-0053 artifact.");
+          console.log(`Verified pre-0053 backup artifact from Actions run ${runId}.`);
+          NODE
 
       - name: Resolve the production database without exposing credentials
         run: |
@@ -167,12 +220,45 @@ jobs:
           }
           NODE
 
-      - name: Apply the final Recovery cutover migration
-        if: inputs.operation == 'apply-0026'
+      - name: Validate Phase A migration preconditions
+        if: inputs.operation == 'apply-latest'
+        run: |
+          node <<'NODE'
+          const { default: pg } = await import("pg");
+          const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+          try {
+            const result = await pool.query(`
+              select
+                (select id from schema_migrations order by id desc limit 1) as migration_head,
+                exists(select 1 from pg_trigger where tgname = 'connector_sync_jobs_recovery_cutover_guard') as connector_job_guard,
+                exists(select 1 from pg_trigger where tgname = 'connector_evidence_running_job_guard') as connector_evidence_guard,
+                exists(select 1 from pg_trigger where tgname = 'renewal_alert_deliveries_recovery_cutover_guard') as renewal_delivery_guard,
+                (select count(*)::int from connector_sync_jobs where status in ('queued', 'running', 'failed', 'paused')) as nonterminal_connector_jobs,
+                (select count(*)::int from connector_sync_runs where status = 'running') as running_connector_runs,
+                (select count(*)::int from renewal_alert_deliveries where recurring_item_id is not null and status in ('scheduled', 'sending', 'failed')) as nonterminal_legacy_reminders
+            `);
+            const state = result.rows[0];
+            console.log(JSON.stringify(state, null, 2));
+            if (state.migration_head !== '0026_recovery_inbound_retention'
+              || !state.connector_job_guard
+              || !state.connector_evidence_guard
+              || !state.renewal_delivery_guard
+              || state.nonterminal_connector_jobs !== 0
+              || state.running_connector_runs !== 0
+              || state.nonterminal_legacy_reminders !== 0) {
+              throw new Error("Phase A production migration preconditions failed.");
+            }
+          } finally {
+            await pool.end();
+          }
+          NODE
+
+      - name: Apply the canonical Phase A migration chain
+        if: inputs.operation == 'apply-latest'
         run: npm run db:apply-schema
 
-      - name: Verify the final Recovery cutover migration
-        if: inputs.operation == 'apply-0026'
+      - name: Verify the canonical Phase A migration chain
+        if: inputs.operation == 'apply-latest'
         run: |
           node <<'NODE'
           const { default: pg } = await import("pg");
@@ -184,10 +270,11 @@ jobs:
           try {
             const result = await pool.query(`
               select
-                exists(select 1 from schema_migrations where id = '0026_recovery_inbound_retention') as migration_applied,
+                (select id from schema_migrations order by id desc limit 1) as migration_head,
                 exists(select 1 from pg_trigger where tgname = 'connector_sync_jobs_recovery_cutover_guard') as connector_job_guard,
                 exists(select 1 from pg_trigger where tgname = 'connector_evidence_running_job_guard') as connector_evidence_guard,
                 exists(select 1 from pg_trigger where tgname = 'renewal_alert_deliveries_recovery_cutover_guard') as renewal_delivery_guard,
+                exists(select 1 from pg_trigger where tgname = 'recovery_inbound_alias_milestones_immutable') as receipt_milestone_guard,
                 (select count(*)::int from connector_sync_jobs
                   where status in ('queued', 'running', 'failed', 'paused')) as nonterminal_connector_jobs,
                 (select count(*)::int from connector_sync_runs where status = 'running') as running_connector_runs,
@@ -196,14 +283,15 @@ jobs:
             `);
             const verification = result.rows[0];
             console.log(JSON.stringify(verification, null, 2));
-            if (!verification.migration_applied
+            if (verification.migration_head !== '0053_phase_a_receipt_activation'
               || !verification.connector_job_guard
               || !verification.connector_evidence_guard
               || !verification.renewal_delivery_guard
+              || !verification.receipt_milestone_guard
               || verification.nonterminal_connector_jobs !== 0
               || verification.running_connector_runs !== 0
               || verification.nonterminal_legacy_reminders !== 0) {
-              throw new Error("The final Recovery cutover verification failed.");
+              throw new Error("The canonical Phase A migration verification failed.");
             }
           } finally {
             await pool.end();
