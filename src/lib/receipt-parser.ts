@@ -23,7 +23,9 @@ const merchantPatterns = [
 
 const mandateLikePattern = /pre-?debit|e-?mandate|\bmandate\b|standing instruction|autopay|auto-?debit/i;
 
-const amountPatternSource = "(?:(₹|Rs\\.?|INR|USD|EUR|GBP|CAD|AUD|KWD|JPY|US\\$|CA\\$|AU\\$|€|£|\\$)\\s*([0-9]{1,3}(?:,[0-9]{2,3})*(?:\\.[0-9]{1,3})?|[0-9]+(?:\\.[0-9]{1,3})?)|([0-9]{1,3}(?:,[0-9]{2,3})*(?:\\.[0-9]{1,3})?|[0-9]+(?:\\.[0-9]{1,3})?)\\s*(INR|USD|EUR|GBP|CAD|AUD|KWD|JPY))";
+// The grouped alternative requires at least one comma group, otherwise it would win
+// on a bare number by matching only its first 1-3 digits ("1500" -> "150").
+const amountPatternSource = "(?:(₹|Rs\\.?|INR|USD|EUR|GBP|CAD|AUD|KWD|JPY|US\\$|CA\\$|AU\\$|€|£|\\$)\\s*([0-9]{1,3}(?:,[0-9]{2,3})+(?:\\.[0-9]{1,3})?|[0-9]+(?:\\.[0-9]{1,3})?)|([0-9]{1,3}(?:,[0-9]{2,3})+(?:\\.[0-9]{1,3})?|[0-9]+(?:\\.[0-9]{1,3})?)\\s*(INR|USD|EUR|GBP|CAD|AUD|KWD|JPY))";
 const amountPattern = new RegExp(amountPatternSource, "i");
 const amountPatternGlobal = new RegExp(amountPatternSource, "gi");
 
@@ -262,10 +264,11 @@ function inferObservedDate(message: string) {
     );
     if (futurePaymentContextPattern.test(clause)) continue;
     if (!/^(?:payment|charge|debit)\s+date$/.test(label)) {
-      const previousClause = precedingReceiptLine(message, labelledDate.index ?? 0);
-      const completedHere = completedPaymentPattern.test(clause);
-      const completedInWrappedLine = completedPaymentPattern.test(previousClause) && amountPattern.test(previousClause);
-      if (!completedHere && !completedInWrappedLine) continue;
+      // Real receipts state "payment received" as a header line separate from the
+      // date line, so accept proof from anywhere in the same blank-line-delimited
+      // receipt block — never from a neighbouring receipt or a deflected sentence.
+      if (!clauseProvesCompletedPayment(clause)
+        && !receiptBlockProvesCompletedPayment(message, labelledDate.index ?? 0)) continue;
     }
     const parsed = parseLooseCalendarDate(labelledDate[2]);
     if (parsed) return parsed;
@@ -274,6 +277,34 @@ function inferObservedDate(message: string) {
 }
 
 const futurePaymentContextPattern = /\b(?:will|would|may|might|scheduled|expected|upcoming|pending|next|not)\b|pre-?debit/i;
+// "Payment received for the June invoice" proves a different document was paid.
+const deflectedPaymentPattern = /\b(?:paid|charged|debited|payment (?:received|successful|completed|was made))\b[^.;\n]{0,40}?\bfor\s+(?:\S+\s+){0,3}?(?:invoice|order|bill|statement|cycle|period)\b/i;
+
+function clauseProvesCompletedPayment(clause: string) {
+  return completedPaymentPattern.test(clause)
+    && !deflectedPaymentPattern.test(clause)
+    && !futurePaymentContextPattern.test(clause);
+}
+
+function receiptBlockProvesCompletedPayment(message: string, index: number) {
+  return enclosingReceiptBlock(message, index).split(/[.;\n]/).some(clauseProvesCompletedPayment);
+}
+
+function enclosingReceiptBlock(message: string, index: number) {
+  const separator = /\n\s*\n/g;
+  let blockStart = 0;
+  let blockEnd = message.length;
+  for (const gap of message.matchAll(separator)) {
+    const gapStart = gap.index ?? 0;
+    const gapEnd = gapStart + gap[0].length;
+    if (gapEnd <= index) blockStart = gapEnd;
+    else if (gapStart > index) {
+      blockEnd = gapStart;
+      break;
+    }
+  }
+  return message.slice(blockStart, blockEnd);
+}
 
 function boundedReceiptClause(message: string, start: number, end: number) {
   let clauseStart = start;
@@ -281,11 +312,6 @@ function boundedReceiptClause(message: string, start: number, end: number) {
   let clauseEnd = end;
   while (clauseEnd < message.length && !/[.;\n]/.test(message[clauseEnd])) clauseEnd += 1;
   return message.slice(clauseStart, clauseEnd);
-}
-
-function precedingReceiptLine(message: string, start: number) {
-  const prefix = message.slice(0, start).replace(/\n\s*$/, "");
-  return prefix.slice(prefix.lastIndexOf("\n") + 1).trim();
 }
 
 export function receiptNextDateIsExplicit(message: string): boolean {

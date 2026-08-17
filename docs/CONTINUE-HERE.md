@@ -8,23 +8,33 @@
 ## 1. Exact checkout
 
 - Folder: `/Users/varunteja/Desktop/CVT Group/Vognary`
-- Branch: `feat/autopilot-loop`; pushed HEAD `051444f` (`feat(autopilot): close release integrity gaps`)
+- Branch: `feat/autopilot-loop`
+- Safety commit `4fa6575` (`fix(recovery): honest cadence totals, receipt semantics, token-free veto, dead-code removal`) preserved the whole repair pass on top of `051444f` and is pushed.
+- This commit adds the two Opus-confirmed parser repairs on top of `4fa6575` and is the convergence candidate.
 - Do **not** `git worktree add ../vognary-*`, clone a sibling, or redo WP-A.
 - Parked copies: `.fallow/` (gitignored)
-- Founder authorized the safety commit and push of this branch. Do **not** open a PR until asked.
+- Founder authorized the safety commit, this commit, and the `main` convergence.
 
 ## 2. What is merged on `main`
 
-- `main` / `origin/main` remain at `b2355fb`. The safety candidate `051444f` is pushed only to `feat/autopilot-loop` and is not on `main`.
+- `main` / `origin/main` were at `b2355fb`. This release converges `main` by **fast-forward** to the tested `feat/autopilot-loop` head — no merge commit, no force-push. Verify the SHA with `git rev-parse main origin/main feat/autopilot-loop origin/feat/autopilot-loop`; all four must match before trusting this line.
 - WP-A PR #32 `2e3c776` · WP-A.1 PR #33 `d84e778` · WP-A.2 PR #34 `1542dda`
 - Recovery v1 PR #31. Public landing is still the audit generation.
 - Composite scoreboard remains **1.5**. Do not invent mandates, payments, or reviewer approvals.
 
-## 3. What is uncommitted on this branch
+## 3. What is committed on this branch
 
-Current repair delta on top of `051444f` (2026-08-17 IST): receipt parsing binds completed-payment context to the observed date clause, keeps invoice/order/billing/due and scheduled dates out of `observedDate`, selects a unique labelled paid/charged/total amount, rejects unresolved multi-amount receipts, maps KWD/JPY explicitly, and preserves labelled merchant identity through out-of-order multi-receipt persistence. Upcoming-only evidence is excluded from recent completed observations. Public veto uses a raw HTML route shell so the capability token is absent from RSC/hydration markup; 429/5xx/network failures keep a replay-safe client retry with outcome-unknown copy. Normal Home puts `Needs attention` before money summaries; active-mandate Home puts veto/exception controls first. Sources copy separates manual evidence from forwarding state and describes the surfaced Gmail confirmation flow. Internal and cron secrets fail closed below 32 UTF-8 bytes.
+Repair delta committed as `4fa6575` on top of `051444f` (2026-08-17 IST): receipt parsing binds completed-payment context to the observed date clause, keeps invoice/order/billing/due and scheduled dates out of `observedDate`, selects a unique labelled paid/charged/total amount, rejects unresolved multi-amount receipts, maps KWD/JPY explicitly, and preserves labelled merchant identity through out-of-order multi-receipt persistence. Upcoming-only evidence is excluded from recent completed observations. Public veto uses a raw HTML route shell so the capability token is absent from RSC/hydration markup; 429/5xx/network failures keep a replay-safe client retry with outcome-unknown copy. Normal Home puts `Needs attention` before money summaries; active-mandate Home puts veto/exception controls first. Sources copy separates manual evidence from forwarding state and describes the surfaced Gmail confirmation flow. Internal and cron secrets fail closed below 32 UTF-8 bytes.
 
-Focused repair evidence currently green: receipt parser **27/27**; veto retry browser **1/1**; merchant persistence PostgreSQL **1/1**; Home hierarchy browser **2/2**; source/Home contracts **29/29**. Final bounded lint/typecheck/unit/PostgreSQL/build/browser validation is still required before committing this delta. Public release blockers are unchanged: strict consented corpora, production migrations through `0047`, durable encrypted backup/restore proof, receipt-inbox launch attestation, retention scheduling, and one founder-proven provider route.
+Two parser repairs land in this commit on top of `4fa6575`, each written as a failing test first.
+
+**P0 — silent amount truncation (FIXED).** `amountPatternSource` let its comma-grouped alternative match zero comma groups, so the grouped branch won on an unseparated number and returned only its first 1–3 digits: `Rs. 1500` → `150`, `Rs. 12000` → `120`, `INR 125000` → `125`, `USD 1000` → `100`, `JPY 15000` → `150`, `EUR 2500.50` → `250`. Every downstream total was silently understated. The repair is one character in each of the two grouped alternatives — `(?:,[0-9]{2,3})*` → `(?:,[0-9]{2,3})+` — so a bare number falls through to the unrestricted numeric branch. No parser rewrite. Reproduced red, then green, with exact `amountDecimal` assertions for all seven cases plus preserved grouped/fractional cases `INR 4,229.00`, `INR 1,25,000.00`, `Rs. 649.00`, `KWD 3.250`.
+
+**P1 — real receipt header dates (FIXED).** Bare `Date:`, `Receipt date:`, and `Transaction date:` required completed-payment language in the same clause or the immediately wrapped line, which rejects the common real layout where `Payment received` is a header line above the date line. Those three labels now accept proof from the enclosing **blank-line-delimited receipt block**. Every safeguard is preserved and two are strengthened: invoice / order / billing / due dates are still never paid dates; the future-context guard now applies to the proving clause as well; a deflected sentence (`Payment received for the June invoice`) no longer lends completed meaning to another date, even inside the same clause; and proof cannot cross into a neighbouring receipt block. Behavioral fixtures cover Netflix, Spotify, Adobe, Google One, and Jio, alongside nine fail-closed proofs (invoice/due without payment evidence, deflected prior-document payment, future pre-debit, scheduled charge, conflicting finals).
+
+Final bounded validation on this checkout (2026-08-17 IST), each run once: `git diff --check` clean · `lint` **0 errors** (1 pre-existing `no-location-assign-relative-destination` warning in untouched `src/app/instant-audit.tsx`) · `typecheck` **PASS** · unit **687/687** · PostgreSQL **126/126** · production build **PASS** · focused browser E2E **56/56** across desktop-chromium and mobile-chromium (`recovery-customer-zero`, `recovery-ui-home`, `recovery-ui-states`, `autopilot-veto`) with **0 skipped**, covering realistic receipt ingestion, unknown-cadence money totals, Home, Sources, and the public veto transient/replay flow. One PostgreSQL run failed first on `cited amount changes invalidate the shadow hash …`; root cause is a pre-existing shared-database concurrency artifact — that assertion compares a **global** `connectedActiveMandates` count read twice while sibling `tests/postgres/*.test.ts` files run concurrently and delete their workspaces in between. It is not a parser defect: the file passes **40/40** in isolation and the full suite is **126/126** on re-run. Left untouched deliberately; a workspace-scoped funnel assertion is a P2 test-isolation item, not a release blocker.
+
+Public release blockers are unchanged: strict consented corpora, production migrations through `0047`, durable encrypted backup/restore proof, receipt-inbox launch attestation, retention scheduling, and one founder-proven provider route.
 
 Fail-closed Autopilot **engineering candidate**, not a live product. WP-C–E are **not** complete. Additive 0040 version-tags frozen notice hashes: genuine 0037 rows retry through the real store using their legacy hash, while new freezes use the tags-and-payload-version hash. Frozen notice identity is immutable on UPDATE and direct DELETE; whole-workspace privacy erasure still cascades. A candidate is current only when its classification snapshot is the latest for that commitment. Funnel, queue, authorization, execution, and reconnect restoration share that check. Reconnect re-runs evaluation and can restore an eligible candidate only to safe `SHADOW`; it never revives prior notice or authorization state. Exact recorded execution replay returns before evaluating gates for a new side effect, so a lost-response retry remains exact after source disconnection. Queued candidates still withdraw when **any cited snapshot evidence source** is disconnected, even if an unrelated workspace source remains. Connected-mandate / D30 / cohort still use workspace-level current-source SQL. 0038 still reconciles stale pending notice events that match an ACCEPTED `provider_message_id` and keeps one production-safe proven-id resolver. 0037 still restores 0023 evidence immutability (workspace-erasure only), keeps `recovery_connected_mandate_cohort` insert-once, and requires the persisted candidate clock plus a currently DELIVERED notice before authorization or execution. Invalid token coverage writes `NOTICE_TOKEN_COVERAGE_INVALID` instead of a silent DELIVERED row. Access export includes cohort and source-disconnection metadata and still excludes raw notice bodies, signed tokens, and extra PII. User-uploaded CSV is not regulated coverage. Honest EXCEPTION can be recorded while execution is off. Billing periods that cross the customer anniversary fail closed.
 
@@ -43,13 +53,19 @@ Final orchestrated release gate on this checkout (2026-08-16, through 0047): **P
 | D | Covered windows inspect the derived debit window (expected−1 through expected+3), do not collapse distinct same-day same-amount debits, and never treat user-uploaded CSV as regulated coverage. Fee periods that cross the customer billing anniversary fail closed. Fee periods are enforced non-overlapping per workspace+currency by PostgreSQL `btree_gist` exclusion, with an immutability trigger that also locks `year_start` / `finalized_at`. First-year billing uses a persisted 12-month customer anchor. Invoices are replay-safe on `inputs_hash`. Razorpay stays **FAIL_CLOSED**. |
 | E | Funnel counts connected active mandates and distinct currently eligible accounts from the candidate's cited snapshot. Eligible accounts require every cited evidence source to be currently connected **and** the candidate classification snapshot to be latest; D30 and connected-mandate counts still use workspace-level current-source SQL. `currentlyEligibleAccounts` is 0 unless notice switches are on and a catalog-proven zero-work provider id is present; test-env allowlists cannot activate production; reporting cannot inject proven IDs. Disabled providers are excluded. D30 uses insert-once `recovery_connected_mandate_cohort` (UPDATE/DELETE blocked except whole-workspace erasure). Source disconnection is a separate authorized fact (`POST .../sources/{id}/disconnect` and reconnect); evidence stays immutable. Disconnect before sign inserts no cohort and does not raise connected shadow counts. Disconnect after cohort keeps the D30 denominator and drops returned/connected/eligible counts. Reconnect evaluates the latest facts before restoring an eligible candidate to safe `SHADOW`; stale notice/authorization state is never revived. Missing cohort table reports D30 as unmeasured. Shadow gate 10/5/0 hashes cited facts. Gmail OAuth remains reserved until Google verification/CASA. |
 
-## 4. Current P0
+## 4. Release level — three different things
+
+- **CODE READY.** The committed tree passes every bounded gate above on this checkout. Engineering on this delta is frozen.
+- **PRODUCTION ACTIVATION NOT READY.** Production migrations stop at `0026` against a required chain through `0047`; durable encrypted backup storage and restore verification are not configured; receipt-inbox launch attestation is pending; retention scheduling is unverified; no founder-proven provider route exists; execution, notice, and receipt-inbox switches stay off. Nothing here may be described as live.
+- **MARKET NOT VALIDATED.** Zero real customers. Strict statement corpus **0/100** and strict receipt corpus **0/200** consented fixtures. Composite scoreboard remains **1.5**. Green gates are engineering evidence and raise no business row.
+
+## 5. Current P0
 
 Public release is blocked until production receives the verified additive migration chain through `0047`, durable encrypted backup storage passes restore verification, receipt-inbox launch attestations and retention scheduling are real, and the consented real corpora reach their strict thresholds. Separately, prove one real zero-chore provider route, then one India customer through mandate → delivered veto → supported cancel or honest exception → covered-window proof.
 
-Until that exists, do not call WP-C–E complete and do not merge.
+Until that exists, do not call WP-C–E complete and do not activate production.
 
-## 5. Next command / gate
+## 6. Next command / gate
 
 ```bash
 cd "/Users/varunteja/Desktop/CVT Group/Vognary"
@@ -63,7 +79,7 @@ VERCEL= npm run build && npm run perf:budget && VERCEL= npm run perf:lighthouse
 
 Quote the path. `DATABASE_URL` must be unset for `npm test`. Do not commit development-login values. `NODE_ENV=production` disables code login.
 
-## 6. Founder-only
+## 7. Founder-only
 
 - Phase A: 10 real ICP conversations. CRM is gitignored `docs/execution/private-autopilot-pilot-crm.csv` (sourced targets, not qualified prospects). Agents must not invent connected / mandate / paid. First 10 public-identity checks (2026-08-15) and founder-approval drafts live in gitignored `docs/execution/private-autopilot-outreach-draft.md`. Nothing sent.
 - Counsel / provider-authority validation for one merchant route. ChatGPT and Notion public help pages are login self-service, not zero-customer-work evidence.
@@ -72,7 +88,7 @@ Quote the path. `DATABASE_URL` must be unset for `npm test`. Do not commit devel
 - Razorpay + tax/legal/privacy before live charges. Webhook must validate the raw body.
 - Do not wait for Gmail or Razorpay to start shadow conversations.
 
-## 7. Ops (fail-closed)
+## 8. Ops (fail-closed)
 
 - **Kill switches:** `AUTOPILOT_EXECUTION_ENABLED`, `AUTOPILOT_NOTICE_ENABLED`, `AUTOPILOT_NOTICE_CHANNEL_READY` default off. Only the literal string `true` enables them. Blank env is NOT READY.
 - **Rollback:** leave the three switches false, keep `RESEND_NOTICE_WEBHOOK_SECRET` / `AUTOPILOT_VETO_TOKEN_SECRET` unset, redeploy. Do not drop 0033 through 0047. Emergency provider disable is founder/internal-operator only: `POST /api/internal/autopilot/providers/{id}/disable` with `INTERNAL_SYNC_SECRET`. Tenant admins cannot globally disable a provider.
