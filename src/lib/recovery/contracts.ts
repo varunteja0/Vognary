@@ -26,7 +26,7 @@ export type SourceType = (typeof sourceTypes)[number];
 export const receiptInboxAliasStates = ["ACTIVE", "ROTATED", "REVOKED"] as const;
 export type ReceiptInboxAliasState = (typeof receiptInboxAliasStates)[number];
 
-export const receiptInboxUpdateStates = ["UNAVAILABLE", "NOT_PROVISIONED", "WAITING", "RECEIVED", "PROCESSING", "READY", "FAILED", "REVOKED"] as const;
+export const receiptInboxUpdateStates = ["UNAVAILABLE", "NOT_PROVISIONED", "ROTATION_REQUIRED", "WAITING", "RECEIVED", "PROCESSING", "READY", "FAILED", "REVOKED"] as const;
 export type ReceiptInboxUpdateState = (typeof receiptInboxUpdateStates)[number];
 
 export const commitmentStatuses = ["ACTIVE", "NOT_RECURRING"] as const;
@@ -198,6 +198,12 @@ export type EvidenceDto = {
     kind: EvidenceProvenanceKind;
     reference: string;
   };
+  senderTrust: {
+    tier: SenderTrustTier;
+    fromDomain: string | null;
+    trustedAuthority: string | null;
+    reasons: readonly string[];
+  } | null;
   confidence: ConfidenceDto;
 };
 
@@ -508,6 +514,9 @@ export type ReceiptInboxStatusDto = {
   lastReceivedAt: string | null;
   lastProcessedAt: string | null;
   lastFailureCode: string | null;
+  setupCompletedAt: string | null;
+  forwardingVerifiedAt: string | null;
+  backfillCompletedAt: string | null;
   gmailVerification?: GmailForwardingVerificationDto | null;
 };
 

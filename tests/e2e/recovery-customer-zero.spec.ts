@@ -250,8 +250,10 @@ async function selectRecoveryView(page: Page, name: "Home" | "Subscriptions" | "
 async function openEvidenceInput(page: Page) {
   await selectRecoveryView(page, "Sources");
   const fallback = page.getByText("Manual fallback", { exact: true });
-  if (await fallback.isVisible()) await fallback.click();
-  await expect(page.getByLabel("Receipt or invoice text")).toBeVisible();
+  const receiptInput = page.getByLabel("Receipt or invoice text");
+  await expect(fallback).toBeVisible();
+  if (!(await receiptInput.isVisible())) await fallback.click();
+  await expect(receiptInput).toBeVisible();
 }
 
 async function openCommitment(page: Page, merchant: string) {

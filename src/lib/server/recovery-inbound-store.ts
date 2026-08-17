@@ -9,6 +9,7 @@ import { upsertConnectedAccount } from "@/lib/server/connector-token-store";
 import { getDatabasePool, isDatabaseConfigured } from "@/lib/server/database";
 import { checkFeatureReadiness } from "@/lib/server/feature-readiness";
 import { checkGoogleAuthConfiguration } from "@/lib/server/google-auth";
+import { recordConsentedProductEvent } from "@/lib/server/product-event-store";
 import { RecoveryServiceError } from "@/lib/server/recovery-api";
 import { checkTokenVaultConfiguration, decryptSecret, encryptSecret, type EncryptedSecret } from "@/lib/server/token-vault";
 
@@ -29,6 +30,7 @@ type ActiveAliasRow = {
   id: string;
   workspace_id: string;
   connected_account_id: string;
+  hmac_key_id: string;
   encrypted_display: EncryptedSecret;
   status: "ACTIVE";
   created_at: Date;
@@ -37,6 +39,9 @@ type ActiveAliasRow = {
   gmail_verification_code: string | null;
   gmail_verification_url: string | null;
   gmail_verification_received_at: Date | null;
+  setup_completed_at: Date | null;
+  forwarding_verified_at: Date | null;
+  backfill_completed_at: Date | null;
 };
 
 type MembershipRow = {
@@ -134,6 +139,7 @@ async function queryRequiredReceiptInboxMigrations() {
     "0025_recovery_renewal_alerts",
     "0026_recovery_inbound_retention",
     "0048_receipt_sender_provenance",
+    "0053_phase_a_receipt_activation",
   ];
   const result = await getDatabasePool().query<{ applied: number }>(
     `select count(*)::int as applied
@@ -164,7 +170,7 @@ export async function provisionReceiptInbox(input: { workspaceId: string; actorU
   const configuration = requireReceiptInboxConfiguration();
   return mutateReceiptInbox(input, async (client, actor) => {
     const existing = await readActiveAlias(client, input.workspaceId);
-    if (existing) return statusFromActiveAlias(existing);
+    if (existing) return statusFromActiveAlias(existing, configuration.hmacKeyId);
     await applyReceiptInboxRevocation(client, input);
 
     const consent = await recordConsentGrant({
@@ -193,8 +199,16 @@ export async function provisionReceiptInbox(input: { workspaceId: string; actorU
       actorUserId: input.actorUserId,
       configuration,
     });
+    await recordConsentedProductEvent({
+      workspaceId: input.workspaceId,
+      userId: input.actorUserId,
+      eventName: "receipt_setup.started",
+      occurredAt: alias.created_at.toISOString(),
+      source: "workspace-api",
+      status: "started",
+    }, client);
     await writeAudit(client, input.workspaceId, input.actorUserId, "recovery.receipt-inbox.provisioned", alias.id);
-    return statusFromActiveAlias(alias);
+    return statusFromActiveAlias(alias, configuration.hmacKeyId);
   });
 }
 
@@ -227,7 +241,7 @@ export async function rotateReceiptInbox(input: {
       const aliasId = typeof replayRow.response_payload.aliasId === "string" ? replayRow.response_payload.aliasId : "";
       const alias = await readAliasById(client, input.workspaceId, aliasId);
       if (!alias) throw new RecoveryServiceError("CONFLICT", "The replayed receipt address is no longer active.");
-      return statusFromActiveAlias(alias);
+      return statusFromActiveAlias(alias, configuration.hmacKeyId);
     }
 
     const active = await readActiveAlias(client, input.workspaceId);
@@ -269,7 +283,7 @@ export async function rotateReceiptInbox(input: {
       [input.workspaceId, input.idempotencyKey, operation, requestHash, next.id],
     );
     await writeAudit(client, input.workspaceId, input.actorUserId, "recovery.receipt-inbox.rotated", next.id);
-    return statusFromActiveAlias(next);
+    return statusFromActiveAlias(next, configuration.hmacKeyId);
   });
 }
 
@@ -363,7 +377,11 @@ async function invalidateInboundLeases(client: PoolClient, workspaceId: string, 
 
 export async function getReceiptInboxStatus(input: { workspaceId: string; actorUserId: string }): Promise<ReceiptInboxStatusDto> {
   if (getReceiptInboxConfiguration().status !== "ready") {
-    return { state: "UNAVAILABLE", alias: null, lastReceivedAt: null, lastProcessedAt: null, lastFailureCode: null };
+    return {
+      state: "UNAVAILABLE", alias: null, lastReceivedAt: null, lastProcessedAt: null,
+      lastFailureCode: null, setupCompletedAt: null, forwardingVerifiedAt: null,
+      backfillCompletedAt: null,
+    };
   }
   const client = await getDatabasePool().connect();
   try {
@@ -465,8 +483,10 @@ async function insertAlias(client: PoolClient, input: {
        hmac_key_id, encrypted_display, encryption_key_fingerprint,
        status, created_by_user_id
      ) values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, 'ACTIVE', $9)
-     returning id, workspace_id, connected_account_id, encrypted_display,
-               status, created_at, rotated_at, revoked_at`,
+    returning id, workspace_id, connected_account_id, hmac_key_id, encrypted_display,
+               status, created_at, rotated_at, revoked_at,
+               gmail_verification_code, gmail_verification_url, gmail_verification_received_at,
+               setup_completed_at, forwarding_verified_at, backfill_completed_at`,
     [
       id,
       input.workspaceId,
@@ -525,9 +545,10 @@ export async function lockReceiptInboxAuthority(
 
 async function readActiveAlias(client: PoolClient, workspaceId: string) {
   const result = await client.query<ActiveAliasRow>(
-    `select alias.id, alias.workspace_id, alias.connected_account_id, alias.encrypted_display,
+    `select alias.id, alias.workspace_id, alias.connected_account_id, alias.hmac_key_id, alias.encrypted_display,
             alias.status, alias.created_at, alias.rotated_at, alias.revoked_at,
-            alias.gmail_verification_code, alias.gmail_verification_url, alias.gmail_verification_received_at
+            alias.gmail_verification_code, alias.gmail_verification_url, alias.gmail_verification_received_at,
+            alias.setup_completed_at, alias.forwarding_verified_at, alias.backfill_completed_at
      from recovery_inbound_aliases alias
      join connected_accounts account
        on account.workspace_id = alias.workspace_id
@@ -544,9 +565,10 @@ async function readActiveAlias(client: PoolClient, workspaceId: string) {
 async function readAliasById(client: PoolClient, workspaceId: string, aliasId: string) {
   if (!aliasId) return null;
   const result = await client.query<ActiveAliasRow>(
-    `select id, workspace_id, connected_account_id, encrypted_display,
+    `select id, workspace_id, connected_account_id, hmac_key_id, encrypted_display,
             status, created_at, rotated_at, revoked_at,
-            gmail_verification_code, gmail_verification_url, gmail_verification_received_at
+            gmail_verification_code, gmail_verification_url, gmail_verification_received_at,
+            setup_completed_at, forwarding_verified_at, backfill_completed_at
      from recovery_inbound_aliases
      where workspace_id = $1 and id = $2 and status = 'ACTIVE'
      limit 1`,
@@ -573,7 +595,10 @@ async function readReceiptInboxStatusWithClient(client: PoolClient, workspaceId:
   );
   const latest = event.rows[0];
   if (active) {
-    const state = !latest
+    const configuration = requireReceiptInboxConfiguration();
+    const state = active.hmac_key_id !== configuration.hmacKeyId
+      ? "ROTATION_REQUIRED"
+      : !latest
       ? "WAITING"
       : latest.status === "RECEIVED"
         ? "RECEIVED"
@@ -588,6 +613,9 @@ async function readReceiptInboxStatusWithClient(client: PoolClient, workspaceId:
       lastReceivedAt: latest?.received_at.toISOString() ?? null,
       lastProcessedAt: latest?.processed_at?.toISOString() ?? null,
       lastFailureCode: latest?.error_code ?? null,
+      setupCompletedAt: active.setup_completed_at?.toISOString() ?? null,
+      forwardingVerifiedAt: active.forwarding_verified_at?.toISOString() ?? null,
+      backfillCompletedAt: active.backfill_completed_at?.toISOString() ?? null,
       gmailVerification: gmailVerificationDto(active),
     };
   }
@@ -605,12 +633,15 @@ async function readReceiptInboxStatusWithClient(client: PoolClient, workspaceId:
     lastReceivedAt: latest?.received_at.toISOString() ?? null,
     lastProcessedAt: latest?.processed_at?.toISOString() ?? null,
     lastFailureCode: latest?.error_code ?? null,
+    setupCompletedAt: null,
+    forwardingVerifiedAt: null,
+    backfillCompletedAt: null,
     gmailVerification: null,
   };
 }
 
 function gmailVerificationDto(alias: ActiveAliasRow) {
-  if (!alias.gmail_verification_received_at) return null;
+  if (alias.forwarding_verified_at || !alias.gmail_verification_received_at) return null;
   return {
     code: alias.gmail_verification_code,
     verificationUrl: alias.gmail_verification_url,
@@ -634,13 +665,16 @@ export async function recordGmailForwardingVerification(input: {
   );
 }
 
-function statusFromActiveAlias(alias: ActiveAliasRow): ReceiptInboxStatusDto {
+function statusFromActiveAlias(alias: ActiveAliasRow, currentHmacKeyId: string): ReceiptInboxStatusDto {
   return {
-    state: "WAITING",
+    state: alias.hmac_key_id === currentHmacKeyId ? "WAITING" : "ROTATION_REQUIRED",
     alias: aliasDto(alias),
     lastReceivedAt: null,
     lastProcessedAt: null,
     lastFailureCode: null,
+    setupCompletedAt: alias.setup_completed_at?.toISOString() ?? null,
+    forwardingVerifiedAt: alias.forwarding_verified_at?.toISOString() ?? null,
+    backfillCompletedAt: alias.backfill_completed_at?.toISOString() ?? null,
     gmailVerification: gmailVerificationDto(alias),
   };
 }

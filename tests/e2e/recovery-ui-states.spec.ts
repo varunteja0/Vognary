@@ -10,6 +10,7 @@ import type { HomeProjectionDto } from "../../src/lib/recovery/contracts";
 
 const email = process.env.VOGNARY_E2E_DEV_LOGIN_EMAIL;
 const accessCode = process.env.VOGNARY_E2E_DEV_LOGIN_CODE;
+const receiptInboxE2e = process.env.VOGNARY_E2E_RECEIPT_INBOX === "true";
 
 test.skip(!email || !accessCode, "development login env not configured");
 
@@ -119,8 +120,10 @@ async function mockEmptyWorkspace(page: Page, home = emptyHome) {
 async function openManualFallback(page: Page) {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
   const fallback = page.getByText("Manual fallback", { exact: true });
-  if (await fallback.isVisible()) await fallback.click();
-  await expect(page.getByLabel("Receipt or invoice text")).toBeVisible();
+  const receiptInput = page.getByLabel("Receipt or invoice text");
+  await expect(fallback).toBeVisible();
+  if (!(await receiptInput.isVisible())) await fallback.click();
+  await expect(receiptInput).toBeVisible();
 }
 
 test("an empty workspace offers exactly one obvious receipt-paste action", async ({ page }) => {
@@ -183,6 +186,89 @@ test("one observed charge asks for a matching receipt instead of rendering an al
   await expect(page.getByRole("heading", { name: "Sources", exact: true })).toBeVisible();
   await expect(page.getByLabel("Receipt or invoice text")).toBeVisible();
   expect(activationCalls).toEqual([]);
+});
+
+test("receipt onboarding shows proven forwarding, backfill, and sender trust", async ({ page }) => {
+  test.skip(!receiptInboxE2e, "receipt inbox E2E environment not configured");
+  await signIn(page);
+  await mockEmptyWorkspace(page, oneObservationHome);
+  await page.route("**/api/workspaces/current/sources", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      data: {
+        state: "READY",
+        alias: {
+          id: "11111111-1111-4111-8111-111111111111",
+          status: "ACTIVE",
+          address: "rcpt_0123456789abcdef0123456789abcdef01234567@receipts.vognary.test",
+          createdAt: "2026-08-10T10:00:00.000Z",
+          rotatedAt: null,
+          revokedAt: null,
+        },
+        lastReceivedAt: "2026-08-10T10:05:00.000Z",
+        lastProcessedAt: "2026-08-10T10:06:00.000Z",
+        lastFailureCode: null,
+        setupCompletedAt: "2026-08-10T10:06:00.000Z",
+        forwardingVerifiedAt: "2026-08-10T10:06:00.000Z",
+        backfillCompletedAt: "2026-08-10T10:06:00.000Z",
+        gmailVerification: null,
+      },
+      meta,
+    }),
+  }));
+  await page.route("**/api/workspaces/current/evidence/evidence-once-1", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      data: {
+        id: "evidence-once-1",
+        source: {
+          id: "source-1",
+          type: "FORWARDED_EMAIL",
+          label: "Forwarded receipt",
+          ingestedAt: "2026-08-10T10:06:00.000Z",
+          coverageStart: "2026-08-09",
+          coverageEnd: "2026-08-09",
+        },
+        immutable: true,
+        observedAt: "2026-08-09T00:00:00.000Z",
+        excerpt: "Figma invoice paid INR 1,499.00 on 9 August 2026.",
+        excerptTruncated: false,
+        amount: { currency: "INR", minor: "149900", exponent: 2, display: "₹1,499.00" },
+        date: "2026-08-09",
+        provenance: { kind: "PROVIDER_RECEIVED", reference: "submission-1:source-1:1" },
+        senderTrust: {
+          tier: "VERIFIED_SENDER",
+          fromDomain: "figma.com",
+          trustedAuthority: "amazonses.com",
+          reasons: ["amazonses.com reported aligned mail authentication for figma.com."],
+        },
+        confidence: { state: "LOW", score: 55, scale: "PERCENT_0_100", reasons: ["One saved observation."] },
+      },
+      meta,
+    }),
+  }));
+
+  await page.goto("/app");
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await expect(page.getByRole("heading", { name: "Finish receipt forwarding" })).toBeVisible();
+  await expect(page.getByText("Forwarding address verified")).toBeVisible();
+  await expect(page.getByText("Receipt flow proven")).toBeVisible();
+  await expect(page.getByText("Historical backfill complete")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Google's forwarding instructions" })).toHaveAttribute("href", /answer\/10957/);
+  await expect(page.getByRole("link", { name: "Google's filter instructions" })).toHaveAttribute("href", /answer\/6579/);
+  await expect(page.getByRole("link", { name: "Google's attachment instructions" })).toHaveAttribute("href", /answer\/9261412/);
+  await expectNoSeriousAxeViolations(page, "receipt onboarding");
+
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Home" }).click();
+  await page.getByRole("button", { name: "Inspect exact evidence" }).click();
+  const evidenceDialog = page.getByRole("dialog", { name: "Exact evidence" });
+  await expect(evidenceDialog.getByText("Sender authentication")).toBeVisible();
+  await expect(evidenceDialog.getByText("Verified by the receiving provider")).toBeVisible();
+  await expect(evidenceDialog.getByText("Sender domain: figma.com")).toBeVisible();
+  await expect(evidenceDialog.getByText("Receiving authority: amazonses.com")).toBeVisible();
+  await expectNoSeriousAxeViolations(page, "sender trust inspector");
 });
 
 async function expectNoSeriousAxeViolations(page: Page, label: string) {

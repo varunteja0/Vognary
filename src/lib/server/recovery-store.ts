@@ -44,7 +44,7 @@ import {
   lockAutopilotAuthorityGate,
   refreshAutopilotCandidates,
 } from "@/lib/server/recovery-autopilot-store";
-import { recordProductEvent } from "@/lib/server/product-event-store";
+import { recordConsentedProductEvent } from "@/lib/server/product-event-store";
 import { lockReceiptInboxAuthority } from "@/lib/server/recovery-inbound-store";
 import {
   extractObservedReceipt,
@@ -179,6 +179,10 @@ type EvidenceRow = {
   next_expected_date: Date | string | null;
   provenance_kind: EvidenceProvenanceKind;
   provenance_reference: string;
+  sender_trust_tier: SenderProvenanceDto["tier"] | null;
+  sender_from_domain: string | null;
+  sender_trusted_authority: string | null;
+  sender_trust_reasons: string[] | null;
   confidence_state: "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN";
   confidence_score: number | null;
   confidence_reasons: string[];
@@ -291,6 +295,7 @@ export async function materializeForwardedEmailEvidence(input: {
   providerEventId: string;
   expectedAttemptCount: number;
   currencyHint?: ReceiptCurrencyHint | null;
+  historicalBackfillClientRefs?: readonly string[];
   request: ForwardedEmailMaterializationRequest;
   now?: Date;
   afterAuthorityInspection?: () => Promise<void>;
@@ -504,6 +509,76 @@ export async function materializeForwardedEmailEvidence(input: {
     if (completedEvent.rowCount !== 1) {
       throw new RecoveryServiceError("CONFLICT", "Receipt processing lease changed before completion.");
     }
+    if (accepted && eventRow.alias_id) {
+      const acceptedBackfillRefs = new Set(
+        (input.historicalBackfillClientRefs ?? []).map((clientRef) => `client-${sha256(clientRef).slice(0, 16)}`),
+      );
+      const acceptedBackfillCount = materialized.results.filter((result) => (
+        result.status === "ACCEPTED" && acceptedBackfillRefs.has(result.clientRef)
+      )).length;
+      const milestones = await client.query<{
+        setup_completed_at: Date;
+        forwarding_verified_at: Date | null;
+        backfill_completed_at: Date | null;
+      }>(
+        `update recovery_inbound_aliases
+         set setup_completed_at = coalesce(setup_completed_at, greatest($3, created_at)),
+             forwarding_verified_at = case
+               when gmail_verification_received_at is not null
+                 then coalesce(forwarding_verified_at, greatest($3, created_at))
+               else forwarding_verified_at
+             end,
+             backfill_completed_at = case
+               when $4::int > 0 then coalesce(backfill_completed_at, greatest($3, created_at))
+               else backfill_completed_at
+             end,
+             gmail_verification_code = case when gmail_verification_received_at is not null then null else gmail_verification_code end,
+             gmail_verification_url = case when gmail_verification_received_at is not null then null else gmail_verification_url end,
+             gmail_verification_received_at = case when gmail_verification_received_at is not null then null else gmail_verification_received_at end
+         where workspace_id = $1 and id = $2 and status = 'ACTIVE'
+         returning setup_completed_at, forwarding_verified_at, backfill_completed_at`,
+        [input.workspaceId, eventRow.alias_id, now, acceptedBackfillCount],
+      );
+      const milestone = milestones.rows[0];
+      if (milestone) {
+        await recordConsentedProductEvent({
+          workspaceId: input.workspaceId,
+          eventName: "receipt_setup.completed",
+          occurredAt: milestone.setup_completed_at.toISOString(),
+          source: "workspace-api",
+          status: "succeeded",
+        }, client);
+        if (milestone.forwarding_verified_at) {
+          await recordConsentedProductEvent({
+            workspaceId: input.workspaceId,
+            eventName: "receipt_forwarding.verified",
+            occurredAt: milestone.forwarding_verified_at.toISOString(),
+            source: "workspace-api",
+            status: "succeeded",
+          }, client);
+        }
+        if (milestone.backfill_completed_at) {
+          await recordConsentedProductEvent({
+            workspaceId: input.workspaceId,
+            eventName: "receipt_backfill.completed",
+            occurredAt: milestone.backfill_completed_at.toISOString(),
+            source: "workspace-api",
+            status: "succeeded",
+            metrics: { recordsSeen: acceptedBackfillCount },
+          }, client);
+        }
+      }
+      if (commitmentTotal > 0) {
+        await recordConsentedProductEvent({
+          workspaceId: input.workspaceId,
+          eventName: "commitments.detected",
+          occurredAt: now.toISOString(),
+          source: "workspace-api",
+          status: "succeeded",
+          metrics: { commitmentsDetected: commitmentTotal },
+        }, client);
+      }
+    }
     stage = "AUDIT";
     await writeRecoveryAudit(client, input.workspaceId, null, "recovery.forwarded-email.materialized", submissionRow.id, {
       actorKind: "system",
@@ -607,11 +682,24 @@ export async function getRecoveryEvidence(input: {
               evidence.currency, evidence.evidence_date, evidence.direction,
               evidence.cadence_hint, evidence.next_expected_date,
               evidence.provenance_kind, evidence.provenance_reference,
+              sender_assessment.trust_tier as sender_trust_tier,
+              sender_assessment.from_domain as sender_from_domain,
+              sender_assessment.trusted_authority as sender_trusted_authority,
+              sender_assessment.reasons as sender_trust_reasons,
               evidence.confidence_state, evidence.confidence_score,
               evidence.confidence_reasons, evidence.created_at
        from recovery_evidence evidence
        join recovery_sources source
          on source.workspace_id = evidence.workspace_id and source.id = evidence.source_id
+       left join lateral (
+         select assessment.trust_tier, assessment.from_domain,
+                assessment.trusted_authority, assessment.reasons
+         from recovery_inbound_sender_assessments assessment
+         where assessment.workspace_id = evidence.workspace_id
+           and assessment.source_id = evidence.source_id
+         order by assessment.assessed_at desc, assessment.id desc
+         limit 1
+       ) sender_assessment on true
        where evidence.workspace_id = $1 and evidence.id = $2
        limit 1`,
       [input.workspaceId, input.evidenceId],
@@ -1008,6 +1096,17 @@ async function mutateCorrection(input: {
       correctionRow.id,
       { commitmentId: input.commitmentId, field: correctionRow.field, workspaceVersion },
     );
+    if (!input.reverseCorrectionId) {
+      await recordConsentedProductEvent({
+        workspaceId: input.workspaceId,
+        userId: input.actorUserId,
+        eventName: "correction.recorded",
+        occurredAt: correctionRow.created_at.toISOString(),
+        source: "workspace-api",
+        status: "succeeded",
+        metrics: { correctionsRecorded: 1 },
+      }, client);
+    }
     await client.query("commit");
     return { data, workspaceVersion, replayed: false };
   } catch (error) {
@@ -1144,7 +1243,7 @@ async function persistSubmissionSources(client: PoolClient, input: {
         input.envelope.capturedAt,
       ],
     );
-    await recordProductEvent({
+    await recordConsentedProductEvent({
       workspaceId: input.workspaceId,
       eventName: "source.connected",
       source: "workspace-api",
@@ -2165,6 +2264,10 @@ async function buildCommitmentDetail(
               evidence.currency, evidence.evidence_date, evidence.direction,
               evidence.cadence_hint, evidence.next_expected_date,
               evidence.provenance_kind, evidence.provenance_reference,
+              sender_assessment.trust_tier as sender_trust_tier,
+              sender_assessment.from_domain as sender_from_domain,
+              sender_assessment.trusted_authority as sender_trusted_authority,
+              sender_assessment.reasons as sender_trust_reasons,
               evidence.confidence_state, evidence.confidence_score,
               evidence.confidence_reasons, evidence.created_at, link.linked_at
        from recovery_commitment_evidence link
@@ -2172,6 +2275,15 @@ async function buildCommitmentDetail(
          on evidence.workspace_id = link.workspace_id and evidence.id = link.evidence_id
        join recovery_sources source
          on source.workspace_id = evidence.workspace_id and source.id = evidence.source_id
+       left join lateral (
+         select assessment.trust_tier, assessment.from_domain,
+                assessment.trusted_authority, assessment.reasons
+         from recovery_inbound_sender_assessments assessment
+         where assessment.workspace_id = evidence.workspace_id
+           and assessment.source_id = evidence.source_id
+         order by assessment.assessed_at desc, assessment.id desc
+         limit 1
+       ) sender_assessment on true
        where link.workspace_id = $1 and link.commitment_id = $2
          and ($3::timestamptz is null or (link.linked_at, link.evidence_id) < ($3::timestamptz, $4::uuid))
        order by link.linked_at desc, link.evidence_id desc
@@ -2218,11 +2330,24 @@ async function loadAllEvidenceRows(client: PoolClient, workspaceId: string) {
             evidence.currency, evidence.evidence_date, evidence.direction,
             evidence.cadence_hint, evidence.next_expected_date,
             evidence.provenance_kind, evidence.provenance_reference,
+            sender_assessment.trust_tier as sender_trust_tier,
+            sender_assessment.from_domain as sender_from_domain,
+            sender_assessment.trusted_authority as sender_trusted_authority,
+            sender_assessment.reasons as sender_trust_reasons,
             evidence.confidence_state, evidence.confidence_score,
             evidence.confidence_reasons, evidence.created_at
      from recovery_evidence evidence
      join recovery_sources source
        on source.workspace_id = evidence.workspace_id and source.id = evidence.source_id
+     left join lateral (
+       select assessment.trust_tier, assessment.from_domain,
+              assessment.trusted_authority, assessment.reasons
+       from recovery_inbound_sender_assessments assessment
+       where assessment.workspace_id = evidence.workspace_id
+         and assessment.source_id = evidence.source_id
+       order by assessment.assessed_at desc, assessment.id desc
+       limit 1
+     ) sender_assessment on true
      where evidence.workspace_id = $1
      order by evidence.created_at asc, evidence.id asc`,
     [workspaceId],
@@ -2276,6 +2401,12 @@ function toEvidenceDto(row: EvidenceRow): EvidenceDto {
     amount: row.amount_minor !== null && row.currency ? toMoneyDto(row.amount_minor, row.currency) : null,
     date: toDateOnly(row.evidence_date),
     provenance: { kind: row.provenance_kind, reference: row.provenance_reference },
+    senderTrust: row.sender_trust_tier ? {
+      tier: row.sender_trust_tier,
+      fromDomain: row.sender_from_domain,
+      trustedAuthority: row.sender_trusted_authority,
+      reasons: row.sender_trust_reasons ?? [],
+    } : null,
     confidence: {
       state: row.confidence_state,
       score: row.confidence_score,

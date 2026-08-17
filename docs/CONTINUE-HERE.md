@@ -5,10 +5,18 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## 0. Founder scope freeze — current strategy
+
+- Canonical product: Vognary automatically knows what a 2–20 person software/AI company is committed to paying for software, shows what is coming, what changed, and why it believes every conclusion.
+- First ICP: 2–20 person software/AI companies without finance/procurement ops.
+- First rail: billing-email / receipt forwarding. Long-term vision: the control layer for recurring money.
+- Only production usability for the first 10 ICP users is in scope. Do not resume Phase B/C/D, merchant identity, absence, alerts, cancellation/autonomous action, AA/banks, Gmail OAuth, generic SaaS management, budgeting, procurement, SSO/SCIM, seats, architecture, or redesign work until real users select it.
+
 ## 1. Exact checkout
 
 - Folder: `/Users/varunteja/Desktop/CVT Group/Vognary`
-- Branch: `feat/commitment-graph`, converged to `main` by fast-forward.
+- Branch: `main`.
+- Operations commits `5b983bf` and `f9b8a14` are pushed. They add the guarded `0053` migration and exact pre/current encrypted backup-restore profiles.
 - Safety commit `4fa6575` (`fix(recovery): honest cadence totals, receipt semantics, token-free veto, dead-code removal`) preserved the whole repair pass on top of `051444f` and is pushed.
 - The commitment-graph delta (Phase B/C/D engineering) sits on top of `dce0e5c` and is the convergence candidate.
 - Do **not** `git worktree add ../vognary-*`, clone a sibling, or redo WP-A.
@@ -22,7 +30,9 @@
 - Recovery v1 PR #31. Public landing is still the audit generation.
 - Composite scoreboard remains **1.5**. Do not invent mandates, payments, or reviewer approvals.
 
-## 3. What is committed on this branch
+## 3. Historical implementation record
+
+The detailed implementation notes below are retained for audit history. Their old activation blocker statements are superseded by sections 4–5.
 
 ### Commitment graph — Phase B/C/D engineering (additive `0049`–`0052`, this delta)
 
@@ -101,15 +111,22 @@ Final orchestrated release gate on this checkout (2026-08-16, through 0047): **P
 
 ## 4. Release level — three different things
 
-- **CODE READY.** The committed tree passes every bounded gate above on this checkout. Engineering on this delta is frozen.
-- **PRODUCTION ACTIVATION NOT READY.** Production migrations stop at `0026` against a required chain through `0052`; durable encrypted backup storage and restore verification are not configured; receipt-inbox launch attestation is pending; retention scheduling is unverified; no founder-proven provider route exists; execution, notice, receipt-inbox and email-notification switches stay off. Nothing here may be described as live.
-- **MARKET NOT VALIDATED.** Zero real customers. Strict statement corpus **0/100** and strict receipt corpus **0/200** consented fixtures. Composite scoreboard remains **1.5**. Green gates are engineering evidence and raise no business row.
+- **PHASE A CODE READY.** Lint has 0 errors (1 pre-existing warning), typecheck/claims/tokens pass, unit **862/862**, PostgreSQL **153/153**, focused receipt-inbox **18/18**, Customer #0 desktop/mobile **2/2**, UI states/onboarding/trust desktop/mobile **16/16**, production build and performance budget pass.
+- **PRODUCTION SCHEMA READY.** GitHub run `32018769474` applied and verified all 53 migrations through `0053_phase_a_receipt_activation`; Neon independently reports both new integrity guards and unchanged core row counts.
+- **PRE-MIGRATION RECOVERY PROVEN.** GitHub run `32018501900` encrypted the exact `0026` production database, restored it into PostgreSQL 18, and retained nonempty artifact `encrypted-postgres-backup-pre-0053` until 2026-11-15.
+- **PRODUCTION ACTIVATION BLOCKED.** Vercel receipt-inbox environment variables cannot be installed from this session because no valid Vercel login/token is available; durable object-storage credentials are absent; launch attestations remain blank; no post-deploy real receipt/replay has succeeded. Receipt forwarding must remain unavailable.
+- **MARKET NOT VALIDATED.** Zero first-ICP users have completed the production flow. Green engineering gates do not raise the business-validation row.
 
 ## 5. Current P0
 
-Public release is blocked until production receives the verified additive migration chain through `0052`, durable encrypted backup storage passes restore verification, receipt-inbox launch attestations and retention scheduling are real, and the consented real corpora reach their strict thresholds. Separately, prove one real zero-chore provider route, then one India customer through mandate → delivered veto → supported cancel or honest exception → covered-window proof.
+Exact remaining activation blockers:
 
-Until that exists, do not call WP-C–E complete and do not activate production.
+1. Authenticate to the linked Vercel project and install the prepared receipt-inbox environment, keeping `ENABLE_RECEIPT_INBOX=false` and attestations blank for the first deploy.
+2. Configure durable S3/R2-compatible storage and restore the uploaded encrypted object; a 90-day GitHub artifact is recovery evidence but does not satisfy durable-storage readiness.
+3. Deploy the Phase A runtime, rotate the two legacy `receipt-alias-v1` aliases to `receipt-alias-v2`, then replay/send one real receipt and verify processing plus replay idempotency.
+4. Only after retained evidence exists, set provider/webhook/replay/retention attestations and enable the inbox.
+
+Do not start another product phase.
 
 ## 6. Next command / gate
 
@@ -140,5 +157,5 @@ Quote the path. `DATABASE_URL` must be unset for `npm test`. Do not commit devel
 - **Rollback:** leave the three switches false, keep `RESEND_NOTICE_WEBHOOK_SECRET` / `AUTOPILOT_VETO_TOKEN_SECRET` unset, redeploy. Do not drop 0033 through 0052. Emergency provider disable is founder/internal-operator only: `POST /api/internal/autopilot/providers/{id}/disable` with `INTERNAL_SYNC_SECRET`. Tenant admins cannot globally disable a provider.
 - **SLOs (alert when breached after go-live, not before):** notice queue age > 15m; delivery failure rate > 5%; veto path 5xx; authorization without delivered+elapsed 48h; attempt latency > 2m; protected leakage > 0; verification pending > 7d; fee insert conflict/failure. Dead letters: `recovery_autopilot_dead_letters`.
 - **Threat model:** signed veto token is capability-bearing; mandate/veto/operator/notice webhook/provider attempt/proof/fee/refund/kill-switch are privileged. No signed text, raw proof, or message bodies in product events.
-- **Backup:** restore verification requires Autopilot audit tables/triggers and additive integrity migrations `0045`, `0046`, `0047`, `0048`, `0049`, `0050`, `0051`, and `0052`. Workspace activation uniqueness is `0041`; semantic reset `0042`; semantic-version marker `0043`; audit-row DELETE lock `0044`; mandate/execution immutability `0045`; billed-window update/delete immutability `0046`; billed-period insert serialization `0047`; receipt sender-provenance immutability `0048`; merchant-identity currency guard and append-only signals `0049`; commitment lifecycle with the settlement reservation and append-only cancellation events `0050`; change-signal citation and delivery-proof constraints `0051`; correction-learning structural-feature guard `0052`. A disposable `pg_dump`/`pg_restore` through 0047 is rehearsed locally; encrypted durable production backup remains founder-owned and currently unconfigured.
+- **Backup:** exact `0026` and `0053` `pg_dump`/`pg_restore` profiles pass locally. Production pre-migration encryption/restore is proven by run `32018501900`. Durable object storage remains unconfigured and must not be called READY.
 - **Autopilot scheduler:** `GET /api/internal/autopilot/due/run` is CRON_SECRET-gated. It is **not** in `vercel.json` (Hobby two-cron cap: renewal alerts + retention). Notices/execution still no-op unless those switches are the literal string `true`.

@@ -187,6 +187,8 @@ export function RecoverySources({
 
             <ReceiptInboxState status={receiptInbox} />
 
+            <ReceiptForwardingSetup receiptInbox={receiptInbox} />
+
             {receiptInbox.state === "READY" ? (
               <div className="border-t border-line pt-5">
                 <h4 className="font-display text-lg font-semibold text-(--ink)">Keep Vognary current</h4>
@@ -223,6 +225,64 @@ export function RecoverySources({
         <div className="border-t border-line p-4 sm:p-6">{manualFallback}</div>
       </details>
     </div>
+  );
+}
+
+function ReceiptForwardingSetup({ receiptInbox }: { receiptInbox: ReceiptInboxStatusDto }) {
+  return (
+    <section aria-labelledby="receipt-forwarding-setup" className="border-t border-line pt-5">
+      <h4 id="receipt-forwarding-setup" className="font-display text-lg font-semibold text-(--ink)">Finish receipt forwarding</h4>
+      <ol className="mt-3 border-t border-line">
+        <li className="border-b border-line py-4">
+          <p className="text-sm font-semibold text-(--ink)">1. Address ready</p>
+          <p className="mt-1 text-sm leading-6 text-(--muted)">Use the private address above only for software billing mail.</p>
+        </li>
+        <li className="border-b border-line py-4">
+          <p className="text-sm font-semibold text-(--ink)">
+            2. {receiptInbox.forwardingVerifiedAt ? "Forwarding address verified" : "Verify the forwarding address"}
+          </p>
+          {receiptInbox.forwardingVerifiedAt ? (
+            <p className="mt-1 text-sm leading-6 text-(--muted)">Verified {formatMoment(receiptInbox.forwardingVerifiedAt)} after a receipt reached this address.</p>
+          ) : (
+            <p className="mt-1 text-sm leading-6 text-(--muted)">
+              On a computer, open Gmail Settings, then See all settings, Forwarding and POP/IMAP, and Add a forwarding address. Paste the private address, choose Next and Proceed, then return here for Google&apos;s confirmation link or code.
+            </p>
+          )}
+          <a href="https://support.google.com/mail/answer/10957?hl=en" target="_blank" rel="noreferrer noopener" className="mt-2 inline-block text-sm font-medium text-(--accent-strong) underline underline-offset-4">
+            Google&apos;s forwarding instructions
+          </a>
+        </li>
+        <li className="border-b border-line py-4">
+          <p className="text-sm font-semibold text-(--ink)">
+            3. {receiptInbox.setupCompletedAt ? "Receipt flow proven" : "Create billing-only filters"}
+          </p>
+          <p className="mt-1 text-sm leading-6 text-(--muted)">
+            Keep global forwarding disabled. For each known billing sender, select one receipt in Gmail, choose More, Filter messages like these, Create filter, Forward it to, this private address, then Create filter. Filters affect new matching mail only.
+          </p>
+          {receiptInbox.setupCompletedAt ? (
+            <p className="mt-1 text-xs leading-5 text-(--muted)">A receipt was accepted {formatMoment(receiptInbox.setupCompletedAt)}.</p>
+          ) : null}
+          <a href="https://support.google.com/mail/answer/6579?hl=en" target="_blank" rel="noreferrer noopener" className="mt-2 inline-block text-sm font-medium text-(--accent-strong) underline underline-offset-4">
+            Google&apos;s filter instructions
+          </a>
+        </li>
+        <li className="py-4">
+          <p className="text-sm font-semibold text-(--ink)">
+            4. {receiptInbox.backfillCompletedAt ? "Historical backfill complete" : "Backfill historical billing email"}
+          </p>
+          {receiptInbox.backfillCompletedAt ? (
+            <p className="mt-1 text-sm leading-6 text-(--muted)">A historical receipt batch was accepted {formatMoment(receiptInbox.backfillCompletedAt)}.</p>
+          ) : (
+            <p className="mt-1 text-sm leading-6 text-(--muted)">
+              In Gmail on a computer, select old software billing emails in batches of up to 20, choose More, Forward as attachment, address the message to your private address, and send. Vognary marks this complete only after an attached receipt is accepted.
+            </p>
+          )}
+          <a href="https://support.google.com/mail/answer/9261412?hl=en" target="_blank" rel="noreferrer noopener" className="mt-2 inline-block text-sm font-medium text-(--accent-strong) underline underline-offset-4">
+            Google&apos;s attachment instructions
+          </a>
+        </li>
+      </ol>
+    </section>
   );
 }
 
@@ -294,6 +354,12 @@ function ReceiptInboxState({ status }: { status: ReceiptInboxStatusDto }) {
     detail: string;
     tone: "neutral" | "caution";
   }> = {
+    ROTATION_REQUIRED: {
+      eyebrow: "Rotation required",
+      title: "Create a new receipt address before forwarding more mail",
+      detail: "This address was created with an older routing key that is no longer available. Use Rotate address below. The old address does not count as a healthy source.",
+      tone: "caution" as const,
+    },
     WAITING: {
       eyebrow: "Waiting",
       title: "Waiting for a receipt",

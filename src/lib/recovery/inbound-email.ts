@@ -30,6 +30,8 @@ export type GmailForwardingVerification = {
 export type ForwardedEmailExtraction = {
   texts: ForwardedReceiptText[];
   skippedAttachments: string[];
+  nestedReceiptCount: number;
+  nestedReceiptClientRefs: string[];
   currencyHint: ReceiptCurrencyHint | null;
   gmailVerification: GmailForwardingVerification | null;
 };
@@ -49,6 +51,8 @@ export async function extractForwardedReceiptTexts(
   const extraction: ForwardedEmailExtraction = {
     texts: [],
     skippedAttachments: [],
+    nestedReceiptCount: 0,
+    nestedReceiptClientRefs: [],
     currencyHint: null,
     gmailVerification: null,
   };
@@ -205,7 +209,12 @@ function addText(
   const digest = createHash("sha256").update(bounded).digest("hex");
   if (seen.has(digest)) return;
   seen.add(digest);
-  extraction.texts.push({ clientRef: `forwarded-${depth}-${digest.slice(0, 20)}`, text: bounded, provenance });
+  const clientRef = `forwarded-${depth}-${digest.slice(0, 20)}`;
+  extraction.texts.push({ clientRef, text: bounded, provenance });
+  if (depth > 0) {
+    extraction.nestedReceiptCount += 1;
+    extraction.nestedReceiptClientRefs.push(clientRef);
+  }
 }
 
 function byteLength(value: string | Uint8Array) {

@@ -24,6 +24,19 @@
 
 Prior-generation material lives only in `docs/archive/`. Treat it as history, not instructions.
 
+### 0.1 Founder scope freeze — 2026-08-17
+
+Until measured first-user evidence invalidates it, the canonical product is:
+
+> **Vognary automatically knows what a 2–20 person software/AI company is committed to paying for software, shows what is coming, what changed, and why it believes every conclusion.**
+
+- First ICP: 2–20 person software/AI companies without dedicated finance/procurement ops.
+- First rail: billing email / receipt forwarding.
+- Product path: sign up → private alias → automatic forwarding → historical backfill → cited recurring-software picture → upcoming money → correction → honest source health.
+- Long-term vision: the control layer for recurring money.
+- Engineering stops after the production path, one real automatic receipt, first-10 instrumentation, and clean pushed `main` are proven.
+- Sections describing Autopilot phases remain historical implementation context, not permission to build Phase B/C/D. Do not build merchant identity, absence, alerts, cancellation/autonomous action, AA/bank rails, Gmail OAuth, generic SaaS management, budgeting, procurement, SSO/SCIM, seats, new architecture, or a redesign without real-user evidence and a new founder decision.
+
 ---
 
 ## 1. One-line identity (every feature must serve this)

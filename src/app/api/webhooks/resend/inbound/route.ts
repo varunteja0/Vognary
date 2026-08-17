@@ -1,5 +1,6 @@
 import { rateLimit } from "@/lib/rate-limit";
 import { isDatabaseConfigured } from "@/lib/server/database";
+import { reportServerError } from "@/lib/server/monitoring";
 import { getReceiptInboxConfiguration } from "@/lib/server/recovery-inbound-store";
 import {
   createResendInboundHandler,
@@ -16,6 +17,11 @@ export async function POST(request: Request) {
 
   const handler = createResendInboundHandler({
     signingSecret: readiness.configuration.webhookSecret,
+    reportProcessingFailure: (error, context) => reportServerError(error, {
+      path: "/api/webhooks/resend/inbound",
+      method: "POST",
+      headers: {},
+    }, context),
     processReceived: async (event) => {
       const rate = await rateLimit(request, {
         namespace: "resend-inbound-webhook",

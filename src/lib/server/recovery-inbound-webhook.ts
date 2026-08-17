@@ -33,6 +33,7 @@ type ResendInboundProcessor = (event: ResendReceivedEvent) => Promise<{
 export function createResendInboundHandler(input: {
   signingSecret: string;
   processReceived: ResendInboundProcessor;
+  reportProcessingFailure?: (error: Error, context: Record<string, unknown>) => Promise<void>;
 }) {
   const webhook = new Webhook(input.signingSecret);
 
@@ -86,6 +87,10 @@ export function createResendInboundHandler(input: {
       });
       return genericResponse(result.status);
     } catch (error) {
+      await input.reportProcessingFailure?.(
+        new Error("Receipt inbox processing will retry."),
+        { boundary: "receipt-inbound-webhook", outcome: "retry" },
+      ).catch(() => undefined);
       if (error instanceof ResendInboundRetryableError) return genericResponse("retry", 503);
       return genericResponse("retry", 503);
     }

@@ -34,8 +34,7 @@ export async function GET(request: Request) {
   const renewalAlertEmail = checkRenewalAlertEmailConfiguration();
   const schemaDegraded = database.status === "ready" && features.schema.status !== "ready";
   const receiptInboxLaunch = getReceiptInboxLaunchReadiness();
-  const receiptInboxMigrationsReady = features.schema.applied?.includes("0024_recovery_inbound_receipts") === true
-    && features.schema.applied?.includes("0026_recovery_inbound_retention") === true;
+  const receiptInboxMigrationsReady = features.schema.applied?.includes("0053_phase_a_receipt_activation") === true;
 
   return Response.json({
     service: "vognary-web",
@@ -74,7 +73,7 @@ export async function GET(request: Request) {
         : "activation-pending",
       receiptInboxMissing: [
         ...receiptInboxLaunch.missing,
-        ...(receiptInboxMigrationsReady ? [] : ["migrations 0024 and 0026"]),
+        ...(receiptInboxMigrationsReady ? [] : ["migration 0053_phase_a_receipt_activation"]),
       ],
       sessionCookies: session.status,
       workspaceAuthorization: database.status === "ready" && session.status === "ready" ? "primitives-ready-no-login" : "not-ready",

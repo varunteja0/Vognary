@@ -2,6 +2,7 @@ import pg from "pg";
 
 const { Pool } = pg;
 const databaseUrl = process.env.DATABASE_URL;
+const receiptAliasHmacKeyId = process.env.RECEIPT_INBOX_ALIAS_HMAC_KEY_ID?.trim() || null;
 
 if (!databaseUrl) {
   console.error("DATABASE_URL is required to report the Vognary funnel.");
@@ -46,6 +47,54 @@ try {
       ),
       commitments: await count(client, "select count(*)::text as n from recovery_commitments"),
       decisions: await count(client, "select count(*)::text as n from recovery_decisions"),
+    };
+
+    const first10Row = (await client.query(
+      `select
+         (select count(distinct workspace_id)::text from recovery_inbound_aliases) as setup_started,
+         (select count(distinct workspace_id)::text from recovery_inbound_aliases where setup_completed_at is not null) as setup_completed,
+         (select count(distinct workspace_id)::text from recovery_inbound_aliases where forwarding_verified_at is not null) as forwarding_verified,
+         (select count(distinct workspace_id)::text from recovery_inbound_aliases where backfill_completed_at is not null) as backfill_completed,
+         (select count(distinct workspace_id)::text from recovery_commitments) as commitments_detected,
+         (select count(*)::text from recovery_corrections) as user_correction_count,
+         (select percentile_cont(0.5) within group (
+            order by (metrics ->> 'secondsToTrustworthyPicture')::double precision
+          )
+          from product_events
+          where event_name = 'workspace.activated'
+            and metrics ? 'secondsToTrustworthyPicture') as median_seconds_to_trustworthy_picture,
+         (select count(distinct alias.workspace_id)::text
+          from recovery_inbound_aliases alias
+          where alias.status = 'ACTIVE'
+              and $1::text is not null
+              and alias.hmac_key_id = $1
+            and alias.setup_completed_at is not null
+            and exists (
+              select 1
+              from recovery_inbound_events event
+              where event.workspace_id = alias.workspace_id
+                and event.alias_id = alias.id
+                and event.status = 'PROCESSED'
+                and event.processed_at >= now() - interval '45 days'
+            )) as sources_remaining_healthy,
+         (select count(*)::text from product_events where event_name = 'workspace.returned') as return_visits,
+            (select count(*)::text from product_events where event_name = 'billing.checkout_started') as checkout_attempts`,
+         [receiptAliasHmacKeyId],
+          )).rows[0] ?? {};
+    const first10Experiment = {
+      setupStarted: Number(first10Row.setup_started ?? 0),
+      setupCompleted: Number(first10Row.setup_completed ?? 0),
+      forwardingVerified: Number(first10Row.forwarding_verified ?? 0),
+      backfillCompleted: Number(first10Row.backfill_completed ?? 0),
+      commitmentsDetected: Number(first10Row.commitments_detected ?? 0),
+      userCorrectionCount: Number(first10Row.user_correction_count ?? 0),
+      medianSecondsToTrustworthyPicture: first10Row.median_seconds_to_trustworthy_picture === null
+        || first10Row.median_seconds_to_trustworthy_picture === undefined
+        ? null
+        : Number(first10Row.median_seconds_to_trustworthy_picture),
+      sourcesRemainingHealthy: Number(first10Row.sources_remaining_healthy ?? 0),
+      returnVisits: Number(first10Row.return_visits ?? 0),
+      checkoutAttempts: Number(first10Row.checkout_attempts ?? 0),
     };
 
     const dailyActiveUsers = (await client.query(
@@ -93,6 +142,7 @@ try {
       signups,
       dailySignups,
       activation,
+      first10Experiment,
       returnVisits: {
         dailyActiveUsers,
         usersWithTwoOrMoreActiveDays: returningUsers,
@@ -109,6 +159,8 @@ try {
     console.log("");
     console.log(`Signups: ${signups.total} total (${signups.last7Days} in 7d, ${signups.last30Days} in 30d)`);
     console.log(`Activated workspaces (saved evidence): ${activation.workspacesWithEvidence}`);
+    console.log(`Receipt setup: ${first10Experiment.setupCompleted}/${first10Experiment.setupStarted} completed`);
+    console.log(`Forwarding verified: ${first10Experiment.forwardingVerified}; backfills completed: ${first10Experiment.backfillCompleted}`);
     console.log(`Users returning on 2+ days: ${returningUsers}`);
     console.log(
       report.returnVisits.d30.rate === null || report.returnVisits.d30.eligibleUsers === 0

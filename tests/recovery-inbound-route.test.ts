@@ -105,10 +105,14 @@ test("signed unrelated events are acknowledged without provider processing", asy
 });
 
 test("retryable processing errors return a generic 503 without provider or receipt detail", async () => {
+  const reports: { error: Error; context: Record<string, unknown> }[] = [];
   const handler = createResendInboundHandler({
     signingSecret,
     processReceived: async () => {
       throw new ResendInboundRetryableError("provider API returned secret body");
+    },
+    reportProcessingFailure: async (error, context) => {
+      reports.push({ error, context });
     },
   });
   const response = await handler(signedRequest(event));
@@ -116,6 +120,14 @@ test("retryable processing errors return a generic 503 without provider or recei
   const payload = await response.json();
   assert.deepEqual(payload, { status: "retry" });
   assert.doesNotMatch(JSON.stringify(payload), /provider|secret|OpenAI/i);
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].error.message, "Receipt inbox processing will retry.");
+  const reported = JSON.stringify(reports[0]);
+  assert.doesNotMatch(reported, /OpenAI|provider API|secret body|rcpt_|email-1|msg_|subject|recipient|payload/i);
+  assert.deepEqual(reports[0].context, {
+    boundary: "receipt-inbound-webhook",
+    outcome: "retry",
+  });
 });
 
 function signedRequest(payload: object) {

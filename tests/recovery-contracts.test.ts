@@ -94,6 +94,7 @@ const evidence = {
   amount: money,
   date: "2026-07-06",
   provenance: { kind: "USER_SUBMITTED", reference: "submission-1:1" },
+  senderTrust: null,
   confidence,
 } as const;
 const commitment = {
@@ -261,7 +262,7 @@ test("Recovery v1 freezes every product enum exhaustively", () => {
   assert.deepEqual(coverageStates, ["NO_EVIDENCE", "BASELINE_ONLY", "PARTIAL", "CURRENT", "STALE"]);
   assert.deepEqual(evidenceProvenanceKinds, ["USER_SUBMITTED", "PROVIDER_RECEIVED"]);
   assert.deepEqual(receiptInboxAliasStates, ["ACTIVE", "ROTATED", "REVOKED"]);
-  assert.deepEqual(receiptInboxUpdateStates, ["UNAVAILABLE", "NOT_PROVISIONED", "WAITING", "RECEIVED", "PROCESSING", "READY", "FAILED", "REVOKED"]);
+  assert.deepEqual(receiptInboxUpdateStates, ["UNAVAILABLE", "NOT_PROVISIONED", "ROTATION_REQUIRED", "WAITING", "RECEIVED", "PROCESSING", "READY", "FAILED", "REVOKED"]);
   assert.deepEqual(recoveryErrorCodes, ["AUTH_REQUIRED", "FORBIDDEN", "NOT_FOUND", "INVALID_EVIDENCE", "PARSE_FAILED", "DUPLICATE_EVIDENCE", "DATABASE_UNAVAILABLE", "CONFLICT", "STALE_STATE", "SAVE_FAILED", "REQUEST_TOO_LARGE", "UNSUPPORTED_MEDIA_TYPE", "FEATURE_UNAVAILABLE", "RATE_LIMITED", "UNKNOWN"]);
   assert.equal(Object.keys(decisionLabels).length, decisions.length);
   assert.equal(Object.keys(cadenceLabels).length, cadences.length);
@@ -477,6 +478,9 @@ test("first ingestion is an honest baseline and all payloads round-trip as produ
     lastReceivedAt: null,
     lastProcessedAt: null,
     lastFailureCode: null,
+    setupCompletedAt: null,
+    forwardingVerifiedAt: null,
+    backfillCompletedAt: null,
   } as const satisfies ReceiptInboxStatusDto;
 
   for (const payload of [receiptRequest, csvRequest, submitResponse, homeResponse, listResponse, detailResponse, decisionRequest, decisionResponse, reverseResponse, session, signedOutSession, receiptInbox, correctionHistory, allChangeVariants]) {

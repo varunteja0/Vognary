@@ -28,6 +28,14 @@ export const productEventNames = [
   "verification.pending",
   "invoice.created",
   "source.connected",
+  "receipt_setup.started",
+  "receipt_setup.completed",
+  "receipt_forwarding.verified",
+  "receipt_backfill.completed",
+  "commitments.detected",
+  "correction.recorded",
+  "source.health_observed",
+  "workspace.returned",
 ] as const;
 
 export const productEventSources = ["sync-runner", "living-ledger", "workspace-api", "product-ui"] as const;
@@ -38,6 +46,10 @@ export const productEventMetricNames = [
   "transactionsWritten",
   "commitmentsTouched",
   "usageObservationsWritten",
+  "commitmentsDetected",
+  "correctionsRecorded",
+  "healthySources",
+  "secondsToTrustworthyPicture",
 ] as const;
 
 export type ProductEventName = typeof productEventNames[number];

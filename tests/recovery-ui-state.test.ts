@@ -72,6 +72,9 @@ const receiptInbox = {
   lastReceivedAt: "2026-08-10T10:05:00.000Z",
   lastProcessedAt: null,
   lastFailureCode: null,
+  setupCompletedAt: null,
+  forwardingVerifiedAt: null,
+  backfillCompletedAt: null,
 } as const satisfies ReceiptInboxStatusDto;
 
 const failure = (error: TransportFailure["error"], origin: TransportFailure["origin"] = "SERVER"): TransportFailure => ({ ok: false, origin, error });

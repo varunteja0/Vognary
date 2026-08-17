@@ -49,6 +49,7 @@ const clientSource = sourceOf("recovery-workspace-client.tsx");
 const commitmentsSource = sourceOf("recovery-commitments.tsx");
 const dialogSource = sourceOf("recovery-dialog.tsx");
 const statesSource = sourceOf("recovery-states.tsx");
+const evidencePanelsSource = sourceOf("recovery-evidence-panels.tsx");
 const landingSource = readFileSync("src/app/launch-landing.tsx", "utf8");
 const loginSource = readFileSync("src/app/login/login-client.tsx", "utf8");
 const appPageSource = readFileSync("src/app/app/page.tsx", "utf8");
@@ -277,6 +278,31 @@ test("Sources makes receipt forwarding primary and keeps manual evidence behind 
   assert.doesNotMatch(clientSource, /workspaceEmpty && state\.view === "HOME"/);
 });
 
+test("Sources carries a user through billing-only forwarding and historical backfill", () => {
+  for (const copy of [
+    "Address ready",
+    "Verify the forwarding address",
+    "Keep global forwarding disabled",
+    "Filter messages like these",
+    "Forward it to",
+    "Filters affect new matching mail only",
+    "Forward as attachment",
+    "batches of up to 20",
+    "Forwarding address verified",
+    "Receipt flow proven",
+    "Historical backfill complete",
+  ]) {
+    assert.ok(sourcesSource.includes(copy), `Sources onboarding must render ${copy}`);
+  }
+  assert.match(sourcesSource, /receiptInbox\.setupCompletedAt/);
+  assert.match(sourcesSource, /receiptInbox\.forwardingVerifiedAt/);
+  assert.match(sourcesSource, /receiptInbox\.backfillCompletedAt/);
+  assert.match(sourcesSource, /support\.google\.com\/mail\/answer\/10957/);
+  assert.match(sourcesSource, /support\.google\.com\/mail\/answer\/6579/);
+  assert.match(sourcesSource, /support\.google\.com\/mail\/answer\/9261412/);
+  assert.doesNotMatch(sourcesSource, /Forward a copy of incoming mail to/);
+});
+
 test("rollback notices name every failed authority action instead of calling it evidence", () => {
   for (const label of [
     "signing the standing mandate",
@@ -294,6 +320,24 @@ test("rollback notices name every failed authority action instead of calling it 
 test("customer confidence copy uses bounded words without publishing heuristic percentages", () => {
   assert.doesNotMatch(statesSource, /confidence\.score\}%|Score \$\{confidence\.score\}/);
   assert.match(statesSource, /confidence level/i);
+});
+
+test("the evidence inspector names sender trust without exposing raw mail headers", () => {
+  for (const copy of [
+    "Sender authentication",
+    "Verified by the receiving provider",
+    "Known sender",
+    "Sender not verified",
+    "Sender authentication raised concerns",
+    "Receiving authority",
+  ]) {
+    assert.ok(evidencePanelsSource.includes(copy), `evidence inspector must render ${copy}`);
+  }
+  assert.match(evidencePanelsSource, /evidence\.senderTrust/);
+  assert.match(evidencePanelsSource, /senderTrust\.fromDomain/);
+  assert.match(evidencePanelsSource, /senderTrust\.trustedAuthority/);
+  assert.match(evidencePanelsSource, /senderTrust\.reasons/);
+  assert.doesNotMatch(evidencePanelsSource, /Authentication-Results|DKIM-Signature|fromAddress|displayName/);
 });
 
 test("money is only ever the server's own display string", () => {

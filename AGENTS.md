@@ -13,8 +13,12 @@
 
 ## 1. What we are building
 
-Evidence-first **recurring-money autopilot**, India-first, honesty-enforced.
-Loop: passive evidence → cited classification → deterministic rules → 48h veto → supported discretionary execution → proof → covered clean windows → outcome billing.
+**Founder scope freeze (2026-08-17):** Vognary automatically knows what a 2–20 person software/AI company is committed to paying for software, shows what is coming, what changed, and why it believes every conclusion. The first evidence rail is billing-email / receipt forwarding. The long-term vision is the control layer for recurring money.
+
+Current loop: private receipt alias → automatic forwarding + historical backfill → sender provenance → cited recurring commitments → upcoming money → user correction → honest source health.
+
+Only complete production usability for the first 10 ICP users. Do **not** build merchant identity, absence, alerts, cancellation/autonomous action, Account Aggregator, bank integrations, Gmail OAuth, generic SaaS management, budgeting, procurement, SSO/SCIM, seats, new architecture, or another redesign until real users invalidate the freeze.
+
 AI must **cite or shut up**. Never invent amounts, merchants, or connector liveness.
 
 ## 2. Working rules

@@ -14,6 +14,13 @@ import {
 import type { CorrectionDraft } from "./state";
 import { ConfidenceBadge, ConfidenceDetail, MoneyValue } from "./recovery-states";
 
+const senderTrustLabels: Record<NonNullable<EvidenceDto["senderTrust"]>["tier"], string> = {
+  VERIFIED_SENDER: "Verified by the receiving provider",
+  KNOWN_SENDER: "Known sender",
+  UNVERIFIED_SENDER: "Sender not verified",
+  SUSPICIOUS_SENDER: "Sender authentication raised concerns",
+};
+
 // Evidence and correction surfaces. Every field shown here is copied from the
 // server DTO; nothing is recomputed, reformatted as money, or filled in.
 
@@ -79,11 +86,33 @@ export function EvidenceInspector({ evidence }: { evidence: EvidenceDto }) {
           <p className="mt-1 font-data text-xs text-(--muted)">Reference {evidence.provenance.reference}</p>
           <p className="mt-1 font-data text-xs text-(--muted)">Immutable: this evidence can never be edited, only corrected above it.</p>
         </Fact>
+        {evidence.senderTrust ? <SenderTrust evidence={evidence} /> : null}
       </div>
       <Fact label="Confidence and uncertainty">
         <ConfidenceDetail confidence={evidence.confidence} />
       </Fact>
     </div>
+  );
+}
+
+function SenderTrust({ evidence }: { evidence: EvidenceDto }) {
+  const senderTrust = evidence.senderTrust;
+  if (!senderTrust) return null;
+  return (
+    <Fact label="Sender authentication">
+      <p className="text-sm font-medium leading-6 text-(--ink)">{senderTrustLabels[senderTrust.tier]}</p>
+      <p className="mt-1 font-data text-xs text-(--muted)">
+        Sender domain: {senderTrust.fromDomain ?? "not established"}
+      </p>
+      <p className="mt-1 font-data text-xs text-(--muted)">
+        Receiving authority: {senderTrust.trustedAuthority ?? "none trusted for this message"}
+      </p>
+      {senderTrust.reasons.length ? (
+        <ul className="mt-2 grid gap-1 text-xs leading-5 text-(--muted)">
+          {senderTrust.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+        </ul>
+      ) : null}
+    </Fact>
   );
 }
 

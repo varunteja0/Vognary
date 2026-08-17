@@ -42,12 +42,13 @@ const forwardedBatch = [
 ].join("\r\n");
 
 test("plain text and nested eml receipts are extracted without rendering other attachments", async () => {
-  const { texts: extracted, skippedAttachments } = await extractForwardedReceiptTexts(forwardedBatch);
+  const { texts: extracted, skippedAttachments, nestedReceiptCount } = await extractForwardedReceiptTexts(forwardedBatch);
   assert.equal(extracted.some((item) => /OpenAI charged INR 1,999/.test(item.text)), true);
   assert.equal(extracted.some((item) => /Attached billing receipt/.test(item.text)), true);
   assert.equal(extracted.some((item) => /UEsDB|ignored\.zip/.test(item.text)), false);
   assert.ok(extracted.every((item) => item.clientRef.startsWith("forwarded-")));
   assert.deepEqual(skippedAttachments, ["application/zip"]);
+  assert.equal(nestedReceiptCount, 1);
 });
 
 test("HTML-only messages produce bounded deterministic text without scripts, images, or link targets", async () => {

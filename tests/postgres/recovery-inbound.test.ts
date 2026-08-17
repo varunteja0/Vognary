@@ -8,6 +8,7 @@ import { DELETE as revokeSource, POST as provisionSource } from "../../src/app/a
 import { POST as rotateSource } from "../../src/app/api/workspaces/current/sources/receipt-inbox/rotate/route";
 import { DELETE as deleteConnectedSource } from "../../src/app/api/workspaces/current/connectors/[accountId]/route";
 import type { ApiSuccess, ReceiptInboxStatusDto, SenderProvenanceDto } from "../../src/lib/recovery/contracts";
+import { recordConsentGrant } from "../../src/lib/server/consent-store";
 import { getDatabasePool } from "../../src/lib/server/database";
 import { RecoveryServiceError } from "../../src/lib/server/recovery-api";
 import {
@@ -177,6 +178,54 @@ test("receipt inbox provision, rotation, and revocation keep routing secret and 
       [workspaceId],
     );
     assert.deepEqual(finalState.rows[0], { active_aliases: "0", account_status: "revoked", active_consents: "0" });
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [userId]);
+    restoreEnvironment();
+  }
+});
+
+test("an alias from an unavailable HMAC key requires explicit rotation", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const restoreEnvironment = setEnvironment(receiptInboxEnvironment);
+  const pool = getDatabasePool();
+  const userId = randomUUID();
+  const workspaceId = randomUUID();
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, `alias-rekey-${randomUUID().slice(0, 8)}@example.test`]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Alias rekey')`, [workspaceId, userId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+
+  try {
+    const first = await provisionReceiptInbox({ workspaceId, actorUserId: userId });
+    const oldAddress = first.alias!.address;
+    const restoreNextKey = setEnvironment({
+      RECEIPT_INBOX_ALIAS_HMAC_SECRET: "33".repeat(32),
+      RECEIPT_INBOX_ALIAS_HMAC_KEY_ID: "receipt-alias-v2",
+    });
+    try {
+      const needsRotation = await getReceiptInboxStatus({ workspaceId, actorUserId: userId });
+      assert.equal(needsRotation.state, "ROTATION_REQUIRED");
+      assert.equal(needsRotation.alias?.address, oldAddress);
+      assert.equal(await resolveReceiptInboxAlias(oldAddress), null);
+
+      const rotated = await rotateReceiptInbox({
+        workspaceId,
+        actorUserId: userId,
+        expectedAliasId: first.alias!.id,
+        idempotencyKey: `alias-rekey-${randomUUID()}`,
+      });
+      assert.equal(rotated.state, "WAITING");
+      assert.notEqual(rotated.alias?.address, oldAddress);
+      assert.equal((await resolveReceiptInboxAlias(rotated.alias!.address))?.workspaceId, workspaceId);
+      const stored = await pool.query<{ hmac_key_id: string }>(
+        `select hmac_key_id from recovery_inbound_aliases where workspace_id = $1 and status = 'ACTIVE'`,
+        [workspaceId],
+      );
+      assert.equal(stored.rows[0]?.hmac_key_id, "receipt-alias-v2");
+    } finally {
+      restoreNextKey();
+    }
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
     await pool.query(`delete from users where id = $1`, [userId]);
@@ -552,6 +601,159 @@ test("forwarded email materializes once into Recovery with provider provenance a
         request: { ...request, receipts: [{ ...request.receipts[0], text: `${request.receipts[0].text} Changed.` }] },
       }),
       (error: unknown) => error instanceof RecoveryServiceError && error.code === "CONFLICT",
+    );
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [userId]);
+    restoreEnvironment();
+  }
+});
+
+test("a proven forwarded backfill records the first-10 receipt milestones exactly once", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const restoreEnvironment = setEnvironment(receiptInboxEnvironment);
+  const pool = getDatabasePool();
+  const userId = randomUUID();
+  const workspaceId = randomUUID();
+  const email = `receipt-milestones-${randomUUID().slice(0, 8)}@example.test`;
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, email]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Receipt milestones')`, [workspaceId, userId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+
+  try {
+    await recordConsentGrant({
+      workspaceId,
+      userId,
+      subjectEmail: email,
+      purpose: "product-analytics-opt-in",
+      noticeVersion: "privacy-2026-07-11",
+      source: "receipt-milestones-test",
+      scopes: ["privacy-safe-product-events"],
+    });
+    const inbox = await provisionReceiptInbox({ workspaceId, actorUserId: userId });
+    await recordGmailForwardingVerification({
+      workspaceId,
+      aliasId: inbox.alias!.id,
+      verification: { code: "473829", verificationUrl: "https://mail-settings.google.com/mail/vf-test" },
+    });
+    const event = {
+      svixId: `msg_${randomUUID()}`,
+      emailId: `email_${randomUUID()}`,
+      recipient: inbox.alias!.address,
+      createdAt: "2026-08-10T12:00:00.000Z",
+      payloadHash: "9".repeat(64),
+    };
+    const raw = [
+      "From: founder@example.test",
+      `To: ${inbox.alias!.address}`,
+      "Subject: Historical billing receipts",
+      "MIME-Version: 1.0",
+      "Content-Type: multipart/mixed; boundary=outer",
+      "",
+      "--outer",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "Historical billing receipts attached.",
+      "--outer",
+      "Content-Type: message/rfc822",
+      "Content-Disposition: attachment; filename=openai.eml",
+      "",
+      "From: billing@example.test",
+      "Subject: OpenAI receipt",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "OpenAI subscription charged INR 1,999 on 6 July 2026. Renews monthly on 6 August 2026.",
+      "--outer--",
+      "",
+    ].join("\r\n");
+
+    assert.deepEqual(
+      await processResendReceivedEvent(event, { retrieveRawEmail: async () => raw }),
+      { status: "processed" },
+    );
+    assert.deepEqual(
+      await processResendReceivedEvent(event, { retrieveRawEmail: async () => raw }),
+      { status: "duplicate" },
+    );
+
+    const status = await getReceiptInboxStatus({ workspaceId, actorUserId: userId });
+    assert.ok(status.setupCompletedAt);
+    assert.ok(status.forwardingVerifiedAt);
+    assert.ok(status.backfillCompletedAt);
+    assert.equal(status.gmailVerification, null);
+
+    const milestones = await pool.query<{ event_name: string; total: string }>(
+      `select event_name, count(*)::text as total
+       from product_events
+       where workspace_id = $1
+         and event_name in (
+           'receipt_setup.started', 'receipt_setup.completed',
+           'receipt_forwarding.verified', 'receipt_backfill.completed',
+           'commitments.detected'
+         )
+       group by event_name
+       order by event_name`,
+      [workspaceId],
+    );
+    assert.deepEqual(milestones.rows, [
+      { event_name: "commitments.detected", total: "1" },
+      { event_name: "receipt_backfill.completed", total: "1" },
+      { event_name: "receipt_forwarding.verified", total: "1" },
+      { event_name: "receipt_setup.completed", total: "1" },
+      { event_name: "receipt_setup.started", total: "1" },
+    ]);
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [userId]);
+    restoreEnvironment();
+  }
+});
+
+test("terminal inbound failures emit one privacy-safe monitoring report", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const restoreEnvironment = setEnvironment(receiptInboxEnvironment);
+  const pool = getDatabasePool();
+  const userId = randomUUID();
+  const workspaceId = randomUUID();
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, `terminal-monitor-${randomUUID().slice(0, 8)}@example.test`]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Terminal monitor')`, [workspaceId, userId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+
+  try {
+    const inbox = await provisionReceiptInbox({ workspaceId, actorUserId: userId });
+    const reports: { error: Error; context: Record<string, unknown> }[] = [];
+    const result = await processResendReceivedEvent({
+      svixId: `msg_${randomUUID()}`,
+      emailId: `email_${randomUUID()}`,
+      recipient: inbox.alias!.address,
+      createdAt: "2026-08-10T12:00:00.000Z",
+      payloadHash: "8".repeat(64),
+    }, {
+      retrieveRawEmail: async () => [
+        "From: sender@example.test",
+        `To: ${inbox.alias!.address}`,
+        "Subject: private subject",
+        "Content-Type: text/plain; charset=utf-8",
+        "",
+      ].join("\r\n"),
+      reportProcessingFailure: async (error, context) => {
+        reports.push({ error, context });
+      },
+    });
+
+    assert.deepEqual(result, { status: "ignored" });
+    assert.equal(reports.length, 1);
+    assert.equal(reports[0].error.message, "Receipt inbox processing ended without evidence.");
+    assert.equal(reports[0].context.boundary, "receipt-inbound-processor");
+    assert.equal(reports[0].context.workspaceId, workspaceId);
+    assert.equal(reports[0].context.outcome, "terminal");
+    assert.equal(reports[0].context.reason, "NO_PLAIN_TEXT_RECEIPT");
+    assert.match(String(reports[0].context.inboundEventId), /^[0-9a-f-]{36}$/);
+    assert.doesNotMatch(
+      JSON.stringify(reports),
+      /rcpt_|sender@example|private subject|email_|msg_|recipient|payload|attachment|body/i,
     );
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);

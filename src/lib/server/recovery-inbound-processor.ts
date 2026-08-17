@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { extractForwardedReceiptTexts, forwardedEmailMaxMimeBytes } from "@/lib/recovery/inbound-email";
 import { getDatabasePool } from "@/lib/server/database";
+import { reportServerError } from "@/lib/server/monitoring";
 import { RecoveryMaterializationError } from "@/lib/server/recovery-api";
 import {
   getReceiptInboxConfiguration,
@@ -20,6 +21,7 @@ import { getReceiptInboxTrustedAuthorities } from "@/lib/server/receipt-inbox-se
 type ProcessorDependencies = {
   retrieveRawEmail?: (emailId: string) => Promise<string | Uint8Array>;
   afterAuthorityInspection?: () => Promise<void>;
+  reportProcessingFailure?: (error: Error, context: Record<string, unknown>) => Promise<void>;
 };
 
 type ReservedEvent = {
@@ -54,6 +56,7 @@ export async function processResendReceivedEvent(
   } catch (error) {
     if (error instanceof ResendInboundTerminalError) {
       const marked = await markTerminalFailure(reservation, error.code);
+      if (marked) await reportTerminalFailure(reservation, error.code, dependencies);
       return { status: marked ? "ignored" : "duplicate" };
     }
     const released = await releaseForRetry(reservation, "PROVIDER_RETRIEVAL_FAILED");
@@ -82,6 +85,7 @@ export async function processResendReceivedEvent(
     });
   } catch {
     const marked = await markTerminalFailure(reservation, "MIME_INVALID");
+    if (marked) await reportTerminalFailure(reservation, "MIME_INVALID", dependencies);
     return { status: marked ? "ignored" : "duplicate" };
   }
   const receipts = extraction.texts;
@@ -95,10 +99,12 @@ export async function processResendReceivedEvent(
     return { status: marked ? "ignored" : "duplicate" };
   }
   if (!receipts.length) {
+    const reason = extraction.skippedAttachments.length ? "UNSUPPORTED_ATTACHMENT" : "NO_PLAIN_TEXT_RECEIPT";
     const marked = await markTerminalFailure(
       reservation,
-      extraction.skippedAttachments.length ? "UNSUPPORTED_ATTACHMENT" : "NO_PLAIN_TEXT_RECEIPT",
+      reason,
     );
+    if (marked) await reportTerminalFailure(reservation, reason, dependencies);
     return { status: marked ? "ignored" : "duplicate" };
   }
 
@@ -109,6 +115,7 @@ export async function processResendReceivedEvent(
       providerEventId: event.svixId,
       expectedAttemptCount: reservation.attemptCount,
       currencyHint: extraction.currencyHint,
+      historicalBackfillClientRefs: extraction.nestedReceiptClientRefs,
       request: {
         kind: "FORWARDED_EMAIL",
         receipts: receipts.map((receipt) => ({
@@ -119,9 +126,9 @@ export async function processResendReceivedEvent(
       },
       afterAuthorityInspection: dependencies.afterAuthorityInspection,
     });
-    return materialized.submission.acceptedEvidenceCount > 0
-      ? { status: "processed" }
-      : { status: "ignored" };
+    if (materialized.submission.acceptedEvidenceCount > 0) return { status: "processed" };
+    await reportTerminalFailure(reservation, "PARSE_FAILED", dependencies);
+    return { status: "ignored" };
   } catch (error) {
     const released = await releaseForRetry(reservation, materializationFailureCode(error));
     if (!released) return { status: "duplicate" };
@@ -129,6 +136,28 @@ export async function processResendReceivedEvent(
       ? error
       : new ResendInboundRetryableError("Receipt materialization failed.");
   }
+}
+
+async function reportTerminalFailure(
+  reservation: ReservedEvent,
+  reason: string,
+  dependencies: ProcessorDependencies,
+) {
+  const reporter = dependencies.reportProcessingFailure ?? ((error, context) => reportServerError(error, {
+    path: "/api/webhooks/resend/inbound",
+    method: "POST",
+    headers: {},
+  }, context));
+  await reporter(
+    new Error("Receipt inbox processing ended without evidence."),
+    {
+      boundary: "receipt-inbound-processor",
+      workspaceId: reservation.workspaceId,
+      inboundEventId: reservation.id,
+      outcome: "terminal",
+      reason,
+    },
+  ).catch(() => undefined);
 }
 
 export function materializationFailureCode(error: unknown) {
