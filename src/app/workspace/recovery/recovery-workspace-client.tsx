@@ -22,6 +22,7 @@ import {
 import { VognaryMark } from "../../brand";
 import { correctionFieldLabels, decisionLabels } from "./labels";
 import { RecoveryAddEvidence } from "./recovery-add-evidence";
+import { RecoveryAttention } from "./recovery-attention";
 import { RecoveryCommitments, type CommitmentsHandlers } from "./recovery-commitments";
 import { RecoveryDialog } from "./recovery-dialog";
 import { CorrectionForm, EvidenceInspector } from "./recovery-evidence-panels";
@@ -791,6 +792,18 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   );
 
   function renderView() {
+    if (state.view === "ATTENTION") {
+      return (
+        <RecoveryAttention
+          onOpenCommitment={(commitmentId) => {
+            dispatch({ type: "COMMITMENT_SELECTED", commitmentId });
+            selectView("COMMITMENTS");
+          }}
+          onOpenSources={() => selectView("ADD_EVIDENCE")}
+        />
+      );
+    }
+
     if (state.view === "ADD_EVIDENCE") {
       return (
         <RecoverySources

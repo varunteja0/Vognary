@@ -79,8 +79,7 @@ const senderTierWeightFactor: Record<SenderTrustTier, number> = {
   SUSPICIOUS_SENDER: 0,
 };
 
-const merchantBlockReasons = ["CURRENCY_MISMATCH", "USER_REJECTED", "CONFLICTING_LEGAL_IDENTITY"] as const;
-export type MerchantBlockReason = (typeof merchantBlockReasons)[number];
+export type MerchantBlockReason = "CURRENCY_MISMATCH" | "USER_REJECTED" | "CONFLICTING_LEGAL_IDENTITY";
 
 export type MerchantSignalMatch = {
   kind: MerchantIdentitySignalKind;
@@ -311,7 +310,7 @@ function compareMerchant(claim: MerchantIdentityClaim, candidateRecord: Canonica
     for (const [key, leftEntry] of [...left.entries()].sort(([a], [b]) => a.localeCompare(b))) {
       const rightEntry = right.get(key);
       if (!rightEntry) continue;
-      let weight = merchantSignalWeights[kind];
+      let weight: number = merchantSignalWeights[kind];
       if (kind === "SENDER_DOMAIN") {
         const tier = order2(weakestSenderTier(claim.signals, key), weakestSenderTier(candidateRecord.signals, key));
         weight = Math.round(weight * senderTierWeightFactor[tier]);

@@ -84,8 +84,8 @@ test("every contract enum has presentation copy, so a contract change cannot ren
 });
 
 test("primary navigation keeps Mandate hidden until delivery is proven or authority already exists", () => {
-  assert.deepEqual([...recoveryViews], ["HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
-  assert.deepEqual(Object.values(recoveryViewLabels), ["Home", "Subscriptions", "Sources", "Mandate"]);
+  assert.deepEqual([...recoveryViews], ["HOME", "ATTENTION", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
+  assert.deepEqual(Object.values(recoveryViewLabels), ["Home", "Attention", "Subscriptions", "Sources", "Mandate"]);
   assert.match(clientSource, /<nav aria-label="Primary"/);
   assert.match(clientSource, /mandateAvailable/);
   assert.match(clientSource, /noticeReadiness\.state === "proven-ready"/);

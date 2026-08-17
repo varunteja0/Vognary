@@ -381,5 +381,5 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.match(ci, /SMOKE_BASE_URL: http:\/\/127\.0\.0\.1:3000[\s\S]*SMOKE_ALLOW_UNCONFIGURED: "true"/);
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[410\]/);
-  assert.match(activation, /Feature migrations 0002 through 0047/);
+  assert.match(activation, /Feature migrations 0002 through 0052/);
 });

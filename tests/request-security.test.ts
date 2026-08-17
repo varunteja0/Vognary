@@ -42,6 +42,7 @@ const guardedMutationRoutes: Array<[string, number]> = [
   ["src/app/api/workspaces/current/commitments/[commitmentId]/corrections/route.ts", 1],
   ["src/app/api/workspaces/current/decisions/route.ts", 2],
   ["src/app/api/workspaces/current/evidence/route.ts", 1],
+  ["src/app/api/workspaces/current/recovery-attention/route.ts", 1],
   ["src/app/api/workspaces/current/activation/route.ts", 1],
   ["src/app/api/workspaces/current/standing-mandate/route.ts", 2],
   ["src/app/api/workspaces/current/autopilot/candidates/[candidateId]/veto/route.ts", 1],
