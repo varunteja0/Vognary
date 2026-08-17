@@ -304,6 +304,7 @@ export type StoredChangeSignal = {
 
 export type ChangeSignalPlan = {
   opened: readonly ChangeSignal[];
+  reopened: readonly { dedupeKey: string; state: "OPEN"; at: string }[];
   closed: readonly { dedupeKey: string; state: "RESOLVED"; at: string }[];
   superseded: readonly { dedupeKey: string; state: "SUPERSEDED"; at: string }[];
 };
@@ -323,6 +324,14 @@ export function reconcileChangeSignals(input: {
   const detectedByKey = new Map(input.detected.map((entry) => [entry.dedupeKey, entry]));
 
   const opened = input.detected.filter((signal) => !storedByKey.has(signal.dedupeKey));
+
+  // A resolution only ever meant "this stopped being true". If the identical
+  // occurrence is true again — a source outage ended and the charge is still
+  // missing — the customer must see it, so resolution is reversible.
+  // Supersession and expiry are judgements about the record itself and stay final.
+  const reopened = input.stored
+    .filter((stored) => stored.state === "RESOLVED" && detectedByKey.has(stored.dedupeKey))
+    .map((stored) => ({ dedupeKey: stored.dedupeKey, state: "OPEN" as const, at: input.at }));
 
   const supersededKeys = new Set<string>();
   for (const signal of opened) {
@@ -344,6 +353,7 @@ export function reconcileChangeSignals(input: {
 
   return {
     opened,
+    reopened,
     closed,
     superseded: [...supersededKeys].sort().map((dedupeKey) => ({ dedupeKey, state: "SUPERSEDED" as const, at: input.at })),
   };

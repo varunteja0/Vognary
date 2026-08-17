@@ -264,6 +264,7 @@ test("re-detecting an open change leaves it untouched", () => {
   const plan = reconcileChangeSignals({ stored, detected, at });
   assert.deepEqual(plan.opened, []);
   assert.deepEqual(plan.closed, []);
+  assert.deepEqual(plan.reopened, []);
   assert.deepEqual(plan.superseded, []);
 });
 
@@ -304,7 +305,7 @@ test("a second price rise supersedes the first rather than duplicating it", () =
   assert.deepEqual(plan.closed, []);
 });
 
-test("a resolved change is never resurrected by reconciliation", () => {
+test("a resolved change reopens when the identical fact becomes true again", () => {
   const detected = detect();
   const plan = reconcileChangeSignals({
     stored: detected.map((signal) => ({ dedupeKey: signal.dedupeKey, kind: signal.kind, commitmentId: signal.commitmentId, state: "RESOLVED" as const })),
@@ -313,4 +314,19 @@ test("a resolved change is never resurrected by reconciliation", () => {
   });
   assert.deepEqual(plan.opened, []);
   assert.deepEqual(plan.closed, []);
+  assert.deepEqual(plan.reopened.map((entry) => entry.dedupeKey), detected.map((signal) => signal.dedupeKey));
+});
+
+test("a superseded or expired change is never resurrected", () => {
+  const detected = detect();
+  for (const state of ["SUPERSEDED", "EXPIRED"] as const) {
+    const plan = reconcileChangeSignals({
+      stored: detected.map((signal) => ({ dedupeKey: signal.dedupeKey, kind: signal.kind, commitmentId: signal.commitmentId, state })),
+      detected,
+      at,
+    });
+    assert.deepEqual(plan.opened, [], state);
+    assert.deepEqual(plan.closed, [], state);
+    assert.deepEqual(plan.reopened, [], state);
+  }
 });
