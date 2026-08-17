@@ -1137,10 +1137,10 @@ async function persistSubmissionSources(client: PoolClient, input: {
   let acceptedEvidenceCount = 0;
   const receiptSource = input.envelope.sourceType !== "CSV_IMPORT";
   const entries = input.envelope.sourceType === "CSV_IMPORT"
-    ? (input.request as Extract<EvidenceIngestRequest, { kind: "CSV_IMPORT" }>).sources.map((source) => ({ clientRef: source.clientRef, text: source.text, provenance: undefined }))
+    ? (input.request as Extract<EvidenceIngestRequest, { kind: "CSV_IMPORT" }>).sources.map((source) => ({ clientRef: source.clientRef, text: storableText(source.text), provenance: undefined }))
     : (input.request as Exclude<EvidenceIngestRequest, { kind: "CSV_IMPORT" }> | ForwardedEmailMaterializationRequest).receipts.map((receipt) => ({
         clientRef: receipt.clientRef,
-        text: receipt.text,
+        text: storableText(receipt.text),
         // Only the forwarded-email path observes transport headers; a paste has none.
         provenance: input.envelope.sourceType === "FORWARDED_EMAIL"
           ? (receipt as ForwardedEmailMaterializationRequest["receipts"][number]).provenance
@@ -1266,6 +1266,14 @@ async function persistSubmissionSources(client: PoolClient, input: {
     results.push({ clientRef: storedClientRef, status: "ACCEPTED", code: null, message: null });
   }
   return { results, acceptedSourceIds, acceptedEvidenceCount };
+}
+
+/**
+ * PostgreSQL rejects U+0000 in text and jsonb. Real invoice PDFs decode unmapped
+ * glyphs to it, so the character is marked unreadable rather than guessed at.
+ */
+function storableText(value: string) {
+  return value.includes("\u0000") ? value.replaceAll("\u0000", "\uFFFD") : value;
 }
 
 function evidenceProvenanceReference(

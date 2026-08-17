@@ -710,6 +710,60 @@ test("a proven forwarded backfill records the first-10 receipt milestones exactl
   }
 });
 
+test("a receipt carrying an unrepresentable character still materializes", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const restoreEnvironment = setEnvironment(receiptInboxEnvironment);
+  const pool = getDatabasePool();
+  const userId = randomUUID();
+  const workspaceId = randomUUID();
+  const inboundEventId = randomUUID();
+  const providerEventId = `svix-${randomUUID()}`;
+  const providerEmailId = `email-${randomUUID()}`;
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, `unrepresentable-${randomUUID().slice(0, 8)}@example.test`]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Unrepresentable receipt')`, [workspaceId, userId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+  const inbox = await provisionReceiptInbox({ workspaceId, actorUserId: userId });
+  await pool.query(
+    `insert into recovery_inbound_events (
+       id, provider, svix_id, provider_email_id, workspace_id, alias_id,
+       event_type, payload_hash, status, processing_started_at, attempt_count
+     ) values ($1, 'RESEND', $2, $3, $4, $5, 'email.received', $6, 'PROCESSING', now(), 1)`,
+    [inboundEventId, providerEventId, providerEmailId, workspaceId, inbox.alias!.id, "9".repeat(64)],
+  );
+
+  try {
+    const result = await materializeForwardedEmailEvidence({
+      workspaceId,
+      inboundEventId,
+      providerEventId,
+      expectedAttemptCount: 1,
+      request: {
+        kind: "FORWARDED_EMAIL" as const,
+        receipts: [{
+          clientRef: providerEmailId,
+          // Real invoice PDFs decode unmapped glyphs to U+0000, which PostgreSQL cannot store.
+          text: "Invoice number UFQUUZWV\u00000008\nOpenAI subscription charged INR 1,999 on 6 July 2026. Renews monthly on 6 August 2026.",
+        }],
+      },
+      now: new Date("2026-08-10T12:00:00.000Z"),
+    });
+
+    assert.equal(result.submission.acceptedEvidenceCount, 1);
+    const evidence = await pool.query<{ excerpt: string; merchant: string | null }>(
+      `select excerpt, merchant from recovery_evidence where workspace_id = $1`,
+      [workspaceId],
+    );
+    assert.equal(evidence.rows.length, 1);
+    assert.ok(!evidence.rows[0].excerpt.includes("\u0000"));
+    assert.ok(!(evidence.rows[0].merchant ?? "").includes("\u0000"));
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [userId]);
+    restoreEnvironment();
+  }
+});
+
 test("terminal inbound failures emit one privacy-safe monitoring report", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
