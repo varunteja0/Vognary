@@ -168,6 +168,7 @@ test("runtime and PostgreSQL tooling are pinned to one reproducible foundation",
   assert.match(backupWorkflow, /BACKUP_VERIFICATION_PROFILE/);
   assert.match(backupWorkflow, /postgres:18\.4@sha256:/);
   assert.match(backupWorkflow, /vognary_restore_drill@127\.0\.0\.1:5432\/vognary_restore/);
+  assert.match(backupWorkflow, /RESTORE_POSTGRES_SSL: "false"/);
   assert.match(backupWorkflow, /retention-days: 90/);
   assert.doesNotMatch(backupWorkflow, /secrets\.DATABASE_URL|secrets\.RESTORE_DATABASE_URL/);
   assert.doesNotMatch(backupWorkflow, /uses: actions\/(?:checkout|setup-node|upload-artifact)@v\d+/);

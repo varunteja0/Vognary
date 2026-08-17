@@ -135,7 +135,7 @@ jobs:
           RESTORE_CONFIRM_DISPOSABLE=true npm run backup:restore-drill -- "$manifest"
         env:
           RESTORE_DATABASE_URL: postgresql://postgres:vognary_restore_drill@127.0.0.1:5432/vognary_restore
-          RESTORE_POSTGRES_SSL: "true"
+          RESTORE_POSTGRES_SSL: "false"
           POSTGRES_CLIENT_MODE: docker
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
