@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { extractObservedReceipt, extractReceiptCandidates, inferReceiptCurrencyHint, receiptNextDateIsExplicit, receiptTextToManualInputs, splitReceiptSnippets } from "../src/lib/receipt-parser";
+import { extractObservedReceipt, extractReceiptCandidates, inferReceiptCurrencyHint, receiptTextToManualInputs, splitReceiptSnippets } from "../src/lib/receipt-parser";
 
 const sampleReceipts = [
   "OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly.",
@@ -56,9 +56,6 @@ test("extracts merchant, amount, and cadence from receipt snippets", () => {
   assert.equal(openai?.frequency, "monthly");
   assert.equal(openai?.observedDate, "2026-07-06");
   assert.equal(openai?.nextExpectedDate, "2026-08-06");
-  assert.equal(receiptNextDateIsExplicit("OpenAI invoice paid INR 1,999 on 2026-07-06. ChatGPT Plus renews monthly."), false);
-  assert.equal(receiptNextDateIsExplicit("OpenAI subscription charged INR 1,999 on 6 July 2026. Monthly billing."), false);
-  assert.equal(receiptNextDateIsExplicit("OpenAI subscription charged INR 1,999 on 6 July 2026. Renews monthly on 6 August 2026."), true);
 
   const cloudflare = candidates.find((candidate) => /cloudflare/i.test(candidate.merchant));
   assert.ok(cloudflare);
@@ -218,16 +215,13 @@ test("categorizes real-world Indian streaming receipts without the Jio telecom c
   ]);
   // JioHotstar contains the "Jio" telecom substring; it must still land in
   // Streaming, while bare Jio stays a telecom Utility.
-  assert.deepEqual(
-    candidates.map((candidate) => [candidate.merchant, candidate.category]),
-    [
+    assert.deepEqual(candidates.map((candidate) => [candidate.merchant, candidate.category]), [
       ["JioHotstar", "Streaming"],
       ["Hotstar", "Streaming"],
       ["Amazon Prime", "Streaming"],
       ["Prime Video", "Streaming"],
       ["Jio", "Utilities"],
-    ],
-  );
+    ]);
 });
 
 test("parses a spread of real subscription, telecom, and insurance formats", () => {
@@ -259,6 +253,18 @@ test("parses a spread of real subscription, telecom, and insurance formats", () 
   );
 });
 
+test("treats a dated annual premium as a declared LIC commitment instead of a generic transaction", () => {
+  const candidates = extractReceiptCandidates([
+    "Merchant: LIC of India; Payment date: 15 July 2026; Annual policy premium. Amount: INR 1,25,000.00",
+  ]);
+
+  assert.equal(candidates.length, 1);
+    assert.equal(candidates[0].merchant, "LIC of India");
+  assert.equal(candidates[0].category, "Insurance");
+  assert.equal(candidates[0].frequency, "yearly");
+  assert.equal(candidates[0].observedDate, "2026-07-15");
+});
+
 test("conservatively rejects receipts without provable recurrence", () => {
   // A bare telecom bill with no cadence and no recurring semantics is not proof
   // of a subscription; importing it would fabricate a recurring commitment.
@@ -269,4 +275,334 @@ test("conservatively rejects receipts without provable recurrence", () => {
     extractReceiptCandidates(["Your EMI of Rs. 4,500 for HDFC personal loan will be debited on 2026-08-05."]),
     [],
   );
+});
+
+test("parses common labelled-date receipt layouts without guessing a missing currency", () => {
+  const cases = [
+    {
+      name: "Netflix email header",
+      text: "From: Netflix; Date: 10 June 2026, your Netflix Premium membership was charged. Amount: Rs. 649.00",
+      expected: ["Netflix", "649.00", "INR", "2026-06-10"],
+    },
+    {
+      name: "Spotify receipt date",
+      text: "From: Spotify; Receipt date: 5 July 2026, payment received; Spotify Premium subscription. Total: ₹119.00",
+      expected: ["Spotify", "119.00", "INR", "2026-07-05"],
+    },
+    {
+      name: "Adobe invoice date",
+      text: "From: Adobe; Invoice date: 2 August 2026; Creative Cloud annual plan billed monthly. Total: INR 4,229.00",
+      expected: null,
+    },
+    {
+      name: "Google One transaction date",
+      text: "From: Google One; Transaction date: 1 July 2026, payment received; Google One subscription. Amount: ₹130.00",
+      expected: ["Google One", "130.00", "INR", "2026-07-01"],
+    },
+    {
+      name: "trailing INR",
+      text: "Merchant: Acme Cloud; Payment date: 12 July 2026; Monthly subscription payment. Total: 1,499.00 INR",
+      expected: ["Acme Cloud", "1499.00", "INR", "2026-07-12"],
+    },
+    {
+      name: "Notion transaction date",
+      text: "From: Notion Labs; Transaction date: August 1, 2026, payment received; Notion monthly subscription. Total: USD 10.00",
+      expected: ["Notion Labs", "10.00", "USD", "2026-08-01"],
+    },
+    {
+      name: "leading Your merchant",
+      text: "From: Your Swiggy One; Payment date: 3 August 2026; Swiggy One membership payment received. Amount: INR 299.00",
+      expected: ["Swiggy One", "299.00", "INR", "2026-08-03"],
+    },
+    {
+      name: "Jio billing date",
+      text: "Jio postpaid bill; Payment date: 4 August 2026; Recurring plan payment received. Amount: Rs. 399.00",
+      expected: ["Jio", "399.00", "INR", "2026-08-04"],
+    },
+    {
+      name: "society maintenance receipt",
+      text: "Merchant: Green Meadows Society; Receipt date: 5 August 2026, payment received; Monthly maintenance. Amount: INR 3,500.00",
+      expected: ["Green Meadows Society", "3500.00", "INR", "2026-08-05"],
+    },
+    {
+      name: "LIC payment date",
+      text: "LIC of India annual policy premium; Payment date: 15 July 2026; Amount: INR 1,25,000.00",
+      expected: ["LIC", "125000.00", "INR", "2026-07-15"],
+    },
+    {
+      name: "future mandate notice",
+      text: "Pre-debit notification: mandate towards MAX BUPA HEALTH for INR 50,000 will be debited on 20 Aug 2026.",
+      expected: ["MAX BUPA HEALTH", "50000", "INR", null],
+    },
+    {
+      name: "Amazon Prime receipt date",
+      text: "Amazon Prime membership; Receipt date: 6 August 2026, payment received; Total: ₹1,499.00; Renews yearly.",
+      expected: ["Amazon Prime", "1499.00", "INR", "2026-08-06"],
+    },
+    {
+      name: "Apple trailing currency",
+      text: "Apple iCloud subscription receipt; Order date: 7 August 2026; Total: 75.00 INR; Renews monthly.",
+      expected: null,
+    },
+    {
+      name: "numeric Date header",
+      text: "Netflix subscription; Date: 2026-08-08, payment received; Amount: INR 649.00; Renews monthly.",
+      expected: ["Netflix", "649.00", "INR", "2026-08-08"],
+    },
+    {
+      name: "missing currency",
+      text: "Merchant: Acme Fitness; Invoice date: 9 August 2026; Monthly membership total: 210.00",
+      expected: null,
+    },
+  ] as const;
+
+  const parsed = cases.map(({ text }) => {
+    const observed = extractObservedReceipt(text);
+    const recurring = extractReceiptCandidates([text])[0] ?? null;
+    const value = observed ?? recurring;
+    return value
+      ? [value.merchant, value.amountDecimal, value.currency, value.observedDate]
+      : null;
+  });
+
+  assert.ok(parsed.filter(Boolean).length >= 12, "at least 12 of 15 representative receipt layouts must be bounded");
+  cases.forEach((fixture, index) => {
+    assert.deepEqual(parsed[index], fixture.expected, fixture.name);
+  });
+});
+
+test("rejects document and due dates as observed charges", () => {
+  for (const receipt of [
+    "From: Adobe; Invoice date: 2 August 2026; Monthly subscription invoice. Total: INR 4,229.00",
+    "From: Apple; Order date: 7 August 2026; iCloud subscription receipt. Total: INR 75.00",
+    "Merchant: Acme Fitness; Due date: 9 August 2026; Monthly membership amount: INR 210.00",
+    "From: Spotify; Receipt date: 5 July 2026; Premium subscription receipt. Total: INR 119.00",
+    "From: Notion Labs; Transaction date: 1 August 2026; Monthly subscription invoice. Total: USD 10.00",
+    "Merchant: Acme Cloud; Invoice billed monthly. Due date: 12 August 2026; Total: INR 1,499.00",
+  ]) {
+    assert.equal(extractObservedReceipt(receipt), null);
+    assert.ok(extractReceiptCandidates([receipt]).every((candidate) => candidate.observedDate === null));
+  }
+});
+
+test("binds completed-payment context to the observed date instead of the whole receipt", () => {
+  assert.equal(extractObservedReceipt(
+    "From: Spotify; Payment received for the June invoice. Receipt date: 5 July 2026; Premium subscription receipt. Total: INR 119.00",
+  ), null);
+  assert.equal(extractObservedReceipt(
+    "From: Notion Labs; Payment completed for an earlier invoice. Transaction date: 1 August 2026; Monthly subscription invoice. Total: USD 10.00",
+  ), null);
+
+  const bounded = extractObservedReceipt(
+    "From: Spotify; Receipt date: 5 July 2026, payment received; Premium subscription. Total: INR 119.00",
+  );
+  assert.equal(bounded?.observedDate, "2026-07-05");
+});
+
+test("preserves newline boundaries for date and explicit merchant inference", () => {
+  assert.equal(extractObservedReceipt([
+    "From: Spotify",
+    "Payment received for the June invoice",
+    "Receipt date: 5 July 2026",
+    "Premium subscription receipt",
+    "Total: INR 119.00",
+  ].join("\n")), null);
+
+  const paid = extractObservedReceipt([
+    "MERCHANT: Acme Cloud",
+    "Payment date: 1 August 2026",
+    "Razorpay payment gateway reference",
+    "Monthly subscription",
+    "Total: INR 1,499.00",
+    "Next billing date: 1 September 2026",
+  ].join("\n"));
+  assert.equal(paid?.merchant, "Acme Cloud");
+  assert.equal(paid?.observedDate, "2026-08-01");
+});
+
+test("keeps scheduled-to-be-charged dates upcoming-only", () => {
+  const [candidate] = extractReceiptCandidates([
+    "Merchant: Acme Cloud; Monthly subscription total: INR 1,499.00; Scheduled to be charged on 20 August 2026.",
+  ]);
+  assert.ok(candidate);
+  assert.equal(candidate.observedDate, null);
+  assert.equal(candidate.nextExpectedDate, "2026-08-20");
+});
+
+test("selects one labelled charged total and rejects unresolved multi-amount receipts", () => {
+  const bounded = extractObservedReceipt(
+    "From: Adobe; Payment date: 2 August 2026; Creative Cloud was charged. Subtotal: INR 3,500.00; Tax: INR 630.00; Total: INR 4,130.00",
+  );
+  assert.equal(bounded?.amountDecimal, "4130.00");
+
+  const amountAndTotal = extractObservedReceipt(
+    "From: Adobe; Payment date: 2 August 2026; Creative Cloud payment received. Amount: INR 3,500.00; Total: INR 4,130.00",
+  );
+  assert.equal(amountAndTotal?.amountDecimal, "4130.00");
+
+  assert.equal(extractObservedReceipt(
+    "From: Adobe; Payment date: 2 August 2026; Creative Cloud payment received. Charged: INR 3,500.00; Total: INR 4,130.00",
+  ), null);
+
+  assert.equal(extractObservedReceipt(
+    "From: Adobe; Payment date: 2 August 2026; Creative Cloud payment. INR 3,500.00 plus INR 630.00",
+  ), null);
+});
+
+test("maps every accepted explicit currency instead of falling back to INR", () => {
+  const candidates = extractReceiptCandidates([
+    "Merchant: Kuwait Cloud; Payment date: 1 August 2026; Monthly subscription paid KWD 1.250.",
+    "Merchant: Japan Cloud; Payment date: 2 August 2026; Monthly subscription paid JPY 1500.",
+  ]);
+  assert.deepEqual(candidates.map((candidate) => candidate.currency), ["KWD", "JPY"]);
+  assert.deepEqual(candidates.map((candidate) => candidate.amountDecimal), ["1.250", "1500"]);
+});
+
+// An unseparated amount must never be truncated to its leading comma-group prefix
+// (Rs. 1500 -> 150), which silently understates every total downstream.
+test("keeps unseparated receipt amounts exact instead of truncating a digit prefix", () => {
+  const cases = [
+    { amount: "Rs. 1500", currency: "INR", decimal: "1500", value: 1500 },
+    { amount: "Rs. 1500.00", currency: "INR", decimal: "1500.00", value: 1500 },
+    { amount: "Rs. 12000", currency: "INR", decimal: "12000", value: 12_000 },
+    { amount: "INR 125000", currency: "INR", decimal: "125000", value: 125_000 },
+    { amount: "USD 1000", currency: "USD", decimal: "1000", value: 1000 },
+    { amount: "JPY 15000", currency: "JPY", decimal: "15000", value: 15_000 },
+    { amount: "EUR 2500.50", currency: "EUR", decimal: "2500.50", value: 2500.5 },
+  ] as const;
+
+  for (const { amount, currency, decimal, value } of cases) {
+    const observed = extractObservedReceipt(
+      `Merchant: Acme Cloud; Payment date: 1 August 2026; Monthly subscription paid ${amount}`,
+    );
+    assert.equal(observed?.amountDecimal, decimal, `${amount} must parse exactly`);
+    assert.equal(observed?.currency, currency, `${amount} must keep its currency`);
+    assert.equal(Number(observed?.amountDecimal), value, `${amount} numeric value`);
+  }
+});
+
+test("keeps grouped and fractional receipt amounts exact", () => {
+  const cases = [
+    { amount: "INR 4,229.00", currency: "INR", decimal: "4229.00", value: 4229 },
+    { amount: "INR 1,25,000.00", currency: "INR", decimal: "125000.00", value: 125_000 },
+    { amount: "Rs. 649.00", currency: "INR", decimal: "649.00", value: 649 },
+    { amount: "KWD 3.250", currency: "KWD", decimal: "3.250", value: 3.25 },
+  ] as const;
+
+  for (const { amount, currency, decimal, value } of cases) {
+    const observed = extractObservedReceipt(
+      `Merchant: Acme Cloud; Payment date: 1 August 2026; Monthly subscription paid ${amount}`,
+    );
+    assert.equal(observed?.amountDecimal, decimal, `${amount} must parse exactly`);
+    assert.equal(observed?.currency, currency, `${amount} must keep its currency`);
+    assert.equal(Number(observed?.amountDecimal), value, `${amount} numeric value`);
+  }
+});
+
+// Real receipts put "payment received" in a header line above the date line, so the
+// completed-payment proof has to be readable from the enclosing receipt block.
+test("reads header dates from real receipt blocks that prove the payment completed", () => {
+  const cases = [
+    {
+      name: "Netflix",
+      text: [
+        "From: Netflix",
+        "Payment received - thank you",
+        "Date: 5 August 2026",
+        "Netflix Premium monthly membership",
+        "Total: Rs. 649.00",
+      ].join("\n"),
+      expected: ["Netflix", "649.00", "INR", "2026-08-05"],
+    },
+    {
+      name: "Spotify",
+      text: [
+        "From: Spotify",
+        "Your Premium subscription was charged",
+        "Receipt date: 5 July 2026",
+        "Spotify Premium monthly",
+        "Total: INR 119.00",
+      ].join("\n"),
+      expected: ["Spotify", "119.00", "INR", "2026-07-05"],
+    },
+    {
+      name: "Adobe",
+      text: [
+        "From: Adobe",
+        "Amount paid: INR 4,229.00",
+        "Transaction date: 2 August 2026",
+        "Creative Cloud All Apps monthly",
+      ].join("\n"),
+      expected: ["Adobe", "4229.00", "INR", "2026-08-02"],
+    },
+    {
+      name: "Google One",
+      text: [
+        "From: Google One",
+        "You were charged for your Google One membership",
+        "Date: 1 July 2026",
+        "Google One 100 GB monthly plan",
+        "Total: INR 130.00",
+      ].join("\n"),
+      expected: ["Google One", "130.00", "INR", "2026-07-01"],
+    },
+    {
+      name: "Jio",
+      text: [
+        "Jio postpaid recharge receipt",
+        "Payment received successfully",
+        "Transaction date: 4 August 2026",
+        "Monthly plan",
+        "Amount: Rs. 399.00",
+      ].join("\n"),
+      expected: ["Jio", "399.00", "INR", "2026-08-04"],
+    },
+  ] as const;
+
+  for (const { name, text, expected } of cases) {
+    const observed = extractObservedReceipt(text);
+    assert.deepEqual(
+      observed ? [observed.merchant, observed.amountDecimal, observed.currency, observed.observedDate] : null,
+      expected,
+      name,
+    );
+  }
+});
+
+test("block-level payment proof stays fail-closed for documents, futures, and conflicts", () => {
+  const failClosed = [
+    // Invoice/due dates with no payment evidence anywhere in the block.
+    ["From: Adobe", "Invoice date: 2 August 2026", "Creative Cloud monthly", "Total: INR 4,229.00"].join("\n"),
+    ["From: Netflix", "Date: 5 August 2026", "Netflix Premium monthly membership", "Total: Rs. 649.00"].join("\n"),
+    ["Merchant: Acme Fitness", "Due date: 9 August 2026", "Monthly membership", "Amount: INR 210.00"].join("\n"),
+    // Payment language that belongs to a different document must not date this one.
+    ["From: Spotify", "Payment received for the June invoice", "Receipt date: 5 July 2026", "Total: INR 119.00"].join("\n"),
+    ["From: Adobe", "Amount paid for the previous invoice", "Transaction date: 2 August 2026", "Total: INR 4,229.00"].join("\n"),
+    // Future pre-debit and scheduled charges are not completed observations.
+    ["From: Netflix", "Your card will be charged", "Date: 5 September 2026", "Total: Rs. 649.00"].join("\n"),
+    ["Pre-debit notification for Jio", "Rs. 399.00 will be debited", "Transaction date: 4 September 2026"].join("\n"),
+    ["From: Google One", "Scheduled to be charged", "Date: 1 September 2026", "Total: INR 130.00"].join("\n"),
+    // Conflicting unlabelled finals stay unresolved.
+    ["From: Adobe", "Payment received", "Transaction date: 2 August 2026", "INR 3,500.00 plus INR 630.00"].join("\n"),
+  ];
+
+  for (const receipt of failClosed) {
+    assert.equal(extractObservedReceipt(receipt), null, receipt.split("\n")[0]);
+    assert.ok(
+      extractReceiptCandidates([receipt]).every((candidate) => candidate.observedDate === null),
+      receipt.split("\n")[0],
+    );
+  }
+});
+
+test("completed-payment proof never crosses into a neighbouring receipt block", () => {
+  const twoReceipts = [
+    ["From: Netflix", "Payment received", "Date: 5 August 2026", "Total: Rs. 649.00"].join("\n"),
+    ["From: Spotify", "Receipt date: 5 July 2026", "Spotify Premium monthly", "Total: INR 119.00"].join("\n"),
+  ].join("\n\n");
+
+  const [netflix, spotify] = splitReceiptSnippets(twoReceipts);
+  assert.equal(extractObservedReceipt(netflix)?.observedDate, "2026-08-05");
+  assert.equal(extractObservedReceipt(spotify), null, "the unpaid block must not borrow the paid block's proof");
+  assert.equal(extractObservedReceipt(twoReceipts), null, "two blocks pasted together stay unresolved");
 });

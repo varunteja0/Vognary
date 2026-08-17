@@ -221,3 +221,22 @@ test("a bare legacy error message is shown without inventing a contract code", a
   assert.equal(result.error.code, "UNKNOWN");
   assert.equal(result.error.message, "Attach at least one statement export or PDF file as files.");
 });
+
+test("evidence-source disconnect and reconnect use the canonical Recovery endpoints", async () => {
+  const payload = {
+    sourceId: "source 1",
+    disconnectedAt: "2026-08-16T00:00:00.000Z",
+    reconnectedAt: null,
+    withdrawnCandidateIds: ["candidate-1"],
+  };
+  const { calls, fetchImpl } = recorder(() => json({ data: payload, meta: { requestId: "request-source", workspaceVersion: 5 } }));
+  const transport = createRecoveryTransport(fetchImpl);
+  const disconnected = await transport.disconnectRecoverySource("source 1", { workspaceVersion: 4, idempotencyKey: "key-disconnect" });
+  const reconnected = await transport.reconnectRecoverySource("source 1", { workspaceVersion: 5, idempotencyKey: "key-reconnect" });
+  assert.equal(disconnected.ok, true);
+  assert.equal(reconnected.ok, true);
+  assert.equal(calls[0].path, "/api/workspaces/current/autopilot/sources/source%201/disconnect");
+  assert.equal(calls[0].init?.method, "POST");
+  assert.equal(calls[1].path, "/api/workspaces/current/autopilot/sources/source%201/reconnect");
+  assert.equal(calls[1].init?.method, "POST");
+});

@@ -63,7 +63,7 @@ import {
   supportedProviders,
   testContractAdapterId,
 } from "../src/lib/recovery/provider-registry";
-import { signVetoToken, verifyVetoToken } from "../src/lib/recovery/veto-token";
+import { isVetoTokenSecretValid, signVetoToken, verifyVetoToken } from "../src/lib/recovery/veto-token";
 import { autopilotSloBreaches } from "../src/lib/recovery/autopilot-metrics";
 
 const openaiMinor = BigInt(199_900);
@@ -505,6 +505,44 @@ test("notice send-acceptance is not delivery; the 48-hour clock starts only from
   assert.equal(laterDeliveredAfterComplaint.vetoDeadlineAt, null);
 });
 
+test("a same-timestamp complaint, bounce, or failure takes precedence over an earlier delivered event", () => {
+  const deliveredAt = "2026-08-24T01:05:00.000Z";
+  const delivered = applyNoticeDeliveryEvent(
+    { status: "ACCEPTED", providerMessageId: "resend-msg-same", deliveredAt: null, vetoDeadlineAt: null },
+    { type: "email.delivered", providerMessageId: "resend-msg-same", occurredAt: deliveredAt },
+  );
+  assert.equal(delivered.status, "DELIVERED");
+  assert.ok(delivered.vetoDeadlineAt);
+
+  for (const [type, status] of [
+    ["email.complained", "COMPLAINED"],
+    ["email.bounced", "BOUNCED"],
+    ["email.failed", "FAILED"],
+  ] as const) {
+    const terminal = applyNoticeDeliveryEvent(delivered, {
+      type,
+      providerMessageId: "resend-msg-same",
+      occurredAt: deliveredAt,
+    });
+    assert.equal(terminal.status, status, `${type} at the delivered timestamp must become ${status}`);
+    assert.equal(terminal.deliveredAt, null);
+    assert.equal(terminal.vetoDeadlineAt, null);
+    const duplicate = applyNoticeDeliveryEvent(terminal, {
+      type,
+      providerMessageId: "resend-msg-same",
+      occurredAt: deliveredAt,
+    });
+    assert.equal(duplicate.status, status);
+    const olderDelivered = applyNoticeDeliveryEvent(terminal, {
+      type: "email.delivered",
+      providerMessageId: "resend-msg-same",
+      occurredAt: "2026-08-24T01:04:59.000Z",
+    });
+    assert.equal(olderDelivered.status, status);
+    assert.equal(olderDelivered.vetoDeadlineAt, null);
+  }
+});
+
 test("execution idempotency binds minutes, proof, and failure reason as well as the actor path", () => {
   const base = {
     workspaceId: "11111111-1111-4111-8111-111111111111",
@@ -616,6 +654,14 @@ test("signed veto tokens are bound to workspace and candidate and reject tamperi
   assert.equal(verified?.candidateId, "22222222-2222-4222-8222-222222222222");
   assert.equal(verifyVetoToken(`${token}x`, secret, new Date("2026-08-25T00:00:00.000Z")), null);
   assert.equal(verifyVetoToken(token, secret, new Date("2026-08-27T00:00:00.000Z")), null);
+  assert.equal(isVetoTokenSecretValid("x"), false);
+  assert.equal(isVetoTokenSecretValid("é".repeat(16)), true);
+  assert.throws(() => signVetoToken({
+    workspaceId: "11111111-1111-4111-8111-111111111111",
+    candidateId: "22222222-2222-4222-8222-222222222222",
+    expiresAt: "2026-08-26T01:00:00.000Z",
+  }, "x"), /32 bytes/i);
+  assert.equal(verifyVetoToken(token, "x", new Date("2026-08-25T00:00:00.000Z")), null);
 });
 
 test("production cannot skip the measured shadow gate with a test switch", () => {
@@ -664,6 +710,7 @@ test("production veto hours stay 48 even if env tries to shorten the clock", () 
 
 test("store contracts keep pasted next dates from inventing renewal, start execution events, and ignore unknown webhooks", () => {
   const store = readFileSync(new URL("../src/lib/server/recovery-autopilot-store.ts", import.meta.url), "utf8");
+  const recoveryStore = readFileSync(new URL("../src/lib/server/recovery-store.ts", import.meta.url), "utf8");
   assert.match(store, /receiptNextDateIsExplicit/);
   assert.match(store, /provenance_kind === "PROVIDER_RECEIVED"/);
   assert.doesNotMatch(store, /coalesce\(candidate\.next_debit_date, commitment\.effective_next_expected_date\)/);
@@ -692,6 +739,23 @@ test("store contracts keep pasted next dates from inventing renewal, start execu
   assert.match(store, /notice_body_hash/);
   assert.match(store, /AUTOPILOT_TEST_NOTICE_PERSIST_CRASH/);
   assert.match(store, /NODE_ENV !== "production"[\s\S]{0,120}AUTOPILOT_TEST_NOTICE_PERSIST_CRASH/);
+  assert.match(store, /pg_advisory_lock\(hashtextextended\('autopilot-shadow-gate', 0\)\)/);
+  assert.match(store, /pg_advisory_unlock\(hashtextextended\('autopilot-shadow-gate', 0\)\)/);
+  for (const [start, end] of [
+    ["export async function materializeForwardedEmailEvidence", "export async function getRecoveryHome"],
+    ["export async function submitRecoveryEvidence", "export async function createRecoveryCorrection"],
+    ["export async function putRecoveryDecision", "type PutDecisionMutationData"],
+    ["async function mutateCorrection", "async function persistSubmissionSources"],
+  ]) {
+    const mutation = recoveryStore.slice(recoveryStore.indexOf(start), recoveryStore.indexOf(end));
+    assert.ok(mutation.indexOf("lockAutopilotAuthorityGate(client)") > mutation.indexOf('client.query("begin")'));
+    assert.ok(mutation.indexOf("lockAutopilotAuthorityGate(client)") < mutation.indexOf("lockRecoveryWorkspace(client"));
+  }
+  const consentRevocation = store.slice(
+    store.indexOf("export async function revokeActiveStandingMandateForConsentWithdrawal"),
+    store.indexOf("export async function disconnectRecoverySource"),
+  );
+  assert.ok(consentRevocation.indexOf("lockAutopilotAuthorityGate(client)") < consentRevocation.indexOf("lockWorkspace(client"));
   const freezeIndex = store.indexOf("freezeAutopilotNotice");
   const sendIndex = store.indexOf("sendAutopilotNotice");
   assert.ok(freezeIndex >= 0 && sendIndex > freezeIndex);
@@ -778,11 +842,13 @@ test("store contracts keep pasted next dates from inventing renewal, start execu
   assert.match(authorizeFn, /standingMandateConsentExistsSql/);
   const readiness = readFileSync(new URL("../src/lib/server/feature-readiness.ts", import.meta.url), "utf8");
   assert.match(readiness, /isAutopilotExecutionEnabled\(\)/);
+  assert.match(readiness, /isVetoTokenSecretValid/);
   assert.match(readiness, /0040_autopilot_review_integrity/);
   assert.doesNotMatch(readiness, /migrationId: "0039_autopilot_frozen_notice_integrity"/);
   const privacy = readFileSync(new URL("../src/lib/server/privacy-lifecycle-store.ts", import.meta.url), "utf8");
-  assert.match(privacy, /as "noticeFingerprint"/);
+  assert.doesNotMatch(privacy, /as "noticeFingerprint"/);
   assert.doesNotMatch(privacy, /as "payloadHash"/);
+  assert.doesNotMatch(privacy, /veto_token_hash|notice_body_hash|proof_reference_hash|notice_fingerprint/);
   assert.match(privacy, /as provider_controls/);
   assert.match(privacy, /connected_mandate_cohort/);
   assert.match(privacy, /source_disconnections/);

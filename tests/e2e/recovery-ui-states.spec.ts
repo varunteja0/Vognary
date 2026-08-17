@@ -35,7 +35,9 @@ const emptyHome: HomeProjectionDto = {
     limitations: ["No evidence has been submitted."],
   },
   activeCommitmentCount: 0,
+  unknownCadenceCommitmentCount: 0,
   reviewItemCount: 0,
+  evidenceSources: [],
 };
 
 const oneObservationHome: HomeProjectionDto = {
@@ -178,7 +180,7 @@ test("one observed charge asks for a matching receipt instead of rendering an al
   await expectNoSeriousAxeViolations(page, "one-observation Home");
 
   await observed.getByRole("button", { name: "Add a matching receipt" }).click();
-  await expect(page.getByRole("heading", { name: "Sources" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sources", exact: true })).toBeVisible();
   await expect(page.getByLabel("Receipt or invoice text")).toBeVisible();
   expect(activationCalls).toEqual([]);
 });

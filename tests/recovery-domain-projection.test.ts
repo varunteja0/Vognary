@@ -8,6 +8,7 @@ import {
   decimalToMinorUnits,
   hasCitedRecurringSpendPicture,
   minorUnitsToDecimal,
+  projectCadenceMonthlyMinor,
   toMoneyDto,
   type CanonicalCommitmentRecord,
 } from "../src/lib/recovery/domain";
@@ -26,6 +27,8 @@ test("Recovery money uses exact bigint-safe minor strings and explicit currency 
   assert.equal(minorUnitsToDecimal("199905", 2), "1999.05");
   assert.equal(minorUnitsToDecimal("1234", 3), "1.234");
 
+  assert.throws(() => toMoneyDto("199900", ""));
+  assert.throws(() => toMoneyDto("199900", "IN"));
   assert.deepEqual(toMoneyDto("199905", "INR"), {
     currency: "INR",
     minor: "199905",
@@ -34,12 +37,22 @@ test("Recovery money uses exact bigint-safe minor strings and explicit currency 
   });
   assert.equal(toMoneyDto("1999", "JPY").display, "JP¥1,999");
   assert.match(toMoneyDto("1234", "KWD").display, /1\.234/);
+  assert.match(toMoneyDto("150000000", "INR").display, /₹15,00,000\.00/);
+  assert.match(toMoneyDto("150000000", "USD").display, /\$1,500,000\.00/);
+  assert.doesNotMatch(toMoneyDto("150000000", "USD").display, /15,00,000/);
   const beyondJsSafeInteger = toMoneyDto("9007199254740993", "INR");
   assert.equal(beyondJsSafeInteger.minor, "9007199254740993");
   assert.equal(beyondJsSafeInteger.exponent, 2);
 
   assert.throws(() => decimalToMinorUnits("1.001", "INR"), /fraction/i);
   assert.throws(() => decimalToMinorUnits("92233720368547758.08", "INR"), /PostgreSQL bigint/i);
+});
+
+test("cadence projection uses exact billing-cycle ratios and never projects irregular evidence", () => {
+  assert.equal(projectCadenceMonthlyMinor(BigInt(1_200_000), "YEARLY"), BigInt(100_000));
+  assert.equal(projectCadenceMonthlyMinor(BigInt(100_000), "QUARTERLY"), BigInt(33_333));
+  assert.equal(projectCadenceMonthlyMinor(BigInt(100_000), "WEEKLY"), BigInt(433_333));
+  assert.equal(projectCadenceMonthlyMinor(BigInt(5_000_000), "IRREGULAR"), BigInt(0));
 });
 
 const commitments: CanonicalCommitmentRecord[] = [
@@ -154,6 +167,36 @@ test("Recovery home is an honest first baseline and keeps currency totals separa
   assert.equal(home.needsMe.some((item) => item.commitmentId === "commitment-ignored"), false);
   assert.deepEqual(home.next.map((item) => item.commitmentId), ["commitment-inr", "commitment-usd"]);
   assert.equal(home.coverage.state, "BASELINE_ONLY");
+  assert.deepEqual(home.evidenceSources, []);
+});
+
+test("active commitments with unknown cadence stay upcoming but never inflate monthly or annual totals", () => {
+  const irregular: CanonicalCommitmentRecord = {
+    ...commitments[0],
+    id: "commitment-irregular",
+    merchant: "MAX BUPA HEALTH",
+    category: "Insurance",
+    cadence: "IRREGULAR",
+    amountMinor: BigInt(5_000_000),
+    monthlyEquivalentMinor: BigInt(5_000_000),
+    nextExpectedDate: "2026-08-20",
+    confidenceScore: 78,
+    confidenceReasons: ["A pre-debit notice provides one dated amount but no recurring cadence."],
+    evidenceIds: ["evidence-irregular-1"],
+  };
+  const home = buildHomeProjection({
+    workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
+    generatedAt: now,
+    commitments: [commitments[0], irregular],
+    sources: [],
+    changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 1, items: [] },
+  });
+
+  assert.deepEqual(home.monthlyTotals.map((total) => total.amount.minor), ["199900"]);
+  assert.deepEqual(home.annualizedEstimateTotals.map((total) => total.amount.minor), ["2398800"]);
+  assert.deepEqual(home.next30DayTotals.map((total) => total.amount.minor), ["5199900"]);
+  assert.equal(home.unknownCadenceCommitmentCount, 1);
+  assert.equal(home.next.some((item) => item.commitmentId === irregular.id), true);
 });
 
 test("Recovery home publishes saved observation facts without fabricating recurrence", () => {
@@ -347,7 +390,7 @@ test("projection totals cite user-correction provenance only for the facts that 
   assert.deepEqual(supersededHome.next30DayTotals[0]?.correctionIds, ["correction-amount-new"]);
 });
 
-test("upcoming items require reminder confidence and suppress KEEP decisions", () => {
+test("upcoming reminders accept repeated established evidence and suppress KEEP decisions", () => {
   const home = buildHomeProjection({
     workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
     generatedAt: now,
@@ -357,9 +400,18 @@ test("upcoming items require reminder confidence and suppress KEEP decisions", (
   });
 
   assert.deepEqual(home.next.map((item) => [item.commitmentId, item.reminderEligible]), [
-    ["commitment-inr", false],
+    ["commitment-inr", true],
     ["commitment-usd", false],
   ]);
+
+  const irregular = buildHomeProjection({
+    workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
+    generatedAt: now,
+    commitments: [{ ...commitments[0], cadence: "IRREGULAR", confidenceScore: 78 }],
+    sources: [],
+    changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 1, items: [] },
+  });
+  assert.equal(irregular.next[0]?.reminderEligible, false);
 });
 
 test("Recovery rejects Changed items without reconstructible provenance", () => {

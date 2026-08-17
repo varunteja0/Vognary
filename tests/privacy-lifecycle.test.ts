@@ -188,13 +188,27 @@ test("privacy export builder emits an allowlisted metadata-only document", () =>
   assert.equal(assertPrivacyExportIsMetadataOnly(document), document);
 });
 
-test("privacy export guard detects sensitive snake-case and camelCase fields", () => {
-  for (const field of ["accessToken", "refresh_token", "rawPayload", "payloadHash", "rawRow", "storageKey"]) {
+test("privacy export guard detects sensitive snake-case, camelCase, and compound aliases", () => {
+  for (const field of [
+    "accessToken",
+    "refresh_token",
+    "rawPayload",
+    "payloadHash",
+    "rawRow",
+    "storageKey",
+    "vetoTokenHash",
+    "noticeBodyHash",
+    "noticeFingerprint",
+    "proofReferenceHash",
+    "proof_reference",
+    "veto_token_hash_v2",
+    "notice_body_hash_alias",
+  ]) {
     assert.throws(
       () => assertPrivacyExportIsMetadataOnly({ safe: { [field]: "must-not-escape" } }),
-      new RegExp(field, "i"),
+      new RegExp(field.replaceAll("_", "[_]?"), "i"),
     );
   }
 
-  assert.doesNotThrow(() => assertPrivacyExportIsMetadataOnly({ rawConnectorPayloadDays: 30 }));
+  assert.doesNotThrow(() => assertPrivacyExportIsMetadataOnly({ rawConnectorPayloadDays: 30, signedTextHash: "a".repeat(64) }));
 });

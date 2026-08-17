@@ -51,8 +51,14 @@ test("every receipt-account deletion path uses canonical alias revocation even a
 
 test("account deletion revokes the departing user's receipt inbox before withdrawing consents", () => {
   const deletion = profileRoute.slice(profileRoute.indexOf("async function deleteUserData"));
+  assert.match(profileRoute, /lockAutopilotAuthorityGate/);
   assert.match(deletion, /applyReceiptInboxRevocation/);
   assert.match(deletion, /receipt-inbox-ingest/);
+  const authorityIndex = deletion.indexOf("lockAutopilotAuthorityGate(client)");
+  const inboxLockIndex = deletion.indexOf("receipt-inbox:${workspaceId}");
+  const userLockIndex = deletion.indexOf("select id from users where id = $1 for update");
+  assert.ok(authorityIndex >= 0 && inboxLockIndex > authorityIndex, "Account deletion must take the Autopilot authority gate before inbox locks.");
+  assert.ok(userLockIndex > inboxLockIndex, "Account deletion must take inbox locks before user/workspace rows.");
   const revokeIndex = deletion.indexOf("applyReceiptInboxRevocation");
   const withdrawIndex = deletion.indexOf("update consent_grants");
   assert.ok(revokeIndex >= 0 && withdrawIndex > revokeIndex, "Inbox revocation must run before consent rows are withdrawn.");

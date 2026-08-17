@@ -11,9 +11,13 @@
 > WP-0…WP-6 detail: [execution-plan-ui-ai-quality.md](execution-plan-ui-ai-quality.md)  
 > Live handoff: [CONTINUE-HERE.md](CONTINUE-HERE.md)
 
-Date: 2026-07-20 · Amended 2026-07-21 (subordinate to THE-LAW)
+Date: 2026-07-20 · Amended 2026-08-17 (subordinate to THE-LAW)
 Status: **canonical implementation index + AI/Twin/UI specs.**  
 (1) Points each topic at the doc that owns it; (2) owns AI, Twin, UI quality, cost model.
+
+Implementation correction: the workspace monolith and guest client described in
+historical Part 2 diagrams are retired. `src/app/workspace/*` is canonical and
+Recovery is the sole live financial authority; living-ledger writes are frozen.
 
 ---
 
@@ -107,12 +111,12 @@ holds the shape in their head:
                          GUEST (client-only, stateless — scales to a crowd free)
 receipt-parser.ts → recurring-audit.ts → renewal-timeline.ts → suggested-cuts.ts
    (paste/CSV/PDF)      (cadence engine)     (45-day calendar)    (keep/watch/cut)
-                                   │  guest-audit-client.tsx / instant-audit.tsx
+                                   │  instant-audit.tsx
                                    ▼
 ─────────────────────────── SIGNED-IN WORKSPACE ────────────────────────────────
-  vognary-mvp-client.tsx (the 5.5k-line monolith — decompose only in a quiet
-  window) over raw Postgres, custom auth (cookies + magic link + Google OIDC),
-  AES-256-GCM token vault, encrypted revisioned snapshots.
+  src/app/workspace/* (canonical Recovery workspace) over Recovery contracts,
+  PostgreSQL, custom auth (cookies + magic link + Google OIDC), AES-256-GCM
+  token vault, and encrypted revisioned snapshots.
                                    │
         ┌──────────────────┬───────┴────────┬────────────────────┐
         ▼                  ▼                 ▼                    ▼

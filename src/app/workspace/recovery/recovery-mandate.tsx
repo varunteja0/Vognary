@@ -1,14 +1,15 @@
 "use client";
 
-import { standingMandateSignedText } from "@/lib/recovery/standing-mandate";
+import { standingMandateSignedText } from "@/lib/recovery/standing-mandate-text";
 import type { AutopilotAttemptDto, AutopilotCandidateDto, StandingMandateDto } from "@/lib/recovery/contracts";
+import { autopilotNoticeReadinessCopy, type AutopilotNoticeReadiness } from "@/lib/recovery/notice-readiness";
 import { StateBlock } from "./recovery-states";
 
 export function RecoveryMandate({
   mandate,
   executionEnabled,
-  noticeEnabled,
-  pending,
+  noticeReadiness,
+  pendingKind,
   online,
   canSign,
   canOperate,
@@ -20,8 +21,8 @@ export function RecoveryMandate({
 }: {
   mandate: StandingMandateDto | null;
   executionEnabled: boolean;
-  noticeEnabled: boolean;
-  pending: boolean;
+  noticeReadiness: AutopilotNoticeReadiness;
+  pendingKind: "SIGN" | "REVOKE" | null;
   online: boolean;
   canSign: boolean;
   canOperate: boolean;
@@ -33,6 +34,9 @@ export function RecoveryMandate({
 }) {
   const active = mandate?.status === "ACTIVE";
   const operatorCases = [...handled, ...needsHelp];
+  const signing = pendingKind === "SIGN";
+  const revoking = pendingKind === "REVOKE";
+  const busy = signing || revoking;
   return (
     <div className="grid gap-5">
       <StateBlock
@@ -57,7 +61,7 @@ export function RecoveryMandate({
       <dl className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-line bg-card p-4">
           <dt className="text-xs uppercase tracking-wide text-(--muted)">Notice delivery</dt>
-          <dd className="mt-1 text-sm text-(--ink)">{noticeEnabled ? "Enabled" : "Off — veto notices are not sent"}</dd>
+          <dd className="mt-1 text-sm text-(--ink)">{autopilotNoticeReadinessCopy(noticeReadiness.state)}</dd>
         </div>
         <div className="rounded-2xl border border-line bg-card p-4">
           <dt className="text-xs uppercase tracking-wide text-(--muted)">Execution</dt>
@@ -68,12 +72,12 @@ export function RecoveryMandate({
       {canSign ? (
         <div className="flex flex-wrap gap-2">
           {active ? (
-            <button type="button" className="btn btn-primary" disabled={pending || !online} onClick={onRevoke}>
-              {pending ? "Revoking…" : "Revoke this mandate"}
+            <button type="button" className="btn btn-primary" disabled={busy || !online} onClick={onRevoke}>
+              {revoking ? "Revoking…" : "Revoke this mandate"}
             </button>
           ) : (
-            <button type="button" className="btn btn-primary" disabled={pending || !online} onClick={onSign}>
-              {pending ? "Saving…" : "I accept this standing mandate"}
+            <button type="button" className="btn btn-primary" disabled={busy || !online} onClick={onSign}>
+              {signing ? "Saving…" : "I accept this standing mandate"}
             </button>
           )}
         </div>

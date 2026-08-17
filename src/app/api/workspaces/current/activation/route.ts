@@ -53,6 +53,14 @@ export async function POST(request: Request) {
       commitmentsTouched: home.activeCommitmentCount,
       evidenceWritten: home.coverage.evidenceCount,
     });
+    if (!recorded.consentCurrent) {
+      return recoverySuccessResponse(
+        { recorded: false, id: null as string | null, outcome: "deferred-no-consent" as const },
+        requestId,
+        home.workspace.version,
+        202,
+      );
+    }
     return recoverySuccessResponse(
       {
         recorded: recorded.recorded,

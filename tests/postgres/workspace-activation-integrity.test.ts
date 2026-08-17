@@ -211,6 +211,15 @@ test("concurrent workspace activation attempts persist exactly one non-null row"
   await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, ownerUserId]);
 
   try {
+    await recordConsentGrant({
+      workspaceId,
+      userId: ownerUserId,
+      subjectEmail: `activation-race-${suffix}@example.test`,
+      purpose: "product-analytics-opt-in",
+      noticeVersion: "privacy-2026-07-11",
+      source: "activation-race-test",
+      scopes: ["privacy-safe-product-events"],
+    });
     const attempts = await Promise.all(Array.from({ length: 8 }, (_, index) => recordWorkspaceActivationOnce({
       workspaceId,
       userId: ownerUserId,
@@ -242,6 +251,15 @@ test("version-1 workspace activation cannot be deleted while the workspace exist
   await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, ownerUserId]);
 
   try {
+    await recordConsentGrant({
+      workspaceId,
+      userId: ownerUserId,
+      subjectEmail: `activation-retain-${suffix}@example.test`,
+      purpose: "product-analytics-opt-in",
+      noticeVersion: "privacy-2026-07-11",
+      source: "activation-retain-test",
+      scopes: ["privacy-safe-product-events"],
+    });
     const recorded = await recordWorkspaceActivationOnce({
       workspaceId,
       userId: ownerUserId,
@@ -282,6 +300,113 @@ test("version-1 workspace activation cannot be deleted while the workspace exist
     );
     assert.deepEqual(remaining.rows.map((row) => row.event_name), ["workspace.activated"]);
   } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [ownerUserId]);
+  }
+});
+
+test("activation writer refuses a withdrawn analytics consent", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const pool = getDatabasePool();
+  const ownerUserId = randomUUID();
+  const workspaceId = randomUUID();
+  const email = `activation-withdrawn-${randomUUID().slice(0, 8)}@example.test`;
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [ownerUserId, email]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Activation withdrawn')`, [workspaceId, ownerUserId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, ownerUserId]);
+  try {
+    await recordConsentGrant({
+      workspaceId,
+      userId: ownerUserId,
+      subjectEmail: email,
+      purpose: "product-analytics-opt-in",
+      noticeVersion: "privacy-2026-07-11",
+      source: "activation-withdrawn-test",
+      scopes: ["privacy-safe-product-events"],
+    });
+    await pool.query(
+      `update consent_grants set withdrawn_at = now()
+       where workspace_id = $1 and user_id = $2 and purpose = 'product-analytics-opt-in'`,
+      [workspaceId, ownerUserId],
+    );
+    const result = await recordWorkspaceActivationOnce({
+      workspaceId,
+      userId: ownerUserId,
+      commitmentsTouched: 1,
+      evidenceWritten: 1,
+    });
+    assert.equal(result.recorded, false);
+    assert.equal(result.consentCurrent, false);
+    assert.equal(Number((await pool.query<{ total: number }>(
+      `select count(*)::int as total from product_events
+       where workspace_id = $1 and event_name = 'workspace.activated'`,
+      [workspaceId],
+    )).rows[0]?.total ?? -1), 0);
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [ownerUserId]);
+  }
+});
+
+test("activation writer waits for concurrent consent withdrawal and then refuses the event", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const pool = getDatabasePool();
+  const ownerUserId = randomUUID();
+  const workspaceId = randomUUID();
+  const email = `activation-withdraw-race-${randomUUID().slice(0, 8)}@example.test`;
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [ownerUserId, email]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Activation withdraw race')`, [workspaceId, ownerUserId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, ownerUserId]);
+  const consent = await recordConsentGrant({
+    workspaceId,
+    userId: ownerUserId,
+    subjectEmail: email,
+    purpose: "product-analytics-opt-in",
+    noticeVersion: "privacy-2026-07-11",
+    source: "activation-withdraw-race-test",
+    scopes: ["privacy-safe-product-events"],
+  });
+  const withdrawClient = await pool.connect();
+  try {
+    await withdrawClient.query("begin");
+    await withdrawClient.query(
+      `update consent_grants set withdrawn_at = now() where id = $1`,
+      [consent.id],
+    );
+    let writerFinished = false;
+    const writerPromise = recordWorkspaceActivationOnce({
+      workspaceId,
+      userId: ownerUserId,
+      commitmentsTouched: 1,
+      evidenceWritten: 1,
+    });
+    void writerPromise.then(() => { writerFinished = true; });
+    let waiting = false;
+    for (let attempt = 0; attempt < 100 && !waiting; attempt += 1) {
+      const locks = await pool.query<{ waiting: number }>(
+        `select count(*)::int as waiting from pg_locks where not granted`,
+      );
+      waiting = (locks.rows[0]?.waiting ?? 0) > 0;
+      if (!waiting) await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    assert.equal(waiting, true, "activation insertion must wait for in-flight consent withdrawal");
+    assert.equal(writerFinished, false);
+    await withdrawClient.query("commit");
+    const result = await writerPromise;
+    assert.equal(result.recorded, false);
+    assert.equal(result.consentCurrent, false);
+    assert.equal(Number((await pool.query<{ total: number }>(
+      `select count(*)::int as total from product_events
+       where workspace_id = $1 and event_name = 'workspace.activated'`,
+      [workspaceId],
+    )).rows[0]?.total ?? -1), 0);
+  } catch (error) {
+    await withdrawClient.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    withdrawClient.release();
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
     await pool.query(`delete from users where id = $1`, [ownerUserId]);
   }

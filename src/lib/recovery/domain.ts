@@ -73,13 +73,23 @@ export type HomeProjectionInput = {
 
 // The single reminder rule: Home labels exactly what scheduleRenewalAlertsForWorkspace will act on.
 export const renewalAlertMinimumConfidence = 80;
+export const renewalAlertRepeatedEvidenceMinimumConfidence = 70;
+
+export function isRecoveryReminderEligible(commitment: Pick<CanonicalCommitmentRecord, "cadence" | "confidenceScore" | "decision" | "evidenceIds">) {
+  if (commitment.decision?.value === "KEEP") return false;
+  if (commitment.confidenceScore >= renewalAlertMinimumConfidence) return true;
+  return commitment.confidenceScore >= renewalAlertRepeatedEvidenceMinimumConfidence
+    && commitment.cadence !== "IRREGULAR"
+    && commitment.evidenceIds.length >= 2;
+}
 
 export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionDto {
   assertReconstructibleChanges(input.changed.items);
   const generatedAt = input.generatedAt ?? new Date();
   const today = dateOnly(generatedAt);
   const active = input.commitments.filter((commitment) => commitment.status === "ACTIVE");
-  const monthlyTotals = buildTotals(active, (commitment) => commitment.monthlyEquivalentMinor, monthlyTotalCorrectionFields);
+  const cadenceEstablished = active.filter((commitment) => commitment.cadence !== "IRREGULAR");
+  const monthlyTotals = buildTotals(cadenceEstablished, (commitment) => commitment.monthlyEquivalentMinor, monthlyTotalCorrectionFields);
   const next30DayCommitments = active.filter((commitment) => {
     const days = commitment.nextExpectedDate ? daysBetween(today, commitment.nextExpectedDate) : null;
     return days !== null && days >= 0 && days <= 30;
@@ -100,7 +110,7 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
       amount: toMoneyDto(commitment.amountMinor, commitment.currency),
       decision: commitment.decision,
       confidence: toConfidence(commitment),
-      reminderEligible: commitment.confidenceScore >= renewalAlertMinimumConfidence && commitment.decision?.value !== "KEEP",
+      reminderEligible: isRecoveryReminderEligible(commitment),
       evidenceIds: commitment.evidenceIds,
     }));
 
@@ -125,7 +135,9 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
     next,
     coverage: buildCoverage(input.sources, input.changed.state, generatedAt),
     activeCommitmentCount: active.length,
+    unknownCadenceCommitmentCount: active.length - cadenceEstablished.length,
     reviewItemCount: needsMe.length,
+    evidenceSources: [],
   };
 }
 
@@ -170,6 +182,24 @@ export function normalizeMinorUnits(value: unknown) {
   return minor.toString();
 }
 
+export function projectCadenceMonthlyMinor(amountMinor: bigint, cadence: Cadence) {
+  const ratios: Record<Cadence, readonly [bigint, bigint]> = {
+    WEEKLY: [BigInt(13), BigInt(3)],
+    BIWEEKLY: [BigInt(13), BigInt(6)],
+    SEMIMONTHLY: [BigInt(2), BigInt(1)],
+    MONTHLY: [BigInt(1), BigInt(1)],
+    BIMONTHLY: [BigInt(1), BigInt(2)],
+    QUARTERLY: [BigInt(1), BigInt(3)],
+    YEARLY: [BigInt(1), BigInt(12)],
+    IRREGULAR: [BigInt(0), BigInt(1)],
+  };
+  const [numerator, denominator] = ratios[cadence];
+  const product = amountMinor * numerator;
+  const quotient = product / denominator;
+  const rounded = product % denominator * BigInt(2) >= denominator ? quotient + BigInt(1) : quotient;
+  return BigInt(normalizeMinorUnits(rounded.toString()));
+}
+
 export function decimalToMinorUnits(value: string, currency: string) {
   const normalized = value.trim();
   if (!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(normalized)) throw new Error("Money value must be a non-negative decimal string.");
@@ -196,7 +226,8 @@ export function toMoneyDto(value: string | bigint, currency: string): MoneyDto {
   const amount = BigInt(minor);
   const factor = BigInt(10) ** BigInt(exponent);
   const fraction = exponent ? (amount % factor).toString().padStart(exponent, "0") : "";
-  const formatter = new Intl.NumberFormat("en-IN", {
+  const locale = normalizedCurrency === "INR" ? "en-IN" : normalizedCurrency === "USD" ? "en-US" : "en-GB";
+  const formatter = new Intl.NumberFormat(locale, {
     style: "currency",
     currency: normalizedCurrency,
     minimumFractionDigits: exponent,

@@ -2,6 +2,7 @@ import "server-only";
 
 import { publicOffer } from "@/lib/public-offer";
 import { isAutopilotExecutionEnabled, isAutopilotNoticeChannelReady, isAutopilotNoticeEnabled } from "@/lib/recovery/autopilot-switch";
+import { isVetoTokenSecretValid } from "@/lib/recovery/veto-token";
 import { getDatabasePool } from "@/lib/server/database";
 
 export const productionFeatureMigrations = [
@@ -48,6 +49,9 @@ export const productionFeatureMigrations = [
   "0042_workspace_activation_semantic_reset",
   "0043_workspace_activation_semantic_version",
   "0044_autopilot_audit_immutability",
+  "0045_autopilot_mandate_execution_immutability",
+  "0046_billed_window_immutability",
+  "0047_billed_window_insert_immutability",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];
@@ -168,7 +172,12 @@ async function checkAutopilot(applied: Set<string>) {
   const executionEnabled = isAutopilotExecutionEnabled();
   const noticeEnabled = isAutopilotNoticeEnabled();
   const noticeChannel = isAutopilotNoticeChannelReady();
-  const mailerReady = Boolean(process.env.RESEND_API_KEY?.trim() && process.env.RESEND_FROM_EMAIL?.trim() && process.env.RESEND_NOTICE_WEBHOOK_SECRET?.trim() && process.env.AUTOPILOT_VETO_TOKEN_SECRET?.trim());
+  const mailerReady = Boolean(
+    process.env.RESEND_API_KEY?.trim()
+    && process.env.RESEND_FROM_EMAIL?.trim()
+    && process.env.RESEND_NOTICE_WEBHOOK_SECRET?.trim()
+    && isVetoTokenSecretValid(process.env.AUTOPILOT_VETO_TOKEN_SECRET?.trim() ?? ""),
+  );
   const gmailOauthReady = process.env.GOOGLE_OAUTH_VERIFICATION_COMPLETE === "true"
     && process.env.GOOGLE_RESTRICTED_SCOPE_CASA_STATUS === "approved";
   if (!applied.has(migrationId)) {

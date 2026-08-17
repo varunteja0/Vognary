@@ -76,7 +76,9 @@ export type PendingMutation =
   | { kind: "CORRECTION_REVERSAL"; idempotencyKey: string; commitmentId: string; correctionId: string }
   | { kind: "MANDATE_SIGN"; idempotencyKey: string }
   | { kind: "MANDATE_REVOKE"; idempotencyKey: string }
-  | { kind: "CANDIDATE_VETO"; idempotencyKey: string; candidateId: string };
+  | { kind: "CANDIDATE_VETO"; idempotencyKey: string; candidateId: string }
+  | { kind: "SOURCE_DISCONNECT"; idempotencyKey: string; sourceId: string }
+  | { kind: "SOURCE_RECONNECT"; idempotencyKey: string; sourceId: string };
 
 export type RollbackNotice = { mutation: PendingMutation; failure: RecoveryFailure };
 
@@ -197,7 +199,8 @@ export type RecoveryAction =
   | { type: "MUTATION_FAILED"; failure: TransportFailure }
   | { type: "ROLLBACK_DISMISSED" }
   | { type: "MANDATE_STARTED"; action: "SIGN" | "REVOKE"; idempotencyKey: string }
-  | { type: "VETO_STARTED"; candidateId: string; idempotencyKey: string };
+  | { type: "VETO_STARTED"; candidateId: string; idempotencyKey: string }
+  | { type: "EVIDENCE_SOURCE_STARTED"; action: "DISCONNECT" | "RECONNECT"; sourceId: string; idempotencyKey: string };
 
 const authRequired = (failure: TransportFailure) => failure.error.code === "AUTH_REQUIRED";
 const needsReload = (failure: TransportFailure) => failure.error.code === "STALE_STATE" || failure.error.code === "CONFLICT";
@@ -275,8 +278,15 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
     case "SNAPSHOT_LOADED":
       {
       const refreshSelectedDetail = state.selectedCommitmentId !== null && state.detail === null;
+      const pendingKind = state.pending?.kind;
+      const clearMandatePending = pendingKind === "MANDATE_SIGN"
+        || pendingKind === "MANDATE_REVOKE"
+        || pendingKind === "CANDIDATE_VETO"
+        || pendingKind === "SOURCE_DISCONNECT"
+        || pendingKind === "SOURCE_RECONNECT";
       return {
         ...state,
+        pending: clearMandatePending ? null : state.pending,
         status: { kind: "READY" },
         home: action.home,
         commitments: action.commitments,
@@ -310,11 +320,20 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
       };
 
     case "SNAPSHOT_FAILED":
+      {
+      const pendingKind = state.pending?.kind;
+      const clearMandatePending = pendingKind === "MANDATE_SIGN"
+        || pendingKind === "MANDATE_REVOKE"
+        || pendingKind === "CANDIDATE_VETO"
+        || pendingKind === "SOURCE_DISCONNECT"
+        || pendingKind === "SOURCE_RECONNECT";
       return {
         ...state,
+        pending: clearMandatePending ? null : state.pending,
         status: authRequired(action.failure) ? { kind: "AUTH_REQUIRED" } : { kind: "FAILED", failure: asFailure(action.failure) },
         announcement: action.failure.error.message,
       };
+      }
 
     case "VIEW_SELECTED":
       return { ...state, view: action.view, announcement: `${recoveryViewLabels[action.view]} view.` };
@@ -485,7 +504,7 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         status: { kind: "READY" },
         refreshRequired: false,
         evidenceDraft: everyResultAccepted ? emptyEvidenceDraft : { ...state.evidenceDraft, preparing: false },
-        announcement: `Evidence submitted. ${action.submission.acceptedEvidenceCount} accepted of ${action.submission.results.length} sent.`,
+        announcement: evidenceSubmissionAnnouncement(action.submission),
       };
     }
 
@@ -587,7 +606,28 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         rollback: null,
         announcement: "Recording the veto…",
       };
+
+    case "EVIDENCE_SOURCE_STARTED":
+      return {
+        ...state,
+        pending: {
+          kind: action.action === "DISCONNECT" ? "SOURCE_DISCONNECT" : "SOURCE_RECONNECT",
+          idempotencyKey: action.idempotencyKey,
+          sourceId: action.sourceId,
+        },
+        rollback: null,
+        announcement: action.action === "DISCONNECT"
+          ? "Disconnecting this evidence source…"
+          : "Reconnecting this evidence source…",
+      };
   }
+}
+
+function evidenceSubmissionAnnouncement(submission: EvidenceSubmissionDto) {
+  const evidenceCount = submission.acceptedEvidenceCount;
+  const submittedCount = submission.results.length;
+  const submittedUnit = submission.type === "CSV_IMPORT" ? "file" : "receipt";
+  return `Evidence submitted. ${evidenceCount} evidence item${evidenceCount === 1 ? "" : "s"} saved from ${submittedCount} submitted ${submittedUnit}${submittedCount === 1 ? "" : "s"}.`;
 }
 
 // The decision a control should render right now: the pending intent while a

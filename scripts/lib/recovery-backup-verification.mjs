@@ -1,11 +1,67 @@
 export const requiredRecoveryMigration = "0023_recovery_v1";
+export const requiredAutopilotIntegrityMigrations = [
+  "0045_autopilot_mandate_execution_immutability",
+  "0046_billed_window_immutability",
+  "0047_billed_window_insert_immutability",
+];
+export const requiredAutopilotIntegrityTriggers = [
+  "product_events_workspace_activated_immutable",
+  "recovery_billing_year_anchors_immutable",
+  "recovery_candidate_events_immutable",
+  "recovery_classification_snapshots_immutable",
+  "recovery_covered_windows_billed_immutable",
+  "recovery_execution_attempts_immutable",
+  "recovery_executions_immutable",
+  "recovery_fee_ledger_immutable",
+  "recovery_operator_actions_immutable",
+  "recovery_standing_mandate_events_immutable",
+  "recovery_standing_mandates_immutable",
+];
+
+export const requiredAutopilotAuditCountKeys = [
+  "standing_mandate_events",
+  "candidate_events",
+  "operator_actions",
+  "classification_snapshots",
+  "executions",
+  "execution_attempts",
+];
+
+export function hasAutopilotAuditFacts(counts) {
+  if (!counts) return false;
+  let total = BigInt(0);
+  for (const key of requiredAutopilotAuditCountKeys) {
+    const value = String(counts[key] ?? "");
+    if (!/^\d+$/.test(value)) return false;
+    total += BigInt(value);
+  }
+  return total > BigInt(0);
+}
 
 export async function readRecoveryBackupVerification(client) {
-  const migration = await client.query(
-    `select id from schema_migrations where id = $1`,
-    [requiredRecoveryMigration],
+  const requiredMigrations = [requiredRecoveryMigration, ...requiredAutopilotIntegrityMigrations];
+  const migrations = await client.query(
+    `select id from schema_migrations where id = any($1::text[]) order by id`,
+    [requiredMigrations],
   );
-  if (migration.rowCount !== 1) throw new Error(`Database is missing required migration: ${requiredRecoveryMigration}`);
+  const appliedMigrations = new Set(migrations.rows.map((row) => row.id));
+  const missingMigrations = requiredMigrations.filter((id) => !appliedMigrations.has(id));
+  if (missingMigrations.length) throw new Error(`Database is missing required migrations: ${missingMigrations.join(", ")}`);
+  const triggers = await client.query(
+    `select trigger.tgname as name
+     from pg_trigger trigger
+     join pg_class relation on relation.oid = trigger.tgrelid
+     join pg_namespace namespace on namespace.oid = relation.relnamespace
+     where namespace.nspname = 'public'
+       and not trigger.tgisinternal
+       and trigger.tgname = any($1::text[])
+     order by trigger.tgname`,
+    [requiredAutopilotIntegrityTriggers],
+  );
+  const integrityTriggers = triggers.rows.map((row) => row.name);
+  const foundTriggers = new Set(integrityTriggers);
+  const missingTriggers = requiredAutopilotIntegrityTriggers.filter((name) => !foundTriggers.has(name));
+  if (missingTriggers.length) throw new Error(`Database is missing required integrity triggers: ${missingTriggers.join(", ")}`);
 
   const result = await client.query(
     `select
@@ -25,6 +81,9 @@ export async function readRecoveryBackupVerification(client) {
        (select count(*)::text from recovery_covered_windows) as covered_windows,
        (select count(*)::text from recovery_fee_ledger) as fee_ledger,
        (select count(*)::text from recovery_execution_attempts) as execution_attempts,
+       (select count(*)::text from recovery_standing_mandate_events) as standing_mandate_events,
+       (select count(*)::text from recovery_candidate_events) as candidate_events,
+       (select count(*)::text from recovery_operator_actions) as operator_actions,
        (select count(*)::text from recovery_shadow_gate_snapshots) as shadow_gate_snapshots,
        (select count(*)::text from recovery_notice_delivery_events) as notice_delivery_events,
        (select count(*)::text from recovery_autopilot_dead_letters) as dead_letters,
@@ -43,6 +102,8 @@ export async function readRecoveryBackupVerification(client) {
 
   return {
     requiredMigration: requiredRecoveryMigration,
+    requiredIntegrityMigrations: [...requiredAutopilotIntegrityMigrations],
+    integrityTriggers,
     recoveryWorkspaceCounts: result.rows[0],
   };
 }
@@ -50,10 +111,24 @@ export async function readRecoveryBackupVerification(client) {
 export function recoveryBackupVerificationMatches(expected, actual) {
   if (!expected || expected.requiredMigration !== requiredRecoveryMigration) return false;
   if (actual.requiredMigration !== expected.requiredMigration) return false;
+  if (!sameStrings(expected.requiredIntegrityMigrations, requiredAutopilotIntegrityMigrations)) return false;
+  if (!sameStrings(actual.requiredIntegrityMigrations, requiredAutopilotIntegrityMigrations)) return false;
+  if (!sameStrings(expected.integrityTriggers, requiredAutopilotIntegrityTriggers)) return false;
+  if (!sameStrings(actual.integrityTriggers, requiredAutopilotIntegrityTriggers)) return false;
   const expectedCounts = expected.recoveryWorkspaceCounts;
   const actualCounts = actual.recoveryWorkspaceCounts;
   if (!expectedCounts || !actualCounts) return false;
+  for (const key of requiredAutopilotAuditCountKeys) {
+    if (!(key in expectedCounts) || !(key in actualCounts)) return false;
+  }
+  if (!hasAutopilotAuditFacts(expectedCounts) || !hasAutopilotAuditFacts(actualCounts)) return false;
   const keys = Object.keys(actualCounts);
   return keys.length === Object.keys(expectedCounts).length
     && keys.every((key) => String(expectedCounts[key]) === String(actualCounts[key]));
+}
+
+function sameStrings(actual, expected) {
+  return Array.isArray(actual)
+    && actual.length === expected.length
+    && actual.every((value, index) => value === expected[index]);
 }

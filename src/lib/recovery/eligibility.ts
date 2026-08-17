@@ -1,6 +1,6 @@
 import { classifyCommitment, executableCommitmentClass, isProtectedCommitmentClass, type CommitmentClass } from "@/lib/commitment-policy";
 import { matchSupportedProvider } from "@/lib/recovery/provider-registry";
-import { isWithinMandateCeilings, standingMandateVetoHours } from "@/lib/recovery/standing-mandate";
+import { isWithinMandateCeilings, standingMandateVetoHours } from "@/lib/recovery/standing-mandate-text";
 
 export const eligibilityCodes = [
   "MANDATE_INACTIVE",

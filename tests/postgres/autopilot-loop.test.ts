@@ -493,7 +493,12 @@ test("persisted private-pilot loop reaches cited picture, mandate, delivered vet
       }),
       /Execution blocked: CLASSIFICATION_STALE/,
     );
-    await pool.query(`delete from recovery_classification_snapshots where id = $1`, [staleSnapshot.rows[0].id]);
+    await pool.query(
+      `update recovery_action_candidates
+       set classification_snapshot_id = $2
+       where workspace_id = $1 and id = $3`,
+      [workspaceId, staleSnapshot.rows[0].id, openai.id],
+    );
 
     const vetoed = await vetoAutopilotCandidate({
       workspaceId,

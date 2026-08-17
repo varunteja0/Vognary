@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import test from "node:test";
@@ -16,6 +17,11 @@ import {
   type LegacyItem,
   type LegacyLedgerBlockerCounts,
 } from "../../scripts/lib/migrate-legacy-recovery";
+import {
+  readRecoveryBackupVerification,
+  recoveryBackupVerificationMatches,
+  requiredAutopilotAuditCountKeys,
+} from "../../scripts/lib/recovery-backup-verification.mjs";
 
 const zeroLegacyBlockers: LegacyLedgerBlockerCounts = {
   unsupportedSources: 0,
@@ -64,6 +70,9 @@ const recoveryRelations = [
   "recovery_veto_notices",
   "recovery_classification_snapshots",
   "recovery_executions",
+  "recovery_standing_mandate_events",
+  "recovery_candidate_events",
+  "recovery_operator_actions",
   "recovery_provider_disables",
 ] as const;
 
@@ -93,15 +102,15 @@ test("the real migration runner installs and records the Recovery receipt inbox 
 }, async () => {
   await withDisposableDatabase("recovery_fresh", async (connectionString) => {
     const result = runMigrations(connectionString);
-      assert.equal(result.applied.at(-1)?.id, "0044_autopilot_audit_immutability");
+    assert.equal(result.applied.at(-1)?.id, "0047_billed_window_insert_immutability");
 
     const pool = createPool(connectionString);
     try {
       const migrations = await pool.query<{ id: string }>(
         `select id from schema_migrations order by id`,
       );
-      assert.equal(migrations.rows.at(-1)?.id, "0044_autopilot_audit_immutability");
-      assert.equal(migrations.rows.length, 44);
+      assert.equal(migrations.rows.at(-1)?.id, "0047_billed_window_insert_immutability");
+      assert.equal(migrations.rows.length, 47);
       await assertRecoveryRelations(pool);
       const integrity = await pool.query<{ conname: string | null; trigger: string | null }>(
         `select
@@ -344,14 +353,17 @@ test("the real migration runner upgrades an existing 0022 database through Recov
       { id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" },
       { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
       { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
+      { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
+      { id: "0046_billed_window_immutability", mode: "applied-migration" },
+      { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
     ]);
 
     const verifyPool = createPool(connectionString);
     try {
       const migration = await verifyPool.query<{ id: string }>(
-        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source', '0029_legacy_tenant_integrity', '0030_legacy_tenant_ownership_immutable', '0031_autopilot_loop', '0032_autopilot_proof_integrity', '0033_autopilot_integrity', '0034_autopilot_repair', '0035_autopilot_codex_repair', '0036_autopilot_notice_hold', '0037_autopilot_clock_integrity', '0038_autopilot_reconcile_integrity', '0039_autopilot_frozen_notice_integrity', '0040_autopilot_review_integrity', '0041_workspace_activation_integrity', '0042_workspace_activation_semantic_reset', '0043_workspace_activation_semantic_version', '0044_autopilot_audit_immutability')`,
+        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source', '0029_legacy_tenant_integrity', '0030_legacy_tenant_ownership_immutable', '0031_autopilot_loop', '0032_autopilot_proof_integrity', '0033_autopilot_integrity', '0034_autopilot_repair', '0035_autopilot_codex_repair', '0036_autopilot_notice_hold', '0037_autopilot_clock_integrity', '0038_autopilot_reconcile_integrity', '0039_autopilot_frozen_notice_integrity', '0040_autopilot_review_integrity', '0041_workspace_activation_integrity', '0042_workspace_activation_semantic_reset', '0043_workspace_activation_semantic_version', '0044_autopilot_audit_immutability', '0045_autopilot_mandate_execution_immutability', '0046_billed_window_immutability', '0047_billed_window_insert_immutability')`,
       );
-      assert.equal(migration.rowCount, 22);
+      assert.equal(migration.rowCount, 25);
       await assertRecoveryRelations(verifyPool);
 
       const preserved = await verifyPool.query<{
@@ -534,6 +546,9 @@ test("the real migration runner upgrades 0027 through 0028 without dropping Reco
       { id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" },
       { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
       { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
+      { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
+      { id: "0046_billed_window_immutability", mode: "applied-migration" },
+      { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -1003,6 +1018,9 @@ test("0029 installs over historical cross-workspace rows without rewriting owner
       { id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" },
       { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
       { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
+      { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
+      { id: "0046_billed_window_immutability", mode: "applied-migration" },
+      { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{ decision_workspace: string; item_workspace: string }>(
@@ -1237,6 +1255,9 @@ test("0030 leaves historical cross-workspace rows untouched and they remain cuto
       { id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" },
       { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
       { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
+      { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
+      { id: "0046_billed_window_immutability", mode: "applied-migration" },
+      { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{
@@ -1429,6 +1450,9 @@ test("upgrading from 0030 through 0033 cannot insert fee rows until 0034 sets fi
       { id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" },
       { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
       { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
+      { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
+      { id: "0046_billed_window_immutability", mode: "applied-migration" },
+      { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -1534,17 +1558,22 @@ test("upgrading a genuinely frozen 0037 notice retries through the real store an
         [ids.mandateId, ids.workspaceId, "c".repeat(64), ids.userId],
       );
       await mid.query(
+        `insert into consent_grants (workspace_id, user_id, subject_email, purpose, notice_version, source)
+         values ($1, $2, $3, 'standing-mandate-autopilot', 'frozen-upgrade', 'frozen-upgrade')`,
+        [ids.workspaceId, ids.userId, `${ids.userId}@frozen-upgrade.test`],
+      );
+      await mid.query(
         `insert into recovery_classification_snapshots (
            id, workspace_id, commitment_id, commitment_class, protected_override, cited_category,
            confidence_score, evidence_ids
-         ) values ($1, $2, $3, 'discretionary-subscription', false, 'Software', 90, ARRAY[$4::uuid])`,
+         ) values ($1, $2, $3, 'discretionary-subscription', false, 'AI tools', 90, ARRAY[$4::uuid])`,
         [ids.snapshotId, ids.workspaceId, ids.commitmentId, ids.evidenceId],
       );
       await mid.query(
         `insert into recovery_action_candidates (
            id, workspace_id, commitment_id, mandate_id, mandate_version, classification_snapshot_id,
-           commitment_class, eligibility, status, amount_minor, currency
-         ) values ($1, $2, $3, $4, 1, $5, 'discretionary-subscription', 'ELIGIBLE', 'NOTICE_QUEUED', 1999, 'INR')`,
+           commitment_class, eligibility, status, amount_minor, currency, provider_id
+         ) values ($1, $2, $3, $4, 1, $5, 'discretionary-subscription', 'ELIGIBLE', 'NOTICE_QUEUED', 1999, 'INR', 'openai')`,
         [ids.candidateId, ids.workspaceId, ids.commitmentId, ids.mandateId, ids.snapshotId],
       );
       await mid.query(
@@ -1580,6 +1609,9 @@ test("upgrading a genuinely frozen 0037 notice retries through the real store an
       { id: "0042_workspace_activation_semantic_reset", mode: "applied-migration" },
       { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
       { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
+      { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
+      { id: "0046_billed_window_immutability", mode: "applied-migration" },
+      { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
     ]);
     const retryOutput = execFileSync(
       process.execPath,
@@ -1599,6 +1631,7 @@ test("upgrading a genuinely frozen 0037 notice retries through the real store an
           AUTOPILOT_NOTICE_ENABLED: "true",
           AUTOPILOT_NOTICE_CHANNEL_READY: "true",
           AUTOPILOT_TEST_ADAPTER: "true",
+          AUTOPILOT_TEST_PROVEN_PROVIDER_IDS: "openai",
           AUTOPILOT_VETO_TOKEN_SECRET: "upgrade-veto-signing-secret-32bytes!!",
           RESEND_FROM_EMAIL: fromEmail,
         },
@@ -1729,6 +1762,9 @@ test("0042 purges legacy workspace.activated rows that 0041 would have preserved
     assert.deepEqual(marker.applied, [
       { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
       { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
+      { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
+      { id: "0046_billed_window_immutability", mode: "applied-migration" },
+      { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
     ]);
 
     const helperOutput = execFileSync(
@@ -1749,6 +1785,7 @@ test("0042 purges legacy workspace.activated rows that 0041 would have preserved
           DATABASE_URL: connectionString,
           POSTGRES_SSL: "false",
           SESSION_SECRET: process.env.SESSION_SECRET || "activation-reset-session-secret-at-least-32-bytes",
+          TOKEN_ENCRYPTION_KEY: process.env.TOKEN_ENCRYPTION_KEY || "11".repeat(32),
           ALLOW_IN_MEMORY_RATE_LIMITS: process.env.ALLOW_IN_MEMORY_RATE_LIMITS || "true",
         },
       },
@@ -1815,6 +1852,9 @@ test("0043 requires a semantic-version marker so old-style activations cannot be
     assert.deepEqual(applied.applied, [
       { id: "0043_workspace_activation_semantic_version", mode: "applied-migration" },
       { id: "0044_autopilot_audit_immutability", mode: "applied-migration" },
+      { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
+      { id: "0046_billed_window_immutability", mode: "applied-migration" },
+      { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
     ]);
 
     const after = createPool(connectionString);
@@ -1851,6 +1891,7 @@ test("0043 requires a semantic-version marker so old-style activations cannot be
           DATABASE_URL: connectionString,
           POSTGRES_SSL: "false",
           SESSION_SECRET: process.env.SESSION_SECRET || "activation-marker-session-secret-at-least-32-bytes",
+          TOKEN_ENCRYPTION_KEY: process.env.TOKEN_ENCRYPTION_KEY || "11".repeat(32),
           ALLOW_IN_MEMORY_RATE_LIMITS: process.env.ALLOW_IN_MEMORY_RATE_LIMITS || "true",
         },
       },
@@ -1892,7 +1933,7 @@ test("0043 requires a semantic-version marker so old-style activations cannot be
   });
 });
 
-test("production-upgrade rehearsal from 0030 preserves Recovery facts through 0044 and fail-closes old activation writes", {
+test("production-upgrade rehearsal from 0030 preserves Recovery facts through 0047 and fail-closes old activation writes", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
   await withDisposableDatabase("autopilot_upgrade_rehearsal", async (connectionString) => {
@@ -1983,6 +2024,9 @@ test("production-upgrade rehearsal from 0030 preserves Recovery facts through 00
       "0042_workspace_activation_semantic_reset",
       "0043_workspace_activation_semantic_version",
       "0044_autopilot_audit_immutability",
+      "0045_autopilot_mandate_execution_immutability",
+      "0046_billed_window_immutability",
+      "0047_billed_window_insert_immutability",
     ]);
 
     const after = createPool(connectionString);
@@ -2012,6 +2056,11 @@ test("production-upgrade rehearsal from 0030 preserves Recovery facts through 00
          ) values ($1, '2026-08-01', '2026-08-31', 'INR', 0, 0, 0, 0, 0, 0, 'FAIL_CLOSED', $2, '2026-08-01')`,
         [workspaceId, "c".repeat(64)],
       );
+      await seedAutopilotAuditFacts(after, { workspaceId, userId, commitmentId, evidenceId });
+      const verification = await readRecoveryBackupVerification(after);
+      for (const key of requiredAutopilotAuditCountKeys) {
+        assert.notEqual(verification.recoveryWorkspaceCounts[key], "0", `${key} must be seeded for restore drills`);
+      }
       await assert.rejects(
         after.query(`delete from recovery_fee_ledger where workspace_id = $1`, [workspaceId]),
         /cannot be deleted directly/i,
@@ -2186,6 +2235,141 @@ async function assertRecoveryRelations(pool: Pool) {
   );
   assert.deepEqual(result.rows.map((row) => row.table_name), [...recoveryRelations].sort());
 }
+
+async function seedAutopilotAuditFacts(
+  pool: Pool,
+  ids: { workspaceId: string; userId: string; commitmentId: string; evidenceId: string },
+) {
+  const mandate = await pool.query<{ id: string }>(
+    `insert into recovery_standing_mandates (
+       workspace_id, version, status, terms_version, signed_text, signed_text_hash,
+       per_action_ceiling_minor, rolling_30d_ceiling_minor, veto_window_hours, signed_by_user_id
+     ) values ($1, 1, 'ACTIVE', 'standing-mandate-2026-08-16', $2, $3, 5000000, 20000000, 48, $4)
+     returning id`,
+    [ids.workspaceId, "I authorize Vognary to cancel supported discretionary subscriptions under this standing mandate for rehearsal.", "b".repeat(64), ids.userId],
+  );
+  await pool.query(
+    `insert into recovery_standing_mandate_events (workspace_id, mandate_id, kind, actor_user_id)
+     values ($1, $2, 'SIGNED', $3)`,
+    [ids.workspaceId, mandate.rows[0]!.id, ids.userId],
+  );
+  const snapshot = await pool.query<{ id: string }>(
+    `insert into recovery_classification_snapshots (
+       workspace_id, commitment_id, commitment_class, protected_override, cited_category,
+       cited_merchant, confidence_score, evidence_ids
+     ) values ($1, $2, 'discretionary-subscription', false, 'Software', 'OpenAI', 90, $3)
+     returning id`,
+    [ids.workspaceId, ids.commitmentId, [ids.evidenceId]],
+  );
+  const candidate = await pool.query<{ id: string }>(
+    `insert into recovery_action_candidates (
+       workspace_id, commitment_id, mandate_id, mandate_version, classification_snapshot_id,
+       commitment_class, eligibility, status, amount_minor, currency
+     ) values ($1, $2, $3, 1, $4, 'discretionary-subscription', 'ELIGIBLE', 'SHADOW', 199900, 'INR')
+     returning id`,
+    [ids.workspaceId, ids.commitmentId, mandate.rows[0]!.id, snapshot.rows[0]!.id],
+  );
+  await pool.query(
+    `insert into recovery_candidate_events (workspace_id, candidate_id, previous_status, status, actor_kind, reason_code)
+     values ($1, $2, null, 'SHADOW', 'SYSTEM', 'shadow-created')`,
+    [ids.workspaceId, candidate.rows[0]!.id],
+  );
+  await pool.query(
+    `insert into recovery_operator_actions (workspace_id, candidate_id, actor_user_id, minutes, outcome)
+     values ($1, $2, $3, 1, 'EXCEPTION')`,
+    [ids.workspaceId, candidate.rows[0]!.id, ids.userId],
+  );
+  await pool.query(
+    `insert into recovery_execution_attempts (
+       workspace_id, candidate_id, attempt_no, operation_key, request_hash, provider_id, status
+     ) values ($1, $2, 1, $3, $4, 'openai', 'AUTHORIZED')`,
+    [ids.workspaceId, candidate.rows[0]!.id, `rehearsal-op-${ids.workspaceId.slice(0, 8)}`, "e".repeat(64)],
+  );
+  await pool.query(
+    `insert into recovery_executions (
+       workspace_id, candidate_id, provider_id, route, actor_kind, outcome, attempt_no
+     ) values ($1, $2, 'openai', 'unsupported', 'OPERATOR', 'EXCEPTION', 1)`,
+    [ids.workspaceId, candidate.rows[0]!.id],
+  );
+}
+
+test("pg_dump/pg_restore preserves Autopilot audit counts through 0047", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("autopilot_dump_source", async (sourceUrl) => {
+    runMigrations(sourceUrl);
+    const source = createPool(sourceUrl);
+    const userId = randomUUID();
+    const workspaceId = randomUUID();
+    const submissionId = randomUUID();
+    const sourceId = randomUUID();
+    const evidenceId = randomUUID();
+    const commitmentId = randomUUID();
+    try {
+      await source.query(`insert into users (id, email) values ($1, $2)`, [userId, `${userId}@dump.test`]);
+      await source.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Dump source')`, [workspaceId, userId]);
+      await source.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+      await source.query(
+        `insert into recovery_submissions (id, workspace_id, source_type, accepted_evidence_count)
+         values ($1, $2, 'RECEIPT_PASTE', 1)`,
+        [submissionId, workspaceId],
+      );
+      await source.query(
+        `insert into recovery_sources (
+           id, workspace_id, submission_id, source_type, client_ref, label, content_hash, raw_evidence
+         ) values ($1, $2, $3, 'RECEIPT_PASTE', 'openai-dump', 'Pasted receipt', $4, '{}'::jsonb)`,
+        [sourceId, workspaceId, submissionId, "a".repeat(64)],
+      );
+      await source.query(
+        `insert into recovery_evidence (
+           id, workspace_id, source_id, fingerprint, evidence_kind, row_number, excerpt, merchant,
+           normalized_merchant, category, provenance_reference, confidence_state
+         ) values ($1, $2, $3, $4, 'RECEIPT', 1, 'OpenAI charged INR 1999', 'OpenAI', 'openai',
+           'Software', 'paste:openai-dump', 'HIGH')`,
+        [evidenceId, workspaceId, sourceId, "b".repeat(64)],
+      );
+      await source.query(
+        `insert into recovery_commitments (
+           id, workspace_id, identity_key, base_status, base_merchant, base_category, base_cadence,
+           base_currency, base_amount_minor, base_monthly_minor, effective_status, effective_merchant,
+           effective_cadence, effective_amount_minor, effective_monthly_minor, confidence_score,
+           recommended_decision, recommendation_reason
+         ) values ($1, $2, 'openai-dump', 'ACTIVE', 'OpenAI', 'Software', 'MONTHLY', 'INR', 1999, 1999,
+           'ACTIVE', 'OpenAI', 'MONTHLY', 1999, 1999, 90, 'KEEP', 'Cited OpenAI debit.')`,
+        [commitmentId, workspaceId],
+      );
+      await seedAutopilotAuditFacts(source, { workspaceId, userId, commitmentId, evidenceId });
+      const expected = await readRecoveryBackupVerification(source);
+      for (const key of requiredAutopilotAuditCountKeys) {
+        assert.notEqual(expected.recoveryWorkspaceCounts[key], "0", key);
+      }
+      const dumpDir = mkdtempSync(path.join(tmpdir(), "vognary-pg-dump-"));
+      const dumpPath = path.join(dumpDir, "audit.dump");
+      try {
+        execFileSync("pg_dump", ["--format=custom", "--no-owner", "--no-acl", `--dbname=${sourceUrl}`, `--file=${dumpPath}`]);
+        await withDisposableDatabase("autopilot_dump_target", async (targetUrl) => {
+          execFileSync("pg_restore", ["--no-owner", "--no-acl", "--exit-on-error", `--dbname=${targetUrl}`, dumpPath]);
+          const restored = createPool(targetUrl);
+          try {
+            const actual = await readRecoveryBackupVerification(restored);
+            assert.equal(recoveryBackupVerificationMatches(expected, actual), true);
+            for (const key of requiredAutopilotAuditCountKeys) {
+              assert.notEqual(actual.recoveryWorkspaceCounts[key], "0", key);
+            }
+          } finally {
+            await restored.end();
+          }
+        });
+      } finally {
+        rmSync(dumpDir, { recursive: true, force: true });
+      }
+    } finally {
+      await source.query(`delete from workspaces where id = $1`, [workspaceId]).catch(() => undefined);
+      await source.query(`delete from users where id = $1`, [userId]).catch(() => undefined);
+      await source.end();
+    }
+  });
+});
 
 function databaseConnectionString(connectionString: string, databaseName: string) {
   const url = new URL(connectionString);

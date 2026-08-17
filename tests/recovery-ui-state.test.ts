@@ -45,7 +45,9 @@ const home: HomeProjectionDto = {
   next: [],
   coverage: { state: "BASELINE_ONLY", sourceCount: 1, evidenceCount: 1, lastEvidenceAt: null, coverageStart: null, coverageEnd: null, limitations: [] },
   activeCommitmentCount: 0,
+  unknownCadenceCommitmentCount: 0,
   reviewItemCount: 0,
+  evidenceSources: [],
 };
 
 const detail: CommitmentDetailDto = {
@@ -278,6 +280,89 @@ test("stale and conflicting state force a reload instead of a silent guess", () 
   }
 });
 
+test("signing or revoking a mandate clears pending when the refreshed snapshot loads, including after failure", () => {
+  const signing = recoveryReducer(loaded(), {
+    type: "MANDATE_STARTED",
+    action: "SIGN",
+    idempotencyKey: "mandate-sign-1",
+  });
+  assert.equal(signing.pending?.kind, "MANDATE_SIGN");
+  const signed = recoveryReducer(signing, {
+    type: "SNAPSHOT_LOADED",
+    home: {
+      ...home,
+      autopilot: {
+        executionEnabled: false,
+        noticeEnabled: false,
+        noticeReadiness: {
+          featureSwitch: false,
+          channelReady: false,
+          credentialsPresent: false,
+          webhookReady: false,
+          deliveryProven: false,
+          state: "off",
+        },
+        mandate: {
+          id: "mandate-1",
+          version: 1,
+          status: "ACTIVE",
+          termsVersion: "standing-mandate-2026-08-16",
+          signedText: "signed",
+          signedTextHash: "a".repeat(64),
+          currency: "INR",
+          perActionCeilingMinor: "5000000",
+          rolling30dCeilingMinor: "20000000",
+          vetoWindowHours: 48,
+          signedAt: "2026-08-16T00:00:00.000Z",
+          revokedAt: null,
+        },
+        watching: [],
+        awaitingDelivery: [],
+        inVeto: [],
+        handled: [],
+        needsHelp: [],
+        proof: [],
+        fees: [],
+        attempts: [],
+      },
+    },
+    commitments: [commitment],
+    total: 1,
+    nextCursor: null,
+    meta,
+  });
+  assert.equal(signed.pending, null);
+
+  const revoking = recoveryReducer(signed, {
+    type: "MANDATE_STARTED",
+    action: "REVOKE",
+    idempotencyKey: "mandate-revoke-1",
+  });
+  assert.equal(revoking.pending?.kind, "MANDATE_REVOKE");
+  const revoked = recoveryReducer(revoking, {
+    type: "SNAPSHOT_LOADED",
+    home: { ...home, autopilot: signed.home?.autopilot ? { ...signed.home.autopilot, mandate: { ...signed.home.autopilot.mandate!, status: "REVOKED", revokedAt: "2026-08-16T01:00:00.000Z" } } : undefined },
+    commitments: [commitment],
+    total: 1,
+    nextCursor: null,
+    meta,
+  });
+  assert.equal(revoked.pending, null);
+
+  const failedSign = recoveryReducer(signing, {
+    type: "MUTATION_FAILED",
+    failure: failure({ code: "SAVE_FAILED", message: "Mandate was not saved.", retryable: true, requestId: "request-mandate-fail" }),
+  });
+  assert.equal(failedSign.pending, null);
+  assert.equal(failedSign.rollback?.mutation.kind, "MANDATE_SIGN");
+
+  const snapshotFailed = recoveryReducer(revoking, {
+    type: "SNAPSHOT_FAILED",
+    failure: failure({ code: "UNKNOWN", message: "Snapshot failed.", retryable: true, requestId: "request-snapshot-fail" }),
+  });
+  assert.equal(snapshotFailed.pending, null);
+});
+
 test("an auth failure moves the whole workspace into the signed-out state", () => {
   const state = recoveryReducer(loaded(), {
     type: "SNAPSHOT_FAILED",
@@ -304,7 +389,17 @@ test("evidence results decide whether the draft is cleared or kept for repair", 
     meta,
   });
   assert.equal(accepted.evidenceDraft.receiptText, "");
-  assert.equal(accepted.announcement, "Evidence submitted. 1 accepted of 1 sent.");
+  assert.equal(accepted.announcement, "Evidence submitted. 1 evidence item saved from 1 submitted receipt.");
+
+  const expanded = recoveryReducer(withDraft, {
+    type: "EVIDENCE_SUBMITTED",
+    submission: { id: "submission-expanded", type: "RECEIPT_PASTE", ingestedAt: "2026-08-09T10:00:00.000Z", acceptedEvidenceCount: 4, results: [{ clientRef: "receipt-paste-1", status: "ACCEPTED", code: null, message: null }] },
+    home,
+    commitments: [commitment],
+    total: 2,
+    meta,
+  });
+  assert.equal(expanded.announcement, "Evidence submitted. 4 evidence items saved from 1 submitted receipt.");
 
   const rejected = recoveryReducer(withDraft, {
     type: "EVIDENCE_SUBMITTED",

@@ -23,7 +23,7 @@ AI must **cite or shut up**. Never invent amounts, merchants, or connector liven
 - Path with spaces: quote `"/Users/varunteja/Desktop/CVT Group/Vognary"`
 - Before merge: `lint` · `typecheck` · `claims:check` · `tokens:check` · `test` · disposable `test:postgres` when the WP touches migrations/stores · then `build` · `perf:budget`
 - Engine changes: **failing test first**
-- Prefer `src/app/workspace/*` over growing `vognary-mvp-client.tsx`
+- Use the canonical `src/app/workspace/*` implementation; do not recreate the retired monolith.
 - Founder-only ops: API keys, Google verification, Razorpay, legal, Setu — agents prepare, never fake READY
 
 ### Autopilot loop — same-repo sequential branch

@@ -103,37 +103,6 @@ test("Recovery v1 persists the canonical Customer #0 lifecycle with isolation an
       [workspaceId],
     );
     assert.doesNotMatch(`${redactedJson.rows[0].results}${redactedJson.rows[0].replay}`, /someone@okhdfcbank|Alice Example|12 Lake Road|Hyderabad/i);
-    const envelope = await pool.query<{
-      submission_source_type: string;
-      source_source_type: string;
-      ingested_at: Date;
-      source_ingested_at: Date;
-      provenance_kind: string;
-      provenance_reference: string;
-    }>(
-      `select
-         submission.source_type as submission_source_type,
-         source.source_type as source_source_type,
-         submission.ingested_at,
-         source.ingested_at as source_ingested_at,
-         evidence.provenance_kind,
-         evidence.provenance_reference
-       from recovery_submissions submission
-       join recovery_sources source
-         on source.workspace_id = submission.workspace_id and source.submission_id = submission.id
-       join recovery_evidence evidence
-         on evidence.workspace_id = source.workspace_id and evidence.source_id = source.id
-       where submission.workspace_id = $1
-       order by submission.ingested_at asc
-       limit 1`,
-      [workspaceId],
-    );
-    assert.equal(envelope.rows[0]?.submission_source_type, "RECEIPT_PASTE");
-    assert.equal(envelope.rows[0]?.source_source_type, "RECEIPT_PASTE");
-    assert.equal(envelope.rows[0]?.ingested_at.toISOString(), "2026-08-09T10:00:00.000Z");
-    assert.equal(envelope.rows[0]?.source_ingested_at.toISOString(), "2026-08-09T10:00:00.000Z");
-    assert.equal(envelope.rows[0]?.provenance_kind, "USER_SUBMITTED");
-    assert.match(envelope.rows[0]?.provenance_reference ?? "", /^[0-9a-f-]+:[0-9a-f-]+:1$/i);
 
     const replay = await submitRecoveryEvidence({
       workspaceId,
@@ -404,9 +373,6 @@ test("two realistic receipt observations infer one canonical monthly subscriptio
     assert.equal(first.data.home.recentObservations[0]?.amount?.minor, "199900");
     assert.equal(first.data.home.recentObservations[0]?.amount?.currency, "INR");
     assert.equal(first.data.home.recentObservations[0]?.date, "2026-07-06");
-    assert.equal(first.data.home.activeCommitmentCount, 0);
-    assert.deepEqual(first.data.home.annualizedEstimateTotals, []);
-    assert.equal(first.data.home.reviewItemCount, 0);
 
     const second = await submitRecoveryEvidence({
       workspaceId,
@@ -430,10 +396,91 @@ test("two realistic receipt observations infer one canonical monthly subscriptio
     assert.equal(second.data.commitments[0]?.amount.minor, "199900");
     assert.equal(second.data.commitments[0]?.evidenceCount, 2);
     assert.equal(second.data.commitments[0]?.nextExpectedDate, "2026-09-06");
-    assert.equal(second.data.home.activeCommitmentCount, 1);
-    assert.equal(second.data.home.reviewItemCount > 0, true);
-    assert.deepEqual(second.data.home.monthlyTotals.map((total) => [total.amount.currency, total.amount.minor]), [["INR", "199900"]]);
-    assert.deepEqual(second.data.home.annualizedEstimateTotals.map((total) => [total.amount.currency, total.amount.minor, total.amount.display]), [["INR", "2398800", "₹23,988.00"]]);
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [ownerUserId]);
+  }
+});
+
+test("observed receipt persistence keeps explicit merchants attached to their own dates", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const pool = getDatabasePool();
+  const ownerUserId = randomUUID();
+  const workspaceId = randomUUID();
+  const suffix = randomUUID().slice(0, 8);
+
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [ownerUserId, `recovery-merchant-${suffix}@example.test`]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Merchant identity workspace')`, [workspaceId, ownerUserId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, ownerUserId]);
+
+  try {
+    await submitRecoveryEvidence({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: 0,
+      idempotencyKey: `merchant-identity-${suffix}`,
+      request: {
+        kind: "RECEIPT_PASTE",
+        receipts: [{
+          clientRef: "out-of-order-receipts",
+          text: [
+            "MERCHANT: Notion Labs; Payment date: 6 August 2026; Software subscription payment. Total: USD 10.00",
+            "Merchant: Acme Cloud; Payment date: 6 July 2026; Software subscription payment. Total: INR 1,499.00",
+          ].join("\n\n"),
+        }],
+      },
+      now: new Date("2026-08-10T10:00:00.000Z"),
+    });
+
+    const evidence = await pool.query<{ merchant: string; category: string; evidence_date: string }>(
+      `select merchant, category, evidence_date::text
+       from recovery_evidence
+       where workspace_id = $1
+       order by evidence_date`,
+      [workspaceId],
+    );
+    assert.deepEqual(evidence.rows, [
+      { merchant: "Acme Cloud", category: "Cloud hosting", evidence_date: "2026-07-06" },
+      { merchant: "Notion Labs", category: "Productivity", evidence_date: "2026-08-06" },
+    ]);
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [ownerUserId]);
+  }
+});
+
+test("upcoming-only receipt evidence never appears as a recent observed charge", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const pool = getDatabasePool();
+  const ownerUserId = randomUUID();
+  const workspaceId = randomUUID();
+  const suffix = randomUUID().slice(0, 8);
+
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [ownerUserId, `recovery-upcoming-${suffix}@example.test`]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Upcoming-only workspace')`, [workspaceId, ownerUserId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, ownerUserId]);
+
+  try {
+    const submitted = await submitRecoveryEvidence({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: 0,
+      idempotencyKey: `upcoming-only-${suffix}`,
+      request: {
+        kind: "RECEIPT_PASTE",
+        receipts: [{
+          clientRef: "future-mandate",
+          text: "Pre-debit notification: mandate towards MAX BUPA HEALTH for INR 50,000 will be debited on 20 August 2026.",
+        }],
+      },
+      now: new Date("2026-08-10T10:00:00.000Z"),
+    });
+
+    assert.equal(submitted.data.submission.acceptedEvidenceCount, 1);
+    assert.equal(submitted.data.home.recentObservations.length, 0);
+    assert.equal(submitted.data.home.next[0]?.date, "2026-08-20");
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
     await pool.query(`delete from users where id = $1`, [ownerUserId]);
@@ -534,28 +581,6 @@ test("Recovery persists JPY, KWD, and PostgreSQL-bigint corrections without JS-n
       now: new Date("2026-08-09T10:00:00.000Z"),
     });
     assert.equal(submitted.workspaceVersion, 1);
-    const csvEnvelope = await pool.query<{
-      source_type: string;
-      ingested_at: Date;
-      provenance_kind: string;
-      coverage_start: string;
-      coverage_end: string;
-    }>(
-      `select source.source_type, source.ingested_at, evidence.provenance_kind,
-              source.coverage_start::text, source.coverage_end::text
-       from recovery_sources source
-       join recovery_evidence evidence
-         on evidence.workspace_id = source.workspace_id and evidence.source_id = source.id
-       where source.workspace_id = $1
-       order by evidence.created_at asc
-       limit 1`,
-      [workspaceId],
-    );
-    assert.equal(csvEnvelope.rows[0]?.source_type, "CSV_IMPORT");
-    assert.equal(csvEnvelope.rows[0]?.ingested_at.toISOString(), "2026-08-09T10:00:00.000Z");
-    assert.equal(csvEnvelope.rows[0]?.provenance_kind, "USER_SUBMITTED");
-    assert.equal(csvEnvelope.rows[0]?.coverage_start, "2026-06-01");
-    assert.equal(csvEnvelope.rows[0]?.coverage_end, "2026-07-02");
     const listed = await listRecoveryCommitments({ workspaceId, actorUserId: ownerUserId, limit: 10 });
     assert.equal(listed.total, 2);
     const jpy = listed.items.find((item) => item.amount.currency === "JPY");

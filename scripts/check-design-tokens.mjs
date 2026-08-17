@@ -20,10 +20,8 @@ export const ALLOWED_FILES = new Set([
   "src/app/pwa/startup/[size]/route.tsx", // PWA splash image spec
 ]);
 
-// The 281 KB monolith is quarantined here until the Phase-2 decomposition. NOT
-// a blanket ignore — one explicit dated file; any *new* file is fully enforced.
-// TODO(Phase-2): decompose vognary-mvp-client.tsx, tokenise its literals, delete this.
-export const WP4_DEFERRED = new Set(["src/app/vognary-mvp-client.tsx"]);
+// No production component is deferred from token enforcement.
+export const WP4_DEFERRED = new Set();
 
 // Narrowly-scoped literal exceptions with a stated reason.
 export const KNOWN_EXCEPTIONS = [

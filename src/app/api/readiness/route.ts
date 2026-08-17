@@ -8,6 +8,7 @@ import { checkGoogleAuthConfiguration } from "@/lib/server/google-auth";
 import { isLeadDatabaseConfigured } from "@/lib/server/lead-store";
 import { getMonitoringBackendStatus } from "@/lib/server/monitoring";
 import { checkRenewalAlertEmailConfiguration } from "@/lib/server/renewal-alert-mailer";
+import { isOperationalSecretValid } from "@/lib/server/internal-auth";
 import { getReceiptInboxLaunchReadiness } from "@/lib/server/recovery-inbound-store";
 import { checkSessionConfiguration } from "@/lib/server/session";
 import { checkTokenVaultConfiguration } from "@/lib/server/token-vault";
@@ -151,7 +152,7 @@ function getRetentionSchedulerStatus(feature: { status: string; lastEnforcedAt: 
   if (process.env.RETENTION_SCHEDULER_STATUS === "production-live" && feature.lastEnforcedAt) return "operator-attested-production-live";
   if (process.env.RETENTION_SCHEDULER_STATUS === "production-live") return "invalid-attestation-no-enforced-run-observed";
   if (feature.lastEnforcedAt) return "last-run-observed-deployment-schedule-unverified";
-  if (process.env.CRON_SECRET) return "cron-secret-configured-deployment-schedule-unverified";
+  if (isOperationalSecretValid(process.env.CRON_SECRET)) return "cron-secret-configured-deployment-schedule-unverified";
   return "cron-route-ready-needs-secret";
 }
 
@@ -161,7 +162,7 @@ function getRenewalAlertStatus(
 ) {
   if (feature.status === "migration-pending" || feature.status === "migration-ledger-unavailable" || feature.status === "schema-query-failed") return feature.status;
   if (email.status !== "ready") return "schema-ready-email-not-configured";
-  if (!process.env.CRON_SECRET) return "email-ready-cron-secret-missing";
+  if (!isOperationalSecretValid(process.env.CRON_SECRET)) return "email-ready-cron-secret-missing";
   if (process.env.RENEWAL_ALERT_DELIVERY_STATUS === "production-live" && feature.lastSentAt) return "operator-attested-production-live";
   if (process.env.RENEWAL_ALERT_DELIVERY_STATUS === "production-live") return "invalid-attestation-no-delivery-observed";
   if (feature.lastSentAt) return "delivery-observed-deployment-schedule-unverified";

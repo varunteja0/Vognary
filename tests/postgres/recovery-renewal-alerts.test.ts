@@ -82,6 +82,10 @@ test("Recovery date corrections and decisions reconcile reminder deliveries atom
       [workspaceId],
     )).rows[0]?.id;
     assert.ok(commitmentId);
+    await pool.query(
+      `update recovery_commitments set confidence_score = 72 where workspace_id = $1 and id = $2`,
+      [workspaceId, commitmentId],
+    );
 
     await scheduleRenewalAlertsForWorkspace(workspaceId);
     assert.deepEqual(await deliveryCounts(pool, workspaceId, dates.old_date), { scheduled: 2, cancelled: 0 });

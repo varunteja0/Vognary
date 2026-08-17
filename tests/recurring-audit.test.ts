@@ -126,6 +126,25 @@ test("surfaces single-occurrence annual commitments as investigate candidates", 
   assert.equal(domain?.frequency, "yearly");
 });
 
+test("preserves recognizable insurance and telecom providers instead of replacing them with categories", () => {
+  const audit = analyzeStatements(
+    [{
+      name: "statement.csv",
+      text: csv([
+        "2026-04-10,LIC OF INDIA POLICY PREMIUM,4200,",
+        "2026-05-06,JIO POSTPAID BILL,399,",
+        "2026-06-06,JIO POSTPAID BILL,399,",
+        "2026-07-06,JIO POSTPAID BILL,399,",
+      ]),
+    }],
+    [],
+    { today },
+  );
+
+  assert.equal(audit.recurringItems.find((item) => item.category === "Insurance")?.merchant, "LIC");
+  assert.equal(audit.recurringItems.find((item) => item.category === "Utilities")?.merchant, "Jio");
+});
+
 test("ignores single-occurrence rows without recurring semantics", () => {
   const audit = analyzeStatements(
     [{

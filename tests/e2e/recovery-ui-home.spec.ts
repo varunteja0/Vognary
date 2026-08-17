@@ -132,7 +132,9 @@ const home = {
     limitations: ["Only pasted receipts are covered."],
   },
   activeCommitmentCount: 1,
+  unknownCadenceCommitmentCount: 0,
   reviewItemCount: 1,
+  evidenceSources: [],
 };
 
 const meta = { requestId: "request-e2e", workspaceVersion: 4 };
@@ -142,12 +144,17 @@ type DecisionOutcome = { ok: true } | { ok: false; status: number; body: unknown
 async function mockRecoveryApi(page: Page, options: { decision?: DecisionOutcome } = {}) {
   let currentDetail: Record<string, unknown> = detail;
   let currentMeta = meta;
-  const activationCalls: string[] = [];
+  const activationResponses: number[] = [];
+  page.on("response", (response) => {
+    const request = response.request();
+    if (request.method() === "POST" && new URL(response.url()).pathname === "/api/workspaces/current/activation") {
+      activationResponses.push(response.status());
+    }
+  });
   await page.route("**/api/workspaces/current/brief", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: home, meta }) }),
   );
   await page.route("**/api/workspaces/current/activation", (route) => {
-    activationCalls.push(route.request().method());
     return route.fulfill({
       status: 201,
       contentType: "application/json",
@@ -185,7 +192,7 @@ async function mockRecoveryApi(page: Page, options: { decision?: DecisionOutcome
       }),
     });
   });
-  return { activationCalls };
+  return { activationResponses };
 }
 
 async function signIn(page: Page) {
@@ -210,16 +217,17 @@ test("home renders attention, upcoming charges, and receipt freshness without in
     });
   });
   await signIn(page);
-  const { activationCalls } = await mockRecoveryApi(page);
+  const { activationResponses } = await mockRecoveryApi(page);
   await page.goto("/app");
 
   await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 
   const nav = page.getByRole("navigation", { name: "Primary" });
-  for (const label of ["Home", "Subscriptions", "Sources", "Mandate"]) {
+  for (const label of ["Home", "Subscriptions", "Sources"]) {
     await expect(nav.getByRole("button", { name: label })).toBeVisible();
   }
+  await expect(nav.getByRole("button", { name: "Mandate" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: `Account for ${email}` })).toHaveAttribute("href", "/profile");
 
   await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
@@ -227,8 +235,12 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
 
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
-  await expect.poll(() => activationCalls.length).toBe(1);
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
+  const attentionBox = await page.getByRole("heading", { name: "Needs attention" }).boundingBox();
+  const recurringAmountBox = await page.getByText("Monthly recurring amount").boundingBox();
+  expect(attentionBox?.y).toBeLessThan(recurringAmountBox?.y ?? 0);
+  await expect.poll(() => activationResponses.length).toBe(1);
+  expect(activationResponses).toEqual([201]);
   await expect(page.getByText("From checked receipts only.").first()).toBeVisible();
   await expect(page.getByText("₹1,999.00").first()).toBeVisible();
   await expect(page.getByText("₹23,988.00")).toBeVisible();
@@ -284,7 +296,7 @@ test("later evidence produces a genuine changed list instead of a baseline", asy
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toBeVisible();
   const changedBox = await page.getByRole("heading", { name: "Since your last visit" }).boundingBox();
   const attentionBox = await page.getByRole("heading", { name: "Needs attention" }).boundingBox();
-  expect(changedBox?.y).toBeLessThan(attentionBox?.y ?? 0);
+  expect(attentionBox?.y).toBeLessThan(changedBox?.y ?? 0);
   await expect(page.getByText("Amount changed")).toBeVisible();
   const changeRow = page.locator("article").filter({ hasText: "Amount changed" });
   await expect(changeRow.getByText("₹1,999.00")).toBeVisible();
@@ -316,7 +328,7 @@ test("a commitment exposes its exact evidence and returns focus after inspection
   await expect(dialog.getByText("6 Jul 2026").first()).toBeVisible();
   await expect(dialog.getByText("INR · 199900 in the smallest unit")).toBeVisible();
   await expect(dialog.getByText("You submitted this evidence")).toBeVisible();
-  await expect(dialog.getByText("Medium confidence · 72%")).toBeVisible();
+  await expect(dialog.getByText("Medium confidence", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Treat the amount and date as provisional until more evidence lands.")).toBeVisible();
 
   await page.keyboard.press("Escape");
@@ -408,17 +420,13 @@ test("the workspace stays usable and keyboard-reachable on a small screen", asyn
   await expect(page.getByRole("heading", { level: 2, name: "Subscriptions" })).toBeFocused();
 });
 
-test("Mandate tab shows the frozen terms and does not claim execution is live", async ({ page }) => {
+test("Mandate stays hidden until notice delivery is proven", async ({ page }) => {
   await signIn(page);
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" }).click();
-  await expect(page.getByText("No standing mandate is signed")).toBeVisible();
-  await expect(page.getByText(/No merchant cancellation route is proven yet/)).toBeVisible();
-  await expect(page.getByText("Off — no cancellation is executed")).toBeVisible();
-  await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Emergency disable" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toHaveCount(0);
 });
 
 test("exception-only Autopilot home is honest on desktop and mobile and has no serious axe issues", async ({ page }) => {
@@ -427,6 +435,14 @@ test("exception-only Autopilot home is honest on desktop and mobile and has no s
     autopilot: {
       executionEnabled: false,
       noticeEnabled: false,
+      noticeReadiness: {
+        featureSwitch: false,
+        channelReady: false,
+        credentialsPresent: false,
+        webhookReady: false,
+        deliveryProven: false,
+        state: "off",
+      },
       mandate: {
         id: "mandate-1",
         version: 1,
@@ -442,11 +458,12 @@ test("exception-only Autopilot home is honest on desktop and mobile and has no s
         revokedAt: null,
       },
       watching: [],
+      awaitingDelivery: [],
       inVeto: [],
       handled: [],
       needsHelp: [],
-      proof: [{ candidateId: "candidate-1", status: "PENDING", expectedDebitDate: "2026-09-06", savingMinor: null }],
-      fees: null,
+      proof: [{ candidateId: "candidate-1", status: "PENDING", expectedDebitDate: "2026-09-06", currency: "USD", saving: null }],
+      fees: [],
       attempts: [],
     },
   };
@@ -457,14 +474,14 @@ test("exception-only Autopilot home is honest on desktop and mobile and has no s
   );
   await page.goto("/app");
 
-  for (const name of ["Watching", "Veto window", "Handled for you", "Needs your help", "Proof and savings", "Fees and refunds", "Mandate"]) {
+  for (const name of ["Watching", "Delivery pending", "48-hour veto window", "Handled for you", "Needs your help", "Proof and savings", "Fees and refunds", "Mandate"]) {
     await expect(page.getByRole("heading", { name })).toBeVisible();
   }
   await expect(page.getByText("Exception-only home")).toBeVisible();
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect(page.getByText("From checked receipts only.").first()).toBeVisible();
   await expect(page.getByText("No recurring amount yet")).toHaveCount(0);
-  await expect(page.getByText("missing coverage is not a ₹0 saving", { exact: false })).toBeVisible();
+  await expect(page.getByText("missing USD coverage is not a zero saving", { exact: false })).toBeVisible();
   await expect(page.getByText("Fee collection stays fail-closed")).toBeVisible();
   await expect(page.getByText("This is not a connected, cancelled, saved, or paid state.")).toBeVisible();
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -486,10 +503,19 @@ test("an active mandate still shows the spend strip when no recurring amount is 
     annualizedEstimateTotals: [],
     next30DayTotals: [],
     activeCommitmentCount: 0,
+    unknownCadenceCommitmentCount: 0,
     reviewItemCount: 0,
     autopilot: {
       executionEnabled: false,
       noticeEnabled: false,
+      noticeReadiness: {
+        featureSwitch: false,
+        channelReady: false,
+        credentialsPresent: false,
+        webhookReady: false,
+        deliveryProven: false,
+        state: "off",
+      },
       mandate: {
         id: "mandate-1",
         version: 1,
@@ -505,11 +531,12 @@ test("an active mandate still shows the spend strip when no recurring amount is 
         revokedAt: null,
       },
       watching: [],
+      awaitingDelivery: [],
       inVeto: [],
       handled: [],
       needsHelp: [],
       proof: [],
-      fees: null,
+      fees: [],
       attempts: [],
     },
   };
@@ -521,7 +548,8 @@ test("an active mandate still shows the spend strip when no recurring amount is 
   await page.goto("/app");
 
   await expect(page.getByText("Exception-only home")).toBeVisible();
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" })).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect(page.getByText("No recurring amount yet")).toBeVisible();
   await expect(page.getByText("Annualized estimate", { exact: true })).toBeVisible();
   await expect(page.getByText("Active commitments")).toBeVisible();
@@ -539,6 +567,7 @@ test("Home posts activation only after a cited recurring-spend picture actually 
     next: [],
     recentObservations: [],
     activeCommitmentCount: 0,
+    unknownCadenceCommitmentCount: 0,
     reviewItemCount: 0,
     coverage: {
       state: "NO_EVIDENCE",
@@ -568,7 +597,7 @@ test("Home posts activation only after a cited recurring-spend picture actually 
 
   await signIn(page);
   await expect(page.getByRole("heading", { level: 2, name: "Home" })).toBeVisible();
-  await expect(page.getByText("Monthly software spend")).toHaveCount(0);
+  await expect(page.getByText("Monthly recurring amount")).toHaveCount(0);
   expect(activationCalls).toEqual([]);
 
   await page.goto("about:blank");
@@ -583,10 +612,10 @@ test("Home posts activation only after a cited recurring-spend picture actually 
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
   await page.goto("/app");
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   await page.reload();
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(1);
 });
@@ -620,20 +649,20 @@ test("Home records activation after analytics opt-in on a tab that previously re
   });
 
   await signIn(page);
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   expect(activationCalls[0]).toEqual({ status: 202 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
 
   consented = true;
   await page.goto("/app");
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(2);
   expect(activationCalls[1]).toEqual({ status: 201 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBe("1");
 
   await page.reload();
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(2);
 });
@@ -671,19 +700,226 @@ test("Home records activation after a 401 once the tab can authenticate again", 
   });
 
   await signIn(page);
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   expect(activationCalls[0]).toEqual({ status: 401 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
 
   authenticated = true;
   await page.goto("/app");
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(2);
   expect(activationCalls[1]).toEqual({ status: 201 });
 
   await page.reload();
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(2);
+});
+
+const queuedCandidate = {
+  id: "candidate-queued",
+  commitmentId: "commitment-1",
+  merchant: "OpenAI",
+  eligibility: "ELIGIBLE",
+  status: "NOTICE_QUEUED",
+  reasons: [],
+  providerId: "openai",
+  amount: money,
+  noticeDeliveredAt: null,
+  vetoDeadlineAt: null,
+  noticeDeliveryStatus: "QUEUED",
+  tokenCoverageInvalid: false,
+  noticePresentation: { kind: "queued" as const },
+  exceptionCode: null,
+};
+
+const deliveredCandidate = {
+  ...queuedCandidate,
+  id: "candidate-delivered",
+  merchant: "Notion",
+  noticeDeliveredAt: "2026-08-24T00:05:00.000Z",
+  vetoDeadlineAt: "2026-08-26T00:05:00.000Z",
+  noticeDeliveryStatus: "DELIVERED",
+  noticePresentation: {
+    kind: "veto-window" as const,
+    deliveredAt: "2026-08-24T00:05:00.000Z",
+    vetoDeadlineAt: "2026-08-26T00:05:00.000Z",
+  },
+};
+
+const bouncedCandidate = {
+  ...queuedCandidate,
+  id: "candidate-bounced",
+  merchant: "Figma",
+  status: "EXCEPTION",
+  noticeDeliveryStatus: "BOUNCED",
+  noticePresentation: { kind: "bounced" as const },
+};
+
+test("notice states distinguish delivery pending from a delivered 48-hour clock", async ({ page }) => {
+  const usdSaving = { currency: "USD", minor: "1000", exponent: 2, display: "$10.00" };
+  const inrSaving = { currency: "INR", minor: "199900", exponent: 2, display: "₹1,999.00" };
+  const noticeHome = {
+    ...home,
+    autopilot: {
+      executionEnabled: false,
+      noticeEnabled: true,
+      noticeReadiness: {
+        featureSwitch: true,
+        channelReady: true,
+        credentialsPresent: true,
+        webhookReady: true,
+        deliveryProven: false,
+        state: "configured-unproven",
+      },
+      mandate: {
+        id: "mandate-1",
+        version: 1,
+        status: "ACTIVE",
+        termsVersion: "standing-mandate-2026-08-16",
+        signedText: "I authorize Vognary. Authority is limited to INR ₹50,000 per action and INR ₹2,00,000 rolling 30-day ceiling.",
+        signedTextHash: "a".repeat(64),
+        currency: "INR",
+        perActionCeilingMinor: "5000000",
+        rolling30dCeilingMinor: "20000000",
+        vetoWindowHours: 48,
+        signedAt: "2026-08-09T10:00:00.000Z",
+        revokedAt: null,
+      },
+      watching: [],
+      awaitingDelivery: [queuedCandidate],
+      inVeto: [deliveredCandidate],
+      handled: [],
+      needsHelp: [bouncedCandidate],
+      proof: [
+        { candidateId: "candidate-delivered", status: "COVERED_CLEAN", expectedDebitDate: "2026-09-06", currency: "INR", saving: inrSaving },
+        { candidateId: "candidate-usd", status: "COVERED_CLEAN", expectedDebitDate: "2026-09-07", currency: "USD", saving: usdSaving },
+      ],
+      fees: [{
+        currency: "INR",
+        monitoring: { currency: "INR", minor: "19900", exponent: 2, display: "₹199.00" },
+        verifiedSaving: inrSaving,
+        outcomeFee: { currency: "INR", minor: "0", exponent: 2, display: "₹0.00" },
+        retained: { currency: "INR", minor: "0", exponent: 2, display: "₹0.00" },
+        refundCredit: { currency: "INR", minor: "0", exponent: 2, display: "₹0.00" },
+        additionalCharge: { currency: "INR", minor: "0", exponent: 2, display: "₹0.00" },
+        chargeStatus: "FAIL_CLOSED",
+      }],
+      attempts: [],
+    },
+  };
+  await signIn(page);
+  await mockRecoveryApi(page);
+  await page.route("**/api/workspaces/current/brief", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: noticeHome, meta }) }),
+  );
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: "Delivery pending" })).toBeVisible();
+  await expect(page.getByText("Delivery is pending.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "48-hour veto window" })).toBeVisible();
+  const vetoWindowBox = await page.getByRole("heading", { name: "48-hour veto window" }).boundingBox();
+  const recurringAmountBox = await page.getByText("Monthly recurring amount").boundingBox();
+  expect(vetoWindowBox?.y).toBeLessThan(recurringAmountBox?.y ?? 0);
+  const watchingBox = await page.getByRole("heading", { name: "Watching" }).boundingBox();
+  const helpBox = await page.getByRole("heading", { name: "Needs your help" }).boundingBox();
+  const handledBox = await page.getByRole("heading", { name: "Handled for you" }).boundingBox();
+  expect(vetoWindowBox?.y).toBeLessThan(watchingBox?.y ?? 0);
+  expect(helpBox?.y).toBeLessThan(handledBox?.y ?? 0);
+  await expect(page.getByText(/Delivered 2026-08-24T00:05:00.000Z/)).toBeVisible();
+  await expect(page.getByText(/Veto by 2026-08-26T00:05:00.000Z/)).toBeVisible();
+  await expect(page.getByText("Notice bounced. There is no active veto countdown.")).toBeVisible();
+  await expect(page.getByLabel("₹1,999.00 INR").first()).toBeVisible();
+  await expect(page.getByLabel("$10.00 USD")).toBeVisible();
+  await expect(page.getByText(/minor units/i)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Veto", exact: true })).toHaveCount(2);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(page.getByText("Delivery is pending.")).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  expect(overflow).toBe(false);
+});
+
+test("Sources tab disconnects cited Recovery sources without rotating the receipt alias", async ({ page }) => {
+  const sourcedHome = {
+    ...home,
+    evidenceSources: [{
+      id: "source-1",
+      kind: "RECEIPT_PASTE",
+      label: "Pasted OpenAI receipt",
+      cited: true,
+      status: "CONNECTED" as const,
+      disconnectedAt: null,
+      reconnectedAt: null,
+    }],
+  };
+  await signIn(page);
+  await mockRecoveryApi(page);
+  await page.route("**/api/workspaces/current/brief", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: sourcedHome, meta }) }),
+  );
+  const disconnectCalls: string[] = [];
+  await page.route("**/api/workspaces/current/autopilot/sources/*/disconnect", (route) => {
+    disconnectCalls.push(route.request().method());
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          sourceId: "source-1",
+          disconnectedAt: "2026-08-16T00:00:00.000Z",
+          reconnectedAt: null,
+          withdrawnCandidateIds: ["candidate-queued"],
+        },
+        meta: { requestId: "request-disconnect", workspaceVersion: 5 },
+      }),
+    });
+  });
+  const reconnectCalls: string[] = [];
+  await page.route("**/api/workspaces/current/autopilot/sources/*/reconnect", (route) => {
+    reconnectCalls.push(route.request().method());
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          sourceId: "source-1",
+          disconnectedAt: "2026-08-16T00:00:00.000Z",
+          reconnectedAt: "2026-08-16T00:05:00.000Z",
+          withdrawnCandidateIds: [],
+        },
+        meta: { requestId: "request-reconnect", workspaceVersion: 6 },
+      }),
+    });
+  });
+  await page.goto("/app");
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await expect(page.getByText("Pasted OpenAI receipt")).toBeVisible();
+  await expect(page.getByText("Pasted receipt · Connected · supports current commitment facts")).toBeVisible();
+  await expect(page.getByText(/does not rotate the receipt address/)).toBeVisible();
+  await page.getByRole("button", { name: "Disconnect source" }).click();
+  await expect.poll(() => disconnectCalls).toEqual(["POST"]);
+
+  await page.route("**/api/workspaces/current/brief", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          ...sourcedHome,
+          evidenceSources: [{
+            ...sourcedHome.evidenceSources[0],
+            status: "DISCONNECTED",
+            cited: false,
+            disconnectedAt: "2026-08-16T00:00:00.000Z",
+          }],
+        },
+        meta,
+      }),
+    }),
+  );
+  await page.reload();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await expect(page.getByText("Pasted receipt · Disconnected · not currently supporting a commitment")).toBeVisible();
+  await page.getByRole("button", { name: "Reconnect source" }).click();
+  await expect.poll(() => reconnectCalls).toEqual(["POST"]);
 });

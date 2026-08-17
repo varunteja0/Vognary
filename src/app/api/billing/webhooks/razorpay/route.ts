@@ -29,15 +29,15 @@ export async function POST(request: Request) {
     && (!oldSecret || !verifyRazorpayWebhookSignature(rawBody, signature, oldSecret))) {
     return Response.json({ error: "Invalid webhook signature." }, { status: 401 });
   }
-  const eventId = request.headers.get("x-razorpay-event-id")?.trim() ?? "";
+  const payloadHash = hashBillingPayload(rawBody);
   let event;
   try {
-    event = parseRazorpayBillingEvent(JSON.parse(rawBody), eventId);
+    event = parseRazorpayBillingEvent(JSON.parse(rawBody), `razorpay:${payloadHash}`);
   } catch (error) {
     return Response.json({ error: error instanceof SyntaxError ? "Webhook JSON is invalid." : "Webhook payload is invalid." }, { status: 400 });
   }
   try {
-    const result = await applyRazorpayBillingEvent(event, hashBillingPayload(rawBody));
+    const result = await applyRazorpayBillingEvent(event, payloadHash);
     return Response.json(result, { status: result.status === "rejected" ? 422 : 200 });
   } catch {
     return Response.json({ error: "Webhook processing failed and should be retried." }, { status: 500 });

@@ -116,24 +116,6 @@ test("tile copy avoids prohibited public claims", () => {
   }
 });
 
-test("consumer connection copy hides company infrastructure details", () => {
-  const source = readFileSync(new URL("../src/app/vognary-mvp-client.tsx", import.meta.url), "utf8");
-  for (const pattern of [
-    /GOOGLE_REDIRECT_URI/,
-    /GOOGLE_OAUTH_VERIFICATION_COMPLETE/,
-    /SETU_AA_/,
-    /ACCOUNT_AGGREGATOR_PARTNER_STATUS/,
-    /requiredEnv\.join/,
-    /missingEnv\.join/,
-    /Required redirect URI/i,
-    /Activation pending on this deployment/i,
-  ]) {
-    assert.doesNotMatch(source, pattern);
-  }
-  assert.match(source, /A regulated partner handles account access/);
-  assert.match(source, /No credentials or technical setup are required from you/);
-});
-
 test("consumer connector endpoints are retired without infrastructure names", () => {
   for (const path of [
     "../src/app/api/integrations/gmail/start/route.ts",
@@ -151,7 +133,6 @@ test("consumer connector endpoints are retired without infrastructure names", ()
 test("customer sign-in and workspace copy hide company configuration", () => {
   for (const path of [
     "../src/app/login/login-client.tsx",
-    "../src/app/vognary-mvp-client.tsx",
     "../src/app/api/auth/google/start/route.ts",
     "../src/app/api/auth/magic-link/request/route.ts",
   ]) {

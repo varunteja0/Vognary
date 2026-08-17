@@ -555,6 +555,7 @@ async function buildAccessExport(client: PoolClient, input: {
       recommendation_type: string;
       reason: string;
       estimated_monthly_savings: string;
+      currency: string;
       confidence_score: number;
       accepted_at: Date | null;
       dismissed_at: Date | null;
@@ -563,6 +564,7 @@ async function buildAccessExport(client: PoolClient, input: {
       `select recommendation.id, recommendation.recurring_item_id,
               recommendation.recommendation_type, recommendation.reason,
               recommendation.estimated_monthly_savings,
+              item.currency,
               recommendation.confidence_score, recommendation.accepted_at,
               recommendation.dismissed_at, recommendation.created_at
        from recommendations recommendation
@@ -709,12 +711,13 @@ async function buildAccessExport(client: PoolClient, input: {
         ) record) as action_candidates,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
           select candidate_id as "candidateId", status, expected_debit_date as "expectedDebitDate",
-                 saving_minor::text as "savingMinor"
+               saving_minor::text as "savingMinor", currency
           from recovery_covered_windows where workspace_id = $1
           order by expected_debit_date asc limit $2
         ) record) as covered_windows,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
           select period_start as "periodStart", period_end as "periodEnd",
+               currency,
                  monitoring_minor::text as "monitoringMinor",
                  verified_saving_minor::text as "verifiedSavingMinor",
                  retained_minor::text as "retainedMinor",
@@ -747,16 +750,15 @@ async function buildAccessExport(client: PoolClient, input: {
         ) record) as candidate_events,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
           select candidate_id as "candidateId", channel, delivery_status as "deliveryStatus",
-                 delivered_at as "deliveredAt", veto_token_hash as "vetoTokenHash",
-                 veto_expires_at as "vetoExpiresAt", notice_body_hash as "noticeBodyHash",
+                 delivered_at as "deliveredAt",
+                 veto_expires_at as "vetoExpiresAt",
                  frozen_at as "frozenAt", created_at as "createdAt"
           from recovery_veto_notices where workspace_id = $1
           order by created_at asc limit $2
         ) record) as veto_notices,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
           select candidate_id as "candidateId", attempt_no as "attemptNo", status, outcome,
-                 operator_minutes::text as "operatorMinutes", proof_kind as "proofKind",
-                 proof_reference_hash as "proofReferenceHash", created_at as "createdAt"
+                 operator_minutes::text as "operatorMinutes", proof_kind as "proofKind", created_at as "createdAt"
           from recovery_execution_attempts where workspace_id = $1
           order by created_at asc limit $2
         ) record) as execution_attempts,
@@ -772,8 +774,7 @@ async function buildAccessExport(client: PoolClient, input: {
           order by created_at asc limit $2
         ) record) as operator_actions,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
-          select candidate_id as "candidateId", event_type as "eventType", occurred_at as "occurredAt",
-                 encode(decode(payload_hash, 'hex'), 'hex') as "noticeFingerprint"
+          select candidate_id as "candidateId", event_type as "eventType", occurred_at as "occurredAt"
           from recovery_notice_delivery_events where workspace_id = $1
           order by created_at asc limit $2
         ) record) as notice_delivery_events,
@@ -1141,16 +1142,22 @@ async function buildAccessExport(client: PoolClient, input: {
       success_fee_basis_points: number;
       minimum_fee_minor: string;
       maximum_fee_minor: string;
+      currency: string;
       authorized_at: Date;
       revoked_at: Date | null;
     }>(
-      `select id, action_case_id, authorized_by_user_id, action, scope,
-              authorization_version, terms_version, authorization_text,
-              success_fee_basis_points, minimum_fee_minor::text,
-              maximum_fee_minor::text, authorized_at, revoked_at
-       from action_authorizations
-       where workspace_id = $1
-       order by authorized_at asc, id asc
+            `select grant_record.id, grant_record.action_case_id, grant_record.authorized_by_user_id,
+                    grant_record.action, grant_record.scope, grant_record.authorization_version,
+                    grant_record.terms_version, grant_record.authorization_text,
+                    grant_record.success_fee_basis_points, grant_record.minimum_fee_minor::text,
+                    grant_record.maximum_fee_minor::text, action_case.currency,
+                    grant_record.authorized_at, grant_record.revoked_at
+             from action_authorizations grant_record
+             join action_cases action_case
+               on action_case.workspace_id = grant_record.workspace_id
+              and action_case.id = grant_record.action_case_id
+             where grant_record.workspace_id = $1
+             order by grant_record.authorized_at asc, grant_record.id asc
        limit $2`,
       [input.workspaceId, exportRowLimits.actionAuthorizations + 1],
     ),
@@ -1433,6 +1440,7 @@ async function buildAccessExport(client: PoolClient, input: {
       recommendationType: row.recommendation_type,
       reason: row.reason,
       estimatedMonthlySavings: Number(row.estimated_monthly_savings),
+      estimatedMonthlySavingsCurrency: row.currency,
       confidenceScore: row.confidence_score,
       acceptedAt: toIso(row.accepted_at),
       dismissedAt: toIso(row.dismissed_at),
@@ -1677,6 +1685,7 @@ async function buildAccessExport(client: PoolClient, input: {
         successFeeBasisPoints: row.success_fee_basis_points,
         minimumFeeMinor: Number(row.minimum_fee_minor),
         maximumFeeMinor: Number(row.maximum_fee_minor),
+        currency: row.currency,
         authorizedAt: row.authorized_at.toISOString(),
         revokedAt: toIso(row.revoked_at),
       })),

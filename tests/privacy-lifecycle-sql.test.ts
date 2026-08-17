@@ -77,8 +77,9 @@ test("privacy export SQL excludes raw rows, secret material, and arbitrary conne
   assert.match(exportSection, /from recovery_changes/);
   assert.doesNotMatch(exportSection, /select[^;]*raw_evidence/);
   assert.doesNotMatch(exportSection, /from recovery_idempotency_keys/);
-  assert.match(exportSection, /as "noticeFingerprint"/);
+  assert.doesNotMatch(exportSection, /as "noticeFingerprint"/);
   assert.doesNotMatch(exportSection, /as "payloadHash"/);
+  assert.doesNotMatch(exportSection, /veto_token_hash|notice_body_hash|proof_reference_hash|notice_fingerprint/);
   assert.match(exportSection, /as provider_controls/);
   assert.match(exportSection, /connected_mandate_cohort/);
   assert.match(exportSection, /source_disconnections/);

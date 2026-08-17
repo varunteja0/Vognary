@@ -3,8 +3,8 @@
 import dynamic from "next/dynamic";
 import type { RecoveryCutoverStatus } from "@/lib/recovery/contracts";
 
-// Signed-in readers get the Recovery workspace. The legacy monolith stays in the
-// tree, untouched, as the rollback reference for this switch.
+// Signed-in readers get the canonical Recovery workspace. The retired monolith
+// is intentionally absent so there is only one live financial authority.
 const RecoveryWorkspaceClient = dynamic(() => import("../workspace/recovery/recovery-workspace-client"), {
   loading: () => <ExperienceLoading label="Opening the workspace…" />,
 });

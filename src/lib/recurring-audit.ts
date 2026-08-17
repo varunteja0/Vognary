@@ -160,6 +160,8 @@ const merchantRules: MerchantRule[] = [
   { pattern: /NETFLIX/i, merchant: "Netflix", category: "Streaming" },
   { pattern: /SPOTIFY/i, merchant: "Spotify", category: "Streaming" },
   { pattern: /YOUTUBE|GOOGLE\*YOUTUBE/i, merchant: "YouTube", category: "Streaming" },
+  { pattern: /JIOHOTSTAR/i, merchant: "JioHotstar", category: "Streaming" },
+  { pattern: /HOTSTAR/i, merchant: "Hotstar", category: "Streaming" },
   { pattern: /APPLE|ICLOUD|APP STORE/i, merchant: "Apple", category: "App store" },
   { pattern: /GOOGLE PLAY|PLAYSTORE|PLAY STORE/i, merchant: "Google Play", category: "App store" },
   { pattern: /ADOBE/i, merchant: "Adobe", category: "Creative tools" },
@@ -174,8 +176,13 @@ const merchantRules: MerchantRule[] = [
   { pattern: /HOSTINGER|GODADDY|NAMECHEAP|CLOUDFLARE/i, merchant: "Domain or hosting provider", category: "Domains" },
   { pattern: /\b(?:LOAN|EMI|ECS|NACH)\b/i, merchant: "Loan or EMI", category: "Debt" },
   { pattern: /SIP|MUTUAL FUND|ZERODHA|GROWW|KUVERA/i, merchant: "Investment SIP", category: "Investments" },
-  { pattern: /INSURANCE|POLICY|LIC|HDFC LIFE|ICICI PRU/i, merchant: "Insurance", category: "Insurance" },
-  { pattern: /AIRTEL|JIO|VI |VODAFONE/i, merchant: "Telecom", category: "Utilities" },
+  { pattern: /\bLIC\b/i, merchant: "LIC", category: "Insurance" },
+  { pattern: /HDFC LIFE/i, merchant: "HDFC Life", category: "Insurance" },
+  { pattern: /ICICI PRU/i, merchant: "ICICI Prudential", category: "Insurance" },
+  { pattern: /INSURANCE|POLICY/i, merchant: "Insurance provider", category: "Insurance" },
+  { pattern: /AIRTEL/i, merchant: "Airtel", category: "Utilities" },
+  { pattern: /\bJIO\b/i, merchant: "Jio", category: "Utilities" },
+  { pattern: /\bVI\b|VODAFONE/i, merchant: "Vodafone Idea", category: "Utilities" },
 ];
 
 const frequencyModels: FrequencyModel[] = [
@@ -303,9 +310,17 @@ export function createEmptyAudit(): AuditResult {
 }
 
 export function getFrequencyMonthlyMultiplier(frequency: Frequency): number {
-  const model = frequencyModels.find((item) => item.frequency === frequency);
-  const expectedGapDays = model?.expectedGapDays ?? 30.44;
-  return 30.44 / expectedGapDays;
+  const cyclesPerYear: Record<Frequency, number> = {
+    weekly: 52,
+    biweekly: 26,
+    semimonthly: 24,
+    monthly: 12,
+    bimonthly: 6,
+    quarterly: 4,
+    yearly: 1,
+    irregular: 0,
+  };
+  return cyclesPerYear[frequency] / 12;
 }
 
 export function getFrequencyGapDays(frequency: Frequency): number {

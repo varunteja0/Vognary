@@ -198,6 +198,7 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.transactions.length, 2);
     assert.equal(document.recurringLedger.length, 2);
     assert.equal(document.decisions.length, 1);
+    assert.equal(document.recommendations.every((recommendation: { estimatedMonthlySavingsCurrency?: string }) => /^[A-Z]{3}$/.test(recommendation.estimatedMonthlySavingsCurrency ?? "")), true);
     assert.equal(document.workspaceState.revision, 1);
     assert.equal(document.workspaceState.state.reviewCompletedAt, "2026-07-11T01:00:00.000Z");
     assert.equal(document.workspaceState.state.statementSources[0].text.includes("NETFLIX"), true);
@@ -252,6 +253,7 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.verifiedOutcomes.actionCases.length, 1);
     assert.equal(document.verifiedOutcomes.authorizations.length, 1);
     assert.match(document.verifiedOutcomes.authorizations[0].authorizationText, /I authorize Vognary/i);
+    assert.equal(document.verifiedOutcomes.authorizations[0].currency, document.verifiedOutcomes.actionCases[0].currency);
     assert.ok(document.verifiedOutcomes.caseEvents.length >= 2);
     assert.ok(document.auditHistory.length >= 4);
 
@@ -296,5 +298,153 @@ test("privacy export includes held product data and excludes all credential mate
     await pool.query(`delete from users where id = $1`, [userId]);
     if (previousKey === undefined) delete process.env.TOKEN_ENCRYPTION_KEY;
     else process.env.TOKEN_ENCRYPTION_KEY = previousKey;
+  }
+});
+
+test("privacy export omits Autopilot hash sentinels while keeping useful event metadata", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const previous = {
+    notice: process.env.AUTOPILOT_NOTICE_ENABLED,
+    channel: process.env.AUTOPILOT_NOTICE_CHANNEL_READY,
+    adapter: process.env.AUTOPILOT_TEST_ADAPTER,
+    secret: process.env.AUTOPILOT_VETO_TOKEN_SECRET,
+    from: process.env.RESEND_FROM_EMAIL,
+  };
+  process.env.AUTOPILOT_NOTICE_ENABLED = "true";
+  process.env.AUTOPILOT_NOTICE_CHANNEL_READY = "false";
+  process.env.AUTOPILOT_TEST_ADAPTER = "true";
+  process.env.AUTOPILOT_VETO_TOKEN_SECRET = "veto-signing-secret-for-tests-32bytes!!";
+  process.env.RESEND_FROM_EMAIL = "notices@vognary.test";
+  const userId = randomUUID();
+  const workspaceId = randomUUID();
+  const email = `${userId}@privacy-hashes.test`;
+  const pool = getDatabasePool();
+  const vetoTokenHash = "11".repeat(32);
+  const noticeBodyHash = "22".repeat(32);
+  const payloadHash = "33".repeat(32);
+  const proofReferenceHash = "44".repeat(32);
+  const noticeFingerprint = "55".repeat(32);
+  try {
+    await pool.query(`insert into users (id, email, display_name) values ($1, $2, 'Hash Export Owner')`, [userId, email]);
+    await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Privacy hash export')`, [workspaceId, userId]);
+    await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+    const july = await submitRecoveryEvidence({
+      workspaceId,
+      actorUserId: userId,
+      expectedVersion: 0,
+      idempotencyKey: `privacy-hash-evidence-july:${randomUUID()}`,
+      request: {
+        kind: "RECEIPT_PASTE",
+        receipts: [{
+          clientRef: "privacy-hash-openai-july",
+          text: "OpenAI subscription charged INR 1,999 on 6 July 2026. Renews monthly on 6 September 2026.",
+        }],
+      },
+      now: new Date("2026-08-09T10:00:00.000Z"),
+    });
+    const august = await submitRecoveryEvidence({
+      workspaceId,
+      actorUserId: userId,
+      expectedVersion: july.workspaceVersion,
+      idempotencyKey: `privacy-hash-evidence-august:${randomUUID()}`,
+      request: {
+        kind: "RECEIPT_PASTE",
+        receipts: [{
+          clientRef: "privacy-hash-openai-august",
+          text: "OpenAI subscription charged INR 1,999 on 6 August 2026. Renews monthly on 6 September 2026.",
+        }],
+      },
+      now: new Date("2026-08-09T10:00:00.000Z"),
+    });
+    await pool.query(`update recovery_commitments set confidence_score = 90 where workspace_id = $1`, [workspaceId]);
+    await signStandingMandate({
+      workspaceId,
+      actorUserId: userId,
+      expectedVersion: august.workspaceVersion,
+      idempotencyKey: `privacy-hash-mandate:${randomUUID()}`,
+    });
+    const candidate = await pool.query<{ id: string }>(
+      `select id::text from recovery_action_candidates where workspace_id = $1 limit 1`,
+      [workspaceId],
+    );
+    assert.ok(candidate.rows[0]);
+    await pool.query(
+      `insert into recovery_covered_windows (
+         workspace_id, candidate_id, window_start, window_end, expected_debit_date,
+         baseline_debit_minor, observed_debit_minor, saving_minor, status, currency
+       ) values ($1, $2, '2026-09-05', '2026-09-09', '2026-09-06', 199900, 0, 199900, 'COVERED_CLEAN', 'INR')`,
+      [workspaceId, candidate.rows[0]!.id],
+    );
+    await pool.query(
+      `insert into recovery_fee_ledger (
+         workspace_id, period_start, period_end, currency, monitoring_minor, verified_saving_minor,
+         outcome_fee_minor, retained_minor, refund_credit_minor, additional_charge_minor,
+         razorpay_charge_status, inputs_hash, year_start
+       ) values ($1, '2026-09-01', '2026-09-30', 'INR', 99900, 199900, 29985, 99900, 0, 0,
+         'FAIL_CLOSED', $2, '2026-08-09')`,
+      [workspaceId, "bb".repeat(32)],
+    );
+    await pool.query(
+      `insert into recovery_veto_notices (
+         workspace_id, candidate_id, channel, delivery_status,
+         veto_token_hash, notice_body_hash, notice_from_email, notice_to_email,
+         notice_subject, notice_text
+       ) values ($1, $2, 'EMAIL', 'QUEUED', $3, $4, 'notices@vognary.test', $5,
+         'Vognary Autopilot notice', 'Queued notice used only to prove export redaction.')`,
+      [workspaceId, candidate.rows[0]!.id, vetoTokenHash, noticeBodyHash, email],
+    );
+    await pool.query(
+      `insert into recovery_notice_delivery_events (
+         workspace_id, candidate_id, provider_event_id, event_type, occurred_at, payload_hash
+       ) values ($1, $2, $3, 'email.delivered', '2026-08-24T00:05:00.000Z', $4)`,
+      [workspaceId, candidate.rows[0]!.id, `svix-privacy-hash-${randomUUID()}`, payloadHash],
+    );
+    await pool.query(
+      `insert into recovery_execution_attempts (
+         workspace_id, candidate_id, attempt_no, operation_key, request_hash, provider_id, status, proof_reference_hash
+       ) values ($1, $2, 1, $3, $4, 'openai', 'AUTHORIZED', $5)`,
+      [workspaceId, candidate.rows[0]!.id, `privacy-hash-op-${randomUUID()}`, "aa".repeat(32), proofReferenceHash],
+    );
+    const request = await createAccessExportRequest({ workspaceId, actorUserId: userId });
+    const downloaded = await downloadAccessExport({ requestId: request.id, workspaceId, actorUserId: userId });
+    assert.equal(downloaded.status, "ok");
+    if (downloaded.status !== "ok") return;
+    const document = JSON.parse(downloaded.serialized);
+    const serialized = downloaded.serialized;
+    for (const key of ["vetoTokenHash", "noticeBodyHash", "payloadHash", "noticeFingerprint", "proofReferenceHash", "proofReference"]) {
+      assert.equal(serialized.includes(key), false, `${key} must not enter the export`);
+    }
+    for (const sentinel of [vetoTokenHash, noticeBodyHash, payloadHash, proofReferenceHash, noticeFingerprint]) {
+      assert.equal(serialized.includes(sentinel), false, "sentinel hash must not enter the export");
+    }
+    assert.ok(document.recovery.vetoNotices.length >= 1);
+    assert.ok(document.recovery.noticeDeliveryEvents.length >= 1);
+    assert.equal(document.recovery.noticeDeliveryEvents[0].eventType, "email.delivered");
+    assert.ok(document.recovery.executionAttempts.length >= 1);
+    assert.equal(document.recovery.executionAttempts[0].status, "AUTHORIZED");
+    assert.equal(document.recovery.coveredWindows[0].currency, "INR");
+    assert.equal(document.recovery.coveredWindows[0].savingMinor, "199900");
+    assert.equal(document.recovery.feeLedger[0].currency, "INR");
+    assert.equal(document.recovery.feeLedger[0].monitoringMinor, "99900");
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    const leftover = await pool.query<{ notices: string }>(
+      `select count(*)::text as notices from recovery_veto_notices where workspace_id = $1`,
+      [workspaceId],
+    );
+    assert.equal(leftover.rows[0]?.notices, "0");
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]).catch(() => undefined);
+    await pool.query(`delete from users where id = $1`, [userId]).catch(() => undefined);
+    if (previous.notice === undefined) delete process.env.AUTOPILOT_NOTICE_ENABLED;
+    else process.env.AUTOPILOT_NOTICE_ENABLED = previous.notice;
+    if (previous.channel === undefined) delete process.env.AUTOPILOT_NOTICE_CHANNEL_READY;
+    else process.env.AUTOPILOT_NOTICE_CHANNEL_READY = previous.channel;
+    if (previous.adapter === undefined) delete process.env.AUTOPILOT_TEST_ADAPTER;
+    else process.env.AUTOPILOT_TEST_ADAPTER = previous.adapter;
+    if (previous.secret === undefined) delete process.env.AUTOPILOT_VETO_TOKEN_SECRET;
+    else process.env.AUTOPILOT_VETO_TOKEN_SECRET = previous.secret;
+    if (previous.from === undefined) delete process.env.RESEND_FROM_EMAIL;
+    else process.env.RESEND_FROM_EMAIL = previous.from;
   }
 });

@@ -5,6 +5,10 @@
 > company-ordered loop WPs. This file is the detailed WP-0…WP-6 UI/AI execution
 > reference — not a competing company roadmap.
 >
+> **Current implementation note (2026-08-17):** WP-4 decomposition is complete.
+> The retired monolith and guest client were deleted; `src/app/workspace/*` is
+> the only customer workspace. CONTINUE-HERE overrides historical WP mechanics.
+>
 > Work packages (WP-0 … WP-6) in order; *parallel-safe* WPs can run in separate
 > worktrees. Companion: [master-build-plan.md](master-build-plan.md) Parts 3 & 5.
 
@@ -24,11 +28,10 @@ Grounding the repo against that spec:
   1. **No token-enforcement gate** — hard-coded hex still slips into `.tsx`
      (`page.tsx`, `command-palette.tsx`, `character.tsx`, heavily in the monolith).
      Part 5.1 demands "audit for violations the way `claims:check` audits copy."
-  2. **No extracted component inventory** — Part 5.2's set (EvidenceChip,
+  2. **Historically, no extracted component inventory** — Part 5.2's set (EvidenceChip,
      LedgerRow, ActionCard, ProofPanel, TrustSignal, RenewalTimeline, RunwayStrip)
-     is bespoke, duplicated markup across `page.tsx`, `guest-audit-client.tsx`,
-     and the **281 KB** monolith `src/app/vognary-mvp-client.tsx` (62 inline
-     `style={{}}`, hard-coded hex). This duplication *is* the fragility.
+     was bespoke and duplicated across `page.tsx`, the guest client, and the
+     **281 KB** workspace monolith. Those retired clients are now deleted.
   3. **The AI live path** — the tested spine is on `main` (`src/lib/server/ai/*`
      incl. `extract.ts`/`narrate.ts`/`pricing.ts`/`models.ts`), but no route wires
      it and no live budget counter exists.
@@ -40,7 +43,8 @@ heroic per-screen redesign.
 
 ## Invariants (master-build-plan Part 0.2 — non-negotiable, every WP)
 
-1. **Isolated worktree per WP**, cut from the freshest committed `main`. **Do not
+1. **Isolated worktree per WP**, cut from the freshest committed `main`, unless
+   CONTINUE-HERE names a same-repo checkout override. **Do not
    stack PRs on top of each other** — merge to `main` and rebase. (Stacked PRs
    merged into already-merged bases stranded RunwayStrip + the AI live layer off
    `main` once; re-landed by cherry-pick. Target `main` directly.)
@@ -107,18 +111,16 @@ Extract the Part-5.2 set as **single, tested, token-only** components in
 Each: props-only, token-only, keyboard-reachable, `aria`-correct, reduced-motion
 safe, one unit test. **Rule:** no new bespoke markup for a covered concept.
 
-## WP-3 — Front-door refactor + polish (Part 5.3/5.4) · after WP-2 · medium
+## WP-3 — Front-door refactor + polish (Part 5.3/5.4) · DONE
 
-`src/app/page.tsx`, `src/app/guest-audit-client.tsx` (`/app` via
-`src/app/app/experience-client.tsx`), `src/app/instant-audit.tsx` compose from
-WP-2 components; token-driven visual rhythm + hierarchy; one restrained Nakul
-moment. **DoD:** axe 0, perf budget (214.8 KB on `/`, `/app`), Lighthouse ≥ 95 /
-LCP < 2s, reduced-motion proven, named e2e + desktop & mobile screenshots on PR.
+`src/app/page.tsx`, `src/app/instant-audit.tsx`, and the canonical Recovery
+workspace carry the front-door and signed-in experience. The guest client was
+deleted. Do not revive it as a parallel product surface.
 
-## WP-4 — Signed-in workspace decomposition + tokenization (Part 5.3) · big · sub-PRs
+## WP-4 — Signed-in workspace decomposition + tokenization (Part 5.3) · DONE
 
-Decompose `src/app/vognary-mvp-client.tsx` into `src/app/workspace/*`, one
-component per commit, props-only, using WP-2 components, killing inline styles/hex.
+The retired `src/app/vognary-mvp-client.tsx` was decomposed into
+`src/app/workspace/*` and deleted. Do not recreate it or a parallel workspace.
 - **4a Home/Overview:** `OverviewPanel` (~3350), `RecurringGraph` (~3869),
   `RenewalRadar` (~3954), `SpendSpectrum` (~4989), `Metric`/`MiniStat`.
 - **4b Subscriptions:** `SubscriptionDetailSheet` (~4182), `SelectedItemPanel`

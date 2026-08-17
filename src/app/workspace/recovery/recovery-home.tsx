@@ -69,14 +69,15 @@ export function RecoveryHome({
   if (home.autopilot?.mandate?.status === "ACTIVE") {
     return (
       <div className="grid gap-5">
-        <RecoveryFirstValueMetrics home={home} compact onCitedPictureRendered={onCitedPictureRendered} />
-        <UpcomingTimeline home={home} compact onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />
         <RecoveryAutopilotHome
           autopilot={home.autopilot}
           onAddEvidence={onAddEvidence}
           onVeto={onVeto ?? (() => undefined)}
           pendingVetoId={pendingVetoId ?? null}
         />
+        <RecoveryFirstValueMetrics home={home} compact onCitedPictureRendered={onCitedPictureRendered} />
+        <UpcomingTimeline home={home} compact onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />
+        <RecoveryProjectionDetails home={home} />
       </div>
     );
   }
@@ -104,7 +105,22 @@ export function RecoveryHome({
 
   return (
     <div className="grid gap-5">
-      <RecoveryFirstValueMetrics home={home} onCitedPictureRendered={onCitedPictureRendered} />
+      <section aria-labelledby="recovery-needs-me" className="panel p-4 sm:p-5">
+        <h3 id="recovery-needs-me" className="font-display text-xl font-semibold text-(--ink)">Needs attention</h3>
+        <div className="mt-4 grid gap-3">
+          {home.needsMe.length ? (
+            home.needsMe.map((item) => <AttentionRow key={item.id} item={item} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />)
+          ) : (
+            <StateBlock
+              eyebrow="Up to date"
+              title="Nothing needs attention right now"
+              detail="Based on the receipts Vognary has checked, there is no decision waiting for you."
+            >
+              <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-primary">Add receipts</button>
+            </StateBlock>
+          )}
+        </div>
+      </section>
 
       {home.changed.state === "COMPARED" ? (
         <section aria-labelledby="recovery-changed" className="panel border-ochre p-4 sm:p-5">
@@ -130,22 +146,9 @@ export function RecoveryHome({
         </section>
       )}
 
-      <section aria-labelledby="recovery-needs-me" className="panel p-4 sm:p-5">
-        <h3 id="recovery-needs-me" className="font-display text-xl font-semibold text-(--ink)">Needs attention</h3>
-        <div className="mt-4 grid gap-3">
-          {home.needsMe.length ? (
-            home.needsMe.map((item) => <AttentionRow key={item.id} item={item} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />)
-          ) : (
-            <StateBlock
-              eyebrow="Up to date"
-              title="Nothing needs attention right now"
-              detail="Based on the receipts Vognary has checked, there is no decision waiting for you."
-            >
-              <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-primary">Add receipts</button>
-            </StateBlock>
-          )}
-        </div>
-      </section>
+      <RecoveryFirstValueMetrics home={home} onCitedPictureRendered={onCitedPictureRendered} />
+
+      <RecoveryProjectionDetails home={home} />
 
       <UpcomingTimeline home={home} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />
 
@@ -181,9 +184,6 @@ function RecoveryFirstValueMetrics({
   onCitedPictureRendered?: (workspaceId: string) => void;
 }) {
   const hasPicture = hasCitedRecurringSpendPicture(home);
-  const omittedAnnualized = home.monthlyTotals.some(
-    (total) => !home.annualizedEstimateTotals.some((annualized) => annualized.amount.currency === total.amount.currency),
-  );
 
   useEffect(() => {
     if (!hasPicture) return;
@@ -191,15 +191,36 @@ function RecoveryFirstValueMetrics({
   }, [hasPicture, home.workspace.id, onCitedPictureRendered]);
 
   return (
-    <section aria-label="Software spend" className={compact ? "panel p-3 sm:p-4" : "panel p-4 sm:p-5"}>
-      <div className={`grid gap-5 ${compact ? "sm:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
-        <TotalBlock label="Monthly software spend" totals={home.monthlyTotals} empty="No recurring amount yet" compact={compact} />
-        <TotalBlock label="Annualized estimate" totals={home.annualizedEstimateTotals} empty="No annualized estimate yet" compact={compact} />
-        <TotalBlock label="Next 30 days" totals={home.next30DayTotals} empty="Nothing expected in the next 30 days" compact={compact} />
-      </div>
+    <section aria-label="Recurring money" className={compact ? "panel p-3 sm:p-4" : "panel p-4 sm:p-5"}>
+      <TotalBlock label="Monthly recurring amount" totals={home.monthlyTotals} empty="No recurring amount yet" compact={compact} />
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <CountBlock label="Active commitments" count={home.activeCommitmentCount} compact={compact} />
         <CountBlock label="Needs review" count={home.reviewItemCount} compact={compact} />
+      </div>
+      {home.unknownCadenceCommitmentCount > 0 ? (
+        <p className="mt-4 text-xs leading-5 text-(--muted)">
+          {home.unknownCadenceCommitmentCount} {home.unknownCadenceCommitmentCount === 1 ? "commitment has" : "commitments have"} no established cadence, so {home.unknownCadenceCommitmentCount === 1 ? "it is" : "they are"} excluded from monthly and annual totals. Any dated debit still appears in Next 30 days.
+        </p>
+      ) : null}
+      {home.coverage.state !== "CURRENT" ? (
+        <p className="mt-2 text-xs leading-5 text-(--muted)" data-coverage-state={home.coverage.state}>
+          {coverageLabels[home.coverage.state]}. {coverageMeanings[home.coverage.state]}
+          {home.coverage.limitations[0] ? ` ${home.coverage.limitations[0]}` : ""}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function RecoveryProjectionDetails({ home }: { home: HomeProjectionDto }) {
+  const omittedAnnualized = home.monthlyTotals.some(
+    (total) => !home.annualizedEstimateTotals.some((annualized) => annualized.amount.currency === total.amount.currency),
+  );
+  return (
+    <section aria-label="Recurring money details" className="panel p-4 sm:p-5">
+      <div className="grid gap-5 sm:grid-cols-2">
+        <TotalBlock label="Next 30 days" totals={home.next30DayTotals} empty="Nothing expected in the next 30 days" />
+        <TotalBlock label="Annualized estimate" totals={home.annualizedEstimateTotals} empty="No annualized estimate yet" />
       </div>
       {omittedAnnualized ? (
         <p className="mt-4 text-xs leading-5 text-(--muted)">
@@ -215,12 +236,6 @@ function RecoveryFirstValueMetrics({
       {home.monthlyTotals.length > 1 || home.annualizedEstimateTotals.length > 1 || home.next30DayTotals.length > 1 ? (
         <p className="mt-2 text-xs leading-5 text-(--muted)">
           Currencies stay separate because Vognary does not invent an exchange rate.
-        </p>
-      ) : null}
-      {home.coverage.state !== "CURRENT" ? (
-        <p className="mt-2 text-xs leading-5 text-(--muted)" data-coverage-state={home.coverage.state}>
-          {coverageLabels[home.coverage.state]}. {coverageMeanings[home.coverage.state]}
-          {home.coverage.limitations[0] ? ` ${home.coverage.limitations[0]}` : ""}
         </p>
       ) : null}
     </section>

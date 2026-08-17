@@ -1,3 +1,10 @@
+import type { NoticeDeliveryStatus } from "@/lib/recovery/notice-delivery";
+import type { AutopilotNoticePresentation } from "@/lib/recovery/notice-presentation";
+import type { AutopilotNoticeReadiness } from "@/lib/recovery/notice-readiness";
+import type { WorkspaceActivationWrite } from "@/lib/recovery/workspace-activation";
+
+export type { WorkspaceActivationWrite };
+
 export const decisions = ["KEEP", "MONITOR", "DOWNGRADE", "CANCEL", "INVESTIGATE"] as const;
 export type Decision = (typeof decisions)[number];
 
@@ -312,6 +319,9 @@ export type AutopilotCandidateDto = {
   amount: MoneyDto;
   noticeDeliveredAt: string | null;
   vetoDeadlineAt: string | null;
+  noticeDeliveryStatus: NoticeDeliveryStatus | null;
+  tokenCoverageInvalid: boolean;
+  noticePresentation: AutopilotNoticePresentation;
   exceptionCode: string | null;
 };
 
@@ -322,7 +332,6 @@ export type AutopilotAttemptDto = {
   outcome: string | null;
   operatorMinutes: string | null;
   proofKind: string | null;
-  proofReferenceHash: string | null;
   failureReason: string | null;
   createdAt: string;
 };
@@ -344,33 +353,47 @@ export type RecoverySourceDisconnectionDto = {
   withdrawnCandidateIds: readonly string[];
 };
 
+export type RecoveryEvidenceSourceDto = {
+  id: string;
+  kind: SourceType;
+  label: string;
+  cited: boolean;
+  status: "CONNECTED" | "DISCONNECTED";
+  disconnectedAt: string | null;
+  reconnectedAt: string | null;
+};
+
 export type AutopilotWindowDto = {
   candidateId: string;
   status: "PENDING" | "COVERED_CLEAN" | "NOT_ELIMINATED" | "MISSING_COVERAGE";
   expectedDebitDate: string;
-  savingMinor: string | null;
+  currency: string;
+  saving: MoneyDto | null;
 };
 
 export type AutopilotFeeDto = {
-  monitoringMinor: string;
-  verifiedSavingMinor: string;
-  outcomeFeeMinor: string;
-  retainedMinor: string;
-  refundCreditMinor: string;
-  additionalChargeMinor: string;
+  currency: string;
+  monitoring: MoneyDto;
+  verifiedSaving: MoneyDto;
+  outcomeFee: MoneyDto;
+  retained: MoneyDto;
+  refundCredit: MoneyDto;
+  additionalCharge: MoneyDto;
   chargeStatus: "FAIL_CLOSED" | "INVOICE_ONLY" | "CHARGED" | "REFUNDED";
 };
 
 export type AutopilotHomeDto = {
   executionEnabled: boolean;
   noticeEnabled: boolean;
+  noticeReadiness: AutopilotNoticeReadiness;
   mandate: StandingMandateDto | null;
   watching: readonly AutopilotCandidateDto[];
+  awaitingDelivery: readonly AutopilotCandidateDto[];
   inVeto: readonly AutopilotCandidateDto[];
   handled: readonly AutopilotCandidateDto[];
   needsHelp: readonly AutopilotCandidateDto[];
   proof: readonly AutopilotWindowDto[];
-  fees: AutopilotFeeDto | null;
+  fees: readonly AutopilotFeeDto[];
   attempts: readonly AutopilotAttemptDto[];
 };
 
@@ -386,7 +409,9 @@ export type HomeProjectionDto = {
   next: readonly UpcomingItemDto[];
   coverage: CoverageDto;
   activeCommitmentCount: number;
+  unknownCadenceCommitmentCount: number;
   reviewItemCount: number;
+  evidenceSources: readonly RecoveryEvidenceSourceDto[];
   autopilot?: AutopilotHomeDto;
 };
 
@@ -600,7 +625,7 @@ export type RecoveryEndpointContracts = {
   logout: { ownership: "RECOVERY_V1"; request: never; response: LogoutResponse | ApiFailure; headers: never };
   submitEvidence: { ownership: "RECOVERY_V1"; request: EvidenceIngestRequest; response: SubmitEvidenceResponse | ApiFailure; headers: RecoveryMutationHeaders };
   home: { ownership: "RECOVERY_V1"; request: never; response: GetHomeResponse | ApiFailure; headers: never };
-  recordWorkspaceActivation: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<{ recorded: boolean; id: string | null; outcome: "recorded" | "already-recorded" | "deferred-no-consent" }> | ApiFailure; headers: never };
+  recordWorkspaceActivation: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<WorkspaceActivationWrite> | ApiFailure; headers: never };
   evidence: { ownership: "RECOVERY_V1"; request: never; response: GetEvidenceResponse | ApiFailure; headers: never };
   commitments: { ownership: "RECOVERY_V1"; request: ListCommitmentsQuery; response: ListCommitmentsResponse | ApiFailure; headers: never };
   commitment: { ownership: "RECOVERY_V1"; request: GetCommitmentQuery; response: GetCommitmentResponse | ApiFailure; headers: never };
