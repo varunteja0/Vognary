@@ -53,6 +53,10 @@ export const productionFeatureMigrations = [
   "0046_billed_window_immutability",
   "0047_billed_window_insert_immutability",
   "0048_receipt_sender_provenance",
+  "0049_recovery_merchant_identity",
+  "0050_recovery_commitment_lifecycle",
+  "0051_recovery_change_signals",
+  "0052_recovery_correction_learning",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];

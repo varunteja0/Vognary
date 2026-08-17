@@ -2684,3 +2684,441 @@ drop trigger if exists recovery_covered_windows_billed_immutable on recovery_cov
 create trigger recovery_covered_windows_billed_immutable
   before insert or update or delete on recovery_covered_windows
   for each row execute function recovery_covered_windows_constrain_billed_mutation();
+
+-- Commitment graph: canonical merchant identity, living commitment state,
+-- change signals with their notifications, and the correction learning dataset.
+-- Additive throughout. recovery_commitments, recovery_evidence and
+-- recovery_corrections remain the authority on money, merchant and cadence.
+create table if not exists recovery_merchants (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  currency char(3) not null check (currency ~ '^[A-Z]{3}$'),
+  display_name text not null check (length(btrim(display_name)) between 1 and 200),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, id),
+  unique (workspace_id, currency, display_name)
+);
+
+create index if not exists recovery_merchants_workspace_idx
+  on recovery_merchants(workspace_id, currency);
+
+create table if not exists recovery_merchant_signals (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  merchant_id uuid not null,
+  evidence_id uuid not null,
+  signal_kind text not null check (
+    signal_kind in (
+      'EXPLICIT_MERCHANT_ID', 'GSTIN', 'BILLING_DOMAIN', 'SENDER_DOMAIN',
+      'PROCESSOR_DESCRIPTOR', 'ACCOUNT_IDENTIFIER', 'INVOICE_IDENTIFIER', 'FUZZY_ALIAS'
+    )
+  ),
+  signal_key text not null check (length(btrim(signal_key)) between 1 and 253),
+  observed_at timestamptz not null default now(),
+  foreign key (workspace_id, merchant_id)
+    references recovery_merchants(workspace_id, id) on delete cascade,
+  foreign key (workspace_id, evidence_id)
+    references recovery_evidence(workspace_id, id) on delete cascade,
+  unique (workspace_id, merchant_id, signal_kind, signal_key, evidence_id)
+);
+
+create index if not exists recovery_merchant_signals_lookup_idx
+  on recovery_merchant_signals(workspace_id, signal_kind, signal_key);
+
+create table if not exists recovery_merchant_links (
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  commitment_id uuid not null,
+  merchant_id uuid not null,
+  decision text not null check (decision in ('AUTO_MERGE', 'USER_CONFIRMED')),
+  score smallint not null check (score between 0 and 100),
+  strongest_signal_kind text not null,
+  reasons jsonb not null default '[]'::jsonb check (jsonb_typeof(reasons) = 'array'),
+  cited_evidence_ids uuid[] not null default '{}' check (cardinality(cited_evidence_ids) >= 1),
+  linked_at timestamptz not null default now(),
+  reversed_at timestamptz,
+  reversed_by_user_id uuid references users(id) on delete set null,
+  primary key (workspace_id, commitment_id, merchant_id),
+  foreign key (workspace_id, commitment_id)
+    references recovery_commitments(workspace_id, id) on delete cascade,
+  foreign key (workspace_id, merchant_id)
+    references recovery_merchants(workspace_id, id) on delete cascade,
+  constraint recovery_merchant_links_reversal_check
+    check (reversed_at is not null or reversed_by_user_id is null)
+);
+
+create unique index if not exists recovery_merchant_links_active_idx
+  on recovery_merchant_links(workspace_id, commitment_id)
+  where reversed_at is null;
+
+create table if not exists recovery_merchant_merge_rejections (
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  commitment_id uuid not null,
+  merchant_id uuid not null,
+  rejected_at timestamptz not null default now(),
+  rejected_by_user_id uuid references users(id) on delete set null,
+  primary key (workspace_id, commitment_id, merchant_id),
+  foreign key (workspace_id, commitment_id)
+    references recovery_commitments(workspace_id, id) on delete cascade,
+  foreign key (workspace_id, merchant_id)
+    references recovery_merchants(workspace_id, id) on delete cascade
+);
+
+create or replace function recovery_merchant_link_currency_guard()
+returns trigger
+language plpgsql
+as $$
+declare
+  merchant_currency char(3);
+  commitment_currency char(3);
+begin
+  select currency into merchant_currency
+    from recovery_merchants
+    where workspace_id = new.workspace_id and id = new.merchant_id;
+  select base_currency into commitment_currency
+    from recovery_commitments
+    where workspace_id = new.workspace_id and id = new.commitment_id;
+  if merchant_currency is distinct from commitment_currency then
+    raise exception 'Recovery merchant links may not cross currency.' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists recovery_merchant_links_currency_trigger on recovery_merchant_links;
+create trigger recovery_merchant_links_currency_trigger
+  before insert or update on recovery_merchant_links
+  for each row execute function recovery_merchant_link_currency_guard();
+
+create or replace function reject_recovery_merchant_signal_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'DELETE'
+    and not exists (select 1 from workspaces where id = old.workspace_id)
+  then
+    return old;
+  end if;
+  raise exception 'Recovery merchant signals are append-only.' using errcode = '55000';
+end;
+$$;
+
+drop trigger if exists recovery_merchant_signals_append_only_trigger on recovery_merchant_signals;
+create trigger recovery_merchant_signals_append_only_trigger
+  before update or delete on recovery_merchant_signals
+  for each row execute function reject_recovery_merchant_signal_mutation();
+
+create table if not exists recovery_commitment_states (
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  commitment_id uuid not null,
+  lifecycle_state text not null check (
+    lifecycle_state in ('OBSERVED', 'ESTABLISHED', 'CHANGED', 'AT_RISK', 'ENDING', 'LIKELY_ENDED', 'ENDED', 'UNVERIFIABLE')
+  ),
+  coverage_state text not null check (
+    coverage_state in ('CURRENT', 'PARTIAL', 'STALE', 'BROKEN', 'BASELINE_ONLY', 'NO_EVIDENCE')
+  ),
+  conflict_state text not null check (
+    conflict_state in ('NONE', 'IDENTITY_CONFLICT', 'CANCELLATION_NOT_EFFECTIVE')
+  ),
+  prediction_state text not null check (
+    prediction_state in (
+      'PREDICTED', 'WITHHELD_UNKNOWN_RHYTHM', 'WITHHELD_INSUFFICIENT_EVIDENCE',
+      'WITHHELD_COVERAGE_NOT_TRUSTWORTHY', 'WITHHELD_ENDED'
+    )
+  ),
+  cancellation_state text not null default 'NONE' check (
+    cancellation_state in (
+      'NONE', 'CANCELLATION_INTENT_RECORDED', 'CANCELLATION_CLAIMED', 'WAITING_FOR_EXPECTED_WINDOW',
+      'LIKELY_STOPPED_BY_COVERED_ABSENCE', 'CHARGED_AGAIN', 'CANNOT_VERIFY', 'CONFIRMED_BY_SETTLEMENT'
+    )
+  ),
+  last_verified_on date,
+  next_verification_due_on date,
+  expected_window_start date,
+  expected_window_end date,
+  belief text not null check (length(btrim(belief)) between 1 and 400),
+  because jsonb not null default '[]'::jsonb check (jsonb_typeof(because) = 'array'),
+  falsifiability jsonb not null default '[]'::jsonb check (jsonb_typeof(falsifiability) = 'array'),
+  cited_evidence_ids uuid[] not null default '{}',
+  coverage_source_ids uuid[] not null default '{}',
+  evaluated_on date not null,
+  updated_at timestamptz not null default now(),
+  primary key (workspace_id, commitment_id),
+  foreign key (workspace_id, commitment_id)
+    references recovery_commitments(workspace_id, id) on delete cascade,
+  constraint recovery_commitment_states_window_order_check
+    check (expected_window_start is null or expected_window_end is null or expected_window_start <= expected_window_end),
+  constraint recovery_commitment_states_window_pairing_check
+    check ((expected_window_start is null) = (expected_window_end is null)),
+  constraint recovery_commitment_states_settlement_reserved_check
+    check (cancellation_state <> 'CONFIRMED_BY_SETTLEMENT'),
+  constraint recovery_commitment_states_prediction_check
+    check (prediction_state <> 'PREDICTED' or expected_window_end is not null)
+);
+
+create index if not exists recovery_commitment_states_lifecycle_idx
+  on recovery_commitment_states(workspace_id, lifecycle_state);
+create index if not exists recovery_commitment_states_due_idx
+  on recovery_commitment_states(workspace_id, next_verification_due_on)
+  where next_verification_due_on is not null;
+
+create table if not exists recovery_cancellation_events (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  commitment_id uuid not null,
+  idempotency_key text not null check (length(btrim(idempotency_key)) between 1 and 200),
+  event_kind text not null check (
+    event_kind in ('INTENT_RECORDED', 'CANCELLATION_CLAIMED', 'WINDOW_OPENED', 'CHARGE_EVALUATED')
+  ),
+  from_state text not null,
+  to_state text not null check (to_state <> 'CONFIRMED_BY_SETTLEMENT'),
+  proof text not null check (proof in ('NONE', 'COVERED_ABSENCE')),
+  reasons jsonb not null default '[]'::jsonb check (jsonb_typeof(reasons) = 'array'),
+  cited_evidence_ids uuid[] not null default '{}',
+  recorded_by_user_id uuid references users(id) on delete set null,
+  recorded_at timestamptz not null default now(),
+  foreign key (workspace_id, commitment_id)
+    references recovery_commitments(workspace_id, id) on delete cascade,
+  unique (workspace_id, id),
+  unique (workspace_id, commitment_id, idempotency_key),
+  constraint recovery_cancellation_events_covered_absence_check
+    check (proof <> 'COVERED_ABSENCE' or to_state = 'LIKELY_STOPPED_BY_COVERED_ABSENCE')
+);
+
+create index if not exists recovery_cancellation_events_commitment_idx
+  on recovery_cancellation_events(workspace_id, commitment_id, recorded_at desc);
+
+create or replace function reject_recovery_cancellation_event_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'DELETE'
+    and not exists (select 1 from workspaces where id = old.workspace_id)
+  then
+    return old;
+  end if;
+  raise exception 'Recovery cancellation events are append-only.' using errcode = '55000';
+end;
+$$;
+
+drop trigger if exists recovery_cancellation_events_append_only_trigger on recovery_cancellation_events;
+create trigger recovery_cancellation_events_append_only_trigger
+  before update or delete on recovery_cancellation_events
+  for each row execute function reject_recovery_cancellation_event_mutation();
+
+create table if not exists recovery_source_health (
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  source_id uuid not null,
+  liveness_state text not null check (
+    liveness_state in ('CURRENT', 'PARTIAL', 'STALE', 'BROKEN', 'BASELINE_ONLY', 'NO_EVIDENCE')
+  ),
+  automatic boolean not null,
+  consecutive_failure_count integer not null default 0 check (consecutive_failure_count >= 0),
+  credential_revoked boolean not null default false,
+  last_delivery_at timestamptz,
+  assessed_at timestamptz not null default now(),
+  primary key (workspace_id, source_id),
+  foreign key (workspace_id, source_id)
+    references recovery_sources(workspace_id, id) on delete cascade,
+  constraint recovery_source_health_automatic_check
+    check (automatic or liveness_state in ('BASELINE_ONLY', 'BROKEN', 'NO_EVIDENCE'))
+);
+
+create index if not exists recovery_source_health_broken_idx
+  on recovery_source_health(workspace_id)
+  where liveness_state = 'BROKEN';
+
+create table if not exists recovery_change_signals (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  dedupe_key text not null check (length(btrim(dedupe_key)) between 1 and 400),
+  kind text not null check (
+    kind in (
+      'TRIAL_CONVERTING', 'ANNUAL_RENEWAL_APPROACHING', 'PRICE_INCREASE', 'NEW_RECURRING_COMMITMENT',
+      'DUPLICATE_SUSPECTED', 'EXPECTED_CHARGE_MISSING', 'CANCELLATION_NOT_EFFECTIVE', 'COVERAGE_BROKEN'
+    )
+  ),
+  state text not null default 'OPEN' check (
+    state in ('OPEN', 'ACKNOWLEDGED', 'RESOLVED', 'SUPERSEDED', 'EXPIRED')
+  ),
+  commitment_id uuid,
+  materiality text not null check (materiality in ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW')),
+  confidence smallint not null check (confidence between 0 and 100),
+  title text not null check (length(btrim(title)) between 1 and 200),
+  detail text not null check (length(btrim(detail)) between 1 and 600),
+  currency char(3) check (currency is null or currency ~ '^[A-Z]{3}$'),
+  amount_minor bigint check (amount_minor is null or amount_minor >= 0),
+  delta_minor bigint,
+  due_date date,
+  citation_kind text not null check (citation_kind in ('EVIDENCE', 'COVERED_ABSENCE', 'SOURCE_HEALTH')),
+  cited_evidence_ids uuid[] not null default '{}',
+  cited_source_ids uuid[] not null default '{}',
+  absence_window_start date,
+  absence_window_end date,
+  detected_at timestamptz not null default now(),
+  acknowledged_at timestamptz,
+  resolved_at timestamptz,
+  superseded_at timestamptz,
+  expired_at timestamptz,
+  foreign key (workspace_id, commitment_id)
+    references recovery_commitments(workspace_id, id) on delete cascade,
+  unique (workspace_id, id),
+  unique (workspace_id, dedupe_key),
+  constraint recovery_change_signals_citation_check check (
+    (citation_kind = 'EVIDENCE' and cardinality(cited_evidence_ids) >= 1)
+    or (
+      citation_kind = 'COVERED_ABSENCE'
+      and cardinality(cited_source_ids) >= 1
+      and absence_window_start is not null
+      and absence_window_end is not null
+      and absence_window_start <= absence_window_end
+    )
+    or (citation_kind = 'SOURCE_HEALTH' and cardinality(cited_source_ids) >= 1)
+  ),
+  constraint recovery_change_signals_money_check
+    check ((amount_minor is null and delta_minor is null) or currency is not null),
+  constraint recovery_change_signals_scope_check
+    check (commitment_id is not null or kind = 'COVERAGE_BROKEN'),
+  constraint recovery_change_signals_state_stamp_check check (
+    (state <> 'ACKNOWLEDGED' or acknowledged_at is not null)
+    and (state = 'RESOLVED') = (resolved_at is not null)
+    and (state = 'SUPERSEDED') = (superseded_at is not null)
+    and (state = 'EXPIRED') = (expired_at is not null)
+  )
+);
+
+create index if not exists recovery_change_signals_open_idx
+  on recovery_change_signals(workspace_id, materiality, detected_at desc)
+  where state in ('OPEN', 'ACKNOWLEDGED');
+create index if not exists recovery_change_signals_commitment_idx
+  on recovery_change_signals(workspace_id, commitment_id)
+  where commitment_id is not null;
+
+create table if not exists recovery_change_notifications (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  change_signal_id uuid not null,
+  channel text not null check (channel in ('IN_APP', 'EMAIL')),
+  delivery_state text not null check (
+    delivery_state in (
+      'QUEUED', 'SENDING', 'PROVIDER_ACCEPTED', 'DELIVERED', 'FAILED',
+      'RETRY_SCHEDULED', 'DEAD_LETTER', 'SUPPRESSED', 'UNSUBSCRIBED'
+    )
+  ),
+  suppression_reason text check (
+    suppression_reason in ('ALREADY_NOTIFIED', 'BELOW_MATERIALITY', 'NO_CONSENT', 'UNSUBSCRIBED', 'CHANNEL_NOT_READY')
+  ),
+  attempt_count integer not null default 0 check (attempt_count >= 0),
+  next_attempt_at timestamptz,
+  provider_message_id text,
+  provider_accepted_at timestamptz,
+  delivered_at timestamptz,
+  failed_at timestamptz,
+  error_code text check (error_code is null or length(btrim(error_code)) between 1 and 120),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  foreign key (workspace_id, change_signal_id)
+    references recovery_change_signals(workspace_id, id) on delete cascade,
+  unique (workspace_id, id),
+  unique (workspace_id, change_signal_id, channel),
+  constraint recovery_change_notifications_delivery_proof_check
+    check (delivery_state <> 'DELIVERED' or (provider_message_id is not null and delivered_at is not null)),
+  constraint recovery_change_notifications_suppression_check
+    check ((delivery_state = 'SUPPRESSED') = (suppression_reason is not null)),
+  constraint recovery_change_notifications_retry_check
+    check ((delivery_state = 'RETRY_SCHEDULED') = (next_attempt_at is not null)),
+  constraint recovery_change_notifications_accepted_check
+    check (delivery_state not in ('PROVIDER_ACCEPTED', 'DELIVERED') or provider_accepted_at is not null)
+);
+
+create index if not exists recovery_change_notifications_due_idx
+  on recovery_change_notifications(workspace_id, next_attempt_at)
+  where delivery_state = 'RETRY_SCHEDULED';
+
+create table if not exists recovery_notification_preferences (
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  product_emails boolean not null default false,
+  minimum_materiality text not null default 'HIGH' check (
+    minimum_materiality in ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW')
+  ),
+  digest_interval_hours smallint not null default 24 check (digest_interval_hours between 1 and 168),
+  digest_last_sent_at timestamptz,
+  unsubscribed_at timestamptz,
+  unsubscribe_token_hash char(64),
+  updated_at timestamptz not null default now(),
+  primary key (workspace_id, user_id),
+  constraint recovery_notification_preferences_unsubscribe_check
+    check (unsubscribed_at is null or product_emails = false)
+);
+
+create or replace function recovery_features_are_structural(features jsonb)
+returns boolean
+language sql
+immutable
+as $$
+  select jsonb_typeof(features) = 'object'
+    and not exists (
+      select 1
+      from jsonb_each(features) as entry(feature_key, feature_value)
+      where jsonb_typeof(entry.feature_value) not in ('string', 'number', 'boolean')
+        or (
+          jsonb_typeof(entry.feature_value) = 'string'
+          and (
+            length(entry.feature_value #>> '{}') > 60
+            or entry.feature_value #>> '{}' like '%@%'
+            or entry.feature_value #>> '{}' like '% %'
+          )
+        )
+    );
+$$;
+
+create table if not exists recovery_correction_outcomes (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  kind text not null check (
+    kind in (
+      'MERCHANT_CORRECTED', 'MERCHANT_ALIAS_ADDED', 'CADENCE_CORRECTED', 'AMOUNT_CORRECTED',
+      'DUPLICATE_MERGE_ACCEPTED', 'DUPLICATE_MERGE_REJECTED', 'LIFECYCLE_CORRECTED',
+      'CANCELLATION_OUTCOME_RECORDED'
+    )
+  ),
+  label text not null check (label in ('ACCEPTED', 'REJECTED', 'CHANGED')),
+  feature_version text not null check (length(btrim(feature_version)) between 1 and 60),
+  features jsonb not null check (recovery_features_are_structural(features)),
+  cited_evidence_ids uuid[] not null default '{}',
+  commitment_id uuid,
+  correction_id uuid,
+  idempotency_key text not null check (length(btrim(idempotency_key)) between 1 and 200),
+  observed_at timestamptz not null default now(),
+  foreign key (workspace_id, commitment_id)
+    references recovery_commitments(workspace_id, id) on delete cascade,
+  foreign key (workspace_id, correction_id)
+    references recovery_corrections(workspace_id, id) on delete cascade,
+  unique (workspace_id, id),
+  unique (workspace_id, kind, idempotency_key)
+);
+
+create index if not exists recovery_correction_outcomes_kind_idx
+  on recovery_correction_outcomes(workspace_id, kind, observed_at desc);
+
+create or replace function reject_recovery_correction_outcome_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  if tg_op = 'DELETE'
+    and not exists (select 1 from workspaces where id = old.workspace_id)
+  then
+    return old;
+  end if;
+  raise exception 'Recovery correction outcomes are append-only.' using errcode = '55000';
+end;
+$$;
+
+drop trigger if exists recovery_correction_outcomes_append_only_trigger on recovery_correction_outcomes;
+create trigger recovery_correction_outcomes_append_only_trigger
+  before update or delete on recovery_correction_outcomes
+  for each row execute function reject_recovery_correction_outcome_mutation();

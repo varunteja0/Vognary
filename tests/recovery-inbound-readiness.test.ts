@@ -9,7 +9,7 @@ import {
 } from "../src/lib/server/recovery-inbound-store";
 
 test("receipt forwarding readiness includes the complete cutover ledger without counting its own account as legacy", () => {
-  assert.deepEqual(productionFeatureMigrations.slice(-26), [
+  assert.deepEqual(productionFeatureMigrations.slice(-30), [
     "0023_recovery_v1",
     "0024_recovery_inbound_receipts",
     "0025_recovery_renewal_alerts",
@@ -36,6 +36,10 @@ test("receipt forwarding readiness includes the complete cutover ledger without 
     "0046_billed_window_immutability",
     "0047_billed_window_insert_immutability",
     "0048_receipt_sender_provenance",
+    "0049_recovery_merchant_identity",
+    "0050_recovery_commitment_lifecycle",
+    "0051_recovery_change_signals",
+    "0052_recovery_correction_learning",
   ], "Production readiness must require every Recovery and Autopilot migration.");
   const source = readFileSync("src/lib/server/feature-readiness.ts", "utf8");
   assert.match(source, /metadata ->> 'ledgerAuthority'[\s\S]*<> 'RECOVERY_V1'/);
