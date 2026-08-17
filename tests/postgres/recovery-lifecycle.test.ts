@@ -402,6 +402,91 @@ test("two realistic receipt observations infer one canonical monthly subscriptio
   }
 });
 
+test("observed receipt persistence keeps explicit merchants attached to their own dates", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const pool = getDatabasePool();
+  const ownerUserId = randomUUID();
+  const workspaceId = randomUUID();
+  const suffix = randomUUID().slice(0, 8);
+
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [ownerUserId, `recovery-merchant-${suffix}@example.test`]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Merchant identity workspace')`, [workspaceId, ownerUserId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, ownerUserId]);
+
+  try {
+    await submitRecoveryEvidence({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: 0,
+      idempotencyKey: `merchant-identity-${suffix}`,
+      request: {
+        kind: "RECEIPT_PASTE",
+        receipts: [{
+          clientRef: "out-of-order-receipts",
+          text: [
+            "MERCHANT: Notion Labs; Payment date: 6 August 2026; Software subscription payment. Total: USD 10.00",
+            "Merchant: Acme Cloud; Payment date: 6 July 2026; Software subscription payment. Total: INR 1,499.00",
+          ].join("\n\n"),
+        }],
+      },
+      now: new Date("2026-08-10T10:00:00.000Z"),
+    });
+
+    const evidence = await pool.query<{ merchant: string; category: string; evidence_date: string }>(
+      `select merchant, category, evidence_date::text
+       from recovery_evidence
+       where workspace_id = $1
+       order by evidence_date`,
+      [workspaceId],
+    );
+    assert.deepEqual(evidence.rows, [
+      { merchant: "Acme Cloud", category: "Cloud hosting", evidence_date: "2026-07-06" },
+      { merchant: "Notion Labs", category: "Productivity", evidence_date: "2026-08-06" },
+    ]);
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [ownerUserId]);
+  }
+});
+
+test("upcoming-only receipt evidence never appears as a recent observed charge", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const pool = getDatabasePool();
+  const ownerUserId = randomUUID();
+  const workspaceId = randomUUID();
+  const suffix = randomUUID().slice(0, 8);
+
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [ownerUserId, `recovery-upcoming-${suffix}@example.test`]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Upcoming-only workspace')`, [workspaceId, ownerUserId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, ownerUserId]);
+
+  try {
+    const submitted = await submitRecoveryEvidence({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: 0,
+      idempotencyKey: `upcoming-only-${suffix}`,
+      request: {
+        kind: "RECEIPT_PASTE",
+        receipts: [{
+          clientRef: "future-mandate",
+          text: "Pre-debit notification: mandate towards MAX BUPA HEALTH for INR 50,000 will be debited on 20 August 2026.",
+        }],
+      },
+      now: new Date("2026-08-10T10:00:00.000Z"),
+    });
+
+    assert.equal(submitted.data.submission.acceptedEvidenceCount, 1);
+    assert.equal(submitted.data.home.recentObservations.length, 0);
+    assert.equal(submitted.data.home.next[0]?.date, "2026-08-20");
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [ownerUserId]);
+  }
+});
+
 test("Recovery Home never combines workspace version v with commitment rows from v+1", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {

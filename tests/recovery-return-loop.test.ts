@@ -48,7 +48,10 @@ test("Recovery reminders schedule canonical subscriptions and cancel unsent lega
   assert.match(retirementMigration, /update renewal_alert_deliveries[\s\S]*recurring_item_id is not null[\s\S]*status in \('scheduled', 'sending', 'failed'\)/);
   assert.match(alerts, /join recovery_commitments commitment/);
   assert.match(alerts, /recovery_commitment_id/);
-  assert.match(alerts, /commitment\.confidence_score >= \$\{renewalAlertMinimumConfidence\}/);
+  assert.match(alerts, /recoveryReminderEligibilitySql/);
+  assert.match(alerts, /renewalAlertRepeatedEvidenceMinimumConfidence/);
+  assert.match(alerts, /recovery_commitment_evidence/);
+  assert.match(alerts, /effective_cadence <> 'IRREGULAR'/);
   assert.match(alerts, /decision\.decision is distinct from 'KEEP'/);
   assert.match(alerts, /recovery\.effective_merchant as merchant/);
   assert.match(alerts, /delivery\.recurring_item_id is null/);

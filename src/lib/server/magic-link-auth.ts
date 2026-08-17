@@ -119,8 +119,7 @@ export async function sendMagicLinkEmail(input: { email: string; link: string; e
   });
 
   if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`Resend email send failed: ${response.status}${detail ? ` ${detail.slice(0, 180)}` : ""}`);
+    throw new Error(`Resend email send failed: ${response.status}`);
   }
 }
 

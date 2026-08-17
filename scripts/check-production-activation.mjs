@@ -81,7 +81,7 @@ const groups = [
   },
   {
     id: "feature-migrations",
-    label: "Feature migrations 0002 through 0026",
+    label: "Feature migrations 0002 through 0047",
     required: ["DATABASE_URL"],
     probe: isFeatureMigrationsReady,
     why: "Confirms the target database recorded every forward migration through Recovery receipt-inbox retention and can query persistent capability schema.",
@@ -425,8 +425,8 @@ function isFeatureMigrationsReady({ endpointPayloads }) {
   const capabilities = endpointPayloads.readiness?.capabilities;
   if (!capabilities) return undefined;
   return capabilities.schema?.status === "ready"
-    && capabilities.schema.required?.includes("0026_recovery_inbound_retention") === true
-    && capabilities.schema.applied?.includes("0026_recovery_inbound_retention") === true
+    && capabilities.schema.required?.includes("0047_billed_window_insert_immutability") === true
+    && capabilities.schema.applied?.includes("0047_billed_window_insert_immutability") === true
     && capabilities.privacyLifecycle?.status !== "schema-query-failed"
     && capabilities.renewalAlerts?.status !== "schema-query-failed"
     && capabilities.commitmentDecisions?.status !== "schema-query-failed"

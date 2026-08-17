@@ -310,9 +310,9 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.match(source, /target activation evidence/);
   assert.match(source, /capabilities\?\.schema\?\.status === "ready"/);
   assert.match(source, /capabilities\.recoveryV1\?\.status === "schema-ready-clean-cutover"/);
-  assert.match(source, /Feature migrations 0002 through 0026/);
-  assert.match(source, /required\?\.includes\("0026_recovery_inbound_retention"\)/);
-  assert.match(source, /applied\?\.includes\("0026_recovery_inbound_retention"\)/);
+  assert.match(source, /Feature migrations 0002 through 0047/);
+  assert.match(source, /required\?\.includes\("0047_billed_window_insert_immutability"\)/);
+  assert.match(source, /applied\?\.includes\("0047_billed_window_insert_immutability"\)/);
   assert.match(source, /betaReady: endpointReport\.every\(\(item\) => item\.ok\)/);
   assert.match(source, /envReport\.filter\(\(item\) => item\.launchBlocking\)/);
   assert.match(source, /activationProfile = "receipt-forwarding"/);
@@ -376,5 +376,5 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.match(ci, /SMOKE_BASE_URL: http:\/\/127\.0\.0\.1:3000[\s\S]*SMOKE_ALLOW_UNCONFIGURED: "true"/);
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[410\]/);
-  assert.match(activation, /Feature migrations 0002 through 0026/);
+  assert.match(activation, /Feature migrations 0002 through 0047/);
 });

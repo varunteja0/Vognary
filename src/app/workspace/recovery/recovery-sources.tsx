@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import type { ReceiptInboxStatusDto, RecoveryEvidenceSourceDto } from "@/lib/recovery/contracts";
-import { formatMoment } from "./labels";
+import { formatMoment, sourceLabels } from "./labels";
 import { AuthRequiredBlock, LoadingBlock, StateBlock } from "./recovery-states";
 import type { LoadState, PendingMutation } from "./state";
 
@@ -65,7 +65,7 @@ export function RecoverySources({
           onReconnect={onReconnectEvidenceSource}
         />
         <p className="border-y border-line px-1 py-3 text-sm leading-6 text-(--muted)">
-          <strong className="text-(--ink-soft)">Manual evidence only.</strong> Receipt forwarding is not available yet. Nothing is connected, and Vognary does not access your inbox.
+          <strong className="text-(--ink-soft)">Manual evidence only.</strong> Receipt forwarding is not available yet. Manual receipt and file evidence remains available, and Vognary does not access your inbox.
         </p>
         {manualFallback}
       </div>
@@ -138,7 +138,7 @@ export function RecoverySources({
             <StateBlock
               eyebrow="Forwarding unavailable"
               title="A receipt address cannot be created right now"
-              detail="Nothing was connected. You can retry or use the manual fallback below."
+              detail="Receipt forwarding was not connected. You can retry or use the manual fallback below."
               tone="caution"
             >
               <button type="button" onClick={onRetry} className="btn btn-sm btn-ghost">Try again</button>
@@ -149,7 +149,7 @@ export function RecoverySources({
             <StateBlock
               eyebrow="Forwarding unavailable"
               title="Receipt forwarding is not active yet"
-              detail="Use the manual fallback below. Nothing is connected, and Vognary does not access your inbox."
+              detail="Use the manual fallback below. Manual evidence remains available, and Vognary does not access your inbox."
               tone="caution"
             />
           </div>
@@ -191,7 +191,7 @@ export function RecoverySources({
               <div className="border-t border-line pt-5">
                 <h4 className="font-display text-lg font-semibold text-(--ink)">Keep Vognary current</h4>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
-                  Forward billing emails manually for now. Gmail automatic forwarding can require a verification message that Vognary does not currently surface, so do not use this address in Gmail’s automatic-forwarding setup yet.
+                  Forward billing emails manually, or use Gmail&apos;s automatic-forwarding setup. If Gmail sends a confirmation challenge, Vognary shows the code or confirmation link above when it arrives. Gmail forwards nothing until you complete that step.
                 </p>
               </div>
             ) : null}
@@ -244,10 +244,10 @@ function EvidenceSourceList({
     : null;
   return (
     <section className="panel p-4 sm:p-6" aria-labelledby="recovery-evidence-sources">
-      <p className="eyebrow eyebrow-xs text-ochre">Cited Recovery sources</p>
+      <p className="eyebrow eyebrow-xs text-ochre">Sources Vognary checked</p>
       <h3 id="recovery-evidence-sources" className="mt-3 font-display text-2xl font-semibold text-(--ink)">Evidence sources in this workspace</h3>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
-        These are the receipt and file sources currently cited for classification. Disconnecting a source stops it supporting future classification and withdraws affected queued Autopilot cases. It does not rotate the receipt address. Reconnect is explicit. An eligible case can return only to shadow watching. An old notice, 48-hour clock, or authorization is never restored.
+        These receipt and file sources support the commitment facts shown in Vognary. Disconnecting a source stops it supporting future facts and withdraws affected queued Autopilot cases. It does not rotate the receipt address. Reconnect is explicit. A case can return only to watching. An old notice, 48-hour clock, or authorization is never restored.
       </p>
       {sources.length ? (
         <ul className="mt-5 grid gap-3">
@@ -257,8 +257,8 @@ function EvidenceSourceList({
               <li key={source.id} className="rounded-2xl border border-line p-4">
                 <p className="font-medium text-(--ink)">{source.label}</p>
                 <p className="mt-1 text-sm text-(--muted)">
-                  {source.kind} · {source.status === "CONNECTED" ? "Connected" : "Disconnected"}
-                  {source.cited ? " · currently cited" : " · not in the current classification"}
+                  {sourceLabels[source.kind]} · {source.status === "CONNECTED" ? "Connected" : "Disconnected"}
+                  {source.cited ? " · supports current commitment facts" : " · not currently supporting a commitment"}
                 </p>
                 {canManage ? (
                   <div className="mt-3 flex flex-wrap gap-2">

@@ -28,14 +28,6 @@ export function RecoveryAutopilotHome({
         <button type="button" className="btn btn-sm btn-ghost" onClick={onAddEvidence}>Add evidence</button>
       </StateBlock>
 
-      <CandidateSection title="Watching" empty="No shadow cases yet." items={autopilot.watching} />
-      <CandidateSection
-        title="Delivery pending"
-        empty="No notices are waiting on delivery."
-        items={autopilot.awaitingDelivery}
-        onVeto={onVeto}
-        pendingVetoId={pendingVetoId}
-      />
       <CandidateSection
         title="48-hour veto window"
         empty="No delivered veto notices are waiting."
@@ -43,7 +35,6 @@ export function RecoveryAutopilotHome({
         onVeto={onVeto}
         pendingVetoId={pendingVetoId}
       />
-      <CandidateSection title="Handled for you" empty="No handled cases yet." items={autopilot.handled} />
       <CandidateSection
         title="Needs your help"
         empty="No exceptions are open."
@@ -51,6 +42,15 @@ export function RecoveryAutopilotHome({
         onVeto={onVeto}
         pendingVetoId={pendingVetoId}
       />
+      <CandidateSection
+        title="Delivery pending"
+        empty="No notices are waiting on delivery."
+        items={autopilot.awaitingDelivery}
+        onVeto={onVeto}
+        pendingVetoId={pendingVetoId}
+      />
+      <CandidateSection title="Watching" empty="No shadow cases yet." items={autopilot.watching} />
+      <CandidateSection title="Handled for you" empty="No handled cases yet." items={autopilot.handled} />
 
       <section className="rounded-2xl border border-line bg-card p-4" aria-labelledby="autopilot-proof">
         <h3 id="autopilot-proof" className="font-display text-lg font-semibold text-(--ink)">Proof and savings</h3>

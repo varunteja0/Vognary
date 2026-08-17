@@ -45,6 +45,7 @@ const home: HomeProjectionDto = {
   next: [],
   coverage: { state: "BASELINE_ONLY", sourceCount: 1, evidenceCount: 1, lastEvidenceAt: null, coverageStart: null, coverageEnd: null, limitations: [] },
   activeCommitmentCount: 0,
+  unknownCadenceCommitmentCount: 0,
   reviewItemCount: 0,
   evidenceSources: [],
 };
@@ -388,7 +389,17 @@ test("evidence results decide whether the draft is cleared or kept for repair", 
     meta,
   });
   assert.equal(accepted.evidenceDraft.receiptText, "");
-  assert.equal(accepted.announcement, "Evidence submitted. 1 accepted of 1 sent.");
+  assert.equal(accepted.announcement, "Evidence submitted. 1 evidence item saved from 1 submitted receipt.");
+
+  const expanded = recoveryReducer(withDraft, {
+    type: "EVIDENCE_SUBMITTED",
+    submission: { id: "submission-expanded", type: "RECEIPT_PASTE", ingestedAt: "2026-08-09T10:00:00.000Z", acceptedEvidenceCount: 4, results: [{ clientRef: "receipt-paste-1", status: "ACCEPTED", code: null, message: null }] },
+    home,
+    commitments: [commitment],
+    total: 2,
+    meta,
+  });
+  assert.equal(expanded.announcement, "Evidence submitted. 4 evidence items saved from 1 submitted receipt.");
 
   const rejected = recoveryReducer(withDraft, {
     type: "EVIDENCE_SUBMITTED",

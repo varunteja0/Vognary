@@ -144,7 +144,11 @@ function CommitmentDetailPanel({ state, handlers }: { state: RecoveryState; hand
         <dl className="mt-4 grid gap-3 sm:grid-cols-3">
           <DetailFact label="Frequency" value={cadenceLabels[detail.cadence]} />
           <DetailFact label="Expected next charge" value={detail.nextExpectedDate ? formatDay(detail.nextExpectedDate) : "Not enough information"} />
-          <DetailFact label="Estimated monthly cost" value={detail.monthlyEquivalent.display} note={detail.monthlyEquivalent.currency} />
+          <DetailFact
+            label="Estimated monthly cost"
+            value={detail.cadence === "IRREGULAR" ? "Not established" : detail.monthlyEquivalent.display}
+            note={detail.cadence === "IRREGULAR" ? undefined : detail.monthlyEquivalent.currency}
+          />
         </dl>
 
         <div className="mt-4 inset p-4">

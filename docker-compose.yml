@@ -20,8 +20,8 @@ services:
       NEXT_PUBLIC_APP_URL: http://localhost:3000
       SESSION_SECRET: local-compose-session-secret-at-least-32-bytes
       TOKEN_ENCRYPTION_KEY: 1111111111111111111111111111111111111111111111111111111111111111
-      INTERNAL_SYNC_SECRET: local-compose-internal-secret
-      CRON_SECRET: local-compose-cron-secret
+      INTERNAL_SYNC_SECRET: local-compose-internal-secret-at-least-32-bytes
+      CRON_SECRET: local-compose-cron-secret-at-least-32-bytes
       ALLOW_IN_MEMORY_RATE_LIMITS: "true"
     depends_on:
       migrate:

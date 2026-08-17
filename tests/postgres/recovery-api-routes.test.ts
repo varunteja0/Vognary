@@ -62,7 +62,7 @@ test("Recovery HTTP routes enforce session, version, replay, isolation, and safe
       kind: "RECEIPT_PASTE",
       receipts: [{
         clientRef: "route-openai-july",
-        text: "OpenAI subscription charged INR 1,999 on 6 July 2026. Renews monthly on 6 August 2026.",
+        text: "From: OpenAI; Invoice date: 6 July 2026; ChatGPT Plus monthly subscription. Amount: INR 1,999.00; Next billing date: 6 August 2026.",
       }],
     };
 
@@ -148,6 +148,8 @@ test("Recovery HTTP routes enforce session, version, replay, isolation, and safe
     assert.equal(homePayload.data.workspace.version, 1);
     assert.equal(homePayload.data.activeCommitmentCount, 1);
     assert.equal(homePayload.data.monthlyTotals[0]?.provenance, "RECEIPT");
+    assert.doesNotMatch(JSON.stringify(homePayload.data), /recovery-source:[0-9a-f-]{36}/i);
+    assert.match(JSON.stringify(homePayload.data), /Pasted receipt/);
     assert.equal(await activationCount(), 0);
 
     const list = await listCommitments(authenticatedRequest("/api/workspaces/current/commitments?limit=1", cookieHeader));

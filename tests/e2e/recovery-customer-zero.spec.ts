@@ -76,7 +76,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toBeVisible();
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect(page.getByText("From checked receipts only.").first()).toBeVisible();
   await expect(page.getByText("Annualized estimate", { exact: true })).toBeVisible();
   await expect(page.getByText(/It is not a historical yearly total/)).toBeVisible();
@@ -182,26 +182,13 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toBeVisible();
   await expect(page.getByText("Amount changed").first()).toBeVisible();
 
-  // 30. Sign the real standing mandate, verify the fail-closed Autopilot home,
-  // persist it across reload, then revoke it through the same browser/API path.
-  await selectRecoveryView(page, "Mandate");
-  await expect(page.getByText("No standing mandate is signed")).toBeVisible();
-  await page.getByRole("button", { name: "I accept this standing mandate" }).click();
-  await expect(page.getByText("This workspace has an active standing mandate")).toBeVisible();
-  await expect(page.getByText("Off — veto notices are not sent")).toBeVisible();
-  await expect(page.getByText("Off — no cancellation is executed")).toBeVisible();
-
+  // 30. Unproven automation authority stays out of the public workspace.
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toHaveCount(0);
   await page.reload();
-  await selectRecoveryView(page, "Mandate");
-  await expect(page.getByText("This workspace has an active standing mandate")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
-  await selectRecoveryView(page, "Home");
-  await expect(page.getByText("Exception-only home")).toBeVisible();
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
-  await expect(page.getByText(/Execution is switched off, so nothing is cancelled from here/)).toBeVisible();
-  await selectRecoveryView(page, "Mandate");
-  await page.getByRole("button", { name: "Revoke this mandate" }).click();
-  await expect(page.getByText("No standing mandate is signed")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
 
   // 31. Exercise canonical export and canonical deletion through Account settings.
   await page.getByRole("link", { name: new RegExp(`Account for ${email}`) }).click();

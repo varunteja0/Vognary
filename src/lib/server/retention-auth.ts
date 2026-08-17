@@ -1,13 +1,16 @@
 import "server-only";
 
 import { timingSafeEqual } from "node:crypto";
+import { isOperationalSecretValid } from "@/lib/server/internal-auth";
 import type { RetentionInvocation } from "@/lib/server/retention-executor";
 
 const noStoreHeaders = { "cache-control": "no-store", pragma: "no-cache" };
 
 export function requireRetentionExecutorSecret(request: Request): { invocation: RetentionInvocation } | Response {
-  const internalSecret = process.env.INTERNAL_SYNC_SECRET?.trim() || null;
-  const cronSecret = process.env.CRON_SECRET?.trim() || null;
+  const configuredInternal = process.env.INTERNAL_SYNC_SECRET?.trim() || null;
+  const configuredCron = process.env.CRON_SECRET?.trim() || null;
+  const internalSecret = isOperationalSecretValid(configuredInternal) ? configuredInternal : null;
+  const cronSecret = isOperationalSecretValid(configuredCron) ? configuredCron : null;
   if (!internalSecret && !cronSecret) {
     return Response.json({
       status: "not-configured",

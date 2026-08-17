@@ -166,6 +166,7 @@ const home = {
     limitations: ["No prior persisted baseline exists."],
   },
   activeCommitmentCount: 1,
+  unknownCadenceCommitmentCount: 0,
   reviewItemCount: 1,
   evidenceSources: [],
 } as const satisfies HomeProjectionDto;

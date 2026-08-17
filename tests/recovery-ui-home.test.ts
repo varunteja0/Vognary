@@ -83,10 +83,13 @@ test("every contract enum has presentation copy, so a contract change cannot ren
   }
 });
 
-test("primary navigation is Home, Subscriptions, Sources, and Mandate, with Account outside the tabs", () => {
+test("primary navigation keeps Mandate hidden until delivery is proven or authority already exists", () => {
   assert.deepEqual([...recoveryViews], ["HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
   assert.deepEqual(Object.values(recoveryViewLabels), ["Home", "Subscriptions", "Sources", "Mandate"]);
   assert.match(clientSource, /<nav aria-label="Primary"/);
+  assert.match(clientSource, /mandateAvailable/);
+  assert.match(clientSource, /noticeReadiness\.state === "proven-ready"/);
+  assert.match(clientSource, /primaryViews\.map/);
   assert.match(clientSource, /aria-current=\{state\.view === view \? "page" : undefined\}/);
   assert.match(clientSource, /href="\/profile"/);
   assert.doesNotMatch(clientSource, /state\.view === "PROFILE"/);
@@ -108,7 +111,7 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   for (const heading of ["Needs attention", "Since your last visit", "Coming up", "Receipts checked"]) {
     assert.ok(homeSource.includes(heading), `home must render ${heading}`);
   }
-  for (const label of ["Monthly software spend", "Annualized estimate", "Next 30 days", "Active commitments", "Needs review"]) {
+  for (const label of ["Monthly recurring amount", "Annualized estimate", "Next 30 days", "Active commitments", "Needs review"]) {
     assert.ok(homeSource.includes(label), `home must render ${label}`);
   }
   assert.match(homeSource, /home\.annualizedEstimateTotals/);
@@ -128,9 +131,16 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   assert.doesNotMatch(addEvidenceSource, /recordWorkspaceActivation|onCitedPictureRendered/);
   assert.doesNotMatch(sourcesSource, /recordWorkspaceActivation|onCitedPictureRendered/);
   assert.match(homeSource, /RecoveryFirstValueMetrics/);
+  assert.match(homeSource, /RecoveryProjectionDetails/);
+  const needsAttentionIndex = homeSource.indexOf('aria-labelledby="recovery-needs-me"');
+  const secondaryProjectionIndexes = [...homeSource.matchAll(/<RecoveryProjectionDetails/g)].map((match) => match.index);
   assert.ok(
-    homeSource.indexOf("<RecoveryFirstValueMetrics") < homeSource.indexOf("<RecoveryAutopilotHome"),
-    "cited spend metrics must render above the exception-only Autopilot home",
+    secondaryProjectionIndexes.some((index) => index > needsAttentionIndex),
+    "Needs attention must appear before annualized and next-30 secondary figures",
+  );
+  assert.ok(
+    homeSource.indexOf("<RecoveryAutopilotHome") < homeSource.indexOf("<RecoveryFirstValueMetrics"),
+    "active Autopilot actions must render above cited spend metrics",
   );
   assert.match(homeSource, /coverageLabels\[home\.coverage\.state\]/);
   assert.match(homeSource, /coverageMeanings\[home\.coverage\.state\]/);
@@ -147,7 +157,7 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   assert.doesNotMatch(
     metricsFn,
     /if \(!hasTotals\) return null/,
-    "an active mandate must still publish Monthly software spend when no recurring amount is cited",
+    "an active mandate must still publish Monthly recurring amount when no recurring amount is cited",
   );
   assert.match(homeSource, /home\.changed\.state === "COMPARED"/);
   assert.doesNotMatch(homeSource, /WHAT NEEDS ME\?|WHAT CHANGED\?|WHAT HAPPENS NEXT\?|COVERAGE/);
@@ -158,8 +168,8 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   assert.match(clientSource, /transport\.evidence\(/);
 });
 
-test("returning Home leads with proven change and exports only the Recovery projection", () => {
-  assert.ok(homeSource.indexOf("Since your last visit") < homeSource.indexOf("Needs attention"));
+test("returning Home leads with attention before proven change and exports only the Recovery projection", () => {
+  assert.ok(homeSource.indexOf("Needs attention") < homeSource.indexOf("Since your last visit"));
   assert.match(homeSource, /Sheets go stale when new charges land/);
   assert.match(homeSource, /This is a floor from receipts checked, not every debit in India\./);
   assert.match(homeSource, /renderRecoveryShareText\(home\)/);
@@ -244,7 +254,7 @@ test("Sources makes receipt forwarding primary and keeps manual evidence behind 
     "Rotate address",
     "Stop receiving",
     "Manual fallback",
-    "do not use this address in Gmail’s automatic-forwarding setup yet",
+    "If Gmail sends a confirmation challenge",
   ]) {
     assert.ok(sourcesSource.includes(copy), `Sources must render ${copy}`);
   }
@@ -253,10 +263,11 @@ test("Sources makes receipt forwarding primary and keeps manual evidence behind 
   assert.match(clientSource, /onReconnectEvidenceSource/);
   assert.match(sourcesSource, /Disconnect source/);
   assert.match(sourcesSource, /Reconnect source/);
-  assert.match(sourcesSource, /stops it supporting future classification/);
+  assert.match(sourcesSource, /stops it supporting future facts/);
   assert.match(sourcesSource, /withdraws affected queued Autopilot cases/);
   assert.match(sourcesSource, /does not rotate the receipt address/);
   assert.match(sourcesSource, /old notice, 48-hour clock, or authorization is never restored/);
+  assert.doesNotMatch(sourcesSource, /Nothing is connected|does not currently surface|do not use this address/i);
   assert.match(clientSource, /manualFallback=\{/);
   assert.match(clientSource, /window\.setInterval\(\(\) => void loadSources\(\), 10_000\)/);
   assert.match(clientSource, /state\.sourceStatus\.kind === "READY" && state\.refreshRequired[\s\S]*void loadSnapshot\(\)/);
@@ -278,6 +289,11 @@ test("rollback notices name every failed authority action instead of calling it 
   }
   assert.match(clientSource, /function rollbackAttemptLabel/);
   assert.match(clientSource, /const exhaustive: never = mutation/);
+});
+
+test("customer confidence copy uses bounded words without publishing heuristic percentages", () => {
+  assert.doesNotMatch(statesSource, /confidence\.score\}%|Score \$\{confidence\.score\}/);
+  assert.match(statesSource, /confidence level/i);
 });
 
 test("money is only ever the server's own display string", () => {

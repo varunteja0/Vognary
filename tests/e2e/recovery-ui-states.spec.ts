@@ -35,6 +35,7 @@ const emptyHome: HomeProjectionDto = {
     limitations: ["No evidence has been submitted."],
   },
   activeCommitmentCount: 0,
+  unknownCadenceCommitmentCount: 0,
   reviewItemCount: 0,
   evidenceSources: [],
 };

@@ -23,6 +23,13 @@ test("Razorpay webhook signatures validate the untouched raw body", () => {
   assert.equal(verifyRazorpayWebhookSignature(`${raw} `, signature, secret), false);
 });
 
+test("Razorpay webhook replay identity comes from the signed raw body", () => {
+  const route = source("src/app/api/billing/webhooks/razorpay/route.ts");
+  assert.doesNotMatch(route, /x-razorpay-event-id/i);
+  assert.match(route, /const payloadHash = hashBillingPayload\(rawBody\)/);
+  assert.match(route, /parseRazorpayBillingEvent\(JSON\.parse\(rawBody\), `razorpay:\$\{payloadHash\}`\)/);
+});
+
 test("paid Payment Link events expose only settlement identifiers", () => {
   const event = parseRazorpayBillingEvent({
     event: "payment_link.paid",
@@ -156,16 +163,6 @@ test("payment returns land on the public status page, never the protected app", 
   assert.doesNotMatch(returnClient, /Razorpay receipt email|authoritative proof/i);
   assert.match(returnClient, /confirmation shown by Razorpay/);
   assert.match(returnClient, /support@vognary\.com/);
-});
-
-test("workspace primary totals use and name the audit primary currency", () => {
-  const client = source("src/app/vognary-mvp-client.tsx");
-  for (const field of ["monthlyRecurringSpend", "annualRecurringSpend", "reviewableMonthlySpend"]) {
-    assert.doesNotMatch(client, new RegExp(`formatCurrency\\(audit\\.summary\\.${field}\\)`));
-    assert.match(client, new RegExp(`formatCurrency\\(audit\\.summary\\.${field}, audit\\.summary\\.primaryCurrency\\)`));
-  }
-  assert.match(client, /Monthly · \$\{audit\.summary\.primaryCurrency\}/);
-  assert.match(client, /Yearly · \$\{audit\.summary\.primaryCurrency\}/);
 });
 
 test("Recovery save guidance uses Google and keeps magic link deferred", () => {

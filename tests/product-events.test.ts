@@ -94,10 +94,9 @@ test("client product-event ingest cannot mark a workspace activated", () => {
   assert.match(store, /do nothing/i);
 });
 
-test("guest clients do not automatically transmit first-session analytics", () => {
-  const guest = readFileSync(new URL("../src/app/guest-audit-client.tsx", import.meta.url), "utf8");
+test("public audit clients do not automatically transmit first-session analytics", () => {
   const privateAudit = readFileSync(new URL("../src/app/private-audit/private-audit-client.tsx", import.meta.url), "utf8");
-  assert.doesNotMatch(`${guest}\n${privateAudit}`, /trackAnonymousFunnelEvent|\/api\/product-events/);
+  assert.doesNotMatch(privateAudit, /trackAnonymousFunnelEvent|\/api\/product-events/);
   for (const eventName of ["guest_audit.started", "guest_audit.evidence_added", "guest_audit.first_result_reached", "private_audit.opened"]) {
     assert.equal((productEventNames as readonly string[]).includes(eventName), false);
   }

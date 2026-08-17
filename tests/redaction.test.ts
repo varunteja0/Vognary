@@ -9,12 +9,12 @@ test("masks account numbers keeping the last four digits", () => {
 });
 
 test("masks PAN, IFSC, phone, and UPI handles", () => {
-  const result = redactText("PAN ABCDE1234F IFSC HDFC0001234 call 9876543210 pay someone@okhdfcbank");
+  const result = redactText("PAN ABCDE1234F IFSC HDFC0001234 call 9876543210 pay someone@okhdfcbank or a@upi");
   assert.match(result.text, /PAN-REDACTED/);
   assert.match(result.text, /IFSC-REDACTED/);
   assert.match(result.text, /PHONE-REDACTED/);
   assert.match(result.text, /HANDLE-REDACTED/);
-  assert.equal(result.redactedCount, 4);
+  assert.equal(result.redactedCount, 5);
 });
 
 test("masks card-style separated digits with last four preserved", () => {

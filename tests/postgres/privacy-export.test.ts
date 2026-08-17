@@ -198,6 +198,7 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.transactions.length, 2);
     assert.equal(document.recurringLedger.length, 2);
     assert.equal(document.decisions.length, 1);
+    assert.equal(document.recommendations.every((recommendation: { estimatedMonthlySavingsCurrency?: string }) => /^[A-Z]{3}$/.test(recommendation.estimatedMonthlySavingsCurrency ?? "")), true);
     assert.equal(document.workspaceState.revision, 1);
     assert.equal(document.workspaceState.state.reviewCompletedAt, "2026-07-11T01:00:00.000Z");
     assert.equal(document.workspaceState.state.statementSources[0].text.includes("NETFLIX"), true);
@@ -252,6 +253,7 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.verifiedOutcomes.actionCases.length, 1);
     assert.equal(document.verifiedOutcomes.authorizations.length, 1);
     assert.match(document.verifiedOutcomes.authorizations[0].authorizationText, /I authorize Vognary/i);
+    assert.equal(document.verifiedOutcomes.authorizations[0].currency, document.verifiedOutcomes.actionCases[0].currency);
     assert.ok(document.verifiedOutcomes.caseEvents.length >= 2);
     assert.ok(document.auditHistory.length >= 4);
 

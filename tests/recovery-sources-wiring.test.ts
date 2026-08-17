@@ -13,7 +13,7 @@ test("the workspace wires Sources and delegates account settings to the profile 
   assert.match(workspaceSource, /import \{ RecoverySources \} from "\.\/recovery-sources"/);
   assert.match(workspaceSource, /<RecoverySources/);
   assert.match(workspaceSource, /href="\/profile"/);
-  assert.match(workspaceSource, /<ul className="grid grid-cols-4 gap-1 sm:flex sm:gap-2">/);
+  assert.match(workspaceSource, /mandateAvailable \? "grid-cols-4" : "grid-cols-3"/);
   assert.doesNotMatch(workspaceSource, /RecoveryProfile/);
   assert.doesNotMatch(workspaceSource, /\bPROFILE\b/);
 });
@@ -39,6 +39,13 @@ test("Sources describes forwarding without pretending sender intent or inbox acc
   assert.doesNotMatch(sourcesSource, /only messages you choose to send/i);
   assert.doesNotMatch(sourcesSource, /(?:Vognary|we) (?:access|scan|read|monitor)s? your inbox/i);
   assert.match(sourcesSource, /Messages sent to that private address are processed as receipt evidence/);
+});
+
+test("Sources translates internal source kinds and classification state into customer language", () => {
+  assert.match(sourcesSource, /sourceLabels\[source\.kind\]/);
+  assert.doesNotMatch(sourcesSource, /\{source\.kind\}/);
+  assert.doesNotMatch(sourcesSource, /not in the current classification/);
+  assert.match(sourcesSource, /not currently supporting a commitment/);
 });
 
 test("failed receipt states surface the last failure code without inventing a renewal", () => {

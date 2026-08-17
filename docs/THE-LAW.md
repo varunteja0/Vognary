@@ -194,11 +194,10 @@ Agents **must refuse** or redirect:
 | Money | Server-owned prices; signed webhooks only; fail closed |
 | Data | Prefer Recovery (`src/lib/recovery`) as the sole financial authority. Living ledger is frozen read-only. |
 
-### 8.3 Monolith policy
+### 8.3 Workspace policy
 
-- `src/app/vognary-mvp-client.tsx` (~5.4k lines) is **quarantined** for token gate (`WP4_DEFERRED`).  
-- Extract into `src/app/workspace/*` only under Phase B decomposition plan.  
-- Prefer **new panels** under `workspace/` over growing the monolith.
+- The legacy workspace monolith is retired. `src/app/workspace/*` is the only customer workspace implementation.
+- Do not recreate a parallel workspace shell or bypass Recovery contracts.
 
 ### 8.4 Definition of done (every PR)
 

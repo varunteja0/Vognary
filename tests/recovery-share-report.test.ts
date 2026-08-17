@@ -67,6 +67,7 @@ const home: HomeProjectionDto = {
     limitations: ["Only submitted receipts are covered."],
   },
   activeCommitmentCount: 2,
+  unknownCadenceCommitmentCount: 0,
   reviewItemCount: 1,
   evidenceSources: [],
 };
@@ -157,6 +158,7 @@ test("Recovery share text names a saved first observation without calling it rec
     next: [],
     needsMe: [],
     activeCommitmentCount: 0,
+    unknownCadenceCommitmentCount: 0,
     reviewItemCount: 0,
     changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 1, items: [] },
     coverage: {

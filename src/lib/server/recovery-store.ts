@@ -31,6 +31,7 @@ import {
   decimalToMinorUnits,
   minorUnitsToDecimal,
   normalizeMinorUnits,
+  projectCadenceMonthlyMinor,
   toMoneyDto,
   type CanonicalCommitmentRecord,
   type RecoveryCoverageSource,
@@ -1262,33 +1263,36 @@ function extractObservedReceiptEvidence(
   rowOffset: number,
 ): ExtractedEvidence[] {
   if (!observed.length) return [];
-  const lines = ["Date,Description,Debit,Credit,Currency"];
-  for (const item of observed) {
-    lines.push([item.observedDate, csvCell(item.evidenceText), item.amountDecimal, "", item.currency].join(","));
-  }
-  const audit = analyzeStatements([{ name: sourceName, text: `${lines.join("\n")}\n` }], [], { today: now });
-  return audit.transactions.map((transaction, index) => ({
-    id: randomUUID(),
-    sourceId,
-    evidenceKind: "TRANSACTION" as const,
-    rowNumber: rowOffset + index + 1,
-    observedAt: `${transaction.date}T00:00:00.000Z`,
-    excerpt: transaction.description,
-    excerptTruncated: transaction.description.replace(/\s+/g, " ").trim().length > recoveryLimits.maxEvidenceExcerptCharacters,
-    merchant: transaction.normalizedMerchant,
-    normalizedMerchant: transaction.normalizedMerchant,
-    category: transaction.category,
-    amountMinor: decimalToMinorUnits(transaction.amountDecimal, transaction.currency),
-    currency: transaction.currency,
-    evidenceDate: transaction.date,
-    direction: transaction.direction,
-    cadenceHint: null,
-    nextExpectedDate: null,
-    provenanceKind,
-    provenanceReference: `${submissionId}:${sourceId}:${rowOffset + index + 1}`,
-    confidenceScore: 55,
-    confidenceReasons: ["Parsed deterministically from a receipt that proved a charge but stated no renewal date."],
-  }));
+  return observed.flatMap((item, index) => {
+    const lines = [
+      "Date,Description,Debit,Credit,Currency",
+      [item.observedDate, csvCell(item.merchant), item.amountDecimal, "", item.currency].join(","),
+    ];
+    const transaction = analyzeStatements([{ name: sourceName, text: `${lines.join("\n")}\n` }], [], { today: now }).transactions[0];
+    if (!transaction) return [];
+    return [{
+      id: randomUUID(),
+      sourceId,
+      evidenceKind: "TRANSACTION" as const,
+      rowNumber: rowOffset + index + 1,
+      observedAt: `${transaction.date}T00:00:00.000Z`,
+      excerpt: item.evidenceText,
+      excerptTruncated: item.evidenceText.replace(/\s+/g, " ").trim().length > recoveryLimits.maxEvidenceExcerptCharacters,
+      merchant: item.merchant,
+      normalizedMerchant: transaction.normalizedMerchant,
+      category: item.category,
+      amountMinor: decimalToMinorUnits(transaction.amountDecimal, transaction.currency),
+      currency: transaction.currency,
+      evidenceDate: transaction.date,
+      direction: transaction.direction,
+      cadenceHint: null,
+      nextExpectedDate: null,
+      provenanceKind,
+      provenanceReference: `${submissionId}:${sourceId}:${rowOffset + index + 1}`,
+      confidenceScore: 55,
+      confidenceReasons: ["Parsed deterministically from a receipt that proved a charge but stated no renewal date."],
+    }];
+  });
 }
 
 function extractCsvEvidence(
@@ -1411,7 +1415,22 @@ async function analyzePersistedEvidence(client: PoolClient, workspaceId: string,
     name: sourceEngineName(sourceId),
     text: buildSyntheticCsv(rows),
   }));
-  return analyzeStatements(sources, manualItems, { today });
+  const audit = analyzeStatements(sources, manualItems, { today });
+  const sourceLabels = new Map(evidence.map((row) => [sourceEngineName(row.source_id), row.source_label]));
+  return {
+    ...audit,
+    recurringItems: audit.recurringItems.map((item) => ({
+      ...item,
+      recommendationReason: publishRecoverySourceLabels(item.recommendationReason, sourceLabels),
+      sourceNames: item.sourceNames.map((name) => sourceLabels.get(name) ?? name),
+    })),
+  };
+}
+
+function publishRecoverySourceLabels(value: string, sourceLabels: ReadonlyMap<string, string>) {
+  let published = value;
+  for (const [internalName, label] of sourceLabels) published = published.replaceAll(internalName, label);
+  return published;
 }
 
 function buildSyntheticCsv(rows: EvidenceRow[]) {
@@ -1611,7 +1630,7 @@ function baseTruthFromRecurring(item: RecurringItem): EffectiveTruth {
     cadence: frequencyToCadence[item.frequency],
     currency: item.currency,
     amountMinor,
-    monthlyMinor: projectMonthlyMinor(amountMinor, frequencyToCadence[item.frequency]),
+    monthlyMinor: projectCadenceMonthlyMinor(amountMinor, frequencyToCadence[item.frequency]),
     nextExpectedDate: item.nextExpectedDate || null,
   };
 }
@@ -1626,7 +1645,7 @@ function applyCorrectionTruth(base: EffectiveTruth, corrections: readonly Correc
     if (patch.field === "CADENCE") effective.cadence = patch.value.cadence;
     if (patch.field === "IS_RECURRING") effective.status = patch.value.isRecurring ? "ACTIVE" : "NOT_RECURRING";
   }
-  effective.monthlyMinor = projectMonthlyMinor(effective.amountMinor, effective.cadence);
+  effective.monthlyMinor = projectCadenceMonthlyMinor(effective.amountMinor, effective.cadence);
   return effective;
 }
 
@@ -1887,11 +1906,12 @@ async function loadHome(
 }
 
 async function loadRecentObservationRecords(client: PoolClient, workspaceId: string): Promise<RecoveryObservationRecord[]> {
-  const result = await client.query<Pick<EvidenceRow, "id" | "merchant" | "amount_minor" | "currency" | "evidence_date">>(
+  const result = await client.query<Pick<EvidenceRow, "id" | "merchant" | "amount_minor" | "currency" | "observed_at">>(
     `select evidence.id, evidence.merchant, evidence.amount_minor,
-            evidence.currency, evidence.evidence_date
+            evidence.currency, evidence.observed_at
      from recovery_evidence evidence
      where evidence.workspace_id = $1
+       and evidence.observed_at is not null
      order by evidence.created_at desc, evidence.id desc
      limit 3`,
     [workspaceId],
@@ -1901,7 +1921,7 @@ async function loadRecentObservationRecords(client: PoolClient, workspaceId: str
     merchant: row.merchant || null,
     amountMinor: row.amount_minor === null ? null : BigInt(normalizeMinorUnits(row.amount_minor)),
     currency: row.currency,
-    date: toDateOnly(row.evidence_date),
+    date: toDateOnly(row.observed_at),
   }));
 }
 
@@ -2411,24 +2431,6 @@ function averageMinor(values: readonly bigint[]) {
   const divisor = BigInt(values.length);
   const quotient = total / divisor;
   const rounded = total % divisor * BigInt(2) >= divisor ? quotient + BigInt(1) : quotient;
-  return BigInt(normalizeMinorUnits(rounded.toString()));
-}
-
-function projectMonthlyMinor(amountMinor: bigint, cadence: Cadence) {
-  const ratios: Record<Cadence, readonly [bigint, bigint]> = {
-    WEEKLY: [BigInt(3_044), BigInt(700)],
-    BIWEEKLY: [BigInt(3_044), BigInt(1_400)],
-    SEMIMONTHLY: [BigInt(3_044), BigInt(1_522)],
-    MONTHLY: [BigInt(1), BigInt(1)],
-    BIMONTHLY: [BigInt(3_044), BigInt(6_088)],
-    QUARTERLY: [BigInt(3_044), BigInt(9_131)],
-    YEARLY: [BigInt(3_044), BigInt(36_525)],
-    IRREGULAR: [BigInt(1), BigInt(1)],
-  };
-  const [numerator, denominator] = ratios[cadence];
-  const product = amountMinor * numerator;
-  const quotient = product / denominator;
-  const rounded = product % denominator * BigInt(2) >= denominator ? quotient + BigInt(1) : quotient;
   return BigInt(normalizeMinorUnits(rounded.toString()));
 }
 

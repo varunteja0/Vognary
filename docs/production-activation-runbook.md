@@ -10,7 +10,7 @@ Do not show the forwarding-first landing or set any receipt-inbox operator flag 
 
 Stop immediately when any of these is true:
 
-- PostgreSQL migrations through `0026_recovery_inbound_retention` are not applied.
+- PostgreSQL migrations through `0047_billed_window_insert_immutability` are not applied.
 - A signed Resend event cannot produce one canonical Recovery submission.
 - Replaying that event creates another submission, source, evidence row, or commitment.
 - A raw provider address, alias token, message subject, body, or attachment appears in logs or privacy export.
@@ -24,7 +24,7 @@ Rollback means setting `ENABLE_RECEIPT_INBOX=false`, clearing the four operator 
 
 1. Select Node `22.22.2` or a later `22.x` version allowed by `package.json`.
 2. Keep `ENABLE_RECEIPT_INBOX=false` and all four receipt-inbox operator evidence flags blank.
-3. Configure `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `SESSION_SECRET`, `INTERNAL_SYNC_SECRET`, and `CRON_SECRET` in the production deployment.
+3. Configure `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `SESSION_SECRET`, `INTERNAL_SYNC_SECRET`, and `CRON_SECRET` in the production deployment. `INTERNAL_SYNC_SECRET` and `CRON_SECRET` must be distinct values containing at least 32 UTF-8 bytes; shorter values fail closed as not configured. Generate each independently with `openssl rand -base64 32`. Never reuse either value as `SESSION_SECRET` or `TOKEN_ENCRYPTION_KEY`.
 4. Before deploying the candidate, apply only the additive Recovery inbox and reminder migrations. They are compatible with the old deployment and provide the columns the candidate uses:
 
 ```bash
@@ -41,14 +41,14 @@ DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-sche
 DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
 ```
 
-10. Query `schema_migrations` and verify the last row is `0026_recovery_inbound_retention`.
+10. Query `schema_migrations` and verify the last row is `0047_billed_window_insert_immutability`.
 11. Verify PostgreSQL contains `connector_sync_jobs_recovery_cutover_guard`, `connector_evidence_running_job_guard`, and `renewal_alert_deliveries_recovery_cutover_guard`. Require zero connector jobs in `queued`, `running`, `failed`, or `paused`, zero connector runs in `running`, and zero legacy renewal deliveries in `scheduled`, `sending`, or `failed`.
 12. Run the fresh and staged upgrade migration tests against disposable PostgreSQL 16. The upgrade test must prove `0024`/`0025` leave old work operational before deployment and `0026` later rejects a new legacy job, reminder, and connector-evidence write.
 
 Expected success:
 
 - `/api/readiness` reports `capabilities.schema.status = ready`.
-- `capabilities.schema.applied` contains `0024_recovery_inbound_receipts`, `0025_recovery_renewal_alerts`, and `0026_recovery_inbound_retention`.
+- `capabilities.schema.status` is `ready`, and `capabilities.schema.applied` ends at `0047_billed_window_insert_immutability`.
 - `capabilities.recoveryV1.status = schema-ready-clean-cutover`.
 
 Stop before `0026` if the retired SHA is not live or old workers have not drained. Keep forwarding disabled and stop activation if checksums differ, the additive phase does not stop exactly at `0025`, any cutover trigger is absent, a nonterminal legacy row remains, a fresh database fails, or an upgrade loses legacy rows.
@@ -183,7 +183,7 @@ Expected success:
 
 - Every endpoint probe passes.
 - `Recovery receipt inbox` is `READY`.
-- Feature migrations are `READY` through 0026.
+- Feature migrations are `READY` through 0047.
 - Identity provider, persistent backend, shared rate limiting, privacy lifecycle, monitoring, backups, and any enabled billing/notification group are `READY`.
 - All retired connector endpoints return `410`.
 

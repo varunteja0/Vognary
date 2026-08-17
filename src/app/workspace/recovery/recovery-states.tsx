@@ -103,7 +103,6 @@ export function ConfidenceBadge({ confidence }: { confidence: ConfidenceDto }) {
   return (
     <span className={pillClass}>
       {confidenceLabels[confidence.state]}
-      {confidence.score === null ? "" : ` · ${confidence.score}%`}
     </span>
   );
 }
@@ -114,7 +113,7 @@ export function ConfidenceDetail({ confidence }: { confidence: ConfidenceDto }) 
       <div className="flex flex-wrap items-center gap-2">
         <ConfidenceBadge confidence={confidence} />
         <span className="font-data text-xs text-(--muted)">
-          {confidence.score === null ? "No score was published for this." : `Score ${confidence.score} on a 0–100 scale.`}
+          This confidence level is based on the cited evidence available to Vognary.
         </span>
       </div>
       <p className="mt-2 text-sm leading-6 text-(--muted)">{confidenceUncertainty[confidence.state]}</p>

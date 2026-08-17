@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { NextRequest } from "next/server";
 import { POST as logoutPost } from "../src/app/api/auth/logout/route";
 import { POST as connectorPreviewPost } from "../src/app/api/connectors/[id]/sync/route";
 import { openAiCostsAdapter } from "../src/lib/connectors/openai-costs-adapter";
 import { checkDevelopmentLoginConfiguration, validateDevelopmentLogin } from "../src/lib/server/development-login";
-import { checkMagicLinkConfiguration, getMagicLinkAppOrigin, normalizeRedirectPath } from "../src/lib/server/magic-link-auth";
+import { checkMagicLinkConfiguration, getMagicLinkAppOrigin, normalizeRedirectPath, sendMagicLinkEmail } from "../src/lib/server/magic-link-auth";
+import { requireCronSecret, requireInternalSecret } from "../src/lib/server/internal-auth";
+import { requireRetentionExecutorSecret } from "../src/lib/server/retention-auth";
 import { isEnvironmentConnectorPreviewEnabled } from "../src/lib/server/connector-preview-policy";
 import { readSession, sessionCookieName } from "../src/lib/server/session";
 
@@ -96,6 +99,73 @@ test("magic-link login stays deferred unless an explicit non-launch opt-in is se
       else process.env[name] = value;
     }
   }
+});
+
+test("magic-link provider failures never surface the provider response body", async () => {
+  const previous = {
+    apiKey: process.env.RESEND_API_KEY,
+    from: process.env.RESEND_FROM_EMAIL,
+    fetch: globalThis.fetch,
+  };
+  process.env.RESEND_API_KEY = "resend-test-key";
+  process.env.RESEND_FROM_EMAIL = "login@vognary.test";
+  globalThis.fetch = async () => new Response("provider-private-diagnostic", { status: 400 });
+  try {
+    await assert.rejects(
+      sendMagicLinkEmail({ email: "owner@example.test", link: "https://vognary.test/login", expiresAt: "2026-08-17T00:00:00.000Z" }),
+      (error: Error) => {
+        assert.match(error.message, /Resend email send failed: 400/);
+        assert.doesNotMatch(error.message, /provider-private-diagnostic/);
+        return true;
+      },
+    );
+  } finally {
+    if (previous.apiKey === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = previous.apiKey;
+    if (previous.from === undefined) delete process.env.RESEND_FROM_EMAIL;
+    else process.env.RESEND_FROM_EMAIL = previous.from;
+    globalThis.fetch = previous.fetch;
+  }
+});
+
+test("internal and cron execution reject configured secrets shorter than 32 bytes", async () => {
+  const previous = {
+    internal: process.env.INTERNAL_SYNC_SECRET,
+    cron: process.env.CRON_SECRET,
+  };
+  process.env.INTERNAL_SYNC_SECRET = "short-internal";
+  process.env.CRON_SECRET = "short-cron";
+  try {
+    const internal = requireInternalSecret(new Request("https://vognary.test/internal", {
+      headers: { authorization: "Bearer short-internal" },
+    }));
+    const cron = requireCronSecret(new Request("https://vognary.test/cron", {
+      headers: { authorization: "Bearer short-cron" },
+    }));
+    const retention = requireRetentionExecutorSecret(new Request("https://vognary.test/retention", {
+      headers: { authorization: "Bearer short-cron" },
+    }));
+    assert.ok(internal instanceof Response);
+    assert.ok(cron instanceof Response);
+    assert.ok(retention instanceof Response);
+    assert.equal(internal.status, 501);
+    assert.equal(cron.status, 501);
+    assert.equal(retention.status, 501);
+  } finally {
+    if (previous.internal === undefined) delete process.env.INTERNAL_SYNC_SECRET;
+    else process.env.INTERNAL_SYNC_SECRET = previous.internal;
+    if (previous.cron === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = previous.cron;
+  }
+});
+
+test("Compose config supplies distinct valid operational secrets", () => {
+  const compose = readFileSync("docker-compose.yml", "utf8");
+  const internal = compose.match(/^\s*INTERNAL_SYNC_SECRET:\s*(\S+)\s*$/m)?.[1] ?? "";
+  const cron = compose.match(/^\s*CRON_SECRET:\s*(\S+)\s*$/m)?.[1] ?? "";
+  assert.ok(Buffer.byteLength(internal, "utf8") >= 32);
+  assert.ok(Buffer.byteLength(cron, "utf8") >= 32);
+  assert.notEqual(internal, cron);
 });
 
 test("environment-backed connector previews can never be enabled in production", () => {

@@ -659,6 +659,11 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
 
   const workspaceEmpty = state.home !== null && state.commitments.length === 0 && state.home.coverage.evidenceCount === 0;
   const accountEmail = state.session?.authenticated ? state.session.session.email : null;
+  const mandateAvailable = Boolean(state.home?.autopilot?.mandate)
+    || state.home?.autopilot?.noticeReadiness.state === "proven-ready";
+  const primaryViews = mandateAvailable
+    ? recoveryViews
+    : recoveryViews.filter((view) => view !== "MANDATE");
   return (
     <main id="recovery-workspace" className="relative px-4 pb-28 pt-5 text-foreground sm:px-6 sm:pb-10 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
@@ -685,8 +690,8 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         </header>
 
         <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 py-2 sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
-          <ul className="grid grid-cols-4 gap-1 sm:flex sm:gap-2">
-            {recoveryViews.map((view) => (
+          <ul className={`grid ${mandateAvailable ? "grid-cols-4" : "grid-cols-3"} gap-1 sm:flex sm:gap-2`}>
+            {primaryViews.map((view) => (
               <li key={view} className="min-w-0">
                 <button
                   type="button"

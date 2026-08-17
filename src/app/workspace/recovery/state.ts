@@ -504,7 +504,7 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         status: { kind: "READY" },
         refreshRequired: false,
         evidenceDraft: everyResultAccepted ? emptyEvidenceDraft : { ...state.evidenceDraft, preparing: false },
-        announcement: `Evidence submitted. ${action.submission.acceptedEvidenceCount} accepted of ${action.submission.results.length} sent.`,
+        announcement: evidenceSubmissionAnnouncement(action.submission),
       };
     }
 
@@ -621,6 +621,13 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
           : "Reconnecting this evidence source…",
       };
   }
+}
+
+function evidenceSubmissionAnnouncement(submission: EvidenceSubmissionDto) {
+  const evidenceCount = submission.acceptedEvidenceCount;
+  const submittedCount = submission.results.length;
+  const submittedUnit = submission.type === "CSV_IMPORT" ? "file" : "receipt";
+  return `Evidence submitted. ${evidenceCount} evidence item${evidenceCount === 1 ? "" : "s"} saved from ${submittedCount} submitted ${submittedUnit}${submittedCount === 1 ? "" : "s"}.`;
 }
 
 // The decision a control should render right now: the pending intent while a

@@ -61,7 +61,7 @@ const rules: RedactionRule[] = [
   },
   {
     kind: "handle",
-    pattern: /\b[\w.+-]{2,}@[a-z][a-z0-9.-]{1,24}\b/gi,
+    pattern: /\b[\w.+-]+@[a-z][a-z0-9.-]{1,24}\b/gi,
     replace: () => "HANDLE-REDACTED",
   },
 ];

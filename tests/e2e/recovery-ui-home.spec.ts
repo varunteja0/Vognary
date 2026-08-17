@@ -132,6 +132,7 @@ const home = {
     limitations: ["Only pasted receipts are covered."],
   },
   activeCommitmentCount: 1,
+  unknownCadenceCommitmentCount: 0,
   reviewItemCount: 1,
   evidenceSources: [],
 };
@@ -223,9 +224,10 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 
   const nav = page.getByRole("navigation", { name: "Primary" });
-  for (const label of ["Home", "Subscriptions", "Sources", "Mandate"]) {
+  for (const label of ["Home", "Subscriptions", "Sources"]) {
     await expect(nav.getByRole("button", { name: label })).toBeVisible();
   }
+  await expect(nav.getByRole("button", { name: "Mandate" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: `Account for ${email}` })).toHaveAttribute("href", "/profile");
 
   await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
@@ -233,7 +235,10 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
 
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
+  const attentionBox = await page.getByRole("heading", { name: "Needs attention" }).boundingBox();
+  const recurringAmountBox = await page.getByText("Monthly recurring amount").boundingBox();
+  expect(attentionBox?.y).toBeLessThan(recurringAmountBox?.y ?? 0);
   await expect.poll(() => activationResponses.length).toBe(1);
   expect(activationResponses).toEqual([201]);
   await expect(page.getByText("From checked receipts only.").first()).toBeVisible();
@@ -291,7 +296,7 @@ test("later evidence produces a genuine changed list instead of a baseline", asy
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toBeVisible();
   const changedBox = await page.getByRole("heading", { name: "Since your last visit" }).boundingBox();
   const attentionBox = await page.getByRole("heading", { name: "Needs attention" }).boundingBox();
-  expect(changedBox?.y).toBeLessThan(attentionBox?.y ?? 0);
+  expect(attentionBox?.y).toBeLessThan(changedBox?.y ?? 0);
   await expect(page.getByText("Amount changed")).toBeVisible();
   const changeRow = page.locator("article").filter({ hasText: "Amount changed" });
   await expect(changeRow.getByText("₹1,999.00")).toBeVisible();
@@ -323,7 +328,7 @@ test("a commitment exposes its exact evidence and returns focus after inspection
   await expect(dialog.getByText("6 Jul 2026").first()).toBeVisible();
   await expect(dialog.getByText("INR · 199900 in the smallest unit")).toBeVisible();
   await expect(dialog.getByText("You submitted this evidence")).toBeVisible();
-  await expect(dialog.getByText("Medium confidence · 72%")).toBeVisible();
+  await expect(dialog.getByText("Medium confidence", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Treat the amount and date as provisional until more evidence lands.")).toBeVisible();
 
   await page.keyboard.press("Escape");
@@ -415,20 +420,13 @@ test("the workspace stays usable and keyboard-reachable on a small screen", asyn
   await expect(page.getByRole("heading", { level: 2, name: "Subscriptions" })).toBeFocused();
 });
 
-test("Mandate tab shows the frozen terms and does not claim execution is live", async ({ page }) => {
+test("Mandate stays hidden until notice delivery is proven", async ({ page }) => {
   await signIn(page);
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" }).click();
-  await expect(page.getByText("No standing mandate is signed")).toBeVisible();
-  await expect(page.getByText(/No merchant cancellation route is proven yet/)).toBeVisible();
-  await expect(page.getByText(/INR ₹50,000 per action/)).toBeVisible();
-  await expect(page.getByText(/INR ₹2,00,000 rolling 30-day ceiling/)).toBeVisible();
-  await expect(page.getByText("Off — veto notices are not sent")).toBeVisible();
-  await expect(page.getByText("Off — no cancellation is executed")).toBeVisible();
-  await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Emergency disable" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toHaveCount(0);
 });
 
 test("exception-only Autopilot home is honest on desktop and mobile and has no serious axe issues", async ({ page }) => {
@@ -480,7 +478,7 @@ test("exception-only Autopilot home is honest on desktop and mobile and has no s
     await expect(page.getByRole("heading", { name })).toBeVisible();
   }
   await expect(page.getByText("Exception-only home")).toBeVisible();
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect(page.getByText("From checked receipts only.").first()).toBeVisible();
   await expect(page.getByText("No recurring amount yet")).toHaveCount(0);
   await expect(page.getByText("missing USD coverage is not a zero saving", { exact: false })).toBeVisible();
@@ -505,6 +503,7 @@ test("an active mandate still shows the spend strip when no recurring amount is 
     annualizedEstimateTotals: [],
     next30DayTotals: [],
     activeCommitmentCount: 0,
+    unknownCadenceCommitmentCount: 0,
     reviewItemCount: 0,
     autopilot: {
       executionEnabled: false,
@@ -549,7 +548,8 @@ test("an active mandate still shows the spend strip when no recurring amount is 
   await page.goto("/app");
 
   await expect(page.getByText("Exception-only home")).toBeVisible();
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" })).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect(page.getByText("No recurring amount yet")).toBeVisible();
   await expect(page.getByText("Annualized estimate", { exact: true })).toBeVisible();
   await expect(page.getByText("Active commitments")).toBeVisible();
@@ -567,6 +567,7 @@ test("Home posts activation only after a cited recurring-spend picture actually 
     next: [],
     recentObservations: [],
     activeCommitmentCount: 0,
+    unknownCadenceCommitmentCount: 0,
     reviewItemCount: 0,
     coverage: {
       state: "NO_EVIDENCE",
@@ -596,7 +597,7 @@ test("Home posts activation only after a cited recurring-spend picture actually 
 
   await signIn(page);
   await expect(page.getByRole("heading", { level: 2, name: "Home" })).toBeVisible();
-  await expect(page.getByText("Monthly software spend")).toHaveCount(0);
+  await expect(page.getByText("Monthly recurring amount")).toHaveCount(0);
   expect(activationCalls).toEqual([]);
 
   await page.goto("about:blank");
@@ -611,10 +612,10 @@ test("Home posts activation only after a cited recurring-spend picture actually 
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
   await page.goto("/app");
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   await page.reload();
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(1);
 });
@@ -648,20 +649,20 @@ test("Home records activation after analytics opt-in on a tab that previously re
   });
 
   await signIn(page);
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   expect(activationCalls[0]).toEqual({ status: 202 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
 
   consented = true;
   await page.goto("/app");
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(2);
   expect(activationCalls[1]).toEqual({ status: 201 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBe("1");
 
   await page.reload();
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(2);
 });
@@ -699,19 +700,19 @@ test("Home records activation after a 401 once the tab can authenticate again", 
   });
 
   await signIn(page);
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   expect(activationCalls[0]).toEqual({ status: 401 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
 
   authenticated = true;
   await page.goto("/app");
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(2);
   expect(activationCalls[1]).toEqual({ status: 201 });
 
   await page.reload();
-  await expect(page.getByText("Monthly software spend")).toBeVisible();
+  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(2);
 });
@@ -817,6 +818,14 @@ test("notice states distinguish delivery pending from a delivered 48-hour clock"
   await expect(page.getByRole("heading", { name: "Delivery pending" })).toBeVisible();
   await expect(page.getByText("Delivery is pending.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "48-hour veto window" })).toBeVisible();
+  const vetoWindowBox = await page.getByRole("heading", { name: "48-hour veto window" }).boundingBox();
+  const recurringAmountBox = await page.getByText("Monthly recurring amount").boundingBox();
+  expect(vetoWindowBox?.y).toBeLessThan(recurringAmountBox?.y ?? 0);
+  const watchingBox = await page.getByRole("heading", { name: "Watching" }).boundingBox();
+  const helpBox = await page.getByRole("heading", { name: "Needs your help" }).boundingBox();
+  const handledBox = await page.getByRole("heading", { name: "Handled for you" }).boundingBox();
+  expect(vetoWindowBox?.y).toBeLessThan(watchingBox?.y ?? 0);
+  expect(helpBox?.y).toBeLessThan(handledBox?.y ?? 0);
   await expect(page.getByText(/Delivered 2026-08-24T00:05:00.000Z/)).toBeVisible();
   await expect(page.getByText(/Veto by 2026-08-26T00:05:00.000Z/)).toBeVisible();
   await expect(page.getByText("Notice bounced. There is no active veto countdown.")).toBeVisible();
@@ -885,7 +894,7 @@ test("Sources tab disconnects cited Recovery sources without rotating the receip
   await page.goto("/app");
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
   await expect(page.getByText("Pasted OpenAI receipt")).toBeVisible();
-  await expect(page.getByText("RECEIPT_PASTE · Connected · currently cited")).toBeVisible();
+  await expect(page.getByText("Pasted receipt · Connected · supports current commitment facts")).toBeVisible();
   await expect(page.getByText(/does not rotate the receipt address/)).toBeVisible();
   await page.getByRole("button", { name: "Disconnect source" }).click();
   await expect.poll(() => disconnectCalls).toEqual(["POST"]);
@@ -910,7 +919,7 @@ test("Sources tab disconnects cited Recovery sources without rotating the receip
   );
   await page.reload();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
-  await expect(page.getByText("RECEIPT_PASTE · Disconnected")).toBeVisible();
+  await expect(page.getByText("Pasted receipt · Disconnected · not currently supporting a commitment")).toBeVisible();
   await page.getByRole("button", { name: "Reconnect source" }).click();
   await expect.poll(() => reconnectCalls).toEqual(["POST"]);
 });

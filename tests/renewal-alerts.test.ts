@@ -129,7 +129,10 @@ test("renewal scheduling and delivery source enforce opt-in, idempotency, bounde
   assert.match(store, /commitment\.effective_monthly_minor as monthly_minor/);
   assert.doesNotMatch(store, /effective_(?:amount|monthly)_minor::numeric \/ 100/);
   assert.doesNotMatch(store, /Number\(row\.(?:monthly_burn|renewal_total|suggestion_monthly_cost)/);
-  assert.match(store, /commitment\.confidence_score >= \$\{renewalAlertMinimumConfidence\}/);
+  assert.match(store, /function recoveryReminderEligibilitySql/);
+  assert.match(store, /renewalAlertRepeatedEvidenceMinimumConfidence/);
+  assert.match(store, /recovery_commitment_evidence/);
+  assert.match(store, /effective_cadence <> 'IRREGULAR'/);
   assert.match(store, /item\.user_decision is distinct from 'KEEP'/);
   assert.match(store, /item\.confidence_score >= 80/);
   assert.doesNotMatch(store, /exists \(select 1 from recurring_items item where item\.workspace_id = (?:preference|delivery)\.workspace_id\)/);

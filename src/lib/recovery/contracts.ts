@@ -355,7 +355,7 @@ export type RecoverySourceDisconnectionDto = {
 
 export type RecoveryEvidenceSourceDto = {
   id: string;
-  kind: string;
+  kind: SourceType;
   label: string;
   cited: boolean;
   status: "CONNECTED" | "DISCONNECTED";
@@ -409,6 +409,7 @@ export type HomeProjectionDto = {
   next: readonly UpcomingItemDto[];
   coverage: CoverageDto;
   activeCommitmentCount: number;
+  unknownCadenceCommitmentCount: number;
   reviewItemCount: number;
   evidenceSources: readonly RecoveryEvidenceSourceDto[];
   autopilot?: AutopilotHomeDto;

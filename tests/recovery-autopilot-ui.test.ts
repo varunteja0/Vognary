@@ -35,15 +35,17 @@ test("exception-only home is honest about shadow mode and missing coverage", () 
   assert.match(autopilotHomeSource, /Fee collection stays fail-closed|not charging — fail-closed/);
   assert.doesNotMatch(autopilotHomeSource, /money stops without chores/i);
   assert.doesNotMatch(autopilotHomeSource, /title="Connected"|Cancelled for you|Saved ₹|Paid in full/);
+  assert.ok(autopilotHomeSource.indexOf("48-hour veto window") < autopilotHomeSource.indexOf("Watching"));
+  assert.ok(autopilotHomeSource.indexOf("Needs your help") < autopilotHomeSource.indexOf("Handled for you"));
 });
 
 test("active mandate still publishes the first-value spend strip when no recurring amount is cited", () => {
   assert.ok(
-    homeSource.indexOf("<RecoveryFirstValueMetrics") < homeSource.indexOf("<RecoveryAutopilotHome"),
-    "cited spend metrics must render above the exception-only Autopilot home",
+     homeSource.indexOf("<RecoveryAutopilotHome") < homeSource.indexOf("<RecoveryFirstValueMetrics"),
+     "active Autopilot actions must render above cited spend metrics",
   );
   const metricsFn = homeSource.slice(homeSource.indexOf("function RecoveryFirstValueMetrics"));
-  assert.match(metricsFn, /label="Monthly software spend"/);
+  assert.match(metricsFn, /label="Monthly recurring amount"/);
   assert.match(metricsFn, /empty="No recurring amount yet"/);
   assert.doesNotMatch(metricsFn, /if \(!hasTotals\) return null/);
 });

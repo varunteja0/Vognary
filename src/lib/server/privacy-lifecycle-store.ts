@@ -555,6 +555,7 @@ async function buildAccessExport(client: PoolClient, input: {
       recommendation_type: string;
       reason: string;
       estimated_monthly_savings: string;
+      currency: string;
       confidence_score: number;
       accepted_at: Date | null;
       dismissed_at: Date | null;
@@ -563,6 +564,7 @@ async function buildAccessExport(client: PoolClient, input: {
       `select recommendation.id, recommendation.recurring_item_id,
               recommendation.recommendation_type, recommendation.reason,
               recommendation.estimated_monthly_savings,
+              item.currency,
               recommendation.confidence_score, recommendation.accepted_at,
               recommendation.dismissed_at, recommendation.created_at
        from recommendations recommendation
@@ -1140,16 +1142,22 @@ async function buildAccessExport(client: PoolClient, input: {
       success_fee_basis_points: number;
       minimum_fee_minor: string;
       maximum_fee_minor: string;
+      currency: string;
       authorized_at: Date;
       revoked_at: Date | null;
     }>(
-      `select id, action_case_id, authorized_by_user_id, action, scope,
-              authorization_version, terms_version, authorization_text,
-              success_fee_basis_points, minimum_fee_minor::text,
-              maximum_fee_minor::text, authorized_at, revoked_at
-       from action_authorizations
-       where workspace_id = $1
-       order by authorized_at asc, id asc
+            `select grant_record.id, grant_record.action_case_id, grant_record.authorized_by_user_id,
+                    grant_record.action, grant_record.scope, grant_record.authorization_version,
+                    grant_record.terms_version, grant_record.authorization_text,
+                    grant_record.success_fee_basis_points, grant_record.minimum_fee_minor::text,
+                    grant_record.maximum_fee_minor::text, action_case.currency,
+                    grant_record.authorized_at, grant_record.revoked_at
+             from action_authorizations grant_record
+             join action_cases action_case
+               on action_case.workspace_id = grant_record.workspace_id
+              and action_case.id = grant_record.action_case_id
+             where grant_record.workspace_id = $1
+             order by grant_record.authorized_at asc, grant_record.id asc
        limit $2`,
       [input.workspaceId, exportRowLimits.actionAuthorizations + 1],
     ),
@@ -1432,6 +1440,7 @@ async function buildAccessExport(client: PoolClient, input: {
       recommendationType: row.recommendation_type,
       reason: row.reason,
       estimatedMonthlySavings: Number(row.estimated_monthly_savings),
+      estimatedMonthlySavingsCurrency: row.currency,
       confidenceScore: row.confidence_score,
       acceptedAt: toIso(row.accepted_at),
       dismissedAt: toIso(row.dismissed_at),
@@ -1676,6 +1685,7 @@ async function buildAccessExport(client: PoolClient, input: {
         successFeeBasisPoints: row.success_fee_basis_points,
         minimumFeeMinor: Number(row.minimum_fee_minor),
         maximumFeeMinor: Number(row.maximum_fee_minor),
+        currency: row.currency,
         authorizedAt: row.authorized_at.toISOString(),
         revokedAt: toIso(row.revoked_at),
       })),

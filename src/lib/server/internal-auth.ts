@@ -1,8 +1,14 @@
 import { timingSafeEqual } from "node:crypto";
 
+export const operationalSecretMinimumBytes = 32;
+
+export function isOperationalSecretValid(value: string | null | undefined) {
+  return Boolean(value && Buffer.byteLength(value.trim(), "utf8") >= operationalSecretMinimumBytes);
+}
+
 export function requireInternalSecret(request: Request) {
   const configured = process.env.INTERNAL_SYNC_SECRET?.trim();
-  if (!configured) {
+  if (!configured || !isOperationalSecretValid(configured)) {
     return Response.json({
       status: "not-configured",
       requiredEnv: ["INTERNAL_SYNC_SECRET"],
@@ -20,7 +26,7 @@ export function requireInternalSecret(request: Request) {
 
 export function requireCronSecret(request: Request) {
   const configured = process.env.CRON_SECRET?.trim();
-  if (!configured) {
+  if (!configured || !isOperationalSecretValid(configured)) {
     return Response.json({
       status: "not-configured",
       requiredEnv: ["CRON_SECRET"],

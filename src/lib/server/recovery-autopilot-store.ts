@@ -70,6 +70,7 @@ import type {
   MoneyDto,
   RecoveryEvidenceSourceDto,
   RecoverySourceDisconnectionDto,
+  SourceType,
   StandingMandateDto,
 } from "@/lib/recovery/contracts";
 import {
@@ -999,7 +1000,7 @@ export async function loadAutopilotHome(client: PoolClient, workspaceId: string)
 export async function loadRecoveryEvidenceSources(client: PoolClient, workspaceId: string): Promise<readonly RecoveryEvidenceSourceDto[]> {
   const result = await client.query<{
     id: string;
-    kind: string;
+    kind: SourceType;
     label: string;
     cited: boolean;
     status: "CONNECTED" | "DISCONNECTED";
@@ -3126,7 +3127,7 @@ async function refreshCandidates(client: PoolClient, workspaceId: string, mandat
             commitment.base_currency as currency, commitment.effective_cadence as cadence,
             commitment.effective_next_expected_date::text as next_expected_date,
             count(distinct evidence.id)::text as evidence_count,
-            count(distinct evidence.evidence_date)::text as distinct_dates,
+            count(distinct evidence.evidence_date) filter (where evidence.observed_at is not null)::text as distinct_dates,
             decision.decision,
             max(source.coverage_end)::text as coverage_end
      from recovery_commitments commitment
@@ -3150,6 +3151,7 @@ async function refreshCandidates(client: PoolClient, workspaceId: string, mandat
       amount_minor: string | null;
       currency: string | null;
       evidence_date: string | null;
+      observed_at: string | null;
       cadence_hint: string | null;
       next_expected_date: string | null;
       excerpt: string | null;
@@ -3157,8 +3159,8 @@ async function refreshCandidates(client: PoolClient, workspaceId: string, mandat
       coverage_start: string | null;
       coverage_end: string | null;
     }>(
-      `select evidence.id::text, evidence.category, evidence.amount_minor::text, evidence.currency,
-              evidence.evidence_date::text, evidence.cadence_hint, evidence.next_expected_date::text,
+            `select evidence.id::text, evidence.category, evidence.amount_minor::text, evidence.currency,
+              evidence.evidence_date::text, evidence.observed_at::text, evidence.cadence_hint, evidence.next_expected_date::text,
               evidence.excerpt, evidence.provenance_kind, source.coverage_start::text, source.coverage_end::text
        from recovery_commitment_evidence link
        join recovery_evidence evidence
@@ -3200,15 +3202,18 @@ async function refreshCandidates(client: PoolClient, workspaceId: string, mandat
     const coverageEnds = evidence.rows.map((row) => row.coverage_end).filter((value): value is string => Boolean(value));
     const latestCoverageEnd = coverageEnds.sort().at(-1) ?? null;
     const nextDebit = deriveNextDebit({
-      occurrences: evidence.rows.flatMap((row) => row.evidence_date ? [{
+      occurrences: evidence.rows.flatMap((row) => {
+        const explicitProviderRenewal = row.provenance_kind === "PROVIDER_RECEIVED" && receiptNextDateIsExplicit(row.excerpt ?? "");
+        return row.evidence_date && (row.observed_at || explicitProviderRenewal) ? [{
         evidenceDate: row.evidence_date,
         amountMinor: BigInt(row.amount_minor ?? "0"),
         currency: row.currency ?? commitment.currency,
         merchant: commitment.merchant,
         cadence: (row.cadence_hint ?? commitment.cadence) as Cadence,
         citedNextExpectedDate: row.next_expected_date,
-        explicitProviderRenewal: row.provenance_kind === "PROVIDER_RECEIVED" && receiptNextDateIsExplicit(row.excerpt ?? ""),
-      }] : []),
+        explicitProviderRenewal,
+      }] : [];
+      }),
       correctionInvalidates: Boolean(contradictory.rows[0]),
     });
     const evaluated = evaluateEligibility({

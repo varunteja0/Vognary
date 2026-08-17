@@ -711,6 +711,62 @@ test("a single pasted receipt cannot invent a next debit, and mixed protected fa
   }
 });
 
+test("scheduled-only receipt dates do not count as completed Autopilot occurrences", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const { pool, ownerUserId, workspaceId, suffix } = await seedWorkspace();
+  try {
+    const submitted = await submitRecoveryEvidence({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: 0,
+      idempotencyKey: `integrity-scheduled-occurrences-${suffix}`,
+      request: {
+        kind: "RECEIPT_PASTE",
+        receipts: [
+          {
+            clientRef: "openai-paid-july",
+            text: "OpenAI subscription charged INR 1,999 on 6 July 2026. Renews monthly on 6 August 2026.",
+          },
+          {
+            clientRef: "openai-scheduled-august",
+            text: "OpenAI monthly subscription total: INR 1,999. Scheduled to be charged on 6 August 2026.",
+          },
+          {
+            clientRef: "openai-scheduled-september",
+            text: "OpenAI monthly subscription total: INR 1,999. Scheduled to be charged on 6 September 2026.",
+          },
+        ],
+      },
+      now: new Date("2026-08-01T10:00:00.000Z"),
+    });
+    await signStandingMandate({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: submitted.workspaceVersion,
+      idempotencyKey: `integrity-scheduled-occurrences-sign-${suffix}`,
+    });
+
+    const candidate = await pool.query<{ next_debit_reason: string | null; eligibility: string; evidence_count: string }>(
+      `select candidate.next_debit_reason, candidate.eligibility,
+              cardinality(snapshot.evidence_ids)::text as evidence_count
+       from recovery_action_candidates candidate
+       join recovery_classification_snapshots snapshot
+         on snapshot.workspace_id = candidate.workspace_id
+        and snapshot.id = candidate.classification_snapshot_id
+       where candidate.workspace_id = $1
+       limit 1`,
+      [workspaceId],
+    );
+    assert.equal(candidate.rows[0]?.evidence_count, "3");
+    assert.equal(candidate.rows[0]?.next_debit_reason, "INSUFFICIENT_OCCURRENCES");
+    assert.notEqual(candidate.rows[0]?.eligibility, "ELIGIBLE");
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [ownerUserId]);
+  }
+});
+
 test("connected mandates require a live Recovery source and current consent; revoke drops the count", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
