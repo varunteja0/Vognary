@@ -22,6 +22,7 @@ import {
   type HomeProjectionDto,
   type PutDecisionRequest,
   type RecoveryCutoverStatus,
+  type SenderProvenanceDto,
   type SourceType,
   type SubmitEvidenceResponse,
 } from "@/lib/recovery/contracts";
@@ -63,6 +64,7 @@ import {
   type StatementSource,
 } from "@/lib/recurring-audit";
 import { recoveryEvidenceFingerprint } from "@/lib/recovery/evidence-fingerprint";
+import { senderTrustConfidenceCeiling } from "@/lib/recovery/sender-provenance";
 import {
   RecoveryCaptureNotReadyError,
   buildRecoveryIngestionEnvelope,
@@ -302,7 +304,17 @@ export async function materializeForwardedEmailEvidence(input: {
   const operation = "recovery.materialize-forwarded-email";
   const idempotencyKey = `forwarded-email:${sha256(`RESEND\0${input.providerEventId}`)}`;
   const currencyHint = input.currencyHint ?? null;
-  const requestHash = hashRecoveryRequest({ operation, providerEventId: input.providerEventId, currencyHint, request });
+  // Sender provenance is a derived assessment that can legitimately shift
+  // between attempts, so it stays out of the replay identity of the evidence.
+  const requestHash = hashRecoveryRequest({
+    operation,
+    providerEventId: input.providerEventId,
+    currencyHint,
+    request: {
+      kind: request.kind,
+      receipts: request.receipts.map((receipt) => ({ clientRef: receipt.clientRef, text: receipt.text })),
+    },
+  });
   const envelope = buildRecoveryIngestionEnvelope({
     workspaceId: input.workspaceId,
     sourceType: "FORWARDED_EMAIL",
@@ -420,6 +432,7 @@ export async function materializeForwardedEmailEvidence(input: {
     const materialized = await persistSubmissionSources(client, {
       workspaceId: envelope.workspaceId,
       submissionId: submissionRow.id,
+      inboundEventId: input.inboundEventId,
       request,
       envelope,
       currencyHint,
@@ -1008,6 +1021,7 @@ async function mutateCorrection(input: {
 async function persistSubmissionSources(client: PoolClient, input: {
   workspaceId: string;
   submissionId: string;
+  inboundEventId?: string | null;
   request: EvidenceIngestRequest | ForwardedEmailMaterializationRequest;
   envelope: RecoveryIngestionEnvelope;
   currencyHint?: ReceiptCurrencyHint | null;
@@ -1024,11 +1038,27 @@ async function persistSubmissionSources(client: PoolClient, input: {
   let acceptedEvidenceCount = 0;
   const receiptSource = input.envelope.sourceType !== "CSV_IMPORT";
   const entries = input.envelope.sourceType === "CSV_IMPORT"
-    ? (input.request as Extract<EvidenceIngestRequest, { kind: "CSV_IMPORT" }>).sources.map((source) => ({ clientRef: source.clientRef, text: source.text }))
-    : (input.request as Exclude<EvidenceIngestRequest, { kind: "CSV_IMPORT" }> | ForwardedEmailMaterializationRequest).receipts.map((receipt) => ({ clientRef: receipt.clientRef, text: receipt.text }));
+    ? (input.request as Extract<EvidenceIngestRequest, { kind: "CSV_IMPORT" }>).sources.map((source) => ({ clientRef: source.clientRef, text: source.text, provenance: undefined }))
+    : (input.request as Exclude<EvidenceIngestRequest, { kind: "CSV_IMPORT" }> | ForwardedEmailMaterializationRequest).receipts.map((receipt) => ({
+        clientRef: receipt.clientRef,
+        text: receipt.text,
+        // Only the forwarded-email path observes transport headers; a paste has none.
+        provenance: input.envelope.sourceType === "FORWARDED_EMAIL"
+          ? (receipt as ForwardedEmailMaterializationRequest["receipts"][number]).provenance
+          : undefined,
+      }));
+
+  const inboundEventId = input.envelope.sourceType === "FORWARDED_EMAIL" ? input.inboundEventId ?? null : null;
 
   for (const entry of entries) {
     const storedClientRef = `client-${sha256(entry.clientRef).slice(0, 16)}`;
+    const retainSenderAssessment = (sourceId: string | null) => recordSenderAssessment(client, {
+      workspaceId: input.workspaceId,
+      inboundEventId,
+      clientRef: storedClientRef,
+      sourceId,
+      provenance: entry.provenance,
+    });
     const contentHash = sha256(`${receiptSource ? "RECEIPT" : "CSV_IMPORT"}\0${entry.text}`);
     const duplicateHashes = receiptSource
       ? [contentHash, sha256(`RECEIPT_PASTE\0${entry.text}`), sha256(`FORWARDED_EMAIL\0${entry.text}`), sha256(`GMAIL_OAUTH\0${entry.text}`)]
@@ -1038,6 +1068,7 @@ async function persistSubmissionSources(client: PoolClient, input: {
       [input.workspaceId, duplicateHashes],
     );
     if (duplicate.rows[0]) {
+      await retainSenderAssessment(null);
       results.push({
         clientRef: storedClientRef,
         status: "REJECTED",
@@ -1066,6 +1097,7 @@ async function persistSubmissionSources(client: PoolClient, input: {
         )
       : extractCsvEvidence(entry.text, sourceId, sourceName, input.submissionId, capturedAt);
     if (!extracted.length) {
+      await retainSenderAssessment(null);
       results.push({
         clientRef: storedClientRef,
         status: "REJECTED",
@@ -1126,8 +1158,10 @@ async function persistSubmissionSources(client: PoolClient, input: {
         sourceId,
         evidence.rowNumber,
       );
+      applySenderTrustCeiling(evidence, entry.provenance);
       await insertExtractedEvidence(client, input.workspaceId, evidence);
     }
+    await retainSenderAssessment(sourceId);
     acceptedSourceIds.push(sourceId);
     acceptedEvidenceCount += novelEvidence.length;
     results.push({ clientRef: storedClientRef, status: "ACCEPTED", code: null, message: null });
@@ -1143,6 +1177,86 @@ function evidenceProvenanceReference(
 ) {
   const base = `${submissionId}:${sourceId}:${rowNumber}`;
   return envelope.consentReference ? `${envelope.consentReference}:${base}` : base;
+}
+
+/**
+ * How well the sender is established bounds what a single forwarded receipt may
+ * assert. Weak transport provenance still keeps the evidence visible; it simply
+ * cannot carry a trusted recurring-money claim on its own.
+ */
+function applySenderTrustCeiling(evidence: ExtractedEvidence, provenance: SenderProvenanceDto | undefined) {
+  if (!provenance) return;
+  const ceiling = senderTrustConfidenceCeiling(provenance.tier);
+  if (evidence.confidenceScore <= ceiling) return;
+  evidence.confidenceScore = ceiling;
+  evidence.confidenceReasons = [...evidence.confidenceReasons, senderTrustCeilingReason(provenance)];
+}
+
+function senderTrustCeilingReason(provenance: SenderProvenanceDto) {
+  const domain = provenance.fromDomain ?? "an unidentified domain";
+  switch (provenance.tier) {
+    case "VERIFIED_SENDER":
+      return `Sender ${domain} passed authentication at ${provenance.trustedAuthority ?? "the forwarding provider"}.`;
+    case "KNOWN_SENDER":
+      return `Sender ${domain} is recognised but its mail was not independently authenticated.`;
+    case "SUSPICIOUS_SENDER":
+      return `Sender ${domain} failed or contradicted mail authentication, so this receipt is held below a trusted claim.`;
+    case "UNVERIFIED_SENDER":
+      return `Sender ${domain} could not be established, so this receipt cannot carry a trusted claim on its own.`;
+  }
+}
+
+/**
+ * Sender provenance is retained even when the receipt is rejected, so source
+ * health can always explain what arrived. Only domain-level facts are stored.
+ */
+async function recordSenderAssessment(client: PoolClient, input: {
+  workspaceId: string;
+  inboundEventId: string | null;
+  clientRef: string;
+  sourceId: string | null;
+  provenance: SenderProvenanceDto | undefined;
+}) {
+  if (!input.provenance) return;
+  await client.query(
+    `insert into recovery_inbound_sender_assessments (
+       workspace_id, inbound_event_id, client_ref, source_id, trust_tier,
+       from_domain, trusted_authority, assertions, signing_domains, reasons
+     ) values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::text[], $10::jsonb)
+     on conflict (workspace_id, inbound_event_id, client_ref) do nothing`,
+    [
+      input.workspaceId,
+      input.inboundEventId,
+      input.clientRef,
+      input.sourceId,
+      input.provenance.tier,
+      input.provenance.fromDomain,
+      input.provenance.trustedAuthority,
+      JSON.stringify(input.provenance.assertions),
+      input.provenance.signingDomains,
+      JSON.stringify(input.provenance.reasons),
+    ],
+  );
+}
+
+/**
+ * Sending domains this workspace has already accepted evidence from *and* that
+ * were established by an independent signal. Repetition alone is not evidence,
+ * so an unverified or suspicious domain can never promote itself by sending
+ * again.
+ */
+export async function listKnownSenderDomains(workspaceId: string, limit = 200) {
+  const result = await getDatabasePool().query<{ from_domain: string }>(
+    `select distinct from_domain
+     from recovery_inbound_sender_assessments
+     where workspace_id = $1
+       and source_id is not null
+       and from_domain is not null
+       and trust_tier in ('VERIFIED_SENDER', 'KNOWN_SENDER')
+     limit $2`,
+    [workspaceId, limit],
+  );
+  return result.rows.map((row) => row.from_domain);
 }
 
 async function filterNovelReceiptEvidence(client: PoolClient, workspaceId: string, evidenceRows: readonly ExtractedEvidence[]) {

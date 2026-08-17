@@ -53,6 +53,47 @@ export type CoverageState = (typeof coverageStates)[number];
 export const evidenceProvenanceKinds = ["USER_SUBMITTED", "PROVIDER_RECEIVED"] as const;
 export type EvidenceProvenanceKind = (typeof evidenceProvenanceKinds)[number];
 
+/**
+ * How well the sender of a forwarded receipt is established, strongest first.
+ * Transport authenticity is never merchant authenticity, so even the strongest
+ * tier records which authority made the assertion.
+ */
+export const senderTrustTiers = [
+  "VERIFIED_SENDER",
+  "KNOWN_SENDER",
+  "UNVERIFIED_SENDER",
+  "SUSPICIOUS_SENDER",
+] as const;
+export type SenderTrustTier = (typeof senderTrustTiers)[number];
+
+export const senderAuthenticationResults = [
+  "pass", "fail", "softfail", "neutral", "none", "temperror", "permerror", "policy",
+] as const;
+export type SenderAuthenticationResult = (typeof senderAuthenticationResults)[number];
+
+export type SenderAuthenticationAssertionDto = {
+  /** `AUTHENTICATION_RESULTS` is a receiving hop's own verdict; `ARC` is a relayed claim. */
+  chain: "AUTHENTICATION_RESULTS" | "ARC";
+  authority: string;
+  spf: SenderAuthenticationResult | null;
+  dkim: SenderAuthenticationResult | null;
+  dmarc: SenderAuthenticationResult | null;
+  dkimDomains: readonly string[];
+  dmarcDomain: string | null;
+};
+
+export type SenderProvenanceDto = {
+  tier: SenderTrustTier;
+  fromAddress: string | null;
+  fromDomain: string | null;
+  displayName: string | null;
+  assertions: readonly SenderAuthenticationAssertionDto[];
+  /** `d=` tags observed on DKIM-Signature headers. Structural presence only. */
+  signingDomains: readonly string[];
+  trustedAuthority: string | null;
+  reasons: readonly string[];
+};
+
 export const projectionAmountProvenances = ["RECEIPT", "USER_CORRECTED"] as const;
 export type ProjectionAmountProvenance = (typeof projectionAmountProvenances)[number];
 
@@ -482,7 +523,7 @@ export type EvidenceIngestRequest =
 
 export type ForwardedEmailMaterializationRequest = {
   kind: "FORWARDED_EMAIL";
-  receipts: readonly { clientRef: string; text: string }[];
+  receipts: readonly { clientRef: string; text: string; provenance?: SenderProvenanceDto }[];
 };
 
 export type PreparedImportSourceDto = {

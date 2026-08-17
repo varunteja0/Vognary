@@ -55,6 +55,7 @@ const recoveryRelations = [
   "recovery_idempotency_keys",
   "recovery_inbound_aliases",
   "recovery_inbound_events",
+  "recovery_inbound_sender_assessments",
   "recovery_standing_mandates",
   "recovery_action_candidates",
   "recovery_covered_windows",
@@ -102,15 +103,15 @@ test("the real migration runner installs and records the Recovery receipt inbox 
 }, async () => {
   await withDisposableDatabase("recovery_fresh", async (connectionString) => {
     const result = runMigrations(connectionString);
-    assert.equal(result.applied.at(-1)?.id, "0047_billed_window_insert_immutability");
+    assert.equal(result.applied.at(-1)?.id, "0048_receipt_sender_provenance");
 
     const pool = createPool(connectionString);
     try {
       const migrations = await pool.query<{ id: string }>(
         `select id from schema_migrations order by id`,
       );
-      assert.equal(migrations.rows.at(-1)?.id, "0047_billed_window_insert_immutability");
-      assert.equal(migrations.rows.length, 47);
+      assert.equal(migrations.rows.at(-1)?.id, "0048_receipt_sender_provenance");
+      assert.equal(migrations.rows.length, 48);
       await assertRecoveryRelations(pool);
       const integrity = await pool.query<{ conname: string | null; trigger: string | null }>(
         `select
@@ -356,14 +357,15 @@ test("the real migration runner upgrades an existing 0022 database through Recov
       { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
       { id: "0046_billed_window_immutability", mode: "applied-migration" },
       { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
+      { id: "0048_receipt_sender_provenance", mode: "applied-migration" },
     ]);
 
     const verifyPool = createPool(connectionString);
     try {
       const migration = await verifyPool.query<{ id: string }>(
-        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source', '0029_legacy_tenant_integrity', '0030_legacy_tenant_ownership_immutable', '0031_autopilot_loop', '0032_autopilot_proof_integrity', '0033_autopilot_integrity', '0034_autopilot_repair', '0035_autopilot_codex_repair', '0036_autopilot_notice_hold', '0037_autopilot_clock_integrity', '0038_autopilot_reconcile_integrity', '0039_autopilot_frozen_notice_integrity', '0040_autopilot_review_integrity', '0041_workspace_activation_integrity', '0042_workspace_activation_semantic_reset', '0043_workspace_activation_semantic_version', '0044_autopilot_audit_immutability', '0045_autopilot_mandate_execution_immutability', '0046_billed_window_immutability', '0047_billed_window_insert_immutability')`,
+        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source', '0029_legacy_tenant_integrity', '0030_legacy_tenant_ownership_immutable', '0031_autopilot_loop', '0032_autopilot_proof_integrity', '0033_autopilot_integrity', '0034_autopilot_repair', '0035_autopilot_codex_repair', '0036_autopilot_notice_hold', '0037_autopilot_clock_integrity', '0038_autopilot_reconcile_integrity', '0039_autopilot_frozen_notice_integrity', '0040_autopilot_review_integrity', '0041_workspace_activation_integrity', '0042_workspace_activation_semantic_reset', '0043_workspace_activation_semantic_version', '0044_autopilot_audit_immutability', '0045_autopilot_mandate_execution_immutability', '0046_billed_window_immutability', '0047_billed_window_insert_immutability', '0048_receipt_sender_provenance')`,
       );
-      assert.equal(migration.rowCount, 25);
+      assert.equal(migration.rowCount, 26);
       await assertRecoveryRelations(verifyPool);
 
       const preserved = await verifyPool.query<{
@@ -549,6 +551,7 @@ test("the real migration runner upgrades 0027 through 0028 without dropping Reco
       { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
       { id: "0046_billed_window_immutability", mode: "applied-migration" },
       { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
+      { id: "0048_receipt_sender_provenance", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -1021,6 +1024,7 @@ test("0029 installs over historical cross-workspace rows without rewriting owner
       { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
       { id: "0046_billed_window_immutability", mode: "applied-migration" },
       { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
+      { id: "0048_receipt_sender_provenance", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{ decision_workspace: string; item_workspace: string }>(
@@ -1258,6 +1262,7 @@ test("0030 leaves historical cross-workspace rows untouched and they remain cuto
       { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
       { id: "0046_billed_window_immutability", mode: "applied-migration" },
       { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
+      { id: "0048_receipt_sender_provenance", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{
@@ -1453,6 +1458,7 @@ test("upgrading from 0030 through 0033 cannot insert fee rows until 0034 sets fi
       { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
       { id: "0046_billed_window_immutability", mode: "applied-migration" },
       { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
+      { id: "0048_receipt_sender_provenance", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -1612,6 +1618,7 @@ test("upgrading a genuinely frozen 0037 notice retries through the real store an
       { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
       { id: "0046_billed_window_immutability", mode: "applied-migration" },
       { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
+      { id: "0048_receipt_sender_provenance", mode: "applied-migration" },
     ]);
     const retryOutput = execFileSync(
       process.execPath,
@@ -1765,6 +1772,7 @@ test("0042 purges legacy workspace.activated rows that 0041 would have preserved
       { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
       { id: "0046_billed_window_immutability", mode: "applied-migration" },
       { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
+      { id: "0048_receipt_sender_provenance", mode: "applied-migration" },
     ]);
 
     const helperOutput = execFileSync(
@@ -1855,6 +1863,7 @@ test("0043 requires a semantic-version marker so old-style activations cannot be
       { id: "0045_autopilot_mandate_execution_immutability", mode: "applied-migration" },
       { id: "0046_billed_window_immutability", mode: "applied-migration" },
       { id: "0047_billed_window_insert_immutability", mode: "applied-migration" },
+      { id: "0048_receipt_sender_provenance", mode: "applied-migration" },
     ]);
 
     const after = createPool(connectionString);
@@ -2027,6 +2036,7 @@ test("production-upgrade rehearsal from 0030 preserves Recovery facts through 00
       "0045_autopilot_mandate_execution_immutability",
       "0046_billed_window_immutability",
       "0047_billed_window_insert_immutability",
+      "0048_receipt_sender_provenance",
     ]);
 
     const after = createPool(connectionString);

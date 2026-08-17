@@ -68,6 +68,7 @@ test("feature readiness checks every persistent capability migration with bounde
     "0045_autopilot_mandate_execution_immutability",
     "0046_billed_window_immutability",
     "0047_billed_window_insert_immutability",
+    "0048_receipt_sender_provenance",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -311,8 +312,8 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.match(source, /capabilities\?\.schema\?\.status === "ready"/);
   assert.match(source, /capabilities\.recoveryV1\?\.status === "schema-ready-clean-cutover"/);
   assert.match(source, /Feature migrations 0002 through 0047/);
-  assert.match(source, /required\?\.includes\("0047_billed_window_insert_immutability"\)/);
-  assert.match(source, /applied\?\.includes\("0047_billed_window_insert_immutability"\)/);
+  assert.match(source, /required\?\.includes\("0048_receipt_sender_provenance"\)/);
+  assert.match(source, /applied\?\.includes\("0048_receipt_sender_provenance"\)/);
   assert.match(source, /betaReady: endpointReport\.every\(\(item\) => item\.ok\)/);
   assert.match(source, /envReport\.filter\(\(item\) => item\.launchBlocking\)/);
   assert.match(source, /activationProfile = "receipt-forwarding"/);

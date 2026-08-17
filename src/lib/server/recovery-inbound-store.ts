@@ -133,6 +133,7 @@ async function queryRequiredReceiptInboxMigrations() {
     "0024_recovery_inbound_receipts",
     "0025_recovery_renewal_alerts",
     "0026_recovery_inbound_retention",
+    "0048_receipt_sender_provenance",
   ];
   const result = await getDatabasePool().query<{ applied: number }>(
     `select count(*)::int as applied

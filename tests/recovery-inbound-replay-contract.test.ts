@@ -21,8 +21,17 @@ test("forwarded materialization idempotency is stable after transport-event rete
     recoveryStore.indexOf("export async function materializeForwardedEmailEvidence"),
     recoveryStore.indexOf("export async function getRecoveryHome"),
   );
-  assert.match(materialization, /hashRecoveryRequest\(\{ operation, providerEventId: input\.providerEventId, currencyHint, request \}\)/);
+  assert.match(
+    materialization,
+    /hashRecoveryRequest\(\{\s*operation,\s*providerEventId: input\.providerEventId,\s*currencyHint,/,
+  );
   assert.doesNotMatch(materialization, /hashRecoveryRequest\(\{ operation, inboundEventId/);
+  // Sender provenance is derived and can legitimately differ between attempts,
+  // so replay identity covers the receipt content only.
+  assert.match(
+    materialization,
+    /receipts: request\.receipts\.map\(\(receipt\) => \(\{ clientRef: receipt\.clientRef, text: receipt\.text \}\)\)/,
+  );
 });
 
 test("existing inbound events on a revoked alias cannot be reserved for later processing", () => {

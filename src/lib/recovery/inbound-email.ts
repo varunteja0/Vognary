@@ -5,6 +5,7 @@ import "pdf-parse/worker";
 import { PDFParse } from "pdf-parse";
 import { assertPdfTextWithinLimits, hasReadablePdfTextLayer, maxPdfPages } from "@/lib/pdf-ingest";
 import { recoveryLimits } from "@/lib/recovery/contracts";
+import { assessSenderProvenance, type SenderProvenance } from "@/lib/recovery/sender-provenance";
 import { inferReceiptCurrencyHint, type ReceiptCurrencyHint } from "@/lib/receipt-parser";
 
 export const forwardedEmailMaxMimeBytes = 8 * 1024 * 1024;
@@ -16,6 +17,8 @@ const maxPdfAttachmentBytes = 4 * 1024 * 1024;
 type ForwardedReceiptText = {
   clientRef: string;
   text: string;
+  /** Assessed from the headers of the message this text came out of, not the outer forward. */
+  provenance: SenderProvenance;
 };
 
 /** Gmail will not forward anything until this challenge is answered by the user. */
@@ -31,7 +34,17 @@ export type ForwardedEmailExtraction = {
   gmailVerification: GmailForwardingVerification | null;
 };
 
-export async function extractForwardedReceiptTexts(raw: string | Uint8Array): Promise<ForwardedEmailExtraction> {
+export type ForwardedEmailExtractionOptions = {
+  /** Authorities whose Authentication-Results this deployment accepts. */
+  trustedAuthorities?: readonly string[];
+  /** Sending domains that already produced accepted evidence in this workspace. */
+  knownSenderDomains?: readonly string[];
+};
+
+export async function extractForwardedReceiptTexts(
+  raw: string | Uint8Array,
+  options: ForwardedEmailExtractionOptions = {},
+): Promise<ForwardedEmailExtraction> {
   if (byteLength(raw) > forwardedEmailMaxMimeBytes) throw new Error("Forwarded email is too large to process.");
   const extraction: ForwardedEmailExtraction = {
     texts: [],
@@ -39,7 +52,7 @@ export async function extractForwardedReceiptTexts(raw: string | Uint8Array): Pr
     currencyHint: null,
     gmailVerification: null,
   };
-  await extractMime(raw, 0, extraction, new Set(), { pdfs: 0 });
+  await extractMime(raw, 0, extraction, new Set(), { pdfs: 0 }, options);
   if (extraction.gmailVerification) return extraction;
   extraction.currencyHint = inferReceiptCurrencyHint(extraction.texts.map((item) => item.text));
   return extraction;
@@ -75,6 +88,7 @@ async function extractMime(
   extraction: ForwardedEmailExtraction,
   seen: Set<string>,
   budget: { pdfs: number },
+  options: ForwardedEmailExtractionOptions,
 ) {  if (depth > maxNestedEmailDepth || extraction.texts.length >= recoveryLimits.maxReceiptSnippets) return;
   if (byteLength(raw) > forwardedEmailMaxMimeBytes) throw new Error("Forwarded email is too large to process.");
 
@@ -94,7 +108,13 @@ async function extractMime(
       return;
     }
   }
-  if (plainText) addText(plainText, depth, extraction, seen);
+  const provenance = assessSenderProvenance({
+    headers: parsed.headers,
+    from: parsed.from,
+    trustedAuthorities: options.trustedAuthorities,
+    knownSenderDomains: options.knownSenderDomains,
+  });
+  if (plainText) addText(plainText, depth, extraction, seen, provenance);
 
   for (const attachment of parsed.attachments) {
     if (extraction.texts.length >= recoveryLimits.maxReceiptSnippets) break;
@@ -102,7 +122,7 @@ async function extractMime(
 
     if (mimeType === "message/rfc822") {
       if (depth >= maxNestedEmailDepth) recordSkipped(extraction, mimeType);
-      else await extractMime(toBytes(attachment.content), depth + 1, extraction, seen, budget);
+      else await extractMime(toBytes(attachment.content), depth + 1, extraction, seen, budget, options);
       continue;
     }
 
@@ -113,7 +133,7 @@ async function extractMime(
       }
       budget.pdfs += 1;
       const text = await pdfReceiptText(attachment.content);
-      if (text) addText(text, depth, extraction, seen);
+      if (text) addText(text, depth, extraction, seen, provenance);
       else recordSkipped(extraction, mimeType);
       continue;
     }
@@ -172,14 +192,20 @@ function htmlReceiptText(html: string) {
   }).replace(/\r\n?/g, "\n").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-function addText(text: string, depth: number, extraction: ForwardedEmailExtraction, seen: Set<string>) {
+function addText(
+  text: string,
+  depth: number,
+  extraction: ForwardedEmailExtraction,
+  seen: Set<string>,
+  provenance: SenderProvenance,
+) {
   const remaining = recoveryLimits.maxReceiptCharacters - extraction.texts.reduce((total, item) => total + item.text.length, 0);
   if (remaining <= 0) return;
   const bounded = text.slice(0, remaining);
   const digest = createHash("sha256").update(bounded).digest("hex");
   if (seen.has(digest)) return;
   seen.add(digest);
-  extraction.texts.push({ clientRef: `forwarded-${depth}-${digest.slice(0, 20)}`, text: bounded });
+  extraction.texts.push({ clientRef: `forwarded-${depth}-${digest.slice(0, 20)}`, text: bounded, provenance });
 }
 
 function byteLength(value: string | Uint8Array) {
