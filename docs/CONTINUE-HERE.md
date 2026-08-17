@@ -8,12 +8,12 @@
 ## 1. Exact checkout
 
 - Folder: `/Users/varunteja/Desktop/CVT Group/Vognary`
-- Branch: `feat/autopilot-loop`
+- Branch: `feat/commitment-graph`, converged to `main` by fast-forward.
 - Safety commit `4fa6575` (`fix(recovery): honest cadence totals, receipt semantics, token-free veto, dead-code removal`) preserved the whole repair pass on top of `051444f` and is pushed.
-- This commit adds the two Opus-confirmed parser repairs on top of `4fa6575` and is the convergence candidate.
+- The commitment-graph delta (Phase B/C/D engineering) sits on top of `dce0e5c` and is the convergence candidate.
 - Do **not** `git worktree add ../vognary-*`, clone a sibling, or redo WP-A.
 - Parked copies: `.fallow/` (gitignored)
-- Founder authorized the safety commit, this commit, and the `main` convergence.
+- Founder authorized the safety commit, the parser commit, and the `main` convergence.
 
 ## 2. What is merged on `main`
 
@@ -24,7 +24,33 @@
 
 ## 3. What is committed on this branch
 
-### Sender provenance for forwarded receipts (additive `0048`, this delta)
+### Commitment graph — Phase B/C/D engineering (additive `0049`–`0052`, this delta)
+
+Nine pure deterministic modules plus four additive migrations, a derived store and one new product surface. Nothing frozen was rewritten: no monetary arithmetic, no receipt parsing, no cadence detection, no corrections, no provenance, no standing-mandate safety, no applied migration.
+
+**Merchant identity** scores eight signals with a noisy-OR combination. GSTIN is validated against its statutory check character, so a mistyped identifier is discarded rather than trusted as a weak alias. Domains normalize without public-suffix guessing. A fuzzy name alone can never auto-merge, only ask. Receipts naming different registered businesses are blocked. Currency is never crossed — enforced by a database trigger, not by callers. A reversed merge is never proposed automatically again. Today's evidence supplies two real signals: the normalized merchant name and, on forwarded mail, the assessed sender domain with its trust tier.
+
+**Source liveness** is per source, not per workspace: `CURRENT` / `PARTIAL` / `STALE` / `BROKEN` / `BASELINE_ONLY` / `NO_EVIDENCE`. A commitment's coverage is computed only from the sources it cites, so a healthy feed cannot vouch for a merchant it never carried. A forwarded receipt creates one source row per delivery, so automatic rows inherit the shared inbox channel's newest delivery and widest window while a one-off import stays a baseline.
+
+**Absence** yields exactly the five declared outcomes. A window still open, or a subscription with no settled rhythm, yields no conclusion at all. Absence needs trustworthy coverage; a charge actually seen is never suppressed by weak coverage. Absence is never turned into cancellation.
+
+**Commitment state** answers all five required questions and is stored per commitment. Cadence is read back from recorded assertions, never re-derived. Only a settled cancellation reads as ended; a covered quiet window reads as likely ended and withholds prediction.
+
+**Change intelligence** implements exactly the eight declared kinds. Every signal cites evidence, a dated absence window plus the sources that vouch for it, or a named unhealthy source — enforced by a database check. Dedupe keys are deterministic, so re-running against unchanged facts writes nothing.
+
+**Attention and notifications.** Silence is success. Consent, unsubscribe, materiality, prior notification and an unconfigured provider each suppress with a stated reason. Sending is fail-closed. `DELIVERED` is reachable only from a provider callback, and the database refuses to store it without a provider message id and a delivery timestamp.
+
+**Control** offers verified instructions only, drafts assisted cancellations the customer sends themselves, models user-confirmed action as a real consent state machine that stays switched off, and never reports autonomous action as available or route-proven.
+
+**Cancellation outcome** implements the declared lifecycle. `CONFIRMED_BY_SETTLEMENT` is unreachable by every event the module defines and is rejected outright by a database constraint.
+
+**Correction learning** stores structural features only; a database guard function rejects free text, addresses and nested objects. Priors are refused below 50 recorded corrections and returns empty weights with a stated reason.
+
+Two real defects were found and fixed while wiring. Date and timestamp columns arrive from the driver as JavaScript `Date` objects, so the coverage span computed as `NaN` and every workspace silently degraded to partial coverage, suppressing every missing-charge signal. And resolving a change was terminal, so a genuinely missing charge closed during a source outage stayed closed after the source returned; resolution now reopens when the identical occurrence is true again, while supersession and expiry stay final.
+
+**Honest release classification for this delta:** `CODE COMPLETE` = yes. `PRODUCTION CONFIGURATION REQUIRED` = **yes** — production migrations still stop at `0026` against a chain that now runs through `0052`; email sending, receipt inbox, charging and autonomous action stay fail-closed. `REAL-WORLD PROOF REQUIRED` = **yes** — zero real merchants have been identified, zero real changes notified, zero real cancellations verified.
+
+### Sender provenance for forwarded receipts (additive `0048`)
 
 Phase A of the automatic-inbox brief asked for four things. Three already existed in code: the receipt inbox itself (alias derivation, rotation, revocation, signed webhook, replay keys, leases, MIME/nested-RFC822/PDF parsing, retention, tenant isolation), historical backfill through nested `message/rfc822`, and coverage states. **Sender trust did not exist at all** — nothing read SPF, DKIM, DMARC, or `Authentication-Results`. That gap is what this delta closes; nothing else in Phase A was rewritten.
 
@@ -76,12 +102,12 @@ Final orchestrated release gate on this checkout (2026-08-16, through 0047): **P
 ## 4. Release level — three different things
 
 - **CODE READY.** The committed tree passes every bounded gate above on this checkout. Engineering on this delta is frozen.
-- **PRODUCTION ACTIVATION NOT READY.** Production migrations stop at `0026` against a required chain through `0048`; durable encrypted backup storage and restore verification are not configured; receipt-inbox launch attestation is pending; retention scheduling is unverified; no founder-proven provider route exists; execution, notice, and receipt-inbox switches stay off. Nothing here may be described as live.
+- **PRODUCTION ACTIVATION NOT READY.** Production migrations stop at `0026` against a required chain through `0052`; durable encrypted backup storage and restore verification are not configured; receipt-inbox launch attestation is pending; retention scheduling is unverified; no founder-proven provider route exists; execution, notice, receipt-inbox and email-notification switches stay off. Nothing here may be described as live.
 - **MARKET NOT VALIDATED.** Zero real customers. Strict statement corpus **0/100** and strict receipt corpus **0/200** consented fixtures. Composite scoreboard remains **1.5**. Green gates are engineering evidence and raise no business row.
 
 ## 5. Current P0
 
-Public release is blocked until production receives the verified additive migration chain through `0048`, durable encrypted backup storage passes restore verification, receipt-inbox launch attestations and retention scheduling are real, and the consented real corpora reach their strict thresholds. Separately, prove one real zero-chore provider route, then one India customer through mandate → delivered veto → supported cancel or honest exception → covered-window proof.
+Public release is blocked until production receives the verified additive migration chain through `0052`, durable encrypted backup storage passes restore verification, receipt-inbox launch attestations and retention scheduling are real, and the consented real corpora reach their strict thresholds. Separately, prove one real zero-chore provider route, then one India customer through mandate → delivered veto → supported cancel or honest exception → covered-window proof.
 
 Until that exists, do not call WP-C–E complete and do not activate production.
 
@@ -111,8 +137,8 @@ Quote the path. `DATABASE_URL` must be unset for `npm test`. Do not commit devel
 ## 8. Ops (fail-closed)
 
 - **Kill switches:** `AUTOPILOT_EXECUTION_ENABLED`, `AUTOPILOT_NOTICE_ENABLED`, `AUTOPILOT_NOTICE_CHANNEL_READY` default off. Only the literal string `true` enables them. Blank env is NOT READY.
-- **Rollback:** leave the three switches false, keep `RESEND_NOTICE_WEBHOOK_SECRET` / `AUTOPILOT_VETO_TOKEN_SECRET` unset, redeploy. Do not drop 0033 through 0048. Emergency provider disable is founder/internal-operator only: `POST /api/internal/autopilot/providers/{id}/disable` with `INTERNAL_SYNC_SECRET`. Tenant admins cannot globally disable a provider.
+- **Rollback:** leave the three switches false, keep `RESEND_NOTICE_WEBHOOK_SECRET` / `AUTOPILOT_VETO_TOKEN_SECRET` unset, redeploy. Do not drop 0033 through 0052. Emergency provider disable is founder/internal-operator only: `POST /api/internal/autopilot/providers/{id}/disable` with `INTERNAL_SYNC_SECRET`. Tenant admins cannot globally disable a provider.
 - **SLOs (alert when breached after go-live, not before):** notice queue age > 15m; delivery failure rate > 5%; veto path 5xx; authorization without delivered+elapsed 48h; attempt latency > 2m; protected leakage > 0; verification pending > 7d; fee insert conflict/failure. Dead letters: `recovery_autopilot_dead_letters`.
 - **Threat model:** signed veto token is capability-bearing; mandate/veto/operator/notice webhook/provider attempt/proof/fee/refund/kill-switch are privileged. No signed text, raw proof, or message bodies in product events.
-- **Backup:** restore verification requires Autopilot audit tables/triggers and additive integrity migrations `0045`, `0046`, `0047`, and `0048`. Workspace activation uniqueness is `0041`; semantic reset `0042`; semantic-version marker `0043`; audit-row DELETE lock `0044`; mandate/execution immutability `0045`; billed-window update/delete immutability `0046`; billed-period insert serialization `0047`; receipt sender-provenance immutability `0048`. A disposable `pg_dump`/`pg_restore` through 0047 is rehearsed locally; encrypted durable production backup remains founder-owned and currently unconfigured.
+- **Backup:** restore verification requires Autopilot audit tables/triggers and additive integrity migrations `0045`, `0046`, `0047`, `0048`, `0049`, `0050`, `0051`, and `0052`. Workspace activation uniqueness is `0041`; semantic reset `0042`; semantic-version marker `0043`; audit-row DELETE lock `0044`; mandate/execution immutability `0045`; billed-window update/delete immutability `0046`; billed-period insert serialization `0047`; receipt sender-provenance immutability `0048`; merchant-identity currency guard and append-only signals `0049`; commitment lifecycle with the settlement reservation and append-only cancellation events `0050`; change-signal citation and delivery-proof constraints `0051`; correction-learning structural-feature guard `0052`. A disposable `pg_dump`/`pg_restore` through 0047 is rehearsed locally; encrypted durable production backup remains founder-owned and currently unconfigured.
 - **Autopilot scheduler:** `GET /api/internal/autopilot/due/run` is CRON_SECRET-gated. It is **not** in `vercel.json` (Hobby two-cron cap: renewal alerts + retention). Notices/execution still no-op unless those switches are the literal string `true`.
