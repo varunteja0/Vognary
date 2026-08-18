@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Recurring Spend Audit",
-  description: "Audit recurring spend from receipts and invoices, review the next renewal, and verify the evidence behind the first action.",
+  title: "Your commitments",
+  description: "Cited recurring software, AI, and cloud bills from evidence you choose — what changed, what comes next, and why.",
   robots: { index: false, follow: false },
 };
 

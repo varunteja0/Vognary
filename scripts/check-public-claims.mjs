@@ -5,6 +5,7 @@ const root = process.cwd();
 const publicSurfaces = [
   "README.md",
   "src/app/page.tsx",
+  "src/app/app/layout.tsx",
   "src/app/launch-landing.tsx",
   "src/app/workspace/recovery/recovery-home.tsx",
   "src/app/workspace/recovery/recovery-commitments.tsx",

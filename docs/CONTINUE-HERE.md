@@ -25,7 +25,7 @@ Proof in that log, in order: `pg_dump` → AES-256-GCM (`keyFingerprint=8it2LaCH
 ## 1. Exact checkout
 
 - Folder: `/Users/varunteja/Desktop/CVT Group/Vognary`
-- Branch: `main`. Record SHA with `git rev-parse HEAD origin/main` after this hardening lands. Parent backup commit is `ec7902249f61727445e6bd7ed4fdaacd51f38961`. Vercel Production still serves `aa71295` until the **exact** hardening SHA is deployed with `ENABLE_RECEIPT_INBOX=false`.
+- Branch: `main`. Intended release SHA is this checkout (`git rev-parse HEAD`). Parent hardening commit is `1ba355f904b4b34c443d11060317b9c17693e875`. Vercel Production of `1ba355f` is live on `www.vognary.com` with `ENABLE_RECEIPT_INBOX` still false (unsigned inbound returns 501). A follow-up claims fix for the signed-in document title is in this commit and must be the next production SHA.
 - This commit is the Commitment Intelligence / Decision B / golden-corpus / honest Source Hub / expected-vs-observed / backup-truth hardening set. Do not discard it. Do not deploy a dirty tree.
 - Operations commits `5b983bf` and `f9b8a14` are pushed. They add the guarded `0053` migration and exact pre/current encrypted backup-restore profiles.
 - Safety commit `4fa6575` (`fix(recovery): honest cadence totals, receipt semantics, token-free veto, dead-code removal`) preserved the whole repair pass on top of `051444f` and is pushed.
@@ -153,7 +153,7 @@ Exact remaining activation blockers:
 
 1. ~~Vercel Production inbox-off + prepared receipt-inbox env~~ **DONE and independently verified 2026-08-18.** Keep `ENABLE_RECEIPT_INBOX=false` on the first hardened deploy.
 2. ~~GitHub Actions Encrypted Backup Drill cannot upload to durable R2.~~ **DONE and independently verified 2026-08-18.** Run `32109925496` uploaded, GETted, decrypted, and restored the stored object. Do not repeat the secrets action.
-3. Deploy the exact Commitment Intelligence SHA to Vercel Production with inbox still false. Then rotate the two legacy `receipt-alias-v1` aliases to `receipt-alias-v2`, then replay/send one real receipt and verify processing plus replay idempotency.
+3. ~~Deploy the exact Commitment Intelligence SHA to Vercel Production with inbox still false.~~ **DONE 2026-08-18:** GitHub Production deployment `5958468107` of `1ba355f` is Ready and aliased to `www.vognary.com`. Unsigned inbound remains 501. Follow-up signed-in title fix must ride the next production SHA. Then rotate the two legacy `receipt-alias-v1` aliases to `receipt-alias-v2` only after the inbox is intentionally enabled, then prove one real receipt plus replay.
 4. Only after retained evidence exists, keep or correct provider/webhook/replay/retention attestations and then enable the inbox. Do not set `RECEIPT_INBOX_RETENTION_REVIEW_STATUS=approved` or `ENABLE_RECEIPT_INBOX=true` until that SHA is live and prerequisites are real.
 
 Do not declare the product live until one real automatic billing receipt, then a second automatic receipt without manual forwarding, is proven.
