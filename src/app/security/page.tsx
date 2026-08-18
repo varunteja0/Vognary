@@ -48,7 +48,7 @@ export default function SecurityPage() {
           </div>
           <div className="mt-10">
             <h2 className="font-display text-xl font-semibold text-(--ink)">Live status - measured, not promised</h2>
-            <p className="mt-2 text-sm leading-6 text-(--muted)">These states are read from this deployment&apos;s configuration each time the page loads. Anything unproven is labeled that way.</p>
+            <p className="mt-2 text-sm leading-6 text-(--muted)">These states are read from this deployment&apos;s configuration each time the page loads. Backup Proven requires a recorded restore of a stored encrypted dump, not only a storage setting. Anything unproven is labeled that way.</p>
             <div className="mt-4 grid gap-3">
               {signals.map((signal) => (
                 <div key={signal.id} className="inset p-4">

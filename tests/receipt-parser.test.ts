@@ -467,6 +467,17 @@ test("maps every accepted explicit currency instead of falling back to INR", () 
 
 // An unseparated amount must never be truncated to its leading comma-group prefix
 // (Rs. 1500 -> 150), which silently understates every total downstream.
+test("a paid amount with cents still binds the charge date", () => {
+  const observed = extractObservedReceipt("Cursor invoice paid USD 13.30 on 2026-08-01. Cursor Pro renews monthly.");
+  assert.equal(observed?.amountDecimal, "13.30");
+  assert.equal(observed?.currency, "USD");
+  assert.equal(observed?.observedDate, "2026-08-01");
+
+  const indian = extractObservedReceipt("OpenAI invoice paid INR 1,999.00 on 2026-07-06. ChatGPT Plus renews monthly.");
+  assert.equal(indian?.amountDecimal, "1999.00");
+  assert.equal(indian?.observedDate, "2026-07-06");
+});
+
 test("keeps unseparated receipt amounts exact instead of truncating a digit prefix", () => {
   const cases = [
     { amount: "Rs. 1500", currency: "INR", decimal: "1500", value: 1500 },

@@ -4,16 +4,16 @@ import { Nakul } from "./character";
 
 const outcomes = [
   {
-    title: "Renewing soon",
-    detail: "See an expected charge before its date arrives.",
+    title: "What you are committed to",
+    detail: "Cited recurring software, AI, and cloud bills — only when receipts support them.",
   },
   {
-    title: "Price changed",
-    detail: "Know when a newer receipt shows a different amount.",
+    title: "What changed",
+    detail: "Price changes, new commitments, and duplicates, each tied to evidence.",
   },
   {
-    title: "Needs a decision",
-    detail: "Keep it, plan to cancel, or review it later.",
+    title: "Why Vognary believes it",
+    detail: "Open the receipt behind every important amount, date, and cadence.",
   },
 ] as const;
 
@@ -23,7 +23,7 @@ export default function LaunchLanding({
   receiptInboxAvailable?: boolean;
 }) {
   const primaryHref = "/login?next=/app";
-  const primaryLabel = "Find my recurring spend";
+  const primaryLabel = "See my commitments";
   return (
     <main id="ledger-main" className="relative overflow-hidden px-4 pb-12 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
@@ -40,13 +40,15 @@ export default function LaunchLanding({
         <section className="scan relative flex min-h-[34rem] items-center overflow-hidden border-b border-line py-12 sm:min-h-[38rem] sm:py-16">
           <div className="relative z-10 max-w-3xl sm:pr-28 lg:pr-0">
             <p className="eyebrow eyebrow-xs text-ochre">
-              {receiptInboxAvailable ? "Software renewals, without inbox access" : "Software renewals, from receipts you choose"}
+              {receiptInboxAvailable ? "Commitment Intelligence for 2–20 person software teams" : "Commitment Intelligence, from receipts you choose"}
             </p>
             <h1 className="mt-5 max-w-3xl font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-6xl">
-              Know what’s renewing before you pay for it.
+              Know what your company is already committed to.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-(--ink-soft) sm:text-lg">
-              Start with the billing receipts you already have. Vognary shows what renews next when the receipts support it, what needs attention, and the receipt behind each claim.
+              {receiptInboxAvailable
+                ? "Software renewals, price changes and recurring bills — continuously maintained from evidence. Start with the billing receipts you already have. Set up billing forwarding once so matching mail keeps arriving. Vognary shows what renews next when the receipts support it, what changed, and the receipt behind each claim."
+                : "Software renewals, price changes and recurring bills — continuously maintained from evidence. Start with the billing receipts you already have. Vognary shows what renews next when the receipts support it, what changed, and the receipt behind each claim."}
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</Link>
@@ -54,7 +56,7 @@ export default function LaunchLanding({
             <p className="mt-6 flex max-w-2xl items-start gap-2 text-sm leading-6 text-(--muted)">
               <span className="live-dot mt-2 shrink-0" aria-hidden />
               <span>{receiptInboxAvailable
-                ? "Messages sent to your private Vognary address are processed as receipt evidence. Keep the address private and forward only billing mail you want reviewed."
+                ? "Messages sent to your private Vognary address are processed as receipt evidence. Vognary does not read the mailbox. Only messages matching the forwarding rule you create are sent. Those rules apply to new matching messages. Historical receipts need a one-time backfill. Coverage depends on that source."
                 : "Add the billing receipts you already have. Vognary shows the amount, the expected date, and the receipt behind each one. No bank passwords. No mailbox access."}</span>
             </p>
           </div>
@@ -87,7 +89,7 @@ export default function LaunchLanding({
             <h2 className="mt-3 font-display text-3xl font-semibold text-(--ink)">Keep it current</h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-(--muted)">
               {receiptInboxAvailable
-                ? "Forward billing emails manually to your Vognary address as they arrive."
+                ? "Set up billing forwarding once. Vognary stays current from the billing evidence you choose to forward. Vognary does not read the mailbox."
                 : "Add new billing receipts as they arrive and Vognary updates what renews next."}
             </p>
           </div>

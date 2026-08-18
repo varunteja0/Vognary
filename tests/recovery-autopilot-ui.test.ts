@@ -46,7 +46,7 @@ test("active mandate still publishes the first-value spend strip when no recurri
   );
   const metricsFn = homeSource.slice(homeSource.indexOf("function RecoveryFirstValueMetrics"));
   assert.match(metricsFn, /label="Monthly recurring amount"/);
-  assert.match(metricsFn, /empty="No recurring amount yet"/);
+  assert.match(metricsFn, /No recurring amount yet/);
   assert.doesNotMatch(metricsFn, /if \(!hasTotals\) return null/);
 });
 

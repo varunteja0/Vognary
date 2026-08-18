@@ -1,4 +1,11 @@
-/** Recovery-native Gmail stays fail-closed until Google restricted-scope verification/CASA is genuinely approved. */
+/**
+ * Recovery-native Gmail stays fail-closed.
+ *
+ * `gmail.readonly` is a Restricted Google scope. Production mailbox storage for
+ * external users requires OAuth verification and an annual third-party security
+ * assessment: https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification
+ * Status: BLOCKED BY EXTERNAL APPROVAL. Do not expose Connect.
+ */
 export function isRecoveryGmailOauthReady(): boolean {
   return process.env.GOOGLE_OAUTH_VERIFICATION_COMPLETE === "true"
     && process.env.GOOGLE_RESTRICTED_SCOPE_CASA_STATUS === "approved";

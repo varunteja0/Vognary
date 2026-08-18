@@ -3,8 +3,10 @@
 import { useState, type ReactNode } from "react";
 import type { ReceiptInboxStatusDto, RecoveryEvidenceSourceDto } from "@/lib/recovery/contracts";
 import { formatMoment, sourceLabels } from "./labels";
+import { ReceiptBillingSetup } from "./recovery-billing-setup";
 import { AuthRequiredBlock, LoadingBlock, StateBlock } from "./recovery-states";
 import type { LoadState, PendingMutation } from "./state";
+import { buildSourceCatalog, sourceAvailabilityLabels } from "@/lib/recovery/source-catalog";
 
 export function RecoverySources({
   receiptInboxPubliclyAvailable,
@@ -57,6 +59,10 @@ export function RecoverySources({
   if (!receiptInboxPubliclyAvailable) {
     return (
       <div className="grid gap-3">
+        <SourceHubCatalog
+          receiptInboxPubliclyAvailable={false}
+          receiptInboxState={receiptInbox?.state ?? null}
+        />
         <EvidenceSourceList
           sources={evidenceSources}
           canManage={canManageEvidenceSources}
@@ -74,6 +80,10 @@ export function RecoverySources({
 
   return (
     <div className="grid gap-5">
+      <SourceHubCatalog
+        receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable}
+        receiptInboxState={receiptInbox?.state ?? null}
+      />
       <EvidenceSourceList
         sources={evidenceSources}
         canManage={canManageEvidenceSources}
@@ -85,7 +95,7 @@ export function RecoverySources({
         <p className="eyebrow eyebrow-xs text-ochre">Recommended source</p>
         <h3 id="receipt-inbox-heading" className="mt-3 font-display text-2xl font-semibold text-(--ink)">Your Vognary receipt address</h3>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
-          Vognary never accesses or scans your inbox. Messages sent to that private address are processed as receipt evidence; keep the address private and forward only billing mail you want Vognary to review.
+          Set up billing forwarding once. Vognary stays current from the billing evidence you choose to forward. Vognary never accesses or scans your inbox. Messages sent to that private address are processed as receipt evidence; keep the address private.
         </p>
 
         {receiptInbox?.gmailVerification ? (
@@ -187,13 +197,13 @@ export function RecoverySources({
 
             <ReceiptInboxState status={receiptInbox} />
 
-            <ReceiptForwardingSetup receiptInbox={receiptInbox} />
+            <ReceiptBillingSetup receiptInbox={receiptInbox} />
 
             {receiptInbox.state === "READY" ? (
               <div className="border-t border-line pt-5">
-                <h4 className="font-display text-lg font-semibold text-(--ink)">Keep Vognary current</h4>
+                <h4 className="font-display text-lg font-semibold text-(--ink)">Matching billing mail should arrive on its own</h4>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
-                  Forward billing emails manually, or use Gmail&apos;s automatic-forwarding setup. If Gmail sends a confirmation challenge, Vognary shows the code or confirmation link above when it arrives. Gmail forwards nothing until you complete that step.
+                  After the Gmail rule is on, new matching billing emails are sent here without forwarding each one by hand. If Gmail sends a confirmation challenge, Vognary shows the code or confirmation link above when it arrives. Gmail forwards nothing until you complete that step. You can still forward one receipt manually as a fallback.
                 </p>
               </div>
             ) : null}
@@ -222,66 +232,44 @@ export function RecoverySources({
         className="border-y border-line"
       >
         <summary className="cursor-pointer px-4 py-4 font-display text-base font-semibold text-(--ink) sm:px-6">Manual fallback</summary>
+        <p className="px-4 text-sm leading-6 text-(--muted) sm:px-6">You can also forward an individual receipt manually, or paste receipt text, if the Gmail rule is not on yet or a message did not match it.</p>
         <div className="border-t border-line p-4 sm:p-6">{manualFallback}</div>
       </details>
     </div>
   );
 }
 
-function ReceiptForwardingSetup({ receiptInbox }: { receiptInbox: ReceiptInboxStatusDto }) {
+function SourceHubCatalog({
+  receiptInboxPubliclyAvailable,
+  receiptInboxState,
+}: {
+  receiptInboxPubliclyAvailable: boolean;
+  receiptInboxState: string | null;
+}) {
+  const catalog = buildSourceCatalog({
+    receiptInboxPubliclyAvailable,
+    receiptInboxState,
+  });
   return (
-    <section aria-labelledby="receipt-forwarding-setup" className="border-t border-line pt-5">
-      <h4 id="receipt-forwarding-setup" className="font-display text-lg font-semibold text-(--ink)">Finish receipt forwarding</h4>
-      <ol className="mt-3 border-t border-line">
-        <li className="border-b border-line py-4">
-          <p className="text-sm font-semibold text-(--ink)">1. Address ready</p>
-          <p className="mt-1 text-sm leading-6 text-(--muted)">Use the private address above only for software billing mail.</p>
-        </li>
-        <li className="border-b border-line py-4">
-          <p className="text-sm font-semibold text-(--ink)">
-            2. {receiptInbox.forwardingVerifiedAt ? "Forwarding address verified" : "Verify the forwarding address"}
-          </p>
-          {receiptInbox.forwardingVerifiedAt ? (
-            <p className="mt-1 text-sm leading-6 text-(--muted)">Verified {formatMoment(receiptInbox.forwardingVerifiedAt)} after a receipt reached this address.</p>
-          ) : (
-            <p className="mt-1 text-sm leading-6 text-(--muted)">
-              On a computer, open Gmail Settings, then See all settings, Forwarding and POP/IMAP, and Add a forwarding address. Paste the private address, choose Next and Proceed, then return here for Google&apos;s confirmation link or code.
-            </p>
-          )}
-          <a href="https://support.google.com/mail/answer/10957?hl=en" target="_blank" rel="noreferrer noopener" className="mt-2 inline-block text-sm font-medium text-(--accent-strong) underline underline-offset-4">
-            Google&apos;s forwarding instructions
-          </a>
-        </li>
-        <li className="border-b border-line py-4">
-          <p className="text-sm font-semibold text-(--ink)">
-            3. {receiptInbox.setupCompletedAt ? "Receipt flow proven" : "Create billing-only filters"}
-          </p>
-          <p className="mt-1 text-sm leading-6 text-(--muted)">
-            Keep global forwarding disabled. For each known billing sender, select one receipt in Gmail, choose More, Filter messages like these, Create filter, Forward it to, this private address, then Create filter. Filters affect new matching mail only.
-          </p>
-          {receiptInbox.setupCompletedAt ? (
-            <p className="mt-1 text-xs leading-5 text-(--muted)">A receipt was accepted {formatMoment(receiptInbox.setupCompletedAt)}.</p>
-          ) : null}
-          <a href="https://support.google.com/mail/answer/6579?hl=en" target="_blank" rel="noreferrer noopener" className="mt-2 inline-block text-sm font-medium text-(--accent-strong) underline underline-offset-4">
-            Google&apos;s filter instructions
-          </a>
-        </li>
-        <li className="py-4">
-          <p className="text-sm font-semibold text-(--ink)">
-            4. {receiptInbox.backfillCompletedAt ? "Historical backfill complete" : "Backfill historical billing email"}
-          </p>
-          {receiptInbox.backfillCompletedAt ? (
-            <p className="mt-1 text-sm leading-6 text-(--muted)">A historical receipt batch was accepted {formatMoment(receiptInbox.backfillCompletedAt)}.</p>
-          ) : (
-            <p className="mt-1 text-sm leading-6 text-(--muted)">
-              In Gmail on a computer, select old software billing emails in batches of up to 20, choose More, Forward as attachment, address the message to your private address, and send. Vognary marks this complete only after an attached receipt is accepted.
-            </p>
-          )}
-          <a href="https://support.google.com/mail/answer/9261412?hl=en" target="_blank" rel="noreferrer noopener" className="mt-2 inline-block text-sm font-medium text-(--accent-strong) underline underline-offset-4">
-            Google&apos;s attachment instructions
-          </a>
-        </li>
-      </ol>
+    <section aria-labelledby="source-hub-heading" className="panel p-4 sm:p-6">
+      <p className="eyebrow eyebrow-xs text-ochre">Source hub</p>
+      <h3 id="source-hub-heading" className="mt-3 font-display text-2xl font-semibold text-(--ink)">Where evidence can come from</h3>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
+        Sources are sensors. The commitment graph is the financial truth. Only a live source can be set up. Planned sources are listed honestly and cannot be connected.
+      </p>
+      <ul className="mt-5 grid gap-3">
+        {catalog.map((entry) => (
+          <li key={entry.id} className="rounded-2xl border border-line p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="font-medium text-(--ink)">{entry.name}</p>
+              <span className={entry.availability === "CONNECTED" ? "pill pill-ready" : entry.availability === "SETUP" ? "pill pill-partial" : "pill pill-planned"}>
+                {sourceAvailabilityLabels[entry.availability]}
+              </span>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-(--muted)">{entry.summary}</p>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -363,7 +351,7 @@ function ReceiptInboxState({ status }: { status: ReceiptInboxStatusDto }) {
     WAITING: {
       eyebrow: "Waiting",
       title: "Waiting for a receipt",
-      detail: "Forward a software billing email to the address above. This page updates when Vognary receives it.",
+      detail: "Waiting for a billing email that matches the Gmail rule. After that rule is on, you should not need to forward each new matching receipt by hand. This page updates when Vognary receives it.",
       tone: "neutral" as const,
     },
     RECEIVED: {
@@ -388,8 +376,8 @@ function ReceiptInboxState({ status }: { status: ReceiptInboxStatusDto }) {
       eyebrow: "Needs another receipt",
       title: "Vognary could not prove a renewal",
       detail: status.lastFailureCode
-        ? `The email arrived, but no receipt could be read from it (${status.lastFailureCode}). Forward one that shows the service name, amount, and date in the message or as a PDF invoice. Scans and screenshots cannot be read.`
-        : "The email arrived, but no receipt could be read from it. Forward one that shows the service name, amount, and date in the message or as a PDF invoice. Scans and screenshots cannot be read.",
+        ? `The email arrived, but no receipt could be read from it (${status.lastFailureCode}). Send one matching billing email, or use the manual fallback, that shows the service name, amount, and date in the message or as a PDF invoice. Scans and screenshots cannot be read.`
+        : "The email arrived, but no receipt could be read from it. Send one matching billing email, or use the manual fallback, that shows the service name, amount, and date in the message or as a PDF invoice. Scans and screenshots cannot be read.",
       tone: "caution" as const,
     },
   };

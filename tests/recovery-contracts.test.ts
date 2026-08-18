@@ -134,6 +134,7 @@ const home = {
     correctionIds: [],
   }],
   next30DayTotals: [{ amount: money, commitmentIds: [commitment.id], evidenceIds: [evidence.id], provenance: "RECEIPT", correctionIds: [] }],
+  confidenceLayers: [],
   needsMe: [{
     id: "attention-1",
     commitmentId: commitment.id,
@@ -179,6 +180,20 @@ const detail = {
   riskTags: ["single occurrence"],
   evidence: { items: [evidence], total: 1, nextCursor: null },
   corrections: [],
+  expectation: {
+    status: "INSUFFICIENT_HISTORY",
+    expectedDate: null,
+    expectedAmount: null,
+    observedDate: null,
+    observedAmount: null,
+    windowStart: null,
+    windowEnd: null,
+    summary: "There is not enough settled rhythm yet to compare an expected charge with what arrived.",
+    reasons: [],
+  },
+  memory: [],
+  belief: null,
+  because: [],
 } as const satisfies CommitmentDetailDto;
 
 const compared = {
@@ -318,7 +333,7 @@ test("Recovery v1 freezes endpoint methods and paths without database vocabulary
 
   const sourceText = readFileSync(new URL("../src/lib/recovery/contracts.ts", import.meta.url), "utf8");
   assert.doesNotMatch(sourceText, /from ["'](?:pg|server-only|@\/lib\/server)/);
-  assert.doesNotMatch(sourceText, /workspace_states|recurring_items|evidence_links|commitment_decisions|sql|\bexception\b|stack|cause/i);
+  assert.doesNotMatch(sourceText, /workspace_states|recurring_items|evidence_links|commitment_decisions|sql|\bexception\b|stack|\bcause\b/i);
   assert.doesNotMatch(sourceText, /\b(?:any|unknown)\b/);
 });
 

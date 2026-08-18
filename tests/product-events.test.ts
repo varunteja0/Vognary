@@ -151,6 +151,10 @@ test("the first-10 report covers the frozen receipt experiment without PII", () 
     "sourcesRemainingHealthy",
     "returnVisits",
     "checkoutAttempts",
+    "paymentsCompleted",
+    "firstAutomaticReceipt",
+    "secondAutomaticReceipt",
+    "medianSetupDurationMs",
   ]) {
     assert.match(report, new RegExp(`\\b${metric}\\b`), `first-10 report must include ${metric}`);
   }
@@ -164,5 +168,7 @@ test("the first-10 report covers the frozen receipt experiment without PII", () 
   assert.match(report, /secondsToTrustworthyPicture/);
   assert.match(report, /workspace\.returned/);
   assert.match(report, /billing\.checkout_started/);
+  assert.match(report, /billing\.payment_settled/);
+  assert.match(report, /duration_ms/);
   assert.doesNotMatch(report, /select[\s\S]{0,120}\b(?:email|subject|excerpt|raw_evidence|encrypted_display|alias_hmac)\b/i);
 });

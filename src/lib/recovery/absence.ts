@@ -110,7 +110,7 @@ export function evaluateExpectedCharge(input: ExpectedChargeInput): ExpectedChar
       status: "NOT_APPLICABLE",
       window: null,
       citedEvidenceIds: [],
-      reasons: ["We do not have a settled billing rhythm for this subscription yet, so there is nothing to expect."],
+      reasons: ["We do not have a settled billing rhythm for this commitment yet, so there is nothing to expect."],
     };
   }
   const start = shiftDate(input.expectedDate, -absenceEarlyDays);
@@ -190,11 +190,11 @@ export function evaluateExpectedCharge(input: ExpectedChargeInput): ExpectedChar
     };
   }
 
-  const reasons = ["Nothing arrived for this subscription in the period we were watching."];
+  const reasons = ["Nothing arrived for this commitment in the period we were watching."];
   if (input.cancellationClaimed) {
-    reasons.push("A cancellation was reported for this subscription, but a quiet month is not proof that it stopped.");
+    reasons.push("A cancellation was reported for this commitment, but a quiet month is not proof that it stopped.");
   } else {
-    reasons.push("This is not proof the subscription ended; a delayed charge looks the same at this point.");
+    reasons.push("This is not proof the commitment ended; a delayed charge looks the same at this point.");
   }
   return {
     status: "EVALUATED",

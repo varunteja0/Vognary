@@ -1,7 +1,7 @@
 "use client";
 
 import { decisions, type CommitmentSummaryDto, type CorrectionDto, type CorrectionField, type Decision, type EvidenceDto } from "@/lib/recovery/contracts";
-import { correctionFieldLabels, cadenceLabels, commitmentStatusLabels, decisionLabels, decisionMeanings, decisionStamps, formatDay, formatMoment } from "./labels";
+import { correctionFieldLabels, cadenceLabels, commitmentStatusLabels, decisionLabels, decisionMeanings, decisionStamps, expectedVsObservedLabels, formatDay, formatMoment, sourceLabels } from "./labels";
 import { CorrectionHistory, EvidenceRow } from "./recovery-evidence-panels";
 import { ConfidenceBadge, ConfidenceDetail, FailureBlock, LoadingBlock, MoneyValue, StateBlock } from "./recovery-states";
 import { displayedDecision, type PendingMutation, type RecoveryState } from "./state";
@@ -29,8 +29,8 @@ export function RecoveryCommitments({ state, handlers }: { state: RecoveryState;
     return (
       <StateBlock
         eyebrow="Nothing saved yet"
-        title="No subscriptions yet"
-        detail="Add a software receipt and Vognary will show a subscription only when the receipt supports it."
+        title="No commitments yet"
+        detail="Add a software receipt and Vognary will show a commitment only when the receipt supports it."
       >
         <button type="button" onClick={handlers.onAddEvidence} className="btn btn-primary">Add receipts</button>
       </StateBlock>
@@ -39,9 +39,9 @@ export function RecoveryCommitments({ state, handlers }: { state: RecoveryState;
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] lg:items-start">
-      <section aria-label="Subscriptions" className={`panel p-3 sm:p-4 ${selected ? "hidden lg:block" : "block"}`}>
+      <section aria-label="Commitments" className={`panel p-3 sm:p-4 ${selected ? "hidden lg:block" : "block"}`}>
         <div className="flex items-baseline justify-between gap-2 px-1">
-          <h3 className="folio" data-folio="05">Subscriptions</h3>
+          <h3 className="folio" data-folio="05">Commitments</h3>
           <span className="font-data text-xs text-(--muted)">{state.commitments.length} shown</span>
         </div>
         <ul className="mt-3 grid gap-2">
@@ -91,7 +91,7 @@ export function RecoveryCommitments({ state, handlers }: { state: RecoveryState;
         ) : (
           <StateBlock
             eyebrow="Nothing selected"
-            title="Choose a subscription to see why it appears"
+            title="Choose a commitment to see why it appears"
             detail="Every amount, date, and frequency can be traced to a receipt or source you provided."
           />
         )}
@@ -153,6 +153,8 @@ function CommitmentDetailPanel({ state, handlers }: { state: RecoveryState; hand
 
         <div className="mt-4 inset p-4">
           <ConfidenceDetail confidence={detail.confidence} />
+          {detail.belief ? <p className="mt-3 text-sm leading-6 text-(--ink-soft)">{detail.belief}</p> : null}
+          {detail.because[0] ? <p className="mt-1 text-sm leading-6 text-(--muted)">{detail.because[0]}</p> : null}
           {detail.riskTags.length ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {detail.riskTags.map((tag) => <span key={tag} className="pill pill-partial">{tag}</span>)}
@@ -160,6 +162,50 @@ function CommitmentDetailPanel({ state, handlers }: { state: RecoveryState; hand
           ) : null}
         </div>
       </section>
+
+      <section aria-labelledby="recovery-expectation-heading" className="panel p-4 sm:p-5">
+        <h4 id="recovery-expectation-heading" className="font-display text-xl font-semibold text-(--ink)">Expected vs observed</h4>
+        <p className="mt-2 font-data text-xs text-(--muted)">{expectedVsObservedLabels[detail.expectation.status]}</p>
+        <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{detail.expectation.summary}</p>
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+          <DetailFact
+            label="Expected"
+            value={detail.expectation.expectedAmount?.display ?? "Not established"}
+            note={[detail.expectation.expectedDate ? formatDay(detail.expectation.expectedDate) : null, detail.expectation.expectedAmount?.currency].filter(Boolean).join(" · ") || undefined}
+          />
+          <DetailFact
+            label="Observed"
+            value={detail.expectation.observedAmount?.display ?? "No supporting evidence yet"}
+            note={[detail.expectation.observedDate ? formatDay(detail.expectation.observedDate) : null, detail.expectation.observedAmount?.currency].filter(Boolean).join(" · ") || undefined}
+          />
+        </dl>
+        {detail.expectation.windowStart && detail.expectation.windowEnd ? (
+          <p className="mt-3 font-data text-xs text-(--muted)">
+            Window {formatDay(detail.expectation.windowStart)} to {formatDay(detail.expectation.windowEnd)}. Absence is not treated as cancellation.
+          </p>
+        ) : null}
+        {detail.expectation.reasons[0] ? (
+          <p className="mt-2 text-sm leading-6 text-(--muted)">{detail.expectation.reasons[0]}</p>
+        ) : null}
+      </section>
+
+      {detail.memory.length ? (
+        <section aria-labelledby="recovery-memory-heading" className="panel p-4 sm:p-5">
+          <h4 id="recovery-memory-heading" className="font-display text-xl font-semibold text-(--ink)">Amount history</h4>
+          <p className="mt-2 text-sm leading-6 text-(--muted)">Dated amounts from stored evidence. Original receipts are not rewritten.</p>
+          <ol className="mt-4 grid gap-2">
+            {detail.memory.map((point) => (
+              <li key={point.evidenceId} className="flex flex-wrap items-baseline justify-between gap-2 inset p-3">
+                <span className="font-data text-sm text-(--ink)">{formatDay(point.date)}</span>
+                <span className="flex flex-wrap items-baseline gap-2">
+                  <MoneyValue amount={point.amount} className="text-sm font-semibold text-(--ink)" />
+                  <span className="font-data text-xs text-(--muted)">{sourceLabels[point.sourceType]}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
 
       <section aria-labelledby="recovery-decision-heading" className="panel p-4 sm:p-5">
         <h4 id="recovery-decision-heading" className="font-display text-xl font-semibold text-(--ink)">What do you want to do?</h4>
@@ -217,7 +263,7 @@ function CommitmentDetailPanel({ state, handlers }: { state: RecoveryState; hand
         <p className="mt-3 font-data text-xs text-(--muted)">
           {detail.decision
             ? `Saved ${decisionLabels[detail.decision.value]} on ${formatMoment(detail.decision.decidedAt)} · last updated ${formatMoment(detail.decision.updatedAt)}.`
-            : "No choice has been saved for this subscription yet."}
+            : "No choice has been saved for this commitment yet."}
         </p>
       </section>
 

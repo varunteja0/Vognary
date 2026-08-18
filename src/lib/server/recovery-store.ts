@@ -65,7 +65,10 @@ import {
   type StatementSource,
 } from "@/lib/recurring-audit";
 import { recoveryEvidenceFingerprint } from "@/lib/recovery/evidence-fingerprint";
+import { evaluateExpectedCharge, type ChargeObservation } from "@/lib/recovery/absence";
+import { presentCommitmentMemory, presentExpectedVsObserved } from "@/lib/recovery/expected-observation";
 import { senderTrustConfidenceCeiling } from "@/lib/recovery/sender-provenance";
+import { isCoverageTrustworthy, type CommitmentCoverage, type SourceLivenessState } from "@/lib/recovery/source-liveness";
 import {
   RecoveryCaptureNotReadyError,
   buildRecoveryIngestionEnvelope,
@@ -521,6 +524,7 @@ export async function materializeForwardedEmailEvidence(input: {
         setup_completed_at: Date;
         forwarding_verified_at: Date | null;
         backfill_completed_at: Date | null;
+        created_at: Date;
       }>(
         `update recovery_inbound_aliases
          set setup_completed_at = coalesce(setup_completed_at, greatest($3, created_at)),
@@ -537,17 +541,22 @@ export async function materializeForwardedEmailEvidence(input: {
              gmail_verification_url = case when gmail_verification_received_at is not null then null else gmail_verification_url end,
              gmail_verification_received_at = case when gmail_verification_received_at is not null then null else gmail_verification_received_at end
          where workspace_id = $1 and id = $2 and status = 'ACTIVE'
-         returning setup_completed_at, forwarding_verified_at, backfill_completed_at`,
+         returning setup_completed_at, forwarding_verified_at, backfill_completed_at, created_at`,
         [input.workspaceId, eventRow.alias_id, now, acceptedBackfillCount],
       );
       const milestone = milestones.rows[0];
       if (milestone) {
+        const setupDurationMs = Math.min(
+          86_400_000,
+          Math.max(0, milestone.setup_completed_at.getTime() - milestone.created_at.getTime()),
+        );
         await recordConsentedProductEvent({
           workspaceId: input.workspaceId,
           eventName: "receipt_setup.completed",
           occurredAt: milestone.setup_completed_at.toISOString(),
           source: "workspace-api",
           status: "succeeded",
+          durationMs: setupDurationMs,
         }, client);
         if (milestone.forwarding_verified_at) {
           await recordConsentedProductEvent({
@@ -2341,6 +2350,7 @@ async function buildCommitmentDetail(
       [workspaceId, commitment.id],
     );
   const page = evidence.rows.slice(0, limit);
+  const truth = await loadCommitmentTruth(client, workspaceId, commitment);
   return {
     ...toCommitmentSummary(commitment),
     recommendationReason: commitment.recommendation_reason,
@@ -2353,6 +2363,113 @@ async function buildCommitmentDetail(
         : null,
     },
     corrections: corrections.rows.map((correction) => toCorrectionDto(correction, commitment.base_currency)),
+    ...truth,
+  };
+}
+
+async function loadCommitmentTruth(
+  client: PoolClient,
+  workspaceId: string,
+  commitment: CommitmentRow,
+): Promise<Pick<CommitmentDetailDto, "expectation" | "memory" | "belief" | "because">> {
+  const memoryRows = await client.query<{
+    id: string;
+    evidence_date: Date | string;
+    amount_minor: string;
+    currency: string;
+    source_type: SourceType;
+  }>(
+    `select evidence.id, evidence.evidence_date, evidence.amount_minor::text as amount_minor,
+            evidence.currency, source.source_type
+     from recovery_commitment_evidence link
+     join recovery_evidence evidence
+       on evidence.workspace_id = link.workspace_id and evidence.id = link.evidence_id
+     join recovery_sources source
+       on source.workspace_id = evidence.workspace_id and source.id = evidence.source_id
+     where link.workspace_id = $1 and link.commitment_id = $2
+       and evidence.evidence_date is not null
+       and evidence.amount_minor is not null
+       and evidence.currency is not null
+     order by evidence.evidence_date asc, evidence.id asc
+     limit 24`,
+    [workspaceId, commitment.id],
+  );
+
+  const memoryObservations = memoryRows.rows.flatMap((row) => {
+    const date = toDateOnly(row.evidence_date);
+    if (!date) return [];
+    return [{
+      date,
+      amountMinor: BigInt(normalizeMinorUnits(row.amount_minor)),
+      currency: row.currency,
+      sourceType: row.source_type,
+      evidenceId: row.id,
+    }];
+  });
+
+  const state = await client.query<{
+    coverage_state: SourceLivenessState;
+    belief: string;
+    because: string[];
+    coverage_source_ids: string[];
+  }>(
+    `select coverage_state, belief, because, coverage_source_ids
+     from recovery_commitment_states
+     where workspace_id = $1 and commitment_id = $2`,
+    [workspaceId, commitment.id],
+  );
+  const stored = state.rows[0];
+  const coverage: CommitmentCoverage = stored
+    ? {
+        state: stored.coverage_state,
+        trustworthy: isCoverageTrustworthy(stored.coverage_state),
+        citedSourceIds: stored.coverage_source_ids,
+        brokenSourceIds: stored.coverage_state === "BROKEN" ? stored.coverage_source_ids : [],
+        staleSourceIds: stored.coverage_state === "STALE" ? stored.coverage_source_ids : [],
+        limitations: [],
+      }
+    : {
+        state: "NO_EVIDENCE",
+        trustworthy: false,
+        citedSourceIds: [],
+        brokenSourceIds: [],
+        staleSourceIds: [],
+        limitations: ["Coverage for this commitment has not been assessed yet."],
+      };
+
+  const currency = commitment.base_currency;
+  const observations: ChargeObservation[] = memoryObservations
+    .filter((row) => row.currency.trim().toUpperCase() === currency)
+    .map((row) => ({
+      evidenceId: row.evidenceId,
+      date: row.date,
+      amountMinor: row.amountMinor,
+      currency: row.currency,
+    }));
+  const expectedDate = toDateOnly(commitment.effective_next_expected_date);
+  const expectedAmountMinor = BigInt(normalizeMinorUnits(commitment.effective_amount_minor));
+  const evaluation = evaluateExpectedCharge({
+    evaluatedOn: new Date().toISOString().slice(0, 10),
+    expectedDate,
+    cadence: commitment.effective_cadence,
+    currency,
+    expectedAmountMinor,
+    coverage,
+    observations,
+    cancellationClaimed: false,
+  });
+
+  return {
+    expectation: presentExpectedVsObserved({
+      evaluation,
+      expectedDate,
+      expectedAmountMinor,
+      currency,
+      cadence: commitment.effective_cadence,
+    }),
+    memory: presentCommitmentMemory(memoryObservations),
+    belief: stored?.belief ?? null,
+    because: stored?.because ?? [],
   };
 }
 

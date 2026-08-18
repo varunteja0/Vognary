@@ -195,7 +195,7 @@ export function buildCommitmentBelief(input: CommitmentBeliefInput): CommitmentB
   const belief = beliefSentence(lifecycleState, input.merchant);
   const because = [...evaluation.reasons];
   if (priceChanged) {
-    because.unshift("The amount charged for this subscription has changed since we started watching.");
+    because.unshift("The amount charged for this commitment has changed since we started watching.");
   }
   if (conflictState === "CANCELLATION_NOT_EFFECTIVE") {
     because.unshift("You were charged again after telling us this was cancelled.");

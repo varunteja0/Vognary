@@ -12,13 +12,13 @@ test("the first-value path leads into the product with assisted audit as a secon
   const failures = collectRuntimeFailures(page);
   await page.goto("/");
 
-  const primary = page.locator("section").filter({ has: page.getByRole("heading", { name: "Know what’s renewing before you pay for it." }) })
-    .getByRole("link", { name: "Find my recurring spend", exact: true });
+  const primary = page.locator("section").filter({ has: page.getByRole("heading", { name: "Know what your company is already committed to." }) })
+    .getByRole("link", { name: "See my commitments", exact: true });
   await expect(primary).toBeVisible();
   await expect(primary).toHaveAttribute("href", "/login?next=/app");
   await primary.click();
   await expect(page).toHaveURL(/\/login/);
-  await expect(page.getByRole("heading", { name: "See what renews next" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "See what you are already committed to" })).toBeVisible();
 
   await page.goto("/");
   const assisted = page.getByRole("link", { name: "Request a private audit", exact: true });

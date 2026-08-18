@@ -5,6 +5,7 @@ import type { AttentionItemDto, ChangeItemDto, HomeProjectionDto, ProjectionTota
 import { hasCitedRecurringSpendPicture } from "@/lib/recovery/domain";
 import { renderRecoveryShareText } from "@/lib/recovery/share-report";
 import { RecoveryAutopilotHome } from "./recovery-autopilot-home";
+import { RecoveryAttention } from "./recovery-attention";
 import {
   attentionReasonLabels,
   cadenceLabels,
@@ -17,6 +18,7 @@ import {
   coverageMeanings,
   projectionAmountProvenanceLabels,
   priorityLabels,
+  confidenceTruthLayerLabels,
 } from "./labels";
 import { ConfidenceBadge, MoneyValue, StateBlock } from "./recovery-states";
 import type { LoadState } from "./state";
@@ -33,6 +35,8 @@ export function RecoveryHome({
   onOpenCommitment,
   onInspectEvidence,
   onAddEvidence,
+  onOpenSources,
+  onWorkspaceMutated,
   receiptInbox,
   sourceStatus,
   pendingSourceAction,
@@ -47,6 +51,8 @@ export function RecoveryHome({
   onOpenCommitment: (commitmentId: string) => void;
   onInspectEvidence: InspectEvidence;
   onAddEvidence: () => void;
+  onOpenSources: () => void;
+  onWorkspaceMutated?: () => void;
   receiptInbox: ReceiptInboxStatusDto | null;
   sourceStatus: LoadState;
   pendingSourceAction: "PROVISION" | "ROTATE" | "REVOKE" | null;
@@ -75,8 +81,13 @@ export function RecoveryHome({
           onVeto={onVeto ?? (() => undefined)}
           pendingVetoId={pendingVetoId ?? null}
         />
-        <RecoveryFirstValueMetrics home={home} compact onCitedPictureRendered={onCitedPictureRendered} />
+        <RecoveryAttention
+          onOpenCommitment={onOpenCommitment}
+          onOpenSources={onOpenSources}
+          onWorkspaceMutated={onWorkspaceMutated}
+        />
         <UpcomingTimeline home={home} compact onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />
+        <RecoveryFirstValueMetrics home={home} compact onCitedPictureRendered={onCitedPictureRendered} />
         <RecoveryProjectionDetails home={home} />
       </div>
     );
@@ -100,11 +111,18 @@ export function RecoveryHome({
       pendingSourceAction={pendingSourceAction}
       onProvisionReceiptInbox={onProvisionReceiptInbox}
       onAddEvidence={onAddEvidence}
+      onOpenSources={onOpenSources}
     />;
   }
 
   return (
     <div className="grid gap-5">
+      <RecoveryAttention
+        onOpenCommitment={onOpenCommitment}
+        onOpenSources={onOpenSources}
+        onWorkspaceMutated={onWorkspaceMutated}
+      />
+
       <section aria-labelledby="recovery-needs-me" className="panel p-4 sm:p-5">
         <h3 id="recovery-needs-me" className="font-display text-xl font-semibold text-(--ink)">Needs attention</h3>
         <div className="mt-4 grid gap-3">
@@ -122,6 +140,12 @@ export function RecoveryHome({
         </div>
       </section>
 
+      <UpcomingTimeline home={home} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />
+
+      <RecoveryFirstValueMetrics home={home} onCitedPictureRendered={onCitedPictureRendered} />
+
+      <RecoveryProjectionDetails home={home} />
+
       {home.changed.state === "COMPARED" ? (
         <section aria-labelledby="recovery-changed" className="panel border-ochre p-4 sm:p-5">
           <p className="eyebrow eyebrow-xs text-ochre">New evidence compared</p>
@@ -132,7 +156,7 @@ export function RecoveryHome({
             ) : (
               <StateBlock
                 eyebrow="No changes"
-                title="Your subscriptions look the same"
+                title="Your commitments look the same"
                 detail="No amount, date, frequency, or recurring status changed in the latest receipts."
               />
             )}
@@ -145,12 +169,6 @@ export function RecoveryHome({
           </p>
         </section>
       )}
-
-      <RecoveryFirstValueMetrics home={home} onCitedPictureRendered={onCitedPictureRendered} />
-
-      <RecoveryProjectionDetails home={home} />
-
-      <UpcomingTimeline home={home} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />
 
       <section aria-labelledby="recovery-receipts" className="grid gap-3 border-t border-line px-1 pt-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -172,7 +190,8 @@ export function RecoveryHome({
   );
 }
 
-const firstValueStory = "Start with the billing receipts you already have. Vognary shows what renews next when the receipts support it, what needs attention, and the receipt behind each claim.";
+const receiptsAlreadyHaveStory = "Start with the billing receipts you already have. Vognary shows what renews next when the receipts support it, what needs attention, and the receipt behind each claim.";
+const forwardingOnceStory = "Start with the billing receipts you already have. Set up billing forwarding once so matching mail keeps arriving. Vognary shows what renews next when the receipts support it, what needs attention, and the receipt behind each claim.";
 
 function RecoveryFirstValueMetrics({
   home,
@@ -196,7 +215,7 @@ function RecoveryFirstValueMetrics({
         label="Monthly recurring amount"
         totals={home.monthlyTotals}
         empty={home.uncertainDuplicateCommitmentCount > 0
-          ? "Monthly total is not published while some subscriptions may be listed twice."
+          ? "Monthly total is not published while some commitments may be listed twice."
           : "No recurring amount yet"}
         compact={compact}
       />
@@ -212,9 +231,26 @@ function RecoveryFirstValueMetrics({
       {home.uncertainDuplicateCommitmentCount > 0 ? (
         <p className="mt-2 text-xs leading-5 text-(--muted)">
           {home.uncertainDuplicateCommitmentCount === 1
-            ? "1 subscription may be listed twice, so it is omitted from monthly, next-30-day, and annual totals until you tell us whether those rows are the same."
-            : `${home.uncertainDuplicateCommitmentCount} subscriptions may be listed twice, so they are omitted from monthly, next-30-day, and annual totals until you tell us whether those rows are the same.`}
+            ? "1 commitment may be listed twice, so it is omitted from monthly, next-30-day, and annual totals until you tell us whether those rows are the same."
+            : `${home.uncertainDuplicateCommitmentCount} commitments may be listed twice, so they are omitted from monthly, next-30-day, and annual totals until you tell us whether those rows are the same.`}
         </p>
+      ) : null}
+      {home.confidenceLayers.length ? (
+        <ul className="mt-4 grid gap-2" aria-label="Certainty of monthly totals">
+          {home.confidenceLayers.map((layer) => (
+            <li key={layer.layer} className="flex flex-wrap items-baseline justify-between gap-2 text-sm leading-6">
+              <span className="text-(--ink-soft)">
+                {confidenceTruthLayerLabels[layer.layer]}
+                <span className="font-data text-xs text-(--muted)"> · {layer.commitmentCount}</span>
+              </span>
+              <span className="font-data tnum text-(--ink)">
+                {layer.totals.length
+                  ? layer.totals.map((total) => `${total.amount.display} ${total.amount.currency}`).join(" · ")
+                  : "No amount"}
+              </span>
+            </li>
+          ))}
+        </ul>
       ) : null}
       {home.coverage.state !== "CURRENT" ? (
         <p className="mt-2 text-xs leading-5 text-(--muted)" data-coverage-state={home.coverage.state}>
@@ -237,14 +273,14 @@ function RecoveryProjectionDetails({ home }: { home: HomeProjectionDto }) {
           label="Next 30 days"
           totals={home.next30DayTotals}
           empty={home.uncertainDuplicateCommitmentCount > 0
-            ? "Next-30-day total is not published while some subscriptions may be listed twice."
+            ? "Next-30-day total is not published while some commitments may be listed twice."
             : "Nothing expected in the next 30 days"}
         />
         <TotalBlock
           label="Annualized estimate"
           totals={home.annualizedEstimateTotals}
           empty={home.uncertainDuplicateCommitmentCount > 0
-            ? "Annualized estimate is not published while some subscriptions may be listed twice."
+            ? "Annualized estimate is not published while some commitments may be listed twice."
             : "No annualized estimate yet"}
         />
       </div>
@@ -321,7 +357,7 @@ function FirstObservationHome({
           : `Vognary saved ${evidenceCount.toLocaleString("en-IN")} receipts, but no service has appeared twice yet.`}
       </p>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
-        Add another receipt from the same service. A matching charge can unlock cadence, monthly spend, an expected date, and a decision without inventing recurrence.
+        When the next matching billing email arrives, Vognary can test a cadence. You can also add a matching receipt as a fallback. A matching charge can unlock cadence, monthly spend, an expected date, and a decision without inventing recurrence.
       </p>
       {home.recentObservations.length ? (
         <div className="mt-5">
@@ -377,6 +413,7 @@ function EmptyRecoveryHome({
   pendingSourceAction,
   onProvisionReceiptInbox,
   onAddEvidence,
+  onOpenSources,
 }: {
   receiptInbox: ReceiptInboxStatusDto | null;
   receiptInboxPubliclyAvailable: boolean;
@@ -384,6 +421,7 @@ function EmptyRecoveryHome({
   pendingSourceAction: "PROVISION" | "ROTATE" | "REVOKE" | null;
   onProvisionReceiptInbox: () => void;
   onAddEvidence: () => void;
+  onOpenSources: () => void;
 }) {
   const [copyStatus, setCopyStatus] = useState("");
   const alias = receiptInbox?.alias ?? null;
@@ -403,7 +441,7 @@ function EmptyRecoveryHome({
       <section aria-label="Get your first result" className="panel p-5 sm:p-6">
         <p className="eyebrow eyebrow-xs text-ochre">Manual evidence only</p>
         <h3 className="mt-3 font-display text-xl font-semibold text-(--ink) sm:text-2xl">Add receipts to see what renews next</h3>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">{firstValueStory}</p>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">{receiptsAlreadyHaveStory}</p>
         <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-5">Add receipts manually</button>
       </section>
     );
@@ -414,12 +452,13 @@ function EmptyRecoveryHome({
       <section aria-label="Get your first result" className="panel p-5 sm:p-6">
         <p className="eyebrow eyebrow-xs text-ochre">Recommended first step</p>
         <h3 className="mt-3 font-display text-xl font-semibold text-(--ink) sm:text-2xl">Your Vognary receipt address</h3>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">{firstValueStory}</p>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">{forwardingOnceStory}</p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <input aria-label="Your Vognary receipt address" className="field field-mono min-w-0" value={alias.address} readOnly />
           <button type="button" onClick={() => void copyAddress()} className="btn btn-primary shrink-0">Copy address</button>
         </div>
         <p role="status" aria-live="polite" className="mt-2 min-h-5 text-xs text-(--muted)">{copyStatus}</p>
+        <button type="button" onClick={onOpenSources} className="btn btn-primary mt-3">Finish one-time billing setup</button>
         <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-ghost mt-3">Add receipts manually</button>
       </section>
     );
@@ -442,11 +481,12 @@ function EmptyRecoveryHome({
         <p className="eyebrow eyebrow-xs text-ochre">Recommended first step</p>
         <h3 className="mt-3 font-display text-xl font-semibold text-(--ink) sm:text-2xl">Get your private receipt address</h3>
         <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">
-          {firstValueStory} Vognary never accesses or scans your inbox.
+          {forwardingOnceStory} Vognary never accesses or scans your inbox.
         </p>
         <button type="button" onClick={onProvisionReceiptInbox} disabled={pendingSourceAction !== null} className="btn btn-primary btn-lg mt-5">
           {pendingSourceAction === "PROVISION" ? "Setting up address…" : "Set up receipt address"}
         </button>
+        <button type="button" onClick={onOpenSources} className="btn btn-sm btn-ghost ml-0 mt-3 sm:ml-2">Open billing setup</button>
         <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-ghost ml-0 mt-3 sm:ml-2">Add receipts manually</button>
       </section>
     );
@@ -456,12 +496,15 @@ function EmptyRecoveryHome({
     <section aria-label="Get your first result" className="panel p-5 sm:p-6">
       <h3 className="font-display text-xl font-semibold text-(--ink) sm:text-2xl">Add receipts to see what renews next</h3>
       <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">
-        {firstValueStory}
+        {receiptInboxPubliclyAvailable ? forwardingOnceStory : receiptsAlreadyHaveStory}
       </p>
       {sourceStatus.kind === "FAILED" ? (
         <p className="mt-2 text-xs leading-5 text-ochre">The receipt address could not be opened. Manual evidence still works.</p>
       ) : null}
-      <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-5">Add receipts manually</button>
+      {receiptInboxPubliclyAvailable ? (
+        <button type="button" onClick={onOpenSources} className="btn btn-primary mt-5">Open billing setup</button>
+      ) : null}
+      <button type="button" onClick={onAddEvidence} className={`btn btn-lg mt-5 ${receiptInboxPubliclyAvailable ? "btn-ghost" : "btn-primary"}`}>Add receipts manually</button>
     </section>
   );
 }
@@ -604,7 +647,7 @@ function UpcomingRow({ item, onOpenCommitment, onInspectEvidence }: { item: Upco
         {item.reminderEligible
           ? "Eligible for an opt-in reminder. Turn reminders on in Account to schedule an email."
           : item.decision?.value === "KEEP"
-            ? "Not reminder eligible — you chose Keep for this subscription."
+            ? "Not reminder eligible — you chose Keep for this commitment."
             : "Not reminder eligible — the evidence behind this date is not strong enough yet."}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">

@@ -13,17 +13,17 @@
 
 ## 1. What we are building
 
-**Founder scope freeze (2026-08-17):** Vognary automatically knows what a 2–20 person software/AI company is committed to paying for software, shows what is coming, what changed, and why it believes every conclusion. The first evidence rail is billing-email / receipt forwarding. The long-term vision is the control layer for recurring money.
+**Founder scope freeze (2026-08-18):** Vognary is Commitment Intelligence: the evidence-backed model of what a 2–20 person software/AI company is committed to, what changed, what comes next, and why. Source 0 is the private billing inbox (one-time billing-only auto-forwarding). Direct Gmail OAuth stays fail-closed until Google restricted-scope verification and a security assessment are complete. Do not mark Gmail Connect. The long-term vision is the control layer for recurring money.
 
-Current loop: private receipt alias → automatic forwarding + historical backfill → sender provenance → cited recurring commitments → upcoming money → user correction → honest source health.
+Current loop: private receipt alias → one-time billing-only auto-forwarding + historical backfill → sender provenance → cited commitments → what changed → upcoming money → why/evidence → user correction → honest source health.
 
-Only complete production usability for the first 10 ICP users. Do **not** build merchant identity, absence, alerts, cancellation/autonomous action, Account Aggregator, bank integrations, Gmail OAuth, generic SaaS management, budgeting, procurement, SSO/SCIM, seats, new architecture, or another redesign until real users invalidate the freeze.
+Only complete production usability for the first 10 ICP users. Do **not** build cancellation/autonomous action, Account Aggregator, bank integrations, Gmail OAuth, Outlook/Zoho connectors, generic SaaS management, budgeting, procurement, SSO/SCIM, seats, new architecture, or another redesign until real users invalidate the freeze. Surfacing already-built graph facts in customer language is in scope.
 
 AI must **cite or shut up**. Never invent amounts, merchants, or connector liveness.
 
 ## 2. Working rules
 
-- **Live checkout (founder override, 2026-08-14):** stay in `"/Users/varunteja/Desktop/CVT Group/Vognary"` on `feat/autopilot-loop`. Do **not** `git worktree add ../vognary-*`, do not clone a sibling folder, and do not redo merged WP-A / PR #34. Parked copies belong in `.fallow/` (gitignored). Isolated-worktree-per-WP resumes only after CONTINUE-HERE names it again.
+- **Live checkout (founder override, 2026-08-18):** stay in `"/Users/varunteja/Desktop/CVT Group/Vognary"` on `main`. Do **not** `git worktree add ../vognary-*`, do not clone a sibling folder, and do not redo merged WP-A / PR #34. Parked copies belong in `.fallow/` (gitignored). Isolated-worktree-per-WP resumes only after CONTINUE-HERE names it again.
 - Path with spaces: quote `"/Users/varunteja/Desktop/CVT Group/Vognary"`
 - Before merge: `lint` · `typecheck` · `claims:check` · `tokens:check` · `test` · disposable `test:postgres` when the WP touches migrations/stores · then `build` · `perf:budget`
 - Engine changes: **failing test first**
@@ -32,7 +32,7 @@ AI must **cite or shut up**. Never invent amounts, merchants, or connector liven
 
 ### Autopilot loop — same-repo sequential branch
 
-WP-B–E continue on `feat/autopilot-loop` in this folder. One Git owner. No sibling worktrees. Do not invent Codex/Opus approvals.
+Commitment Intelligence freeze continues on `main` in this folder. One Git owner. No sibling worktrees. Do not invent Codex/Opus approvals.
 
 ## 3. Hard stops
 
@@ -52,7 +52,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 [ ] Read docs/THE-LAW.md
 [ ] Read docs/CONTINUE-HERE.md
 [ ] State scoreboard row + loop step this task raises
-[ ] List files; stay in this repo folder on the CONTINUE-HERE branch (`feat/autopilot-loop`). Do not create sibling folders.
+[ ] List files; stay in this repo folder on the CONTINUE-HERE branch (`main`). Do not create sibling folders.
 [ ] Implement; tests; gate chain
 [ ] Update CONTINUE-HERE / docs/execution/scoreboard.md if phase evidence changed
 ```

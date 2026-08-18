@@ -55,12 +55,12 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 1-3. Open landing and establish a saved identity independently of provider activation.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Know what’s renewing before you pay for it");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Know what your company is already committed to");
   await tabToAndActivate(page, "Sign in");
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await loginAsDevelopmentUser(page);
-  await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your commitments" })).toBeVisible();
 
   // 4-7. Use the explicit manual fallback once and persist real-format receipts.
   await openEvidenceInput(page);
@@ -158,7 +158,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 27. Reload and verify the saved correction and final decision remain visible.
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your commitments" })).toBeVisible();
   await openCommitment(page, "OpenAI India");
   await expect(page.getByText(/Saved I don’t recognize this on/)).toBeVisible();
   await expect(page.getByText("Merchant set to “OpenAI India”")).toBeVisible();
@@ -186,7 +186,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your commitments" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expect(page.getByText("Monthly recurring amount")).toBeVisible();
 
@@ -240,10 +240,10 @@ async function loginAsDevelopmentUser(page: Page) {
   await page.getByRole("button", { name: "Sign in as developer" }).click();
   await page.waitForURL(/\/app$/);
   await page.waitForLoadState("domcontentloaded");
-  await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your commitments" })).toBeVisible();
 }
 
-async function selectRecoveryView(page: Page, name: "Home" | "Subscriptions" | "Sources" | "Mandate") {
+async function selectRecoveryView(page: Page, name: "Home" | "Commitments" | "Sources" | "Mandate") {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name }).click();
 }
 
@@ -260,7 +260,7 @@ async function openEvidenceInput(page: Page) {
 }
 
 async function openCommitment(page: Page, merchant: string) {
-  await selectRecoveryView(page, "Subscriptions");
+  await selectRecoveryView(page, "Commitments");
   const heading = page.getByRole("heading", { name: merchant, exact: true });
   if (await heading.isVisible()) return;
   const commitment = page.getByRole("button", { name: new RegExp(merchant) }).first();

@@ -57,6 +57,20 @@ try {
          (select count(distinct workspace_id)::text from recovery_inbound_aliases where backfill_completed_at is not null) as backfill_completed,
          (select count(distinct workspace_id)::text from recovery_commitments) as commitments_detected,
          (select count(*)::text from recovery_corrections) as user_correction_count,
+         (select count(distinct workspace_id)::text from recovery_inbound_events where status = 'PROCESSED') as first_automatic_receipt,
+         (select count(*)::text from (
+            select workspace_id
+            from recovery_inbound_events
+            where status = 'PROCESSED'
+            group by workspace_id
+            having count(*) >= 2
+          ) second_receipt) as second_automatic_receipt,
+         (select percentile_cont(0.5) within group (
+            order by duration_ms
+          )
+          from product_events
+          where event_name = 'receipt_setup.completed'
+            and duration_ms is not null) as median_setup_duration_ms,
          (select percentile_cont(0.5) within group (
             order by (metrics ->> 'secondsToTrustworthyPicture')::double precision
           )
@@ -78,7 +92,8 @@ try {
                 and event.processed_at >= now() - interval '45 days'
             )) as sources_remaining_healthy,
          (select count(*)::text from product_events where event_name = 'workspace.returned') as return_visits,
-            (select count(*)::text from product_events where event_name = 'billing.checkout_started') as checkout_attempts`,
+            (select count(*)::text from product_events where event_name = 'billing.checkout_started') as checkout_attempts,
+            (select count(*)::text from product_events where event_name = 'billing.payment_settled') as payments_completed`,
          [receiptAliasHmacKeyId],
           )).rows[0] ?? {};
     const first10Experiment = {
@@ -86,6 +101,12 @@ try {
       setupCompleted: Number(first10Row.setup_completed ?? 0),
       forwardingVerified: Number(first10Row.forwarding_verified ?? 0),
       backfillCompleted: Number(first10Row.backfill_completed ?? 0),
+      firstAutomaticReceipt: Number(first10Row.first_automatic_receipt ?? 0),
+      secondAutomaticReceipt: Number(first10Row.second_automatic_receipt ?? 0),
+      medianSetupDurationMs: first10Row.median_setup_duration_ms === null
+        || first10Row.median_setup_duration_ms === undefined
+        ? null
+        : Number(first10Row.median_setup_duration_ms),
       commitmentsDetected: Number(first10Row.commitments_detected ?? 0),
       userCorrectionCount: Number(first10Row.user_correction_count ?? 0),
       medianSecondsToTrustworthyPicture: first10Row.median_seconds_to_trustworthy_picture === null
@@ -95,6 +116,7 @@ try {
       sourcesRemainingHealthy: Number(first10Row.sources_remaining_healthy ?? 0),
       returnVisits: Number(first10Row.return_visits ?? 0),
       checkoutAttempts: Number(first10Row.checkout_attempts ?? 0),
+      paymentsCompleted: Number(first10Row.payments_completed ?? 0),
     };
 
     const dailyActiveUsers = (await client.query(
@@ -161,6 +183,9 @@ try {
     console.log(`Activated workspaces (saved evidence): ${activation.workspacesWithEvidence}`);
     console.log(`Receipt setup: ${first10Experiment.setupCompleted}/${first10Experiment.setupStarted} completed`);
     console.log(`Forwarding verified: ${first10Experiment.forwardingVerified}; backfills completed: ${first10Experiment.backfillCompleted}`);
+    console.log(`Processed inbound workspaces: ${first10Experiment.firstAutomaticReceipt}; two-or-more processed: ${first10Experiment.secondAutomaticReceipt}`);
+    console.log("Inbound processed counts do not distinguish Gmail-filter mail from manual forwards.");
+    console.log(`Checkout attempts: ${first10Experiment.checkoutAttempts}; payments settled: ${first10Experiment.paymentsCompleted}`);
     console.log(`Users returning on 2+ days: ${returningUsers}`);
     console.log(
       report.returnVisits.d30.rate === null || report.returnVisits.d30.eligibleUsers === 0

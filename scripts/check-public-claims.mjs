@@ -9,6 +9,9 @@ const publicSurfaces = [
   "src/app/workspace/recovery/recovery-home.tsx",
   "src/app/workspace/recovery/recovery-commitments.tsx",
   "src/app/workspace/recovery/recovery-sources.tsx",
+  "src/app/workspace/recovery/recovery-billing-setup.tsx",
+  "src/app/workspace/recovery/recovery-attention.tsx",
+  "src/lib/recovery/source-catalog.ts",
   "src/app/workspace/recovery/recovery-mandate.tsx",
   "src/app/workspace/recovery/recovery-autopilot-home.tsx",
   "src/app/profile/profile-client.tsx",
@@ -40,6 +43,12 @@ const prohibitedClaims = [
   { pattern: /fully automated across all/i, reason: "automation and coverage remain source-specific" },
   { pattern: /\blink(?:ed|ing|s)?[^.\n]{0,30}\bmerchants?\b/i, reason: "merchants are watched, never linked" },
   { pattern: /\bmerchants?[^.\n]{0,30}\blink(?:ed|ing|s)?\b/i, reason: "merchants are watched, never linked" },
+  { pattern: /subscription tracker/i, reason: "the product is Commitment Intelligence, not a subscription tracker" },
+  { pattern: /expense tracker/i, reason: "the product is Commitment Intelligence, not an expense tracker" },
+  { pattern: /saas manager/i, reason: "the product is Commitment Intelligence, not a generic SaaS manager" },
+  { pattern: /mailbox sync/i, reason: "mailbox sync is not a live source" },
+  { pattern: /autonomous finance/i, reason: "autonomous finance is not a live capability" },
+  { pattern: /connect gmail/i, reason: "direct Gmail Connect is not offered" },
 ];
 
 const violations = [];

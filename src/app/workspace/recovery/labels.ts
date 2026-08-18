@@ -5,11 +5,13 @@ import type {
   ChangeKind,
   CommitmentStatus,
   ConfidenceState,
+  ConfidenceTruthLayer,
   CorrectionField,
   CorrectionStatus,
   CoverageState,
   Decision,
   EvidenceProvenanceKind,
+  ExpectedVsObservedStatus,
   ProjectionAmountProvenance,
   RecoveryErrorCode,
   SourceType,
@@ -67,10 +69,10 @@ export const commitmentStatusLabels: Record<CommitmentStatus, string> = {
 };
 
 export const confidenceLabels: Record<ConfidenceState, string> = {
-  HIGH: "High confidence",
-  MEDIUM: "Medium confidence",
-  LOW: "Low confidence",
-  UNKNOWN: "Confidence unknown",
+  HIGH: "Confirmed",
+  MEDIUM: "Likely",
+  LOW: "Needs review",
+  UNKNOWN: "Unknown",
 };
 
 export const confidenceUncertainty: Record<ConfidenceState, string> = {
@@ -78,6 +80,22 @@ export const confidenceUncertainty: Record<ConfidenceState, string> = {
   MEDIUM: "Treat the amount and date as provisional until more evidence lands.",
   LOW: "Check this against your own record before acting on it.",
   UNKNOWN: "No confidence was established for this. Do not treat it as settled.",
+};
+
+export const confidenceTruthLayerLabels: Record<ConfidenceTruthLayer, string> = {
+  CONFIRMED: "Confirmed",
+  LIKELY: "Likely",
+  NEEDS_REVIEW: "Needs review",
+  UNKNOWN: "Unknown",
+};
+
+export const expectedVsObservedLabels: Record<ExpectedVsObservedStatus, string> = {
+  MATCHED: "Matched",
+  AMOUNT_CHANGED: "Amount changed",
+  ARRIVED_LATE: "Arrived later than expected",
+  NOT_YET_OBSERVED: "Not yet observed",
+  CANNOT_EVALUATE: "Cannot evaluate",
+  INSUFFICIENT_HISTORY: "Not enough history",
 };
 
 export const correctionFieldLabels: Record<CorrectionField, string> = {

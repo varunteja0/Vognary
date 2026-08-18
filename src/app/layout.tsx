@@ -29,15 +29,15 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.vognary.com"),
   applicationName: "Vognary",
   title: {
-    default: "Vognary - Know what’s renewing before you pay",
+    default: "Vognary - Know what your company is already committed to",
     template: "%s - Vognary",
   },
   description:
-    "Vognary helps solo founders review software renewals from submitted evidence and decide what needs attention.",
+    "Vognary is Commitment Intelligence for 2–20 person software teams: what they are already committed to from submitted evidence, what changed, and why.",
   keywords: [
+    "Commitment Intelligence",
     "software renewals",
-    "subscription receipts",
-    "SaaS renewals",
+    "recurring vendor commitments",
     "renewal reminders",
     "Vognary",
   ],
@@ -59,15 +59,15 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "Vognary",
     url: "/",
-    title: "Vognary - Know what’s renewing before you pay",
+    title: "Vognary - Know what your company is already committed to",
     description:
-      "Vognary helps solo founders review software renewals from submitted evidence and decide what needs attention.",
+      "Vognary is Commitment Intelligence for 2–20 person software teams: what they are already committed to from submitted evidence, what changed, and why.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vognary - Know what’s renewing before you pay",
+    title: "Vognary - Know what your company is already committed to",
     description:
-      "Vognary helps solo founders review software renewals from submitted evidence and decide what needs attention.",
+      "Vognary is Commitment Intelligence for 2–20 person software teams: what they are already committed to from submitted evidence, what changed, and why.",
   },
 };
 

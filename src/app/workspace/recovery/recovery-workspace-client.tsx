@@ -22,7 +22,6 @@ import {
 import { VognaryMark } from "../../brand";
 import { correctionFieldLabels, decisionLabels } from "./labels";
 import { RecoveryAddEvidence } from "./recovery-add-evidence";
-import { RecoveryAttention } from "./recovery-attention";
 import { RecoveryCommitments, type CommitmentsHandlers } from "./recovery-commitments";
 import { RecoveryDialog } from "./recovery-dialog";
 import { CorrectionForm, EvidenceInspector } from "./recovery-evidence-panels";
@@ -671,7 +670,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2.5">
             <VognaryMark size={24} />
-            <h1 className="font-display text-lg font-semibold text-(--ink)">Your renewal review</h1>
+            <h1 className="font-display text-lg font-semibold text-(--ink)">Your commitments</h1>
           </div>
           <div className="flex items-center gap-2">
             <p className="hidden font-data text-xs text-(--muted) sm:block">
@@ -691,7 +690,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         </header>
 
         <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 py-2 sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
-          <ul className={`grid ${primaryViews.length === 5 ? "grid-cols-5" : "grid-cols-4"} gap-1 sm:flex sm:gap-2`}>
+          <ul className={`grid ${primaryViews.length === 4 ? "grid-cols-4" : "grid-cols-3"} gap-1 sm:flex sm:gap-2`}>
             {primaryViews.map((view) => (
               <li key={view} className="min-w-0">
                 <button
@@ -792,18 +791,6 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   );
 
   function renderView() {
-    if (state.view === "ATTENTION") {
-      return (
-        <RecoveryAttention
-          onOpenCommitment={(commitmentId) => {
-            openCommitment(commitmentId);
-          }}
-          onOpenSources={() => selectView("ADD_EVIDENCE")}
-          onWorkspaceMutated={() => void loadSnapshot()}
-        />
-      );
-    }
-
     if (state.view === "ADD_EVIDENCE") {
       return (
         <RecoverySources
@@ -877,6 +864,11 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           setManualFallbackOpen(true);
           selectView("ADD_EVIDENCE");
         }}
+        onOpenSources={() => {
+          setManualFallbackOpen(false);
+          selectView("ADD_EVIDENCE");
+        }}
+        onWorkspaceMutated={() => void loadSnapshot()}
         receiptInbox={state.receiptInbox}
         sourceStatus={state.sourceStatus}
         pendingSourceAction={state.pendingSourceAction}

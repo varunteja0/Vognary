@@ -88,7 +88,8 @@ test("configuration and operator attestations flip the matching signals", () => 
     const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
     assert.equal(byId.get("session-signing")?.state, "configured");
     assert.equal(byId.get("token-vault")?.state, "configured");
-    assert.equal(byId.get("backups")?.state, "proven");
+    assert.equal(byId.get("backups")?.state, "configured");
+    assert.match(byId.get("backups")?.detail ?? "", /recorded restore of the stored object/i);
     assert.equal(byId.get("receipt-inbox")?.state, "configured");
     assert.equal(byId.get("retention-scheduler")?.state, "proven");
     assert.equal(byId.get("renewal-alert-delivery")?.state, "proven");
@@ -105,7 +106,7 @@ test("partial backup configuration stays below proven", () => {
   });
 });
 
-test("a dated restore-drill attestation appears in the proven backup detail", () => {
+test("a restore-drill attestation without stored-object evidence stays configured", () => {
   withEnvironment({
     BACKUP_STORAGE_BUCKET: "vognary-backups",
     BACKUP_RESTORE_DRILL_STATUS: "passed",
@@ -113,8 +114,21 @@ test("a dated restore-drill attestation appears in the proven backup detail", ()
     BACKUP_KEY_FINGERPRINT: "test-fingerprint",
   }, () => {
     const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
+    assert.equal(byId.get("backups")?.state, "configured");
+    assert.doesNotMatch(byId.get("backups")?.detail ?? "", /2026-07-19/);
+  });
+});
+
+test("a matching stored-object restore record can prove backups", () => {
+  withEnvironment({
+    R2_BUCKET: "vognary-postgres-backups",
+    BACKUP_RESTORE_DRILL_STATUS: "passed",
+    BACKUP_KEY_FINGERPRINT: "8it2LaCH1w__ilS1",
+  }, () => {
+    const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
     assert.equal(byId.get("backups")?.state, "proven");
-    assert.match(byId.get("backups")?.detail ?? "", /2026-07-19/);
+    assert.match(byId.get("backups")?.detail ?? "", /downloaded and restored/i);
+    assert.match(byId.get("backups")?.detail ?? "", /2026-08-18/);
   });
 });
 
@@ -126,7 +140,7 @@ test("a malformed restore-drill date is ignored, never rendered", () => {
     BACKUP_KEY_FINGERPRINT: "test-fingerprint",
   }, () => {
     const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
-    assert.equal(byId.get("backups")?.state, "proven");
+    assert.equal(byId.get("backups")?.state, "configured");
     assert.ok(!(byId.get("backups")?.detail ?? "").includes("not-a-date"));
   });
 });

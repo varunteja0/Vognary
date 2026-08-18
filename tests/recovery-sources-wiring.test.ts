@@ -13,8 +13,8 @@ test("the workspace wires Sources and delegates account settings to the profile 
   assert.match(workspaceSource, /import \{ RecoverySources \} from "\.\/recovery-sources"/);
   assert.match(workspaceSource, /<RecoverySources/);
   assert.match(workspaceSource, /href="\/profile"/);
-  assert.match(workspaceSource, /primaryViews.length === 5 \? "grid-cols-5" : "grid-cols-4"/);
-  assert.doesNotMatch(workspaceSource, /grid-cols-3/);
+  assert.match(workspaceSource, /primaryViews.length === 4 \? "grid-cols-4" : "grid-cols-3"/);
+  assert.doesNotMatch(workspaceSource, /grid-cols-5/);
   assert.doesNotMatch(workspaceSource, /RecoveryProfile/);
   assert.doesNotMatch(workspaceSource, /\bPROFILE\b/);
 });
@@ -64,4 +64,10 @@ test("the canonical Home renders server totals without doing money math itself",
   assert.match(homeSource, /home\.monthlyTotals/);
   assert.match(homeSource, /home\.next30DayTotals/);
   assert.doesNotMatch(homeSource, /\.reduce\(|BigInt\(|parseFloat\(|Number\(/);
+});
+
+test("Source Hub does not style an unconnected billing inbox as already connected", () => {
+  assert.match(sourcesSource, /availability === "SETUP" \? "pill pill-partial"/);
+  assert.doesNotMatch(sourcesSource, /availability === "CONNECTED" \|\| entry\.availability === "SETUP"/);
+  assert.doesNotMatch(sourcesSource, /Connect Google|Connect Gmail|Connect Microsoft|Connect Zoho/i);
 });

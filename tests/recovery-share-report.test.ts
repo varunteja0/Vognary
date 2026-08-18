@@ -20,6 +20,7 @@ const home: HomeProjectionDto = {
     { amount: { currency: "USD", minor: "24000", exponent: 2, display: "$240.00" }, commitmentIds: ["commitment-2"], evidenceIds: ["evidence-2"], provenance: "RECEIPT", correctionIds: [] },
   ],
   next30DayTotals: [{ amount: inr, commitmentIds: ["commitment-1"], evidenceIds: ["evidence-1"], provenance: "RECEIPT", correctionIds: [] }],
+  confidenceLayers: [],
   needsMe: [{
     id: "attention-1",
     commitmentId: "commitment-1",

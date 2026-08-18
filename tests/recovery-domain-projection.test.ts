@@ -162,6 +162,10 @@ test("Recovery home is an honest first baseline and keeps currency totals separa
   assert.equal(home.activeCommitmentCount, 2);
   assert.equal(home.reviewItemCount, 1);
   assert.equal(hasCitedRecurringSpendPicture(home), true);
+  assert.deepEqual(home.confidenceLayers.map((layer) => [layer.layer, layer.commitmentCount, layer.totals.map((total) => [total.amount.currency, total.amount.minor])]), [
+    ["CONFIRMED", 1, [["USD", "833"]]],
+    ["LIKELY", 1, [["INR", "199900"]]],
+  ]);
   assert.deepEqual(home.next30DayTotals.map((total) => [total.amount.currency, total.amount.minor]), [["INR", "199900"]]);
   assert.equal(home.needsMe.some((item) => item.commitmentId === "commitment-inr"), true);
   assert.equal(home.needsMe.some((item) => item.commitmentId === "commitment-ignored"), false);
@@ -465,6 +469,7 @@ test("unresolved duplicate suspicions are omitted from headline money totals wit
   assert.deepEqual(uncertain.annualizedEstimateTotals.map((total) => [total.amount.currency, total.amount.minor]), [["USD", "9996"]]);
   assert.ok(uncertain.coverage.limitations[0]?.includes("listed twice"));
   assert.equal(hasCitedRecurringSpendPicture(uncertain), true);
+  assert.deepEqual(uncertain.confidenceLayers.map((layer) => [layer.layer, layer.commitmentCount]), [["CONFIRMED", 1]]);
 
   const allUncertain = buildHomeProjection({
     workspace,
@@ -479,6 +484,7 @@ test("unresolved duplicate suspicions are omitted from headline money totals wit
   assert.deepEqual(allUncertain.monthlyTotals, []);
   assert.deepEqual(allUncertain.annualizedEstimateTotals, []);
   assert.deepEqual(allUncertain.next30DayTotals, []);
+  assert.deepEqual(allUncertain.confidenceLayers, []);
   assert.equal(hasCitedRecurringSpendPicture(allUncertain), false);
 
   const confirmedSame = buildHomeProjection({

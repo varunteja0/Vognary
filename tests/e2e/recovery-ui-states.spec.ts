@@ -23,6 +23,7 @@ const emptyHome: HomeProjectionDto = {
   monthlyTotals: [],
   annualizedEstimateTotals: [],
   next30DayTotals: [],
+  confidenceLayers: [],
   needsMe: [],
   changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 4, items: [] },
   next: [],
@@ -255,9 +256,9 @@ test("receipt onboarding shows proven forwarding, backfill, and sender trust", a
 
   await page.goto("/app");
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
-  await expect(page.getByRole("heading", { name: "Finish receipt forwarding" })).toBeVisible();
-  await expect(page.getByText("Forwarding address verified")).toBeVisible();
-  await expect(page.getByText("Receipt flow proven")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Set up billing forwarding once" })).toBeVisible();
+  await expect(page.getByText("Gmail address verified")).toBeVisible();
+  await expect(page.getByText("First matching billing email received")).toBeVisible();
   await expect(page.getByText("Historical backfill complete")).toBeVisible();
   await expect(page.getByRole("link", { name: "Google's forwarding instructions" })).toHaveAttribute("href", /answer\/10957/);
   await expect(page.getByRole("link", { name: "Google's filter instructions" })).toHaveAttribute("href", /answer\/6579/);

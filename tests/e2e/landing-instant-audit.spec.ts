@@ -4,21 +4,21 @@ import { expect, test } from "@playwright/test";
 test("the landing sends every visitor to the product without claiming forwarding", async ({ page }) => {
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Know what’s renewing before you pay for it." });
+  const heading = page.getByRole("heading", { level: 1, name: "Know what your company is already committed to." });
   const hero = page.locator("section").filter({ has: heading });
   await expect(heading).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
 
-  const getStarted = hero.getByRole("link", { name: "Find my recurring spend", exact: true });
+  const getStarted = hero.getByRole("link", { name: "See my commitments", exact: true });
   const signIn = page.getByRole("navigation", { name: "Public" }).getByRole("link", { name: "Sign in", exact: true });
   await expect(getStarted).toHaveAttribute("href", "/login?next=/app");
   await expect(signIn).toHaveAttribute("href", "/login?next=/app");
 
   await expect(page.getByText("Add the billing receipts you already have. Vognary shows the amount, the expected date, and the receipt behind each one. No bank passwords. No mailbox access.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "What you get" })).toBeVisible();
-  await expect(page.getByText("Renewing soon", { exact: true })).toBeVisible();
-  await expect(page.getByText("Price changed", { exact: true })).toBeVisible();
-  await expect(page.getByText("Needs a decision", { exact: true })).toBeVisible();
+  await expect(page.getByText("What you are committed to", { exact: true })).toBeVisible();
+  await expect(page.getByText("What changed", { exact: true })).toBeVisible();
+  await expect(page.getByText("Why Vognary believes it", { exact: true })).toBeVisible();
 
   await expect(page.getByRole("textbox")).toHaveCount(0);
   await expect(page.getByText(/sample audit/i)).toHaveCount(0);
@@ -34,8 +34,8 @@ test("the mobile landing keeps the primary action visible without overflow", asy
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Know what’s renewing before you pay for it." });
-  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Find my recurring spend", exact: true });
+  const heading = page.getByRole("heading", { level: 1, name: "Know what your company is already committed to." });
+  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "See my commitments", exact: true });
   await expect(getStarted).toBeVisible();
   const actionBottom = await getStarted.evaluate((element) => element.getBoundingClientRect().bottom);
   const metrics = await page.evaluate(() => ({
@@ -49,7 +49,7 @@ test("the mobile landing keeps the primary action visible without overflow", asy
 test("login presents one Google identity path without product detours", async ({ page }) => {
   await page.goto("/login?next=/app");
 
-  await expect(page.getByRole("heading", { level: 1, name: "See what renews next" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "See what you are already committed to" })).toBeVisible();
   await expect(page.getByText(/save the billing receipts you already have/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await expect(page.getByText("Google is only for sign-in. Vognary does not access Gmail.")).toBeVisible();
@@ -64,7 +64,7 @@ test("signed-out app entry returns to the canonical sign-in path", async ({ page
   await page.goto("/app");
 
   await expect(page).toHaveURL(/\/login\?next=(?:%2F|\/)app$/);
-  await expect(page.getByRole("heading", { level: 1, name: "See what renews next" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "See what you are already committed to" })).toBeVisible();
   await expect(page.getByLabel("Paste receipts or invoices")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "See a sample audit" })).toHaveCount(0);
 });

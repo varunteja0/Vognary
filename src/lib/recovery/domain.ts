@@ -1,5 +1,7 @@
 import type {
   ChangeItemDto,
+  ConfidenceState,
+  ConfidenceTruthLayer,
   Decision,
   DecisionDto,
   HomeChangedDto,
@@ -78,7 +80,7 @@ export type HomeProjectionInput = {
 };
 
 const uncertainDuplicateLimitation =
-  "Monthly, next-30-day, and annual totals omit subscriptions that may be listed twice until you tell us whether they are the same.";
+  "Monthly, next-30-day, and annual totals omit commitments that may be listed twice until you tell us whether they are the same.";
 
 export function commitmentIdsExcludedFromHeadlineTotals(state: HeadlineDuplicateState = {}): Set<string> {
   const excluded = new Set(state.unresolvedCommitmentIds ?? []);
@@ -158,6 +160,7 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
     monthlyTotals,
     annualizedEstimateTotals: buildAnnualizedEstimateTotals(monthlyTotals),
     next30DayTotals,
+    confidenceLayers: buildConfidenceLayers(cadenceEstablished.filter(inHeadline)),
     needsMe,
     changed: input.changed,
     next,
@@ -386,6 +389,26 @@ function toConfidence(commitment: CanonicalCommitmentRecord) {
     scale: "PERCENT_0_100" as const,
     reasons: commitment.confidenceReasons,
   };
+}
+
+export function confidenceTruthLayerFromState(state: ConfidenceState): ConfidenceTruthLayer {
+  if (state === "HIGH") return "CONFIRMED";
+  if (state === "MEDIUM") return "LIKELY";
+  if (state === "LOW") return "NEEDS_REVIEW";
+  return "UNKNOWN";
+}
+
+function buildConfidenceLayers(commitments: readonly CanonicalCommitmentRecord[]): HomeProjectionDto["confidenceLayers"] {
+  const layers: ConfidenceTruthLayer[] = ["CONFIRMED", "LIKELY", "NEEDS_REVIEW", "UNKNOWN"];
+  return layers.flatMap((layer) => {
+    const inLayer = commitments.filter((commitment) => confidenceTruthLayerFromState(toConfidence(commitment).state) === layer);
+    if (!inLayer.length) return [];
+    return [{
+      layer,
+      totals: buildTotals(inLayer, (commitment) => commitment.monthlyEquivalentMinor, monthlyTotalCorrectionFields),
+      commitmentCount: inLayer.length,
+    }];
+  });
 }
 
 function buildCoverage(

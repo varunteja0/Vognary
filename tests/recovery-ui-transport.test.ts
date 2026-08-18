@@ -22,6 +22,7 @@ const home = {
   generatedAt: "2026-08-09T10:00:00.000Z",
   monthlyTotals: [],
   next30DayTotals: [],
+  confidenceLayers: [],
   needsMe: [],
   changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 4, items: [] },
   next: [],
@@ -67,7 +68,7 @@ test("mutations carry the exact contract headers and body the server requires", 
 });
 
 test("correction paths percent-encode identifiers and reversal uses DELETE", async () => {
-  const detail = { ...commitment, recommendationReason: "", riskTags: [], evidence: { items: [], total: 0, nextCursor: null }, corrections: [] };
+  const detail = { ...commitment, recommendationReason: "", riskTags: [], evidence: { items: [], total: 0, nextCursor: null }, corrections: [], expectation: { status: "INSUFFICIENT_HISTORY", expectedDate: null, expectedAmount: null, observedDate: null, observedAmount: null, windowStart: null, windowEnd: null, summary: "There is not enough settled rhythm yet to compare an expected charge with what arrived.", reasons: [] }, memory: [], belief: null, because: [] };
   const correction = { id: "correction 1", commitmentId: "commitment 1", patch: { field: "MERCHANT", value: { merchant: "OpenAI" } }, reason: null, status: "REVERSED", createdAt: "2026-08-09T10:00:00.000Z", reversedAt: "2026-08-09T10:01:00.000Z", supersededAt: null };
   const { calls, fetchImpl } = recorder(() => json({ data: { correction, commitment: detail, home }, meta: { requestId: "request-2", workspaceVersion: 6 } }));
   const transport = createRecoveryTransport(fetchImpl);
@@ -82,7 +83,7 @@ test("correction paths percent-encode identifiers and reversal uses DELETE", asy
 });
 
 test("evidence paging is requested with the contract page size and cursor", async () => {
-  const detail = { ...commitment, recommendationReason: "", riskTags: [], evidence: { items: [], total: 0, nextCursor: null }, corrections: [] };
+  const detail = { ...commitment, recommendationReason: "", riskTags: [], evidence: { items: [], total: 0, nextCursor: null }, corrections: [], expectation: { status: "INSUFFICIENT_HISTORY", expectedDate: null, expectedAmount: null, observedDate: null, observedAmount: null, windowStart: null, windowEnd: null, summary: "There is not enough settled rhythm yet to compare an expected charge with what arrived.", reasons: [] }, memory: [], belief: null, because: [] };
   const { calls, fetchImpl } = recorder(() => json({ data: detail, meta: { requestId: "request-3", workspaceVersion: 4 } }));
   const transport = createRecoveryTransport(fetchImpl);
 

@@ -35,6 +35,9 @@ export type CommitmentStatus = (typeof commitmentStatuses)[number];
 export const confidenceStates = ["HIGH", "MEDIUM", "LOW", "UNKNOWN"] as const;
 export type ConfidenceState = (typeof confidenceStates)[number];
 
+export const confidenceTruthLayers = ["CONFIRMED", "LIKELY", "NEEDS_REVIEW", "UNKNOWN"] as const;
+export type ConfidenceTruthLayer = (typeof confidenceTruthLayers)[number];
+
 export const correctionFields = ["MERCHANT", "AMOUNT", "NEXT_EXPECTED_DATE", "CADENCE", "IS_RECURRING"] as const;
 export type CorrectionField = (typeof correctionFields)[number];
 
@@ -162,6 +165,12 @@ export type ProjectionTotalDto = {
   correctionIds: readonly string[];
 };
 
+export type ConfidenceLayerTotalDto = {
+  layer: ConfidenceTruthLayer;
+  totals: readonly ProjectionTotalDto[];
+  commitmentCount: number;
+};
+
 export type ConfidenceDto = {
   state: ConfidenceState;
   score: number | null;
@@ -258,6 +267,35 @@ export type CommitmentSummaryDto = {
   updatedAt: string;
 };
 
+export const expectedVsObservedStatuses = [
+  "MATCHED",
+  "AMOUNT_CHANGED",
+  "ARRIVED_LATE",
+  "NOT_YET_OBSERVED",
+  "CANNOT_EVALUATE",
+  "INSUFFICIENT_HISTORY",
+] as const;
+export type ExpectedVsObservedStatus = (typeof expectedVsObservedStatuses)[number];
+
+export type ExpectedVsObservedDto = {
+  status: ExpectedVsObservedStatus;
+  expectedDate: string | null;
+  expectedAmount: MoneyDto | null;
+  observedDate: string | null;
+  observedAmount: MoneyDto | null;
+  windowStart: string | null;
+  windowEnd: string | null;
+  summary: string;
+  reasons: readonly string[];
+};
+
+export type CommitmentMemoryPointDto = {
+  date: string;
+  amount: MoneyDto;
+  sourceType: SourceType;
+  evidenceId: string;
+};
+
 export type CommitmentDetailDto = CommitmentSummaryDto & {
   recommendationReason: string;
   riskTags: readonly string[];
@@ -267,6 +305,10 @@ export type CommitmentDetailDto = CommitmentSummaryDto & {
     nextCursor: string | null;
   };
   corrections: readonly CorrectionDto[];
+  expectation: ExpectedVsObservedDto;
+  memory: readonly CommitmentMemoryPointDto[];
+  belief: string | null;
+  because: readonly string[];
 };
 
 export type AttentionItemDto = {
@@ -451,6 +493,7 @@ export type HomeProjectionDto = {
   monthlyTotals: readonly ProjectionTotalDto[];
   annualizedEstimateTotals: readonly ProjectionTotalDto[];
   next30DayTotals: readonly ProjectionTotalDto[];
+  confidenceLayers: readonly ConfidenceLayerTotalDto[];
   needsMe: readonly AttentionItemDto[];
   changed: HomeChangedDto;
   next: readonly UpcomingItemDto[];

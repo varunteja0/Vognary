@@ -16,7 +16,7 @@ test("the public page resolves receipt inbox readiness at request time", () => {
 
 test("the landing selects the proven entry path without demo or instant-audit surfaces", () => {
   assert.match(landingSource, /const primaryHref = "\/login\?next=\/app";/);
-  assert.match(landingSource, /const primaryLabel = "Find my recurring spend";/);
+  assert.match(landingSource, /const primaryLabel = "See my commitments";/);
   assert.doesNotMatch(landingSource, /sample|demo|InstantAudit|instant audit/i);
 });
 
@@ -48,7 +48,7 @@ test("static layout metadata remains readiness-neutral", () => {
   assert.ok(metadataStart >= 0 && metadataEnd > metadataStart);
   const metadataSource = layoutSource.slice(metadataStart, metadataEnd);
 
-  assert.match(metadataSource, /Vognary - Know what’s renewing before you pay/);
-  assert.match(metadataSource, /helps solo founders review software renewals from submitted evidence and decide what needs attention/);
+  assert.match(metadataSource, /Vognary - Know what your company is already committed to/);
+  assert.match(metadataSource, /Commitment Intelligence for 2–20 person software teams/);
   assert.doesNotMatch(metadataSource, /\b(?:forward(?:ed|ing)?|Gmail|bank|UPI|cancel(?:s|led|ling|lation|lations)?)\b/i);
 });

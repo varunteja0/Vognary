@@ -1,3 +1,4 @@
+import { isRecordedDurableBackupRestore, recordedBackupDrillEvidence } from "./backup-drill-evidence";
 import { checkBackupConfiguration } from "./backup-readiness";
 import { checkGoogleAuthConfiguration } from "./google-auth";
 import { checkSessionConfiguration } from "./session";
@@ -99,15 +100,26 @@ function tokenVaultSignal(): PublicTrustSignal {
 
 function backupSignal(): PublicTrustSignal {
   const backups = checkBackupConfiguration();
-  if (backups.status === "configured") {
-    const drillDate = parseAttestationDate(process.env.BACKUP_RESTORE_DRILL_AT);
+  const objectRestoreProven = backups.status === "configured"
+    && isRecordedDurableBackupRestore(recordedBackupDrillEvidence, backups.keyFingerprint);
+  if (objectRestoreProven) {
+    const drillDate = parseAttestationDate(recordedBackupDrillEvidence.restoredAt.slice(0, 10))
+      ?? parseAttestationDate(process.env.BACKUP_RESTORE_DRILL_AT);
     return {
       id: "backups",
       label: "Encrypted backups and restore drill",
       state: "proven",
       detail: drillDate
-        ? `Backup storage, an encryption-key proof, and a successful restore drill (${drillDate}) are recorded for this deployment.`
-        : "Backup storage, an encryption-key proof, and a successful restore drill are recorded for this deployment.",
+        ? `An encrypted dump in private backup storage was downloaded and restored into an isolated database (${drillDate}).`
+        : "An encrypted dump in private backup storage was downloaded and restored into an isolated database.",
+    };
+  }
+  if (backups.status === "configured") {
+    return {
+      id: "backups",
+      label: "Encrypted backups and restore drill",
+      state: "configured",
+      detail: "Backup storage and a restore-drill attestation are present. Public proof waits for a recorded restore of the stored object.",
     };
   }
   if (backups.storage === "configured") {

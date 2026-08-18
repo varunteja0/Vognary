@@ -24,18 +24,23 @@
 
 Prior-generation material lives only in `docs/archive/`. Treat it as history, not instructions.
 
-### 0.1 Founder scope freeze — 2026-08-17
+### 0.1 Founder scope freeze — 2026-08-18 (Commitment Intelligence)
 
 Until measured first-user evidence invalidates it, the canonical product is:
 
-> **Vognary automatically knows what a 2–20 person software/AI company is committed to paying for software, shows what is coming, what changed, and why it believes every conclusion.**
+> **Vognary is Commitment Intelligence: the continuously maintained, evidence-backed model of what a 2–20 person software/AI company is financially committed to, what changed, what comes next, how certain Vognary is, and why it believes every important claim.**
 
 - First ICP: 2–20 person software/AI companies without dedicated finance/procurement ops.
-- First rail: billing email / receipt forwarding.
-- Product path: sign up → private alias → automatic forwarding → historical backfill → cited recurring-software picture → upcoming money → correction → honest source health.
+- First domain: software, AI, cloud, and recurring vendor commitments.
+- Source law: many replaceable sources → one normalized evidence layer → one commitment graph → one financial truth model. No connector owns the truth.
+- Source 0 (live rail): private billing inbox. Decision B (2026-08-18): one-time billing-only auto-forwarding is the primary loop. Manual forwarding is first-proof fallback, historical backfill assistance, and recovery only.
+- **V1 production rail freeze (2026-08-18):** private billing inbox + one-time billing-only auto-forward + one-time historical backfill + existing evidence → commitment graph → changes / expectations / why. Do not implement Gmail OAuth, Outlook, Zoho, bank/AA, card feeds, vendor APIs, SSO/SCIM, procurement, seats, autonomous cancellation, or a mailbox-wide AI scanner in this release.
+- Product path: sign up → private alias → one-time billing-only auto-forwarding → historical backfill → cited commitments → what changed → upcoming money → why/evidence → correction → honest source health.
+- Direct Gmail/Google Workspace OAuth stays fail-closed until restricted-scope verification and the required third-party security assessment are genuinely complete. Do not mark Gmail “Connect” or advertise mailbox sync.
+- **Future Gmail (prepare, do not build):** preferred later connector is selective direct mailbox intelligence — OAuth → candidate discovery → fetch likely billing evidence only → classify → normalize → retain minimum auditable evidence → discard unnecessary content → commitment graph. Historical selective backfill on first connection; incremental processing afterward. Not full mailbox warehousing. Status: **DEFERRED / BLOCKED BY EXTERNAL APPROVAL**.
 - Long-term vision: the control layer for recurring money.
-- Engineering stops after the production path, one real automatic receipt, first-10 instrumentation, and clean pushed `main` are proven.
-- Sections describing Autopilot phases remain historical implementation context, not permission to build Phase B/C/D. Do not build merchant identity, absence, alerts, cancellation/autonomous action, AA/bank rails, Gmail OAuth, generic SaaS management, budgeting, procurement, SSO/SCIM, seats, new architecture, or a redesign without real-user evidence and a new founder decision.
+- Engineering stops after the production forwarding path, one real automatic receipt, returning-user Changes/Why/memory from real state, first-10 instrumentation, and clean pushed `main` are proven.
+- Surfacing already-built commitment-graph, absence, and change-intelligence **facts** in customer language is in scope. Do not rebuild those engines. Do not enable notification sending, cancellation/autonomous action, AA/bank rails, Gmail OAuth, Outlook/Zoho connectors, generic SaaS management, budgeting, procurement, SSO/SCIM, seats, new architecture, or a redesign without real-user evidence and a new founder decision.
 
 ---
 

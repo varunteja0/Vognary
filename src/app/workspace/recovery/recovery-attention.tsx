@@ -52,20 +52,11 @@ const urgencyCopy: Record<AttentionCardDto["urgency"], string> = {
 };
 
 const nextStepCopy: Record<AttentionCardDto["nextStep"], string> = {
-  REVIEW_SUBSCRIPTION: "Open this subscription",
+  REVIEW_SUBSCRIPTION: "Open this commitment",
   CONFIRM_SAME_SUBSCRIPTION: "Tell us if these are the same",
-  RECONNECT_SOURCE: "Reconnect the source",
+  RECONNECT_SOURCE: "Open sources",
   CHECK_CANCELLATION: "Check the cancellation",
   DECIDE_BEFORE_RENEWAL: "Decide before it renews",
-};
-
-const sourceHealthCopy: Record<SourceHealthDto["state"], string> = {
-  CURRENT: "Watching now",
-  PARTIAL: "Watching, but not for long enough to be sure",
-  STALE: "Nothing has arrived here in a while",
-  BROKEN: "Stopped working",
-  BASELINE_ONLY: "A one-off import; it will not pick up anything new",
-  NO_EVIDENCE: "Nothing has arrived yet",
 };
 
 async function fetchAttention(): Promise<AttentionPayload> {
@@ -150,7 +141,7 @@ export function RecoveryAttention({
       if (body.data) setPayload(body.data);
       onWorkspaceMutated?.();
     } catch {
-      setActionError("We could not save whether those subscriptions are the same. Nothing was merged. Try again.");
+      setActionError("We could not save whether those commitments are the same. Nothing was merged. Try again.");
     } finally {
       setPendingId(null);
     }
@@ -173,126 +164,68 @@ export function RecoveryAttention({
   }
 
   const data = payload!;
-  const brokenSources = data.sources.filter((source) => source.state === "BROKEN");
 
   return (
-    <div className="grid gap-5">
-      <section aria-labelledby="attention-list" className="panel p-4 sm:p-5">
-        <h3 id="attention-list" className="font-display text-xl font-semibold text-(--ink)">What needs you</h3>
-        {actionError ? <p role="alert" className="mt-2 text-sm text-ember">{actionError}</p> : null}
-        <div className="mt-4 grid gap-3">
-          {data.attention.length ? data.attention.map((card) => (
-            <article key={card.id} className="rounded-xl border border-line p-3 sm:p-4">
-              <p className="eyebrow eyebrow-xs text-(--muted)">{urgencyCopy[card.urgency]}</p>
-              <h4 className="mt-1 font-display text-base font-semibold text-(--ink)">{card.headline}</h4>
-              <p className="mt-1 text-sm text-(--muted)">{card.body}</p>
-              {card.dueDate ? <p className="mt-1 font-data text-xs text-(--muted)">Expected {card.dueDate}</p> : null}
-              <div className="mt-3 flex flex-wrap gap-2">
-                {card.nextStep === "RECONNECT_SOURCE" ? (
-                  <button type="button" onClick={onOpenSources} className="btn btn-sm btn-primary">
-                    {nextStepCopy[card.nextStep]}
-                  </button>
-                ) : card.nextStep === "CONFIRM_SAME_SUBSCRIPTION" && card.commitmentId && card.otherCommitmentId ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => void answerDuplicate(card, true)}
-                      disabled={pendingId === card.id}
-                      className="btn btn-sm btn-primary"
-                    >
-                      {pendingId === card.id ? "Saving…" : "Yes, they are the same"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void answerDuplicate(card, false)}
-                      disabled={pendingId === card.id}
-                      className="btn btn-sm btn-ghost"
-                    >
-                      No, they are different
-                    </button>
-                  </>
-                ) : card.commitmentId ? (
-                  <button type="button" onClick={() => onOpenCommitment(card.commitmentId!)} className="btn btn-sm btn-primary">
-                    {nextStepCopy[card.nextStep]}
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => void acknowledge(card.id)}
-                  disabled={pendingId === card.id}
-                  className="btn btn-sm btn-ghost"
-                >
-                  {pendingId === card.id ? "Saving…" : "I have seen this"}
+    <section aria-labelledby="attention-list" className="panel p-4 sm:p-5">
+      <h3 id="attention-list" className="font-display text-xl font-semibold text-(--ink)">What changed</h3>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
+        Only changes backed by stored evidence or a source that was actually watching. Missing evidence is not treated as cancellation.
+      </p>
+      {actionError ? <p role="alert" className="mt-2 text-sm text-ember">{actionError}</p> : null}
+      <div className="mt-4 grid gap-3">
+        {data.attention.length ? data.attention.map((card) => (
+          <article key={card.id} className="rounded-xl border border-line p-3 sm:p-4">
+            <p className="eyebrow eyebrow-xs text-(--muted)">{urgencyCopy[card.urgency]}</p>
+            <h4 className="mt-1 font-display text-base font-semibold text-(--ink)">{card.headline}</h4>
+            <p className="mt-1 text-sm text-(--muted)">{card.body}</p>
+            {card.dueDate ? <p className="mt-1 font-data text-xs text-(--muted)">Expected {card.dueDate}</p> : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {card.nextStep === "RECONNECT_SOURCE" ? (
+                <button type="button" onClick={onOpenSources} className="btn btn-sm btn-primary">
+                  {nextStepCopy[card.nextStep]}
                 </button>
-              </div>
-            </article>
-          )) : (
-            <StateBlock
-              eyebrow="Nothing new"
-              title="Nothing needs you right now"
-              detail="We keep watching. You will only hear from us when something actually changes."
-            />
-          )}
-        </div>
-      </section>
-
-      <section aria-labelledby="attention-sources" className="panel p-4 sm:p-5">
-        <h3 id="attention-sources" className="font-display text-xl font-semibold text-(--ink)">Where this comes from</h3>
-        {brokenSources.length ? (
-          <p className="mt-2 text-sm text-(--muted)">
-            Something has stopped working, so recent charges may be missing until you reconnect it.
-          </p>
-        ) : null}
-        {!data.coverage.automaticSourceCount ? (
-          <p className="mt-2 text-sm text-(--muted)">
-            Nothing automatic is watching yet, so new charges will only appear when you add them.
-          </p>
-        ) : null}
-        <ul className="mt-4 grid gap-2">
-          {data.sources.map((source) => (
-            <li key={source.id} className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl border border-line p-3">
-              <span className="text-sm font-medium text-(--ink)">{source.label}</span>
-              <span className="font-data text-xs text-(--muted)">{sourceHealthCopy[source.state]}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-3">
-          <button type="button" onClick={onOpenSources} className="btn btn-sm btn-ghost">Manage sources</button>
-        </div>
-      </section>
-
-      <section aria-labelledby="attention-beliefs" className="panel p-4 sm:p-5">
-        <h3 id="attention-beliefs" className="font-display text-xl font-semibold text-(--ink)">What we think is true</h3>
-        <div className="mt-4 grid gap-3">
-          {data.commitments.length ? data.commitments.map((commitment) => (
-            <article key={commitment.commitmentId} className="rounded-xl border border-line p-3 sm:p-4">
-              <h4 className="font-display text-base font-semibold text-(--ink)">{commitment.merchant}</h4>
-              <p className="mt-1 text-sm text-(--ink)">{commitment.belief}</p>
-              {commitment.because.length ? (
-                <p className="mt-1 text-sm text-(--muted)">{commitment.because[0]}</p>
-              ) : null}
-              <p className="mt-2 font-data text-xs text-(--muted)">
-                {commitment.lastVerifiedOn ? `Last seen ${commitment.lastVerifiedOn}.` : "Not seen yet."}
-                {commitment.nextVerificationDueOn ? ` We will know more after ${commitment.nextVerificationDueOn}.` : ""}
-              </p>
-              {commitment.falsifiability.length ? (
-                <p className="mt-2 text-sm text-(--muted)">{commitment.falsifiability[0]}</p>
-              ) : null}
-              <div className="mt-3">
-                <button type="button" onClick={() => onOpenCommitment(commitment.commitmentId)} className="btn btn-sm btn-ghost">
-                  Open this subscription
+              ) : card.nextStep === "CONFIRM_SAME_SUBSCRIPTION" && card.commitmentId && card.otherCommitmentId ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void answerDuplicate(card, true)}
+                    disabled={pendingId === card.id}
+                    className="btn btn-sm btn-primary"
+                  >
+                    {pendingId === card.id ? "Saving…" : "Yes, they are the same"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void answerDuplicate(card, false)}
+                    disabled={pendingId === card.id}
+                    className="btn btn-sm btn-ghost"
+                  >
+                    No, they are different
+                  </button>
+                </>
+              ) : card.commitmentId ? (
+                <button type="button" onClick={() => onOpenCommitment(card.commitmentId!)} className="btn btn-sm btn-primary">
+                  {nextStepCopy[card.nextStep]}
                 </button>
-              </div>
-            </article>
-          )) : (
-            <StateBlock
-              eyebrow="Nothing yet"
-              title="No subscriptions to describe yet"
-              detail="Once a receipt arrives we will tell you what we believe and what would change our mind."
-            />
-          )}
-        </div>
-      </section>
-    </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void acknowledge(card.id)}
+                disabled={pendingId === card.id}
+                className="btn btn-sm btn-ghost"
+              >
+                {pendingId === card.id ? "Saving…" : "I have seen this"}
+              </button>
+            </div>
+          </article>
+        )) : (
+          <StateBlock
+            eyebrow="Nothing new"
+            title="Nothing changed that needs you"
+            detail="Vognary keeps watching. You will only see a change here when stored evidence or a watching source supports it."
+          />
+        )}
+      </div>
+    </section>
   );
 }

@@ -186,7 +186,7 @@ export function assessCommitmentCoverage(
       citedSourceIds: [],
       brokenSourceIds: [],
       staleSourceIds: [],
-      limitations: ["No working source is watching this subscription."],
+      limitations: ["No working source is watching this commitment."],
     };
   }
   const state = bestState(cited.map((source) => source.state));

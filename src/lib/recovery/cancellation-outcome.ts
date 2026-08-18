@@ -97,7 +97,7 @@ export function advanceCancellationOutcome(input: {
         previousState: current,
         state: "CANCELLATION_INTENT_RECORDED",
         proof: "NONE",
-        reasons: ["You told us you want to end this subscription."],
+        reasons: ["You told us you want to end this commitment."],
         citedEvidenceIds: [],
       };
 

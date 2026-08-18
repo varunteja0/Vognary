@@ -81,6 +81,20 @@ const detail = {
       supersededAt: null,
     },
   ],
+  expectation: {
+    status: "INSUFFICIENT_HISTORY",
+    expectedDate: null,
+    expectedAmount: null,
+    observedDate: null,
+    observedAmount: null,
+    windowStart: null,
+    windowEnd: null,
+    summary: "There is not enough settled rhythm yet to compare an expected charge with what arrived.",
+    reasons: [],
+  },
+  memory: [],
+  belief: null,
+  because: [],
 };
 
 const home = {
@@ -95,6 +109,7 @@ const home = {
     correctionIds: [],
   }],
   next30DayTotals: [{ amount: money, commitmentIds: ["commitment-1"], evidenceIds: ["evidence-1"], provenance: "RECEIPT", correctionIds: [] }],
+  confidenceLayers: [],
   needsMe: [
     {
       id: "attention-1",
@@ -142,6 +157,13 @@ const meta = { requestId: "request-e2e", workspaceVersion: 4 };
 
 type DecisionOutcome = { ok: true } | { ok: false; status: number; body: unknown };
 
+const emptyAttention = {
+  attention: [],
+  coverage: { coverageBroken: false, automaticSourceCount: 0, limitations: [] },
+  sources: [],
+  commitments: [],
+};
+
 async function mockRecoveryApi(page: Page, options: { decision?: DecisionOutcome } = {}) {
   let currentDetail: Record<string, unknown> = detail;
   let currentMeta = meta;
@@ -154,6 +176,9 @@ async function mockRecoveryApi(page: Page, options: { decision?: DecisionOutcome
   });
   await page.route("**/api/workspaces/current/brief", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: home, meta }) }),
+  );
+  await page.route("**/api/workspaces/current/recovery-attention", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: emptyAttention, meta: currentMeta }) }),
   );
   await page.route("**/api/workspaces/current/activation", (route) => {
     return route.fulfill({
@@ -221,16 +246,17 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   const { activationResponses } = await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Your renewal review" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Your commitments" })).toBeVisible();
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 
   const nav = page.getByRole("navigation", { name: "Primary" });
-  for (const label of ["Home", "Subscriptions", "Sources"]) {
+  for (const label of ["Home", "Commitments", "Sources"]) {
     await expect(nav.getByRole("button", { name: label })).toBeVisible();
   }
   await expect(nav.getByRole("button", { name: "Mandate" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: `Account for ${email}` })).toHaveAttribute("href", "/profile");
 
+  await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toBeVisible();
@@ -311,7 +337,7 @@ test("a commitment exposes its exact evidence and returns focus after inspection
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Subscriptions" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   await expect(page.getByRole("heading", { name: "OpenAI" })).toBeVisible();
@@ -332,7 +358,7 @@ test("a commitment exposes its exact evidence and returns focus after inspection
   await expect(dialog.getByText(/unpublished/)).toHaveCount(0);
   await expect(dialog.getByText(/legacy-evidence/)).toHaveCount(0);
   await expect(dialog.getByText("You submitted this evidence")).toBeVisible();
-  await expect(dialog.getByText("Medium confidence", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Likely", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Treat the amount and date as provisional until more evidence lands.")).toBeVisible();
 
   await page.keyboard.press("Escape");
@@ -345,7 +371,7 @@ test("three primary choices and two secondary choices preserve the server decisi
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Subscriptions" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   const group = page.getByRole("group", { name: "Your choice" });
@@ -355,7 +381,7 @@ test("three primary choices and two secondary choices preserve the server decisi
   await page.getByText("More choices").click();
   await expect(page.getByRole("button", { name: "Consider a cheaper plan" })).toBeVisible();
   await expect(page.getByRole("button", { name: "I don’t recognize this" })).toBeVisible();
-  await expect(page.getByText("No choice has been saved for this subscription yet.")).toBeVisible();
+  await expect(page.getByText("No choice has been saved for this commitment yet.")).toBeVisible();
 
   await group.getByRole("button", { name: /^Plan to cancel/ }).click();
   await expect(page.getByText(/Saved Plan to cancel on/)).toBeVisible();
@@ -373,7 +399,7 @@ test("a rejected decision rolls back visibly and states what the workspace still
   });
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Subscriptions" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
   await page.getByRole("group", { name: "Your choice" }).getByRole("button", { name: /^Plan to cancel/ }).click();
 
@@ -382,7 +408,7 @@ test("a rejected decision rolls back visibly and states what the workspace still
   await expect(alert.getByText(/“Plan to cancel” for OpenAI was not saved/)).toBeVisible();
   await expect(alert.getByText(/still without a recorded decision/)).toBeVisible();
   await expect(alert.getByText(/request-rollback/)).toBeVisible();
-  await expect(page.getByText("No choice has been saved for this subscription yet.")).toBeVisible();
+  await expect(page.getByText("No choice has been saved for this commitment yet.")).toBeVisible();
 });
 
 test("correcting a commitment offers every contract field and shows reversible history", async ({ page }) => {
@@ -390,7 +416,7 @@ test("correcting a commitment offers every contract field and shows reversible h
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Subscriptions" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   for (const label of ["Correct merchant", "Correct amount", "Correct expected date", "Correct cadence", "Correct recurring or not"]) {
@@ -419,10 +445,10 @@ test("the workspace stays usable and keyboard-reachable on a small screen", asyn
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   expect(overflow).toBe(false);
 
-  const commitmentsTab = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Subscriptions" });
+  const commitmentsTab = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" });
   await commitmentsTab.focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 2, name: "Subscriptions" })).toBeFocused();
+  await expect(page.getByRole("heading", { level: 2, name: "Commitments" })).toBeFocused();
 });
 
 test("Mandate stays hidden until notice delivery is proven", async ({ page }) => {

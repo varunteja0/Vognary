@@ -1,24 +1,34 @@
-# CONTINUE HERE — live handoff (2026-08-17)
+# CONTINUE HERE — live handoff (2026-08-18)
 
 > Read [`docs/THE-LAW.md`](THE-LAW.md) first. This file is **live state only**.
 > Market: [`docs/execution/phase-a-market-contact.md`](execution/phase-a-market-contact.md).
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## Live state — independently verified 2026-08-18 13:20 IST
+
+**DURABLE BACKUP + RESTORE is 99%+ PROVEN** by GitHub run [`32109925496`](https://github.com/varunteja0/Vognary/actions/runs/32109925496) on `ec79022`. Inbox stays off until the Commitment Intelligence SHA is live on Vercel Production and receipt prerequisites are real.
+
+Proof in that log, in order: `pg_dump` → AES-256-GCM (`keyFingerprint=8it2LaCH1w__ilS1`, same as Vercel Production) → `storage.status=uploaded` to `vognary-postgres/vognary-postgres-2026-08-18T07-07-54-751Z.dump.enc` (etag `d0638a31123d332675aca57f0c31d075`) → local `*.dump.enc` deleted → `BACKUP_RESTORE_SOURCE=storage` GET → `storageRestore.source=durable-object-get` → decrypt `plaintextSha256=45eb736e98ea2f286448df3d6229eb154c4e0649f1c4cfdd970eda60cf81b5a4` → isolated PostgreSQL 18 restore-drill-passed (schema through `0053_phase_a_receipt_activation`; restored counts include inbound_aliases 2, inbound_events 4, evidence 5, commitments 4). Artifact after dump deletion was the manifest only (1488 bytes). Public `/security` Proven now requires that recorded object GET, not only `BACKUP_RESTORE_DRILL_STATUS=passed`.
+
+**CODE GATES on the Commitment Intelligence hardening tree (this checkout, 2026-08-18):** lint **0 errors** (1 pre-existing `no-location-assign-relative-destination` warning in untouched `src/app/instant-audit.tsx`) · typecheck **PASS** · `claims:check` **PASS** (24 surfaces) · `tokens:check` **PASS** · unit **905/905** · PostgreSQL **154/154** · Playwright **104/104** passed (desktop-chromium + mobile-chromium; 2 skipped because receipt-inbox E2E env is unset while the inbox is fail-closed) · production build **PASS** · `perf:budget` **PASS**. Do not treat these gates as live-receipt proof.
+
 ## 0. Founder scope freeze — current strategy
 
-- Canonical product: Vognary automatically knows what a 2–20 person software/AI company is committed to paying for software, shows what is coming, what changed, and why it believes every conclusion.
+- Canonical product: **Commitment Intelligence**. Vognary maintains an evidence-backed model of what a 2–20 person software/AI company is already committed to, what changed, what comes next, how certain it is, and why.
 - First ICP: 2–20 person software/AI companies without finance/procurement ops.
-- First rail: billing-email / receipt forwarding. Long-term vision: the control layer for recurring money.
-- Only production usability for the first 10 ICP users is in scope. Do not resume Phase B/C/D, merchant identity, absence, alerts, cancellation/autonomous action, AA/banks, Gmail OAuth, generic SaaS management, budgeting, procurement, SSO/SCIM, seats, architecture, or redesign work until real users select it.
+- Source 0: billing-email / receipt forwarding. One-time billing-source setup is the primary loop (Decision B, 2026-08-18): private alias → Gmail verification → one billing-only auto-forwarding filter → passive future evidence → interrupt only when uncertain. Manual forwarding is first-proof fallback, historical backfill assistance, and recovery only.
+- Product path: sign up → private alias → one-time billing-only forwarding → historical backfill → cited commitments → what changed → upcoming money → why/evidence → correction → honest source health.
+- Direct connectors: Google Workspace / Gmail OAuth is **BLOCKED BY EXTERNAL APPROVAL** (`gmail.readonly` is Restricted; production mailbox storage requires Google verification plus an annual third-party security assessment). Source Hub may list it as Planned. Do not show Connect. Do not advertise mailbox sync. Microsoft 365, Zoho Books, accounting, card/bank settlement, and vendor APIs stay **DEFERRED BY DESIGN**. Do not build AA/banks, cancellation/autonomous action, or a redesign until real users select it.
+- Future Gmail, when unblocked: **selective direct mailbox intelligence**, not full mailbox warehousing. Do not implement OAuth in V1.
 
 ## 1. Exact checkout
 
 - Folder: `/Users/varunteja/Desktop/CVT Group/Vognary`
-- Branch: `main`.
+- Branch: `main`. Record SHA with `git rev-parse HEAD origin/main` after this hardening lands. Parent backup commit is `ec7902249f61727445e6bd7ed4fdaacd51f38961`. Vercel Production still serves `aa71295` until the **exact** hardening SHA is deployed with `ENABLE_RECEIPT_INBOX=false`.
+- This commit is the Commitment Intelligence / Decision B / golden-corpus / honest Source Hub / expected-vs-observed / backup-truth hardening set. Do not discard it. Do not deploy a dirty tree.
 - Operations commits `5b983bf` and `f9b8a14` are pushed. They add the guarded `0053` migration and exact pre/current encrypted backup-restore profiles.
 - Safety commit `4fa6575` (`fix(recovery): honest cadence totals, receipt semantics, token-free veto, dead-code removal`) preserved the whole repair pass on top of `051444f` and is pushed.
-- The commitment-graph delta (Phase B/C/D engineering) sits on top of `dce0e5c` and is the convergence candidate.
 - Do **not** `git worktree add ../vognary-*`, clone a sibling, or redo WP-A.
 - Parked copies: `.fallow/` (gitignored)
 - Founder authorized the safety commit, the parser commit, and the `main` convergence.
@@ -27,7 +37,7 @@
 
 - `main` / `origin/main` were at `b2355fb`. This release converges `main` by **fast-forward** to the tested `feat/autopilot-loop` head — no merge commit, no force-push. Verify the SHA with `git rev-parse main origin/main feat/autopilot-loop origin/feat/autopilot-loop`; all four must match before trusting this line.
 - WP-A PR #32 `2e3c776` · WP-A.1 PR #33 `d84e778` · WP-A.2 PR #34 `1542dda`
-- Recovery v1 PR #31. Public landing is still the audit generation.
+- Recovery v1 PR #31. Public landing is Commitment Intelligence copy on the receipts-first path; the inbox remains founder-gated.
 - Composite scoreboard remains **1.5**. Do not invent mandates, payments, or reviewer approvals.
 
 ## 3. Historical implementation record
@@ -114,19 +124,39 @@ Final orchestrated release gate on this checkout (2026-08-16, through 0047): **P
 - **PHASE A CODE READY.** Lint has 0 errors (1 pre-existing warning), typecheck/claims/tokens pass, unit **862/862**, PostgreSQL **153/153**, focused receipt-inbox **18/18**, Customer #0 desktop/mobile **2/2**, UI states/onboarding/trust desktop/mobile **16/16**, production build and performance budget pass.
 - **PRODUCTION SCHEMA READY.** GitHub run `32018769474` applied and verified all 53 migrations through `0053_phase_a_receipt_activation`; Neon independently reports both new integrity guards and unchanged core row counts.
 - **PRE-MIGRATION RECOVERY PROVEN.** GitHub run `32018501900` encrypted the exact `0026` production database, restored it into PostgreSQL 18, and retained nonempty artifact `encrypted-postgres-backup-pre-0053` until 2026-11-15.
-- **PRODUCTION ACTIVATION BLOCKED.** Vercel receipt-inbox environment variables cannot be installed from this session because no valid Vercel login/token is available; durable object-storage credentials are absent; launch attestations remain blank; no post-deploy real receipt/replay has succeeded. Receipt forwarding must remain unavailable.
+- **PRODUCTION INBOX-OFF PROVEN (2026-08-18, live probes of `https://www.vognary.com`).** Unsigned `POST /api/webhooks/resend/inbound` returns **501** `{status:"not-available"}`. Unauthenticated `/api/readiness` returns **401**. Authenticated readiness: `hardening.receiptInbox=activation-pending`; `receiptInboxMissing` is only `ENABLE_RECEIPT_INBOX=true` and `RECEIPT_INBOX_RETENTION_REVIEW_STATUS=approved`. Schema is through `0053_phase_a_receipt_activation`; Recovery cutover is `schema-ready-clean-cutover`. Public `/security` still says receipt forwarding is **not yet proven**. Do **not** turn the inbox on.
+- **PREPARED INBOX SECRETS ARE PRESENT.** Live readiness does **not** list `RESEND_RECEIVING_API_KEY`, `RESEND_INBOUND_WEBHOOK_SECRET`, `RESEND_RECEIVING_DOMAIN`, `RECEIPT_INBOX_ALIAS_HMAC_SECRET`, `RECEIPT_INBOX_ALIAS_HMAC_KEY_ID`, or `TOKEN_ENCRYPTION_KEY` as missing. Three launch attestations are **already set** (`RECEIPT_INBOX_PROVIDER_STATUS=production-live`, `RECEIPT_INBOX_WEBHOOK_PROOF_STATUS=passed`, `RECEIPT_INBOX_REPLAY_PROOF_STATUS=passed`) while processing is still fail-closed — leave them alone until a real receipt/replay exists; do not set retention approved.
+- **PRODUCTION ACTIVATION BLOCKED.** Durable R2 backup + GET-restore is proven by run `32109925496` (see Live state). Vercel `/security` backups Proven remains env attestation; the 99% proof is the drill log, not that page. No post-deploy real receipt/replay has succeeded. Receipt forwarding must remain unavailable.
 - **MARKET NOT VALIDATED.** Zero first-ICP users have completed the production flow. Green engineering gates do not raise the business-validation row.
+
+## 4.1 Decision B onboarding — code present, production proof blocked
+
+Sources now teach one-time passive billing forwarding when the receipt inbox is publicly available: private alias → Gmail verification with global forwarding left off → one editable subject-only billing filter → wait for matching mail → separate one-time historical backfill. Manual paste/forward remains behind Manual fallback. Gmail filters apply to new mail only ([Google Help 6579](https://support.google.com/mail/answer/6579)). Filter-forwarding requires the address to be verified while automatic mailbox forwarding stays off ([Google Help 10957](https://support.google.com/mail/answer/10957)).
+
+This does **not** enable `ENABLE_RECEIPT_INBOX`. Production proof of a filter-generated receipt, then a second matching receipt without manual forwarding, remains blocked by section 5. Do not start Gmail OAuth.
+
+## 4.2 Commitment Intelligence surface — code in this pass
+
+Home now leads with graph-backed **What changed** (existing change signals; duplicate answers stay on those cards). Commitment detail publishes expected-vs-observed from the absence engine and an amount timeline from stored evidence. Sources shows an honest catalog: billing inbox is the only live/setup path; Google Workspace, Microsoft 365, and Zoho Books are **Planned**. Direct Gmail is **BLOCKED BY EXTERNAL APPROVAL** (`gmail.readonly` Restricted; [restricted-scope verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification) plus an annual security assessment). No Connect button. No mailbox-sync advertising.
+
+Do not enable notification sending, Autopilot execution, or `ENABLE_RECEIPT_INBOX` from this pass.
+
+Code gates on this checkout (2026-08-18), each run once: lint **0 errors** (1 pre-existing `no-location-assign-relative-destination` warning in untouched `src/app/instant-audit.tsx`) · typecheck **PASS** · `claims:check` **PASS** (24 surfaces) · `tokens:check` **PASS** · unit **905/905** · PostgreSQL **154/154** · Playwright **104/104** (2 skipped: receipt-inbox E2E env unset) · production build **PASS** · `perf:budget` **PASS**.
+
+Hardening in this commit: golden release corpus for parser → money → headline totals; failed/declined payments are refused; `paid USD 13.30 on DATE` no longer loses the charge date at the decimal point; Source Hub setup is not styled as connected; PWA/layout copy is Commitment Intelligence; customer-facing “subscription” labels on attention/Home/absence/belief copy were aligned to commitment; public backup Proven requires the recorded R2 object restore. None of that is live-receipt proof.
+
+**99% product-controlled release is NOT PROVEN.** Remaining proof is section 5. Do not round tests up to 99%.
 
 ## 5. Current P0
 
 Exact remaining activation blockers:
 
-1. Authenticate to the linked Vercel project and install the prepared receipt-inbox environment, keeping `ENABLE_RECEIPT_INBOX=false` and attestations blank for the first deploy.
-2. Configure durable S3/R2-compatible storage and restore the uploaded encrypted object; a 90-day GitHub artifact is recovery evidence but does not satisfy durable-storage readiness.
-3. Deploy the Phase A runtime, rotate the two legacy `receipt-alias-v1` aliases to `receipt-alias-v2`, then replay/send one real receipt and verify processing plus replay idempotency.
-4. Only after retained evidence exists, set provider/webhook/replay/retention attestations and enable the inbox.
+1. ~~Vercel Production inbox-off + prepared receipt-inbox env~~ **DONE and independently verified 2026-08-18.** Keep `ENABLE_RECEIPT_INBOX=false` on the first hardened deploy.
+2. ~~GitHub Actions Encrypted Backup Drill cannot upload to durable R2.~~ **DONE and independently verified 2026-08-18.** Run `32109925496` uploaded, GETted, decrypted, and restored the stored object. Do not repeat the secrets action.
+3. Deploy the exact Commitment Intelligence SHA to Vercel Production with inbox still false. Then rotate the two legacy `receipt-alias-v1` aliases to `receipt-alias-v2`, then replay/send one real receipt and verify processing plus replay idempotency.
+4. Only after retained evidence exists, keep or correct provider/webhook/replay/retention attestations and then enable the inbox. Do not set `RECEIPT_INBOX_RETENTION_REVIEW_STATUS=approved` or `ENABLE_RECEIPT_INBOX=true` until that SHA is live and prerequisites are real.
 
-Do not start another product phase.
+Do not declare the product live until one real automatic billing receipt, then a second automatic receipt without manual forwarding, is proven.
 
 ## 6. Next command / gate
 
@@ -157,5 +187,5 @@ Quote the path. `DATABASE_URL` must be unset for `npm test`. Do not commit devel
 - **Rollback:** leave the three switches false, keep `RESEND_NOTICE_WEBHOOK_SECRET` / `AUTOPILOT_VETO_TOKEN_SECRET` unset, redeploy. Do not drop 0033 through 0052. Emergency provider disable is founder/internal-operator only: `POST /api/internal/autopilot/providers/{id}/disable` with `INTERNAL_SYNC_SECRET`. Tenant admins cannot globally disable a provider.
 - **SLOs (alert when breached after go-live, not before):** notice queue age > 15m; delivery failure rate > 5%; veto path 5xx; authorization without delivered+elapsed 48h; attempt latency > 2m; protected leakage > 0; verification pending > 7d; fee insert conflict/failure. Dead letters: `recovery_autopilot_dead_letters`.
 - **Threat model:** signed veto token is capability-bearing; mandate/veto/operator/notice webhook/provider attempt/proof/fee/refund/kill-switch are privileged. No signed text, raw proof, or message bodies in product events.
-- **Backup:** exact `0026` and `0053` `pg_dump`/`pg_restore` profiles pass locally. Production pre-migration encryption/restore is proven by run `32018501900`. Durable object storage remains unconfigured and must not be called READY.
+- **Backup:** Encrypted dump → R2 upload → GET of that object → decrypt → isolated PostgreSQL 18 restore is proven by GitHub run `32109925496` (`storage.status=uploaded`, `storageRestore.source=durable-object-get`, fingerprint `8it2LaCH1w__ilS1`). Do **not** treat `/security` env attestation as the proof. Inbox stays off.
 - **Autopilot scheduler:** `GET /api/internal/autopilot/due/run` is CRON_SECRET-gated. It is **not** in `vercel.json` (Hobby two-cron cap: renewal alerts + retention). Notices/execution still no-op unless those switches are the literal string `true`.

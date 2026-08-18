@@ -40,6 +40,7 @@ const home: HomeProjectionDto = {
   monthlyTotals: [],
   annualizedEstimateTotals: [],
   next30DayTotals: [],
+  confidenceLayers: [],
   needsMe: [],
   changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 4, items: [] },
   next: [],
@@ -57,6 +58,20 @@ const detail: CommitmentDetailDto = {
   riskTags: [],
   evidence: { items: [], total: 0, nextCursor: null },
   corrections: [],
+  expectation: {
+    status: "INSUFFICIENT_HISTORY",
+    expectedDate: null,
+    expectedAmount: null,
+    observedDate: null,
+    observedAmount: null,
+    windowStart: null,
+    windowEnd: null,
+    summary: "There is not enough settled rhythm yet to compare an expected charge with what arrived.",
+    reasons: [],
+  },
+  memory: [],
+  belief: null,
+  because: [],
 };
 
 const meta = { requestId: "request-1", workspaceVersion: 4 };

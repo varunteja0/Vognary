@@ -89,7 +89,7 @@ export type ObservedReceipt = {
 // recurring engine infer the schedule from the gap instead of discarding both.
 export function extractObservedReceipt(message: string, currencyHint: ReceiptCurrencyHint | null = null): ObservedReceipt | null {
   const normalized = normalizeReceiptMessage(message);
-  if (!normalized) return null;
+  if (!normalized || looksLikeFailedPayment(normalized)) return null;
 
   const parsedAmount = extractReceiptAmount(normalized, currencyHint);
   const merchantMatch = matchReceiptMerchant(normalized);
@@ -115,7 +115,7 @@ export function extractObservedReceipt(message: string, currencyHint: ReceiptCur
 
 function extractReceiptCandidate(message: string, currencyHint: ReceiptCurrencyHint | null): ReceiptCandidate | null {
   const normalized = normalizeReceiptMessage(message);
-  if (!normalized) return null;
+  if (!normalized || looksLikeFailedPayment(normalized)) return null;
 
   const mandateLike = mandateLikePattern.test(normalized);
   const subscriptionLike = mandateLike
@@ -165,6 +165,12 @@ function normalizeReceiptMessage(message: string) {
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+// A failed or declined charge is not a completed payment. Reject the whole
+// snippet rather than mint a commitment from "payment … failed" language.
+function looksLikeFailedPayment(message: string) {
+  return /\b(?:payment(?:\s+\S+){0,8}\s+(?:failed|was declined|was unsuccessful)|payment failed|charge failed|transaction failed|card (?:was )?declined|could not (?:process|complete) (?:your |the )?payment)\b/i.test(message);
 }
 
 function normalizeAmountDecimal(value: string) {
@@ -222,7 +228,10 @@ function inferReceiptFrequency(message: string, mandateLike: boolean): ManualRec
 // the latter is how Netflix, Spotify, Google, and Apple receipts write dates.
 const receiptDateForms = "\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}|\\d{1,2}[-/]\\d{1,2}[-/]\\d{2,4}|\\d{1,2}(?:st|nd|rd|th)?\\s+[A-Za-z]{3,9}\\.?,?\\s+\\d{4}|[A-Za-z]{3,9}\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4}";
 const explicitNextDatePattern = new RegExp(`(?:renews?\\b|next billing|next charge|due|will be debited|pre-?debit|scheduled (?:for|on|to be (?:charged|debited|paid)(?:\\s+on)?)|next debit(?: date)?)[^.\\n]{0,120}?(${receiptDateForms})`, "i");
-const chargeDatePattern = new RegExp(`(?:paid|charged|debited)[^.;\\n]{0,80}?(${receiptDateForms})`, "i");
+// Decimal points in amounts are not sentence boundaries, otherwise
+// "paid USD 13.30 on 2026-08-01" never reaches the date.
+const chargeDateGap = "(?:[^.;\\n]|\\.(?=\\d)){0,80}?";
+const chargeDatePattern = new RegExp(`(?:paid|charged|debited)${chargeDateGap}(${receiptDateForms})`, "i");
 const labelledDatePattern = new RegExp(`\\b((?:(?:invoice|order|receipt|transaction|payment|billing|charge|debit|due)\\s+)?date)\\s*:\\s*(${receiptDateForms})`, "gi");
 const completedPaymentPattern = /\b(?:paid|charged|debited|payment (?:received|successful|completed|was made))\b/i;
 

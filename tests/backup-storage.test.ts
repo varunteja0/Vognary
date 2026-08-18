@@ -11,11 +11,12 @@ import {
 } from "../scripts/lib/backup-storage.mjs";
 
 const r2Env = {
+  NODE_ENV: "test",
   R2_BUCKET: "vognary-postgres-backups",
   BACKUP_STORAGE_ENDPOINT: "https://example.r2.cloudflarestorage.com",
   BACKUP_STORAGE_ACCESS_KEY_ID: "AKIAEXAMPLE",
   BACKUP_STORAGE_SECRET_ACCESS_KEY: "secret-example",
-};
+} as NodeJS.ProcessEnv;
 
 test("R2 backup storage is ready from bucket, endpoint, and access keys", () => {
   const config = getBackupStorageConfig(r2Env);

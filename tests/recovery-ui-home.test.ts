@@ -12,6 +12,8 @@ import {
   coverageStates,
   decisions,
   evidenceProvenanceKinds,
+  confidenceTruthLayers,
+  expectedVsObservedStatuses,
   projectionAmountProvenances,
   recoveryErrorCodes,
   sourceTypes,
@@ -22,6 +24,7 @@ import {
   changeKindLabels,
   commitmentStatusLabels,
   confidenceLabels,
+  confidenceTruthLayerLabels,
   confidenceUncertainty,
   correctionFieldLabels,
   correctionStatusLabels,
@@ -31,6 +34,7 @@ import {
   decisionMeanings,
   decisionStamps,
   errorCopy,
+  expectedVsObservedLabels,
   formatDay,
   formatMoment,
   formatObservedInstant,
@@ -56,6 +60,7 @@ const loginSource = readFileSync("src/app/login/login-client.tsx", "utf8");
 const appPageSource = readFileSync("src/app/app/page.tsx", "utf8");
 const experienceSource = readFileSync("src/app/app/experience-client.tsx", "utf8");
 const sourcesSource = sourceOf("recovery-sources.tsx");
+const billingSetupSource = sourceOf("recovery-billing-setup.tsx");
 const accountSectionsSource = readFileSync("src/app/profile/profile-sections.tsx", "utf8");
 const inboundStoreSource = readFileSync("src/lib/server/recovery-inbound-store.ts", "utf8");
 
@@ -69,6 +74,8 @@ test("every contract enum has presentation copy, so a contract change cannot ren
     [commitmentStatuses, commitmentStatusLabels],
     [confidenceStates, confidenceLabels],
     [confidenceStates, confidenceUncertainty],
+    [confidenceTruthLayers, confidenceTruthLayerLabels],
+    [expectedVsObservedStatuses, expectedVsObservedLabels],
     [correctionFields, correctionFieldLabels],
     [correctionStatuses, correctionStatusLabels],
     [changeKinds, changeKindLabels],
@@ -86,8 +93,8 @@ test("every contract enum has presentation copy, so a contract change cannot ren
 });
 
 test("primary navigation keeps Mandate hidden until delivery is proven or authority already exists", () => {
-  assert.deepEqual([...recoveryViews], ["HOME", "ATTENTION", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
-  assert.deepEqual(Object.values(recoveryViewLabels), ["Home", "Attention", "Subscriptions", "Sources", "Mandate"]);
+  assert.deepEqual([...recoveryViews], ["HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
+  assert.deepEqual(Object.values(recoveryViewLabels), ["Home", "Commitments", "Sources", "Mandate"]);
   assert.match(clientSource, /<nav aria-label="Primary"/);
   assert.match(clientSource, /mandateAvailable/);
   assert.match(clientSource, /noticeReadiness\.state === "proven-ready"/);
@@ -95,7 +102,7 @@ test("primary navigation keeps Mandate hidden until delivery is proven or author
   assert.match(clientSource, /aria-current=\{state\.view === view \? "page" : undefined\}/);
   assert.match(clientSource, /href="\/profile"/);
   assert.doesNotMatch(clientSource, /state\.view === "PROFILE"/);
-  assert.match(clientSource, /primaryViews\.length === 5 \? "grid-cols-5" : "grid-cols-4"/);
+  assert.match(clientSource, /primaryViews\.length === 4 \? "grid-cols-4" : "grid-cols-3"/);
 });
 
 test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
@@ -105,7 +112,7 @@ test("landing, login, and empty Home tell one receipts-to-decision product story
   }
   assert.match(landingSource, /Want it done for you\?/);
   assert.match(landingSource, /href="\/private-audit"/);
-  assert.match(clientSource, /Your renewal review/);
+  assert.match(clientSource, /Your commitments/);
   assert.match(landingSource, /No bank passwords\. No mailbox access\. You choose which billing text to add\./);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
 });
@@ -135,7 +142,10 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   assert.doesNotMatch(sourcesSource, /recordWorkspaceActivation|onCitedPictureRendered/);
   assert.match(homeSource, /RecoveryFirstValueMetrics/);
   assert.match(homeSource, /RecoveryProjectionDetails/);
+  assert.match(homeSource, /<RecoveryAttention/);
+  const graphChangesIndex = homeSource.indexOf("<RecoveryAttention");
   const needsAttentionIndex = homeSource.indexOf('aria-labelledby="recovery-needs-me"');
+  assert.ok(graphChangesIndex >= 0 && graphChangesIndex < needsAttentionIndex, "graph-backed What changed must lead Needs attention");
   const secondaryProjectionIndexes = [...homeSource.matchAll(/<RecoveryProjectionDetails/g)].map((match) => match.index);
   assert.ok(
     secondaryProjectionIndexes.some((index) => index > needsAttentionIndex),
@@ -171,11 +181,17 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   assert.match(clientSource, /transport\.evidence\(/);
 });
 
-test("returning Home leads with attention before proven change and exports only the Recovery projection", () => {
+test("returning Home leads with graph-backed changes before last-visit diffs and exports only the Recovery projection", () => {
+  assert.ok(homeSource.indexOf("<RecoveryAttention") < homeSource.indexOf("Needs attention"));
   assert.ok(homeSource.indexOf("Needs attention") < homeSource.indexOf("Since your last visit"));
   assert.match(homeSource, /Sheets go stale when new charges land/);
   assert.match(homeSource, /This is a floor from receipts checked, not every debit in India\./);
-  assert.match(homeSource, /uncertainDuplicateCommitmentCount/);
+  assert.match(homeSource, /home\.confidenceLayers/);
+  assert.match(homeSource, /confidenceTruthLayerLabels\[layer\.layer\]/);
+  assert.equal(confidenceLabels.HIGH, "Confirmed");
+  assert.equal(confidenceLabels.MEDIUM, "Likely");
+  assert.equal(confidenceLabels.LOW, "Needs review");
+  assert.equal(confidenceLabels.UNKNOWN, "Unknown");
   assert.match(homeSource, /listed twice/);
   assert.match(homeSource, /renderRecoveryShareText\(home\)/);
   assert.match(homeSource, /Copy for WhatsApp/);
@@ -188,7 +204,9 @@ test("an empty Home loads and surfaces the receipt source before manual evidence
   assert.match(homeSource, /Your Vognary receipt address/);
   assert.match(homeSource, /Copy address/);
   assert.match(homeSource, /Set up receipt address/);
+  assert.match(homeSource, /Finish one-time billing setup/);
   assert.match(homeSource, /Add receipts manually/);
+  assert.match(clientSource, /onOpenSources=/);
 });
 
 test("canonical Recovery advertises the receipt inbox only behind public launch readiness", () => {
@@ -229,7 +247,7 @@ test("one observation is coached toward a second matching receipt instead of ren
   }
 });
 
-test("subscriptions use ordinary language and three primary choices", () => {
+test("commitments use ordinary language and three primary choices", () => {
   assert.deepEqual(decisionLabels, {
     KEEP: "Keep",
     MONITOR: "Review later",
@@ -241,6 +259,11 @@ test("subscriptions use ordinary language and three primary choices", () => {
   assert.match(commitmentsSource, /What do you want to do\?/);
   assert.match(commitmentsSource, /Planning to cancel records your intent; Vognary does not cancel the service\./);
   assert.match(commitmentsSource, /Why Vognary thinks this/);
+  assert.match(commitmentsSource, /Expected vs observed/);
+  assert.match(commitmentsSource, /Amount history/);
+  assert.match(commitmentsSource, /Absence is not treated as cancellation/);
+  assert.match(commitmentsSource, /detail\.expectation/);
+  assert.match(commitmentsSource, /detail\.memory/);
   assert.doesNotMatch(commitmentsSource, />Your decision</);
   assert.doesNotMatch(commitmentsSource, />Evidence behind this</);
 });
@@ -255,14 +278,19 @@ test("Sources makes receipt forwarding primary and keeps manual evidence behind 
     "Waiting for a receipt",
     "Receipt received",
     "Looking for renewals",
-    "Keep Vognary current",
+    "Matching billing mail should arrive on its own",
     "Rotate address",
     "Stop receiving",
     "Manual fallback",
     "If Gmail sends a confirmation challenge",
+    "Where evidence can come from",
+    "Planned sources are listed honestly and cannot be connected",
   ]) {
     assert.ok(sourcesSource.includes(copy), `Sources must render ${copy}`);
   }
+  assert.doesNotMatch(sourcesSource, /gmailOauthReady:\s*true/);
+  assert.match(sourcesSource, /availability === "SETUP" \? "pill pill-partial"/);
+  assert.doesNotMatch(sourcesSource, /Connect Google|Connect Gmail|Connect Microsoft|Connect Zoho/i);
   assert.match(clientSource, /<RecoverySources/);
   assert.match(clientSource, /onDisconnectEvidenceSource/);
   assert.match(clientSource, /onReconnectEvidenceSource/);
@@ -283,28 +311,32 @@ test("Sources makes receipt forwarding primary and keeps manual evidence behind 
 });
 
 test("Sources carries a user through billing-only forwarding and historical backfill", () => {
+  const onboarding = `${sourcesSource}\n${billingSetupSource}`;
   for (const copy of [
     "Address ready",
     "Verify the forwarding address",
     "Keep global forwarding disabled",
-    "Filter messages like these",
+    "Create one billing-only Gmail filter",
     "Forward it to",
     "Filters affect new matching mail only",
     "Forward as attachment",
     "batches of up to 20",
-    "Forwarding address verified",
-    "Receipt flow proven",
+    "Gmail address verified",
+    "First matching billing email received",
     "Historical backfill complete",
+    "Copy Gmail search",
   ]) {
-    assert.ok(sourcesSource.includes(copy), `Sources onboarding must render ${copy}`);
+    assert.ok(onboarding.includes(copy), `Sources onboarding must render ${copy}`);
   }
-  assert.match(sourcesSource, /receiptInbox\.setupCompletedAt/);
-  assert.match(sourcesSource, /receiptInbox\.forwardingVerifiedAt/);
-  assert.match(sourcesSource, /receiptInbox\.backfillCompletedAt/);
-  assert.match(sourcesSource, /support\.google\.com\/mail\/answer\/10957/);
-  assert.match(sourcesSource, /support\.google\.com\/mail\/answer\/6579/);
-  assert.match(sourcesSource, /support\.google\.com\/mail\/answer\/9261412/);
-  assert.doesNotMatch(sourcesSource, /Forward a copy of incoming mail to/);
+  assert.match(billingSetupSource, /receiptInbox\.setupCompletedAt/);
+  assert.match(billingSetupSource, /receiptInbox\.forwardingVerifiedAt/);
+  assert.match(billingSetupSource, /receiptInbox\.backfillCompletedAt/);
+  assert.match(billingSetupSource, /gmailForwardingHelpUrl|answer\/10957/);
+  assert.match(billingSetupSource, /gmailFilterHelpUrl|answer\/6579/);
+  assert.match(billingSetupSource, /gmailAttachmentHelpUrl|answer\/9261412/);
+  assert.match(billingSetupSource, /Leave &quot;Forward a copy of incoming mail to&quot; off/);
+  assert.doesNotMatch(onboarding, /For each known billing sender/);
+  assert.doesNotMatch(onboarding, /Forward billing emails manually, or use Gmail/);
 });
 
 test("rollback notices name every failed authority action instead of calling it evidence", () => {
