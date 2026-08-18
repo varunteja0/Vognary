@@ -22,7 +22,7 @@ test("the workspace wires Sources and delegates account settings to the profile 
 test("Sources fails closed on authentication and preserves every fallback control", () => {
   assert.match(sourcesSource, /import \{ AuthRequiredBlock, LoadingBlock, StateBlock \}/);
   assert.match(sourcesSource, /sourceStatus\.kind === "AUTH_REQUIRED" \? \([\s\S]*?<AuthRequiredBlock \/>/);
-  assert.match(sourcesSource, /Manual fallback/);
+  assert.match(sourcesSource, /Add more bills/);
   assert.match(sourcesSource, /onRotate/);
   assert.match(sourcesSource, /Rotate address/);
   assert.match(sourcesSource, /onRevoke/);
@@ -33,7 +33,7 @@ test("Sources stays available for manual evidence when receipt forwarding is not
   assert.match(sourcesRoute, /configurationRequired: false/);
   assert.match(inboundStore, /state: "UNAVAILABLE"/);
   assert.match(sourcesSource, /receiptInbox\?\.state === "UNAVAILABLE"/);
-  assert.match(sourcesSource, /Use the manual fallback below/);
+  assert.match(sourcesSource, /Paste or upload billing evidence/);
 });
 
 test("Sources describes forwarding without pretending sender intent or inbox access is enforced", () => {

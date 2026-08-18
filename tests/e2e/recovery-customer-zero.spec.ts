@@ -62,16 +62,13 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await loginAsDevelopmentUser(page);
   await expect(page.getByRole("heading", { level: 1, name: "Your commitments" })).toBeVisible();
 
-  // 4-7. Use the explicit manual fallback once and persist real-format receipts.
-  await openEvidenceInput(page);
+  // 4-7. Add bills from empty Home, not Gmail setup.
+  await expect(page.getByRole("heading", { name: "Add a few recent software bills" })).toBeVisible();
+  await page.getByRole("button", { name: "Add a few recent software bills" }).click();
   const receiptInput = page.getByLabel("Receipt or invoice text");
   await receiptInput.fill(`${firstReceipt}\n\n${secondReceipt}`);
   await page.getByRole("button", { name: "Save this receipt as evidence" }).click();
-  await expect(page.getByRole("heading", { name: "What the workspace did with it" })).toBeVisible();
-  await expect(page.getByText("Accepted", { exact: true }).first()).toBeVisible();
-  await selectRecoveryView(page, "Home");
-
-  // 8-11. Home shows attention, upcoming charges, and source freshness without a fake comparison.
+  await expect(page.getByRole("heading", { name: "What we found" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
@@ -81,7 +78,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await expect(page.getByText("Annualized estimate", { exact: true })).toBeVisible();
   await expect(page.getByText(/It is not a historical yearly total/)).toBeVisible();
   await expect(page.getByText("Active commitments")).toBeVisible();
-  await expect(page.getByText("Needs review")).toBeVisible();
+  await expect(page.getByText("Needs review", { exact: true })).toBeVisible();
   await expect(page.getByText("OpenAI").first()).toBeVisible();
   await expectNoSeriousAxeViolations(page, "Recovery Home baseline");
   await expectNoHorizontalOverflow(page);
@@ -176,9 +173,6 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await openEvidenceInput(page);
   await page.getByLabel("Receipt or invoice text").fill(laterReceipt);
   await page.getByRole("button", { name: "Save this receipt as evidence" }).click();
-  await expect(page.getByRole("heading", { name: "What the workspace did with it" })).toBeVisible();
-  await expect(page.getByText("Accepted", { exact: true })).toBeVisible();
-  await selectRecoveryView(page, "Home");
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toBeVisible();
   await expect(page.getByText("Amount changed").first()).toBeVisible();
 
@@ -249,13 +243,14 @@ async function selectRecoveryView(page: Page, name: "Home" | "Commitments" | "So
 
 async function openEvidenceInput(page: Page) {
   await selectRecoveryView(page, "Sources");
-  const fallback = page.getByText("Manual fallback", { exact: true });
   const receiptInput = page.getByLabel("Receipt or invoice text");
-  await expect(receiptInput.or(fallback)).toBeVisible();
-  if (!(await receiptInput.isVisible())) {
-    await expect(fallback).toBeVisible();
-    await fallback.click();
+  if (await receiptInput.isVisible()) {
+    await expect(receiptInput).toBeVisible();
+    return;
   }
+  const addMore = page.getByText("Add more bills", { exact: true });
+  await expect(addMore).toBeVisible();
+  await addMore.click();
   await expect(receiptInput).toBeVisible();
 }
 

@@ -21,7 +21,6 @@ import {
   confidenceTruthLayerLabels,
 } from "./labels";
 import { ConfidenceBadge, MoneyValue, StateBlock } from "./recovery-states";
-import type { LoadState } from "./state";
 
 // Home renders the server's home projection verbatim, in the server's order.
 // It performs no ranking, totalling, or recurrence reasoning of its own.
@@ -38,9 +37,6 @@ export function RecoveryHome({
   onOpenSources,
   onWorkspaceMutated,
   receiptInbox,
-  sourceStatus,
-  pendingSourceAction,
-  onProvisionReceiptInbox,
   onVeto,
   pendingVetoId,
   onCitedPictureRendered,
@@ -54,9 +50,6 @@ export function RecoveryHome({
   onOpenSources: () => void;
   onWorkspaceMutated?: () => void;
   receiptInbox: ReceiptInboxStatusDto | null;
-  sourceStatus: LoadState;
-  pendingSourceAction: "PROVISION" | "ROTATE" | "REVOKE" | null;
-  onProvisionReceiptInbox: () => void;
   onVeto?: (candidateId: string) => void;
   pendingVetoId?: string | null;
   onCitedPictureRendered?: (workspaceId: string) => void;
@@ -105,11 +98,7 @@ export function RecoveryHome({
 
   if (!home.coverage.evidenceCount) {
     return <EmptyRecoveryHome
-      receiptInbox={receiptInbox}
       receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable}
-      sourceStatus={sourceStatus}
-      pendingSourceAction={pendingSourceAction}
-      onProvisionReceiptInbox={onProvisionReceiptInbox}
       onAddEvidence={onAddEvidence}
       onOpenSources={onOpenSources}
     />;
@@ -117,6 +106,26 @@ export function RecoveryHome({
 
   return (
     <div className="grid gap-5">
+      <WhatWeFound home={home} />
+
+      {home.changed.state === "COMPARED" ? (
+        <section aria-labelledby="recovery-changed" className="panel border-ochre p-4 sm:p-5">
+          <p className="eyebrow eyebrow-xs text-ochre">New evidence compared</p>
+          <h3 id="recovery-changed" className="mt-2 font-display text-xl font-semibold text-(--ink)">Since your last visit</h3>
+          <div className="mt-4 grid gap-3">
+            {home.changed.items.length ? (
+              home.changed.items.map((item) => <ChangeRow key={item.id} item={item} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />)
+            ) : (
+              <StateBlock
+                eyebrow="No changes"
+                title="Your commitments look the same"
+                detail="No amount, date, frequency, or recurring status changed in the latest receipts."
+              />
+            )}
+          </div>
+        </section>
+      ) : null}
+
       <RecoveryAttention
         onOpenCommitment={onOpenCommitment}
         onOpenSources={onOpenSources}
@@ -146,29 +155,11 @@ export function RecoveryHome({
 
       <RecoveryProjectionDetails home={home} />
 
-      {home.changed.state === "COMPARED" ? (
-        <section aria-labelledby="recovery-changed" className="panel border-ochre p-4 sm:p-5">
-          <p className="eyebrow eyebrow-xs text-ochre">New evidence compared</p>
-          <h3 id="recovery-changed" className="mt-2 font-display text-xl font-semibold text-(--ink)">Since your last visit</h3>
-          <div className="mt-4 grid gap-3">
-            {home.changed.items.length ? (
-              home.changed.items.map((item) => <ChangeRow key={item.id} item={item} onOpenCommitment={onOpenCommitment} onInspectEvidence={onInspectEvidence} />)
-            ) : (
-              <StateBlock
-                eyebrow="No changes"
-                title="Your commitments look the same"
-                detail="No amount, date, frequency, or recurring status changed in the latest receipts."
-              />
-            )}
-          </div>
-        </section>
-      ) : (
-        <section aria-label="Keep this review current" className="border-y border-line px-1 py-4">
-          <p className="text-sm leading-6 text-(--ink-soft)">
-            <strong>Sheets go stale when new charges land.</strong> Add later receipts and Vognary will show what amount, date, or recurring status changed, with the new evidence beside it.
-          </p>
-        </section>
-      )}
+      <KeepCurrentOffer
+        receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable}
+        receiptInbox={receiptInbox}
+        onOpenSources={onOpenSources}
+      />
 
       <section aria-labelledby="recovery-receipts" className="grid gap-3 border-t border-line px-1 pt-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -190,8 +181,7 @@ export function RecoveryHome({
   );
 }
 
-const receiptsAlreadyHaveStory = "Start with the billing receipts you already have. Vognary shows what renews next when the receipts support it, what needs attention, and the receipt behind each claim.";
-const forwardingOnceStory = "Start with the billing receipts you already have. Set up billing forwarding once so matching mail keeps arriving. Vognary shows what renews next when the receipts support it, what needs attention, and the receipt behind each claim.";
+const receiptsAlreadyHaveStory = "Start with the billing receipts you already have. Vognary will reconstruct your current commitments, upcoming renewals and changes from the evidence. Cadence and renewal dates appear only when the receipts support them.";
 
 function RecoveryFirstValueMetrics({
   home,
@@ -210,7 +200,9 @@ function RecoveryFirstValueMetrics({
   }, [hasPicture, home.workspace.id, onCitedPictureRendered]);
 
   return (
-    <section aria-label="Recurring money" className={compact ? "panel p-3 sm:p-4" : "panel p-4 sm:p-5"}>
+    <section aria-labelledby={compact ? undefined : "recovery-committed"} aria-label={compact ? "Currently committed" : undefined} className={compact ? "panel p-3 sm:p-4" : "panel p-4 sm:p-5"}>
+      {compact ? null : <h3 id="recovery-committed" className="font-display text-xl font-semibold text-(--ink)">Currently committed</h3>}
+      <div className={compact ? undefined : "mt-4"}>
       <TotalBlock
         label="Monthly recurring amount"
         totals={home.monthlyTotals}
@@ -219,6 +211,7 @@ function RecoveryFirstValueMetrics({
           : "No recurring amount yet"}
         compact={compact}
       />
+      </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <CountBlock label="Active commitments" count={home.activeCommitmentCount} compact={compact} />
         <CountBlock label="Needs review" count={home.reviewItemCount} compact={compact} />
@@ -406,105 +399,88 @@ function SavedObservationRow({
   );
 }
 
-function EmptyRecoveryHome({
-  receiptInbox,
+function WhatWeFound({ home }: { home: HomeProjectionDto }) {
+  const comparedItems = home.changed.state === "COMPARED" ? home.changed.items : [];
+  const priceChanges = comparedItems.filter((item) => item.kind === "AMOUNT").length;
+  const facts: string[] = [];
+  if (home.activeCommitmentCount > 0) {
+    facts.push(`${home.activeCommitmentCount.toLocaleString("en-IN")} commitment${home.activeCommitmentCount === 1 ? "" : "s"} found`);
+  }
+  for (const total of home.monthlyTotals) {
+    facts.push(`${total.amount.display}/month currently identified`);
+  }
+  if (priceChanges > 0) {
+    facts.push(`${priceChanges.toLocaleString("en-IN")} price change${priceChanges === 1 ? "" : "s"}`);
+  }
+  if (home.next.length > 0) {
+    facts.push(`${home.next.length.toLocaleString("en-IN")} upcoming expected commitment${home.next.length === 1 ? "" : "s"}`);
+  }
+  if (home.reviewItemCount > 0) {
+    facts.push(`${home.reviewItemCount.toLocaleString("en-IN")} item${home.reviewItemCount === 1 ? "" : "s"} ${home.reviewItemCount === 1 ? "needs" : "need"} review`);
+  }
+  if (home.uncertainDuplicateCommitmentCount > 0) {
+    facts.push(
+      home.uncertainDuplicateCommitmentCount === 1
+        ? "1 item may be listed twice"
+        : `${home.uncertainDuplicateCommitmentCount.toLocaleString("en-IN")} items may be listed twice`,
+    );
+  }
+  if (!facts.length) return null;
+  return (
+    <section aria-labelledby="what-we-found" className="panel border-ochre p-4 sm:p-5">
+      <p className="eyebrow eyebrow-xs text-ochre">From your evidence</p>
+      <h3 id="what-we-found" className="mt-2 font-display text-xl font-semibold text-(--ink)">What we found</h3>
+      <ul className="mt-4 grid gap-2">
+        {facts.map((fact) => (
+          <li key={fact} className="font-display text-base font-semibold text-(--ink)">{fact}</li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs leading-5 text-(--muted)">Every figure is from stored evidence. Unknown remains unknown.</p>
+    </section>
+  );
+}
+
+function KeepCurrentOffer({
   receiptInboxPubliclyAvailable,
-  sourceStatus,
-  pendingSourceAction,
-  onProvisionReceiptInbox,
+  receiptInbox,
+  onOpenSources,
+}: {
+  receiptInboxPubliclyAvailable: boolean;
+  receiptInbox: ReceiptInboxStatusDto | null;
+  onOpenSources: () => void;
+}) {
+  if (!receiptInboxPubliclyAvailable) return null;
+  if (receiptInbox?.forwardingVerifiedAt && receiptInbox.setupCompletedAt) return null;
+  return (
+    <section aria-labelledby="keep-current" className="panel p-4 sm:p-5">
+      <p className="eyebrow eyebrow-xs text-ochre">After you have seen this</p>
+      <h3 id="keep-current" className="mt-2 font-display text-xl font-semibold text-(--ink)">Keep this current</h3>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
+        Set up a private Vognary billing address and one billing-only forwarding filter so matching mail can keep arriving. Vognary does not read the mailbox and does not capture every bill. Coverage depends on the rule you create.
+      </p>
+      <button type="button" onClick={onOpenSources} className="btn btn-primary mt-4">Keep Vognary current</button>
+    </section>
+  );
+}
+
+function EmptyRecoveryHome({
+  receiptInboxPubliclyAvailable,
   onAddEvidence,
   onOpenSources,
 }: {
-  receiptInbox: ReceiptInboxStatusDto | null;
   receiptInboxPubliclyAvailable: boolean;
-  sourceStatus: LoadState;
-  pendingSourceAction: "PROVISION" | "ROTATE" | "REVOKE" | null;
-  onProvisionReceiptInbox: () => void;
   onAddEvidence: () => void;
   onOpenSources: () => void;
 }) {
-  const [copyStatus, setCopyStatus] = useState("");
-  const alias = receiptInbox?.alias ?? null;
-
-  async function copyAddress() {
-    if (!alias) return;
-    try {
-      await navigator.clipboard.writeText(alias.address);
-      setCopyStatus("Address copied.");
-    } catch {
-      setCopyStatus("Could not copy automatically. Select the address and copy it.");
-    }
-  }
-
-  if (!receiptInboxPubliclyAvailable) {
-    return (
-      <section aria-label="Get your first result" className="panel p-5 sm:p-6">
-        <p className="eyebrow eyebrow-xs text-ochre">Manual evidence only</p>
-        <h3 className="mt-3 font-display text-xl font-semibold text-(--ink) sm:text-2xl">Add receipts to see what renews next</h3>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">{receiptsAlreadyHaveStory}</p>
-        <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-5">Add receipts manually</button>
-      </section>
-    );
-  }
-
-  if (alias) {
-    return (
-      <section aria-label="Get your first result" className="panel p-5 sm:p-6">
-        <p className="eyebrow eyebrow-xs text-ochre">Recommended first step</p>
-        <h3 className="mt-3 font-display text-xl font-semibold text-(--ink) sm:text-2xl">Your Vognary receipt address</h3>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">{forwardingOnceStory}</p>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <input aria-label="Your Vognary receipt address" className="field field-mono min-w-0" value={alias.address} readOnly />
-          <button type="button" onClick={() => void copyAddress()} className="btn btn-primary shrink-0">Copy address</button>
-        </div>
-        <p role="status" aria-live="polite" className="mt-2 min-h-5 text-xs text-(--muted)">{copyStatus}</p>
-        <button type="button" onClick={onOpenSources} className="btn btn-primary mt-3">Finish one-time billing setup</button>
-        <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-ghost mt-3">Add receipts manually</button>
-      </section>
-    );
-  }
-
-  if (sourceStatus.kind === "IDLE" || sourceStatus.kind === "LOADING") {
-    return (
-      <StateBlock
-        eyebrow="Preparing your first source"
-        title="Opening your receipt options…"
-        detail="Vognary is checking whether this deployment can create your private receipt address."
-      />
-    );
-  }
-
-  const canProvision = receiptInbox?.state === "NOT_PROVISIONED" || receiptInbox?.state === "REVOKED";
-  if (canProvision) {
-    return (
-      <section aria-label="Get your first result" className="panel p-5 sm:p-6">
-        <p className="eyebrow eyebrow-xs text-ochre">Recommended first step</p>
-        <h3 className="mt-3 font-display text-xl font-semibold text-(--ink) sm:text-2xl">Get your private receipt address</h3>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">
-          {forwardingOnceStory} Vognary never accesses or scans your inbox.
-        </p>
-        <button type="button" onClick={onProvisionReceiptInbox} disabled={pendingSourceAction !== null} className="btn btn-primary btn-lg mt-5">
-          {pendingSourceAction === "PROVISION" ? "Setting up address…" : "Set up receipt address"}
-        </button>
-        <button type="button" onClick={onOpenSources} className="btn btn-sm btn-ghost ml-0 mt-3 sm:ml-2">Open billing setup</button>
-        <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-ghost ml-0 mt-3 sm:ml-2">Add receipts manually</button>
-      </section>
-    );
-  }
-
   return (
     <section aria-label="Get your first result" className="panel p-5 sm:p-6">
-      <h3 className="font-display text-xl font-semibold text-(--ink) sm:text-2xl">Add receipts to see what renews next</h3>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">
-        {receiptInboxPubliclyAvailable ? forwardingOnceStory : receiptsAlreadyHaveStory}
-      </p>
-      {sourceStatus.kind === "FAILED" ? (
-        <p className="mt-2 text-xs leading-5 text-ochre">The receipt address could not be opened. Manual evidence still works.</p>
-      ) : null}
+      <p className="eyebrow eyebrow-xs text-ochre">First useful output</p>
+      <h3 className="mt-3 font-display text-xl font-semibold text-(--ink) sm:text-2xl">Add a few recent software bills</h3>
+      <p className="mt-2 max-w-xl text-sm leading-6 text-(--muted)">{receiptsAlreadyHaveStory}</p>
+      <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-5">Add a few recent software bills</button>
       {receiptInboxPubliclyAvailable ? (
-        <button type="button" onClick={onOpenSources} className="btn btn-primary mt-5">Open billing setup</button>
+        <button type="button" onClick={onOpenSources} className="btn btn-sm btn-ghost mt-3">Keep Vognary current later</button>
       ) : null}
-      <button type="button" onClick={onAddEvidence} className={`btn btn-lg mt-5 ${receiptInboxPubliclyAvailable ? "btn-ghost" : "btn-primary"}`}>Add receipts manually</button>
     </section>
   );
 }

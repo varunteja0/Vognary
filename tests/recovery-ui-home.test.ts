@@ -108,17 +108,20 @@ test("primary navigation keeps Mandate hidden until delivery is proven or author
 test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
   for (const source of [landingSource, loginSource, homeSource]) {
     assert.match(source, /billing receipts you already have/);
-    assert.match(source, /what renews next/);
   }
+  assert.match(landingSource, /what renews next/);
+  assert.match(loginSource, /what renews next/);
+  assert.match(homeSource, /upcoming renewals and changes from the evidence/);
   assert.match(landingSource, /Want it done for you\?/);
   assert.match(landingSource, /href="\/private-audit"/);
   assert.match(clientSource, /Your commitments/);
   assert.match(landingSource, /No bank passwords\. No mailbox access\. You choose which billing text to add\./);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
+  assert.doesNotMatch(landingSource, /Set up billing forwarding once so matching mail keeps arriving/);
 });
 
 test("home leads with action, only shows real changes, and keeps source freshness compact", () => {
-  for (const heading of ["Needs attention", "Since your last visit", "Coming up", "Receipts checked"]) {
+  for (const heading of ["What we found", "Needs attention", "Since your last visit", "Coming up", "Currently committed", "Receipts checked"]) {
     assert.ok(homeSource.includes(heading), `home must render ${heading}`);
   }
   for (const label of ["Monthly recurring amount", "Annualized estimate", "Next 30 days", "Active commitments", "Needs review"]) {
@@ -143,9 +146,13 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   assert.match(homeSource, /RecoveryFirstValueMetrics/);
   assert.match(homeSource, /RecoveryProjectionDetails/);
   assert.match(homeSource, /<RecoveryAttention/);
-  const graphChangesIndex = homeSource.indexOf("<RecoveryAttention");
+  const populatedHome = homeSource.slice(homeSource.indexOf("<WhatWeFound"));
+  const lastVisitIndex = populatedHome.indexOf('aria-labelledby="recovery-changed"');
+  const graphChangesIndex = populatedHome.indexOf("<RecoveryAttention");
+  const populatedNeedsAttentionIndex = populatedHome.indexOf('aria-labelledby="recovery-needs-me"');
+  assert.ok(lastVisitIndex >= 0 && lastVisitIndex < graphChangesIndex, "returning-user last-visit changes must lead graph-backed What changed");
+  assert.ok(graphChangesIndex >= 0 && graphChangesIndex < populatedNeedsAttentionIndex, "graph-backed What changed must lead Needs attention");
   const needsAttentionIndex = homeSource.indexOf('aria-labelledby="recovery-needs-me"');
-  assert.ok(graphChangesIndex >= 0 && graphChangesIndex < needsAttentionIndex, "graph-backed What changed must lead Needs attention");
   const secondaryProjectionIndexes = [...homeSource.matchAll(/<RecoveryProjectionDetails/g)].map((match) => match.index);
   assert.ok(
     secondaryProjectionIndexes.some((index) => index > needsAttentionIndex),
@@ -181,10 +188,12 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   assert.match(clientSource, /transport\.evidence\(/);
 });
 
-test("returning Home leads with graph-backed changes before last-visit diffs and exports only the Recovery projection", () => {
-  assert.ok(homeSource.indexOf("<RecoveryAttention") < homeSource.indexOf("Needs attention"));
-  assert.ok(homeSource.indexOf("Needs attention") < homeSource.indexOf("Since your last visit"));
-  assert.match(homeSource, /Sheets go stale when new charges land/);
+test("returning Home leads with last-visit changes, then graph-backed changes, and exports only the Recovery projection", () => {
+  const populatedHome = homeSource.slice(homeSource.indexOf("<WhatWeFound"));
+  assert.ok(populatedHome.indexOf("Since your last visit") < populatedHome.indexOf("<RecoveryAttention"));
+  assert.ok(populatedHome.indexOf("<RecoveryAttention") < populatedHome.indexOf("Needs attention"));
+  assert.match(homeSource, /Keep this current/);
+  assert.doesNotMatch(homeSource, /Sheets go stale when new charges land/);
   assert.match(homeSource, /This is a floor from receipts checked, not every debit in India\./);
   assert.match(homeSource, /home\.confidenceLayers/);
   assert.match(homeSource, /confidenceTruthLayerLabels\[layer\.layer\]/);
@@ -198,15 +207,18 @@ test("returning Home leads with graph-backed changes before last-visit diffs and
   assert.doesNotMatch(homeSource, /renderAuditReportShareText|buildAuditReport/);
 });
 
-test("an empty Home loads and surfaces the receipt source before manual evidence", () => {
+test("an empty Home leads with adding bills, not Gmail setup", () => {
   assert.match(clientSource, /void loadSources\(\)/);
   assert.match(clientSource, /receiptInbox=\{state\.receiptInbox\}/);
-  assert.match(homeSource, /Your Vognary receipt address/);
-  assert.match(homeSource, /Copy address/);
-  assert.match(homeSource, /Set up receipt address/);
-  assert.match(homeSource, /Finish one-time billing setup/);
-  assert.match(homeSource, /Add receipts manually/);
+  assert.match(homeSource, /Add a few recent software bills/);
+  assert.match(homeSource, /reconstruct your current commitments, upcoming renewals and changes/);
+  assert.match(homeSource, /Keep Vognary current later/);
   assert.match(clientSource, /onOpenSources=/);
+  assert.doesNotMatch(homeSource, /Finish one-time billing setup/);
+  assert.doesNotMatch(homeSource, /Set up receipt address/);
+  assert.doesNotMatch(homeSource, /Add receipts manually/);
+  assert.doesNotMatch(homeSource, /Your Vognary receipt address/);
+  assert.doesNotMatch(homeSource, /Recommended first step/);
 });
 
 test("canonical Recovery advertises the receipt inbox only behind public launch readiness", () => {
@@ -239,9 +251,9 @@ test("one observation is coached toward a second matching receipt instead of ren
   assert.match(homeSource, /observation\.amount/);
   assert.match(homeSource, /observation\.date/);
   for (const step of [
-    "Paste 2-3 billing emails or invoices",
-    "Use the same service twice",
-    "See monthly burn, an annualized estimate, the next expected charge, and one decision",
+    "Paste 2–5 recent software bills, invoices, or billing emails",
+    "Prefer more than one vendor, and two records from the same vendor",
+    "Vognary reconstructs current commitments, upcoming renewals, and changes only when the evidence supports them",
   ]) {
     assert.ok(addEvidenceSource.includes(step), `first-value guide must render ${step}`);
   }
@@ -268,7 +280,7 @@ test("commitments use ordinary language and three primary choices", () => {
   assert.doesNotMatch(commitmentsSource, />Evidence behind this</);
 });
 
-test("Sources makes receipt forwarding primary and keeps manual evidence behind a fallback", () => {
+test("Sources keeps forwarding as stay-current infrastructure and paste as the empty-workspace first action", () => {
   assert.ok(recoveryFiles.includes("recovery-sources.tsx"), "Recovery Sources view must exist");
   const sourcesSource = sourceOf("recovery-sources.tsx");
   for (const copy of [
@@ -281,17 +293,21 @@ test("Sources makes receipt forwarding primary and keeps manual evidence behind 
     "Matching billing mail should arrive on its own",
     "Rotate address",
     "Stop receiving",
-    "Manual fallback",
+    "Add more bills",
+    "Keep Vognary current",
+    "How Vognary stays current",
     "If Gmail sends a confirmation challenge",
-    "Where evidence can come from",
     "Planned sources are listed honestly and cannot be connected",
   ]) {
     assert.ok(sourcesSource.includes(copy), `Sources must render ${copy}`);
   }
+  assert.doesNotMatch(sourcesSource, /Sources are sensors/);
   assert.doesNotMatch(sourcesSource, /gmailOauthReady:\s*true/);
   assert.match(sourcesSource, /availability === "SETUP" \? "pill pill-partial"/);
   assert.doesNotMatch(sourcesSource, /Connect Google|Connect Gmail|Connect Microsoft|Connect Zoho/i);
   assert.match(clientSource, /<RecoverySources/);
+  assert.match(clientSource, /firstValue=\{workspaceEmpty\}/);
+  assert.match(clientSource, /keepCurrentOpen=\{keepCurrentOpen\}/);
   assert.match(clientSource, /onDisconnectEvidenceSource/);
   assert.match(clientSource, /onReconnectEvidenceSource/);
   assert.match(sourcesSource, /Disconnect source/);

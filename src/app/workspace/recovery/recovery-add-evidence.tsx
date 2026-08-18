@@ -39,13 +39,13 @@ export function RecoveryAddEvidence({
     <div className="grid gap-5">
       <section aria-labelledby="recovery-paste-heading" className="panel p-4 sm:p-6">
         <h3 id="recovery-paste-heading" className="font-display text-xl font-semibold text-(--ink) sm:text-2xl">
-          {variant === "EMPTY_WORKSPACE" ? "Paste your first receipt" : "Paste a receipt or invoice"}
+          {variant === "EMPTY_WORKSPACE" ? "Add a few recent software bills" : "Paste a receipt or invoice"}
         </h3>
         {variant === "EMPTY_WORKSPACE" ? (
           <ol className="mt-4 grid max-w-2xl gap-2 text-sm leading-6 text-(--muted)">
-            <li><strong className="text-(--ink-soft)">1.</strong> Paste 2-3 billing emails or invoices.</li>
-            <li><strong className="text-(--ink-soft)">2.</strong> Use the same service twice so Vognary can test a cadence.</li>
-            <li><strong className="text-(--ink-soft)">3.</strong> See monthly burn, an annualized estimate, the next expected charge, and one decision when the receipts support them.</li>
+            <li><strong className="text-(--ink-soft)">1.</strong> Paste 2–5 recent software bills, invoices, or billing emails.</li>
+            <li><strong className="text-(--ink-soft)">2.</strong> Prefer more than one vendor, and two records from the same vendor when you want Vognary to test a cadence.</li>
+            <li><strong className="text-(--ink-soft)">3.</strong> Vognary reconstructs current commitments, upcoming renewals, and changes only when the evidence supports them. Unknown stays unknown.</li>
           </ol>
         ) : (
           <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Paste the receipt text exactly as you received it. It is stored as evidence and never edited.</p>

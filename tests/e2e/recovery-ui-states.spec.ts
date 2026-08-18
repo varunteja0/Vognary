@@ -121,12 +121,11 @@ async function mockEmptyWorkspace(page: Page, home = emptyHome) {
 
 async function openManualFallback(page: Page) {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
-  const fallback = page.getByText("Manual fallback", { exact: true });
   const receiptInput = page.getByLabel("Receipt or invoice text");
-  if (!(await receiptInput.isVisible())) {
-    await expect(fallback).toBeVisible();
-    await fallback.click();
-  }
+  if (await receiptInput.isVisible()) return;
+  const addMore = page.getByText("Add more bills", { exact: true });
+  await expect(addMore).toBeVisible();
+  await addMore.click();
   await expect(receiptInput).toBeVisible();
 }
 
@@ -134,12 +133,15 @@ test("an empty workspace offers exactly one obvious receipt-paste action", async
   await signIn(page);
   const { activationCalls } = await mockEmptyWorkspace(page);
   await page.goto("/app");
-  await openManualFallback(page);
 
-  await expect(page.getByRole("heading", { name: "Paste your first receipt" })).toBeVisible();
-  await expect(page.getByText("Paste 2-3 billing emails or invoices.")).toBeVisible();
-  await expect(page.getByText("Use the same service twice so Vognary can test a cadence.")).toBeVisible();
-  await expect(page.getByText(/See monthly burn, an annualized estimate, the next expected charge, and one decision/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Add a few recent software bills" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add a few recent software bills" })).toBeVisible();
+  await page.getByRole("button", { name: "Add a few recent software bills" }).click();
+
+  await expect(page.getByRole("heading", { name: "Add a few recent software bills" })).toBeVisible();
+  await expect(page.getByText("Paste 2–5 recent software bills, invoices, or billing emails.")).toBeVisible();
+  await expect(page.getByText("Prefer more than one vendor, and two records from the same vendor when you want Vognary to test a cadence.")).toBeVisible();
+  await expect(page.getByText(/Vognary reconstructs current commitments, upcoming renewals, and changes only when the evidence supports them/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Save this receipt as evidence" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save this receipt as evidence" })).toBeDisabled();
   await expect(page.getByText("Import a statement file instead (fallback)")).toBeVisible();

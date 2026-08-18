@@ -409,6 +409,7 @@ test("evidence results decide whether the draft is cleared or kept for repair", 
     meta,
   });
   assert.equal(accepted.evidenceDraft.receiptText, "");
+  assert.equal(accepted.view, "HOME");
   assert.equal(accepted.announcement, "Evidence submitted. 1 evidence item saved from 1 submitted receipt.");
 
   const expanded = recoveryReducer(withDraft, {
@@ -431,6 +432,36 @@ test("evidence results decide whether the draft is cleared or kept for repair", 
   });
   assert.equal(rejected.evidenceDraft.receiptText, "OpenAI invoice INR 1,999", "rejected text must stay so it can be fixed");
   assert.equal(rejected.submission?.results[0].status, "REJECTED");
+
+  const onSources = recoveryReducer(withDraft, { type: "VIEW_SELECTED", view: "ADD_EVIDENCE" });
+  const acceptedFromSources = recoveryReducer(onSources, {
+    type: "EVIDENCE_SUBMITTED",
+    submission: { id: "submission-home", type: "RECEIPT_PASTE", ingestedAt: "2026-08-09T10:00:00.000Z", acceptedEvidenceCount: 1, results: [{ clientRef: "receipt-paste-1", status: "ACCEPTED", code: null, message: null }] },
+    home,
+    commitments: [commitment],
+    total: 2,
+    meta,
+  });
+  assert.equal(acceptedFromSources.view, "HOME");
+
+  const mixedFromSources = recoveryReducer(onSources, {
+    type: "EVIDENCE_SUBMITTED",
+    submission: {
+      id: "submission-mixed",
+      type: "RECEIPT_PASTE",
+      ingestedAt: "2026-08-09T10:00:00.000Z",
+      acceptedEvidenceCount: 1,
+      results: [
+        { clientRef: "receipt-paste-1", status: "ACCEPTED", code: null, message: null },
+        { clientRef: "receipt-paste-2", status: "REJECTED", code: "PARSE_FAILED", message: "No merchant, amount, and date were found." },
+      ],
+    },
+    home,
+    commitments: [commitment],
+    total: 2,
+    meta,
+  });
+  assert.equal(mixedFromSources.view, "ADD_EVIDENCE");
 });
 
 test("dialogs record where focus must return and prefill corrections from server values only", () => {

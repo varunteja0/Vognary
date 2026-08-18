@@ -32,7 +32,7 @@ export function RecoveryCommitments({ state, handlers }: { state: RecoveryState;
         title="No commitments yet"
         detail="Add a software receipt and Vognary will show a commitment only when the receipt supports it."
       >
-        <button type="button" onClick={handlers.onAddEvidence} className="btn btn-primary">Add receipts</button>
+        <button type="button" onClick={handlers.onAddEvidence} className="btn btn-primary">Add a few recent software bills</button>
       </StateBlock>
     );
   }

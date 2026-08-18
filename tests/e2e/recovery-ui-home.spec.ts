@@ -256,12 +256,15 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(nav.getByRole("button", { name: "Mandate" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: `Account for ${email}` })).toHaveAttribute("href", "/profile");
 
+  await expect(page.getByRole("heading", { name: "What we found" })).toBeVisible();
+  await expect(page.getByText("1 commitment found")).toBeVisible();
   await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
 
+  await expect(page.getByRole("heading", { name: "Currently committed" })).toBeVisible();
   await expect(page.getByText("Monthly recurring amount")).toBeVisible();
   const attentionBox = await page.getByRole("heading", { name: "Needs attention" }).boundingBox();
   const recurringAmountBox = await page.getByText("Monthly recurring amount").boundingBox();
@@ -274,12 +277,11 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByText("Annualized estimate", { exact: true })).toBeVisible();
   await expect(page.getByText(/It is not a historical yearly total/)).toBeVisible();
   await expect(page.getByText("Active commitments")).toBeVisible();
-  await expect(page.getByText("Needs review")).toBeVisible();
+  await expect(page.getByText("Needs review", { exact: true })).toBeVisible();
   await expect(page.getByText("Confirm OpenAI")).toBeVisible();
   await expect(page.getByText("Low confidence")).toBeVisible();
   await expect(page.getByText("6 Aug 2026 · in 3 days")).toBeVisible();
   await expect(page.getByText(/1 item from 1 source · latest/)).toBeVisible();
-  await expect(page.getByText("Sheets go stale when new charges land.", { exact: false })).toBeVisible();
 
   await page.getByRole("button", { name: "Copy for WhatsApp" }).click();
   await expect(page.getByText("WhatsApp summary copied.", { exact: true })).toBeVisible();
@@ -323,7 +325,7 @@ test("later evidence produces a genuine changed list instead of a baseline", asy
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toBeVisible();
   const changedBox = await page.getByRole("heading", { name: "Since your last visit" }).boundingBox();
   const attentionBox = await page.getByRole("heading", { name: "Needs attention" }).boundingBox();
-  expect(attentionBox?.y).toBeLessThan(changedBox?.y ?? 0);
+  expect(changedBox?.y).toBeLessThan(attentionBox?.y ?? 0);
   await expect(page.getByText("Amount changed")).toBeVisible();
   const changeRow = page.locator("article").filter({ hasText: "Amount changed" });
   await expect(changeRow.getByText("₹1,999.00")).toBeVisible();

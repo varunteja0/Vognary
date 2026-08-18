@@ -10,7 +10,7 @@
 | Wedge sharpness | 8 | 2026-07-21 | Strategy review |
 | Intelligence engine | 6 | 2026-07-21 | Engines strong; corpus empty |
 | Trust & honesty | 9 | 2026-07-21 | Claims CI + fail-closed design |
-| Product UX | 7.5 | 2026-08-16 | Cited first-value Home + fail-closed Autopilot UI is automated across desktop/mobile, including real-PostgreSQL Customer #0, correction propagation, export/delete, mandate/revoke, axe, overflow, and reduced motion. Real-human <3 min remains unmeasured |
+| Product UX | 7.5 | 2026-08-18 | Value-first empty Home (add 2–5 bills before Gmail) is in code. Cited first-value Home + fail-closed Autopilot UI remains automated across desktop/mobile. Real-human <3 min remains unmeasured |
 | Backend readiness | 8 | 2026-07-21 | SLOs met in production |
 | Production activation | 7 | 2026-08-18 | Schema through `0053`. Durable R2 backup GET-restore proven by GitHub run `32109925496`. Inbox processing is on (unsigned inbound 401 unauthorized; readiness missing list empty). Google forwarding confirmation reached the founder v1 alias at 15:06 UTC (`GMAIL_VERIFICATION_PENDING`, URL stored). `bfeb457` treated that mail as a failed billing receipt; Sources confirmation UX is the live defect being fixed. HMAC key id remains `receipt-alias-v1`. Real automatic receipt, second automatic receipt, and replay remain unproven |
 | Live connector depth | 4 | 2026-07-21 | Registry ≠ live |

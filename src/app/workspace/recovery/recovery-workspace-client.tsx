@@ -104,6 +104,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   const [inspectedEvidenceFailure, setInspectedEvidenceFailure] = useState<TransportFailure | null>(null);
   const [inspectingEvidence, setInspectingEvidence] = useState(false);
   const [manualFallbackOpen, setManualFallbackOpen] = useState(false);
+  const [keepCurrentOpen, setKeepCurrentOpen] = useState(false);
   const viewHeadingRef = useRef<HTMLHeadingElement>(null);
   const viewChangedRef = useRef(false);
 
@@ -375,7 +376,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   useEffect(() => {
     if (
       state.status.kind !== "READY"
-      || state.home?.coverage.evidenceCount
+      || !state.home?.coverage.evidenceCount
       || state.sourceStatus.kind !== "IDLE"
     ) return;
     void loadSources();
@@ -636,6 +637,8 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     else dispatch({ type: "SNAPSHOT_FAILED", failure: result });
   }
 
+  const workspaceEmpty = state.home !== null && state.commitments.length === 0 && state.home.coverage.evidenceCount === 0;
+
   const commitmentsHandlers: CommitmentsHandlers = {
     onSelect: (commitmentId) => dispatch({ type: "COMMITMENT_SELECTED", commitmentId }),
     onDecide: (commitment, decision) => void decide(commitment, decision),
@@ -651,13 +654,16 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     },
     onReverseCorrection: (correction) => void reverseCorrection(correction),
     onEvidencePage: (cursor) => dispatch({ type: "DETAIL_EVIDENCE_PAGE_REQUESTED", cursor }),
-    onAddEvidence: () => selectView("ADD_EVIDENCE"),
+    onAddEvidence: () => {
+      setKeepCurrentOpen(false);
+      setManualFallbackOpen(!workspaceEmpty);
+      selectView("ADD_EVIDENCE");
+    },
     onRetryDetail: () => dispatch({ type: "DETAIL_EVIDENCE_PAGE_REQUESTED", cursor: state.detailEvidenceCursor }),
     onLoadMoreCommitments: () => void loadMoreCommitments(),
     loadingMoreCommitments,
   };
 
-  const workspaceEmpty = state.home !== null && state.commitments.length === 0 && state.home.coverage.evidenceCount === 0;
   const accountEmail = state.session?.authenticated ? state.session.session.email : null;
   const mandateAvailable = Boolean(state.home?.autopilot?.mandate)
     || state.home?.autopilot?.noticeReadiness.state === "proven-ready";
@@ -809,6 +815,9 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           onRetry={() => void loadSources()}
           manualFallbackOpen={manualFallbackOpen}
           onManualFallbackToggle={setManualFallbackOpen}
+          firstValue={workspaceEmpty}
+          keepCurrentOpen={keepCurrentOpen}
+          onKeepCurrentToggle={setKeepCurrentOpen}
           manualFallback={
             <RecoveryAddEvidence
               draft={state.evidenceDraft}
@@ -861,18 +870,17 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         onOpenCommitment={openCommitment}
         onInspectEvidence={inspectEvidence}
         onAddEvidence={() => {
-          setManualFallbackOpen(true);
+          setKeepCurrentOpen(false);
+          setManualFallbackOpen(!workspaceEmpty);
           selectView("ADD_EVIDENCE");
         }}
         onOpenSources={() => {
+          setKeepCurrentOpen(true);
           setManualFallbackOpen(false);
           selectView("ADD_EVIDENCE");
         }}
         onWorkspaceMutated={() => void loadSnapshot()}
         receiptInbox={state.receiptInbox}
-        sourceStatus={state.sourceStatus}
-        pendingSourceAction={state.pendingSourceAction}
-        onProvisionReceiptInbox={() => void updateReceiptInbox("PROVISION")}
         onVeto={(candidateId) => void vetoCandidate(candidateId)}
         pendingVetoId={state.pending?.kind === "CANDIDATE_VETO" ? state.pending.candidateId : null}
         onCitedPictureRendered={recordCitedPictureActivation}

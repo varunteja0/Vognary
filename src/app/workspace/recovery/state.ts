@@ -509,6 +509,7 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         status: { kind: "READY" },
         refreshRequired: false,
         evidenceDraft: everyResultAccepted ? emptyEvidenceDraft : { ...state.evidenceDraft, preparing: false },
+        view: everyResultAccepted && action.submission.acceptedEvidenceCount > 0 ? "HOME" : state.view,
         announcement: evidenceSubmissionAnnouncement(action.submission),
       };
     }

@@ -7,7 +7,7 @@
 
 ## Live state — independently verified 2026-08-18 21:00 IST
 
-**DURABLE BACKUP + RESTORE is 99%+ PROVEN** by GitHub run [`32109925496`](https://github.com/varunteja0/Vognary/actions/runs/32109925496) on `ec79022`. Inbox on. HMAC key id `receipt-alias-v1`. Alias unchanged.
+**VALUE-FIRST FIRST SESSION is in this tree.** Empty Home leads with adding 2–5 bills. Gmail/private inbox is Keep Vognary current after value. **DURABLE BACKUP + RESTORE is 99%+ PROVEN** by GitHub run [`32109925496`](https://github.com/varunteja0/Vognary/actions/runs/32109925496) on `ec79022`. Inbox on. HMAC key id `receipt-alias-v1`. Alias unchanged.
 
 Google's forwarding confirmation **was parsed** on the founder v1 alias at 2026-08-18 15:06 UTC: inbound `TERMINAL_FAILED` / `GMAIL_VERIFICATION_PENDING`, `gmail_verification_received_at` set, confirmation **URL stored** (`mail-settings.google.com/mail/vf-…`, 223 chars). No numeric code in the real Google message (URL-only, wrapped lines). `forwarding_verified_at` remains null until a matching billing email arrives after the founder confirms in Gmail.
 
@@ -21,15 +21,15 @@ Proof in that log, in order: `pg_dump` → AES-256-GCM (`keyFingerprint=8it2LaCH
 
 - Canonical product: **Commitment Intelligence**. Vognary maintains an evidence-backed model of what a 2–20 person software/AI company is already committed to, what changed, what comes next, how certain it is, and why.
 - First ICP: 2–20 person software/AI companies without finance/procurement ops.
-- Source 0: billing-email / receipt forwarding. One-time billing-source setup is the primary loop (Decision B, 2026-08-18): private alias → Gmail verification → one billing-only auto-forwarding filter → passive future evidence → interrupt only when uncertain. Manual forwarding is first-proof fallback, historical backfill assistance, and recovery only.
-- Product path: sign up → private alias → one-time billing-only forwarding → historical backfill → cited commitments → what changed → upcoming money → why/evidence → correction → honest source health.
+- Source 0: billing-email / receipt forwarding. One-time billing-source setup is the primary **ongoing** loop after first value (Decision B, 2026-08-18). First session is value-first: add 2–5 bills, then offer Keep Vognary current. Manual paste/upload is the first-session path. Manual forwarding remains historical backfill assistance and recovery.
+- Product path: sign in → add 2–5 billing records → cited commitments → what changed → upcoming money → why/evidence → correction → then keep current (private alias + billing-only auto-forwarding) → honest source health.
 - Direct connectors: Google Workspace / Gmail OAuth is **BLOCKED BY EXTERNAL APPROVAL** (`gmail.readonly` is Restricted; production mailbox storage requires Google verification plus an annual third-party security assessment). Source Hub may list it as Planned. Do not show Connect. Do not advertise mailbox sync. Microsoft 365, Zoho Books, accounting, card/bank settlement, and vendor APIs stay **DEFERRED BY DESIGN**. Do not build AA/banks, cancellation/autonomous action, or a redesign until real users select it.
 - Future Gmail, when unblocked: **selective direct mailbox intelligence**, not full mailbox warehousing. Do not implement OAuth in V1.
 
 ## 1. Exact checkout
 
 - Folder: `/Users/varunteja/Desktop/CVT Group/Vognary`
-- Branch: `main`. Next production SHA is this Gmail-confirmation UX fix on parent `bfeb4577bf2ebbd6f8887e41d2cb1067472ec262`. Keep `ENABLE_RECEIPT_INBOX=true` and `RECEIPT_INBOX_ALIAS_HMAC_KEY_ID=receipt-alias-v1`. Do not rotate aliases. Unsigned inbound must stay 401 unauthorized.
+- Branch: `main`. Next production SHA is this value-first first-session commit on parent `dc39f8e23cfcd5ab43d32642467484c84f057cb4`. Keep `ENABLE_RECEIPT_INBOX=true` and `RECEIPT_INBOX_ALIAS_HMAC_KEY_ID=receipt-alias-v1`. Do not rotate aliases. Unsigned inbound must stay 401 unauthorized.
 - This commit is the Commitment Intelligence / Decision B / golden-corpus / honest Source Hub / expected-vs-observed / backup-truth hardening set. Do not discard it. Do not deploy a dirty tree.
 - Operations commits `5b983bf` and `f9b8a14` are pushed. They add the guarded `0053` migration and exact pre/current encrypted backup-restore profiles.
 - Safety commit `4fa6575` (`fix(recovery): honest cadence totals, receipt semantics, token-free veto, dead-code removal`) preserved the whole repair pass on top of `051444f` and is pushed.
@@ -133,19 +133,21 @@ Final orchestrated release gate on this checkout (2026-08-16, through 0047): **P
 - **PRODUCTION ACTIVATION BLOCKED ON LIVE RECEIPT.** Durable R2 backup + GET-restore is proven by run `32109925496` (see Live state). No inbound event after `ENABLE_RECEIPT_INBOX=true`. Two ACTIVE aliases are still `receipt-alias-v1`. Do not treat Sources “latest receipt processed” from 03:31 UTC as post-enable proof.
 - **MARKET NOT VALIDATED.** Zero first-ICP users have completed the production flow. Green engineering gates do not raise the business-validation row.
 
-## 4.1 Decision B onboarding — code present, production proof blocked
+## 4.1 Value-first first session, then Decision B keep-current
 
-Sources now teach one-time passive billing forwarding when the receipt inbox is publicly available: private alias → Gmail verification with global forwarding left off → one editable subject-only billing filter → wait for matching mail → separate one-time historical backfill. Manual paste/forward remains behind Manual fallback. Gmail filters apply to new mail only ([Google Help 6579](https://support.google.com/mail/answer/6579)). Filter-forwarding requires the address to be verified while automatic mailbox forwarding stays off ([Google Help 10957](https://support.google.com/mail/answer/10957)).
+Empty Home now leads with **Add a few recent software bills**. Gmail/private inbox remains the live automation rail and is offered as **Keep Vognary current** after evidence exists. Sources still teach private alias → Gmail verification with global forwarding left off → one editable subject-only billing filter → wait for matching mail → separate one-time historical backfill. Paste/upload is the first-session path, not a hidden fallback.
+
+Gmail filters apply to new mail only ([Google Help 6579](https://support.google.com/mail/answer/6579)). Filter-forwarding requires the address to be verified while automatic mailbox forwarding stays off ([Google Help 10957](https://support.google.com/mail/answer/10957)).
 
 `ENABLE_RECEIPT_INBOX` is now true. Production proof of a filter-generated receipt, then a second matching receipt without manual forwarding, remains blocked by section 5. Do not start Gmail OAuth. Do not create a new v1 address; rotate the HMAC key id first.
 
 ## 4.2 Commitment Intelligence surface — code in this pass
 
-Home now leads with graph-backed **What changed** (existing change signals; duplicate answers stay on those cards). Commitment detail publishes expected-vs-observed from the absence engine and an amount timeline from stored evidence. Sources shows an honest catalog: billing inbox is the only live/setup path; Google Workspace, Microsoft 365, and Zoho Books are **Planned**. Direct Gmail is **BLOCKED BY EXTERNAL APPROVAL** (`gmail.readonly` Restricted; [restricted-scope verification](https://developers.google.com/identity/protocols/oauth2/production-readiness/restricted-scope-verification) plus an annual security assessment). No Connect button. No mailbox-sync advertising.
+Empty Home leads with **Add a few recent software bills**. After accepted evidence, Home opens **What we found** from cited facts only, then last-visit changes, graph-backed What changed, Needs attention, Coming up, Currently committed, and **Keep this current**. Sources is how Vognary stays current: paste is first on an empty workspace; billing forwarding is offered after value. Commitment detail still publishes expected-vs-observed and Why. Source Hub catalog: billing inbox is the only live/setup path; Google Workspace, Microsoft 365, and Zoho Books are **Planned**. Direct Gmail is **BLOCKED BY EXTERNAL APPROVAL**. No Connect button. No mailbox-sync advertising.
 
-Do not enable notification sending, Autopilot execution, or `ENABLE_RECEIPT_INBOX` from this pass.
+Do not enable notification sending or Autopilot execution from this pass. Keep `ENABLE_RECEIPT_INBOX=true` and alias key `receipt-alias-v1`.
 
-Code gates on this checkout (2026-08-18), each run once: lint **0 errors** (1 pre-existing `no-location-assign-relative-destination` warning in untouched `src/app/instant-audit.tsx`) · typecheck **PASS** · `claims:check` **PASS** (24 surfaces) · `tokens:check` **PASS** · unit **905/905** · PostgreSQL **154/154** · Playwright **104/104** (2 skipped: receipt-inbox E2E env unset) · production build **PASS** · `perf:budget` **PASS**.
+Code gates on this checkout (2026-08-18), each run once: lint **0 errors** (1 pre-existing `no-location-assign-relative-destination` warning in untouched `src/app/instant-audit.tsx`) · typecheck **PASS** · `claims:check` **PASS** (25 surfaces) · `tokens:check` **PASS** · unit **910/910** · Playwright Customer #0 desktop+mobile **2/2** · recovery-ui-home/states/landing focused journeys green (2 skipped: receipt-inbox E2E env unset) · production build **PASS** · `perf:budget` **PASS**. PostgreSQL suite was not re-run; no migrations in this pass. Do not treat these gates as live-receipt proof.
 
 Hardening in this commit: golden release corpus for parser → money → headline totals; failed/declined payments are refused; `paid USD 13.30 on DATE` no longer loses the charge date at the decimal point; Source Hub setup is not styled as connected; PWA/layout copy is Commitment Intelligence; customer-facing “subscription” labels on attention/Home/absence/belief copy were aligned to commitment; public backup Proven requires the recorded R2 object restore. None of that is live-receipt proof.
 
@@ -160,7 +162,7 @@ Exact remaining activation blockers:
 3. ~~Deploy the exact Commitment Intelligence SHA to Vercel Production with inbox still false.~~ **DONE 2026-08-18:** Production of `bfeb457` is Ready and aliased to `www.vognary.com`.
 4. ~~Set `RECEIPT_INBOX_RETENTION_REVIEW_STATUS=approved`, then `ENABLE_RECEIPT_INBOX=true`.~~ **DONE and independently verified 2026-08-18:** readiness missing list is empty; unsigned inbound is 401 unauthorized.
 5. ~~Flip `RECEIPT_INBOX_ALIAS_HMAC_KEY_ID` to `receipt-alias-v2` while inbox is live.~~ **DEFERRED.** Dual-key overlap is not implemented. Leave v1.
-6. ~~Gmail confirmation mail to the v1 alias.~~ **Parsed 2026-08-18 15:06 UTC** (`GMAIL_VERIFICATION_PENDING`, URL stored). **Sources UX was defective on `bfeb457`** (confirmation looked like a failed receipt; step 2 had no CTA). This commit is the fix. Founder must confirm in Gmail after it is live, before any billing filter. `forwarding_verified_at` stays null until a later matching billing email.
+6. ~~Gmail confirmation mail to the v1 alias.~~ **Parsed 2026-08-18 15:06 UTC** (`GMAIL_VERIFICATION_PENDING`, URL stored). Confirmation CTA shipped in `dc39f8e`. This commit is value-first first session. Founder must confirm in Gmail after this SHA is live, before any billing filter. `forwarding_verified_at` stays null until a later matching billing email.
 
 Do not declare the product live until one real automatic billing receipt, then a second automatic receipt without manual forwarding, is proven.
 
