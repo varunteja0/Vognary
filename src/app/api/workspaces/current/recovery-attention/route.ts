@@ -106,6 +106,7 @@ function serializeGraph(view: Awaited<ReturnType<typeof readCommitmentGraph>>) {
     attention: view.attention.map((card) => ({
       id: card.id,
       commitmentId: card.commitmentId,
+      otherCommitmentId: card.otherCommitmentId,
       headline: card.headline,
       body: card.body,
       urgency: card.urgency,

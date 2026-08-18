@@ -37,6 +37,7 @@ const emptyHome: HomeProjectionDto = {
   },
   activeCommitmentCount: 0,
   unknownCadenceCommitmentCount: 0,
+  uncertainDuplicateCommitmentCount: 0,
   reviewItemCount: 0,
   evidenceSources: [],
 };
@@ -121,8 +122,10 @@ async function openManualFallback(page: Page) {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
   const fallback = page.getByText("Manual fallback", { exact: true });
   const receiptInput = page.getByLabel("Receipt or invoice text");
-  await expect(fallback).toBeVisible();
-  if (!(await receiptInput.isVisible())) await fallback.click();
+  if (!(await receiptInput.isVisible())) {
+    await expect(fallback).toBeVisible();
+    await fallback.click();
+  }
   await expect(receiptInput).toBeVisible();
 }
 

@@ -457,6 +457,7 @@ export type HomeProjectionDto = {
   coverage: CoverageDto;
   activeCommitmentCount: number;
   unknownCadenceCommitmentCount: number;
+  uncertainDuplicateCommitmentCount: number;
   reviewItemCount: number;
   evidenceSources: readonly RecoveryEvidenceSourceDto[];
   autopilot?: AutopilotHomeDto;

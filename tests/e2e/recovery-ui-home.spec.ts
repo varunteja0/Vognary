@@ -133,6 +133,7 @@ const home = {
   },
   activeCommitmentCount: 1,
   unknownCadenceCommitmentCount: 0,
+  uncertainDuplicateCommitmentCount: 0,
   reviewItemCount: 1,
   evidenceSources: [],
 };
@@ -326,7 +327,10 @@ test("a commitment exposes its exact evidence and returns focus after inspection
   await expect(dialog.getByText("Observed fact (exact excerpt)")).toBeVisible();
   await expect(dialog.getByText("Pasted receipt", { exact: true }).first()).toBeVisible();
   await expect(dialog.getByText("6 Jul 2026").first()).toBeVisible();
-  await expect(dialog.getByText("INR · 199900 in the smallest unit")).toBeVisible();
+  await expect(dialog.getByText("INR", { exact: true }).first()).toBeVisible();
+  await expect(dialog.getByText(/smallest unit/)).toHaveCount(0);
+  await expect(dialog.getByText(/unpublished/)).toHaveCount(0);
+  await expect(dialog.getByText(/legacy-evidence/)).toHaveCount(0);
   await expect(dialog.getByText("You submitted this evidence")).toBeVisible();
   await expect(dialog.getByText("Medium confidence", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Treat the amount and date as provisional until more evidence lands.")).toBeVisible();
@@ -399,7 +403,8 @@ test("correcting a commitment offers every contract field and shows reversible h
   await trigger.click();
   const dialog = page.getByRole("dialog", { name: "Correct amount" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText(/which is 199900 in the smallest unit of INR/)).toBeVisible();
+  await expect(dialog.getByText(/Enter the amount a founder would read on the receipt/)).toBeVisible();
+  await expect(dialog.getByText(/smallest unit/)).toHaveCount(0);
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(trigger).toBeFocused();
 });
@@ -504,6 +509,7 @@ test("an active mandate still shows the spend strip when no recurring amount is 
     next30DayTotals: [],
     activeCommitmentCount: 0,
     unknownCadenceCommitmentCount: 0,
+  uncertainDuplicateCommitmentCount: 0,
     reviewItemCount: 0,
     autopilot: {
       executionEnabled: false,
@@ -568,6 +574,7 @@ test("Home posts activation only after a cited recurring-spend picture actually 
     recentObservations: [],
     activeCommitmentCount: 0,
     unknownCadenceCommitmentCount: 0,
+  uncertainDuplicateCommitmentCount: 0,
     reviewItemCount: 0,
     coverage: {
       state: "NO_EVIDENCE",

@@ -56,6 +56,16 @@ function clientFailure(message: string, retryable: boolean): TransportFailure {
   return { ok: false, origin: "CLIENT", error: { code: "UNKNOWN", message, retryable, requestId: clientFailureReference } };
 }
 
+function unexplainedHttpFailure(status: number): TransportFailure {
+  if (status === 412) {
+    return clientFailure("A change landed after this page loaded. Reload to see the saved truth before trying again.", false);
+  }
+  return clientFailure(
+    "The workspace could not complete that action. Nothing was changed. Try again, or reload if this page is out of date.",
+    status >= 500,
+  );
+}
+
 function serverFailure(error: RecoveryError): TransportFailure {
   return { ok: false, origin: "SERVER", error };
 }
@@ -97,13 +107,13 @@ async function requestJson(doFetch: FetchLike, path: string, init?: RequestInit)
   try {
     payload = await response.json();
   } catch {
-    return { failure: clientFailure(`The workspace replied without a readable body (HTTP ${response.status}).`, response.status >= 500) };
+    return { failure: unexplainedHttpFailure(response.status) };
   }
   const contractFailure = readContractFailure(payload);
   if (contractFailure) return { failure: serverFailure(contractFailure) };
   const legacyMessage = readLegacyMessage(payload);
   if (legacyMessage) return { failure: { ok: false, origin: "SERVER", error: { code: "UNKNOWN", message: legacyMessage, retryable: response.status >= 500, requestId: clientFailureReference } } };
-  if (!response.ok) return { failure: clientFailure(`The workspace refused this request (HTTP ${response.status}) without an explained reason.`, response.status >= 500) };
+  if (!response.ok) return { failure: unexplainedHttpFailure(response.status) };
   return { payload };
 }
 

@@ -122,7 +122,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await expect(page.getByRole("heading", { name: "OpenAI India" })).toBeVisible();
 
   await saveCorrection(page, "Correct amount", "Correct amount", async (dialog) => {
-    await dialog.getByLabel(/Amount in the smallest unit/).fill("175000");
+    await dialog.getByLabel(/Amount in INR/).fill("1750.00");
   });
   await expect(page.getByText("Amount set to ₹1,750.00")).toBeVisible();
 
@@ -251,8 +251,11 @@ async function openEvidenceInput(page: Page) {
   await selectRecoveryView(page, "Sources");
   const fallback = page.getByText("Manual fallback", { exact: true });
   const receiptInput = page.getByLabel("Receipt or invoice text");
-  await expect(fallback).toBeVisible();
-  if (!(await receiptInput.isVisible())) await fallback.click();
+  await expect(receiptInput.or(fallback)).toBeVisible();
+  if (!(await receiptInput.isVisible())) {
+    await expect(fallback).toBeVisible();
+    await fallback.click();
+  }
   await expect(receiptInput).toBeVisible();
 }
 

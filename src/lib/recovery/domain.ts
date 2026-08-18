@@ -62,6 +62,11 @@ export type RecoveryObservationRecord = {
   date: string | null;
 };
 
+export type HeadlineDuplicateState = {
+  unresolvedCommitmentIds?: readonly string[];
+  confirmedSameGroups?: readonly (readonly string[])[];
+};
+
 export type HomeProjectionInput = {
   workspace: WorkspaceDto;
   generatedAt?: Date;
@@ -69,7 +74,21 @@ export type HomeProjectionInput = {
   observations?: readonly RecoveryObservationRecord[];
   sources: readonly RecoveryCoverageSource[];
   changed: HomeChangedDto;
+  duplicateState?: HeadlineDuplicateState;
 };
+
+const uncertainDuplicateLimitation =
+  "Monthly, next-30-day, and annual totals omit subscriptions that may be listed twice until you tell us whether they are the same.";
+
+export function commitmentIdsExcludedFromHeadlineTotals(state: HeadlineDuplicateState = {}): Set<string> {
+  const excluded = new Set(state.unresolvedCommitmentIds ?? []);
+  for (const group of state.confirmedSameGroups ?? []) {
+    const ids = [...new Set(group)].sort();
+    if (ids.length < 2) continue;
+    for (const id of ids.slice(1)) excluded.add(id);
+  }
+  return excluded;
+}
 
 // The single reminder rule: Home labels exactly what scheduleRenewalAlertsForWorkspace will act on.
 export const renewalAlertMinimumConfidence = 80;
@@ -88,9 +107,16 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
   const generatedAt = input.generatedAt ?? new Date();
   const today = dateOnly(generatedAt);
   const active = input.commitments.filter((commitment) => commitment.status === "ACTIVE");
+  const excludedFromHeadline = commitmentIdsExcludedFromHeadlineTotals(input.duplicateState);
+  const inHeadline = (commitment: CanonicalCommitmentRecord) => !excludedFromHeadline.has(commitment.id);
   const cadenceEstablished = active.filter((commitment) => commitment.cadence !== "IRREGULAR");
-  const monthlyTotals = buildTotals(cadenceEstablished, (commitment) => commitment.monthlyEquivalentMinor, monthlyTotalCorrectionFields);
+  const monthlyTotals = buildTotals(
+    cadenceEstablished.filter(inHeadline),
+    (commitment) => commitment.monthlyEquivalentMinor,
+    monthlyTotalCorrectionFields,
+  );
   const next30DayCommitments = active.filter((commitment) => {
+    if (!inHeadline(commitment)) return false;
     const days = commitment.nextExpectedDate ? daysBetween(today, commitment.nextExpectedDate) : null;
     return days !== null && days >= 0 && days <= 30;
   });
@@ -115,6 +141,8 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
     }));
 
   const needsMe = active.flatMap((commitment) => buildAttention(commitment, today));
+  const coverage = buildCoverage(input.sources, input.changed.state, generatedAt);
+  const unresolvedDuplicateCount = new Set(input.duplicateState?.unresolvedCommitmentIds ?? []).size;
 
   return {
     workspace: input.workspace,
@@ -133,9 +161,12 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
     needsMe,
     changed: input.changed,
     next,
-    coverage: buildCoverage(input.sources, input.changed.state, generatedAt),
+    coverage: unresolvedDuplicateCount
+      ? { ...coverage, limitations: [uncertainDuplicateLimitation, ...coverage.limitations] }
+      : coverage,
     activeCommitmentCount: active.length,
     unknownCadenceCommitmentCount: active.length - cadenceEstablished.length,
+    uncertainDuplicateCommitmentCount: unresolvedDuplicateCount,
     reviewItemCount: needsMe.length,
     evidenceSources: [],
   };

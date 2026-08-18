@@ -46,6 +46,7 @@ const home: HomeProjectionDto = {
   coverage: { state: "BASELINE_ONLY", sourceCount: 1, evidenceCount: 1, lastEvidenceAt: null, coverageStart: null, coverageEnd: null, limitations: [] },
   activeCommitmentCount: 0,
   unknownCadenceCommitmentCount: 0,
+  uncertainDuplicateCommitmentCount: 0,
   reviewItemCount: 0,
   evidenceSources: [],
 };
@@ -246,6 +247,7 @@ test("pages and details from another workspace version are rejected instead of m
   });
   assert.equal(staleDetail.refreshRequired, true);
   assert.equal(staleDetail.detail, null);
+  assert.equal(staleDetail.detailStatus.kind, "IDLE");
 });
 
 test("reloading a stale selected detail schedules a fresh detail request", () => {
@@ -429,7 +431,8 @@ test("dialogs record where focus must return and prefill corrections from server
   });
 
   assert.equal(open.returnFocusId, "recovery-correct-AMOUNT");
-  assert.equal(open.correctionDraft.amountMinor, "199900");
+  assert.equal(open.correctionDraft.amountMinor, "1999.00");
+  assert.equal(open.correctionDraft.amountCurrency, "INR");
   assert.equal(open.correctionDraft.merchant, "OpenAI");
   assert.equal(open.correctionDraft.cadence, "MONTHLY");
   assert.equal(open.correctionDraft.isRecurring, true);
@@ -440,14 +443,15 @@ test("dialogs record where focus must return and prefill corrections from server
 });
 
 test("correction drafts only become contract patches when they are complete", () => {
-  const base = { field: "MERCHANT", merchant: "", amountMinor: "", date: "", cadence: "MONTHLY", isRecurring: true, reason: "" } as const;
+  const base = { field: "MERCHANT", merchant: "", amountMinor: "", amountCurrency: "INR", date: "", cadence: "MONTHLY", isRecurring: true, reason: "" } as const;
 
   assert.equal(correctionPatchFromDraft({ ...base }), null);
   assert.deepEqual(correctionPatchFromDraft({ ...base, merchant: " OpenAI " }), { field: "MERCHANT", value: { merchant: "OpenAI" } });
   assert.equal(correctionPatchFromDraft({ ...base, field: "AMOUNT" }), null);
-  assert.equal(correctionPatchFromDraft({ ...base, field: "AMOUNT", amountMinor: "19.99" }), null);
-  assert.equal(correctionPatchFromDraft({ ...base, field: "AMOUNT", amountMinor: "0199900" }), null);
-  assert.deepEqual(correctionPatchFromDraft({ ...base, field: "AMOUNT", amountMinor: "9007199254740993" }), { field: "AMOUNT", value: { amountMinor: "9007199254740993" } });
+  assert.equal(correctionPatchFromDraft({ ...base, field: "AMOUNT", amountMinor: "19.999" }), null);
+  assert.equal(correctionPatchFromDraft({ ...base, field: "AMOUNT", amountMinor: "01999" }), null);
+  assert.deepEqual(correctionPatchFromDraft({ ...base, field: "AMOUNT", amountMinor: "1999.00" }), { field: "AMOUNT", value: { amountMinor: "199900" } });
+  assert.deepEqual(correctionPatchFromDraft({ ...base, field: "AMOUNT", amountMinor: "830" }), { field: "AMOUNT", value: { amountMinor: "83000" } });
   assert.equal(correctionPatchFromDraft({ ...base, field: "NEXT_EXPECTED_DATE", date: "06-08-2026" }), null);
   assert.deepEqual(correctionPatchFromDraft({ ...base, field: "NEXT_EXPECTED_DATE", date: "2026-08-06" }), { field: "NEXT_EXPECTED_DATE", value: { date: "2026-08-06" } });
   assert.deepEqual(correctionPatchFromDraft({ ...base, field: "CADENCE", cadence: "YEARLY" }), { field: "CADENCE", value: { cadence: "YEARLY" } });

@@ -35,6 +35,7 @@ import {
   projectCadenceMonthlyMinor,
   toMoneyDto,
   type CanonicalCommitmentRecord,
+  type HeadlineDuplicateState,
   type RecoveryCoverageSource,
   type RecoveryObservationRecord,
 } from "@/lib/recovery/domain";
@@ -2106,6 +2107,7 @@ async function loadHome(
   const commitments = await loadCommitmentRecords(client, membership.workspace_id);
   const observations = await loadRecentObservationRecords(client, membership.workspace_id);
   const sources = await loadCoverageSources(client, membership.workspace_id);
+  const duplicateState = await loadHeadlineDuplicateState(client, membership.workspace_id);
   const home = buildHomeProjection({
     workspace: {
       id: membership.workspace_id,
@@ -2118,12 +2120,40 @@ async function loadHome(
     observations,
     sources,
     changed,
+    duplicateState,
   });
   return {
     ...home,
     evidenceSources: await loadRecoveryEvidenceSources(client, membership.workspace_id),
     autopilot: await loadAutopilotHome(client, membership.workspace_id),
   };
+}
+
+async function loadHeadlineDuplicateState(client: PoolClient, workspaceId: string): Promise<HeadlineDuplicateState> {
+  const openSignals = await client.query<{ dedupe_key: string }>(
+    `select dedupe_key from recovery_change_signals
+     where workspace_id = $1
+       and kind = 'DUPLICATE_SUSPECTED'
+       and state in ('OPEN', 'ACKNOWLEDGED')`,
+    [workspaceId],
+  );
+  const unresolvedCommitmentIds = [...new Set(openSignals.rows.flatMap((row) => {
+    if (!row.dedupe_key.startsWith("DUPLICATE_SUSPECTED:")) return [];
+    const parts = row.dedupe_key.slice("DUPLICATE_SUSPECTED:".length).split(":");
+    return parts.length === 2 && parts[0] && parts[1] ? [parts[0], parts[1]] : [];
+  }))];
+
+  const links = await client.query<{ merchant_id: string; commitment_id: string }>(
+    `select merchant_id, commitment_id from recovery_merchant_links
+     where workspace_id = $1 and reversed_at is null`,
+    [workspaceId],
+  );
+  const byMerchant = new Map<string, string[]>();
+  for (const row of links.rows) {
+    byMerchant.set(row.merchant_id, [...(byMerchant.get(row.merchant_id) ?? []), row.commitment_id]);
+  }
+  const confirmedSameGroups = [...byMerchant.values()].filter((group) => group.length > 1);
+  return { unresolvedCommitmentIds, confirmedSameGroups };
 }
 
 async function loadRecentObservationRecords(client: PoolClient, workspaceId: string): Promise<RecoveryObservationRecord[]> {

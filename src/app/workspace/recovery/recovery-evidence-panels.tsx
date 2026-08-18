@@ -8,6 +8,7 @@ import {
   correctionStatusLabels,
   formatDay,
   formatMoment,
+  formatObservedInstant,
   provenanceLabels,
   sourceLabels,
 } from "./labels";
@@ -46,6 +47,7 @@ export function EvidenceRow({ evidence, buttonId, onInspect }: { evidence: Evide
 }
 
 export function EvidenceInspector({ evidence }: { evidence: EvidenceDto }) {
+  const observedLabel = evidence.observedAt ? formatObservedInstant(evidence.observedAt, evidence.date) : null;
   return (
     <div className="grid gap-4">
       <Fact label="Observed fact (exact excerpt)">
@@ -61,21 +63,21 @@ export function EvidenceInspector({ evidence }: { evidence: EvidenceDto }) {
           <p className="text-sm leading-6 text-(--ink)">{sourceLabels[evidence.source.type]}</p>
           <p className="mt-1 font-data text-xs text-(--muted)">{evidence.source.label}</p>
           <p className="mt-1 font-data text-xs text-(--muted)">Ingested {formatMoment(evidence.source.ingestedAt)}</p>
-          <p className="mt-1 font-data text-xs text-(--muted)">
-            Source covers {evidence.source.coverageStart ? formatDay(evidence.source.coverageStart) : "an unpublished start"} to {evidence.source.coverageEnd ? formatDay(evidence.source.coverageEnd) : "an unpublished end"}
-          </p>
+          {evidence.source.coverageStart || evidence.source.coverageEnd ? (
+            <p className="mt-1 font-data text-xs text-(--muted)">
+              Source covers {evidence.source.coverageStart ? formatDay(evidence.source.coverageStart) : "the earliest stored date"} to {evidence.source.coverageEnd ? formatDay(evidence.source.coverageEnd) : "the latest stored date"}
+            </p>
+          ) : null}
         </Fact>
-        <Fact label="Date">
+        <Fact label="Charge date">
           <p className="text-sm leading-6 text-(--ink)">{evidence.date ? formatDay(evidence.date) : "No date published"}</p>
-          <p className="mt-1 font-data text-xs text-(--muted)">
-            {evidence.observedAt ? `Observed ${formatMoment(evidence.observedAt)}` : "No observation instant published"}
-          </p>
+          {observedLabel ? <p className="mt-1 font-data text-xs text-(--muted)">{observedLabel}</p> : null}
         </Fact>
         <Fact label="Amount and currency">
           {evidence.amount ? (
             <>
               <MoneyValue amount={evidence.amount} className="text-lg font-semibold text-(--ink)" />
-              <p className="mt-1 font-data text-xs text-(--muted)">{evidence.amount.currency} · {evidence.amount.minor} in the smallest unit</p>
+              <p className="mt-1 font-data text-xs text-(--muted)">{evidence.amount.currency}</p>
             </>
           ) : (
             <p className="text-sm leading-6 text-(--muted)">No amount was published for this evidence.</p>
@@ -83,7 +85,6 @@ export function EvidenceInspector({ evidence }: { evidence: EvidenceDto }) {
         </Fact>
         <Fact label="Provenance">
           <p className="text-sm leading-6 text-(--ink)">{provenanceLabels[evidence.provenance.kind]}</p>
-          <p className="mt-1 font-data text-xs text-(--muted)">Reference {evidence.provenance.reference}</p>
           <p className="mt-1 font-data text-xs text-(--muted)">Immutable: this evidence can never be edited, only corrected above it.</p>
         </Fact>
         {evidence.senderTrust ? <SenderTrust evidence={evidence} /> : null}
@@ -222,10 +223,10 @@ export function CorrectionForm({
 
       {draft.field === "AMOUNT" ? (
         <label className="grid gap-1.5">
-          <span className="field-label">Amount in the smallest unit of {detail.amount.currency}</span>
-          <input className="field field-mono" inputMode="numeric" value={draft.amountMinor} onChange={(event) => onChange({ amountMinor: event.target.value })} autoComplete="off" />
+          <span className="field-label">Amount in {detail.amount.currency}</span>
+          <input className="field" inputMode="decimal" value={draft.amountMinor} onChange={(event) => onChange({ amountMinor: event.target.value })} autoComplete="off" />
           <span className="field-hint">
-            The workspace currently shows {detail.amount.display}, which is {detail.amount.minor} in the smallest unit of {detail.amount.currency}. Vognary will not convert units for you, so the exact smallest-unit number is required.
+            The workspace currently shows {detail.amount.display}. Enter the amount a founder would read on the receipt, not a converted unit.
           </span>
         </label>
       ) : null}

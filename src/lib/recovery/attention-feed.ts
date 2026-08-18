@@ -23,6 +23,7 @@ export type AttentionCard = {
   id: string;
   kind: ChangeSignalKind;
   commitmentId: string | null;
+  otherCommitmentId: string | null;
   sourceIds: readonly string[];
   headline: string;
   body: string;
@@ -34,6 +35,17 @@ export type AttentionCard = {
   deltaMinor: bigint | null;
   evidenceIds: readonly string[];
 };
+
+const duplicateKeyPrefix = "DUPLICATE_SUSPECTED:";
+
+export function otherCommitmentIdFromDuplicateKey(dedupeKey: string, commitmentId: string | null): string | null {
+  if (!dedupeKey.startsWith(duplicateKeyPrefix) || !commitmentId) return null;
+  const parts = dedupeKey.slice(duplicateKeyPrefix.length).split(":");
+  if (parts.length !== 2) return null;
+  if (parts[0] === commitmentId) return parts[1] ?? null;
+  if (parts[1] === commitmentId) return parts[0] ?? null;
+  return null;
+}
 
 const materialityRank: Record<ChangeMateriality, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
@@ -81,6 +93,7 @@ export function buildAttentionFeed(
       id: signal.dedupeKey,
       kind: signal.kind,
       commitmentId: signal.commitmentId,
+      otherCommitmentId: otherCommitmentIdFromDuplicateKey(signal.dedupeKey, signal.commitmentId),
       sourceIds: signal.citation.kind === "SOURCE_HEALTH"
         ? signal.citation.sourceIds
         : signal.citation.kind === "COVERED_ABSENCE"

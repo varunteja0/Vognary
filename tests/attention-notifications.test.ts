@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildAttentionFeed } from "../src/lib/recovery/attention-feed";
+import { buildAttentionFeed, otherCommitmentIdFromDuplicateKey } from "../src/lib/recovery/attention-feed";
 import type { ChangeSignal } from "../src/lib/recovery/change-intelligence";
 import {
   advanceNotificationDelivery,
@@ -73,10 +73,18 @@ test("attention urgency reflects both importance and how soon it lands", () => {
 test("attention offers the right next step for each kind", () => {
   const feed = buildAttentionFeed([
     signal({ dedupeKey: "a", kind: "COVERAGE_BROKEN", commitmentId: null, merchant: null }),
-    signal({ dedupeKey: "b", kind: "DUPLICATE_SUSPECTED" }),
+    signal({ dedupeKey: "DUPLICATE_SUSPECTED:c-1:c-2", kind: "DUPLICATE_SUSPECTED", commitmentId: "c-1" }),
     signal({ dedupeKey: "c", kind: "PRICE_INCREASE" }),
   ], { evaluatedOn });
   assert.deepEqual(feed.map((card) => card.nextStep).sort(), ["CONFIRM_SAME_SUBSCRIPTION", "RECONNECT_SOURCE", "REVIEW_SUBSCRIPTION"]);
+  const duplicate = feed.find((card) => card.nextStep === "CONFIRM_SAME_SUBSCRIPTION");
+  assert.equal(duplicate?.otherCommitmentId, "c-2");
+});
+
+test("duplicate attention keys expose the other commitment without leaking extra fields", () => {
+  assert.equal(otherCommitmentIdFromDuplicateKey("DUPLICATE_SUSPECTED:aaa:bbb", "aaa"), "bbb");
+  assert.equal(otherCommitmentIdFromDuplicateKey("DUPLICATE_SUSPECTED:aaa:bbb", "bbb"), "aaa");
+  assert.equal(otherCommitmentIdFromDuplicateKey("PRICE_INCREASE:c-1", "c-1"), null);
 });
 
 test("attention never shows internal vocabulary or raw scores", () => {

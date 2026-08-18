@@ -33,6 +33,7 @@ import {
   errorCopy,
   formatDay,
   formatMoment,
+  formatObservedInstant,
   projectionAmountProvenanceLabels,
   provenanceLabels,
   sourceLabels,
@@ -94,6 +95,7 @@ test("primary navigation keeps Mandate hidden until delivery is proven or author
   assert.match(clientSource, /aria-current=\{state\.view === view \? "page" : undefined\}/);
   assert.match(clientSource, /href="\/profile"/);
   assert.doesNotMatch(clientSource, /state\.view === "PROFILE"/);
+  assert.match(clientSource, /primaryViews\.length === 5 \? "grid-cols-5" : "grid-cols-4"/);
 });
 
 test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
@@ -154,7 +156,7 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   assert.match(homeSource, /Coming up/);
   assert.match(homeSource, /home\.next/);
   const metricsFn = homeSource.slice(homeSource.indexOf("function RecoveryFirstValueMetrics"));
-  assert.match(metricsFn, /empty="No recurring amount yet"/);
+  assert.match(metricsFn, /No recurring amount yet/);
   assert.doesNotMatch(
     metricsFn,
     /if \(!hasTotals\) return null/,
@@ -173,6 +175,8 @@ test("returning Home leads with attention before proven change and exports only 
   assert.ok(homeSource.indexOf("Needs attention") < homeSource.indexOf("Since your last visit"));
   assert.match(homeSource, /Sheets go stale when new charges land/);
   assert.match(homeSource, /This is a floor from receipts checked, not every debit in India\./);
+  assert.match(homeSource, /uncertainDuplicateCommitmentCount/);
+  assert.match(homeSource, /listed twice/);
   assert.match(homeSource, /renderRecoveryShareText\(home\)/);
   assert.match(homeSource, /Copy for WhatsApp/);
   assert.doesNotMatch(homeSource, /renderAuditReportShareText|buildAuditReport/);
@@ -389,20 +393,32 @@ test("dates are formatted for reading without shifting a calendar day", () => {
   assert.equal(formatDay("not-a-date"), "not-a-date");
   assert.match(formatMoment("2026-08-09T10:00:00.000Z"), /2026/);
   assert.equal(formatMoment("still-not-a-date"), "still-not-a-date");
+  assert.equal(formatObservedInstant("2026-08-01T00:00:00.000Z", "2026-08-01"), null);
+  assert.match(formatObservedInstant("2026-08-17T17:22:00.000Z", "2026-08-01") ?? "", /Recorded/);
 });
 
 test("evidence inspection exposes every fact the reader needs to check a rupee", () => {
   const panels = sourceOf("recovery-evidence-panels.tsx");
-  for (const label of ["Observed fact (exact excerpt)", "Source", "Date", "Amount and currency", "Provenance", "Confidence and uncertainty"]) {
+  for (const label of ["Observed fact (exact excerpt)", "Source", "Charge date", "Amount and currency", "Provenance", "Confidence and uncertainty"]) {
     assert.ok(panels.includes(label), `evidence inspection must show ${label}`);
   }
   assert.match(panels, /\{evidence\.excerpt\}/);
   assert.match(panels, /excerptTruncated/);
   assert.match(panels, /evidence\.source\.label/);
-  assert.match(panels, /evidence\.provenance\.reference/);
+  assert.doesNotMatch(panels, /evidence\.provenance\.reference/);
+  assert.doesNotMatch(panels, /unpublished start|unpublished end/);
+  const inspector = panels.slice(panels.indexOf("export function EvidenceInspector"), panels.indexOf("function SenderTrust"));
+  assert.doesNotMatch(inspector, /smallest unit|legacy-evidence/);
   assert.match(statesSource, /confidenceUncertainty\[confidence\.state\]/);
   assert.match(panels, /correction\.authoritativeAmount/);
   assert.doesNotMatch(panels, /Amount set to.*smallest currency unit/);
+  assert.doesNotMatch(panels, /smallest unit of/);
+  assert.match(panels, /Enter the amount a founder would read on the receipt/);
+  const attention = sourceOf("recovery-attention.tsx");
+  assert.match(attention, /Yes, they are the same/);
+  assert.match(attention, /No, they are different/);
+  assert.match(attention, /ANSWER_DUPLICATE/);
+  assert.match(attention, /card.nextStep === "CONFIRM_SAME_SUBSCRIPTION"/);
 });
 
 test("motion is left to the token layer, so reduced motion is honoured globally", () => {

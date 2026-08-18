@@ -16,7 +16,9 @@ export function renderRecoveryShareText(home: HomeProjectionDto): string {
     }
     lines.push("Currencies stay separate; no exchange rate was invented.");
   } else {
-    lines.push("No monthly recurring total is published from these receipts.");
+    lines.push(home.uncertainDuplicateCommitmentCount > 0
+      ? "No monthly recurring total is published while some subscriptions may be listed twice."
+      : "No monthly recurring total is published from these receipts.");
   }
 
   for (const total of home.monthlyTotals) {

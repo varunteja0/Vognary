@@ -432,3 +432,68 @@ test("Recovery rejects Changed items without reconstructible provenance", () => 
     provenance: { kind: "CORRECTION", correctionId: "correction-1", evidenceIds: ["old-evidence"] },
   }] as unknown as ChangeItemDto[]), /only its correction/i);
 });
+
+test("unresolved duplicate suspicions are omitted from headline money totals without merging rows", () => {
+  const workspace = { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 } as const;
+  const sources = [{
+    id: "source-1",
+    ingestedAt: now.toISOString(),
+    coverageStart: "2026-07-01",
+    coverageEnd: "2026-08-09",
+    evidenceCount: 4,
+  }];
+  const changed = { state: "NO_PRIOR_BASELINE" as const, fromVersion: null, toVersion: 1, items: [] as const };
+  const duplicateOpenAi: CanonicalCommitmentRecord = {
+    ...commitments[0],
+    id: "commitment-inr-copy",
+    evidenceIds: ["evidence-inr-copy"],
+  };
+
+  const uncertain = buildHomeProjection({
+    workspace,
+    generatedAt: now,
+    commitments: [commitments[0], duplicateOpenAi, commitments[1]],
+    sources,
+    changed,
+    duplicateState: {
+      unresolvedCommitmentIds: [commitments[0].id, duplicateOpenAi.id],
+    },
+  });
+  assert.equal(uncertain.activeCommitmentCount, 3);
+  assert.equal(uncertain.uncertainDuplicateCommitmentCount, 2);
+  assert.deepEqual(uncertain.monthlyTotals.map((total) => [total.amount.currency, total.amount.minor]), [["USD", "833"]]);
+  assert.deepEqual(uncertain.annualizedEstimateTotals.map((total) => [total.amount.currency, total.amount.minor]), [["USD", "9996"]]);
+  assert.ok(uncertain.coverage.limitations[0]?.includes("listed twice"));
+  assert.equal(hasCitedRecurringSpendPicture(uncertain), true);
+
+  const allUncertain = buildHomeProjection({
+    workspace,
+    generatedAt: now,
+    commitments: [commitments[0], duplicateOpenAi],
+    sources,
+    changed,
+    duplicateState: {
+      unresolvedCommitmentIds: [commitments[0].id, duplicateOpenAi.id],
+    },
+  });
+  assert.deepEqual(allUncertain.monthlyTotals, []);
+  assert.deepEqual(allUncertain.annualizedEstimateTotals, []);
+  assert.deepEqual(allUncertain.next30DayTotals, []);
+  assert.equal(hasCitedRecurringSpendPicture(allUncertain), false);
+
+  const confirmedSame = buildHomeProjection({
+    workspace,
+    generatedAt: now,
+    commitments: [commitments[0], duplicateOpenAi, commitments[1]],
+    sources,
+    changed,
+    duplicateState: {
+      confirmedSameGroups: [[commitments[0].id, duplicateOpenAi.id]],
+    },
+  });
+  assert.equal(confirmedSame.uncertainDuplicateCommitmentCount, 0);
+  assert.deepEqual(confirmedSame.monthlyTotals.map((total) => [total.amount.currency, total.amount.minor]), [
+    ["INR", "199900"],
+    ["USD", "833"],
+  ]);
+});

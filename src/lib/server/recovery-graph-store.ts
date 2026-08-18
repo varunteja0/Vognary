@@ -304,15 +304,29 @@ function buildMerchantClaims(input: {
  * translated back into the commitment it actually refers to before detection
  * runs. A question the customer has already answered is never asked again.
  */
+function confirmedSamePairKeys(links: readonly { commitment_id: string; merchant_id: string }[]) {
+  const commitmentsByMerchant = new Map<string, string[]>();
+  for (const link of links) {
+    commitmentsByMerchant.set(link.merchant_id, [...(commitmentsByMerchant.get(link.merchant_id) ?? []), link.commitment_id]);
+  }
+  const keys = new Set<string>();
+  for (const group of commitmentsByMerchant.values()) {
+    const ids = [...new Set(group)].sort();
+    for (let i = 0; i < ids.length; i += 1) {
+      for (let j = i + 1; j < ids.length; j += 1) {
+        keys.add(`${ids[i]}:${ids[j]}`);
+      }
+    }
+  }
+  return { commitmentsByMerchant, keys };
+}
+
 function buildDuplicateSuspicions(
   claims: readonly CanonicalMerchantRecord[],
   rejections: readonly { commitment_id: string; merchant_id: string }[],
   links: readonly { commitment_id: string; merchant_id: string }[],
 ): DuplicateSuspicion[] {
-  const commitmentsByMerchant = new Map<string, string[]>();
-  for (const link of links) {
-    commitmentsByMerchant.set(link.merchant_id, [...(commitmentsByMerchant.get(link.merchant_id) ?? []), link.commitment_id]);
-  }
+  const { commitmentsByMerchant, keys: confirmedSame } = confirmedSamePairKeys(links);
   const rejectedPairs = new Set<string>();
   for (const rejection of rejections) {
     for (const other of commitmentsByMerchant.get(rejection.merchant_id) ?? []) {
@@ -335,6 +349,7 @@ function buildDuplicateSuspicions(
     if (!match) continue;
     const other = claims.find((entry) => entry.id === match.merchantId);
     if (!other) continue;
+    if (confirmedSame.has([claim.id, other.id].sort().join(":"))) continue;
     suspicions.push({
       commitmentId: claim.id,
       otherCommitmentId: other.id,
@@ -779,18 +794,22 @@ export async function answerDuplicateSuspicion(input: {
 
     if (input.sameSubscription) {
       // Accepting makes one canonical merchant the answer for both sides. The
-      // database still refuses the link if the currencies differ.
+      // database still refuses the link if the currencies differ. Without a
+      // stored link, refresh would reopen the same question and the headline
+      // would count both rows again.
       const merchantId = await ensureCanonicalMerchant(client, input.workspaceId, input.commitmentId);
-      if (merchantId && signal.rows[0].cited_evidence_ids.length) {
-        for (const commitmentId of [input.commitmentId, input.otherCommitmentId]) {
-          await linkCommitmentToMerchant(client, {
-            workspaceId: input.workspaceId,
-            commitmentId,
-            merchantId,
-            score: signal.rows[0].confidence,
-            citedEvidenceIds: signal.rows[0].cited_evidence_ids,
-          });
-        }
+      const citedEvidenceIds = signal.rows[0].cited_evidence_ids;
+      if (!merchantId || citedEvidenceIds.length === 0) {
+        throw new RecoveryServiceError("INVALID_EVIDENCE", "We could not record that these are the same subscription from the receipts already stored.");
+      }
+      for (const commitmentId of [input.commitmentId, input.otherCommitmentId]) {
+        await linkCommitmentToMerchant(client, {
+          workspaceId: input.workspaceId,
+          commitmentId,
+          merchantId,
+          score: signal.rows[0].confidence,
+          citedEvidenceIds,
+        });
       }
     } else {
       // Rejecting records the other side as its own canonical merchant and

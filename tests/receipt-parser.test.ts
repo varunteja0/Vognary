@@ -64,6 +64,13 @@ test("extracts merchant, amount, and cadence from receipt snippets", () => {
   assert.equal(cloudflare?.nextExpectedDate, "2026-09-10");
 });
 
+test("a paid Notion invoice keeps the charge date distinct from the next expected date", () => {
+  const [notion] = extractReceiptCandidates(["Notion invoice paid INR 830 on 2026-07-01. Notion Plus renews monthly."]);
+  assert.ok(notion);
+  assert.equal(notion.observedDate, "2026-07-01");
+  assert.equal(notion.nextExpectedDate, "2026-08-01");
+});
+
 test("converts pasted receipt text into ledger-ready manual inputs", () => {
   const inputs = receiptTextToManualInputs(sampleReceipts);
   assert.equal(inputs.length, 2);

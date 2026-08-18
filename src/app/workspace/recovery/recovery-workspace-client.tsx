@@ -691,7 +691,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         </header>
 
         <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 py-2 sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
-          <ul className={`grid ${mandateAvailable ? "grid-cols-4" : "grid-cols-3"} gap-1 sm:flex sm:gap-2`}>
+          <ul className={`grid ${primaryViews.length === 5 ? "grid-cols-5" : "grid-cols-4"} gap-1 sm:flex sm:gap-2`}>
             {primaryViews.map((view) => (
               <li key={view} className="min-w-0">
                 <button
@@ -796,10 +796,10 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
       return (
         <RecoveryAttention
           onOpenCommitment={(commitmentId) => {
-            dispatch({ type: "COMMITMENT_SELECTED", commitmentId });
-            selectView("COMMITMENTS");
+            openCommitment(commitmentId);
           }}
           onOpenSources={() => selectView("ADD_EVIDENCE")}
+          onWorkspaceMutated={() => void loadSnapshot()}
         />
       );
     }

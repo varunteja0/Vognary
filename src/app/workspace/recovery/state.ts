@@ -15,6 +15,7 @@ import type {
 } from "@/lib/recovery/contracts";
 import { decisionLabels } from "./labels";
 import type { FailureOrigin, ResponseMeta, TransportFailure } from "./transport";
+import { decimalToMinorUnits, minorUnitsToDecimal } from "@/lib/recovery/domain";
 
 // Pure state for the Recovery workspace. It holds exactly two things: server
 // payloads stored verbatim, and the client-only facts the UI is allowed to own
@@ -60,6 +61,7 @@ export type CorrectionDraft = {
   field: CorrectionField;
   merchant: string;
   amountMinor: string;
+  amountCurrency: string;
   date: string;
   cadence: Cadence;
   isRecurring: boolean;
@@ -125,6 +127,7 @@ const emptyCorrectionDraft: CorrectionDraft = {
   field: "MERCHANT",
   merchant: "",
   amountMinor: "",
+  amountCurrency: "INR",
   date: "",
   cadence: "MONTHLY",
   isRecurring: true,
@@ -219,7 +222,8 @@ function correctionDraftFor(field: CorrectionField, detail: CommitmentDetailDto 
   return {
     field,
     merchant: detail.merchant,
-    amountMinor: String(detail.amount.minor),
+    amountMinor: minorUnitsToDecimal(detail.amount.minor, detail.amount.exponent),
+    amountCurrency: detail.amount.currency,
     date: detail.nextExpectedDate ?? "",
     cadence: detail.cadence,
     isRecurring: detail.status === "ACTIVE",
@@ -234,10 +238,11 @@ export function correctionPatchFromDraft(draft: CorrectionDraft): CorrectionPatc
       return merchant ? { field: "MERCHANT", value: { merchant } } : null;
     }
     case "AMOUNT": {
-      const amountMinor = draft.amountMinor.trim();
-      return /^(?:0|[1-9]\d*)$/.test(amountMinor)
-        ? { field: "AMOUNT", value: { amountMinor } }
-        : null;
+      try {
+        return { field: "AMOUNT", value: { amountMinor: decimalToMinorUnits(draft.amountMinor.trim(), draft.amountCurrency) } };
+      } catch {
+        return null;
+      }
     }
     case "NEXT_EXPECTED_DATE":
       return /^\d{4}-\d{2}-\d{2}$/.test(draft.date) ? { field: "NEXT_EXPECTED_DATE", value: { date: draft.date } } : null;
@@ -356,7 +361,7 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         return {
           ...state,
           detail: null,
-          detailStatus: { kind: "LOADING" },
+          detailStatus: { kind: "IDLE" },
           refreshRequired: true,
           announcement: "The commitment detail belongs to another saved workspace version. Reload before continuing.",
         };

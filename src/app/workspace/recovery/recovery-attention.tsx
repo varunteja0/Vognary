@@ -13,6 +13,7 @@ import { StateBlock } from "./recovery-states";
 type AttentionCardDto = {
   id: string;
   commitmentId: string | null;
+  otherCommitmentId: string | null;
   headline: string;
   body: string;
   urgency: "NOW" | "SOON" | "WHENEVER";
@@ -78,14 +79,17 @@ async function fetchAttention(): Promise<AttentionPayload> {
 export function RecoveryAttention({
   onOpenCommitment,
   onOpenSources,
+  onWorkspaceMutated,
 }: {
   onOpenCommitment: (commitmentId: string) => void;
   onOpenSources: () => void;
+  onWorkspaceMutated?: () => void;
 }) {
   const [payload, setPayload] = useState<AttentionPayload | null>(null);
   const [status, setStatus] = useState<"LOADING" | "READY" | "FAILED">("LOADING");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,6 +112,7 @@ export function RecoveryAttention({
 
   const acknowledge = useCallback(async (id: string) => {
     setPendingId(id);
+    setActionError(null);
     try {
       const response = await fetch("/api/workspaces/current/recovery-attention", {
         method: "POST",
@@ -117,12 +122,39 @@ export function RecoveryAttention({
       if (!response.ok) throw new Error("acknowledge-failed");
       const body = await response.json() as { data?: AttentionPayload };
       if (body.data) setPayload(body.data);
+      onWorkspaceMutated?.();
     } catch {
-      setStatus("FAILED");
+      setActionError("That change did not save. Nothing was assumed. Try again.");
     } finally {
       setPendingId(null);
     }
-  }, []);
+  }, [onWorkspaceMutated]);
+
+  const answerDuplicate = useCallback(async (card: AttentionCardDto, sameSubscription: boolean) => {
+    if (!card.commitmentId || !card.otherCommitmentId) return;
+    setPendingId(card.id);
+    setActionError(null);
+    try {
+      const response = await fetch("/api/workspaces/current/recovery-attention", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ANSWER_DUPLICATE",
+          commitmentId: card.commitmentId,
+          otherCommitmentId: card.otherCommitmentId,
+          sameSubscription,
+        }),
+      });
+      if (!response.ok) throw new Error("answer-duplicate-failed");
+      const body = await response.json() as { data?: AttentionPayload };
+      if (body.data) setPayload(body.data);
+      onWorkspaceMutated?.();
+    } catch {
+      setActionError("We could not save whether those subscriptions are the same. Nothing was merged. Try again.");
+    } finally {
+      setPendingId(null);
+    }
+  }, [onWorkspaceMutated]);
 
   if (status === "LOADING" && !payload) {
     return <StateBlock eyebrow="Checking" title="Looking at what changed" detail="We are re-reading your receipts before showing you anything." />;
@@ -147,6 +179,7 @@ export function RecoveryAttention({
     <div className="grid gap-5">
       <section aria-labelledby="attention-list" className="panel p-4 sm:p-5">
         <h3 id="attention-list" className="font-display text-xl font-semibold text-(--ink)">What needs you</h3>
+        {actionError ? <p role="alert" className="mt-2 text-sm text-ember">{actionError}</p> : null}
         <div className="mt-4 grid gap-3">
           {data.attention.length ? data.attention.map((card) => (
             <article key={card.id} className="rounded-xl border border-line p-3 sm:p-4">
@@ -159,6 +192,25 @@ export function RecoveryAttention({
                   <button type="button" onClick={onOpenSources} className="btn btn-sm btn-primary">
                     {nextStepCopy[card.nextStep]}
                   </button>
+                ) : card.nextStep === "CONFIRM_SAME_SUBSCRIPTION" && card.commitmentId && card.otherCommitmentId ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void answerDuplicate(card, true)}
+                      disabled={pendingId === card.id}
+                      className="btn btn-sm btn-primary"
+                    >
+                      {pendingId === card.id ? "Saving…" : "Yes, they are the same"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void answerDuplicate(card, false)}
+                      disabled={pendingId === card.id}
+                      className="btn btn-sm btn-ghost"
+                    >
+                      No, they are different
+                    </button>
+                  </>
                 ) : card.commitmentId ? (
                   <button type="button" onClick={() => onOpenCommitment(card.commitmentId!)} className="btn btn-sm btn-primary">
                     {nextStepCopy[card.nextStep]}

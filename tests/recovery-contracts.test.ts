@@ -168,6 +168,7 @@ const home = {
   },
   activeCommitmentCount: 1,
   unknownCadenceCommitmentCount: 0,
+  uncertainDuplicateCommitmentCount: 0,
   reviewItemCount: 1,
   evidenceSources: [],
 } as const satisfies HomeProjectionDto;

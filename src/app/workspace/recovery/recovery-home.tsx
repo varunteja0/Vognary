@@ -192,7 +192,14 @@ function RecoveryFirstValueMetrics({
 
   return (
     <section aria-label="Recurring money" className={compact ? "panel p-3 sm:p-4" : "panel p-4 sm:p-5"}>
-      <TotalBlock label="Monthly recurring amount" totals={home.monthlyTotals} empty="No recurring amount yet" compact={compact} />
+      <TotalBlock
+        label="Monthly recurring amount"
+        totals={home.monthlyTotals}
+        empty={home.uncertainDuplicateCommitmentCount > 0
+          ? "Monthly total is not published while some subscriptions may be listed twice."
+          : "No recurring amount yet"}
+        compact={compact}
+      />
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <CountBlock label="Active commitments" count={home.activeCommitmentCount} compact={compact} />
         <CountBlock label="Needs review" count={home.reviewItemCount} compact={compact} />
@@ -200,6 +207,13 @@ function RecoveryFirstValueMetrics({
       {home.unknownCadenceCommitmentCount > 0 ? (
         <p className="mt-4 text-xs leading-5 text-(--muted)">
           {home.unknownCadenceCommitmentCount} {home.unknownCadenceCommitmentCount === 1 ? "commitment has" : "commitments have"} no established cadence, so {home.unknownCadenceCommitmentCount === 1 ? "it is" : "they are"} excluded from monthly and annual totals. Any dated debit still appears in Next 30 days.
+        </p>
+      ) : null}
+      {home.uncertainDuplicateCommitmentCount > 0 ? (
+        <p className="mt-2 text-xs leading-5 text-(--muted)">
+          {home.uncertainDuplicateCommitmentCount === 1
+            ? "1 subscription may be listed twice, so it is omitted from monthly, next-30-day, and annual totals until you tell us whether those rows are the same."
+            : `${home.uncertainDuplicateCommitmentCount} subscriptions may be listed twice, so they are omitted from monthly, next-30-day, and annual totals until you tell us whether those rows are the same.`}
         </p>
       ) : null}
       {home.coverage.state !== "CURRENT" ? (
@@ -219,8 +233,20 @@ function RecoveryProjectionDetails({ home }: { home: HomeProjectionDto }) {
   return (
     <section aria-label="Recurring money details" className="panel p-4 sm:p-5">
       <div className="grid gap-5 sm:grid-cols-2">
-        <TotalBlock label="Next 30 days" totals={home.next30DayTotals} empty="Nothing expected in the next 30 days" />
-        <TotalBlock label="Annualized estimate" totals={home.annualizedEstimateTotals} empty="No annualized estimate yet" />
+        <TotalBlock
+          label="Next 30 days"
+          totals={home.next30DayTotals}
+          empty={home.uncertainDuplicateCommitmentCount > 0
+            ? "Next-30-day total is not published while some subscriptions may be listed twice."
+            : "Nothing expected in the next 30 days"}
+        />
+        <TotalBlock
+          label="Annualized estimate"
+          totals={home.annualizedEstimateTotals}
+          empty={home.uncertainDuplicateCommitmentCount > 0
+            ? "Annualized estimate is not published while some subscriptions may be listed twice."
+            : "No annualized estimate yet"}
+        />
       </div>
       {omittedAnnualized ? (
         <p className="mt-4 text-xs leading-5 text-(--muted)">

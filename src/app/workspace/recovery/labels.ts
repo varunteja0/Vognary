@@ -181,3 +181,11 @@ export function formatMoment(value: string): string {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : momentFormat.format(parsed);
 }
+
+/** UTC midnight of a stored charge date is a calendar day, not a clock time. */
+export function formatObservedInstant(observedAt: string, chargeDate: string | null): string | null {
+  if (chargeDate && /^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.000)?Z$/.test(observedAt) && observedAt.startsWith(`${chargeDate}T`)) {
+    return null;
+  }
+  return `Recorded ${formatMoment(observedAt)}`;
+}
