@@ -1,6 +1,8 @@
 import { createHash, createHmac } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+const EMPTY_PAYLOAD_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 export function getBackupStorageConfig(env = process.env) {
   const bucket = env.BACKUP_STORAGE_BUCKET?.trim() || env.S3_BUCKET?.trim() || env.R2_BUCKET?.trim() || "";
@@ -33,50 +35,24 @@ export function getBackupStorageConfig(env = process.env) {
   };
 }
 
+export function storedBackupObjectKeys(manifest) {
+  const status = manifest?.storage?.status;
+  const encryptedDump = manifest?.storage?.objects?.encryptedDump?.trim() || "";
+  const manifestObject = manifest?.storage?.objects?.manifest?.trim() || "";
+  if (status !== "uploaded" || !encryptedDump || !manifestObject) {
+    throw new Error("Backup manifest does not reference uploaded durable-storage objects.");
+  }
+  return { encryptedDump, manifest: manifestObject };
+}
+
 export async function uploadBackupObject(config, { filePath, objectKey, contentType }) {
-  if (!config.ready) throw new Error(`Backup storage is not configured: ${config.missing.join(", ")}`);
-
   const body = await readFile(filePath);
-  const payloadHash = sha256Hex(body);
-  const now = new Date();
-  const amzDate = toAmzDate(now);
-  const dateStamp = amzDate.slice(0, 8);
   const target = buildS3Target(config, objectKey);
-  const headers = {
-    "content-type": contentType,
-    host: target.host,
-    "x-amz-content-sha256": payloadHash,
-    "x-amz-date": amzDate,
-  };
-
-  if (config.sessionToken) headers["x-amz-security-token"] = config.sessionToken;
-
-  const signedHeaders = Object.keys(headers).sort().join(";");
-  const canonicalHeaders = Object.keys(headers).sort().map((key) => `${key}:${String(headers[key]).trim()}\n`).join("");
-  const canonicalRequest = [
-    "PUT",
-    target.canonicalUri,
-    "",
-    canonicalHeaders,
-    signedHeaders,
-    payloadHash,
-  ].join("\n");
-  const credentialScope = `${dateStamp}/${config.region}/s3/aws4_request`;
-  const stringToSign = [
-    "AWS4-HMAC-SHA256",
-    amzDate,
-    credentialScope,
-    sha256Hex(canonicalRequest),
-  ].join("\n");
-  const signature = hmacHex(getSigningKey(config.secretAccessKey, dateStamp, config.region, "s3"), stringToSign);
-
-  const response = await fetch(target.url, {
+  const response = await signedS3Fetch(config, {
     method: "PUT",
-    headers: {
-      ...headers,
-      authorization: `AWS4-HMAC-SHA256 Credential=${config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
-    },
+    objectKey,
     body,
+    contentType,
   });
 
   if (!response.ok) {
@@ -94,8 +70,80 @@ export async function uploadBackupObject(config, { filePath, objectKey, contentT
   };
 }
 
+export async function downloadBackupObject(config, { objectKey, filePath }) {
+  const target = buildS3Target(config, objectKey);
+  const response = await signedS3Fetch(config, {
+    method: "GET",
+    objectKey,
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Backup object download failed with HTTP ${response.status}. ${detail.slice(0, 500)}`.trim());
+  }
+
+  const bytes = Buffer.from(await response.arrayBuffer());
+  await writeFile(filePath, bytes, { mode: 0o600 });
+
+  return {
+    provider: config.provider,
+    bucket: config.bucket,
+    region: config.region,
+    objectKey,
+    url: target.redactedUrl,
+    etag: response.headers.get("etag") ?? undefined,
+    bytes: bytes.length,
+    sha256: sha256Hex(bytes),
+  };
+}
+
 export function backupObjectKey(config, filePath) {
   return `${config.prefix}${path.basename(filePath)}`;
+}
+
+async function signedS3Fetch(config, { method, objectKey, body, contentType, now = new Date() }) {
+  if (!config.ready) throw new Error(`Backup storage is not configured: ${config.missing.join(", ")}`);
+
+  const payloadHash = body ? sha256Hex(body) : EMPTY_PAYLOAD_SHA256;
+  const amzDate = toAmzDate(now);
+  const dateStamp = amzDate.slice(0, 8);
+  const target = buildS3Target(config, objectKey);
+  const headers = {
+    host: target.host,
+    "x-amz-content-sha256": payloadHash,
+    "x-amz-date": amzDate,
+  };
+
+  if (contentType) headers["content-type"] = contentType;
+  if (config.sessionToken) headers["x-amz-security-token"] = config.sessionToken;
+
+  const signedHeaders = Object.keys(headers).sort().join(";");
+  const canonicalHeaders = Object.keys(headers).sort().map((key) => `${key}:${String(headers[key]).trim()}\n`).join("");
+  const canonicalRequest = [
+    method,
+    target.canonicalUri,
+    "",
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join("\n");
+  const credentialScope = `${dateStamp}/${config.region}/s3/aws4_request`;
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    amzDate,
+    credentialScope,
+    sha256Hex(canonicalRequest),
+  ].join("\n");
+  const signature = hmacHex(getSigningKey(config.secretAccessKey, dateStamp, config.region, "s3"), stringToSign);
+
+  return fetch(target.url, {
+    method,
+    headers: {
+      ...headers,
+      authorization: `AWS4-HMAC-SHA256 Credential=${config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
+    },
+    body: body || undefined,
+  });
 }
 
 function buildS3Target(config, objectKey) {

@@ -12,6 +12,11 @@ import {
   runPostgresCommand,
 } from "./lib/postgres-backup-utils.mjs";
 import {
+  downloadBackupObject,
+  getBackupStorageConfig,
+  storedBackupObjectKeys,
+} from "./lib/backup-storage.mjs";
+import {
   readRecoveryBackupVerification,
   recoveryBackupVerificationMatches,
   requiredRecoveryTablesForProfile,
@@ -21,7 +26,7 @@ import {
 const { Pool } = pg;
 
 if (process.argv.includes("--help")) {
-  console.log(`Restore an encrypted Vognary PostgreSQL backup into a disposable database and verify core tables.\n\nRequired env:\n  RESTORE_DATABASE_URL             Disposable target database. This script runs pg_restore --clean.\n  RESTORE_CONFIRM_DISPOSABLE=true Safety confirmation. Never point this at production.\n  BACKUP_ENCRYPTION_KEY           32-byte base64url or hex AES-256-GCM key\n\nUsage:\n  RESTORE_DATABASE_URL='postgres://disposable...' RESTORE_CONFIRM_DISPOSABLE=true BACKUP_ENCRYPTION_KEY='...' npm run backup:restore-drill -- backups/postgres/<backup>.manifest.json`);
+  console.log(`Restore an encrypted Vognary PostgreSQL backup into a disposable database and verify core tables.\n\nRequired env:\n  RESTORE_DATABASE_URL             Disposable target database. This script runs pg_restore --clean.\n  RESTORE_CONFIRM_DISPOSABLE=true Safety confirmation. Never point this at production.\n  BACKUP_ENCRYPTION_KEY           32-byte base64url or hex AES-256-GCM key\n\nOptional env:\n  BACKUP_RESTORE_SOURCE=storage   GET the encrypted dump and manifest from durable object storage and restore those bytes. Local runner copies are not used.\n\nUsage:\n  RESTORE_DATABASE_URL='postgres://disposable...' RESTORE_CONFIRM_DISPOSABLE=true BACKUP_ENCRYPTION_KEY='...' npm run backup:restore-drill -- backups/postgres/<backup>.manifest.json`);
   process.exit(0);
 }
 
@@ -39,11 +44,54 @@ if (process.env.DATABASE_URL?.trim() && process.env.DATABASE_URL.trim() === rest
 
 const backupKey = parseBackupEncryptionKey(process.env.BACKUP_ENCRYPTION_KEY);
 const restoreConnectionEnv = postgresConnectionEnv(restoreDatabaseUrl);
-const { manifestPath, encryptedDumpPath, manifest } = await resolveBackupInput(input);
+const restoreFromStorage = process.env.BACKUP_RESTORE_SOURCE?.trim().toLowerCase() === "storage";
+const localBackup = await resolveBackupInput(input);
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "vognary-pg-restore-"));
-const plainDumpPath = path.join(tempDir, path.basename(encryptedDumpPath, ".enc"));
+let manifestPath = localBackup.manifestPath;
+let encryptedDumpPath = localBackup.encryptedDumpPath;
+let manifest = localBackup.manifest;
+let storageRestore;
 
 try {
+  if (restoreFromStorage) {
+    const objectKeys = storedBackupObjectKeys(localBackup.manifest);
+    const storageConfig = getBackupStorageConfig();
+    const downloadedManifestPath = path.join(tempDir, path.basename(objectKeys.manifest));
+    const downloadedDumpPath = path.join(tempDir, path.basename(objectKeys.encryptedDump));
+    const manifestDownload = await downloadBackupObject(storageConfig, {
+      objectKey: objectKeys.manifest,
+      filePath: downloadedManifestPath,
+    });
+    const dumpDownload = await downloadBackupObject(storageConfig, {
+      objectKey: objectKeys.encryptedDump,
+      filePath: downloadedDumpPath,
+    });
+    const storedManifest = JSON.parse(await readFile(downloadedManifestPath, "utf8"));
+    if (storedManifest.dump?.plaintextSha256 !== localBackup.manifest.dump?.plaintextSha256) {
+      throw new Error("Downloaded backup manifest plaintext checksum does not match the runner manifest.");
+    }
+    manifestPath = downloadedManifestPath;
+    encryptedDumpPath = downloadedDumpPath;
+    manifest = storedManifest;
+    storageRestore = {
+      source: "durable-object-get",
+      provider: dumpDownload.provider,
+      objects: {
+        encryptedDump: dumpDownload.objectKey,
+        manifest: manifestDownload.objectKey,
+      },
+      etags: {
+        encryptedDump: dumpDownload.etag,
+        manifest: manifestDownload.etag,
+      },
+      downloadedBytes: {
+        encryptedDump: dumpDownload.bytes,
+        manifest: manifestDownload.bytes,
+      },
+    };
+  }
+
+  const plainDumpPath = path.join(tempDir, path.basename(encryptedDumpPath, ".enc"));
   const decrypted = await decryptFile({
     inputPath: encryptedDumpPath,
     outputPath: plainDumpPath,
@@ -87,8 +135,11 @@ try {
     targetDatabase: redactDatabaseUrl(restoreDatabaseUrl),
     plaintextBytes: decrypted.plaintextBytes,
     plaintextSha256: decrypted.plaintextSha256,
+    storageRestore: storageRestore ?? { source: "local-runner-copy" },
     verification,
-    next: "Record this drill externally, upload the encrypted dump to durable storage, then set BACKUP_RESTORE_DRILL_STATUS=passed in production only after the storage copy is confirmed.",
+    next: restoreFromStorage
+      ? "Record this durable-storage restore drill externally. Set BACKUP_RESTORE_DRILL_STATUS=passed in production only after this log shows source=durable-object-get."
+      : "Record this drill externally, upload the encrypted dump to durable storage, then set BACKUP_RESTORE_DRILL_STATUS=passed in production only after the storage copy is confirmed.",
   }, null, 2));
 } finally {
   await rm(tempDir, { recursive: true, force: true });

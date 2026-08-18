@@ -129,15 +129,24 @@ jobs:
           BACKUP_STORAGE_ACCESS_KEY_ID: ${{ secrets.BACKUP_STORAGE_ACCESS_KEY_ID }}
           BACKUP_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_STORAGE_SECRET_ACCESS_KEY }}
           BACKUP_STORAGE_PREFIX: ${{ vars.BACKUP_STORAGE_PREFIX }}
-      - name: Restore the encrypted backup into disposable PostgreSQL 18
+      - name: Restore the stored object into disposable PostgreSQL 18
         run: |
           manifest="$(ls -t backups/postgres/*.manifest.json | head -1)"
-          RESTORE_CONFIRM_DISPOSABLE=true npm run backup:restore-drill -- "$manifest"
+          rm -f backups/postgres/*.dump.enc
+          BACKUP_RESTORE_SOURCE=storage RESTORE_CONFIRM_DISPOSABLE=true npm run backup:restore-drill -- "$manifest"
         env:
           RESTORE_DATABASE_URL: postgresql://postgres:vognary_restore_drill@127.0.0.1:5432/vognary_restore
           RESTORE_POSTGRES_SSL: "false"
           POSTGRES_CLIENT_MODE: docker
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+          BACKUP_STORAGE_BUCKET: ${{ secrets.BACKUP_STORAGE_BUCKET }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          BACKUP_STORAGE_ENDPOINT: ${{ secrets.BACKUP_STORAGE_ENDPOINT }}
+          BACKUP_STORAGE_REGION: ${{ secrets.BACKUP_STORAGE_REGION }}
+          BACKUP_STORAGE_ACCESS_KEY_ID: ${{ secrets.BACKUP_STORAGE_ACCESS_KEY_ID }}
+          BACKUP_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_STORAGE_SECRET_ACCESS_KEY }}
+          BACKUP_STORAGE_PREFIX: ${{ vars.BACKUP_STORAGE_PREFIX }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
