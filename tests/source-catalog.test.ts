@@ -23,6 +23,17 @@ test("the source catalog never offers Connect for reserved mailbox or accounting
   assert.match(catalog.find((entry) => entry.id === "GOOGLE_WORKSPACE")?.summary ?? "", /does not read Gmail/i);
 });
 
+test("a Gmail forwarding confirmation is setup, not a connected or failed receipt source", () => {
+  const catalog = buildSourceCatalog({
+    receiptInboxPubliclyAvailable: true,
+    receiptInboxState: "FAILED",
+    gmailConfirmationPending: true,
+  });
+  assert.equal(catalog.find((entry) => entry.id === "BILLING_INBOX")?.availability, "SETUP");
+  assert.match(catalog.find((entry) => entry.id === "BILLING_INBOX")?.summary ?? "", /forwarding confirmation/i);
+  assert.doesNotMatch(catalog.find((entry) => entry.id === "BILLING_INBOX")?.summary ?? "", /PARSE_FAILED/);
+});
+
 test("an unavailable receipt inbox is listed honestly and still does not fake Gmail", () => {
   const catalog = buildSourceCatalog({
     receiptInboxPubliclyAvailable: false,

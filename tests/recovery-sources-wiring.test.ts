@@ -54,6 +54,13 @@ test("failed receipt states surface the last failure code without inventing a re
   assert.match(sourcesSource, /no receipt could be read from it \(\$\{status\.lastFailureCode\}\)/);
 });
 
+test("a Gmail forwarding confirmation is not rendered as a failed billing receipt", () => {
+  assert.match(sourcesSource, /if \(status\.gmailVerification\) return null;/);
+  assert.match(sourcesSource, /receiptInbox\.state === "READY" && !receiptInbox\.gmailVerification/);
+  assert.match(readFileSync("src/app/workspace/recovery/recovery-billing-setup.tsx", "utf8"), /GmailForwardingConfirmation/);
+  assert.match(readFileSync("src/app/workspace/recovery/recovery-gmail-confirmation.tsx", "utf8"), /Confirm forwarding with Google/);
+});
+
 test("the canonical Home keeps server-published action and coverage fields", () => {
   assert.match(homeSource, /home\.needsMe/);
   assert.match(homeSource, /home\.next/);

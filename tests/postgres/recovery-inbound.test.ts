@@ -1895,6 +1895,88 @@ test("sender provenance is retained per receipt and bounds what an unverified se
   }
 });
 
+test("a Gmail forwarding confirmation does not mark the inbox as a failed billing receipt", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const restoreEnvironment = setEnvironment(receiptInboxEnvironment);
+  const pool = getDatabasePool();
+  const userId = randomUUID();
+  const workspaceId = randomUUID();
+  await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, `gmail-confirm-${randomUUID().slice(0, 8)}@example.test`]);
+  await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Gmail confirm')`, [workspaceId, userId]);
+  await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+
+  const receiptMime = (address: string) => [
+    "From: billing@example.test",
+    `To: ${address}`,
+    "Subject: OpenAI receipt",
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    "OpenAI subscription charged INR 1,999 on 6 July 2026. Monthly billing.",
+  ].join("\r\n");
+  const confirmationMime = (address: string) => [
+    "From: Gmail Team <forwarding-noreply@google.com>",
+    `To: ${address}`,
+    "Subject: Gmail Forwarding Confirmation - Receive Mail from founder@example.com",
+    "Content-Type: text/plain; charset=UTF-8",
+    "",
+    `founder@example.com has requested to automatically forward mail to your email address ${address}.`,
+    "",
+    "To allow founder@example.com to automatically forward mail to your address, please click the link below to confirm the request:",
+    "",
+    "https://mail-settings.google.com/mail/vf-test-token-do-not-use",
+    "",
+    "Thanks for using Gmail!",
+  ].join("\r\n");
+
+  try {
+    const inbox = await provisionReceiptInbox({ workspaceId, actorUserId: userId });
+    assert.deepEqual(
+      await processResendReceivedEvent({
+        svixId: `msg_${randomUUID()}`,
+        emailId: `email_${randomUUID()}`,
+        recipient: inbox.alias!.address,
+        createdAt: "2026-08-10T16:00:00.000Z",
+        payloadHash: "aa".repeat(32),
+      }, { retrieveRawEmail: async () => receiptMime(inbox.alias!.address) }),
+      { status: "processed" },
+    );
+    assert.equal((await getReceiptInboxStatus({ workspaceId, actorUserId: userId })).state, "READY");
+
+    assert.deepEqual(
+      await processResendReceivedEvent({
+        svixId: `msg_${randomUUID()}`,
+        emailId: `email_${randomUUID()}`,
+        recipient: inbox.alias!.address,
+        createdAt: "2026-08-10T16:05:00.000Z",
+        payloadHash: "bb".repeat(32),
+      }, { retrieveRawEmail: async () => confirmationMime(inbox.alias!.address) }),
+      { status: "ignored" },
+    );
+
+    const status = await getReceiptInboxStatus({ workspaceId, actorUserId: userId });
+    assert.equal(status.state, "READY");
+    assert.notEqual(status.lastFailureCode, "GMAIL_VERIFICATION_PENDING");
+    assert.notEqual(status.lastFailureCode, "PARSE_FAILED");
+    assert.ok(status.gmailVerification?.verificationUrl);
+    assert.match(status.gmailVerification.verificationUrl ?? "", /^https:\/\/mail-settings\.google\.com\/mail\//);
+    assert.equal(status.forwardingVerifiedAt, null);
+
+    const terminal = await pool.query<{ error_code: string }>(
+      `select error_code from recovery_inbound_events
+       where workspace_id = $1
+       order by received_at desc
+       limit 1`,
+      [workspaceId],
+    );
+    assert.equal(terminal.rows[0]?.error_code, "GMAIL_VERIFICATION_PENDING");
+  } finally {
+    await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
+    await pool.query(`delete from users where id = $1`, [userId]);
+    restoreEnvironment();
+  }
+});
+
 async function activeAliasId(workspaceId: string) {
   const result = await getDatabasePool().query<{ id: string }>(
     `select id from recovery_inbound_aliases where workspace_id = $1 and status = 'ACTIVE'`,

@@ -137,14 +137,18 @@ export function billingSetupProgress(status: {
   const completed: BillingSetupStep[] = ["ALIAS_CREATED"];
   if (status.forwardingVerifiedAt) completed.push("VERIFICATION_WAITING", "VERIFICATION_PROVEN");
   if (status.setupCompletedAt) completed.push("FIRST_AUTOMATIC_RECEIPT_WAITING", "FIRST_AUTOMATIC_RECEIPT_RECEIVED");
-  if (status.state === "READY" && status.setupCompletedAt) completed.push("SOURCE_HEALTHY");
+  if (status.state === "READY" && status.setupCompletedAt && status.forwardingVerifiedAt) {
+    completed.push("SOURCE_HEALTHY");
+  }
 
   let current: BillingSetupStep = "VERIFICATION_WAITING";
-  if (status.forwardingVerifiedAt && !status.setupCompletedAt) {
+  if (!status.forwardingVerifiedAt) {
+    current = "VERIFICATION_WAITING";
+  } else if (!status.setupCompletedAt) {
     current = "FIRST_AUTOMATIC_RECEIPT_WAITING";
-  } else if (status.setupCompletedAt && status.state === "READY") {
+  } else if (status.state === "READY") {
     current = "SOURCE_HEALTHY";
-  } else if (status.setupCompletedAt) {
+  } else {
     current = "FIRST_AUTOMATIC_RECEIPT_RECEIVED";
   }
 

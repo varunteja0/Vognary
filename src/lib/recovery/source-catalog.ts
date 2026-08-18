@@ -29,6 +29,7 @@ export type SourceCatalogInput = {
   receiptInboxPubliclyAvailable: boolean;
   receiptInboxState: string | null;
   gmailOauthReady?: boolean;
+  gmailConfirmationPending?: boolean;
 };
 
 function billingInboxEntry(input: SourceCatalogInput): SourceCatalogEntry {
@@ -42,6 +43,15 @@ function billingInboxEntry(input: SourceCatalogInput): SourceCatalogEntry {
     };
   }
   const ready = input.receiptInboxState === "READY" || input.receiptInboxState === "RECEIVED" || input.receiptInboxState === "PROCESSING";
+  if (input.gmailConfirmationPending) {
+    return {
+      id: "BILLING_INBOX",
+      name: "Private billing inbox",
+      availability: "SETUP",
+      action: "SETUP",
+      summary: "Gmail sent a forwarding confirmation to your private address. Confirm it before creating the billing-only filter. Vognary does not read the mailbox.",
+    };
+  }
   if (ready) {
     return {
       id: "BILLING_INBOX",

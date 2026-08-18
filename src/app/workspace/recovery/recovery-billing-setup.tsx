@@ -14,6 +14,7 @@ import {
   outlookForwardingHelpUrl,
 } from "@/lib/recovery/billing-forwarding-rule";
 import { formatMoment } from "./labels";
+import { GmailForwardingConfirmation } from "./recovery-gmail-confirmation";
 
 export function ReceiptBillingSetup({ receiptInbox }: { receiptInbox: ReceiptInboxStatusDto }) {
   const [query, setQuery] = useState(defaultGmailBillingFilterQuery);
@@ -61,6 +62,13 @@ export function ReceiptBillingSetup({ receiptInbox }: { receiptInbox: ReceiptInb
           </p>
           {receiptInbox.forwardingVerifiedAt ? (
             <p className="mt-1 text-sm leading-6 text-(--muted)">Verified {formatMoment(receiptInbox.forwardingVerifiedAt)} after a matching billing email arrived following Google&apos;s confirmation request.</p>
+          ) : receiptInbox.gmailVerification ? (
+            <div className="mt-3 grid gap-3">
+              <p className="text-sm leading-6 text-(--muted)">
+                Gmail sent a confirmation request to this private address. Confirm it below. Leave &quot;Forward a copy of incoming mail to&quot; off. Do not create the billing filter until Google shows the address as confirmed.
+              </p>
+              <GmailForwardingConfirmation verification={receiptInbox.gmailVerification} />
+            </div>
           ) : (
             <p className="mt-1 text-sm leading-6 text-(--muted)">
               On a computer, open Gmail Settings, then See all settings, Forwarding and POP/IMAP, and Add a forwarding address. Paste the private address, choose Next and Proceed, then return here for Google&apos;s confirmation link or code. Leave &quot;Forward a copy of incoming mail to&quot; off. Do not turn on automatic forwarding for every new message. Gmail forwards nothing until you confirm. Vognary marks this step done only after a matching billing email arrives following that confirmation.

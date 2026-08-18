@@ -42,6 +42,40 @@ test("a Gmail forwarding verification email is recognized and never treated as r
   assert.deepEqual(extraction.texts, [], "Google's challenge must not become receipt evidence");
 });
 
+test("a URL-only Google confirmation with wrapped lines is still a confirmation, not a receipt", async () => {
+  const address = "rcpt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@inbox.vognary.com";
+  const mime = [
+    "From: Gmail Team <forwarding-noreply@google.com>",
+    `To: ${address}`,
+    "Subject: (Gmail Forwarding Confirmation - Receive Mail from founder@example.com",
+    "Content-Type: text/plain; charset=UTF-8",
+    "",
+    "founder@example.com has requested to automatically forward mail",
+    "to your email",
+    `address ${address}.`,
+    "",
+    "To allow founder@example.com to automatically forward mail to",
+    "your address,",
+    "please click the link below to confirm the request:",
+    "",
+    "https://mail-settings.google.com/mail/vf-%5BANGjdJ_example_token%5D-vSHnhaQxsA",
+    "",
+    "If you click the link and it appears to be broken, please copy and paste it",
+    "into a new browser window.",
+    "",
+    "Thanks for using Gmail!",
+  ].join("\r\n");
+
+  const extraction = await extractForwardedReceiptTexts(mime);
+
+  assert.equal(extraction.gmailVerification?.code, null);
+  assert.match(
+    extraction.gmailVerification?.verificationUrl ?? "",
+    /^https:\/\/mail-settings\.google\.com\/mail\/vf-/,
+  );
+  assert.deepEqual(extraction.texts, []);
+});
+
 test("an ordinary forwarded receipt is not mistaken for a verification challenge", async () => {
   const extraction = await extractForwardedReceiptTexts(realReceipt);
 

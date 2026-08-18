@@ -80,4 +80,15 @@ test("setup progress names alias, verification, first matching mail, and health 
       "SOURCE_HEALTHY",
     ],
   });
+
+  assert.deepEqual(billingSetupProgress({
+    state: "FAILED",
+    alias: { id: "alias" },
+    forwardingVerifiedAt: null,
+    setupCompletedAt: "2026-08-18T00:02:00.000Z",
+    gmailVerification: { receivedAt: "2026-08-18T15:06:10.000Z" },
+  }), {
+    current: "VERIFICATION_WAITING",
+    completed: ["ALIAS_CREATED", "FIRST_AUTOMATIC_RECEIPT_WAITING", "FIRST_AUTOMATIC_RECEIPT_RECEIVED"],
+  });
 });

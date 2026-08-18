@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import type { ReceiptInboxStatusDto } from "@/lib/recovery/contracts";
+import { selectReceiptInboxHealthEvent } from "@/lib/recovery/receipt-inbox-health";
 import { currentPrivacyNoticeVersion } from "@/lib/privacy-notice";
 import { recordConsentGrant } from "@/lib/server/consent-store";
 import { upsertConnectedAccount } from "@/lib/server/connector-token-store";
@@ -590,29 +591,33 @@ async function readReceiptInboxStatusWithClient(client: PoolClient, workspaceId:
      where workspace_id = $1
        and ($2::uuid is null or alias_id = $2)
      order by received_at desc, id desc
-     limit 1`,
+     limit 20`,
     [workspaceId, active?.id ?? null],
   );
   const latest = event.rows[0];
+  const health = selectReceiptInboxHealthEvent(event.rows);
+  const lastProcessed = event.rows.find((row) => row.status === "PROCESSED");
   if (active) {
     const configuration = requireReceiptInboxConfiguration();
     const state = active.hmac_key_id !== configuration.hmacKeyId
       ? "ROTATION_REQUIRED"
-      : !latest
+      : !health
       ? "WAITING"
-      : latest.status === "RECEIVED"
+      : health.status === "RECEIVED"
         ? "RECEIVED"
-        : latest.status === "PROCESSING"
+        : health.status === "PROCESSING"
           ? "PROCESSING"
-          : latest.status === "PROCESSED"
+          : health.status === "PROCESSED"
             ? "READY"
             : "FAILED";
     return {
       state,
       alias: aliasDto(active),
       lastReceivedAt: latest?.received_at.toISOString() ?? null,
-      lastProcessedAt: latest?.processed_at?.toISOString() ?? null,
-      lastFailureCode: latest?.error_code ?? null,
+      lastProcessedAt: lastProcessed?.processed_at?.toISOString() ?? null,
+      lastFailureCode: health && health.status !== "RECEIVED" && health.status !== "PROCESSING" && health.status !== "PROCESSED"
+        ? health.error_code
+        : null,
       setupCompletedAt: active.setup_completed_at?.toISOString() ?? null,
       forwardingVerifiedAt: active.forwarding_verified_at?.toISOString() ?? null,
       backfillCompletedAt: active.backfill_completed_at?.toISOString() ?? null,

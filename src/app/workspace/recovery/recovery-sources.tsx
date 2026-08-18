@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import type { ReceiptInboxStatusDto, RecoveryEvidenceSourceDto } from "@/lib/recovery/contracts";
 import { formatMoment, sourceLabels } from "./labels";
 import { ReceiptBillingSetup } from "./recovery-billing-setup";
+import { GmailForwardingConfirmation } from "./recovery-gmail-confirmation";
 import { AuthRequiredBlock, LoadingBlock, StateBlock } from "./recovery-states";
 import type { LoadState, PendingMutation } from "./state";
 import { buildSourceCatalog, sourceAvailabilityLabels } from "@/lib/recovery/source-catalog";
@@ -83,6 +84,7 @@ export function RecoverySources({
       <SourceHubCatalog
         receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable}
         receiptInboxState={receiptInbox?.state ?? null}
+        gmailConfirmationPending={Boolean(receiptInbox?.gmailVerification)}
       />
       <EvidenceSourceList
         sources={evidenceSources}
@@ -107,22 +109,13 @@ export function RecoverySources({
               tone="caution"
             >
               <div className="grid gap-3">
-                {receiptInbox.gmailVerification.code ? (
+                {receiptInbox.gmailVerification.code || receiptInbox.gmailVerification.verificationUrl ? (
+                  <GmailForwardingConfirmation verification={receiptInbox.gmailVerification} />
+                ) : (
                   <p className="text-sm leading-6 text-(--ink)">
-                    Confirmation code: <span className="font-mono font-semibold">{receiptInbox.gmailVerification.code}</span>
-                    {" "}— paste this into Gmail&apos;s Forwarding settings.
+                    Gmail sent a confirmation request. Reload this page if the confirmation button does not appear.
                   </p>
-                ) : null}
-                {receiptInbox.gmailVerification.verificationUrl ? (
-                  <a
-                    href={receiptInbox.gmailVerification.verificationUrl}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="btn btn-sm btn-primary justify-self-start"
-                  >
-                    Confirm forwarding with Google
-                  </a>
-                ) : null}
+                )}
               </div>
             </StateBlock>
           </div>
@@ -199,7 +192,7 @@ export function RecoverySources({
 
             <ReceiptBillingSetup receiptInbox={receiptInbox} />
 
-            {receiptInbox.state === "READY" ? (
+            {receiptInbox.state === "READY" && !receiptInbox.gmailVerification ? (
               <div className="border-t border-line pt-5">
                 <h4 className="font-display text-lg font-semibold text-(--ink)">Matching billing mail should arrive on its own</h4>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
@@ -242,13 +235,16 @@ export function RecoverySources({
 function SourceHubCatalog({
   receiptInboxPubliclyAvailable,
   receiptInboxState,
+  gmailConfirmationPending = false,
 }: {
   receiptInboxPubliclyAvailable: boolean;
   receiptInboxState: string | null;
+  gmailConfirmationPending?: boolean;
 }) {
   const catalog = buildSourceCatalog({
     receiptInboxPubliclyAvailable,
     receiptInboxState,
+    gmailConfirmationPending,
   });
   return (
     <section aria-labelledby="source-hub-heading" className="panel p-4 sm:p-6">
@@ -335,6 +331,7 @@ function EvidenceSourceList({
 }
 
 function ReceiptInboxState({ status }: { status: ReceiptInboxStatusDto }) {
+  if (status.gmailVerification) return null;
   if (status.state === "UNAVAILABLE" || status.state === "NOT_PROVISIONED" || status.state === "REVOKED") return null;
   const contentByState: Record<typeof status.state, {
     eyebrow: string;
