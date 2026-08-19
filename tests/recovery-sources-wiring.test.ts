@@ -66,7 +66,9 @@ test("a Gmail forwarding confirmation is not rendered as a failed billing receip
 });
 
 test("the canonical Home keeps server-published action and coverage fields", () => {
-  assert.match(homeSource, /homeAttentionItems/);
+  assert.match(homeSource, /home\.decisionQueue/);
+  assert.match(homeSource, /home\.decisionOutcomes/);
+  assert.match(homeSource, /home\.nextQuietCharge/);
   assert.match(homeSource, /home\.next/);
   assert.match(homeSource, /home\.coverage/);
 });

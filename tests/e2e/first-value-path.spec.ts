@@ -12,7 +12,7 @@ test("the first-value path leads into the product without a cancel promise", asy
   const failures = collectRuntimeFailures(page);
   await page.goto("/");
 
-  const primary = page.locator("section").filter({ has: page.getByRole("heading", { name: "Know what your company is committed to pay next — and what deserves attention before the card fires." }) })
+  const primary = page.locator("section").filter({ has: page.getByRole("heading", { name: "Decide before the charge, not after it." }) })
     .getByRole("link", { name: "Review my software stack", exact: true });
   await expect(primary).toBeVisible();
   await expect(primary).toHaveAttribute("href", "/login?next=/app");

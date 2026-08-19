@@ -97,6 +97,7 @@ const detail = {
   because: [],
   context: null,
   overlap: null,
+  decisionHistory: [],
 };
 
 const home = {
@@ -155,6 +156,22 @@ const home = {
   reviewItemCount: 1,
   possibleOverlaps: [],
   evidenceSources: [],
+  decisionQueue: [{
+    commitmentId: "commitment-1",
+    merchant: "OpenAI",
+    dueDate: "2026-08-06",
+    daysAway: 3,
+    charge: money,
+    stake: { currency: "INR", minor: "2398800", exponent: 2, display: "₹23,988.00" },
+    headline: "Decide before Thursday",
+    reasonKeys: ["RENEWS_SOON"],
+    reasons: ["Expected in 3 days."],
+    overlapMerchants: [],
+    askPurpose: false,
+    evidenceIds: ["evidence-1"],
+  }],
+  decisionOutcomes: [],
+  nextQuietCharge: null,
 };
 
 const meta = { requestId: "request-e2e", workspaceVersion: 4 };
@@ -260,24 +277,19 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(nav.getByRole("button", { name: "Mandate" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: `Account for ${email}` })).toHaveAttribute("href", "/profile");
 
-  await expect(page.getByText("Software commitments")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Coming later" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What we found" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Currently committed" })).toHaveCount(0);
 
-  const spendBox = await page.getByText("Software commitments").boundingBox();
-  const attentionBox = await page.getByRole("heading", { name: "Needs attention" }).boundingBox();
-  expect(spendBox?.y).toBeLessThan(attentionBox?.y ?? 0);
   await expect.poll(() => activationResponses.length).toBe(1);
   expect(activationResponses).toEqual([201]);
   await expect(page.getByText("₹1,999.00").first()).toBeVisible();
-  await expect(page.getByText("1 active tool")).toBeVisible();
   await expect(page.getByText("OpenAI").first()).toBeVisible();
-  await expect(page.getByText("Not enough information")).toBeVisible();
-  await expect(page.getByText("₹23,988.00")).toHaveCount(0);
+  await expect(page.getByText("₹23,988.00 / year at stake")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Keep", exact: true })).toBeVisible();
   await expect(page.getByText("Annualized estimate", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Copy summary" })).toHaveCount(0);
 
@@ -317,8 +329,8 @@ test("later evidence produces a genuine changed list instead of a baseline", asy
 
   await expect(page.getByRole("heading", { name: "Recent change" })).toBeVisible();
   const changedBox = await page.getByRole("heading", { name: "Recent change" }).boundingBox();
-  const attentionBox = await page.getByRole("heading", { name: "Needs attention" }).boundingBox();
-  expect(attentionBox?.y).toBeLessThan(changedBox?.y ?? 0);
+  const decisionsBox = await page.getByRole("heading", { name: "Decisions due soon" }).boundingBox();
+  expect(decisionsBox?.y).toBeLessThan(changedBox?.y ?? 0);
   await expect(page.getByText("Amount changed")).toBeVisible();
   await expect(page.getByText("OpenAI").first()).toBeVisible();
   await expect(page.getByText("Your subscriptions look the same")).toHaveCount(0);
@@ -367,7 +379,7 @@ test("three primary choices and two secondary choices preserve the server decisi
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   const group = page.getByRole("group", { name: "Your choice" });
-  for (const label of ["Keep", "Plan to cancel", "Review"]) {
+  for (const label of ["Keep", "Plan to cancel", "Review later"]) {
     await expect(group.getByRole("button", { name: new RegExp(`^${label}`) })).toBeVisible();
   }
   await page.getByText("More", { exact: true }).click();
@@ -573,7 +585,7 @@ test("an active mandate still shows the spend strip when no recurring amount is 
   await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" })).toBeVisible();
   await expect(page.getByText("Software commitments")).toBeVisible();
   await expect(page.getByText("No recurring amount yet")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Coming later" })).toBeVisible();
 });
 
 test("Home posts activation only after a cited recurring-spend picture actually renders", async ({ page }) => {
@@ -632,10 +644,10 @@ test("Home posts activation only after a cited recurring-spend picture actually 
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
   await page.goto("/app");
-  await expect(page.getByText("Software commitments")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   await page.reload();
-  await expect(page.getByText("Software commitments")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(1);
 });
@@ -669,20 +681,20 @@ test("Home records activation after analytics opt-in on a tab that previously re
   });
 
   await signIn(page);
-  await expect(page.getByText("Software commitments")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   expect(activationCalls[0]).toEqual({ status: 202 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
 
   consented = true;
   await page.goto("/app");
-  await expect(page.getByText("Software commitments")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(2);
   expect(activationCalls[1]).toEqual({ status: 201 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBe("1");
 
   await page.reload();
-  await expect(page.getByText("Software commitments")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(2);
 });
@@ -720,19 +732,19 @@ test("Home records activation after a 401 once the tab can authenticate again", 
   });
 
   await signIn(page);
-  await expect(page.getByText("Software commitments")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   expect(activationCalls[0]).toEqual({ status: 401 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
 
   authenticated = true;
   await page.goto("/app");
-  await expect(page.getByText("Software commitments")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(2);
   expect(activationCalls[1]).toEqual({ status: 201 });
 
   await page.reload();
-  await expect(page.getByText("Software commitments")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(2);
 });

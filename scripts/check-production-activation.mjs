@@ -425,8 +425,8 @@ function isFeatureMigrationsReady({ endpointPayloads }) {
   const capabilities = endpointPayloads.readiness?.capabilities;
   if (!capabilities) return undefined;
   return capabilities.schema?.status === "ready"
-    && capabilities.schema.required?.includes("0054_recovery_commitment_context") === true
-    && capabilities.schema.applied?.includes("0054_recovery_commitment_context") === true
+    && capabilities.schema.required?.includes("0055_recovery_decision_cycles") === true
+    && capabilities.schema.applied?.includes("0055_recovery_decision_cycles") === true
     && capabilities.privacyLifecycle?.status !== "schema-query-failed"
     && capabilities.renewalAlerts?.status !== "schema-query-failed"
     && capabilities.commitmentDecisions?.status !== "schema-query-failed"

@@ -75,6 +75,7 @@ test("privacy export SQL excludes raw rows, secret material, and arbitrary conne
   assert.match(exportSection, /from recovery_corrections/);
   assert.match(exportSection, /from recovery_decisions/);
   assert.match(exportSection, /from recovery_commitment_context/);
+  assert.match(exportSection, /from recovery_decision_cycles/);
   assert.match(exportSection, /from recovery_changes/);
   assert.doesNotMatch(exportSection, /select[^;]*raw_evidence/);
   assert.doesNotMatch(exportSection, /from recovery_idempotency_keys/);

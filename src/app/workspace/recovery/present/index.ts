@@ -19,6 +19,12 @@ export {
   overlapIdsForWorkspace,
 } from "./home-brief";
 export { presentExpectedObservation, type ExpectedObservationCopy } from "./expected-observation";
+export {
+  commitmentDecisionState,
+  commitmentDecisionStateLabel,
+  decisionOutcomeTone,
+  type DecisionStateTone,
+} from "./decision-state";
 export { customerErrorCopy, inboxFailureCopy, rejectedSubmissionCopy } from "./errors";
 export {
   customerInboxStatus,

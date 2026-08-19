@@ -145,7 +145,10 @@ select {
   color: var(--ink);
 }
 
-:focus-visible {
+/* Elements marked data-focus-quiet are focus targets that are never
+   Tab-reachable, so the accent ring would only ever appear as an unexplained
+   box after a click. They carry `outline-none` themselves. */
+:focus-visible:not([data-focus-quiet]) {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
@@ -433,6 +436,50 @@ select {
   box-shadow: var(--shadow-1);
 }
 
+/* Workspace view switcher. Deliberately not gold: gold marks the action a
+   founder can take, never the page they are already on. */
+.viewnav {
+  display: grid;
+  gap: 2px;
+}
+.viewnav > li > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 2.75rem;
+  padding: 0 0.85rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.viewnav > li > button:hover {
+  color: var(--ink);
+}
+.viewnav > li > button[aria-current="page"] {
+  background: var(--card-3);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+@media (min-width: 40rem) {
+  .viewnav {
+    display: inline-flex;
+    padding: 3px;
+    background: var(--card-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-xs);
+  }
+  .viewnav > li > button {
+    height: 2.1rem;
+  }
+}
+
 /* Numbered step rail — the guided, easy-to-remember path */
 .step-rail {
   display: flex;
@@ -623,6 +670,213 @@ select.field option {
 .pill-planned { color: var(--ink-soft); background: rgba(255, 255, 255, 0.05); }
 
 /* ------------------------------------------------------------------ *
+ * Decision objects — the pre-renewal queue
+ *
+ * One financial decision, one object. Money and due date read first, the
+ * reasons read second, the choices read last. The leading card carries a
+ * single gold edge; every following card stays quiet so a queue of three
+ * never becomes three competing alarms.
+ * ------------------------------------------------------------------ */
+
+.decision {
+  display: grid;
+  gap: 1.1rem;
+  padding: 1.05rem 1.1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.decision[data-lead="true"] {
+  border-color: var(--gold-line);
+  background:
+    radial-gradient(115% 150% at 100% -30%, color-mix(in srgb, var(--gold) 9%, transparent), transparent 62%),
+    var(--card);
+  box-shadow: var(--shadow-2), inset 2px 0 0 var(--gold);
+}
+
+.decision-head {
+  display: grid;
+  gap: 0.7rem;
+}
+.decision-cue {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ochre);
+}
+.decision-merchant {
+  margin-top: 0.3rem;
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+.decision-amount {
+  display: block;
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.decision-due {
+  margin-top: 0.25rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+.decision-stake {
+  margin-top: 0.15rem;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+@media (min-width: 34rem) {
+  .decision {
+    gap: 1.25rem;
+    padding: 1.35rem 1.5rem 1.4rem;
+  }
+  .decision-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 1.75rem;
+  }
+  .decision-money {
+    text-align: right;
+  }
+  .decision-merchant {
+    font-size: 1.5rem;
+  }
+  .decision-amount {
+    font-size: 1.75rem;
+  }
+}
+
+/* Reason list — hairline markers, never bullet-point noise */
+.reason-list {
+  display: grid;
+  gap: 0.3rem;
+}
+.reason-list > li {
+  position: relative;
+  padding-left: 0.95rem;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.reason-list > li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  width: 5px;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+/* Choice row — one primary, one neutral, one deliberate */
+.decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.btn-quiet-danger {
+  background: transparent;
+  color: var(--ink-soft);
+  border-color: color-mix(in srgb, var(--ember) 30%, var(--line));
+}
+.btn-quiet-danger:hover {
+  color: var(--ember);
+  border-color: color-mix(in srgb, var(--ember) 55%, transparent);
+  background: color-mix(in srgb, var(--ember) 9%, transparent);
+}
+.link-quiet {
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  cursor: pointer;
+  transition: color 0.16s ease;
+}
+.link-quiet:hover {
+  color: var(--ink);
+}
+
+/* Outcome — what happened to the decision the customer already made */
+.outcome {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.85rem 0 0.9rem 0.9rem;
+  border-left: 2px solid var(--line-strong);
+}
+.outcome-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.outcome-alert {
+  padding: 1.05rem 1.15rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--ember) 30%, transparent);
+  border-left-width: 2px;
+  border-left-color: var(--ember);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ember) 5%, var(--card));
+}
+.outcome-alert .outcome-title {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1.12rem;
+  font-weight: 600;
+}
+.outcome-settled { border-left-color: color-mix(in srgb, var(--verdict) 55%, transparent); }
+.outcome-open { border-left-color: color-mix(in srgb, var(--ochre) 55%, transparent); }
+.outcome-unknown { border-left-color: var(--line-strong); }
+
+/* Ledger rows — vendor, money, date. Two lines narrow, one line wide.
+   Separators live on the list so a single-child row never draws a stray rule. */
+.ledger-list > li + li {
+  border-top: 1px solid var(--line);
+}
+.ledger-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 1rem;
+  row-gap: 0.15rem;
+  width: 100%;
+  padding: 0.65rem 0;
+  text-align: left;
+}
+.ledger-name {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ledger-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 0.15rem 0.7rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.ledger-meta .ledger-date {
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ *
  * Instrument ticker
  * ------------------------------------------------------------------ */
 
@@ -670,12 +924,106 @@ select.field option {
   box-shadow: inset 2px 0 0 var(--gold);
 }
 
+/* Commitment inventory row — two lines, so a long vendor name can never
+   collide with the amount the way fixed side-by-side columns allowed. */
+.ledger-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 0.9rem;
+  row-gap: 0.2rem;
+  width: 100%;
+  padding: 0.7rem 0.75rem;
+  border-radius: var(--radius-xs);
+  text-align: left;
+}
+.ledger-item-name {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ledger-item-cost {
+  font-size: 0.83rem;
+  color: var(--ink-soft);
+}
+.ledger-item-when {
+  justify-self: end;
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ledger-item-state {
+  justify-self: end;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ledger-item-state[data-tone="due"] { color: var(--ochre); }
+.ledger-item-state[data-tone="cancel"] { color: var(--ember); }
+.ledger-item-state[data-tone="keep"] { color: var(--verdict); }
+
+/* Decision memory — dated timeline, not an audit log */
+.timeline {
+  display: grid;
+  gap: 0;
+  margin-left: 0.28rem;
+  border-left: 1px solid var(--line);
+}
+.timeline > li {
+  position: relative;
+  padding: 0.5rem 0 0.5rem 1.15rem;
+}
+.timeline > li::before {
+  content: "";
+  position: absolute;
+  left: -3.5px;
+  top: 0.98rem;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+}
+.timeline > li[data-current="true"]::before {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.timeline-when {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.timeline-what {
+  margin-top: 0.1rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.timeline-note {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
 /* ------------------------------------------------------------------ *
  * Motion
  * ------------------------------------------------------------------ */
 
 .rise {
   animation: rise-in var(--motion-emphasis) var(--ease-emphasis) both;
+}
+
+/* A short settle for a disclosure that opens under the pointer */
+.settle {
+  animation: settle-in var(--motion-fast) var(--ease-enter) both;
+}
+
+@keyframes settle-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes rise-in {
@@ -735,8 +1083,19 @@ select.field option {
   #overview, #connect, #ledger, #review, #data {
     animation: none;
   }
-  .nakul-pulse {
+  .nakul-pulse,
+  .rise,
+  .settle,
+  .stamp-animate,
+  .live-dot,
+  .tape::after,
+  .scan::after {
     animation: none;
+  }
+  .rise,
+  .settle {
+    opacity: 1;
+    transform: none;
   }
 }
 

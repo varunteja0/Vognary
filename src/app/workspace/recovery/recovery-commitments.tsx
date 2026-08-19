@@ -16,6 +16,7 @@ import {
 import {
   cadenceLabels,
   correctionFieldLabels,
+  decisionCycleActionLabels,
   decisionLabels,
   decisionMeanings,
   formatDay,
@@ -27,6 +28,7 @@ import {
 } from "./labels";
 import {
   cadenceShortLabels,
+  commitmentDecisionState,
   commitmentNeedsAttention,
   customerPhrases,
   customerStatusForCommitment,
@@ -77,21 +79,15 @@ export function RecoveryCommitments({ state, handlers }: { state: RecoveryState;
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start lg:gap-8">
       <section aria-label="Commitments" className={selected ? "hidden lg:block" : "block"}>
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" aria-pressed={filter === "ALL"} onClick={() => setFilter("ALL")} className={`btn btn-sm ${filter === "ALL" ? "btn-ghost font-semibold" : "btn-ghost"}`}>All</button>
-          <button type="button" aria-pressed={filter === "ATTENTION"} onClick={() => setFilter("ATTENTION")} className={`btn btn-sm ${filter === "ATTENTION" ? "btn-ghost font-semibold" : "btn-ghost"}`}>Needs attention</button>
+        <div className="segmented" role="group" aria-label="Filter commitments">
+          <button type="button" data-active={filter === "ALL"} aria-pressed={filter === "ALL"} onClick={() => setFilter("ALL")}>All</button>
+          <button type="button" data-active={filter === "ATTENTION"} aria-pressed={filter === "ATTENTION"} onClick={() => setFilter("ATTENTION")}>Needs attention</button>
         </div>
-        <ul className="mt-3 grid gap-1">
-          <li className="hidden px-3 py-2 font-data text-xs uppercase tracking-[0.12em] text-(--muted) lg:grid lg:grid-cols-[minmax(0,1fr)_7rem_6rem_7rem] lg:gap-3">
-            <span>Vendor</span>
-            <span>Cost</span>
-            <span>Next</span>
-            <span>Status</span>
-          </li>
+        <ul className="ledger-list mt-4 grid">
           {rows.map((commitment) => {
-            const status = customerStatusForCommitment(commitment, overlapIds.has(commitment.id));
+            const decisionState = commitmentDecisionState(commitment, state.home);
             return (
               <li key={commitment.id}>
                 <button
@@ -99,17 +95,15 @@ export function RecoveryCommitments({ state, handlers }: { state: RecoveryState;
                   onClick={() => handlers.onSelect(commitment.id)}
                   data-active={commitment.id === selected}
                   aria-current={commitment.id === selected ? "true" : undefined}
-                  className="ledger-row w-full p-3 text-left lg:grid lg:grid-cols-[minmax(0,1fr)_7rem_6rem_7rem] lg:items-baseline lg:gap-3"
+                  className="ledger-row ledger-item"
                 >
-                  <span className="font-display text-base font-semibold text-(--ink)">{commitment.merchant}</span>
-                  <span className="mt-1 font-data text-sm text-(--ink-soft) lg:mt-0">
+                  <span className="ledger-item-name">{commitment.merchant}</span>
+                  <span className="ledger-item-state" data-tone={decisionState.tone}>{decisionState.label}</span>
+                  <span className="ledger-item-cost">
                     {commitment.amount.display}{cadenceShortLabels[commitment.cadence]}
                   </span>
-                  <span className="mt-1 font-data text-xs text-(--muted) lg:mt-0">
-                    {commitment.nextExpectedDate ? formatDay(commitment.nextExpectedDate) : "—"}
-                  </span>
-                  <span className={`mt-2 text-xs font-medium lg:mt-0 ${status === "ON_TRACK" ? "text-(--muted)" : "text-ochre"}`}>
-                    {customerStatusLabels[status]}
+                  <span className="ledger-item-when">
+                    {commitment.nextExpectedDate ? formatDay(commitment.nextExpectedDate) : "No date yet"}
                   </span>
                 </button>
               </li>
@@ -181,9 +175,13 @@ function CommitmentDetailPanel({
   const showDecisions = needsDecision || changeOpen;
 
   return (
-    <article aria-labelledby="recovery-commitment-heading" className="grid gap-6">
+    <article aria-labelledby="recovery-commitment-heading" className="grid max-w-2xl gap-6">
       <header>
-        <button type="button" onClick={() => handlers.onSelect(null)} className="btn btn-sm btn-ghost lg:hidden">← Back</button>
+        {/* .btn sets display outside Tailwind's layers, so the utility alone
+            cannot hide it — the wrapper carries the breakpoint instead. */}
+        <div className="lg:hidden">
+          <button type="button" onClick={() => handlers.onSelect(null)} className="btn btn-sm btn-ghost">← Back</button>
+        </div>
         <h3 id="recovery-commitment-heading" className="mt-3 font-display text-3xl font-semibold tracking-tight text-(--ink) lg:mt-0">
           {detail.merchant}
         </h3>
@@ -191,18 +189,24 @@ function CommitmentDetailPanel({
           {detail.amount.display}
           <span className="text-base text-(--ink-soft)">{cadenceShortLabels[detail.cadence] || ` · ${cadenceLabels[detail.cadence]}`}</span>
         </p>
-        <dl className="mt-4 grid gap-1 text-sm leading-6">
-          <div className="flex flex-wrap gap-x-3">
-            <dt className="text-(--muted)">Next expected</dt>
-            <dd className="text-(--ink)">{detail.nextExpectedDate ? formatDay(detail.nextExpectedDate) : "Not enough information"}</dd>
+        <dl className="mt-4 grid gap-x-8 gap-y-2 sm:grid-cols-2">
+          <div>
+            <dt className="field-label mb-0">Next expected</dt>
+            <dd className="text-sm text-(--ink)">{detail.nextExpectedDate ? formatDay(detail.nextExpectedDate) : "Not enough information"}</dd>
           </div>
-          <div className="flex flex-wrap gap-x-3">
-            <dt className="text-(--muted)">Status</dt>
-            <dd className="text-(--ink)">{customerStatusLabels[status]}</dd>
+          <div>
+            <dt className="field-label mb-0">This cycle</dt>
+            <dd className="text-sm text-(--ink)">
+              {detail.cycle
+                ? `${decisionCycleActionLabels[detail.cycle.action]}${
+                    detail.cycle.action === "REVIEW_LATER" && detail.cycle.reviewAt ? ` until ${formatDay(detail.cycle.reviewAt)}` : ""
+                  } · due ${formatDay(detail.cycle.dueDate)}`
+                : customerStatusLabels[status]}
+            </dd>
           </div>
         </dl>
         {observation ? (
-          <p className="mt-3 text-sm leading-6 text-(--ink-soft)">
+          <p className="mt-4 max-w-prose text-sm leading-6 text-(--ink-soft)">
             {observation.sentence}
             {observation.detail ? ` ${observation.detail}` : ""}
           </p>
@@ -225,7 +229,7 @@ function CommitmentDetailPanel({
                     aria-describedby={`recovery-decision-meaning-${decision}`}
                     disabled={state.pending !== null}
                     onClick={() => handlers.onDecide(detail, decision)}
-                    className={`btn btn-sm ${active ? "btn-primary" : "btn-ghost"}`}
+                    className={`btn btn-sm ${active ? "btn-primary" : decision === "CANCEL" ? "btn-quiet-danger" : "btn-ghost"}`}
                   >
                     {decisionLabels[decision]}
                     {active && decisionPending ? " · saving…" : ""}
@@ -290,18 +294,20 @@ function CommitmentDetailPanel({
                   </p>
                 ) : null}
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <ContextSelect
-                    id="recovery-purpose"
-                    label="Purpose"
-                    value={detail.context?.purpose ?? ""}
-                    disabled={state.pending !== null}
-                    options={commitmentPurposes.map((value) => [value, purposeLabels[value]] as const)}
-                    onChange={(value) => {
-                      if (commitmentPurposes.includes(value as typeof commitmentPurposes[number])) {
-                        handlers.onSaveContext(detail.id, { purpose: value as typeof commitmentPurposes[number] });
-                      }
-                    }}
-                  />
+                  {detail.overlap || detail.context?.purpose ? (
+                    <ContextSelect
+                      id="recovery-purpose"
+                      label="Purpose"
+                      value={detail.context?.purpose ?? ""}
+                      disabled={state.pending !== null}
+                      options={commitmentPurposes.map((value) => [value, purposeLabels[value]] as const)}
+                      onChange={(value) => {
+                        if (commitmentPurposes.includes(value as typeof commitmentPurposes[number])) {
+                          handlers.onSaveContext(detail.id, { purpose: value as typeof commitmentPurposes[number] });
+                        }
+                      }}
+                    />
+                  ) : null}
                   <ContextSelect
                     id="recovery-importance"
                     label="If you stop?"
@@ -333,20 +339,43 @@ function CommitmentDetailPanel({
           {
             id: "history",
             label: "History",
-            panel: detail.memory.length ? (
-              <ol className="grid gap-2">
-                {detail.memory.map((point) => (
-                  <li key={point.evidenceId} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
-                    <span className="font-data text-sm text-(--ink)">{formatDay(point.date)}</span>
-                    <span className="flex flex-wrap items-baseline gap-2">
-                      <MoneyValue amount={point.amount} className="text-sm font-semibold text-(--ink)" />
-                      <span className="font-data text-xs text-(--muted)">{sourceLabels[point.sourceType]}</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="text-sm leading-6 text-(--muted)">No dated amounts yet.</p>
+            panel: (
+              <div className="grid gap-6">
+                {detail.decisionHistory.length ? (
+                  <div>
+                    <p className="eyebrow eyebrow-xs">What you decided</p>
+                    <ol className="timeline mt-3">
+                      {detail.decisionHistory.map((item, index) => (
+                        <li key={`${item.dueDate}-${item.decidedAt}`} data-current={index === detail.decisionHistory.length - 1}>
+                          <p className="timeline-when">{formatDay(item.dueDate)}</p>
+                          <p className="timeline-what">{decisionCycleActionLabels[item.action]}</p>
+                          {item.verificationHeadline ? <p className="timeline-note">{item.verificationHeadline}</p> : null}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                ) : null}
+                <div>
+                  <p className="eyebrow eyebrow-xs">Amounts seen</p>
+                  {detail.memory.length ? (
+                    <ol className="ledger-list mt-2 grid">
+                      {detail.memory.map((point) => (
+                        <li key={point.evidenceId}>
+                          <p className="ledger-line">
+                            <span className="font-data text-sm text-(--ink-soft)">{formatDay(point.date)}</span>
+                            <span className="ledger-meta">
+                              <MoneyValue amount={point.amount} className="text-(--ink)" />
+                              <span className="ledger-date font-data text-xs">{sourceLabels[point.sourceType]}</span>
+                            </span>
+                          </p>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="mt-2 text-sm leading-6 text-(--muted)">No dated amounts yet.</p>
+                  )}
+                </div>
+              </div>
             ),
           },
           {

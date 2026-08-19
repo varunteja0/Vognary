@@ -14,7 +14,7 @@ import {
 function verification(auditFacts: Record<string, string> = {}) {
   return {
     profile: "current",
-    migrationHead: "0054_recovery_commitment_context",
+    migrationHead: "0055_recovery_decision_cycles",
     requiredMigration: requiredRecoveryMigration,
     requiredIntegrityMigrations: [...requiredAutopilotIntegrityMigrations],
     integrityTriggers: [...requiredAutopilotIntegrityTriggers],

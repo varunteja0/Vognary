@@ -673,6 +673,16 @@ async function buildAccessExport(client: PoolClient, input: {
           order by updated_at asc, commitment_id asc limit $2
         ) record) as commitment_context,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select commitment_id as "commitmentId", due_date as "dueDate",
+                 stake_minor::text as "stakeMinor", currency, reason_keys as "reasonKeys",
+                 user_action as "userAction", review_at as "reviewAt",
+                 decided_at as "decidedAt", verification_outcome as "verificationOutcome",
+                 verified_at as "verifiedAt", created_at as "createdAt",
+                 updated_at as "updatedAt"
+          from recovery_decision_cycles where workspace_id = $1
+          order by due_date asc, commitment_id asc limit $2
+        ) record) as decision_cycles,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
              select id, commitment_id as "commitmentId", from_version::text as "fromVersion",
                to_version::text as "toVersion", kind, merchant, before_value as "before",
                after_value as "after", provenance_kind as "provenanceKind",
@@ -1473,6 +1483,7 @@ async function buildAccessExport(client: PoolClient, input: {
       corrections: recovery.corrections,
       decisions: recovery.decisions,
       commitmentContext: recovery.commitment_context,
+      decisionCycles: recovery.decision_cycles,
       changes: recovery.changes,
       inboundAliases: recovery.inbound_aliases,
       inboundEvents: recovery.inbound_events,
@@ -2065,6 +2076,7 @@ type RecoveryExportRow = {
   corrections: Array<Record<string, unknown>>;
   decisions: Array<Record<string, unknown>>;
   commitment_context: Array<Record<string, unknown>>;
+  decision_cycles: Array<Record<string, unknown>>;
   changes: Array<Record<string, unknown>>;
   inbound_aliases: Array<Record<string, unknown>>;
   inbound_events: Array<Record<string, unknown>>;

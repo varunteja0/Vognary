@@ -51,6 +51,9 @@ const home: HomeProjectionDto = {
   reviewItemCount: 0,
   possibleOverlaps: [],
   evidenceSources: [],
+  decisionQueue: [],
+  decisionOutcomes: [],
+  nextQuietCharge: null,
 };
 
 const detail: CommitmentDetailDto = {
@@ -75,6 +78,7 @@ const detail: CommitmentDetailDto = {
   because: [],
   context: null,
   overlap: null,
+  decisionHistory: [],
 };
 
 const meta = { requestId: "request-1", workspaceVersion: 4 };

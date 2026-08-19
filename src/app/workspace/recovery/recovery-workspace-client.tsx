@@ -18,6 +18,7 @@ import {
   type Decision,
   type EvidenceDto,
   type PutCommitmentContextRequest,
+  type PutDecisionRequest,
   type SourceType,
 } from "@/lib/recovery/contracts";
 import { VognaryMark } from "../../brand";
@@ -473,16 +474,23 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     });
   }
 
-  async function decide(commitment: CommitmentSummaryDto, decision: Decision) {
+  async function decide(request: PutDecisionRequest) {
     if (state.workspaceVersion === null) return;
+    const commitment = state.commitments.find((item) => item.id === request.commitmentId)
+      ?? (state.detail?.id === request.commitmentId ? state.detail : null);
+    if (!commitment) return;
     const idempotencyKey = newIdempotencyKey();
-    dispatch({ type: "DECISION_STARTED", commitmentId: commitment.id, decision, previous: commitment.decision, idempotencyKey });
+    dispatch({ type: "DECISION_STARTED", commitmentId: request.commitmentId, decision: request.decision, previous: commitment.decision, idempotencyKey });
     const result = await transport.putDecision(
-      { commitmentId: commitment.id, decision },
+      request,
       { workspaceVersion: state.workspaceVersion, idempotencyKey },
     );
     if (result.ok) dispatch({ type: "DECISION_SAVED", commitment: result.data.commitment, home: result.data.home, meta: result.meta });
     else dispatch({ type: "MUTATION_FAILED", failure: result });
+  }
+
+  async function decideFromDetail(commitment: CommitmentSummaryDto, decision: Decision) {
+    await decide({ commitmentId: commitment.id, decision });
   }
 
   async function saveContext(commitmentId: string, request: PutCommitmentContextRequest) {
@@ -650,7 +658,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
 
   const commitmentsHandlers: CommitmentsHandlers = {
     onSelect: (commitmentId) => dispatch({ type: "COMMITMENT_SELECTED", commitmentId }),
-    onDecide: (commitment, decision) => void decide(commitment, decision),
+    onDecide: (commitment, decision) => void decideFromDetail(commitment, decision),
     onSaveContext: (commitmentId, request) => void saveContext(commitmentId, request),
     onInspectEvidence: (evidence: EvidenceDto, buttonId: string) =>
       inspectEvidence(state.selectedCommitmentId ?? "", evidence.id, buttonId),
@@ -702,14 +710,14 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         </header>
 
         <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 py-2 sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
-          <ul className={`grid ${primaryViews.length === 4 ? "grid-cols-4" : "grid-cols-3"} gap-1 sm:flex sm:gap-2`}>
+          <ul className={`viewnav ${primaryViews.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
             {primaryViews.map((view) => (
               <li key={view} className="min-w-0">
                 <button
                   type="button"
                   onClick={() => selectView(view)}
                   aria-current={state.view === view ? "page" : undefined}
-                  className={`btn btn-sm w-full justify-center truncate ${state.view === view ? "btn-primary" : "btn-ghost"}`}
+                  className="truncate"
                 >
                   {recoveryViewLabels[view]}
                 </button>
@@ -736,7 +744,18 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           {state.rollback ? <RollbackAlert state={state} onDismiss={() => dispatch({ type: "ROLLBACK_DISMISSED" })} /> : null}
         </div>
 
-        <h2 ref={viewHeadingRef} tabIndex={-1} className="mt-6 font-display text-2xl font-semibold tracking-tight text-(--ink)">
+        {/* Focus target for view changes. It is never Tab-reachable, so the
+            programmatic ring is suppressed rather than drawn across the page. */}
+        <h2
+          ref={viewHeadingRef}
+          tabIndex={-1}
+          data-focus-quiet
+          className={
+            state.view === "HOME"
+              ? "mt-6 w-fit font-data text-xs font-medium text-(--muted) outline-none"
+              : "mt-6 w-fit font-display text-2xl font-semibold tracking-tight text-(--ink) outline-none"
+          }
+        >
           {recoveryViewLabels[state.view]}
         </h2>
 
@@ -883,10 +902,13 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         onOpenSources={() => selectView("ADD_EVIDENCE")}
         onSeeAllCommitments={() => selectView("COMMITMENTS")}
         onDismissFirstResult={() => dispatch({ type: "FIRST_RESULT_DISMISSED" })}
+        onDecide={(request) => void decide(request)}
+        onSaveContext={(commitmentId, request) => void saveContext(commitmentId, request)}
         onWorkspaceMutated={() => void loadSnapshot()}
         receiptInbox={state.receiptInbox}
         onVeto={(candidateId) => void vetoCandidate(candidateId)}
         pendingVetoId={state.pending?.kind === "CANDIDATE_VETO" ? state.pending.candidateId : null}
+        pendingDecisionId={state.pending?.kind === "DECISION" ? state.pending.commitmentId : null}
         onCitedPictureRendered={recordCitedPictureActivation}
       />
     ) : (

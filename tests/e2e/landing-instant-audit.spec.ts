@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 test("the landing sends every visitor to the product without claiming forwarding", async ({ page }) => {
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Know what your company is committed to pay next — and what deserves attention before the card fires." });
+  const heading = page.getByRole("heading", { level: 1, name: "Decide before the charge, not after it." });
   const hero = page.locator("section").filter({ has: heading });
   await expect(heading).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
@@ -14,11 +14,11 @@ test("the landing sends every visitor to the product without claiming forwarding
   await expect(getStarted).toHaveAttribute("href", "/login?next=/app");
   await expect(signIn).toHaveAttribute("href", "/login?next=/app");
 
-  await expect(page.getByText("No mailbox access required. Add the billing receipts you already have. Vognary shows the amount, the expected date, and the receipt behind each one. No bank passwords.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "What you get" })).toBeVisible();
-  await expect(page.getByText("What you are committed to", { exact: true })).toBeVisible();
-  await expect(page.getByText("What changed, and what is coming", { exact: true })).toBeVisible();
-  await expect(page.getByText("What deserves review, and why", { exact: true })).toBeVisible();
+  await expect(page.getByText("No mailbox access required. Add the billing receipts you already have. Vognary shows the amount, the expected date, and the receipt behind each one, so you know what renews next. No bank passwords.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What you get before the next charge" })).toBeVisible();
+  await expect(page.getByText("What is due next", { exact: true })).toBeVisible();
+  await expect(page.getByText("Why it deserves a look", { exact: true })).toBeVisible();
+  await expect(page.getByText("What happened after you decided", { exact: true })).toBeVisible();
 
   await expect(page.getByRole("textbox")).toHaveCount(0);
   await expect(page.getByText(/sample audit/i)).toHaveCount(0);
@@ -34,7 +34,7 @@ test("the mobile landing keeps the primary action visible without overflow", asy
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Know what your company is committed to pay next — and what deserves attention before the card fires." });
+  const heading = page.getByRole("heading", { level: 1, name: "Decide before the charge, not after it." });
   const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Review my software stack", exact: true });
   await expect(getStarted).toBeVisible();
   const actionBottom = await getStarted.evaluate((element) => element.getBoundingClientRect().bottom);

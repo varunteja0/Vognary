@@ -42,6 +42,9 @@ const emptyHome: HomeProjectionDto = {
   reviewItemCount: 0,
   possibleOverlaps: [],
   evidenceSources: [],
+  decisionQueue: [],
+  decisionOutcomes: [],
+  nextQuietCharge: null,
 };
 
 const oneObservationHome: HomeProjectionDto = {

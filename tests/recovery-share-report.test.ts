@@ -73,6 +73,9 @@ const home: HomeProjectionDto = {
   reviewItemCount: 1,
   possibleOverlaps: [],
   evidenceSources: [],
+  decisionQueue: [],
+  decisionOutcomes: [],
+  nextQuietCharge: null,
 };
 
 test("Recovery share text projects server facts without combining currencies", () => {

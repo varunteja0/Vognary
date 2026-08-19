@@ -8,6 +8,39 @@ export type { WorkspaceActivationWrite };
 export const decisions = ["KEEP", "MONITOR", "DOWNGRADE", "CANCEL", "INVESTIGATE"] as const;
 export type Decision = (typeof decisions)[number];
 
+export const decisionCycleActions = ["KEEP", "REVIEW_LATER", "PLAN_TO_CANCEL"] as const;
+export type DecisionCycleAction = (typeof decisionCycleActions)[number];
+
+export const decisionReviewSnoozes = ["TOMORROW", "THREE_DAYS_BEFORE", "ONE_DAY_BEFORE"] as const;
+export type DecisionReviewSnooze = (typeof decisionReviewSnoozes)[number];
+
+export const decisionReasonKeys = [
+  "RENEWS_SOON",
+  "PRICE_INCREASE",
+  "OVERLAP_NO_PURPOSE",
+  "NEW_COMMITMENT",
+  "IDENTITY_UNCERTAIN",
+  "AMOUNT_CONFLICT",
+  "NO_PRIOR_DECISION",
+] as const;
+export type DecisionReasonKey = (typeof decisionReasonKeys)[number];
+
+export const decisionVerificationOutcomes = [
+  "CHARGE_ARRIVED",
+  "NO_CHARGE_IN_WINDOW",
+  "CANNOT_EVALUATE",
+] as const;
+export type DecisionVerificationOutcome = (typeof decisionVerificationOutcomes)[number];
+
+export const decisionOutcomeKinds = [
+  "CONTINUED_AS_PLANNED",
+  "CHARGE_AFTER_CANCEL_PLAN",
+  "NO_CHARGE_SEEN",
+  "CANNOT_VERIFY",
+  "DECISION_DUE_AGAIN",
+] as const;
+export type DecisionOutcomeKind = (typeof decisionOutcomeKinds)[number];
+
 export const overlapFamilies = [
   "AI_RESEARCH",
   "PROJECT_MANAGEMENT",
@@ -295,6 +328,12 @@ export type CorrectionDto =
   | CorrectionBaseDto & { status: "REVERSED"; reversedAt: string; supersededAt: null }
   | CorrectionBaseDto & { status: "SUPERSEDED"; reversedAt: null; supersededAt: string };
 
+export type CommitmentCycleDto = {
+  dueDate: string;
+  action: DecisionCycleAction;
+  reviewAt: string | null;
+};
+
 export type CommitmentSummaryDto = {
   id: string;
   version: number;
@@ -308,6 +347,7 @@ export type CommitmentSummaryDto = {
   confidence: ConfidenceDto;
   recommendedDecision: Decision;
   decision: DecisionDto | null;
+  cycle?: CommitmentCycleDto | null;
   evidenceCount: number;
   updatedAt: string;
 };
@@ -317,6 +357,47 @@ export type CommitmentContextDto = {
   importance: CommitmentImportance | null;
   owner: CommitmentOwner | null;
   updatedAt: string;
+};
+
+export type DecisionCardDto = {
+  commitmentId: string;
+  merchant: string;
+  dueDate: string | null;
+  daysAway: number | null;
+  charge: MoneyDto;
+  stake: MoneyDto | null;
+  headline: string;
+  reasonKeys: readonly DecisionReasonKey[];
+  reasons: readonly string[];
+  overlapMerchants: readonly string[];
+  askPurpose: boolean;
+  evidenceIds: readonly string[];
+};
+
+export type DecisionOutcomeDto = {
+  commitmentId: string;
+  merchant: string;
+  kind: DecisionOutcomeKind;
+  headline: string;
+  detail: string;
+  amount: MoneyDto | null;
+  date: string | null;
+  evidenceIds: readonly string[];
+};
+
+export type QuietNextChargeDto = {
+  commitmentId: string;
+  merchant: string;
+  amount: MoneyDto;
+  date: string;
+};
+
+export type DecisionHistoryItemDto = {
+  dueDate: string;
+  action: DecisionCycleAction;
+  decidedAt: string;
+  reviewAt: string | null;
+  verificationHeadline: string | null;
 };
 
 export type PossibleOverlapGroupDto = {
@@ -375,6 +456,7 @@ export type CommitmentDetailDto = CommitmentSummaryDto & {
   because: readonly string[];
   context: CommitmentContextDto | null;
   overlap: PossibleOverlapGroupDto | null;
+  decisionHistory: readonly DecisionHistoryItemDto[];
 };
 
 export type AttentionItemDto = {
@@ -570,6 +652,9 @@ export type HomeProjectionDto = {
   reviewItemCount: number;
   possibleOverlaps: readonly PossibleOverlapGroupDto[];
   evidenceSources: readonly RecoveryEvidenceSourceDto[];
+  decisionQueue: readonly DecisionCardDto[];
+  decisionOutcomes: readonly DecisionOutcomeDto[];
+  nextQuietCharge: QuietNextChargeDto | null;
   autopilot?: AutopilotHomeDto;
 };
 
@@ -693,6 +778,8 @@ export type CreateCorrectionRequest = {
 export type PutDecisionRequest = {
   commitmentId: string;
   decision: Decision;
+  action?: DecisionCycleAction;
+  reviewSnooze?: DecisionReviewSnooze;
 };
 
 export type PutCommitmentContextRequest = {

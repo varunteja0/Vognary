@@ -22,6 +22,7 @@ export const requiredAutopilotIntegrityMigrations = [
   "0052_recovery_correction_learning",
   "0053_phase_a_receipt_activation",
   "0054_recovery_commitment_context",
+  "0055_recovery_decision_cycles",
 ];
 export const requiredAutopilotIntegrityTriggers = [
   "product_events_workspace_activated_immutable",
@@ -84,6 +85,7 @@ export function requiredRecoveryTablesForProfile(value) {
   return [
     ...base,
     "recovery_commitment_context",
+    "recovery_decision_cycles",
     "recovery_standing_mandates",
     "recovery_action_candidates",
     "recovery_covered_windows",
@@ -120,7 +122,7 @@ function verificationProfile(value) {
       }
     : {
         profile,
-        migrationHead: "0054_recovery_commitment_context",
+        migrationHead: "0055_recovery_decision_cycles",
         requiredMigrations: [requiredRecoveryMigration, ...requiredAutopilotIntegrityMigrations],
         integrityMigrations: requiredAutopilotIntegrityMigrations,
         requiredTriggers: requiredAutopilotIntegrityTriggers,

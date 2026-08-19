@@ -10,6 +10,7 @@ import {
   type CommitmentImportance,
   type CommitmentOwner,
   type CommitmentPurpose,
+  type CommitmentCycleDto,
   type CommitmentDetailDto,
   type CommitmentStatus,
   type CommitmentSummaryDto,
@@ -17,6 +18,8 @@ import {
   type CorrectionPatch,
   type CreateCorrectionRequest,
   type Decision,
+  type DecisionCycleAction,
+  type DecisionVerificationOutcome,
   type EvidenceDto,
   type EvidenceIngestRequest,
   type EvidenceProvenanceKind,
@@ -39,6 +42,8 @@ import {
   normalizeMinorUnits,
   overlapForCommitment,
   projectCadenceMonthlyMinor,
+  annualizedStake,
+  toDecisionFacts,
   toMoneyDto,
   type CanonicalCommitmentRecord,
   type HeadlineDuplicateState,
@@ -72,6 +77,13 @@ import {
 } from "@/lib/recurring-audit";
 import { recoveryEvidenceFingerprint } from "@/lib/recovery/evidence-fingerprint";
 import { evaluateExpectedCharge, type ChargeObservation } from "@/lib/recovery/absence";
+import {
+  collectReasonKeys,
+  decisionHistoryItems,
+  resolveDecisionWrite,
+  verificationFromEvaluation,
+  type SavedDecisionCycle,
+} from "@/lib/recovery/decision-cycle";
 import { presentCommitmentMemory, presentExpectedVsObserved } from "@/lib/recovery/expected-observation";
 import { senderTrustConfidenceCeiling } from "@/lib/recovery/sender-provenance";
 import { isCoverageTrustworthy, type CommitmentCoverage, type SourceLivenessState } from "@/lib/recovery/source-liveness";
@@ -625,10 +637,19 @@ export async function getRecoveryHome(input: {
   actorUserId: string;
   generatedAt?: Date;
 }) {
-  return withRecoveryRead(async (client) => {
+  const client = await getDatabasePool().connect();
+  try {
+    await client.query("begin isolation level repeatable read");
     const membership = await assertRecoveryRole(client, input.actorUserId, input.workspaceId, "viewer", { lock: false });
-    return await loadHome(client, membership, input.generatedAt ?? new Date());
-  });
+    const home = await loadHome(client, membership, input.generatedAt ?? new Date());
+    await client.query("commit");
+    return home;
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function listRecoveryCommitments(input: {
@@ -656,8 +677,9 @@ export async function listRecoveryCommitments(input: {
       [input.workspaceId],
     );
     const page = result.rows.slice(0, limit);
+    const cycles = await loadSavedDecisionCycles(client, input.workspaceId);
     return {
-      items: page.map(toCommitmentSummary),
+      items: page.map((row) => toCommitmentSummary(row, cycleForRow(row, cycles))),
       total: Number(count.rows[0]?.total ?? 0),
       nextCursor: result.rows.length > limit && page.length
         ? encodeCursor(page.at(-1)!.updated_at, page.at(-1)!.id)
@@ -847,7 +869,8 @@ export async function submitRecoveryEvidence(input: {
     await refreshAutopilotCandidates(client, input.workspaceId);
     const currentState = await readWorkspaceState(client, input.workspaceId);
     const home = await loadHome(client, membership, now, currentState ?? state);
-    const commitments = (await loadCommitmentRows(client, input.workspaceId)).map(toCommitmentSummary);
+    const cycles = await loadSavedDecisionCycles(client, input.workspaceId);
+    const commitments = (await loadCommitmentRows(client, input.workspaceId)).map((row) => toCommitmentSummary(row, cycleForRow(row, cycles)));
     const data: SubmitEvidenceResponse["data"] = {
       submission: {
         id: submissionRow.id,
@@ -931,6 +954,9 @@ export async function putRecoveryDecision(input: {
     assertWorkspaceVersion(state, input.expectedVersion);
     const commitment = await getCommitmentRow(client, input.workspaceId, input.request.commitmentId);
     if (!commitment) throw new RecoveryServiceError("NOT_FOUND");
+    const today = now.toISOString().slice(0, 10);
+    const dueDate = toDateOnly(commitment.effective_next_expected_date);
+    const write = resolveDecisionWrite(input.request, today, dueDate);
     const decision = await client.query<{ decision: Decision; decided_at: Date; updated_at: Date }>(
       `insert into recovery_decisions (workspace_id, commitment_id, decided_by_user_id, decision, decided_at, updated_at)
        values ($1, $2, $3, $4, $5, $5)
@@ -939,8 +965,48 @@ export async function putRecoveryDecision(input: {
                      decided_by_user_id = excluded.decided_by_user_id,
                      updated_at = excluded.updated_at
        returning decision, decided_at, updated_at`,
-      [input.workspaceId, input.request.commitmentId, input.actorUserId, input.request.decision, now],
+      [input.workspaceId, input.request.commitmentId, input.actorUserId, write.stamp, now],
     );
+    if (write.action && dueDate) {
+      const records = await loadCommitmentRecords(client, input.workspaceId);
+      const fact = toDecisionFacts(records).find((item) => item.commitmentId === commitment.id);
+      const reasonKeys = fact ? collectReasonKeys(fact, today) : [];
+      const stake = annualizedStake(
+        BigInt(normalizeMinorUnits(commitment.effective_amount_minor)),
+        commitment.effective_cadence,
+        commitment.base_currency,
+      );
+      await client.query(
+        `insert into recovery_decision_cycles (
+           workspace_id, commitment_id, due_date, stake_minor, currency, reason_keys,
+           user_action, review_at, decided_at, decided_by_user_id, created_at, updated_at
+         )
+         values ($1, $2, $3::date, $4, $5, $6::text[], $7, $8::date, $9, $10, $9, $9)
+         on conflict (workspace_id, commitment_id, due_date)
+         do update set stake_minor = excluded.stake_minor,
+                       currency = excluded.currency,
+                       reason_keys = excluded.reason_keys,
+                       user_action = excluded.user_action,
+                       review_at = excluded.review_at,
+                       decided_at = excluded.decided_at,
+                       decided_by_user_id = excluded.decided_by_user_id,
+                       verification_outcome = null,
+                       verified_at = null,
+                       updated_at = excluded.updated_at`,
+        [
+          input.workspaceId,
+          input.request.commitmentId,
+          dueDate,
+          stake ? stake.minor : null,
+          commitment.base_currency,
+          reasonKeys,
+          write.action,
+          write.reviewAt,
+          now,
+          input.actorUserId,
+        ],
+      );
+    }
     const workspaceVersion = await advanceWorkspaceVersion(client, {
       workspaceId: input.workspaceId,
       actorUserId: input.actorUserId,
@@ -952,18 +1018,22 @@ export async function putRecoveryDecision(input: {
     await refreshAutopilotCandidates(client, input.workspaceId);
     const updated = await getCommitmentRow(client, input.workspaceId, input.request.commitmentId);
     if (!updated || !decision.rows[0]) throw new RecoveryServiceError("SAVE_FAILED");
+    const cycles = await loadSavedDecisionCycles(client, input.workspaceId);
     const data: PutDecisionMutationData = {
       decision: {
         value: decision.rows[0].decision,
         decidedAt: decision.rows[0].decided_at.toISOString(),
         updatedAt: decision.rows[0].updated_at.toISOString(),
       },
-      commitment: toCommitmentSummary(updated),
+      commitment: toCommitmentSummary(updated, cycleForRow(updated, cycles)),
       home: await loadHome(client, membership, now),
     };
     await writeIdempotent(client, input.workspaceId, input.idempotencyKey, operation, requestHash, data, workspaceVersion);
     await writeRecoveryAudit(client, input.workspaceId, input.actorUserId, "recovery.decision.saved", input.request.commitmentId, {
-      decision: input.request.decision,
+      decision: write.stamp,
+      action: write.action,
+      reviewAt: write.reviewAt,
+      dueDate,
       workspaceVersion,
     });
     await client.query("commit");
@@ -2277,6 +2347,7 @@ async function loadHome(
 ) {
   const state = suppliedState ?? await readWorkspaceState(client, membership.workspace_id);
   const version = Number(state?.version ?? 0);
+  await refreshDecisionCycleVerification(client, membership.workspace_id, generatedAt);
   const changed = await loadChanged(client, membership.workspace_id, state, version);
   const commitments = await loadCommitmentRecords(client, membership.workspace_id);
   const observations = await loadRecentObservationRecords(client, membership.workspace_id);
@@ -2381,9 +2452,12 @@ async function loadCommitmentRecords(client: PoolClient, workspaceId: string): P
   const rows = await loadCommitmentRows(client, workspaceId);
   const correctionMap = await loadActiveCorrectionMap(client, workspaceId);
   const contextMap = await loadContextMap(client, workspaceId);
+  const cyclesByCommitment = await loadSavedDecisionCycles(client, workspaceId);
+  const amountSignals = await loadAmountSignals(client, workspaceId);
   return rows.map((row) => {
     const evidenceIds = asNonEmpty(row.evidence_ids);
     const context = contextMap.get(row.id);
+    const signal = amountSignals.get(row.id);
     return {
       id: row.id,
       version: Number(row.version),
@@ -2412,6 +2486,10 @@ async function loadCommitmentRecords(client: PoolClient, workspaceId: string): P
       purpose: context?.purpose ?? null,
       importance: context?.importance ?? null,
       owner: context?.owner ?? null,
+      firstDetectedAt: toDateOnly(row.first_detected_at) ?? row.first_detected_at.toISOString(),
+      priceChange: signal?.priceChange ?? null,
+      amountConflict: signal?.amountConflict === true || /does not match the usual amount/i.test(row.recommendation_reason),
+      cycles: cyclesByCommitment.get(row.id) ?? [],
       updatedAt: row.updated_at.toISOString(),
     };
   });
@@ -2520,9 +2598,10 @@ async function buildCommitmentDetail(
       [workspaceId, commitment.id],
     );
   const page = evidence.rows.slice(0, limit);
+  const cycles = await loadSavedDecisionCycles(client, workspaceId);
   const truth = await loadCommitmentTruth(client, workspaceId, commitment);
   return {
-    ...toCommitmentSummary(commitment),
+    ...toCommitmentSummary(commitment, cycleForRow(commitment, cycles)),
     recommendationReason: commitment.recommendation_reason,
     riskTags: commitment.risk_tags,
     evidence: {
@@ -2536,6 +2615,7 @@ async function buildCommitmentDetail(
     ...truth,
     context: toContextDto((await loadContextMap(client, workspaceId)).get(commitment.id) ?? null),
     overlap: overlapForCommitment(await loadCommitmentRecords(client, workspaceId), commitment.id),
+    decisionHistory: decisionHistoryItems(cycles.get(commitment.id) ?? []),
   };
 }
 
@@ -2702,7 +2782,244 @@ function toContextDto(row: ContextRow | null | undefined): CommitmentContextDto 
   };
 }
 
-function toCommitmentSummary(row: CommitmentRow): CommitmentSummaryDto {
+type CycleRow = {
+  id: string;
+  commitment_id: string;
+  due_date: Date | string;
+  user_action: DecisionCycleAction;
+  review_at: Date | string | null;
+  decided_at: Date;
+  verification_outcome: DecisionVerificationOutcome | null;
+  verified_at: Date | null;
+  currency: string;
+};
+
+function cycleForRow(row: CommitmentRow, cycles: ReadonlyMap<string, readonly SavedDecisionCycle[]>) {
+  const dueDate = toDateOnly(row.effective_next_expected_date);
+  if (!dueDate) return null;
+  return cycles.get(row.id)?.find((cycle) => cycle.dueDate === dueDate) ?? null;
+}
+
+async function refreshDecisionCycleVerification(client: PoolClient, workspaceId: string, now: Date) {
+  const pending = await client.query<CycleRow>(
+    `select id, commitment_id, due_date, user_action, review_at, decided_at,
+            verification_outcome, verified_at, currency
+     from recovery_decision_cycles
+     where workspace_id = $1 and verification_outcome is null`,
+    [workspaceId],
+  );
+  if (!pending.rows.length) return;
+  const today = now.toISOString().slice(0, 10);
+  const observations = await loadWorkspaceChargeObservations(client, workspaceId);
+  const coverage = await loadWorkspaceCoverageMap(client, workspaceId);
+  const commitments = new Map((await loadCommitmentRows(client, workspaceId)).map((row) => [row.id, row]));
+  for (const cycle of pending.rows) {
+    const commitment = commitments.get(cycle.commitment_id);
+    const dueDate = toDateOnly(cycle.due_date);
+    if (!commitment || !dueDate) continue;
+    const evaluation = evaluateExpectedCharge({
+      evaluatedOn: today,
+      expectedDate: dueDate,
+      cadence: commitment.effective_cadence,
+      currency: commitment.base_currency,
+      expectedAmountMinor: BigInt(normalizeMinorUnits(commitment.effective_amount_minor)),
+      coverage: coverage.get(cycle.commitment_id) ?? uncoveredCommitment(),
+      observations: observations.get(cycle.commitment_id) ?? [],
+      cancellationClaimed: false,
+    });
+    const mapped = verificationFromEvaluation(evaluation);
+    if (!mapped.persist) continue;
+    await client.query(
+      `update recovery_decision_cycles
+       set verification_outcome = $3, verified_at = $4, updated_at = $4
+       where workspace_id = $1 and id = $2 and verification_outcome is null`,
+      [workspaceId, cycle.id, mapped.outcome, now],
+    );
+  }
+}
+
+async function loadSavedDecisionCycles(
+  client: PoolClient,
+  workspaceId: string,
+): Promise<Map<string, SavedDecisionCycle[]>> {
+  const result = await client.query<CycleRow>(
+    `select id, commitment_id, due_date, user_action, review_at, decided_at,
+            verification_outcome, verified_at, currency
+     from recovery_decision_cycles
+     where workspace_id = $1
+     order by due_date asc, decided_at asc`,
+    [workspaceId],
+  );
+  if (!result.rows.length) return new Map();
+  const today = new Date().toISOString().slice(0, 10);
+  const observations = await loadWorkspaceChargeObservations(client, workspaceId);
+  const coverage = await loadWorkspaceCoverageMap(client, workspaceId);
+  const commitments = new Map((await loadCommitmentRows(client, workspaceId)).map((row) => [row.id, row]));
+  const byCommitment = new Map<string, SavedDecisionCycle[]>();
+  for (const row of result.rows) {
+    const commitment = commitments.get(row.commitment_id);
+    const dueDate = toDateOnly(row.due_date);
+    if (!dueDate) continue;
+    const evaluation = commitment
+      ? evaluateExpectedCharge({
+          evaluatedOn: today,
+          expectedDate: dueDate,
+          cadence: commitment.effective_cadence,
+          currency: commitment.base_currency,
+          expectedAmountMinor: BigInt(normalizeMinorUnits(commitment.effective_amount_minor)),
+          coverage: coverage.get(row.commitment_id) ?? uncoveredCommitment(),
+          observations: observations.get(row.commitment_id) ?? [],
+          cancellationClaimed: false,
+        })
+      : null;
+    const observed = evaluation?.status === "EVALUATED"
+      ? {
+          observedAmountMinor: evaluation.observedAmountMinor,
+          observedDate: evaluation.observedDate,
+          observedCurrency: evaluation.observedAmountMinor === null ? null : (commitment?.base_currency ?? row.currency),
+          observedEvidenceIds: evaluation.citedEvidenceIds,
+        }
+      : {
+          observedAmountMinor: null,
+          observedDate: null,
+          observedCurrency: null,
+          observedEvidenceIds: [] as const,
+        };
+    const cycles = byCommitment.get(row.commitment_id) ?? [];
+    cycles.push({
+      dueDate,
+      userAction: row.user_action,
+      reviewAt: toDateOnly(row.review_at),
+      decidedAt: row.decided_at.toISOString(),
+      verificationOutcome: row.verification_outcome,
+      verifiedAt: row.verified_at?.toISOString() ?? null,
+      ...observed,
+    });
+    byCommitment.set(row.commitment_id, cycles);
+  }
+  return byCommitment;
+}
+
+async function loadAmountSignals(client: PoolClient, workspaceId: string) {
+  const result = await client.query<{
+    commitment_id: string;
+    amount_minor: string;
+    currency: string;
+    evidence_date: Date | string;
+  }>(
+    `select link.commitment_id, evidence.amount_minor::text as amount_minor,
+            evidence.currency, evidence.evidence_date
+     from recovery_commitment_evidence link
+     join recovery_evidence evidence
+       on evidence.workspace_id = link.workspace_id and evidence.id = link.evidence_id
+     where link.workspace_id = $1
+       and evidence.amount_minor is not null
+       and evidence.currency is not null
+       and evidence.evidence_date is not null
+     order by evidence.evidence_date asc, evidence.id asc`,
+    [workspaceId],
+  );
+  const grouped = new Map<string, { amountMinor: bigint; currency: string }[]>();
+  for (const row of result.rows) {
+    const list = grouped.get(row.commitment_id) ?? [];
+    list.push({ amountMinor: BigInt(normalizeMinorUnits(row.amount_minor)), currency: row.currency });
+    grouped.set(row.commitment_id, list);
+  }
+  const signals = new Map<string, {
+    priceChange: { previousMinor: bigint; currentMinor: bigint } | null;
+    amountConflict: boolean;
+  }>();
+  for (const [commitmentId, amounts] of grouped) {
+    const previous = amounts.at(-2);
+    const current = amounts.at(-1);
+    if (!previous || !current || previous.currency !== current.currency) {
+      signals.set(commitmentId, { priceChange: null, amountConflict: false });
+      continue;
+    }
+    const increased = current.amountMinor > previous.amountMinor;
+    signals.set(commitmentId, {
+      priceChange: increased ? { previousMinor: previous.amountMinor, currentMinor: current.amountMinor } : null,
+      amountConflict: current.amountMinor !== previous.amountMinor && !increased,
+    });
+  }
+  return signals;
+}
+
+async function loadWorkspaceChargeObservations(client: PoolClient, workspaceId: string) {
+  const result = await client.query<{
+    commitment_id: string;
+    id: string;
+    evidence_date: Date | string;
+    amount_minor: string;
+    currency: string;
+  }>(
+    `select link.commitment_id, evidence.id, evidence.evidence_date,
+            evidence.amount_minor::text as amount_minor, evidence.currency
+     from recovery_commitment_evidence link
+     join recovery_evidence evidence
+       on evidence.workspace_id = link.workspace_id and evidence.id = link.evidence_id
+     where link.workspace_id = $1
+       and evidence.evidence_date is not null
+       and evidence.amount_minor is not null
+       and evidence.currency is not null
+     order by evidence.evidence_date asc, evidence.id asc`,
+    [workspaceId],
+  );
+  const byCommitment = new Map<string, ChargeObservation[]>();
+  for (const row of result.rows) {
+    const date = toDateOnly(row.evidence_date);
+    if (!date) continue;
+    const list = byCommitment.get(row.commitment_id) ?? [];
+    list.push({
+      evidenceId: row.id,
+      date,
+      amountMinor: BigInt(normalizeMinorUnits(row.amount_minor)),
+      currency: row.currency,
+    });
+    byCommitment.set(row.commitment_id, list);
+  }
+  return byCommitment;
+}
+
+async function loadWorkspaceCoverageMap(client: PoolClient, workspaceId: string) {
+  const result = await client.query<{
+    commitment_id: string;
+    coverage_state: SourceLivenessState;
+    coverage_source_ids: string[];
+  }>(
+    `select commitment_id, coverage_state, coverage_source_ids
+     from recovery_commitment_states
+     where workspace_id = $1`,
+    [workspaceId],
+  );
+  return new Map(result.rows.map((row) => [row.commitment_id, coverageFromState(row)]));
+}
+
+function coverageFromState(row: { coverage_state: SourceLivenessState; coverage_source_ids: string[] }): CommitmentCoverage {
+  return {
+    state: row.coverage_state,
+    trustworthy: isCoverageTrustworthy(row.coverage_state),
+    citedSourceIds: row.coverage_source_ids,
+    brokenSourceIds: row.coverage_state === "BROKEN" ? row.coverage_source_ids : [],
+    staleSourceIds: row.coverage_state === "STALE" ? row.coverage_source_ids : [],
+    limitations: [],
+  };
+}
+
+function uncoveredCommitment(): CommitmentCoverage {
+  return {
+    state: "NO_EVIDENCE",
+    trustworthy: false,
+    citedSourceIds: [],
+    brokenSourceIds: [],
+    staleSourceIds: [],
+    limitations: ["Coverage for this commitment has not been assessed yet."],
+  };
+}
+
+function toCommitmentSummary(row: CommitmentRow, cycle?: SavedDecisionCycle | null): CommitmentSummaryDto {
+  const dueDate = toDateOnly(row.effective_next_expected_date);
+  const current = cycle ?? null;
   return {
     id: row.id,
     version: Number(row.version),
@@ -2712,7 +3029,7 @@ function toCommitmentSummary(row: CommitmentRow): CommitmentSummaryDto {
     cadence: row.effective_cadence,
     amount: toMoneyDto(row.effective_amount_minor, row.base_currency),
     monthlyEquivalent: toMoneyDto(row.effective_monthly_minor, row.base_currency),
-    nextExpectedDate: toDateOnly(row.effective_next_expected_date),
+    nextExpectedDate: dueDate,
     confidence: {
       state: confidenceState(row.confidence_score),
       score: row.confidence_score || null,
@@ -2725,6 +3042,11 @@ function toCommitmentSummary(row: CommitmentRow): CommitmentSummaryDto {
       decidedAt: row.decided_at.toISOString(),
       updatedAt: row.decision_updated_at.toISOString(),
     } : null,
+    cycle: current ? {
+      dueDate: current.dueDate,
+      action: current.userAction,
+      reviewAt: current.reviewAt,
+    } satisfies CommitmentCycleDto : null,
     evidenceCount: row.evidence_ids.length,
     updatedAt: row.updated_at.toISOString(),
   };

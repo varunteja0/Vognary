@@ -37,6 +37,9 @@ const home = (overrides: Partial<HomeProjectionDto> = {}): HomeProjectionDto => 
   reviewItemCount: 0,
   possibleOverlaps: [],
   evidenceSources: [],
+  decisionQueue: [],
+  decisionOutcomes: [],
+  nextQuietCharge: null,
   ...overrides,
 });
 
@@ -95,9 +98,36 @@ test("Home hides renewals from Needs attention and hides empty last-visit change
   }] } })), true);
 });
 
-test("first-result brief uses server commitment order and counts overlap as attention", () => {
+test("first-result brief uses server commitment order and counts queued decisions", () => {
   const brief = firstResultBrief(home({
     activeCommitmentCount: 2,
+    decisionQueue: [{
+      commitmentId: "commitment-1",
+      merchant: "OpenAI",
+      dueDate: "2026-09-06",
+      daysAway: 18,
+      charge: money,
+      stake: null,
+      headline: "Decision needed",
+      reasonKeys: ["PRICE_INCREASE"],
+      reasons: ["Price increased ₹500"],
+      overlapMerchants: ["Claude"],
+      askPurpose: false,
+      evidenceIds: ["evidence-1"],
+    }, {
+      commitmentId: "commitment-2",
+      merchant: "Claude",
+      dueDate: "2026-09-01",
+      daysAway: 13,
+      charge: money,
+      stake: null,
+      headline: "Decision needed",
+      reasonKeys: ["OVERLAP_NO_PURPOSE"],
+      reasons: ["Possible overlap"],
+      overlapMerchants: ["OpenAI"],
+      askPurpose: true,
+      evidenceIds: ["evidence-2"],
+    }],
     needsMe: [attention("LOW_CONFIDENCE")],
     possibleOverlaps: [{
       family: "AI_RESEARCH",

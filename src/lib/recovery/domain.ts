@@ -19,6 +19,11 @@ import type {
   CorrectionStatus,
 } from "./contracts";
 import { groupStackOverlaps } from "./stack-overlap";
+import {
+  buildDecisionHome,
+  identityLooksUncertain,
+  type SavedDecisionCycle,
+} from "./decision-cycle";
 
 const dayMs = 24 * 60 * 60 * 1_000;
 
@@ -50,6 +55,10 @@ export type CanonicalCommitmentRecord = {
   purpose?: CommitmentPurpose | null;
   importance?: CommitmentImportance | null;
   owner?: CommitmentOwner | null;
+  firstDetectedAt?: string;
+  priceChange?: { previousMinor: bigint; currentMinor: bigint } | null;
+  amountConflict?: boolean;
+  cycles?: readonly SavedDecisionCycle[];
   updatedAt: string;
 };
 
@@ -153,6 +162,8 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
   const needsMe = active.flatMap((commitment) => buildAttention(commitment, today));
   const coverage = buildCoverage(input.sources, input.changed.state, generatedAt);
   const unresolvedDuplicateCount = new Set(input.duplicateState?.unresolvedCommitmentIds ?? []).size;
+  const possibleOverlaps = buildPossibleOverlaps(active.filter(inHeadline));
+  const decisionHome = buildDecisionHome(toDecisionFacts(active.filter(inHeadline)), today);
 
   return {
     workspace: input.workspace,
@@ -178,9 +189,12 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
     activeCommitmentCount: active.length,
     unknownCadenceCommitmentCount: active.length - cadenceEstablished.length,
     uncertainDuplicateCommitmentCount: unresolvedDuplicateCount,
-    reviewItemCount: needsMe.length,
-    possibleOverlaps: buildPossibleOverlaps(active.filter(inHeadline)),
+    reviewItemCount: decisionHome.decisionQueue.length,
+    possibleOverlaps,
     evidenceSources: [],
+    decisionQueue: decisionHome.decisionQueue,
+    decisionOutcomes: decisionHome.decisionOutcomes,
+    nextQuietCharge: decisionHome.nextQuietCharge,
   };
 }
 
@@ -284,6 +298,11 @@ export function toMoneyDto(value: string | bigint, currency: string): MoneyDto {
       .map((part) => part.type === "fraction" ? fraction : part.value)
       .join(""),
   };
+}
+
+export function annualizedStake(amountMinor: bigint, cadence: Cadence, currency: string): MoneyDto | null {
+  if (cadence === "IRREGULAR") return null;
+  return tryAnnualizedMoney(projectCadenceMonthlyMinor(amountMinor, cadence), currency);
 }
 
 function tryAnnualizedMoney(monthly: bigint, currency: string): MoneyDto | null {
@@ -515,6 +534,34 @@ function buildPossibleOverlaps(commitments: readonly CanonicalCommitmentRecord[]
       missingCadenceCount: group.members.length - established.length,
       missingPurposeCount: group.members.length - purposes.length,
       sharedPurpose: [...purposeCounts.values()].some((count) => count >= 2),
+    };
+  });
+}
+
+export function toDecisionFacts(commitments: readonly CanonicalCommitmentRecord[]) {
+  const overlaps = groupStackOverlaps(commitments);
+  return commitments.map((commitment) => {
+    const group = overlaps.find((item) => item.members.some((member) => member.id === commitment.id));
+    return {
+      commitmentId: commitment.id,
+      merchant: commitment.merchant,
+      status: commitment.status,
+      cadence: commitment.cadence,
+      currency: commitment.currency,
+      amountMinor: commitment.amountMinor,
+      nextExpectedDate: commitment.nextExpectedDate,
+      firstDetectedOn: commitment.firstDetectedAt ?? null,
+      observationCount: commitment.evidenceIds.length,
+      purpose: commitment.purpose ?? null,
+      stamp: commitment.decision?.value ?? null,
+      identityUncertain: identityLooksUncertain(commitment.recommendationReason),
+      amountConflict: commitment.amountConflict === true,
+      priceChange: commitment.priceChange ?? null,
+      overlapPeers: (group?.members ?? [])
+        .filter((member) => member.id !== commitment.id)
+        .map((member) => ({ merchant: member.merchant, purpose: member.purpose ?? null })),
+      evidenceIds: commitment.evidenceIds,
+      cycles: commitment.cycles ?? [],
     };
   });
 }

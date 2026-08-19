@@ -72,6 +72,23 @@ test("Recovery evidence, correction, and decision bodies are strict and bounded"
     commitmentId: "2f626050-70f8-4cae-902d-caa9223cbebe",
     decision: "INVESTIGATE",
   });
+  assert.deepEqual(normalizeDecisionRequest({
+    commitmentId: "2f626050-70f8-4cae-902d-caa9223cbebe",
+    action: "PLAN_TO_CANCEL",
+  }), {
+    commitmentId: "2f626050-70f8-4cae-902d-caa9223cbebe",
+    decision: "CANCEL",
+    action: "PLAN_TO_CANCEL",
+  });
+  assert.deepEqual(normalizeDecisionRequest({
+    commitmentId: "2f626050-70f8-4cae-902d-caa9223cbebe",
+    decision: "MONITOR",
+  }), {
+    commitmentId: "2f626050-70f8-4cae-902d-caa9223cbebe",
+    decision: "MONITOR",
+    action: "REVIEW_LATER",
+    reviewSnooze: "TOMORROW",
+  });
   for (const decision of ["KEEP", "MONITOR", "DOWNGRADE", "CANCEL", "INVESTIGATE"] as const) {
     assert.equal(normalizeDecisionRequest({ commitmentId: "2f626050-70f8-4cae-902d-caa9223cbebe", decision }).decision, decision);
   }

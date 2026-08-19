@@ -6,7 +6,7 @@ test("forwarding-first landing respects reduced motion", async ({ page }, testIn
   const surface = testInfo.project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Know what your company is committed to pay next — and what deserves attention before the card fires." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decide before the charge, not after it." })).toBeVisible();
 
   const motionState = await page.evaluate(() => ({
     rootScrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,

@@ -55,7 +55,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 1-3. Open landing and establish a saved identity independently of provider activation.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Know what your company is committed to pay next");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Decide before the charge, not after it.");
   await tabToAndActivate(page, "Sign in");
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
@@ -70,11 +70,11 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await addBills.getByRole("tab", { name: "Paste text" }).click();
   await addBills.getByLabel("Receipt or invoice text").fill(`${firstReceipt}\n\n${secondReceipt}`);
   await addBills.getByRole("button", { name: "Add bills" }).click();
-  await expect(page.getByRole("heading", { name: /We found \d+ software commitment/ })).toBeVisible();
+  await expect(page.getByText(/We found \d+ software commitment/)).toBeVisible();
   await expect(page.getByText("OpenAI").first()).toBeVisible();
   await page.getByRole("button", { name: "Review results" }).click();
-  await expect(page.getByText("Software commitments")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Coming later" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What we found" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
@@ -102,14 +102,16 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await openCommitment(page, "OpenAI");
 
   // Save one decision on the first recurring commitment.
-  const reviewChoice = page.getByRole("button", { name: "Review", exact: true });
+  const reviewChoice = page.getByRole("button", { name: "Review later", exact: true });
   if (!(await reviewChoice.isVisible())) {
     await page.getByRole("button", { name: "Change", exact: true }).click();
   }
   await reviewChoice.click();
-  await expect(page.getByText(/Saved Review on/)).toBeVisible();
+  await expect(page.getByText(/Saved Review later on/)).toBeVisible();
   await selectRecoveryView(page, "Home");
-  await expect(page.getByText("Software commitments")).toBeVisible();
+  // The decision is remembered for this cycle, so Home stops asking for it.
+  await expect(page.getByRole("heading", { name: "Nothing to decide right now" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toHaveCount(0);
   await openCommitment(page, "OpenAI");
 
   // 16-20. Correct every contract field through the modal UI.
@@ -146,7 +148,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 22-26. Exercise every stored decision through three primary and two secondary user choices.
   await page.getByText("More", { exact: true }).click();
-  for (const decision of ["Keep", "Review", "Consider a cheaper plan", "Plan to cancel", "I don’t recognize this"]) {
+  for (const decision of ["Keep", "Review later", "Consider a cheaper plan", "Plan to cancel", "I don’t recognize this"]) {
     const button = page.getByRole("button", { name: decision, exact: true });
     if (!(await button.isVisible())) {
       const change = page.getByRole("button", { name: "Change", exact: true });
@@ -189,7 +191,8 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
-  await expect(page.getByText("Software commitments")).toBeVisible();
+  // The next charge is months away, so Home stays calm instead of manufacturing urgency.
+  await expect(page.getByRole("heading", { name: "Nothing to decide right now" })).toBeVisible();
 
   // 31. Exercise canonical export and canonical deletion through Account settings.
   await openAccount(page);

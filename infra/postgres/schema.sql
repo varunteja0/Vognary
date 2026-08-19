@@ -1462,6 +1462,48 @@ create table if not exists recovery_commitment_context (
   check (purpose is not null or importance is not null or owner is not null)
 );
 
+create table if not exists recovery_decision_cycles (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  commitment_id uuid not null,
+  due_date date not null,
+  stake_minor bigint,
+  currency text not null,
+  reason_keys text[] not null default '{}',
+  user_action text not null check (user_action in ('KEEP', 'REVIEW_LATER', 'PLAN_TO_CANCEL')),
+  review_at date,
+  decided_at timestamptz not null default now(),
+  decided_by_user_id uuid references users(id) on delete set null,
+  verification_outcome text check (
+    verification_outcome is null
+    or verification_outcome in ('CHARGE_ARRIVED', 'NO_CHARGE_IN_WINDOW', 'CANNOT_EVALUATE')
+  ),
+  verified_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, commitment_id, due_date),
+  foreign key (workspace_id, commitment_id)
+    references recovery_commitments(workspace_id, id) on delete cascade,
+  check (
+    (user_action = 'REVIEW_LATER' and review_at is not null)
+    or (user_action <> 'REVIEW_LATER' and review_at is null)
+  ),
+  check (
+    reason_keys <@ array[
+      'RENEWS_SOON',
+      'PRICE_INCREASE',
+      'OVERLAP_NO_PURPOSE',
+      'NEW_COMMITMENT',
+      'IDENTITY_UNCERTAIN',
+      'AMOUNT_CONFLICT',
+      'NO_PRIOR_DECISION'
+    ]::text[]
+  )
+);
+
+create index if not exists recovery_decision_cycles_workspace_due_idx
+  on recovery_decision_cycles (workspace_id, due_date);
+
 create table if not exists recovery_changes (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references workspaces(id) on delete cascade,

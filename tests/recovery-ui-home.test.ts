@@ -11,6 +11,11 @@ import {
   correctionStatuses,
   coverageStates,
   decisions,
+  decisionCycleActions,
+  decisionOutcomeKinds,
+  decisionReasonKeys,
+  decisionReviewSnoozes,
+  decisionVerificationOutcomes,
   evidenceProvenanceKinds,
   commitmentImportances,
   commitmentOwners,
@@ -33,9 +38,14 @@ import {
   correctionStatusLabels,
   coverageLabels,
   coverageMeanings,
+  decisionCycleActionLabels,
   decisionLabels,
   decisionMeanings,
+  decisionOutcomeKindLabels,
+  decisionReasonKeyLabels,
+  decisionReviewSnoozeLabels,
   decisionStamps,
+  decisionVerificationOutcomeLabels,
   errorCopy,
   expectedVsObservedLabels,
   formatDay,
@@ -75,6 +85,11 @@ test("every contract enum has presentation copy, so a contract change cannot ren
     [decisions, decisionLabels],
     [decisions, decisionMeanings],
     [decisions, decisionStamps],
+    [decisionCycleActions, decisionCycleActionLabels],
+    [decisionReviewSnoozes, decisionReviewSnoozeLabels],
+    [decisionReasonKeys, decisionReasonKeyLabels],
+    [decisionVerificationOutcomes, decisionVerificationOutcomeLabels],
+    [decisionOutcomeKinds, decisionOutcomeKindLabels],
     [commitmentPurposes, purposeLabels],
     [commitmentImportances, importanceLabels],
     [commitmentOwners, ownerLabels],
@@ -128,15 +143,14 @@ test("landing, login, and empty Home tell one receipts-to-decision product story
   assert.doesNotMatch(landingSource, /Set up billing forwarding once so matching mail keeps arriving/);
 });
 
-test("home leads with attention, upcoming money, and a cited spend picture", () => {
-  for (const heading of ["Needs attention", "Coming up", "Recent change"]) {
+test("home leads with the pre-renewal decision queue and cited spend activation", () => {
+  for (const heading of ["Decisions due soon", "Coming later", "Recent change"]) {
     assert.ok(homeSource.includes(heading), `home must render ${heading}`);
   }
   assert.doesNotMatch(homeSource, /What we found/);
   assert.doesNotMatch(homeSource, /Currently committed/);
   assert.doesNotMatch(homeSource, /Receipts checked/);
   assert.doesNotMatch(homeSource, /Annualized estimate/);
-  assert.match(homeSource, /home\.activeCommitmentCount/);
   assert.match(homeSource, /onCitedPictureRendered/);
   assert.match(homeSource, /hasCitedRecurringSpendPicture/);
   assert.match(clientSource, /recordCitedPictureActivationWithRetry/);
@@ -148,12 +162,12 @@ test("home leads with attention, upcoming money, and a cited spend picture", () 
   assert.match(homeSource, /SpendHero/);
   assert.match(homeSource, /<RecoveryAttention/);
   const quietHome = homeSource.slice(homeSource.indexOf("className=\"stack-page\""));
-  assert.ok(quietHome.indexOf("<NeedsAttention") < quietHome.indexOf("<ComingUp"), "Needs attention must lead Coming up");
+  assert.ok(quietHome.indexOf("<DecisionQueue") < quietHome.indexOf("<ComingLater"), "Decision queue must lead Coming later");
   assert.ok(
     homeSource.indexOf("<RecoveryAutopilotHome") < homeSource.indexOf("<SpendHero"),
     "active Autopilot actions must render above cited spend metrics",
   );
-  assert.match(homeSource, /Coming up/);
+  assert.match(homeSource, /Coming later/);
   assert.match(homeSource, /home\.next/);
   assert.match(homeSource, /No recurring amount yet/);
   assert.match(homeSource, /shouldShowRecentChange/);
@@ -219,7 +233,7 @@ test("one observation is coached toward a second matching receipt instead of ren
 test("commitments use ordinary language and three primary choices", () => {
   assert.deepEqual(decisionLabels, {
     KEEP: "Keep",
-    MONITOR: "Review",
+    MONITOR: "Review later",
     DOWNGRADE: "Consider a cheaper plan",
     CANCEL: "Plan to cancel",
     INVESTIGATE: "I don’t recognize this",

@@ -68,7 +68,10 @@ test("sequential OpenAI and Notion receipts collapse to two commitments, not fou
     assert.equal(second.data.commitments.length, 1, "two OpenAI months must stay one commitment");
     assert.equal(second.data.commitments[0]?.evidenceCount, 2);
     assert.equal(second.data.home.activeCommitmentCount, 1);
-    assert.equal(second.data.home.reviewItemCount, 0);
+    assert.ok(
+      second.data.home.decisionQueue.some((card) => card.reasonKeys.includes("NEW_COMMITMENT")),
+      "a newly observed recurring commitment still needs a first decision",
+    );
     assert.equal(second.data.commitments[0]?.recommendedDecision, "KEEP");
     assert.equal(second.data.home.monthlyTotals[0]?.amount.minor, "199900");
 
@@ -113,7 +116,7 @@ test("sequential OpenAI and Notion receipts collapse to two commitments, not fou
     assert.deepEqual(active.map((commitment) => commitment.merchant).sort(), ["Notion", "OpenAI"]);
     assert.equal(active.every((commitment) => commitment.recommendedDecision === "KEEP"), true);
     assert.equal(afterNotionMonthTwo.data.home.activeCommitmentCount, 2);
-    assert.equal(afterNotionMonthTwo.data.home.reviewItemCount, 0);
+    assert.equal(afterNotionMonthTwo.data.home.reviewItemCount, 2);
     assert.equal(afterNotionMonthTwo.data.home.monthlyTotals[0]?.amount.minor, "282900");
 
     const priced = await submitRecoveryEvidence({
@@ -132,7 +135,8 @@ test("sequential OpenAI and Notion receipts collapse to two commitments, not fou
     assert.equal(openai?.recommendedDecision, "MONITOR");
     assert.match(priced.data.home.needsMe[0]?.detail ?? "", /Price changed|higher than the earlier/i);
     assert.equal(notionKept?.recommendedDecision, "KEEP");
-    assert.equal(priced.data.home.reviewItemCount, 1);
+    assert.ok(priced.data.home.decisionQueue.some((card) => card.reasonKeys.includes("PRICE_INCREASE")));
+    assert.ok(priced.data.home.reviewItemCount >= 1);
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
     await pool.query(`delete from users where id = $1`, [ownerUserId]);

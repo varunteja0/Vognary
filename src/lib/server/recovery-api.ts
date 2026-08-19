@@ -4,6 +4,8 @@ import {
   commitmentImportances,
   commitmentOwners,
   commitmentPurposes,
+  decisionCycleActions,
+  decisionReviewSnoozes,
   decisions,
   recoveryErrorStatusByCode,
   recoveryLimits,
@@ -21,6 +23,7 @@ import {
   type SenderProvenanceDto,
   type SenderTrustTier,
 } from "@/lib/recovery/contracts";
+import { stampForCycleAction } from "@/lib/recovery/decision-cycle";
 import { normalizeMinorUnits } from "@/lib/recovery/domain";
 
 const safeMessages: Record<RecoveryErrorCode, string> = {
@@ -201,11 +204,27 @@ export function normalizeCorrectionRequest(value: unknown): CreateCorrectionRequ
 
 export function normalizeDecisionRequest(value: unknown): PutDecisionRequest {
   const record = requireRecord(value, "Decision request");
-  rejectUnknown(record, new Set(["commitmentId", "decision"]), "decision request");
+  rejectUnknown(record, new Set(["commitmentId", "decision", "action", "reviewSnooze"]), "decision request");
   const commitmentId = boundedText(record.commitmentId, "commitmentId", 36, 36);
   if (!isUuid(commitmentId)) throw invalid("commitmentId must be a UUID.");
-  if (typeof record.decision !== "string" || !decisions.includes(record.decision as (typeof decisions)[number])) throw invalid("decision is not supported.");
-  return { commitmentId, decision: record.decision as (typeof decisions)[number] };
+  const action = optionalBoundedEnum(record.action, decisionCycleActions, "action");
+  const reviewSnooze = optionalBoundedEnum(record.reviewSnooze, decisionReviewSnoozes, "reviewSnooze");
+  if (action === null || reviewSnooze === null) throw invalid("decision is not supported.");
+  if (record.decision === undefined && action === undefined) throw invalid("decision is not supported.");
+  if (record.decision !== undefined && (typeof record.decision !== "string" || !decisions.includes(record.decision as (typeof decisions)[number]))) {
+    throw invalid("decision is not supported.");
+  }
+  const decision = record.decision === undefined
+    ? stampForCycleAction(action!)
+    : record.decision as (typeof decisions)[number];
+  const resolvedAction = action ?? (decision === "MONITOR" ? "REVIEW_LATER" as const : undefined);
+  const resolvedSnooze = reviewSnooze ?? (resolvedAction === "REVIEW_LATER" ? "TOMORROW" as const : undefined);
+  return {
+    commitmentId,
+    decision,
+    ...(resolvedAction ? { action: resolvedAction } : {}),
+    ...(resolvedSnooze ? { reviewSnooze: resolvedSnooze } : {}),
+  };
 }
 
 export function normalizeContextRequest(value: unknown): PutCommitmentContextRequest {

@@ -13,6 +13,11 @@ import type {
   CorrectionStatus,
   CoverageState,
   Decision,
+  DecisionCycleAction,
+  DecisionOutcomeKind,
+  DecisionReasonKey,
+  DecisionReviewSnooze,
+  DecisionVerificationOutcome,
   EvidenceProvenanceKind,
   ExpectedVsObservedStatus,
   ProjectionAmountProvenance,
@@ -26,15 +31,15 @@ import type {
 
 export const decisionLabels: Record<Decision, string> = {
   KEEP: "Keep",
-  MONITOR: "Review",
+  MONITOR: "Review later",
   DOWNGRADE: "Consider a cheaper plan",
   CANCEL: "Plan to cancel",
   INVESTIGATE: "I don’t recognize this",
 };
 
 export const decisionMeanings: Record<Decision, string> = {
-  KEEP: "No action needed.",
-  MONITOR: "Look at this before the next bill. Nothing is cancelled.",
+  KEEP: "No action needed this cycle.",
+  MONITOR: "Look at this again before the next bill. Nothing is cancelled.",
   DOWNGRADE: "Keep the service, but consider a cheaper plan.",
   CANCEL: "Record that you plan to cancel it yourself. Vognary does not cancel it.",
   INVESTIGATE: "Flag this because you do not recognize it.",
@@ -46,6 +51,42 @@ export const decisionStamps: Record<Decision, string> = {
   DOWNGRADE: "stamp stamp-downgrade",
   CANCEL: "stamp stamp-cancel",
   INVESTIGATE: "stamp stamp-investigate",
+};
+
+export const decisionCycleActionLabels: Record<DecisionCycleAction, string> = {
+  KEEP: "Keep",
+  REVIEW_LATER: "Review later",
+  PLAN_TO_CANCEL: "Plan to cancel",
+};
+
+export const decisionReviewSnoozeLabels: Record<DecisionReviewSnooze, string> = {
+  TOMORROW: "Tomorrow",
+  THREE_DAYS_BEFORE: "3 days before the charge",
+  ONE_DAY_BEFORE: "1 day before the charge",
+};
+
+export const decisionReasonKeyLabels: Record<DecisionReasonKey, string> = {
+  RENEWS_SOON: "Renews soon",
+  PRICE_INCREASE: "Price increased",
+  OVERLAP_NO_PURPOSE: "Possible overlap",
+  NEW_COMMITMENT: "New commitment",
+  IDENTITY_UNCERTAIN: "Identity uncertain",
+  AMOUNT_CONFLICT: "Amount conflict",
+  NO_PRIOR_DECISION: "No prior decision",
+};
+
+export const decisionVerificationOutcomeLabels: Record<DecisionVerificationOutcome, string> = {
+  CHARGE_ARRIVED: "Charge arrived",
+  NO_CHARGE_IN_WINDOW: "No charge in the window",
+  CANNOT_EVALUATE: "Cannot verify yet",
+};
+
+export const decisionOutcomeKindLabels: Record<DecisionOutcomeKind, string> = {
+  CONTINUED_AS_PLANNED: "Continued as planned",
+  CHARGE_AFTER_CANCEL_PLAN: "Charged after you planned to cancel",
+  NO_CHARGE_SEEN: "No new charge seen",
+  CANNOT_VERIFY: "Cannot verify yet",
+  DECISION_DUE_AGAIN: "Decision due again",
 };
 
 export const purposeLabels: Record<CommitmentPurpose, string> = {

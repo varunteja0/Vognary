@@ -26,11 +26,14 @@ const senderTrustLabels: Record<NonNullable<EvidenceDto["senderTrust"]>["tier"],
 // server DTO; nothing is recomputed, reformatted as money, or filled in.
 
 export function EvidenceRow({ evidence, buttonId, onInspect }: { evidence: EvidenceDto; buttonId: string; onInspect: () => void }) {
+  const kind = sourceLabels[evidence.source.type];
+  // The stored label often restates the source kind; printing both reads as a stutter.
+  const label = evidence.source.label === kind ? null : evidence.source.label;
   return (
     <li className="inset p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-data text-xs text-(--muted)">
-          {sourceLabels[evidence.source.type]} · {evidence.source.label}
+          {kind}{label ? ` · ${label}` : ""}
         </p>
         {evidence.amount ? <MoneyValue amount={evidence.amount} className="text-sm font-semibold text-(--ink)" /> : <span className="font-data text-xs text-(--muted)">No amount published</span>}
       </div>

@@ -283,7 +283,7 @@ jobs:
             `);
             const verification = result.rows[0];
             console.log(JSON.stringify(verification, null, 2));
-            if (verification.migration_head !== '0054_recovery_commitment_context'
+            if (verification.migration_head !== '0055_recovery_decision_cycles'
               || !verification.connector_job_guard
               || !verification.connector_evidence_guard
               || !verification.renewal_delivery_guard

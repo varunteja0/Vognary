@@ -298,6 +298,7 @@ test("MONITOR with an explicit reason remains on the attention queue", () => {
       decision: null,
       evidenceIds: ["evidence-1", "evidence-2"],
       factCorrections: [],
+      priceChange: { previousMinor: BigInt(199_900), currentMinor: BigInt(249_900) },
       updatedAt: now.toISOString(),
     }],
     sources: [],
@@ -305,6 +306,7 @@ test("MONITOR with an explicit reason remains on the attention queue", () => {
   });
   assert.equal(home.reviewItemCount, 1);
   assert.equal(home.needsMe[0]?.detail.includes("Price changed"), true);
+  assert.equal(home.decisionQueue[0]?.reasonKeys.includes("PRICE_INCREASE"), true);
 });
 
 test("relationship policy splits conflicting workspaces and collapses sequential unlabeled bills", () => {

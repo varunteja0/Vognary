@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import type { ReceiptInboxStatusDto, RecoveryEvidenceSourceDto } from "@/lib/recovery/contracts";
-import { customerInboxStatus, customerInboxStatusLabel, customerPhrases, gmailWizardStep, inboxFailureCopy } from "./present";
+import { customerInboxStatus, customerInboxStatusLabel, customerPhrases, gmailWizardStep, inboxFailureCopy, type CustomerInboxStatus } from "./present";
 import { ReceiptBillingSetup, SourcesAdvancedHelp } from "./recovery-billing-setup";
 import { AuthRequiredBlock, LoadingBlock, StateBlock } from "./recovery-states";
 import type { LoadState, PendingMutation } from "./state";
@@ -57,24 +57,26 @@ export function RecoverySources({
 
   if (!receiptInboxPubliclyAvailable) {
     return (
-      <div className="stack-page">
-        <StayUpToDateHeading />
-        <p className="max-w-xl text-sm leading-6 text-(--muted)">
-          Automatic forwarding is not available yet. Add bills manually. {customerPhrases.trustOnce}{" "}
-          <a href="/security" className="underline underline-offset-4">Trust</a>
-        </p>
-        <ManualAdd onAddBills={onAddBills} />
-        <AdvancedPanel
-          receiptInbox={null}
-          evidenceSources={evidenceSources}
-          canManage={canManageEvidenceSources}
-          pendingAction={pendingAction}
-          pendingMutation={pendingMutation}
-          onDisconnect={onDisconnectEvidenceSource}
-          onReconnect={onReconnectEvidenceSource}
-          onRotate={onRotate}
-          onRevoke={onRevoke}
-        />
+      <div className="w-full max-w-2xl">
+        <div className="stack-page">
+          <StayUpToDateHeading />
+          <p className="text-sm leading-6 text-(--muted)">
+            Automatic forwarding is not available yet. Add bills manually. {customerPhrases.trustOnce}{" "}
+            <a href="/security" className="link-quiet">See how your data is handled</a>
+          </p>
+          <ManualAdd onAddBills={onAddBills} />
+          <AdvancedPanel
+            receiptInbox={null}
+            evidenceSources={evidenceSources}
+            canManage={canManageEvidenceSources}
+            pendingAction={pendingAction}
+            pendingMutation={pendingMutation}
+            onDisconnect={onDisconnectEvidenceSource}
+            onReconnect={onReconnectEvidenceSource}
+            onRotate={onRotate}
+            onRevoke={onRevoke}
+          />
+        </div>
       </div>
     );
   }
@@ -91,85 +93,94 @@ export function RecoverySources({
   }
 
   return (
-    <div className="stack-page">
-      <StayUpToDateHeading />
+    <div className="w-full max-w-2xl">
+      <div className="stack-page">
+        <StayUpToDateHeading />
 
-      <section className="grid max-w-xl gap-3">
-        <h3 className="font-display text-lg font-semibold text-(--ink)">{customerPhrases.privateInbox}</h3>
-        <p className="text-sm leading-6 text-(--muted)">{customerPhrases.forwardMatching}</p>
-        <p className="text-sm text-(--ink-soft)">Status: {customerInboxStatusLabel(inboxStatus)}</p>
-        {inboxStatus === "ON" && !wizardOpen ? (
-          <p className="text-sm leading-6 text-(--muted)">Matching billing mail should arrive on its own.</p>
-        ) : wizardOpen && receiptInbox?.alias ? (
-          <ReceiptBillingSetup
-            receiptInbox={receiptInbox}
-            localStep={localStep}
-            onAdvance={() => setLocalStep((step) => (step === 3 ? 3 : (step + 1) as 1 | 2 | 3))}
-          />
+        <section className="grid gap-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h3 className="font-display text-lg font-semibold text-(--ink)">{customerPhrases.privateInbox}</h3>
+            <span className={inboxPill(inboxStatus)}>{customerInboxStatusLabel(inboxStatus)}</span>
+          </div>
+          <p className="text-sm leading-6 text-(--muted)">{customerPhrases.forwardMatching}</p>
+          {inboxStatus === "ON" && !wizardOpen ? (
+            <p className="text-sm leading-6 text-(--muted)">Matching billing mail should arrive on its own.</p>
+          ) : wizardOpen && receiptInbox?.alias ? (
+            <ReceiptBillingSetup
+              receiptInbox={receiptInbox}
+              localStep={localStep}
+              onAdvance={() => setLocalStep((step) => (step === 3 ? 3 : (step + 1) as 1 | 2 | 3))}
+            />
+          ) : (
+            <button type="button" onClick={openSetup} disabled={pendingAction !== null} className="btn btn-primary justify-self-start">
+              {pendingAction === "PROVISION" ? "Creating address…" : inboxStatus === "NOT_SET_UP" ? "Set up" : "Continue setup"}
+            </button>
+          )}
+          {receiptInbox?.state === "FAILED" ? (
+            <StateBlock
+              eyebrow="Needs another bill"
+              title={inboxFailureCopy(receiptInbox.lastFailureCode).title}
+              detail={inboxFailureCopy(receiptInbox.lastFailureCode).detail}
+              tone="caution"
+            >
+              <button type="button" onClick={onAddBills} className="btn btn-sm btn-primary">{customerPhrases.addBills}</button>
+            </StateBlock>
+          ) : null}
+          <p className="text-sm leading-6 text-(--muted)">
+            {customerPhrases.trustOnce} <a href="/security" className="link-quiet">See how your data is handled</a>
+          </p>
+        </section>
+
+        <ManualAdd onAddBills={onAddBills} />
+
+        {receiptInbox?.alias ? (
+          <details>
+            <summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">Older bills</summary>
+            <div className="mt-3"><SourcesAdvancedHelp receiptInbox={receiptInbox} /></div>
+          </details>
         ) : (
-          <button type="button" onClick={openSetup} disabled={pendingAction !== null} className="btn btn-primary justify-self-start">
-            {pendingAction === "PROVISION" ? "Creating address…" : inboxStatus === "NOT_SET_UP" ? "Set up" : "Continue setup"}
-          </button>
+          <details>
+            <summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">Using Outlook?</summary>
+            <div className="mt-3">{receiptInbox ? <SourcesAdvancedHelp receiptInbox={receiptInbox} /> : <p className="text-sm text-(--muted)">Set up the private inbox first.</p>}</div>
+          </details>
         )}
-        {receiptInbox?.state === "FAILED" ? (
-          <StateBlock
-            eyebrow="Needs another bill"
-            title={inboxFailureCopy(receiptInbox.lastFailureCode).title}
-            detail={inboxFailureCopy(receiptInbox.lastFailureCode).detail}
-            tone="caution"
-          >
-            <button type="button" onClick={onAddBills} className="btn btn-sm btn-primary">{customerPhrases.addBills}</button>
+
+        {sourceStatus.kind === "FAILED" && receiptInbox ? (
+          <StateBlock eyebrow="Source update failed" title="The last address action was not saved" detail={sourceStatus.failure.error.message} tone="caution">
+            <button type="button" onClick={onRetry} className="btn btn-sm btn-ghost">Reload</button>
           </StateBlock>
         ) : null}
-        <p className="text-sm text-(--muted)">{customerPhrases.trustOnce} <a href="/security" className="underline underline-offset-4">Trust</a></p>
-      </section>
 
-      <ManualAdd onAddBills={onAddBills} />
-
-      {receiptInbox?.alias ? (
-        <details>
-          <summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">Older bills</summary>
-          <div className="mt-3"><SourcesAdvancedHelp receiptInbox={receiptInbox} /></div>
-        </details>
-      ) : (
-        <details>
-          <summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">Using Outlook?</summary>
-          <div className="mt-3">{receiptInbox ? <SourcesAdvancedHelp receiptInbox={receiptInbox} /> : <p className="text-sm text-(--muted)">Set up the private inbox first.</p>}</div>
-        </details>
-      )}
-
-      {sourceStatus.kind === "FAILED" && receiptInbox ? (
-        <StateBlock eyebrow="Source update failed" title="The last address action was not saved" detail={sourceStatus.failure.error.message} tone="caution">
-          <button type="button" onClick={onRetry} className="btn btn-sm btn-ghost">Reload</button>
-        </StateBlock>
-      ) : null}
-
-      <AdvancedPanel
-        receiptInbox={receiptInbox}
-        evidenceSources={evidenceSources}
-        canManage={canManageEvidenceSources}
-        pendingAction={pendingAction}
-        pendingMutation={pendingMutation}
-        onDisconnect={onDisconnectEvidenceSource}
-        onReconnect={onReconnectEvidenceSource}
-        onRotate={onRotate}
-        onRevoke={onRevoke}
-      />
+        <AdvancedPanel
+          receiptInbox={receiptInbox}
+          evidenceSources={evidenceSources}
+          canManage={canManageEvidenceSources}
+          pendingAction={pendingAction}
+          pendingMutation={pendingMutation}
+          onDisconnect={onDisconnectEvidenceSource}
+          onReconnect={onReconnectEvidenceSource}
+          onRotate={onRotate}
+          onRevoke={onRevoke}
+        />
+      </div>
     </div>
   );
 }
 
+function inboxPill(status: CustomerInboxStatus): string {
+  if (status === "ON") return "pill pill-ready";
+  if (status === "NEEDS_HELP") return "pill pill-blocked";
+  if (status === "NOT_SET_UP") return "pill pill-planned";
+  return "pill pill-partial";
+}
+
 function StayUpToDateHeading() {
-  return (
-    <header>
-      <h3 className="font-display text-2xl font-semibold tracking-tight text-(--ink)">{customerPhrases.stayUpToDate}</h3>
-    </header>
-  );
+  return <p className="eyebrow eyebrow-xs">{customerPhrases.stayUpToDate}</p>;
 }
 
 function ManualAdd({ onAddBills }: { onAddBills: () => void }) {
   return (
-    <section className="grid max-w-xl gap-3">
+    <section className="grid gap-3">
       <h3 className="font-display text-lg font-semibold text-(--ink)">{customerPhrases.addBillManually}</h3>
       <button type="button" onClick={onAddBills} className="btn btn-ghost justify-self-start">{customerPhrases.addBills}</button>
     </section>

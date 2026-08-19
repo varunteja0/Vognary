@@ -293,6 +293,17 @@ test("autopilot loop schema is additive and consolidated for fresh databases", (
   assert.match(schema, /before insert or update or delete on recovery_covered_windows/i);
 });
 
+test("0055 adds remembered decision cycles without rewriting evidence", () => {
+  const cycleMigration = readFileSync(new URL("../infra/postgres/migrations/0055_recovery_decision_cycles.sql", import.meta.url), "utf8");
+  for (const sql of [cycleMigration, schema]) {
+    assert.match(sql, /create table if not exists recovery_decision_cycles/i);
+    assert.match(sql, /unique \(workspace_id, commitment_id, due_date\)/);
+    assert.match(sql, /user_action in \('KEEP', 'REVIEW_LATER', 'PLAN_TO_CANCEL'\)/);
+  }
+  assert.match(cycleMigration, /insert into recovery_decision_cycles/);
+  assert.doesNotMatch(cycleMigration, /drop table|truncate|alter table recovery_commitments|alter table recovery_decisions|alter table recovery_evidence/i);
+});
+
 test("0054 adds an isolated purpose/importance overlay without rewriting evidence", () => {
   const contextMigration = readFileSync(new URL("../infra/postgres/migrations/0054_recovery_commitment_context.sql", import.meta.url), "utf8");
   for (const sql of [contextMigration, schema]) {

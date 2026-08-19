@@ -40,11 +40,11 @@ export function RecoveryAddEvidence({
 
   return (
     <div className="grid gap-5">
-      <div role="tablist" aria-label="How to add bills" className="flex flex-wrap gap-2">
-        <button type="button" role="tab" aria-selected={method === "UPLOAD"} className={`btn btn-sm btn-ghost ${method === "UPLOAD" ? "font-semibold" : ""}`} onClick={() => setMethod("UPLOAD")}>
+      <div role="tablist" aria-label="How to add bills" className="segmented">
+        <button type="button" role="tab" aria-selected={method === "UPLOAD"} data-active={method === "UPLOAD"} onClick={() => setMethod("UPLOAD")}>
           Upload file
         </button>
-        <button type="button" role="tab" aria-selected={method === "PASTE"} className={`btn btn-sm btn-ghost ${method === "PASTE" ? "font-semibold" : ""}`} onClick={() => setMethod("PASTE")}>
+        <button type="button" role="tab" aria-selected={method === "PASTE"} data-active={method === "PASTE"} onClick={() => setMethod("PASTE")}>
           Paste text
         </button>
       </div>

@@ -50,7 +50,7 @@ export function firstResultBrief(
 ): FirstResultBrief {
   return {
     commitmentCount: home.activeCommitmentCount,
-    attentionCount: homeAttentionCount(home),
+    attentionCount: home.decisionQueue.length,
     items: commitments,
   };
 }

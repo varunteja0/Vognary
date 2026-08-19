@@ -173,6 +173,9 @@ const home = {
   reviewItemCount: 1,
   possibleOverlaps: [],
   evidenceSources: [],
+  decisionQueue: [],
+  decisionOutcomes: [],
+  nextQuietCharge: null,
 } as const satisfies HomeProjectionDto;
 
 const detail = {
@@ -197,6 +200,7 @@ const detail = {
   because: [],
   context: null,
   overlap: null,
+  decisionHistory: [],
 } as const satisfies CommitmentDetailDto;
 
 const compared = {

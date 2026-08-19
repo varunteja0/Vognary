@@ -75,6 +75,7 @@ test("feature readiness checks every persistent capability migration with bounde
     "0052_recovery_correction_learning",
     "0053_phase_a_receipt_activation",
     "0054_recovery_commitment_context",
+    "0055_recovery_decision_cycles",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -129,7 +130,7 @@ test("production migration workflow requires a pre-0053 backup restore and exact
   assert.match(workflow, /run\.conclusion !== "success"/);
   assert.match(workflow, /ageMs > 24 \* 60 \* 60 \* 1000/);
   assert.match(workflow, /state\.migration_head !== '0026_recovery_inbound_retention'/);
-  assert.match(workflow, /verification\.migration_head !== '0054_recovery_commitment_context'/);
+  assert.match(workflow, /verification\.migration_head !== '0055_recovery_decision_cycles'/);
   assert.match(workflow, /recovery_inbound_alias_milestones_immutable/);
   assert.doesNotMatch(workflow, /NEON_RESTORE_BRANCH_ID|backup\/pre-0053-/);
   assert.doesNotMatch(workflow, /apply-0026|APPLY_0026_PRODUCTION/);
@@ -200,6 +201,7 @@ test("restore drills require Recovery v1 and report restored Recovery state", ()
     "recovery_corrections",
     "recovery_decisions",
     "recovery_commitment_context",
+    "recovery_decision_cycles",
     "recovery_changes",
     "recovery_idempotency_keys",
     "recovery_inbound_aliases",
@@ -243,7 +245,7 @@ test("Vercel builds never race Recovery cutover migrations ahead of worker retir
   assert.match(runbook, /Deploy the exact candidate SHA/);
   assert.match(runbook, /Wait at least five minutes after the last old sync, reminder, or savings-verification invocation finishes/);
   assert.match(runbook, /DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema/);
-  assert.match(runbook, /last row is `0054_recovery_commitment_context`/);
+  assert.match(runbook, /last row is `0055_recovery_decision_cycles`/);
 });
 
 test("CI browser journeys exercise the built Next.js production artifact", () => {
@@ -346,8 +348,8 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.match(source, /capabilities\?\.schema\?\.status === "ready"/);
   assert.match(source, /capabilities\.recoveryV1\?\.status === "schema-ready-clean-cutover"/);
   assert.match(source, /Feature migrations 0002 through 0054/);
-  assert.match(source, /required\?\.includes\("0054_recovery_commitment_context"\)/);
-  assert.match(source, /applied\?\.includes\("0054_recovery_commitment_context"\)/);
+  assert.match(source, /required\?\.includes\("0055_recovery_decision_cycles"\)/);
+  assert.match(source, /applied\?\.includes\("0055_recovery_decision_cycles"\)/);
   assert.match(source, /betaReady: endpointReport\.every\(\(item\) => item\.ok\)/);
   assert.match(source, /envReport\.filter\(\(item\) => item\.launchBlocking\)/);
   assert.match(source, /activationProfile = "receipt-forwarding"/);
