@@ -12,7 +12,7 @@
 | Trust & honesty | 9 | 2026-07-21 | Claims CI + fail-closed design |
 | Product UX | 8 | 2026-08-19 | B2B landing promise is committed-to-pay-next plus attention before the card fires. Signed-in IA is Home / Commitments / Sources with an add-bills overlay (PDF dropzone + paste). Quiet KEEP unless a cited reason exists. Sequential same-vendor receipts collapse to one commitment in unit/postgres tests. Real-human <3 min remains unmeasured |
 | Backend readiness | 8 | 2026-07-21 | SLOs met in production |
-| Production activation | 7 | 2026-08-19 | Code schema through `0054`. Durable R2 backup GET-restore remains proven at `0053` by GitHub run `32109925496`. Inbox processing is on (unsigned inbound 401). Google forwarding confirmation URL is stored; `forwarding_verified_at` is still null. HMAC key id remains `receipt-alias-v1`. Real automatic receipt, second automatic receipt, and replay remain unproven |
+| Production activation | 7 | 2026-08-19 | Code schema through `0055_recovery_decision_cycles` (applied on production Neon 2026-08-19; checksum matches this tree; one deterministic Notion `PLAN_TO_CANCEL` backfill, no fabricated verification). Durable R2 backup GET-restore remains proven at `0053` by GitHub run `32109925496`. Inbox processing is on (unsigned inbound 401). Google forwarding confirmation URL is stored; `forwarding_verified_at` is still null. HMAC key id remains `receipt-alias-v1`. Real automatic receipt, second automatic receipt, and replay remain unproven |
 | Live connector depth | 4 | 2026-07-21 | Registry ≠ live |
 | Data / network moat | 3 | 2026-07-21 | No network data yet |
 | Business validation | 1.5 | 2026-07-21 | Pipeline not asked — founder Phase A |
@@ -38,7 +38,7 @@
 | 0 Hygiene | DONE | 2026-07-21 |
 | A Market contact | ACTIVE | Private autopilot pilots; gitignored CRM has 20 sourced-target rows; funnel 20→5→2→1→1 defined; conversations/connected/mandate/paid remain 0; nothing sent |
 | B Loop shipping | ACTIVE | WP-A.2 is on `main` (PR #34). Autopilot integrity work is on `feat/autopilot-loop` through additive 0047. Final orchestrator: code CI, disposable PostgreSQL, complete browser/axe, production smoke, and load budgets PASS; strict corpora, operations, and strict production activation FAIL. Focused proof: migration rehearsal 27/27; source authority 26/26; receipt-inbox PostgreSQL 14/14; direct/concurrent billed-window inserts fail closed. WP-C–E are not complete. No live receipt/notice/provider/payment evidence. No measured scoreboard raise |
-| C Production min | ACTIVE | Code schema through `0054`. Durable R2 GET-restore proven at `0053`. Inbox processing is on. B2B V1 freeze SHA is not yet the production web SHA until this deploy. Real receipt/replay unproven |
+| C Production min | ACTIVE | Code schema through `0055`. Durable R2 GET-restore proven at `0053`. Inbox processing is on. B2B V1 decision-queue SHA is the next production web SHA after this push. Real receipt/replay unproven |
 | D Intelligence moat | PENDING | Needs corpus |
 | E Distribution | PENDING | After A signal |
 | F Platform | BLOCKED | Until A–E |
