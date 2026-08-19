@@ -121,8 +121,8 @@ test("landing, login, and empty Home tell one receipts-to-decision product story
   assert.match(landingSource, /what renews next/);
   assert.match(loginSource, /what renews next/);
   assert.match(homeSource, /upcoming renewals and changes from the evidence/);
-  assert.match(landingSource, /Want it done for you\?/);
-  assert.match(landingSource, /href="\/private-audit"/);
+  assert.doesNotMatch(landingSource, /Want it done for you\?/);
+  assert.doesNotMatch(landingSource, /href="\/private-audit"/);
   assert.match(clientSource, /Your commitments/);
   assert.match(landingSource, /No bank passwords\. No mailbox access\. You choose which billing text to add\./);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
@@ -203,7 +203,7 @@ test("returning Home leads with last-visit changes, then graph-backed changes, a
   assert.ok(populatedHome.indexOf("<RecoveryAttention") < populatedHome.indexOf("Needs attention"));
   assert.match(homeSource, /Keep this current/);
   assert.doesNotMatch(homeSource, /Sheets go stale when new charges land/);
-  assert.match(homeSource, /This is a floor from receipts checked, not every debit in India\./);
+  assert.match(homeSource, /This is a floor from receipts checked, not every software bill\./);
   assert.match(homeSource, /home\.confidenceLayers/);
   assert.match(homeSource, /confidenceTruthLayerLabels\[layer\.layer\]/);
   assert.equal(confidenceLabels.HIGH, "Confirmed");
@@ -212,7 +212,7 @@ test("returning Home leads with last-visit changes, then graph-backed changes, a
   assert.equal(confidenceLabels.UNKNOWN, "Unknown");
   assert.match(homeSource, /listed twice/);
   assert.match(homeSource, /renderRecoveryShareText\(home\)/);
-  assert.match(homeSource, /Copy for WhatsApp/);
+  assert.match(homeSource, /Copy summary/);
   assert.doesNotMatch(homeSource, /renderAuditReportShareText|buildAuditReport/);
 });
 
@@ -250,8 +250,8 @@ test("one observation is coached toward a second matching receipt instead of ren
     "Add a matching receipt",
     "One charge is evidence, not a pattern",
     "Inspect exact evidence",
-    "Copy for WhatsApp",
-    "This is a floor from receipts checked, not every debit in India.",
+    "Copy summary",
+    "This is a floor from receipts checked, not every software bill.",
   ]) {
     assert.ok(homeSource.includes(copy), `one-observation Home must render ${copy}`);
   }
@@ -306,7 +306,7 @@ test("Sources keeps forwarding as stay-current infrastructure and paste as the e
     "Keep Vognary current",
     "How Vognary stays current",
     "If Gmail sends a confirmation challenge",
-    "Planned sources are listed honestly and cannot be connected",
+    "Other inboxes and banks are not offered in this release",
   ]) {
     assert.ok(sourcesSource.includes(copy), `Sources must render ${copy}`);
   }
@@ -322,9 +322,7 @@ test("Sources keeps forwarding as stay-current infrastructure and paste as the e
   assert.match(sourcesSource, /Disconnect source/);
   assert.match(sourcesSource, /Reconnect source/);
   assert.match(sourcesSource, /stops it supporting future facts/);
-  assert.match(sourcesSource, /withdraws affected queued Autopilot cases/);
   assert.match(sourcesSource, /does not rotate the receipt address/);
-  assert.match(sourcesSource, /old notice, 48-hour clock, or authorization is never restored/);
   assert.doesNotMatch(sourcesSource, /Nothing is connected|does not currently surface|do not use this address/i);
   assert.match(clientSource, /manualFallback=\{/);
   assert.match(clientSource, /window\.setInterval\(\(\) => void loadSources\(\), 10_000\)/);

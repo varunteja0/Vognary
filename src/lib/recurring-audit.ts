@@ -1,6 +1,17 @@
 import { parseIsoDateOnly } from "./date-only";
 import { parseLooseCalendarDate, resolveNumericDateOrder, type NumericDateOrder } from "./loose-date";
 import { getCommitmentPolicy, type CommitmentPolicy } from "./commitment-policy";
+import {
+  KEEP_BASELINE_REASON,
+  IDENTITY_UNCERTAIN_REASON,
+  OVERLAP_REVIEW_REASON,
+  buildPriceIncreaseReason as buildDiscretionaryPriceIncreaseReason,
+  decideRelationshipMerge,
+  extractRelationshipIdentity,
+  relationshipIdentityHint,
+  type RelationshipSnapshot,
+} from "./recovery/commitment-relationship";
+import { groupStackOverlaps } from "./recovery/stack-overlap";
 
 export type Frequency =
   | "weekly"
@@ -117,6 +128,8 @@ export type ManualRecurringInput = {
   currency?: string;
   frequency: Frequency;
   nextExpectedDate: string;
+  /** Paid/observed date when known. Identity chronology uses this, not the next expected date. */
+  observedDate?: string | null;
   category: string;
   sourceName?: string;
   /** Raw proof text (e.g. pasted receipt) — used for mandate rails + evidence display. */
@@ -237,8 +250,12 @@ export function analyzeStatements(
   const transactions = uniqueSources.flatMap((source) => parseCsvStatement(source.text, source.name, warnings));
   const recurrenceTransactions = selectRecurrenceTransactions(transactions, warnings);
   const detectedItems = detectRecurringItems(recurrenceTransactions, today);
-  const recurringItems = assignIdentityKeys(
+  const collapsed = collapseRelatedCommitments(
     mergeManualEvidence(detectedItems, manualItems, today),
+    today,
+  );
+  const recurringItems = assignIdentityKeys(
+    applyOverlapReviews(applyAmbiguousIdentityReview(applyPriceChangeReviews(collapsed))),
   ).sort((left, right) => right.monthlyCost - left.monthlyCost);
 
   return {
@@ -463,13 +480,15 @@ function buildManualRecurringItem(input: ManualRecurringInput, today: Date): Rec
   const riskTags = new Set(["manual entry", ...recommendation.riskTags]);
   if (projected.missedCycles >= 1) riskTags.add(`${policy.terminology.nextEvent} passed; confirm status`);
   if (currency !== primaryCurrency) riskTags.add(`foreign currency (${currency})`);
+  const observedDate = input.observedDate || input.nextExpectedDate;
+  const identitySnapshot = snapshotFromManual(input, normalized.merchant, currency, observedDate);
 
   return {
     id: input.id,
     canonicalRecurringItemId: input.canonicalRecurringItemId,
     identityHint: input.canonicalRecurringItemId
       ? `canonical|${input.canonicalRecurringItemId}`
-      : `manual|${input.id}`,
+      : relationshipIdentityHint(identitySnapshot),
     identityKey: `${normalized.merchant.trim().toLowerCase()}::${currency}`,
     merchant: input.merchant.trim() || normalized.merchant,
     normalizedMerchant: normalized.merchant,
@@ -482,11 +501,11 @@ function buildManualRecurringItem(input: ManualRecurringInput, today: Date): Rec
     averageAmount: input.amount,
     monthlyCost,
     annualCost: monthlyCost * 12,
-    lastChargeDate: input.nextExpectedDate,
+    lastChargeDate: observedDate,
     nextExpectedDate: projected.date,
     confidenceScore: 72,
-    recommendationType: recommendation.type === "keep" ? "watch" : recommendation.type,
-    recommendationReason: `Recorded from ${sourceName}. Verify the source. ${recommendation.reason}`,
+    recommendationType: recommendation.type,
+    recommendationReason: recommendation.reason,
     riskTags: [...riskTags],
     evidence: [
       {
@@ -531,22 +550,17 @@ function mergeManualEvidence(detected: RecurringItem[], manualInputs: ManualRecu
 }
 
 function canMergeEvidence(item: RecurringItem, manual: RecurringItem): boolean {
-  if (item.normalizedMerchant.toLowerCase() !== manual.normalizedMerchant.toLowerCase()) return false;
-  // A USD charge and an INR charge are different commitments, whatever the name.
-  if (item.currency !== manual.currency) return false;
-
-  const frequencyCompatible = item.frequency === manual.frequency
-    || item.frequency === "irregular"
-    || manual.frequency === "irregular";
-  if (!frequencyCompatible) return false;
-
-  const larger = Math.max(item.averageAmount, manual.averageAmount);
-  if (!larger) return false;
-  return Math.abs(item.averageAmount - manual.averageAmount) / larger <= 0.25;
+  return decideRelationshipMerge(snapshotFromItem(item), snapshotFromItem(manual)).action === "collapse";
 }
 
 function mergeEvidence(target: RecurringItem, manual: RecurringItem, input: ManualRecurringInput, today: Date): RecurringItem {
-  const evidence = dedupeEvidence([...target.evidence, ...manual.evidence])
+  const absorbed = absorbRecurringItem(target, manual, today);
+  const merchant = genericMerchantNames.has(absorbed.merchant) && input.merchant.trim() ? input.merchant.trim() : absorbed.merchant;
+  return { ...absorbed, merchant };
+}
+
+function absorbRecurringItem(target: RecurringItem, incoming: RecurringItem, today: Date): RecurringItem {
+  const evidence = dedupeEvidence([...target.evidence, ...incoming.evidence])
     .sort((left, right) => compareDate(left.date, right.date));
   const uniqueEvidenceAdded = evidence.length > target.evidence.length;
   const sourceNames = [...new Set(evidence.map((link) => link.source))];
@@ -555,27 +569,37 @@ function mergeEvidence(target: RecurringItem, manual: RecurringItem, input: Manu
   const amountMin = amounts.length ? Math.min(...amounts) : target.amountMin;
   const amountMax = amounts.length ? Math.max(...amounts) : target.amountMax;
   const amountVariance = averageAmount ? (amountMax - amountMin) / averageAmount : 0;
-  const frequency = target.frequency === "irregular" ? manual.frequency : target.frequency;
+  const frequency = target.frequency === "irregular" ? incoming.frequency : target.frequency;
   const monthlyCost = averageAmount * getFrequencyMonthlyMultiplier(frequency);
   const confidenceScore = uniqueEvidenceAdded
-    ? Math.min(98, Math.max(target.confidenceScore, manual.confidenceScore) + 6)
+    ? Math.min(98, Math.max(target.confidenceScore, incoming.confidenceScore) + 6)
     : target.confidenceScore;
-  const nextExpectedDate = pickNextExpectedDate(target.nextExpectedDate, manual.nextExpectedDate, today);
-  const merchant = genericMerchantNames.has(target.merchant) && input.merchant.trim() ? input.merchant.trim() : target.merchant;
+  const nextExpectedDate = pickNextExpectedDate(target.nextExpectedDate, incoming.nextExpectedDate, today);
+  const lastChargeDate = compareDate(target.lastChargeDate, incoming.lastChargeDate) >= 0
+    ? target.lastChargeDate
+    : incoming.lastChargeDate;
+  const merchant = genericMerchantNames.has(target.merchant) && !genericMerchantNames.has(incoming.merchant)
+    ? incoming.merchant
+    : target.merchant;
   const recommendation = recommendItem(target.category, monthlyCost, confidenceScore, nextExpectedDate, amountVariance, today);
-
+  const priceChange = detectPriceChange(amounts);
   const singleSourceTags = new Set(["single occurrence", "needs verification", "manual entry"]);
-  const riskTags = [...new Set([
+  const riskTags = new Set([
     ...target.riskTags.filter((tag) => !singleSourceTags.has(tag)),
-    ...manual.riskTags.filter((tag) => !singleSourceTags.has(tag)),
+    ...incoming.riskTags.filter((tag) => !singleSourceTags.has(tag)),
     ...recommendation.riskTags,
     ...(uniqueEvidenceAdded && sourceNames.length > 1 ? ["multi-source verified"] : []),
-  ])];
+  ]);
+  const decided = overlayPriceChange({
+    recommendationType: recommendation.type,
+    recommendationReason: recommendation.reason,
+    riskTags: [...riskTags],
+  }, target.category, priceChange);
 
   return {
     ...target,
-    canonicalRecurringItemId: target.canonicalRecurringItemId ?? manual.canonicalRecurringItemId,
-    identityHint: target.identityHint ?? manual.identityHint,
+    canonicalRecurringItemId: target.canonicalRecurringItemId ?? incoming.canonicalRecurringItemId,
+    identityHint: preferRelationshipHint(target.identityHint, incoming.identityHint),
     merchant,
     frequency,
     amountMin,
@@ -583,16 +607,151 @@ function mergeEvidence(target: RecurringItem, manual: RecurringItem, input: Manu
     averageAmount,
     monthlyCost,
     annualCost: monthlyCost * 12,
+    lastChargeDate,
     nextExpectedDate,
     confidenceScore,
-    recommendationType: recommendation.type,
-    recommendationReason: uniqueEvidenceAdded && sourceNames.length > 1
-      ? `${recommendation.reason} Confirmed by ${sourceNames.length} independent sources.`
-      : recommendation.reason,
-    riskTags,
+    recommendationType: decided.recommendationType,
+    recommendationReason: decided.recommendationReason,
+    riskTags: decided.riskTags,
     evidence,
     sourceNames,
+    priceChange,
   };
+}
+
+function collapseRelatedCommitments(items: RecurringItem[], today: Date): RecurringItem[] {
+  const collapsed: RecurringItem[] = [];
+  for (const item of items) {
+    const index = collapsed.findIndex((existing) => (
+      decideRelationshipMerge(snapshotFromItem(existing), snapshotFromItem(item)).action === "collapse"
+    ));
+    if (index === -1) {
+      collapsed.push(item);
+      continue;
+    }
+    collapsed[index] = absorbRecurringItem(collapsed[index], item, today);
+  }
+  return collapsed;
+}
+
+function applyPriceChangeReviews(items: RecurringItem[]): RecurringItem[] {
+  return items.map((item) => {
+    const amounts = [...item.evidence]
+      .sort((left, right) => compareDate(left.date, right.date))
+      .map((link) => link.amount);
+    const priceChange = detectPriceChange(amounts) ?? item.priceChange;
+    if (!priceChange) return item;
+    const decided = overlayPriceChange(item, item.category, priceChange);
+    return { ...item, ...decided, priceChange };
+  });
+}
+
+function applyAmbiguousIdentityReview(items: RecurringItem[]): RecurringItem[] {
+  const flagged = new Set<string>();
+  for (let index = 0; index < items.length; index += 1) {
+    for (let other = index + 1; other < items.length; other += 1) {
+      const decision = decideRelationshipMerge(snapshotFromItem(items[index]), snapshotFromItem(items[other]));
+      if (decision.action !== "ambiguous") continue;
+      flagged.add(items[index].id);
+      flagged.add(items[other].id);
+    }
+  }
+  return items.map((item) => {
+    if (!flagged.has(item.id) || item.recommendationType !== "keep") return item;
+    return {
+      ...item,
+      recommendationType: "watch",
+      recommendationReason: IDENTITY_UNCERTAIN_REASON,
+      riskTags: [...new Set([...item.riskTags, "identity uncertain"])],
+    };
+  });
+}
+
+function applyOverlapReviews(items: RecurringItem[]): RecurringItem[] {
+  const groups = groupStackOverlaps(items.map((item) => ({
+    id: item.id,
+    merchant: item.merchant,
+    category: item.category,
+    status: "ACTIVE" as const,
+  })));
+  const reasons = new Map<string, string>();
+  for (const group of groups) {
+    for (const member of group.members) {
+      reasons.set(member.id, OVERLAP_REVIEW_REASON(group.label));
+    }
+  }
+  return items.map((item) => {
+    const reason = reasons.get(item.id);
+    if (!reason || item.recommendationType !== "keep") return item;
+    return {
+      ...item,
+      recommendationType: "watch",
+      recommendationReason: reason,
+      riskTags: [...new Set([...item.riskTags, "possible overlap"])],
+    };
+  });
+}
+
+function overlayPriceChange(
+  item: Pick<RecurringItem, "recommendationType" | "recommendationReason" | "riskTags">,
+  category: string,
+  priceChange: PriceChange | null,
+): Pick<RecurringItem, "recommendationType" | "recommendationReason" | "riskTags"> {
+  if (!priceChange) return item;
+  const riskTags = [...new Set([
+    ...item.riskTags,
+    priceChange.direction === "increase"
+      ? `price increased ~${priceChange.changePercent}%`
+      : `price decreased ~${priceChange.changePercent}%`,
+  ])];
+  if (priceChange.direction !== "increase") return { ...item, riskTags };
+  const policy = getCommitmentPolicy(category);
+  return {
+    recommendationType: "watch",
+    recommendationReason: policy.class === "discretionary-subscription"
+      ? buildDiscretionaryPriceIncreaseReason(priceChange.changePercent)
+      : buildPriceIncreaseReason(policy, priceChange.changePercent),
+    riskTags,
+  };
+}
+
+function snapshotFromItem(item: RecurringItem): RelationshipSnapshot {
+  return {
+    merchant: item.merchant,
+    normalizedMerchant: item.normalizedMerchant,
+    currency: item.currency,
+    frequency: item.frequency,
+    lastChargeDate: item.lastChargeDate,
+    averageAmount: item.averageAmount,
+    evidenceDates: item.evidence.map((link) => link.date),
+    evidenceTexts: [item.merchant, ...item.evidence.map((link) => link.description)],
+  };
+}
+
+function snapshotFromManual(
+  input: ManualRecurringInput,
+  normalizedMerchant: string,
+  currency: string,
+  observedDate: string,
+): RelationshipSnapshot {
+  return {
+    merchant: input.merchant,
+    normalizedMerchant,
+    currency,
+    frequency: input.frequency,
+    lastChargeDate: observedDate,
+    averageAmount: input.amount,
+    evidenceDates: [observedDate],
+    evidenceTexts: [input.merchant, input.evidenceDescription ?? ""],
+  };
+}
+
+function preferRelationshipHint(left?: string, right?: string): string | undefined {
+  if (left?.startsWith("canonical|")) return left;
+  if (right?.startsWith("canonical|")) return right;
+  if (left?.startsWith("rel|")) return left;
+  if (right?.startsWith("rel|")) return right;
+  return left ?? right;
 }
 
 function dedupeEvidence(evidence: EvidenceLink[]) {
@@ -958,40 +1117,27 @@ function extractOutflowAmount(
 
 function detectRecurringItems(transactions: ParsedTransaction[], today: Date): RecurringItem[] {
   const grouped = transactions.reduce<Record<string, ParsedTransaction[]>>((groups, transaction) => {
-    // Currency is part of the grouping key: a USD and an INR charge from the
-    // same merchant are different commitments.
-    const key = `${transaction.normalizedMerchant}||${transaction.currency}`;
+    const identity = extractRelationshipIdentity({
+      merchant: transaction.normalizedMerchant,
+      normalizedMerchant: transaction.normalizedMerchant,
+      currency: transaction.currency,
+      frequency: "irregular",
+      lastChargeDate: transaction.date,
+      averageAmount: transaction.amount,
+      evidenceDates: [transaction.date],
+      evidenceTexts: [transaction.description],
+    });
+    const key = `${identity.merchantKey}||${identity.currency}||${identity.productKey ?? "_"}||${identity.accountKey ?? "_"}`;
     groups[key] = groups[key] ? [...groups[key], transaction] : [transaction];
     return groups;
   }, {});
 
-  const initialItems = Object.values(grouped)
+  return Object.values(grouped)
     .map((group) => group.length >= 2
       ? buildRecurringItem(group[0].normalizedMerchant, group, today)
       : buildSingleOccurrenceItem(group[0].normalizedMerchant, group[0], today))
     .filter((item): item is RecurringItem => Boolean(item))
     .sort((left, right) => right.monthlyCost - left.monthlyCost);
-
-  const categoryCounts = initialItems.reduce<Record<string, number>>((counts, item) => {
-    counts[item.category] = (counts[item.category] ?? 0) + 1;
-    return counts;
-  }, {});
-
-  return initialItems.map((item) => {
-    const duplicateCategory = categoryCounts[item.category] > 1 && ["AI tools", "Cloud hosting", "Streaming", "Design tools", "Creative tools"].includes(item.category);
-    if (!duplicateCategory || item.recommendationType === "investigate") return item;
-
-    const policy = getCommitmentPolicy(item.category);
-    const usageBased = policy.class === "usage-based-cloud";
-    return {
-      ...item,
-      recommendationType: item.monthlyCost > 1500 && !usageBased ? "downgrade" : "watch",
-      recommendationReason: usageBased
-        ? `Multiple recurring ${item.category.toLowerCase()} charges were found. ${policy.highCostGuidance} ${policy.consequenceWarning}`
-        : `Multiple recurring ${item.category.toLowerCase()} charges were found. Compare actual usage before the next renewal.`,
-      riskTags: [...new Set([...item.riskTags, "possible duplicate stack"])],
-    };
-  });
 }
 
 function buildSingleOccurrenceItem(merchant: string, transaction: ParsedTransaction, today: Date): RecurringItem | null {
@@ -1017,7 +1163,16 @@ function buildSingleOccurrenceItem(merchant: string, transaction: ParsedTransact
 
   return {
     id: slugify(`${merchant}-${transaction.date}`),
-    identityHint: statementIdentityHint(merchant, [transaction]),
+    identityHint: relationshipIdentityHint({
+      merchant,
+      normalizedMerchant: merchant,
+      currency: transaction.currency,
+      frequency,
+      lastChargeDate: transaction.date,
+      averageAmount: transaction.amount,
+      evidenceDates: [transaction.date],
+      evidenceTexts: [transaction.description, merchant],
+    }),
     identityKey: `${merchant.trim().toLowerCase()}::${transaction.currency}`,
     merchant,
     normalizedMerchant: merchant,
@@ -1111,7 +1266,16 @@ function buildRecurringItem(merchant: string, group: ParsedTransaction[], today:
 
   return {
     id: slugify(`${merchant}-${lastChargeDate}`),
-    identityHint: statementIdentityHint(merchant, transactions),
+    identityHint: relationshipIdentityHint({
+      merchant,
+      normalizedMerchant: merchant,
+      currency,
+      frequency: frequency.frequency,
+      lastChargeDate,
+      averageAmount,
+      evidenceDates: transactions.map((transaction) => transaction.date),
+      evidenceTexts: [merchant, ...transactions.map((transaction) => transaction.description)],
+    }),
     identityKey: `${merchant.trim().toLowerCase()}::${currency}`,
     merchant,
     normalizedMerchant: merchant,
@@ -1145,16 +1309,8 @@ function buildRecurringItem(merchant: string, group: ParsedTransaction[], today:
   };
 }
 
-function statementIdentityHint(merchant: string, transactions: ParsedTransaction[]) {
-  const descriptors = transactions
-    .map((transaction) => normalizeIdentityDescriptor(transaction.description))
-    .filter(Boolean)
-    .sort((left, right) => left.length - right.length || left.localeCompare(right));
-  return `statement|${descriptors[0] || normalizeIdentityDescriptor(merchant)}`;
-}
-
 function detectPriceChange(amountsInDateOrder: number[]): PriceChange | null {
-  if (amountsInDateOrder.length < 3) return null;
+  if (amountsInDateOrder.length < 2) return null;
 
   const prior = amountsInDateOrder.slice(0, -1);
   const latest = amountsInDateOrder[amountsInDateOrder.length - 1];
@@ -1211,25 +1367,9 @@ function recommendItem(
     };
   }
 
-  if (["AI tools", "Developer tools"].includes(category) && monthlyCost >= 2500) {
-    return {
-      type: "downgrade",
-      reason: "High recurring builder spend. Check actual usage before renewing or downgrade idle seats/projects.",
-      riskTags,
-    };
-  }
-
-  if (["Streaming", "Creative tools", "Design tools"].includes(category) && monthlyCost >= 1200) {
-    return {
-      type: "watch",
-      reason: "Consumer/tool subscription with meaningful monthly burn. Confirm it is actively used.",
-      riskTags,
-    };
-  }
-
   return {
     type: "keep",
-    reason: "Pattern is consistent. Keep it if the service is still actively used.",
+    reason: KEEP_BASELINE_REASON,
     riskTags,
   };
 }

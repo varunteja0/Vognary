@@ -71,7 +71,7 @@ export function renderRecoveryShareText(home: HomeProjectionDto): string {
 
   const receipts = `${home.coverage.evidenceCount.toLocaleString("en-IN")} receipt${home.coverage.evidenceCount === 1 ? "" : "s"}`;
   const sources = `${home.coverage.sourceCount.toLocaleString("en-IN")} source${home.coverage.sourceCount === 1 ? "" : "s"}`;
-  lines.push(`Coverage: ${receipts} from ${sources}. This is a floor from receipts checked, not every debit in India.`);
+  lines.push(`Coverage: ${receipts} from ${sources}. This is a floor from receipts checked, not every software bill.`);
   lines.push("Every amount and expected date above comes from the saved Recovery projection; anything unsupported is left out.");
 
   return lines.join("\n");

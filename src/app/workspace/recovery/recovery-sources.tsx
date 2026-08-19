@@ -312,13 +312,13 @@ function SourceHubCatalog({
     receiptInboxPubliclyAvailable,
     receiptInboxState,
     gmailConfirmationPending,
-  });
+  }).filter((entry) => entry.availability !== "PLANNED");
   return (
     <section aria-labelledby="source-hub-heading" className="panel p-4 sm:p-6">
       <p className="eyebrow eyebrow-xs text-ochre">Stay current</p>
       <h3 id="source-hub-heading" className="mt-3 font-display text-2xl font-semibold text-(--ink)">How Vognary stays current</h3>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
-        Only a live path can be set up. Planned sources are listed honestly and cannot be connected.
+        Only a live path can be set up. Other inboxes and banks are not offered in this release.
       </p>
       <ul className="mt-5 grid gap-3">
         {catalog.map((entry) => (
@@ -358,7 +358,7 @@ function EvidenceSourceList({
       <p className="eyebrow eyebrow-xs text-ochre">Sources Vognary checked</p>
       <h3 id="recovery-evidence-sources" className="mt-3 font-display text-2xl font-semibold text-(--ink)">Evidence sources in this workspace</h3>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
-        These receipt and file sources support the commitment facts shown in Vognary. Disconnecting a source stops it supporting future facts and withdraws affected queued Autopilot cases. It does not rotate the receipt address. Reconnect is explicit. A case can return only to watching. An old notice, 48-hour clock, or authorization is never restored.
+        These receipt and file sources support the commitment facts shown in Vognary. Disconnecting a source stops it supporting future facts. It does not rotate the receipt address. Reconnect is explicit.
       </p>
       {sources.length ? (
         <ul className="mt-5 grid gap-3">

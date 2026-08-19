@@ -48,7 +48,7 @@ test("static layout metadata remains readiness-neutral", () => {
   assert.ok(metadataStart >= 0 && metadataEnd > metadataStart);
   const metadataSource = layoutSource.slice(metadataStart, metadataEnd);
 
-  assert.match(metadataSource, /Vognary - Know which software is worth paying for before you pay again/);
-  assert.match(metadataSource, /Software Decision Intelligence for founder-led 2–20 person software and AI companies/);
+  assert.match(metadataSource, /Vognary - Know what your company is committed to pay next/);
+  assert.match(metadataSource, /Commitment Intelligence for founder-led 2–20 person software and AI companies/);
   assert.doesNotMatch(metadataSource, /\b(?:forward(?:ed|ing)?|Gmail|bank|UPI|cancel(?:s|led|ling|lation|lations)?)\b/i);
 });

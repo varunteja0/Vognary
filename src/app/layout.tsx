@@ -29,11 +29,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.vognary.com"),
   applicationName: "Vognary",
   title: {
-    default: "Vognary - Know which software is worth paying for before you pay again",
+    default: "Vognary - Know what your company is committed to pay next",
     template: "%s - Vognary",
   },
   description:
-    "Vognary is Software Decision Intelligence for founder-led 2–20 person software and AI companies: know which software is worth paying for before you pay again.",
+    "Vognary is Commitment Intelligence for founder-led 2–20 person software and AI companies: know what you are committed to pay next, and what deserves attention before the card fires.",
   keywords: [
     "Software Decision Intelligence",
     "Commitment Intelligence",
@@ -60,15 +60,15 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "Vognary",
     url: "/",
-    title: "Vognary - Know which software is worth paying for before you pay again",
+    title: "Vognary - Know what your company is committed to pay next",
     description:
-      "Vognary is Software Decision Intelligence for founder-led 2–20 person software and AI companies: know which software is worth paying for before you pay again.",
+      "Vognary is Commitment Intelligence for founder-led 2–20 person software and AI companies: know what you are committed to pay next, and what deserves attention before the card fires.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vognary - Know which software is worth paying for before you pay again",
+    title: "Vognary - Know what your company is committed to pay next",
     description:
-      "Vognary is Software Decision Intelligence for founder-led 2–20 person software and AI companies: know which software is worth paying for before you pay again.",
+      "Vognary is Commitment Intelligence for founder-led 2–20 person software and AI companies: know what you are committed to pay next, and what deserves attention before the card fires.",
   },
 };
 

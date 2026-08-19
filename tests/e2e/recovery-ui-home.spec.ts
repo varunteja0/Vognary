@@ -261,7 +261,7 @@ test("home renders attention, upcoming charges, and receipt freshness without in
 
   await expect(page.getByRole("heading", { name: "What we found" })).toBeVisible();
   await expect(page.getByText("1 commitment found")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What changed" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toBeVisible();
@@ -286,8 +286,8 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByText("6 Aug 2026 · in 3 days")).toBeVisible();
   await expect(page.getByText(/1 item from 1 source · latest/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Copy for WhatsApp" }).click();
-  await expect(page.getByText("WhatsApp summary copied.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Copy summary" }).click();
+  await expect(page.getByText("Summary copied.", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText)).toContain("Monthly burn from checked receipts: ₹1,999.00/mo.");
   expect(await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText)).toContain("Annualized estimate (12 × cited monthly equivalent, not a historical yearly total): ₹23,988.00/yr.");
 

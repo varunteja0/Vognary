@@ -37,16 +37,16 @@ export default function LaunchLanding({
           </div>
         </nav>
 
-        <section className="scan relative flex min-h-[34rem] items-center overflow-hidden border-b border-line py-12 sm:min-h-[38rem] sm:py-16">
+        <section className="scan relative flex min-h-[28rem] items-center overflow-hidden border-b border-line py-8 sm:min-h-[38rem] sm:py-16">
           <div className="relative z-10 max-w-3xl sm:pr-28 lg:pr-0">
             <p className="eyebrow eyebrow-xs text-ochre">
               Software Decision Intelligence for founder-led software and AI companies
             </p>
             <h1 className="mt-5 max-w-3xl font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-6xl">
-              Know which software is worth paying for before you pay again.
+              Know what your company is committed to pay next — and what deserves attention before the card fires.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-(--ink-soft) sm:text-lg">
-              Software, AI and cloud spend quietly accumulates across many tools. The founder cannot confidently answer what is still worth paying for. Add a few recent software bills. Vognary reconstructs your commitments, changes, upcoming decisions and evidence.
+              Add a few recent software bills. Vognary reconstructs cited commitments, changes, upcoming money, and what deserves attention — with the evidence behind every important claim.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</Link>
@@ -66,7 +66,7 @@ export default function LaunchLanding({
           />
         </section>
 
-        <section aria-labelledby="outcomes-heading" className="py-12 sm:py-16">
+        <section aria-labelledby="outcomes-heading" className="py-8 sm:py-16">
           <div className="max-w-2xl">
             <p className="eyebrow eyebrow-xs text-ochre">One useful review</p>
             <h2 id="outcomes-heading" className="mt-3 font-display text-3xl font-semibold text-(--ink)">What you get</h2>
@@ -81,7 +81,7 @@ export default function LaunchLanding({
           </div>
         </section>
 
-        <section className="grid gap-8 border-t border-line py-12 sm:py-16 lg:grid-cols-2 lg:gap-16">
+        <section className="grid gap-8 border-t border-line py-8 sm:py-16 lg:grid-cols-2 lg:gap-16">
           <div>
             <p className="eyebrow eyebrow-xs text-ochre">Keep it current</p>
             <h2 className="mt-3 font-display text-3xl font-semibold text-(--ink)">Keep it current</h2>
@@ -114,9 +114,6 @@ export default function LaunchLanding({
           <Link href={primaryHref} className="btn btn-primary btn-lg mt-6">
             {primaryLabel}
           </Link>
-          <p className="mt-5 text-sm leading-6 muted-on-dark">
-            Want it done for you? <Link href="/private-audit" className="underline underline-offset-4">Request a private audit</Link>.
-          </p>
         </section>
 
         <footer className="flex flex-col items-center justify-between gap-4 border-t border-line py-7 text-center sm:flex-row sm:text-left">

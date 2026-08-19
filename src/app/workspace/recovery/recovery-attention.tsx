@@ -164,6 +164,9 @@ export function RecoveryAttention({
   }
 
   const data = payload!;
+  if (status === "READY" && data.attention.length === 0 && !data.coverage.coverageBroken) {
+    return null;
+  }
 
   return (
     <section aria-labelledby="attention-list" className="panel p-4 sm:p-5">

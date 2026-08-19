@@ -59,7 +59,7 @@ export function RecoveryHome({
   async function copyShareText() {
     try {
       await navigator.clipboard.writeText(renderRecoveryShareText(home));
-      setShareStatus("WhatsApp summary copied.");
+      setShareStatus("Summary copied.");
     } catch {
       setShareStatus("Could not copy automatically. Try again from a browser that allows clipboard access.");
     }
@@ -172,11 +172,11 @@ export function RecoveryHome({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void copyShareText()} className="btn btn-sm btn-primary">Copy for WhatsApp</button>
+            <button type="button" onClick={() => void copyShareText()} className="btn btn-sm btn-primary">Copy summary</button>
             <button type="button" onClick={onAddEvidence} className="btn btn-sm btn-ghost">Add receipts</button>
           </div>
         </div>
-        <p className="text-xs leading-5 text-(--muted)">This is a floor from receipts checked, not every debit in India.</p>
+        <p className="text-xs leading-5 text-(--muted)">This is a floor from receipts checked, not every software bill.</p>
         <p role="status" aria-live="polite" className="min-h-5 text-xs text-(--muted)">{shareStatus}</p>
       </section>
     </div>
@@ -364,10 +364,10 @@ function FirstObservationHome({
           </div>
         </div>
       ) : null}
-      <p className="mt-4 text-xs leading-5 text-(--muted)">This is a floor from receipts checked, not every debit in India.</p>
+      <p className="mt-4 text-xs leading-5 text-(--muted)">This is a floor from receipts checked, not every software bill.</p>
       <div className="mt-5 flex flex-wrap gap-2">
         <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg">Add a matching receipt</button>
-        <button type="button" onClick={onCopyShareText} className="btn btn-ghost">Copy for WhatsApp</button>
+        <button type="button" onClick={onCopyShareText} className="btn btn-ghost">Copy summary</button>
       </div>
       <p role="status" aria-live="polite" className="mt-2 min-h-5 text-xs text-(--muted)">{shareStatus}</p>
     </section>

@@ -348,13 +348,14 @@ function buildTotals(
 function buildAttention(commitment: CanonicalCommitmentRecord, today: string): HomeProjectionDto["needsMe"] {
   const confidence = toConfidence(commitment);
   const daysAway = commitment.nextExpectedDate ? daysBetween(today, commitment.nextExpectedDate) : null;
-  if (!commitment.decision) {
+  const needsDecision = !commitment.decision && commitment.recommendedDecision !== "KEEP";
+  if (needsDecision) {
     return [{
       id: `decision:${commitment.id}:${commitment.version}`,
       commitmentId: commitment.id,
       priority: daysAway !== null && daysAway <= 7 ? "HIGH" : "MEDIUM",
       reason: "DECISION_REQUIRED",
-      title: `Decide on ${commitment.merchant}`,
+      title: `Review ${commitment.merchant}`,
       detail: commitment.recommendationReason,
       amount: toMoneyDto(commitment.amountMinor, commitment.currency),
       dueDate: commitment.nextExpectedDate,

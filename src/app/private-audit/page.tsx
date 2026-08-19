@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import PrivateAuditClient from "./private-audit-client";
 
 export const metadata: Metadata = {
-  title: "Private Recurring Money Audit",
+  title: "Private software commitment audit",
   description:
-    "Apply for a proof-backed Vognary audit across SaaS, AI tools, cloud, UPI AutoPay, card mandates, app stores, domains, EMIs, SIPs, insurance, and receipts.",
+    "Apply for a proof-backed Vognary audit of software, AI, and cloud commitments from invoices and billing emails you choose.",
 };
 
 export default function PrivateAuditPage() {

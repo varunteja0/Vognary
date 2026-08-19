@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 test("the landing sends every visitor to the product without claiming forwarding", async ({ page }) => {
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Know which software is worth paying for before you pay again." });
+  const heading = page.getByRole("heading", { level: 1, name: "Know what your company is committed to pay next — and what deserves attention before the card fires." });
   const hero = page.locator("section").filter({ has: heading });
   await expect(heading).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
@@ -34,7 +34,7 @@ test("the mobile landing keeps the primary action visible without overflow", asy
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Know which software is worth paying for before you pay again." });
+  const heading = page.getByRole("heading", { level: 1, name: "Know what your company is committed to pay next — and what deserves attention before the card fires." });
   const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Review my software stack", exact: true });
   await expect(getStarted).toBeVisible();
   const actionBottom = await getStarted.evaluate((element) => element.getBoundingClientRect().bottom);
@@ -49,7 +49,7 @@ test("the mobile landing keeps the primary action visible without overflow", asy
 test("login presents one Google identity path without product detours", async ({ page }) => {
   await page.goto("/login?next=/app");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Know which software is worth paying for" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Know what your company is committed to pay next" })).toBeVisible();
   await expect(page.getByText(/save the billing receipts you already have/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await expect(page.getByText("Google is only for sign-in. Vognary does not access Gmail.")).toBeVisible();
@@ -64,7 +64,7 @@ test("signed-out app entry returns to the canonical sign-in path", async ({ page
   await page.goto("/app");
 
   await expect(page).toHaveURL(/\/login\?next=(?:%2F|\/)app$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Know which software is worth paying for" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Know what your company is committed to pay next" })).toBeVisible();
   await expect(page.getByLabel("Paste receipts or invoices")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "See a sample audit" })).toHaveCount(0);
 });

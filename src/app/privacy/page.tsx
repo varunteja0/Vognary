@@ -62,7 +62,10 @@ const sections = [
         Vognary uses data to authenticate you; create and secure your workspace; discover, reconcile, classify, and forecast recurring
         commitments; show evidence and source freshness; prepare user-approved actions and exports; operate synchronization; prevent
         fraud and abuse; diagnose reliability issues; respond to support or rights requests; and comply with applicable law. Financial
-        evidence is not used to sell third-party advertising.
+        evidence is not used to sell third-party advertising. Vognary does not train models on submitted invoices or receipt text.
+        Signed-in recovery paste and receipt-forwarding reconstruction are deterministic. If an Anthropic API key is configured, the
+        guest document-ingest assist may send document text to Anthropic; proposed line items are kept only when they reconcile to the
+        document&apos;s own stated total. Vognary does not control Anthropic&apos;s retention.
       </>
     ),
   },

@@ -1745,6 +1745,7 @@ async function analyzePersistedEvidence(client: PoolClient, workspaceId: string,
       currency: row.currency,
       frequency: cadenceToFrequency[row.cadence_hint],
       nextExpectedDate: toDateOnly(row.next_expected_date)!,
+      observedDate: toDateOnly(row.evidence_date) ?? undefined,
       category: row.category,
       sourceName: sourceEngineName(row.source_id),
       evidenceDescription: row.excerpt,
@@ -1801,10 +1802,28 @@ function transactionAnalysisDescription(row: EvidenceRow) {
 }
 
 async function upsertCanonicalCommitments(client: PoolClient, workspaceId: string, items: readonly RecurringItem[]) {
-  const existing = new Map((await loadCommitmentRows(client, workspaceId)).map((row) => [row.identity_key, row]));
+  const rows = await loadCommitmentRows(client, workspaceId);
+  const existing = new Map(rows.map((row) => [row.identity_key, row]));
   const corrections = await loadActiveCorrectionMap(client, workspaceId);
+  const currentKeys = new Set(items.map((item) => item.identityKey));
+  const claimed = new Set<string>();
+
   for (const item of items) {
-    const current = existing.get(item.identityKey);
+    let current = existing.get(item.identityKey);
+    if (!current) {
+      current = pickAdoptableCommitment(rows, item, currentKeys, claimed);
+      if (current && current.identity_key !== item.identityKey) {
+        await client.query(
+          `update recovery_commitments
+           set identity_key = $3, updated_at = now()
+           where workspace_id = $1 and id = $2`,
+          [workspaceId, current.id, item.identityKey],
+        );
+        existing.delete(current.identity_key);
+        current = { ...current, identity_key: item.identityKey };
+        existing.set(item.identityKey, current);
+      }
+    }
     const base = baseTruthFromRecurring(item);
     const effective = applyCorrectionTruth(base, corrections.get(current?.id ?? "") ?? []);
     if (!current) {
@@ -1840,10 +1859,14 @@ async function upsertCanonicalCommitments(client: PoolClient, workspaceId: strin
       );
       const id = inserted.rows[0]?.id;
       if (!id) throw new RecoveryServiceError("SAVE_FAILED");
-      existing.set(item.identityKey, (await getCommitmentRow(client, workspaceId, id))!);
+      const insertedRow = (await getCommitmentRow(client, workspaceId, id))!;
+      existing.set(item.identityKey, insertedRow);
+      rows.push(insertedRow);
+      claimed.add(id);
       continue;
     }
 
+    claimed.add(current.id);
     const changed = !sameEffectiveTruth(current, effective);
     await client.query(
       `update recovery_commitments
@@ -1895,6 +1918,40 @@ async function upsertCanonicalCommitments(client: PoolClient, workspaceId: strin
       ],
     );
   }
+
+  for (const row of rows) {
+    if (row.effective_status !== "ACTIVE") continue;
+    if (claimed.has(row.id)) continue;
+    if (currentKeys.has(row.identity_key)) continue;
+    await client.query(
+      `delete from recovery_commitments where workspace_id = $1 and id = $2`,
+      [workspaceId, row.id],
+    );
+  }
+}
+
+function pickAdoptableCommitment(
+  rows: readonly CommitmentRow[],
+  item: RecurringItem,
+  currentKeys: ReadonlySet<string>,
+  claimed: ReadonlySet<string>,
+): CommitmentRow | undefined {
+  const wantedCadence = frequencyToCadence[item.frequency];
+  const matches = rows.filter((row) => {
+    if (row.effective_status !== "ACTIVE") return false;
+    if (claimed.has(row.id)) return false;
+    if (currentKeys.has(row.identity_key)) return false;
+    if (row.base_currency !== item.currency) return false;
+    const merchant = row.effective_merchant.trim().toLowerCase();
+    return merchant === item.normalizedMerchant.trim().toLowerCase()
+      || merchant === item.merchant.trim().toLowerCase();
+  });
+  const cadenceMatches = matches.filter((row) => row.effective_cadence === wantedCadence);
+  const pool = cadenceMatches.length ? cadenceMatches : matches;
+  return [...pool].sort((left, right) => {
+    const byDetected = new Date(left.first_detected_at).getTime() - new Date(right.first_detected_at).getTime();
+    return byDetected || left.id.localeCompare(right.id);
+  })[0];
 }
 
 async function recomputeEffectiveCommitment(client: PoolClient, workspaceId: string, commitmentId: string) {

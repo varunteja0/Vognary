@@ -55,7 +55,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 1-3. Open landing and establish a saved identity independently of provider activation.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Know which software is worth paying for before you pay again");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Know what your company is committed to pay next");
   await tabToAndActivate(page, "Sign in");
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
@@ -104,8 +104,8 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await page.getByRole("button", { name: "Review", exact: true }).click();
   await expect(page.getByText(/Saved Review on/)).toBeVisible();
   await selectRecoveryView(page, "Home");
-  await page.getByRole("button", { name: "Copy for WhatsApp" }).click();
-  await expect(page.getByText("WhatsApp summary copied.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Copy summary" }).click();
+  await expect(page.getByText("Summary copied.", { exact: true })).toBeVisible();
   const sharedText = await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText ?? "");
   expect(sharedText).toContain("Monthly burn from checked receipts: ₹");
   expect(sharedText).toMatch(/Annualized estimate \(12 × cited monthly equivalent, not a historical yearly total\): ₹/);

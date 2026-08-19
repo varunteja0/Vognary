@@ -12,8 +12,6 @@ const personas = [
   "Agency owner",
   "AI builder",
   "Developer",
-  "Household / personal user",
-  "CA / finance operator",
   "Other",
 ];
 
@@ -22,24 +20,14 @@ const paymentTypes = [
   "SaaS tools",
   "Cloud hosting",
   "Domains",
-  "App stores",
-  "UPI AutoPay",
-  "Card mandates",
-  "Insurance",
-  "EMIs",
-  "SIPs",
-  "Utilities",
-  "Streaming",
+  "Developer tools",
   "Other",
 ];
 
 const sourceTypes = [
-  "Redacted bank/card statement",
-  "UPI/card mandate screenshot",
   "SaaS invoices",
   "Cloud invoices",
-  "Gmail receipt snippets",
-  "Apple/Google Play screenshot",
+  "Billing email snippets",
   "Manual list only",
   "Not sure yet",
 ];
@@ -55,10 +43,9 @@ const concerns = [
 ];
 
 const auditOutcomes = [
-  "One recurring ledger with source, amount, cadence, next expected debit, and confidence.",
-  "Missing-source map for Gmail, UPI, cards, app stores, bank debits, SaaS, cloud, domains, EMIs, SIPs, insurance, and utilities.",
-  "Action labels for keep, watch, downgrade, cancel, and investigate, with the evidence behind each label.",
-  "A redaction-first source plan so you know the minimum proof to share next instead of uploading everything.",
+  "A cited list of software, AI, and cloud commitments with amount, cadence when supported, and next expected date.",
+  "What changed, what is coming, and which items deserve attention — with an explicit reason.",
+  "Evidence behind every important claim, plus a redaction-first plan for the minimum proof to share next.",
 ];
 
 const safetyRules = [
@@ -69,9 +56,9 @@ const safetyRules = [
 ];
 
 const sourceTiers = [
-  { label: "Fastest start", value: "CSV statement + Gmail receipt snippets" },
+  { label: "Fastest start", value: "Recent software invoices and billing emails" },
   { label: "Founder stack", value: "OpenAI, GitHub, Vercel/Render, Cloudflare, domains" },
-  { label: "India rails", value: "UPI AutoPay, card mandates, SIPs, EMIs, insurance" },
+  { label: "Keep current", value: "Optional private billing address after the first result" },
 ];
 
 type IntakeForm = {
@@ -100,7 +87,7 @@ const initialForm: IntakeForm = {
   persona: "Founder",
   spendGuess: "",
   paymentTypes: ["AI tools", "SaaS tools"],
-  sourceTypes: ["Redacted bank/card statement"],
+  sourceTypes: ["SaaS invoices"],
   biggestConcern: "Privacy",
   canContact: false,
   message: "",
@@ -173,7 +160,7 @@ export default function PrivateAuditClient() {
               Prove what renews{" "}<br /><span className="glow-num">before it charges.</span>
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 muted-on-dark">
-              Apply for a redaction-first audit across SaaS, AI tools, cloud, domains, app stores, UPI AutoPay, card mandates, insurance, EMIs, SIPs, utilities, and receipt emails.
+              Apply for a redaction-first audit of software, AI, and cloud commitments. Vognary reconstructs what you are committed to pay next and what deserves attention — from evidence you choose.
             </p>
             <div className="mt-8 grid gap-2.5">
               <Proof label="Assisted audit" value={`${publicOffer.currency} ${(publicOffer.amountMinor / 100).toLocaleString("en-IN")}`} />
@@ -233,7 +220,7 @@ export default function PrivateAuditClient() {
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <MiniStep title="1. Minimum source" body="Get the safest first source and exact redactions immediately." />
                 <MiniStep title="2. Proof pass" body="Vognary identifies recurring items, confidence, next debits, and missing rails." />
-                <MiniStep title="3. Action review" body="You get a keep/watch/downgrade/cancel/investigate review before sharing more." />
+                <MiniStep title="3. Action review" body="You get keep or review with a concrete reason, plus the evidence behind each claim." />
               </div>
             </div>
 
@@ -263,7 +250,7 @@ export default function PrivateAuditClient() {
               />
               <div className="mt-5 grid gap-2">
                 <label htmlFor="private-audit-message" className="text-sm font-semibold text-(--ink)">Anything specific to audit?</label>
-                <textarea id="private-audit-message" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="field min-h-28" placeholder="Example: AI tools, AWS, domains, card mandates, SIPs, EMIs, app-store subscriptions..." />
+                  <textarea id="private-audit-message" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="field min-h-28" placeholder="Example: AI tools, AWS, domains, GitHub, Vercel invoices..." />
               </div>
             </details>
 

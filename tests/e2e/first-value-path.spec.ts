@@ -8,26 +8,19 @@ const assistedAuditOffer = {
   currency: "INR",
 };
 
-test("the first-value path leads into the product with assisted audit as a secondary option", async ({ page }) => {
+test("the first-value path leads into the product without a cancel promise", async ({ page }) => {
   const failures = collectRuntimeFailures(page);
   await page.goto("/");
 
-  const primary = page.locator("section").filter({ has: page.getByRole("heading", { name: "Know which software is worth paying for before you pay again." }) })
+  const primary = page.locator("section").filter({ has: page.getByRole("heading", { name: "Know what your company is committed to pay next — and what deserves attention before the card fires." }) })
     .getByRole("link", { name: "Review my software stack", exact: true });
   await expect(primary).toBeVisible();
   await expect(primary).toHaveAttribute("href", "/login?next=/app");
   await primary.click();
   await expect(page).toHaveURL(/\/login/);
-  await expect(page.getByRole("heading", { name: "Know which software is worth paying for" })).toBeVisible();
-
+  await expect(page.getByRole("heading", { name: "Know what your company is committed to pay next" })).toBeVisible();
   await page.goto("/");
-  const assisted = page.getByRole("link", { name: "Request a private audit", exact: true });
-  await expect(assisted).toHaveAttribute("href", "/private-audit");
-  await assisted.click();
-  await expect(page).toHaveURL(/\/private-audit$/);
-  await expect(page.getByRole("heading", { name: /Prove what renews/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Request private audit" })).toBeVisible();
-  await expect(page.getByText(/sample audit/i)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Request a private audit" })).toHaveCount(0);
   expect(failures).toEqual([]);
 });
 

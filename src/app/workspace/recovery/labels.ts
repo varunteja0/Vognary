@@ -33,7 +33,7 @@ export const decisionLabels: Record<Decision, string> = {
 };
 
 export const decisionMeanings: Record<Decision, string> = {
-  KEEP: "Keep tracking it and ask again only when something changes.",
+  KEEP: "No current evidence suggests this needs attention.",
   MONITOR: "Mark this for review. Nothing is cancelled.",
   DOWNGRADE: "Keep the service but consider moving to a cheaper plan.",
   CANCEL: "Record that you plan to cancel it at the service itself.",

@@ -89,7 +89,7 @@ test("Recovery share text projects server facts without combining currencies", (
   assert.match(text, /Changed since last visit: OpenAI — Amount changed\./);
   assert.match(text, /Next expected charge: OpenAI · ₹1,999\.00 · 18 Aug 2026 \(in 6 days\)\./);
   assert.match(text, /Needs attention: Decide on OpenAI — Choose keep, review later, or plan to cancel\./);
-  assert.match(text, /Coverage: 3 receipts from 2 sources\. This is a floor from receipts checked, not every debit in India\./);
+  assert.match(text, /Coverage: 3 receipts from 2 sources\. This is a floor from receipts checked, not every software bill\./);
   assert.doesNotMatch(text, /₹3,999|converted|approximately|₹1,999\.00\/mo \+ \$20\.00\/mo/i);
 });
 

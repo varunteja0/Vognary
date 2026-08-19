@@ -119,12 +119,12 @@ test("high-cost protected commitments receive class-safe review language", () =>
   }
 });
 
-test("high-cost discretionary SaaS keeps the existing downgrade recommendation", () => {
+test("high-cost discretionary SaaS stays on the quiet KEEP baseline instead of inventing unused-seat advice", () => {
   const item = auditOne("OPENAI CHATGPT TEAM", 5_000);
   assert.equal(item.category, "AI tools");
-  assert.equal(item.recommendationType, "downgrade");
-  assert.match(item.recommendationReason, /High recurring builder spend/i);
-  assert.match(item.recommendationReason, /downgrade idle seats/i);
+  assert.equal(item.recommendationType, "keep");
+  assert.match(item.recommendationReason, /No current evidence suggests this needs attention/i);
+  assert.doesNotMatch(item.recommendationReason, /downgrade idle seats|actively used/i);
 });
 
 test("a protected price increase uses its own financial terminology", () => {

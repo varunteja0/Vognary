@@ -174,8 +174,8 @@ test("one observed charge asks for a matching receipt instead of rendering an al
   await expect(observed.getByText("₹1,499.00", { exact: true })).toBeVisible();
   await expect(observed.getByText("9 Aug 2026", { exact: true })).toBeVisible();
   await expect(observed.getByRole("button", { name: "Inspect exact evidence" })).toBeVisible();
-  await expect(observed.getByRole("button", { name: "Copy for WhatsApp" })).toBeVisible();
-  await expect(observed.getByText("This is a floor from receipts checked, not every debit in India.")).toBeVisible();
+  await expect(observed.getByRole("button", { name: "Copy summary" })).toBeVisible();
+  await expect(observed.getByText("This is a floor from receipts checked, not every software bill.")).toBeVisible();
   await expect(page.getByText("Nothing needs attention right now")).toHaveCount(0);
 
   await observed.getByRole("button", { name: "Inspect exact evidence" }).click();
@@ -184,8 +184,8 @@ test("one observed charge asks for a matching receipt instead of rendering an al
   await page.keyboard.press("Escape");
   await expect(evidenceDialog).toHaveCount(0);
 
-  await observed.getByRole("button", { name: "Copy for WhatsApp" }).click();
-  await expect(observed.getByText("WhatsApp summary copied.", { exact: true })).toBeVisible();
+  await observed.getByRole("button", { name: "Copy summary" }).click();
+  await expect(observed.getByText("Summary copied.", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText)).toContain("Saved receipt observation (not yet recurring): Figma · ₹1,499.00 · 9 Aug 2026.");
   await expectNoSeriousAxeViolations(page, "one-observation Home");
 
