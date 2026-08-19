@@ -41,11 +41,11 @@ test("exception-only home is honest about shadow mode and missing coverage", () 
 
 test("active mandate still publishes the first-value spend strip when no recurring amount is cited", () => {
   assert.ok(
-     homeSource.indexOf("<RecoveryAutopilotHome") < homeSource.indexOf("<RecoveryFirstValueMetrics"),
+     homeSource.indexOf("<RecoveryAutopilotHome") < homeSource.indexOf("<SpendHero"),
      "active Autopilot actions must render above cited spend metrics",
   );
-  const metricsFn = homeSource.slice(homeSource.indexOf("function RecoveryFirstValueMetrics"));
-  assert.match(metricsFn, /label="Monthly recurring amount"/);
+  const metricsFn = homeSource.slice(homeSource.indexOf("function SpendHero"));
+  assert.match(metricsFn, /Software commitments/);
   assert.match(metricsFn, /No recurring amount yet/);
   assert.doesNotMatch(metricsFn, /if \(!hasTotals\) return null/);
 });

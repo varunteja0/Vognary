@@ -434,7 +434,27 @@ test("evidence results decide whether the draft is cleared or kept for repair", 
   });
   assert.equal(accepted.evidenceDraft.receiptText, "");
   assert.equal(accepted.view, "HOME");
-  assert.equal(accepted.announcement, "Evidence submitted. 1 evidence item saved from 1 submitted receipt.");
+  assert.equal(accepted.addBillsOpen, false);
+  assert.equal(accepted.showFirstResult, false);
+
+  const fromEmpty = recoveryReducer(
+    {
+      ...withDraft,
+      home: { ...home, coverage: { ...home.coverage, state: "NO_EVIDENCE", evidenceCount: 0 }, activeCommitmentCount: 0 },
+      commitments: [],
+      commitmentTotal: 0,
+    },
+    {
+      type: "EVIDENCE_SUBMITTED",
+      submission: { id: "submission-first", type: "RECEIPT_PASTE", ingestedAt: "2026-08-09T10:00:00.000Z", acceptedEvidenceCount: 1, results: [{ clientRef: "receipt-paste-1", status: "ACCEPTED", code: null, message: null }] },
+      home: { ...home, activeCommitmentCount: 1 },
+      commitments: [commitment],
+      total: 1,
+      meta,
+    },
+  );
+  assert.equal(fromEmpty.showFirstResult, true);
+  assert.equal(accepted.announcement, "Saved 1 bill from 1 submitted bill.");
 
   const expanded = recoveryReducer(withDraft, {
     type: "EVIDENCE_SUBMITTED",
@@ -444,7 +464,7 @@ test("evidence results decide whether the draft is cleared or kept for repair", 
     total: 2,
     meta,
   });
-  assert.equal(expanded.announcement, "Evidence submitted. 4 evidence items saved from 1 submitted receipt.");
+  assert.equal(expanded.announcement, "Saved 4 bills from 1 submitted bill.");
 
   const rejected = recoveryReducer(withDraft, {
     type: "EVIDENCE_SUBMITTED",
@@ -486,6 +506,16 @@ test("evidence results decide whether the draft is cleared or kept for repair", 
     meta,
   });
   assert.equal(mixedFromSources.view, "ADD_EVIDENCE");
+
+  const returning = recoveryReducer({ ...accepted, home: { ...home, activeCommitmentCount: 0 }, showFirstResult: false }, {
+    type: "EVIDENCE_SUBMITTED",
+    submission: { id: "submission-later", type: "RECEIPT_PASTE", ingestedAt: "2026-08-09T11:00:00.000Z", acceptedEvidenceCount: 1, results: [{ clientRef: "receipt-paste-1", status: "ACCEPTED", code: null, message: null }] },
+    home: { ...home, activeCommitmentCount: 1 },
+    commitments: [commitment],
+    total: 2,
+    meta,
+  });
+  assert.equal(returning.showFirstResult, false);
 });
 
 test("dialogs record where focus must return and prefill corrections from server values only", () => {

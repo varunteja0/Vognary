@@ -40,7 +40,7 @@ export function EvidenceRow({ evidence, buttonId, onInspect }: { evidence: Evide
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <ConfidenceBadge confidence={evidence.confidence} />
         <span className="font-data text-xs text-(--muted)">{evidence.date ? formatDay(evidence.date) : "No date published"}</span>
-        <button type="button" id={buttonId} onClick={onInspect} className="btn btn-sm btn-ghost">Inspect this evidence</button>
+        <button type="button" id={buttonId} onClick={onInspect} className="btn btn-sm btn-ghost">See the receipt</button>
       </div>
     </li>
   );

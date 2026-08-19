@@ -148,6 +148,7 @@ const home = {
     coverageEnd: "2026-07-06",
     limitations: ["Only pasted receipts are covered."],
   },
+  recentObservations: [],
   activeCommitmentCount: 1,
   unknownCadenceCommitmentCount: 0,
   uncertainDuplicateCommitmentCount: 0,
@@ -249,7 +250,7 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   const { activationResponses } = await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Your commitments" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 
   const nav = page.getByRole("navigation", { name: "Primary" });
@@ -259,37 +260,26 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(nav.getByRole("button", { name: "Mandate" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: `Account for ${email}` })).toHaveAttribute("href", "/profile");
 
-  await expect(page.getByRole("heading", { name: "What we found" })).toBeVisible();
-  await expect(page.getByText("1 commitment found")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "What changed" })).toHaveCount(0);
+  await expect(page.getByText("Software commitments")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Needs attention" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Receipts checked" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What we found" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Receipts checked" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Currently committed" })).toHaveCount(0);
 
-  await expect(page.getByRole("heading", { name: "Currently committed" })).toBeVisible();
-  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
+  const spendBox = await page.getByText("Software commitments").boundingBox();
   const attentionBox = await page.getByRole("heading", { name: "Needs attention" }).boundingBox();
-  const recurringAmountBox = await page.getByText("Monthly recurring amount").boundingBox();
-  expect(attentionBox?.y).toBeLessThan(recurringAmountBox?.y ?? 0);
+  expect(spendBox?.y).toBeLessThan(attentionBox?.y ?? 0);
   await expect.poll(() => activationResponses.length).toBe(1);
   expect(activationResponses).toEqual([201]);
-  await expect(page.getByText("From checked receipts only.").first()).toBeVisible();
   await expect(page.getByText("₹1,999.00").first()).toBeVisible();
-  await expect(page.getByText("₹23,988.00")).toBeVisible();
-  await expect(page.getByText("Annualized estimate", { exact: true })).toBeVisible();
-  await expect(page.getByText(/It is not a historical yearly total/)).toBeVisible();
-  await expect(page.getByText("Active commitments")).toBeVisible();
-  await expect(page.getByText("Needs review", { exact: true })).toBeVisible();
-  await expect(page.getByText("Confirm OpenAI")).toBeVisible();
-  await expect(page.getByText("Low confidence")).toBeVisible();
-  await expect(page.getByText("6 Aug 2026 · in 3 days")).toBeVisible();
-  await expect(page.getByText(/1 item from 1 source · latest/)).toBeVisible();
-
-  await page.getByRole("button", { name: "Copy summary" }).click();
-  await expect(page.getByText("Summary copied.", { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText)).toContain("Monthly burn from checked receipts: ₹1,999.00/mo.");
-  expect(await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText)).toContain("Annualized estimate (12 × cited monthly equivalent, not a historical yearly total): ₹23,988.00/yr.");
+  await expect(page.getByText("1 active tool")).toBeVisible();
+  await expect(page.getByText("OpenAI").first()).toBeVisible();
+  await expect(page.getByText("Not enough information")).toBeVisible();
+  await expect(page.getByText("₹23,988.00")).toHaveCount(0);
+  await expect(page.getByText("Annualized estimate", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Copy summary" })).toHaveCount(0);
 
   await expect(page.getByText(/connect|sync your bank|Gmail/i)).toHaveCount(0);
 });
@@ -325,15 +315,12 @@ test("later evidence produces a genuine changed list instead of a baseline", asy
   );
   await page.goto("/app");
 
-  await expect(page.getByRole("heading", { name: "Since your last visit" })).toBeVisible();
-  const changedBox = await page.getByRole("heading", { name: "Since your last visit" }).boundingBox();
+  await expect(page.getByRole("heading", { name: "Recent change" })).toBeVisible();
+  const changedBox = await page.getByRole("heading", { name: "Recent change" }).boundingBox();
   const attentionBox = await page.getByRole("heading", { name: "Needs attention" }).boundingBox();
-  expect(changedBox?.y).toBeLessThan(attentionBox?.y ?? 0);
+  expect(attentionBox?.y).toBeLessThan(changedBox?.y ?? 0);
   await expect(page.getByText("Amount changed")).toBeVisible();
-  const changeRow = page.locator("article").filter({ hasText: "Amount changed" });
-  await expect(changeRow.getByText("₹1,999.00")).toBeVisible();
-  await expect(changeRow.getByText("₹2,099.00")).toBeVisible();
-  await expect(changeRow.getByText("1 new evidence item caused this comparison")).toBeVisible();
+  await expect(page.getByText("OpenAI").first()).toBeVisible();
   await expect(page.getByText("Your subscriptions look the same")).toHaveCount(0);
 });
 
@@ -346,14 +333,14 @@ test("a commitment exposes its exact evidence and returns focus after inspection
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   await expect(page.getByRole("heading", { name: "OpenAI" })).toBeVisible();
-  await expect(page.getByText("Confirm this with a second receipt.")).toBeVisible();
-  await expect(page.getByText("Showing 1 of 1")).toBeVisible();
+  await page.getByRole("tab", { name: "Why" }).click();
+  await expect(page.getByText("Not enough history yet.")).toBeVisible();
   await expect(page.getByText("OpenAI invoice paid INR 1,999. Renews monthly.", { exact: false })).toBeVisible();
 
-  const inspect = page.getByRole("button", { name: "Inspect this evidence" });
+  const inspect = page.getByRole("button", { name: "See the receipt" });
   await inspect.click();
 
-  const dialog = page.getByRole("dialog", { name: "Exact evidence" });
+  const dialog = page.getByRole("dialog", { name: "The receipt" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("Observed fact (exact excerpt)")).toBeVisible();
   await expect(dialog.getByText("Pasted receipt", { exact: true }).first()).toBeVisible();
@@ -362,9 +349,9 @@ test("a commitment exposes its exact evidence and returns focus after inspection
   await expect(dialog.getByText(/smallest unit/)).toHaveCount(0);
   await expect(dialog.getByText(/unpublished/)).toHaveCount(0);
   await expect(dialog.getByText(/legacy-evidence/)).toHaveCount(0);
-  await expect(dialog.getByText("You submitted this evidence")).toBeVisible();
+  await expect(dialog.getByText("You added this")).toBeVisible();
   await expect(dialog.getByText("Likely", { exact: true })).toBeVisible();
-  await expect(dialog.getByText("Treat the amount and date as provisional until more evidence lands.")).toBeVisible();
+  await expect(dialog.getByText("Treat the amount and date as an estimate until another bill arrives.")).toBeVisible();
 
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
@@ -383,10 +370,9 @@ test("three primary choices and two secondary choices preserve the server decisi
   for (const label of ["Keep", "Plan to cancel", "Review"]) {
     await expect(group.getByRole("button", { name: new RegExp(`^${label}`) })).toBeVisible();
   }
-  await page.getByText("More choices").click();
+  await page.getByText("More", { exact: true }).click();
   await expect(page.getByRole("button", { name: "Consider a cheaper plan" })).toBeVisible();
   await expect(page.getByRole("button", { name: "I don’t recognize this" })).toBeVisible();
-  await expect(page.getByText("No choice has been saved for this commitment yet.")).toBeVisible();
 
   await group.getByRole("button", { name: /^Plan to cancel/ }).click();
   await expect(page.getByText(/Saved Plan to cancel on/)).toBeVisible();
@@ -413,7 +399,6 @@ test("a rejected decision rolls back visibly and states what the workspace still
   await expect(alert.getByText(/“Plan to cancel” for OpenAI was not saved/)).toBeVisible();
   await expect(alert.getByText(/still without a recorded decision/)).toBeVisible();
   await expect(alert.getByText(/request-rollback/)).toBeVisible();
-  await expect(page.getByText("No choice has been saved for this commitment yet.")).toBeVisible();
 });
 
 test("correcting a commitment offers every contract field and shows reversible history", async ({ page }) => {
@@ -424,7 +409,8 @@ test("correcting a commitment offers every contract field and shows reversible h
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
-  for (const label of ["Correct merchant", "Correct amount", "Correct expected date", "Correct cadence", "Correct recurring or not"]) {
+  await page.getByText("Something wrong?").click();
+  for (const label of ["Correct merchant", "Correct amount", "Correct expected date", "Correct how often", "Correct recurring or not"]) {
     await expect(page.getByRole("button", { name: label })).toBeVisible();
   }
   await expect(page.getByText("Merchant set to “OpenAI”")).toBeVisible();
@@ -440,8 +426,8 @@ test("correcting a commitment offers every contract field and shows reversible h
   await expect(trigger).toBeFocused();
 });
 
-test("the workspace stays usable and keyboard-reachable on a small screen", async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 812 });
+test("the workspace stays usable and keyboard-reachable on a 390px phone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page);
   await mockRecoveryApi(page);
   await page.goto("/app");
@@ -514,8 +500,7 @@ test("exception-only Autopilot home is honest on desktop and mobile and has no s
     await expect(page.getByRole("heading", { name })).toBeVisible();
   }
   await expect(page.getByText("Exception-only home")).toBeVisible();
-  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
-  await expect(page.getByText("From checked receipts only.").first()).toBeVisible();
+  await expect(page.getByText("Software commitments")).toBeVisible();
   await expect(page.getByText("No recurring amount yet")).toHaveCount(0);
   await expect(page.getByText("missing USD coverage is not a zero saving", { exact: false })).toBeVisible();
   await expect(page.getByText("Fee collection stays fail-closed")).toBeVisible();
@@ -586,12 +571,9 @@ test("an active mandate still shows the spend strip when no recurring amount is 
 
   await expect(page.getByText("Exception-only home")).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" })).toBeVisible();
-  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
+  await expect(page.getByText("Software commitments")).toBeVisible();
   await expect(page.getByText("No recurring amount yet")).toBeVisible();
-  await expect(page.getByText("Annualized estimate", { exact: true })).toBeVisible();
-  await expect(page.getByText("Active commitments")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Coming up" })).toBeVisible();
-  await expect(page.getByText("Baseline only")).toBeVisible();
 });
 
 test("Home posts activation only after a cited recurring-spend picture actually renders", async ({ page }) => {
@@ -635,7 +617,7 @@ test("Home posts activation only after a cited recurring-spend picture actually 
 
   await signIn(page);
   await expect(page.getByRole("heading", { level: 2, name: "Home" })).toBeVisible();
-  await expect(page.getByText("Monthly recurring amount")).toHaveCount(0);
+  await expect(page.getByText("Software commitments")).toHaveCount(0);
   expect(activationCalls).toEqual([]);
 
   await page.goto("about:blank");
@@ -650,10 +632,10 @@ test("Home posts activation only after a cited recurring-spend picture actually 
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
   await page.goto("/app");
-  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
+  await expect(page.getByText("Software commitments")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   await page.reload();
-  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
+  await expect(page.getByText("Software commitments")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(1);
 });
@@ -687,20 +669,20 @@ test("Home records activation after analytics opt-in on a tab that previously re
   });
 
   await signIn(page);
-  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
+  await expect(page.getByText("Software commitments")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   expect(activationCalls[0]).toEqual({ status: 202 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
 
   consented = true;
   await page.goto("/app");
-  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
+  await expect(page.getByText("Software commitments")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(2);
   expect(activationCalls[1]).toEqual({ status: 201 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBe("1");
 
   await page.reload();
-  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
+  await expect(page.getByText("Software commitments")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(2);
 });
@@ -738,19 +720,19 @@ test("Home records activation after a 401 once the tab can authenticate again", 
   });
 
   await signIn(page);
-  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
+  await expect(page.getByText("Software commitments")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   expect(activationCalls[0]).toEqual({ status: 401 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
 
   authenticated = true;
   await page.goto("/app");
-  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
+  await expect(page.getByText("Software commitments")).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(2);
   expect(activationCalls[1]).toEqual({ status: 201 });
 
   await page.reload();
-  await expect(page.getByText("Monthly recurring amount")).toBeVisible();
+  await expect(page.getByText("Software commitments")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(2);
 });
@@ -857,7 +839,7 @@ test("notice states distinguish delivery pending from a delivered 48-hour clock"
   await expect(page.getByText("Delivery is pending.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "48-hour veto window" })).toBeVisible();
   const vetoWindowBox = await page.getByRole("heading", { name: "48-hour veto window" }).boundingBox();
-  const recurringAmountBox = await page.getByText("Monthly recurring amount").boundingBox();
+  const recurringAmountBox = await page.getByText("Software commitments").boundingBox();
   expect(vetoWindowBox?.y).toBeLessThan(recurringAmountBox?.y ?? 0);
   const watchingBox = await page.getByRole("heading", { name: "Watching" }).boundingBox();
   const helpBox = await page.getByRole("heading", { name: "Needs your help" }).boundingBox();
@@ -931,9 +913,9 @@ test("Sources tab disconnects cited Recovery sources without rotating the receip
   });
   await page.goto("/app");
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await page.getByText("Advanced").click();
   await expect(page.getByText("Pasted OpenAI receipt")).toBeVisible();
-  await expect(page.getByText("Pasted receipt · Connected · supports current commitment facts")).toBeVisible();
-  await expect(page.getByText(/does not rotate the receipt address/)).toBeVisible();
+  await expect(page.getByText("Pasted bill · Connected")).toBeVisible();
   await page.getByRole("button", { name: "Disconnect source" }).click();
   await expect.poll(() => disconnectCalls).toEqual(["POST"]);
 
@@ -957,7 +939,8 @@ test("Sources tab disconnects cited Recovery sources without rotating the receip
   );
   await page.reload();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
-  await expect(page.getByText("Pasted receipt · Disconnected · not currently supporting a commitment")).toBeVisible();
+  await page.getByText("Advanced").click();
+  await expect(page.getByText("Pasted bill · Disconnected")).toBeVisible();
   await page.getByRole("button", { name: "Reconnect source" }).click();
   await expect.poll(() => reconnectCalls).toEqual(["POST"]);
 });

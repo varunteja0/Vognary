@@ -87,6 +87,8 @@ export type RollbackNotice = { mutation: PendingMutation; failure: RecoveryFailu
 
 export type RecoveryState = {
   view: RecoveryView;
+  addBillsOpen: boolean;
+  showFirstResult: boolean;
   online: boolean;
   session: RecoverySessionResponse | null;
   status: LoadState;
@@ -136,6 +138,8 @@ const emptyCorrectionDraft: CorrectionDraft = {
 
 export const initialRecoveryState: RecoveryState = {
   view: "HOME",
+  addBillsOpen: false,
+  showFirstResult: false,
   online: true,
   session: null,
   status: { kind: "LOADING" },
@@ -173,6 +177,9 @@ export type RecoveryAction =
   | { type: "COMMITMENTS_PAGE_APPENDED"; items: readonly CommitmentSummaryDto[]; total: number; nextCursor: string | null; meta: ResponseMeta }
   | { type: "SNAPSHOT_FAILED"; failure: TransportFailure }
   | { type: "VIEW_SELECTED"; view: RecoveryView }
+  | { type: "ADD_BILLS_OPENED" }
+  | { type: "ADD_BILLS_CLOSED" }
+  | { type: "FIRST_RESULT_DISMISSED" }
   | { type: "COMMITMENT_SELECTED"; commitmentId: string | null }
   | { type: "DETAIL_EVIDENCE_PAGE_REQUESTED"; cursor: string | null }
   | { type: "DETAIL_LOADED"; detail: CommitmentDetailDto; meta: ResponseMeta }
@@ -346,6 +353,15 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
     case "VIEW_SELECTED":
       return { ...state, view: action.view, announcement: `${recoveryViewLabels[action.view]} view.` };
 
+    case "ADD_BILLS_OPENED":
+      return { ...state, addBillsOpen: true, evidenceFailure: null, announcement: "Add bills." };
+
+    case "ADD_BILLS_CLOSED":
+      return { ...state, addBillsOpen: false };
+
+    case "FIRST_RESULT_DISMISSED":
+      return { ...state, showFirstResult: false };
+
     case "COMMITMENT_SELECTED":
       return {
         ...state,
@@ -497,6 +513,8 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
     case "EVIDENCE_SUBMITTED": {
       const everyResultAccepted = action.submission.results.every((result) => result.status === "ACCEPTED");
       const refreshSelectedDetail = state.selectedCommitmentId !== null;
+      const accepted = everyResultAccepted && action.submission.acceptedEvidenceCount > 0;
+      const firstCitedPicture = (state.home?.coverage.evidenceCount ?? 0) === 0;
       return {
         ...state,
         pending: null,
@@ -512,7 +530,9 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         status: { kind: "READY" },
         refreshRequired: false,
         evidenceDraft: everyResultAccepted ? emptyEvidenceDraft : { ...state.evidenceDraft, preparing: false },
-        view: everyResultAccepted && action.submission.acceptedEvidenceCount > 0 ? "HOME" : state.view,
+        view: accepted ? "HOME" : state.view,
+        addBillsOpen: accepted ? false : state.addBillsOpen,
+        showFirstResult: accepted && firstCitedPicture && action.total > 0,
         announcement: evidenceSubmissionAnnouncement(action.submission),
       };
     }
@@ -655,9 +675,10 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
 
 function evidenceSubmissionAnnouncement(submission: EvidenceSubmissionDto) {
   const evidenceCount = submission.acceptedEvidenceCount;
+  if (evidenceCount === 0) return "Nothing was saved. Try another file or paste the receipt text.";
   const submittedCount = submission.results.length;
-  const submittedUnit = submission.type === "CSV_IMPORT" ? "file" : "receipt";
-  return `Evidence submitted. ${evidenceCount} evidence item${evidenceCount === 1 ? "" : "s"} saved from ${submittedCount} submitted ${submittedUnit}${submittedCount === 1 ? "" : "s"}.`;
+  const submittedUnit = submission.type === "CSV_IMPORT" ? "file" : "bill";
+  return `Saved ${evidenceCount} bill${evidenceCount === 1 ? "" : "s"} from ${submittedCount} submitted ${submittedUnit}${submittedCount === 1 ? "" : "s"}.`;
 }
 
 // The decision a control should render right now: the pending intent while a

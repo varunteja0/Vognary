@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   commitmentImportances,
   commitmentOwners,
@@ -12,10 +13,31 @@ import {
   type EvidenceDto,
   type PutCommitmentContextRequest,
 } from "@/lib/recovery/contracts";
-import { correctionFieldLabels, cadenceLabels, commitmentStatusLabels, decisionLabels, decisionMeanings, decisionStamps, expectedVsObservedLabels, formatDay, formatMoment, importanceLabels, ownerLabels, purposeLabels, sourceLabels } from "./labels";
+import {
+  cadenceLabels,
+  correctionFieldLabels,
+  decisionLabels,
+  decisionMeanings,
+  formatDay,
+  formatMoment,
+  importanceLabels,
+  ownerLabels,
+  purposeLabels,
+  sourceLabels,
+} from "./labels";
+import {
+  cadenceShortLabels,
+  commitmentNeedsAttention,
+  customerPhrases,
+  customerStatusForCommitment,
+  customerStatusLabels,
+  overlapIdsForWorkspace,
+  presentExpectedObservation,
+} from "./present";
 import { CorrectionHistory, EvidenceRow } from "./recovery-evidence-panels";
-import { ConfidenceBadge, ConfidenceDetail, FailureBlock, LoadingBlock, MoneyValue, StateBlock } from "./recovery-states";
+import { FailureBlock, LoadingBlock, MoneyValue, StateBlock } from "./recovery-states";
 import { displayedDecision, type PendingMutation, type RecoveryState } from "./state";
+import { DisclosureTabs } from "./ui/disclosure-tabs";
 
 const primaryDecisions = ["KEEP", "CANCEL", "MONITOR"] as const satisfies readonly Decision[];
 const secondaryDecisions = ["DOWNGRADE", "INVESTIGATE"] as const satisfies readonly Decision[];
@@ -36,54 +58,63 @@ export type CommitmentsHandlers = {
 
 export function RecoveryCommitments({ state, handlers }: { state: RecoveryState; handlers: CommitmentsHandlers }) {
   const selected = state.selectedCommitmentId;
+  const [filter, setFilter] = useState<"ALL" | "ATTENTION">("ALL");
+  const overlapIds = state.home ? overlapIdsForWorkspace(state.home) : new Set<string>();
+  const rows = filter === "ATTENTION"
+    ? state.commitments.filter((commitment) => commitmentNeedsAttention(commitment, overlapIds.has(commitment.id)))
+    : state.commitments;
 
   if (!state.commitments.length) {
     return (
       <StateBlock
         eyebrow="Nothing saved yet"
         title="No commitments yet"
-        detail="Add a software receipt and Vognary will show a commitment only when the receipt supports it."
+        detail="Add a few software bills and Vognary will organize what you're paying for."
       >
-        <button type="button" onClick={handlers.onAddEvidence} className="btn btn-primary">Add a few recent software bills</button>
+        <button type="button" onClick={handlers.onAddEvidence} className="btn btn-primary">{customerPhrases.addBills}</button>
       </StateBlock>
     );
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)] lg:items-start">
-      <section aria-label="Commitments" className={`panel p-3 sm:p-4 ${selected ? "hidden lg:block" : "block"}`}>
-        <div className="flex items-baseline justify-between gap-2 px-1">
-          <h3 className="folio" data-folio="05">Commitments</h3>
-          <span className="font-data text-xs text-(--muted)">{state.commitments.length} shown</span>
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start">
+      <section aria-label="Commitments" className={selected ? "hidden lg:block" : "block"}>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" aria-pressed={filter === "ALL"} onClick={() => setFilter("ALL")} className={`btn btn-sm ${filter === "ALL" ? "btn-ghost font-semibold" : "btn-ghost"}`}>All</button>
+          <button type="button" aria-pressed={filter === "ATTENTION"} onClick={() => setFilter("ATTENTION")} className={`btn btn-sm ${filter === "ATTENTION" ? "btn-ghost font-semibold" : "btn-ghost"}`}>Needs attention</button>
         </div>
-        <ul className="mt-3 grid gap-2">
-          {state.commitments.map((commitment) => (
-            <li key={commitment.id}>
-              <button
-                type="button"
-                onClick={() => handlers.onSelect(commitment.id)}
-                data-active={commitment.id === selected}
-                aria-current={commitment.id === selected ? "true" : undefined}
-                className="ledger-row inset w-full p-3 text-left"
-              >
-                <span className="flex flex-wrap items-baseline justify-between gap-2">
+        <ul className="mt-3 grid gap-1">
+          <li className="hidden px-3 py-2 font-data text-xs uppercase tracking-[0.12em] text-(--muted) lg:grid lg:grid-cols-[minmax(0,1fr)_7rem_6rem_7rem] lg:gap-3">
+            <span>Vendor</span>
+            <span>Cost</span>
+            <span>Next</span>
+            <span>Status</span>
+          </li>
+          {rows.map((commitment) => {
+            const status = customerStatusForCommitment(commitment, overlapIds.has(commitment.id));
+            return (
+              <li key={commitment.id}>
+                <button
+                  type="button"
+                  onClick={() => handlers.onSelect(commitment.id)}
+                  data-active={commitment.id === selected}
+                  aria-current={commitment.id === selected ? "true" : undefined}
+                  className="ledger-row w-full p-3 text-left lg:grid lg:grid-cols-[minmax(0,1fr)_7rem_6rem_7rem] lg:items-baseline lg:gap-3"
+                >
                   <span className="font-display text-base font-semibold text-(--ink)">{commitment.merchant}</span>
-                  <MoneyValue amount={commitment.amount} className="text-sm font-semibold text-(--ink)" />
-                </span>
-                <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-data text-xs text-(--muted)">
-                  <span>{cadenceLabels[commitment.cadence]}</span>
-                  <span>{commitment.nextExpectedDate ? formatDay(commitment.nextExpectedDate) : "No date published"}</span>
-                  <span>{commitment.evidenceCount} receipt{commitment.evidenceCount === 1 ? "" : "s"}</span>
-                </span>
-                <span className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className={decisionStamps[commitment.decision?.value ?? commitment.recommendedDecision]}>
-                    {commitment.decision ? decisionLabels[commitment.decision.value] : `Suggested: ${decisionLabels[commitment.recommendedDecision]}`}
+                  <span className="mt-1 font-data text-sm text-(--ink-soft) lg:mt-0">
+                    {commitment.amount.display}{cadenceShortLabels[commitment.cadence]}
                   </span>
-                  <ConfidenceBadge confidence={commitment.confidence} />
-                </span>
-              </button>
-            </li>
-          ))}
+                  <span className="mt-1 font-data text-xs text-(--muted) lg:mt-0">
+                    {commitment.nextExpectedDate ? formatDay(commitment.nextExpectedDate) : "—"}
+                  </span>
+                  <span className={`mt-2 text-xs font-medium lg:mt-0 ${status === "ON_TRACK" ? "text-(--muted)" : "text-ochre"}`}>
+                    {customerStatusLabels[status]}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
         {state.commitmentsCursor ? (
           <button
@@ -99,21 +130,27 @@ export function RecoveryCommitments({ state, handlers }: { state: RecoveryState;
 
       <div className={selected ? "block" : "hidden lg:block"}>
         {selected ? (
-          <CommitmentDetailPanel state={state} handlers={handlers} />
+          <CommitmentDetailPanel state={state} handlers={handlers} overlap={overlapIds.has(selected)} />
         ) : (
-          <StateBlock
-            eyebrow="Nothing selected"
-            title="Choose a commitment to see why it appears"
-            detail="Every amount, date, and frequency can be traced to a receipt or source you provided."
-          />
+          <p className="px-1 text-sm leading-6 text-(--muted)">Choose a tool to see the next bill and why it is listed.</p>
         )}
       </div>
     </div>
   );
 }
 
-function CommitmentDetailPanel({ state, handlers }: { state: RecoveryState; handlers: CommitmentsHandlers }) {
+function CommitmentDetailPanel({
+  state,
+  handlers,
+  overlap,
+}: {
+  state: RecoveryState;
+  handlers: CommitmentsHandlers;
+  overlap: boolean;
+}) {
   const { detail, detailStatus } = state;
+  const [tab, setTab] = useState<"overview" | "history" | "why">("overview");
+  const [changeOpen, setChangeOpen] = useState(false);
 
   if (detailStatus.kind === "LOADING" && !detail) return <LoadingBlock label="Opening this commitment…" />;
   if (detailStatus.kind === "FAILED") {
@@ -138,254 +175,234 @@ function CommitmentDetailPanel({ state, handlers }: { state: RecoveryState; hand
 
   const decisionPending = state.pending?.kind === "DECISION" && state.pending.commitmentId === detail.id;
   const shown = displayedDecision(state, detail.id, detail.decision);
+  const status = customerStatusForCommitment(detail, overlap);
+  const observation = presentExpectedObservation(detail.expectation);
+  const needsDecision = status === "NEEDS_ATTENTION" || shown.value === "MONITOR" || shown.value === "CANCEL" || (!detail.decision && detail.recommendedDecision !== "KEEP");
+  const showDecisions = needsDecision || changeOpen;
 
   return (
-    <article aria-labelledby="recovery-commitment-heading" className="grid gap-5">
-      <section className="panel p-4 sm:p-5">
-        <button type="button" onClick={() => handlers.onSelect(null)} className="btn btn-sm btn-ghost lg:hidden">← Back to the list</button>
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-3 lg:mt-0">
-          <div>
-            <h3 id="recovery-commitment-heading" className="font-display text-2xl font-semibold text-(--ink)">{detail.merchant}</h3>
-            <p className="mt-1 font-data text-xs text-(--muted)">
-              {detail.category} · {commitmentStatusLabels[detail.status]} · updated {formatMoment(detail.updatedAt)}
-            </p>
-          </div>
-          <MoneyValue amount={detail.amount} className="text-2xl font-semibold text-(--ink)" />
-        </div>
-
-        <dl className="mt-4 grid gap-3 sm:grid-cols-3">
-          <DetailFact label="Frequency" value={cadenceLabels[detail.cadence]} />
-          <DetailFact label="Expected next charge" value={detail.nextExpectedDate ? formatDay(detail.nextExpectedDate) : "Not enough information"} />
-          <DetailFact
-            label="Estimated monthly cost"
-            value={detail.cadence === "IRREGULAR" ? "Not established" : detail.monthlyEquivalent.display}
-            note={detail.cadence === "IRREGULAR" ? undefined : detail.monthlyEquivalent.currency}
-          />
-        </dl>
-
-        <div className="mt-4 inset p-4">
-          <ConfidenceDetail confidence={detail.confidence} />
-          {detail.belief ? <p className="mt-3 text-sm leading-6 text-(--ink-soft)">{detail.belief}</p> : null}
-          {detail.because[0] ? <p className="mt-1 text-sm leading-6 text-(--muted)">{detail.because[0]}</p> : null}
-          {detail.riskTags.length ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {detail.riskTags.map((tag) => <span key={tag} className="pill pill-partial">{tag}</span>)}
-            </div>
-          ) : null}
-        </div>
-      </section>
-
-      <section aria-labelledby="recovery-expectation-heading" className="panel p-4 sm:p-5">
-        <h4 id="recovery-expectation-heading" className="font-display text-xl font-semibold text-(--ink)">Expected vs observed</h4>
-        <p className="mt-2 font-data text-xs text-(--muted)">{expectedVsObservedLabels[detail.expectation.status]}</p>
-        <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{detail.expectation.summary}</p>
-        <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-          <DetailFact
-            label="Expected"
-            value={detail.expectation.expectedAmount?.display ?? "Not established"}
-            note={[detail.expectation.expectedDate ? formatDay(detail.expectation.expectedDate) : null, detail.expectation.expectedAmount?.currency].filter(Boolean).join(" · ") || undefined}
-          />
-          <DetailFact
-            label="Observed"
-            value={detail.expectation.observedAmount?.display ?? "No supporting evidence yet"}
-            note={[detail.expectation.observedDate ? formatDay(detail.expectation.observedDate) : null, detail.expectation.observedAmount?.currency].filter(Boolean).join(" · ") || undefined}
-          />
-        </dl>
-        {detail.expectation.windowStart && detail.expectation.windowEnd ? (
-          <p className="mt-3 font-data text-xs text-(--muted)">
-            Window {formatDay(detail.expectation.windowStart)} to {formatDay(detail.expectation.windowEnd)}. Absence is not treated as cancellation.
-          </p>
-        ) : null}
-        {detail.expectation.reasons[0] ? (
-          <p className="mt-2 text-sm leading-6 text-(--muted)">{detail.expectation.reasons[0]}</p>
-        ) : null}
-      </section>
-
-      {detail.memory.length ? (
-        <section aria-labelledby="recovery-memory-heading" className="panel p-4 sm:p-5">
-          <h4 id="recovery-memory-heading" className="font-display text-xl font-semibold text-(--ink)">Amount history</h4>
-          <p className="mt-2 text-sm leading-6 text-(--muted)">Dated amounts from stored evidence. Original receipts are not rewritten.</p>
-          <ol className="mt-4 grid gap-2">
-            {detail.memory.map((point) => (
-              <li key={point.evidenceId} className="flex flex-wrap items-baseline justify-between gap-2 inset p-3">
-                <span className="font-data text-sm text-(--ink)">{formatDay(point.date)}</span>
-                <span className="flex flex-wrap items-baseline gap-2">
-                  <MoneyValue amount={point.amount} className="text-sm font-semibold text-(--ink)" />
-                  <span className="font-data text-xs text-(--muted)">{sourceLabels[point.sourceType]}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
-
-      {detail.overlap ? (
-        <section aria-labelledby="recovery-overlap-heading" className="panel p-4 sm:p-5">
-          <h4 id="recovery-overlap-heading" className="font-display text-xl font-semibold text-(--ink)">Possible overlap</h4>
-          <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
-            {detail.overlap.merchants.join(", ")}
-            {detail.overlap.yearlyTotals[0]
-              ? ` — ${detail.overlap.yearlyTotals.map((total) => total.amount.display).join(" and ")}/year across ${detail.overlap.merchants.length.toLocaleString("en-IN")} ${detail.overlap.label.toLowerCase()} tools.`
-              : ` share a ${detail.overlap.label.toLowerCase()} category.`}
-          </p>
-          <p className="mt-2 text-sm leading-6 text-(--muted)">
-            Sharing a category does not mean these tools are interchangeable. Tell Vognary what each is used for before Keep or Review.
-          </p>
-        </section>
-      ) : null}
-
-      <section aria-labelledby="recovery-context-heading" className="panel p-4 sm:p-5">
-        <h4 id="recovery-context-heading" className="font-display text-xl font-semibold text-(--ink)">How you use this</h4>
-        <p className="mt-2 text-sm leading-6 text-(--muted)">Optional. Answer only when it helps you decide. This does not change the receipt.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <ContextSelect
-            id="recovery-purpose"
-            label="What do you use this for?"
-            value={detail.context?.purpose ?? ""}
-            disabled={state.pending !== null}
-            options={commitmentPurposes.map((value) => [value, purposeLabels[value]] as const)}
-            onChange={(value) => {
-              if (commitmentPurposes.includes(value as typeof commitmentPurposes[number])) {
-                handlers.onSaveContext(detail.id, { purpose: value as typeof commitmentPurposes[number] });
-              }
-            }}
-          />
-          <ContextSelect
-            id="recovery-importance"
-            label="If you stop using this?"
-            value={detail.context?.importance ?? ""}
-            disabled={state.pending !== null}
-            options={commitmentImportances.map((value) => [value, importanceLabels[value]] as const)}
-            onChange={(value) => {
-              if (commitmentImportances.includes(value as typeof commitmentImportances[number])) {
-                handlers.onSaveContext(detail.id, { importance: value as typeof commitmentImportances[number] });
-              }
-            }}
-          />
-          <ContextSelect
-            id="recovery-owner"
-            label="Who owns this?"
-            value={detail.context?.owner ?? ""}
-            disabled={state.pending !== null}
-            options={commitmentOwners.map((value) => [value, ownerLabels[value]] as const)}
-            onChange={(value) => {
-              if (commitmentOwners.includes(value as typeof commitmentOwners[number])) {
-                handlers.onSaveContext(detail.id, { owner: value as typeof commitmentOwners[number] });
-              }
-            }}
-          />
-        </div>
-      </section>
-
-      <section aria-labelledby="recovery-decision-heading" className="panel p-4 sm:p-5">
-        <h4 id="recovery-decision-heading" className="font-display text-xl font-semibold text-(--ink)">What do you want to do?</h4>
-        <p className="mt-3 text-sm leading-6 text-(--ink-soft)">
-          Vognary suggests <strong>{decisionLabels[detail.recommendedDecision]}</strong>. {detail.recommendationReason}
+    <article aria-labelledby="recovery-commitment-heading" className="grid gap-6">
+      <header>
+        <button type="button" onClick={() => handlers.onSelect(null)} className="btn btn-sm btn-ghost lg:hidden">← Back</button>
+        <h3 id="recovery-commitment-heading" className="mt-3 font-display text-3xl font-semibold tracking-tight text-(--ink) lg:mt-0">
+          {detail.merchant}
+        </h3>
+        <p className="mt-2 font-data text-xl text-(--ink)">
+          {detail.amount.display}
+          <span className="text-base text-(--ink-soft)">{cadenceShortLabels[detail.cadence] || ` · ${cadenceLabels[detail.cadence]}`}</span>
         </p>
-        <p className="mt-1 text-xs leading-5 text-(--muted)">Nothing changes until you choose.</p>
-        <div role="group" aria-label="Your choice" className="mt-4 flex flex-wrap gap-2">
-          {primaryDecisions.map((decision) => {
-            const active = shown.value === decision;
-            return (
-              <button
-                key={decision}
-                type="button"
-                aria-pressed={active}
-                aria-describedby={`recovery-decision-meaning-${decision}`}
-                disabled={state.pending !== null}
-                onClick={() => handlers.onDecide(detail, decision)}
-                className={`btn btn-sm ${active ? "btn-primary" : "btn-ghost"}`}
-              >
-                {decisionLabels[decision]}
-                {active && decisionPending ? " · saving…" : ""}
-              </button>
-            );
-          })}
-        </div>
-        <details className="mt-3">
-          <summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">More choices</summary>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {secondaryDecisions.map((decision) => {
-              const active = shown.value === decision;
-              return (
-                <button
-                  key={decision}
-                  type="button"
-                  aria-pressed={active}
-                  aria-describedby={`recovery-decision-meaning-${decision}`}
-                  disabled={state.pending !== null}
-                  onClick={() => handlers.onDecide(detail, decision)}
-                  className={`btn btn-sm ${active ? "btn-primary" : "btn-ghost"}`}
-                >
-                  {decisionLabels[decision]}
-                  {active && decisionPending ? " · saving…" : ""}
-                </button>
-              );
-            })}
+        <dl className="mt-4 grid gap-1 text-sm leading-6">
+          <div className="flex flex-wrap gap-x-3">
+            <dt className="text-(--muted)">Next expected</dt>
+            <dd className="text-(--ink)">{detail.nextExpectedDate ? formatDay(detail.nextExpectedDate) : "Not enough information"}</dd>
           </div>
-        </details>
+          <div className="flex flex-wrap gap-x-3">
+            <dt className="text-(--muted)">Status</dt>
+            <dd className="text-(--ink)">{customerStatusLabels[status]}</dd>
+          </div>
+        </dl>
+        {observation ? (
+          <p className="mt-3 text-sm leading-6 text-(--ink-soft)">
+            {observation.sentence}
+            {observation.detail ? ` ${observation.detail}` : ""}
+          </p>
+        ) : null}
+      </header>
+
+      <section aria-labelledby="recovery-decision-heading">
+        <h4 id="recovery-decision-heading" className="sr-only">Decision</h4>
+        {showDecisions ? (
+          <>
+            {!needsDecision ? <p className="mb-3 text-sm leading-6 text-(--muted)">{customerPhrases.noActionNeeded}</p> : null}
+            <div role="group" aria-label="Your choice" className="flex flex-wrap gap-2">
+              {primaryDecisions.map((decision) => {
+                const active = shown.value === decision;
+                return (
+                  <button
+                    key={decision}
+                    type="button"
+                    aria-pressed={active}
+                    aria-describedby={`recovery-decision-meaning-${decision}`}
+                    disabled={state.pending !== null}
+                    onClick={() => handlers.onDecide(detail, decision)}
+                    className={`btn btn-sm ${active ? "btn-primary" : "btn-ghost"}`}
+                  >
+                    {decisionLabels[decision]}
+                    {active && decisionPending ? " · saving…" : ""}
+                  </button>
+                );
+              })}
+            </div>
+            <details className="mt-3">
+              <summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">More</summary>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {secondaryDecisions.map((decision) => {
+                  const active = shown.value === decision;
+                  return (
+                    <button
+                      key={decision}
+                      type="button"
+                      aria-pressed={active}
+                      aria-describedby={`recovery-decision-meaning-${decision}`}
+                      disabled={state.pending !== null}
+                      onClick={() => handlers.onDecide(detail, decision)}
+                      className={`btn btn-sm ${active ? "btn-primary" : "btn-ghost"}`}
+                    >
+                      {decisionLabels[decision]}
+                    </button>
+                  );
+                })}
+              </div>
+            </details>
+            {shown.value === "CANCEL" ? (
+              <p className="mt-3 text-xs leading-6 text-(--muted)">Planning to cancel records your intent. Vognary does not cancel the service.</p>
+            ) : null}
+          </>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm leading-6 text-(--muted)">{customerPhrases.noActionNeeded}</p>
+            <button type="button" onClick={() => setChangeOpen(true)} className="btn btn-sm btn-ghost">Change</button>
+          </div>
+        )}
+        {detail.decision ? (
+          <p className="mt-2 font-data text-xs text-(--muted)">Saved {decisionLabels[detail.decision.value]} on {formatMoment(detail.decision.decidedAt)}.</p>
+        ) : null}
         <ul className="sr-only">
           {decisions.map((decision) => (
             <li key={decision} id={`recovery-decision-meaning-${decision}`}>{decisionMeanings[decision]}</li>
           ))}
         </ul>
-        <p className="mt-3 text-xs leading-5 text-(--muted)">Planning to cancel records your intent; Vognary does not cancel the service.</p>
-        <p className="mt-3 font-data text-xs text-(--muted)">
-          {detail.decision
-            ? `Saved ${decisionLabels[detail.decision.value]} on ${formatMoment(detail.decision.decidedAt)} · last updated ${formatMoment(detail.decision.updatedAt)}.`
-            : "No choice has been saved for this commitment yet."}
-        </p>
       </section>
 
-      <section aria-labelledby="recovery-evidence-heading" className="panel p-4 sm:p-5">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h4 id="recovery-evidence-heading" className="font-display text-xl font-semibold text-(--ink)">Why Vognary thinks this</h4>
-          <span className="font-data text-xs text-(--muted)">
-            Showing {detail.evidence.items.length} of {detail.evidence.total}
-          </span>
-        </div>
-        {detail.evidence.items.length ? (
-          <ul className="mt-4 grid gap-3">
-            {detail.evidence.items.map((evidence) => (
-              <EvidenceRow
-                key={evidence.id}
-                evidence={evidence}
-                buttonId={`recovery-evidence-${evidence.id}`}
-                onInspect={() => handlers.onInspectEvidence(evidence, `recovery-evidence-${evidence.id}`)}
-              />
+      <DisclosureTabs
+        active={tab}
+        onChange={setTab}
+        labelledBy="recovery-commitment-heading"
+        tabs={[
+          {
+            id: "overview",
+            label: "Overview",
+            panel: (
+              <div className="grid gap-4">
+                {detail.overlap ? (
+                  <p className="text-sm leading-6 text-(--ink-soft)">
+                    Possible overlap with {detail.overlap.merchants.filter((name) => name !== detail.merchant).join(", ") || detail.overlap.label}.
+                  </p>
+                ) : null}
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <ContextSelect
+                    id="recovery-purpose"
+                    label="Purpose"
+                    value={detail.context?.purpose ?? ""}
+                    disabled={state.pending !== null}
+                    options={commitmentPurposes.map((value) => [value, purposeLabels[value]] as const)}
+                    onChange={(value) => {
+                      if (commitmentPurposes.includes(value as typeof commitmentPurposes[number])) {
+                        handlers.onSaveContext(detail.id, { purpose: value as typeof commitmentPurposes[number] });
+                      }
+                    }}
+                  />
+                  <ContextSelect
+                    id="recovery-importance"
+                    label="If you stop?"
+                    value={detail.context?.importance ?? ""}
+                    disabled={state.pending !== null}
+                    options={commitmentImportances.map((value) => [value, importanceLabels[value]] as const)}
+                    onChange={(value) => {
+                      if (commitmentImportances.includes(value as typeof commitmentImportances[number])) {
+                        handlers.onSaveContext(detail.id, { importance: value as typeof commitmentImportances[number] });
+                      }
+                    }}
+                  />
+                  <ContextSelect
+                    id="recovery-owner"
+                    label="Owner"
+                    value={detail.context?.owner ?? ""}
+                    disabled={state.pending !== null}
+                    options={commitmentOwners.map((value) => [value, ownerLabels[value]] as const)}
+                    onChange={(value) => {
+                      if (commitmentOwners.includes(value as typeof commitmentOwners[number])) {
+                        handlers.onSaveContext(detail.id, { owner: value as typeof commitmentOwners[number] });
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            ),
+          },
+          {
+            id: "history",
+            label: "History",
+            panel: detail.memory.length ? (
+              <ol className="grid gap-2">
+                {detail.memory.map((point) => (
+                  <li key={point.evidenceId} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
+                    <span className="font-data text-sm text-(--ink)">{formatDay(point.date)}</span>
+                    <span className="flex flex-wrap items-baseline gap-2">
+                      <MoneyValue amount={point.amount} className="text-sm font-semibold text-(--ink)" />
+                      <span className="font-data text-xs text-(--muted)">{sourceLabels[point.sourceType]}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-sm leading-6 text-(--muted)">No dated amounts yet.</p>
+            ),
+          },
+          {
+            id: "why",
+            label: "Why",
+            panel: (
+              <div className="grid gap-4">
+                {detail.confidence.state === "LOW" || detail.confidence.state === "UNKNOWN" ? (
+                  <p className="text-sm leading-6 text-(--ink-soft)">Not enough history yet.</p>
+                ) : null}
+                {detail.evidence.items.length ? (
+                  <ul className="grid gap-3">
+                    {detail.evidence.items.map((evidence) => (
+                      <EvidenceRow
+                        key={evidence.id}
+                        evidence={evidence}
+                        buttonId={`recovery-evidence-${evidence.id}`}
+                        onInspect={() => handlers.onInspectEvidence(evidence, `recovery-evidence-${evidence.id}`)}
+                      />
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm leading-6 text-(--muted)">No receipt excerpt is on this page yet.</p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {state.detailEvidenceCursor ? (
+                    <button type="button" onClick={() => handlers.onEvidencePage(null)} className="btn btn-sm btn-ghost">Earlier receipts</button>
+                  ) : null}
+                  {detail.evidence.nextCursor ? (
+                    <button type="button" onClick={() => handlers.onEvidencePage(detail.evidence.nextCursor)} className="btn btn-sm btn-ghost">More receipts</button>
+                  ) : null}
+                </div>
+              </div>
+            ),
+          },
+        ]}
+      />
+
+      <details>
+        <summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">{customerPhrases.somethingWrong}</summary>
+        <div className="mt-4 grid gap-3">
+          <p className="text-sm leading-6 text-(--muted)">Correct what we got wrong. The original bill is never overwritten.</p>
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(correctionFieldLabels) as CorrectionField[]).map((field) => (
+              <button
+                key={field}
+                type="button"
+                id={`recovery-correct-${field}`}
+                disabled={state.pending !== null}
+                onClick={() => handlers.onCorrect(field, `recovery-correct-${field}`)}
+                className="btn btn-sm btn-ghost"
+              >
+                Correct {correctionFieldLabels[field].toLowerCase()}
+              </button>
             ))}
-          </ul>
-        ) : (
-          <p className="mt-4 text-sm leading-6 text-(--muted)">The workspace published no evidence rows for this page.</p>
-        )}
-        <div className="mt-4 flex flex-wrap gap-2">
-          {state.detailEvidenceCursor ? (
-            <button type="button" onClick={() => handlers.onEvidencePage(null)} className="btn btn-sm btn-ghost">Back to the first page of evidence</button>
-          ) : null}
-          {detail.evidence.nextCursor ? (
-            <button type="button" onClick={() => handlers.onEvidencePage(detail.evidence.nextCursor)} className="btn btn-sm btn-ghost">Next page of evidence</button>
-          ) : null}
-        </div>
-      </section>
-
-      <section aria-labelledby="recovery-corrections-heading" className="panel p-4 sm:p-5">
-        <h4 id="recovery-corrections-heading" className="folio" data-folio="08">Corrections</h4>
-        <p className="mt-3 text-sm leading-6 text-(--muted)">Correct what the evidence got wrong. Your original evidence is never overwritten.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {(Object.keys(correctionFieldLabels) as CorrectionField[]).map((field) => (
-            <button
-              key={field}
-              type="button"
-              id={`recovery-correct-${field}`}
-              disabled={state.pending !== null}
-              onClick={() => handlers.onCorrect(field, `recovery-correct-${field}`)}
-              className="btn btn-sm btn-ghost"
-            >
-              Correct {correctionFieldLabels[field].toLowerCase()}
-            </button>
-          ))}
-        </div>
-        <div className="mt-5">
+          </div>
           <CorrectionHistory
             corrections={detail.corrections}
             onReverse={handlers.onReverseCorrection}
@@ -393,23 +410,13 @@ function CommitmentDetailPanel({ state, handlers }: { state: RecoveryState; hand
             disabled={state.pending !== null}
           />
         </div>
-      </section>
+      </details>
     </article>
   );
 }
 
 function reversingCorrectionId(pending: PendingMutation | null) {
   return pending?.kind === "CORRECTION_REVERSAL" ? pending.correctionId : null;
-}
-
-function DetailFact({ label, value, note }: { label: string; value: string; note?: string }) {
-  return (
-    <div className="inset p-3">
-      <dt className="eyebrow eyebrow-xs">{label}</dt>
-      <dd className="font-data mt-1.5 text-base font-semibold tnum text-(--ink)">{value}</dd>
-      {note ? <dd className="mt-1 font-data text-xs text-(--muted)">{note}</dd> : null}
-    </div>
-  );
 }
 
 function ContextSelect({

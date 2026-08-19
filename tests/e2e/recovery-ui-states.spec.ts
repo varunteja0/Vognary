@@ -120,78 +120,46 @@ async function mockEmptyWorkspace(page: Page, home = emptyHome) {
   return { activationCalls };
 }
 
-async function openManualFallback(page: Page) {
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
-  const receiptInput = page.getByLabel("Receipt or invoice text");
-  if (await receiptInput.isVisible()) return;
-  const addMore = page.getByText("Add more bills", { exact: true });
-  await expect(addMore).toBeVisible();
-  await addMore.click();
-  await expect(receiptInput).toBeVisible();
+async function openAddBills(page: Page) {
+  await page.getByRole("button", { name: "Add bills" }).first().click();
+  const overlay = page.getByRole("dialog", { name: "Add bills" });
+  await expect(overlay).toBeVisible();
+  await overlay.getByRole("tab", { name: "Paste text" }).click();
+  return overlay;
 }
 
-test("an empty workspace offers exactly one obvious receipt-paste action", async ({ page }) => {
+test("an empty workspace offers exactly one obvious add-bills action", async ({ page }) => {
   await signIn(page);
   const { activationCalls } = await mockEmptyWorkspace(page);
   await page.goto("/app");
 
-  await expect(page.getByRole("heading", { name: "Add a few recent software bills" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add a few recent software bills" })).toBeVisible();
-  await page.getByRole("button", { name: "Add a few recent software bills" }).click();
-
-  await expect(page.getByRole("heading", { name: "Add a few recent software bills" })).toBeVisible();
-  await expect(page.getByText("Paste 2–5 recent software bills, invoices, or billing emails.")).toBeVisible();
-  await expect(page.getByText("Prefer more than one vendor, and two records from the same vendor when you want Vognary to test a cadence.")).toBeVisible();
-  await expect(page.getByText(/Vognary reconstructs current commitments, upcoming renewals, and changes only when the evidence supports them/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save this receipt as evidence" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Save this receipt as evidence" })).toBeDisabled();
-  await expect(page.getByText("Import a text statement or email file instead (fallback)")).toBeVisible();
-  await expect(page.getByRole("button", { name: /connect|Gmail|bank account/i })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Let's review your software stack." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add bills" })).toBeVisible();
+  await expect(page.getByText("No mailbox access required.")).toBeVisible();
+  const overlay = await openAddBills(page);
+  await expect(overlay.getByRole("heading", { name: "Add bills" })).toBeVisible();
+  await expect(overlay.getByLabel("Receipt or invoice text")).toBeVisible();
+  await expect(overlay.getByRole("button", { name: "Add bills" })).toBeDisabled();
+  await expect(overlay.getByText(/connect|Gmail|bank account/i)).toHaveCount(0);
   expect(activationCalls).toEqual([]);
 });
 
 test("one observed charge asks for a matching receipt instead of rendering an all-clear", async ({ page }) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: async (text: string) => {
-          (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText = text;
-        },
-      },
-    });
-  });
   await signIn(page);
   const { activationCalls } = await mockEmptyWorkspace(page, oneObservationHome);
   await page.goto("/app");
 
-  const observed = page.getByRole("region", { name: "Build a recurring pattern" });
-  await expect(observed.getByText("Seen once")).toBeVisible();
-  await expect(observed.getByRole("heading", { name: "Not called recurring yet" })).toBeVisible();
-  await expect(observed.getByText("One charge is evidence, not a pattern.", { exact: false })).toBeVisible();
-  await expect(observed.getByRole("heading", { name: "Saved proof" })).toBeVisible();
+  const observed = page.getByRole("region", { name: "Not enough history yet" });
+  await expect(observed.getByRole("heading", { name: "Not enough history yet" })).toBeVisible();
+  await expect(observed.getByText("We saved 1 bill.")).toBeVisible();
   await expect(observed.getByText("Figma", { exact: true })).toBeVisible();
   await expect(observed.getByText("₹1,499.00", { exact: true })).toBeVisible();
-  await expect(observed.getByText("9 Aug 2026", { exact: true })).toBeVisible();
-  await expect(observed.getByRole("button", { name: "Inspect exact evidence" })).toBeVisible();
-  await expect(observed.getByRole("button", { name: "Copy summary" })).toBeVisible();
-  await expect(observed.getByText("This is a floor from receipts checked, not every software bill.")).toBeVisible();
   await expect(page.getByText("Nothing needs attention right now")).toHaveCount(0);
-
-  await observed.getByRole("button", { name: "Inspect exact evidence" }).click();
-  const evidenceDialog = page.getByRole("dialog", { name: "Exact evidence" });
-  await expect(evidenceDialog).toContainText("Figma invoice paid INR 1,499.00 on 9 August 2026.");
-  await page.keyboard.press("Escape");
-  await expect(evidenceDialog).toHaveCount(0);
-
-  await observed.getByRole("button", { name: "Copy summary" }).click();
-  await expect(observed.getByText("Summary copied.", { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => (window as typeof window & { __vognaryCopiedText?: string }).__vognaryCopiedText)).toContain("Saved receipt observation (not yet recurring): Figma · ₹1,499.00 · 9 Aug 2026.");
+  await expect(observed.getByRole("button", { name: "Add bills" })).toBeVisible();
   await expectNoSeriousAxeViolations(page, "one-observation Home");
 
-  await observed.getByRole("button", { name: "Add a matching receipt" }).click();
-  await expect(page.getByRole("heading", { name: "Sources", exact: true })).toBeVisible();
-  await expect(page.getByLabel("Receipt or invoice text")).toBeVisible();
+  await observed.getByRole("button", { name: "Add bills" }).click();
+  await expect(page.getByRole("dialog", { name: "Add bills" })).toBeVisible();
   expect(activationCalls).toEqual([]);
 });
 
@@ -259,23 +227,16 @@ test("receipt onboarding shows proven forwarding, backfill, and sender trust", a
 
   await page.goto("/app");
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
-  await expect(page.getByRole("heading", { name: "Set up billing forwarding once" })).toBeVisible();
-  await expect(page.getByText("Gmail address verified")).toBeVisible();
-  await expect(page.getByText("First matching billing email received")).toBeVisible();
-  await expect(page.getByText("Historical backfill complete")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Stay up to date" })).toBeVisible();
+  await expect(page.getByText("Status: On")).toBeVisible();
+  await page.getByText("Older bills", { exact: true }).click();
   await expect(page.getByRole("link", { name: "Google's forwarding instructions" })).toHaveAttribute("href", /answer\/10957/);
   await expect(page.getByRole("link", { name: "Google's filter instructions" })).toHaveAttribute("href", /answer\/6579/);
   await expect(page.getByRole("link", { name: "Google's attachment instructions" })).toHaveAttribute("href", /answer\/9261412/);
   await expectNoSeriousAxeViolations(page, "receipt onboarding");
 
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Home" }).click();
-  await page.getByRole("button", { name: "Inspect exact evidence" }).click();
-  const evidenceDialog = page.getByRole("dialog", { name: "Exact evidence" });
-  await expect(evidenceDialog.getByText("Sender authentication")).toBeVisible();
-  await expect(evidenceDialog.getByText("Verified by the receiving provider")).toBeVisible();
-  await expect(evidenceDialog.getByText("Sender domain: figma.com")).toBeVisible();
-  await expect(evidenceDialog.getByText("Receiving authority: amazonses.com")).toBeVisible();
-  await expectNoSeriousAxeViolations(page, "sender trust inspector");
+  await expect(page.getByRole("heading", { name: "Not enough history yet" })).toBeVisible();
 });
 
 async function expectNoSeriousAxeViolations(page: Page, label: string) {
@@ -314,19 +275,18 @@ test("submitted evidence reports accepted, invalid, unreadable, and duplicate re
     }),
   );
   await page.goto("/app");
-  await openManualFallback(page);
+  const overlay = await openAddBills(page);
 
-  await page.getByLabel("Receipt or invoice text").fill("OpenAI invoice paid INR 1,999 on 2026-07-06. Renews monthly.");
-  await page.getByRole("button", { name: "Save this receipt as evidence" }).click();
+  await overlay.getByLabel("Receipt or invoice text").fill("OpenAI invoice paid INR 1,999 on 2026-07-06. Renews monthly.");
+  await overlay.getByRole("button", { name: "Add bills" }).click();
 
-  const receipt = page.getByRole("region", { name: "What the workspace did with it" });
+  const receipt = overlay.getByRole("region", { name: "What happened" });
   await expect(receipt).toBeVisible();
-  await expect(receipt.getByText("Accepted", { exact: true })).toBeVisible();
-  await expect(receipt.getByText("Nothing could be read")).toBeVisible();
-  await expect(receipt.getByText("Already submitted")).toBeVisible();
-  await expect(receipt.getByText("Evidence not accepted")).toBeVisible();
-  await expect(receipt.getByText("No merchant, amount, and date were found.")).toBeVisible();
-  await expect(page.getByLabel("Receipt or invoice text")).toHaveValue(/OpenAI invoice/);
+  await expect(receipt.getByText("1 bill was saved.")).toBeVisible();
+  await expect(receipt.getByText("We couldn't read this invoice.")).toBeVisible();
+  await expect(receipt.getByText("Already added")).toBeVisible();
+  await expect(receipt.getByText("This invoice couldn't be read.")).toBeVisible();
+  await expect(overlay.getByLabel("Receipt or invoice text")).toHaveValue(/OpenAI invoice/);
 });
 
 test("an unreachable saved workspace is stated plainly and never faked", async ({ page }) => {
@@ -345,6 +305,7 @@ test("an unreachable saved workspace is stated plainly and never faked", async (
 
   await expect(page.getByText("Saved workspace unavailable")).toBeVisible();
   await expect(page.getByText("Your saved workspace could not be reached. Nothing was changed.")).toBeVisible();
+  await page.getByText("Technical details").click();
   await expect(page.getByText(/reference request-db/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   await expect(page.getByText("₹")).toHaveCount(0);
@@ -369,7 +330,7 @@ test("going offline is stated before any action is attempted", async ({ page }) 
   await signIn(page);
   await mockEmptyWorkspace(page);
   await page.goto("/app");
-  await openManualFallback(page);
+  await openAddBills(page);
 
   await page.context().setOffline(true);
   await expect(page.getByText("This device is offline")).toBeVisible();
@@ -390,4 +351,60 @@ test("account access leaves Recovery for the canonical profile route", async ({ 
   await account.press("Enter");
   await expect(page).toHaveURL(/\/profile$/);
   await expect(page.getByRole("heading", { level: 1, name: "Account Settings" })).toBeVisible();
+});
+
+test("empty Home and the add-bills overlay fit a 390px phone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page);
+  await mockEmptyWorkspace(page);
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: "Let's review your software stack." })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await page.getByRole("button", { name: "Add bills" }).click();
+  const overlay = page.getByRole("dialog", { name: "Add bills" });
+  await expect(overlay.getByText("Drop invoices or receipts here")).toBeVisible();
+  await overlay.getByRole("tab", { name: "Paste text" }).click();
+  await expect(overlay.getByLabel("Receipt or invoice text")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await expectNoSeriousAxeViolations(page, "390px empty Home overlay");
+});
+
+test("Gmail wizard step 1 fits a 390px phone", async ({ page }) => {
+  test.skip(!receiptInboxE2e, "receipt inbox E2E environment not configured");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page);
+  await mockEmptyWorkspace(page);
+  await page.route("**/api/workspaces/current/sources", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      data: {
+        state: "WAITING",
+        alias: {
+          id: "11111111-1111-4111-8111-111111111111",
+          status: "ACTIVE",
+          address: "rcpt_0123456789abcdef0123456789abcdef01234567@receipts.vognary.test",
+          createdAt: "2026-08-10T10:00:00.000Z",
+          rotatedAt: null,
+          revokedAt: null,
+        },
+        lastReceivedAt: null,
+        lastProcessedAt: null,
+        lastFailureCode: null,
+        setupCompletedAt: null,
+        forwardingVerifiedAt: null,
+        backfillCompletedAt: null,
+        gmailVerification: null,
+      },
+      meta,
+    }),
+  }));
+  await page.goto("/app");
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await expect(page.getByRole("heading", { name: "Stay up to date" })).toBeVisible();
+  await page.getByRole("button", { name: "Continue setup" }).click();
+  await expect(page.getByRole("heading", { name: "Verify your private Vognary address" })).toBeVisible();
+  await expect(page.getByText("Step 1 of 3")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await expectNoSeriousAxeViolations(page, "390px Gmail wizard step 1");
 });

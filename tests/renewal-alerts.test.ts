@@ -86,7 +86,7 @@ test("reminder UI never presents eligibility or preference state as delivery pro
   const home = source("src/app/workspace/recovery/recovery-home.tsx");
   const profile = source("src/app/profile/profile-sections.tsx");
 
-  assert.match(home, /Eligible for an opt-in reminder/);
+  assert.doesNotMatch(home, /Eligible for an opt-in reminder/);
   assert.doesNotMatch(home, /Reminder active|Vognary emails you/);
   assert.match(profile, /When enabled, a Monday digest is scheduled/);
   assert.doesNotMatch(profile, /Sent on Monday/);

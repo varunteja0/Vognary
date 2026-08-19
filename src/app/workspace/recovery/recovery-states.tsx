@@ -52,16 +52,19 @@ export function FailureBlock({ failure, children }: { failure: RecoveryFailure; 
     <div className="inset border border-ember p-4 sm:p-5" role="alert">
       <p className="eyebrow eyebrow-xs text-ember">{copy.title}</p>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-(--ink-soft)">{copy.detail}</p>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Reported message: {error.message}</p>
       {error.code === "STALE_STATE" ? (
         <p className="mt-2 font-data text-xs text-(--muted)">The saved workspace is at version {error.currentVersion}.</p>
       ) : null}
       {error.code === "RATE_LIMITED" ? (
         <p className="mt-2 font-data text-xs text-(--muted)">Retry after {error.retryAfterSeconds} seconds.</p>
       ) : null}
-      <p className="mt-2 font-data text-xs text-(--muted)">
-        {origin === "SERVER" ? "Raised by the workspace" : "Raised on this device before the workspace answered"} · reference {error.requestId} · {error.retryable ? "safe to retry" : "retrying will not help"}
-      </p>
+      <details className="mt-2">
+        <summary className="cursor-pointer font-data text-xs text-(--muted)">Technical details</summary>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Reported message: {error.message}</p>
+        <p className="mt-2 font-data text-xs text-(--muted)">
+          {origin === "SERVER" ? "Raised by the workspace" : "Raised on this device before the workspace answered"} · reference {error.requestId} · {error.retryable ? "safe to retry" : "retrying will not help"}
+        </p>
+      </details>
       {children ? <div className="mt-4 flex flex-wrap gap-2">{children}</div> : null}
     </div>
   );

@@ -33,11 +33,11 @@ export const decisionLabels: Record<Decision, string> = {
 };
 
 export const decisionMeanings: Record<Decision, string> = {
-  KEEP: "No current evidence suggests this needs attention.",
-  MONITOR: "Mark this for review. Nothing is cancelled.",
-  DOWNGRADE: "Keep the service but consider moving to a cheaper plan.",
-  CANCEL: "Record that you plan to cancel it at the service itself.",
-  INVESTIGATE: "Mark this for review because you do not recognize it.",
+  KEEP: "No action needed.",
+  MONITOR: "Look at this before the next bill. Nothing is cancelled.",
+  DOWNGRADE: "Keep the service, but consider a cheaper plan.",
+  CANCEL: "Record that you plan to cancel it yourself. Vognary does not cancel it.",
+  INVESTIGATE: "Flag this because you do not recognize it.",
 };
 
 export const decisionStamps: Record<Decision, string> = {
@@ -92,8 +92,8 @@ export const cadenceLabels: Record<Cadence, string> = {
 };
 
 export const sourceLabels: Record<SourceType, string> = {
-  RECEIPT_PASTE: "Pasted receipt",
-  CSV_IMPORT: "Imported statement file",
+  RECEIPT_PASTE: "Pasted bill",
+  CSV_IMPORT: "Uploaded file",
   FORWARDED_EMAIL: "Forwarded email",
   GMAIL_OAUTH: "Gmail (not yet proven)",
 };
@@ -111,10 +111,10 @@ export const confidenceLabels: Record<ConfidenceState, string> = {
 };
 
 export const confidenceUncertainty: Record<ConfidenceState, string> = {
-  HIGH: "Still only as complete as the evidence you gave.",
-  MEDIUM: "Treat the amount and date as provisional until more evidence lands.",
-  LOW: "Check this against your own record before acting on it.",
-  UNKNOWN: "No confidence was established for this. Do not treat it as settled.",
+  HIGH: "This matches the bills you added.",
+  MEDIUM: "Treat the amount and date as an estimate until another bill arrives.",
+  LOW: "Not enough history yet. Check this against your own record.",
+  UNKNOWN: "Not enough information yet.",
 };
 
 export const confidenceTruthLayerLabels: Record<ConfidenceTruthLayer, string> = {
@@ -125,11 +125,11 @@ export const confidenceTruthLayerLabels: Record<ConfidenceTruthLayer, string> = 
 };
 
 export const expectedVsObservedLabels: Record<ExpectedVsObservedStatus, string> = {
-  MATCHED: "Matched",
+  MATCHED: "On track",
   AMOUNT_CHANGED: "Amount changed",
   ARRIVED_LATE: "Arrived later than expected",
-  NOT_YET_OBSERVED: "Not yet observed",
-  CANNOT_EVALUATE: "Cannot evaluate",
+  NOT_YET_OBSERVED: "We haven't seen it yet",
+  CANNOT_EVALUATE: "We can't check this yet",
   INSUFFICIENT_HISTORY: "Not enough history",
 };
 
@@ -137,7 +137,7 @@ export const correctionFieldLabels: Record<CorrectionField, string> = {
   MERCHANT: "Merchant",
   AMOUNT: "Amount",
   NEXT_EXPECTED_DATE: "Expected date",
-  CADENCE: "Cadence",
+  CADENCE: "How often",
   IS_RECURRING: "Recurring or not",
 };
 
@@ -152,16 +152,16 @@ export const changeKindLabels: Record<ChangeKind, string> = {
   MERCHANT: "Merchant changed",
   AMOUNT: "Amount changed",
   DATE: "Date changed",
-  CADENCE: "Cadence changed",
+  CADENCE: "How often changed",
   RECURRING_CLASSIFICATION: "Recurring classification changed",
 };
 
 export const attentionReasonLabels: Record<AttentionReason, string> = {
-  DECISION_REQUIRED: "Decision required",
-  RENEWS_SOON: "Renews soon",
-  LOW_CONFIDENCE: "Low confidence",
-  PRICE_INCREASE: "Price increase",
-  EVIDENCE_CONFLICT: "Evidence conflict",
+  DECISION_REQUIRED: "Needs attention",
+  RENEWS_SOON: "Coming up",
+  LOW_CONFIDENCE: "Not enough information",
+  PRICE_INCREASE: "Price changed",
+  EVIDENCE_CONFLICT: "Needs attention",
 };
 
 export const priorityLabels: Record<AttentionItemDto["priority"], string> = {
@@ -187,8 +187,8 @@ export const coverageMeanings: Record<CoverageState, string> = {
 };
 
 export const provenanceLabels: Record<EvidenceProvenanceKind, string> = {
-  USER_SUBMITTED: "You submitted this evidence",
-  PROVIDER_RECEIVED: "Received through your Vognary receipt address",
+  USER_SUBMITTED: "You added this",
+  PROVIDER_RECEIVED: "Arrived at your Vognary address",
 };
 
 export const projectionAmountProvenanceLabels: Record<ProjectionAmountProvenance, string> = {
@@ -200,15 +200,15 @@ export const errorCopy: Record<RecoveryErrorCode, { title: string; detail: strin
   AUTH_REQUIRED: { title: "Sign in required", detail: "This workspace is not open on this device. Sign in to continue." },
   FORBIDDEN: { title: "Not permitted", detail: "This account is not allowed to open this workspace." },
   NOT_FOUND: { title: "Not found", detail: "That item is no longer in this workspace." },
-  INVALID_EVIDENCE: { title: "Evidence not accepted", detail: "This text was not accepted as evidence. Nothing was saved." },
-  PARSE_FAILED: { title: "Nothing could be read", detail: "No merchant, amount, and date could be read from this evidence." },
-  DUPLICATE_EVIDENCE: { title: "Already submitted", detail: "This exact evidence is already in your workspace. It was not added twice." },
+  INVALID_EVIDENCE: { title: "This invoice couldn't be read.", detail: "Nothing was saved. Try another file or paste the receipt text." },
+  PARSE_FAILED: { title: "We couldn't read this invoice.", detail: "Try another file or paste the receipt text." },
+  DUPLICATE_EVIDENCE: { title: "Already added", detail: "This exact bill is already in your workspace. It was not added twice." },
   DATABASE_UNAVAILABLE: { title: "Saved workspace unavailable", detail: "Your saved workspace could not be reached. Nothing was changed." },
   CONFLICT: { title: "Conflicting change", detail: "Another change landed first. Reload before retrying." },
   STALE_STATE: { title: "This page is behind", detail: "The workspace moved on while this page was open. Reload to continue." },
   SAVE_FAILED: { title: "Not saved", detail: "The change did not save. Nothing was changed." },
   REQUEST_TOO_LARGE: { title: "Too much at once", detail: "This submission is larger than the accepted limit. Send less at a time." },
-  UNSUPPORTED_MEDIA_TYPE: { title: "Format not accepted", detail: "This format is not accepted as evidence." },
+  UNSUPPORTED_MEDIA_TYPE: { title: "This file type isn't supported.", detail: "Use a text-based PDF, CSV, TXT, or spreadsheet." },
   FEATURE_UNAVAILABLE: { title: "Not available yet", detail: "This feature is not active for this deployment." },
   RATE_LIMITED: { title: "Too many requests", detail: "Too many requests were sent. Wait before retrying." },
   UNKNOWN: { title: "Unexplained failure", detail: "The workspace returned a failure it did not explain. Nothing is assumed about your money." },

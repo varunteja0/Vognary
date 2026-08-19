@@ -51,7 +51,7 @@ import {
 import { recoveryViewLabels, recoveryViews } from "../src/app/workspace/recovery/state";
 
 const recoveryDir = "src/app/workspace/recovery";
-const recoveryFiles = readdirSync(recoveryDir).filter((file) => file.endsWith(".ts") || file.endsWith(".tsx"));
+const recoveryFiles = readdirSync(recoveryDir, { recursive: true }).filter((file): file is string => typeof file === "string" && (file.endsWith(".ts") || file.endsWith(".tsx")));
 const sourceOf = (file: string) => readFileSync(`${recoveryDir}/${file}`, "utf8");
 const allSource = recoveryFiles.map(sourceOf).join("\n");
 const homeSource = sourceOf("recovery-home.tsx");
@@ -115,35 +115,28 @@ test("primary navigation keeps Mandate hidden until delivery is proven or author
 });
 
 test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
-  for (const source of [landingSource, loginSource, homeSource]) {
-    assert.match(source, /billing receipts you already have/);
-  }
+  assert.match(landingSource, /billing receipts you already have/);
   assert.match(landingSource, /what renews next/);
   assert.match(loginSource, /what renews next/);
-  assert.match(homeSource, /upcoming renewals and changes from the evidence/);
+  assert.match(allSource, /Let's review your software stack/);
+  assert.match(allSource, /Add a few recent software bills/);
   assert.doesNotMatch(landingSource, /Want it done for you\?/);
   assert.doesNotMatch(landingSource, /href="\/private-audit"/);
-  assert.match(clientSource, /Your commitments/);
+  assert.match(clientSource, />Vognary</);
   assert.match(landingSource, /No bank passwords\. No mailbox access\. You choose which billing text to add\./);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
   assert.doesNotMatch(landingSource, /Set up billing forwarding once so matching mail keeps arriving/);
 });
 
-test("home leads with action, only shows real changes, and keeps source freshness compact", () => {
-  for (const heading of ["What we found", "Decisions worth reviewing", "Needs attention", "Since your last visit", "Coming up", "Currently committed", "Receipts checked"]) {
+test("home leads with attention, upcoming money, and a cited spend picture", () => {
+  for (const heading of ["Needs attention", "Coming up", "Recent change"]) {
     assert.ok(homeSource.includes(heading), `home must render ${heading}`);
   }
-  for (const label of ["Monthly recurring amount", "Annualized estimate", "Next 30 days", "Active commitments", "Needs review"]) {
-    assert.ok(homeSource.includes(label), `home must render ${label}`);
-  }
-  assert.match(homeSource, /home\.annualizedEstimateTotals/);
+  assert.doesNotMatch(homeSource, /What we found/);
+  assert.doesNotMatch(homeSource, /Currently committed/);
+  assert.doesNotMatch(homeSource, /Receipts checked/);
+  assert.doesNotMatch(homeSource, /Annualized estimate/);
   assert.match(homeSource, /home\.activeCommitmentCount/);
-  assert.match(homeSource, /home\.reviewItemCount/);
-  assert.match(homeSource, /12 × the cited monthly equivalent from receipts\. It is not a historical yearly total\./);
-  assert.match(homeSource, /12 × the cited monthly equivalent, including a saved correction\. It is not a historical yearly total\./);
-  assert.match(homeSource, /projectionAmountProvenanceLabels\[total\.provenance\]/);
-  assert.equal(projectionAmountProvenanceLabels.RECEIPT, "From checked receipts only.");
-  assert.equal(projectionAmountProvenanceLabels.USER_CORRECTED, "Includes a saved correction.");
   assert.match(homeSource, /onCitedPictureRendered/);
   assert.match(homeSource, /hasCitedRecurringSpendPicture/);
   assert.match(clientSource, /recordCitedPictureActivationWithRetry/);
@@ -152,76 +145,43 @@ test("home leads with action, only shows real changes, and keeps source freshnes
   assert.match(clientSource, /onCitedPictureRendered=/);
   assert.doesNotMatch(addEvidenceSource, /recordWorkspaceActivation|onCitedPictureRendered/);
   assert.doesNotMatch(sourcesSource, /recordWorkspaceActivation|onCitedPictureRendered/);
-  assert.match(homeSource, /RecoveryFirstValueMetrics/);
-  assert.match(homeSource, /RecoveryProjectionDetails/);
+  assert.match(homeSource, /SpendHero/);
   assert.match(homeSource, /<RecoveryAttention/);
-  const populatedHome = homeSource.slice(homeSource.indexOf("<WhatWeFound"));
-  const lastVisitIndex = populatedHome.indexOf('aria-labelledby="recovery-changed"');
-  const graphChangesIndex = populatedHome.indexOf("<RecoveryAttention");
-  const populatedNeedsAttentionIndex = populatedHome.indexOf('aria-labelledby="recovery-needs-me"');
-  assert.ok(lastVisitIndex >= 0 && lastVisitIndex < graphChangesIndex, "returning-user last-visit changes must lead graph-backed What changed");
-  assert.ok(graphChangesIndex >= 0 && graphChangesIndex < populatedNeedsAttentionIndex, "graph-backed What changed must lead Needs attention");
-  const needsAttentionIndex = homeSource.indexOf('aria-labelledby="recovery-needs-me"');
-  const secondaryProjectionIndexes = [...homeSource.matchAll(/<RecoveryProjectionDetails/g)].map((match) => match.index);
+  const quietHome = homeSource.slice(homeSource.indexOf("className=\"stack-page\""));
+  assert.ok(quietHome.indexOf("<NeedsAttention") < quietHome.indexOf("<ComingUp"), "Needs attention must lead Coming up");
   assert.ok(
-    secondaryProjectionIndexes.some((index) => index > needsAttentionIndex),
-    "Needs attention must appear before annualized and next-30 secondary figures",
-  );
-  assert.ok(
-    homeSource.indexOf("<RecoveryAutopilotHome") < homeSource.indexOf("<RecoveryFirstValueMetrics"),
+    homeSource.indexOf("<RecoveryAutopilotHome") < homeSource.indexOf("<SpendHero"),
     "active Autopilot actions must render above cited spend metrics",
   );
-  assert.match(homeSource, /coverageLabels\[home\.coverage\.state\]/);
-  assert.match(homeSource, /coverageMeanings\[home\.coverage\.state\]/);
-  const mandateBranch = homeSource.slice(
-    homeSource.indexOf("home.autopilot?.mandate?.status === \"ACTIVE\""),
-    homeSource.indexOf("if (home.coverage.evidenceCount > 0 && commitmentTotal === 0)"),
-  );
-  assert.match(mandateBranch, /UpcomingTimeline/);
-  assert.match(mandateBranch, /home=\{home\}/);
   assert.match(homeSource, /Coming up/);
   assert.match(homeSource, /home\.next/);
-  const metricsFn = homeSource.slice(homeSource.indexOf("function RecoveryFirstValueMetrics"));
-  assert.match(metricsFn, /No recurring amount yet/);
-  assert.doesNotMatch(
-    metricsFn,
-    /if \(!hasTotals\) return null/,
-    "an active mandate must still publish Monthly recurring amount when no recurring amount is cited",
-  );
-  assert.match(homeSource, /home\.changed\.state === "COMPARED"/);
+  assert.match(homeSource, /No recurring amount yet/);
+  assert.match(homeSource, /shouldShowRecentChange/);
   assert.doesNotMatch(homeSource, /WHAT NEEDS ME\?|WHAT CHANGED\?|WHAT HAPPENS NEXT\?|COVERAGE/);
   assert.doesNotMatch(homeSource, /TotalsStrip|Server totals|Compared version|No prior baseline/);
-  assert.match(homeSource, /onInspectEvidence/);
-  assert.match(homeSource, /item\.evidenceIds\[0\]/);
-  assert.match(homeSource, /item\.provenance\.evidenceIds\[0\]/);
   assert.match(clientSource, /transport\.evidence\(/);
 });
 
-test("returning Home leads with last-visit changes, then graph-backed changes, and exports only the Recovery projection", () => {
-  const populatedHome = homeSource.slice(homeSource.indexOf("<WhatWeFound"));
-  assert.ok(populatedHome.indexOf("Since your last visit") < populatedHome.indexOf("<RecoveryAttention"));
-  assert.ok(populatedHome.indexOf("<RecoveryAttention") < populatedHome.indexOf("Needs attention"));
-  assert.match(homeSource, /Keep this current/);
+test("returning Home stays quiet unless a real change or attention item exists", () => {
+  assert.match(allSource, /Keep Vognary current/);
   assert.doesNotMatch(homeSource, /Sheets go stale when new charges land/);
-  assert.match(homeSource, /This is a floor from receipts checked, not every software bill\./);
-  assert.match(homeSource, /home\.confidenceLayers/);
-  assert.match(homeSource, /confidenceTruthLayerLabels\[layer\.layer\]/);
+  assert.doesNotMatch(homeSource, /This is a floor from receipts checked, not every software bill\./);
+  assert.doesNotMatch(homeSource, /home\.confidenceLayers/);
   assert.equal(confidenceLabels.HIGH, "Confirmed");
   assert.equal(confidenceLabels.MEDIUM, "Likely");
   assert.equal(confidenceLabels.LOW, "Needs review");
   assert.equal(confidenceLabels.UNKNOWN, "Unknown");
-  assert.match(homeSource, /listed twice/);
-  assert.match(homeSource, /renderRecoveryShareText\(home\)/);
-  assert.match(homeSource, /Copy summary/);
+  assert.doesNotMatch(homeSource, /renderRecoveryShareText\(home\)/);
+  assert.doesNotMatch(homeSource, /Copy summary/);
   assert.doesNotMatch(homeSource, /renderAuditReportShareText|buildAuditReport/);
 });
 
 test("an empty Home leads with adding bills, not Gmail setup", () => {
   assert.match(clientSource, /void loadSources\(\)/);
   assert.match(clientSource, /receiptInbox=\{state\.receiptInbox\}/);
-  assert.match(homeSource, /Add a few recent software bills/);
-  assert.match(homeSource, /reconstruct your current commitments, upcoming renewals and changes/);
-  assert.match(homeSource, /Keep Vognary current later/);
+  assert.match(allSource, /Let's review your software stack/);
+  assert.match(allSource, /Add a few recent software bills/);
+  assert.match(allSource, /No mailbox access required/);
   assert.match(clientSource, /onOpenSources=/);
   assert.doesNotMatch(homeSource, /Finish one-time billing setup/);
   assert.doesNotMatch(homeSource, /Set up receipt address/);
@@ -237,35 +197,23 @@ test("canonical Recovery advertises the receipt inbox only behind public launch 
   assert.match(clientSource, /if \(!receiptInboxPubliclyAvailable\) return/);
   assert.match(homeSource, /receiptInboxPubliclyAvailable/);
   assert.match(sourcesSource, /if \(!receiptInboxPubliclyAvailable\)/);
-  assert.match(sourcesSource, /Manual evidence only/);
+  assert.match(sourcesSource, /Automatic forwarding is not available yet/);
 });
 
 test("one observation is coached toward a second matching receipt instead of rendering a false all-clear", () => {
   assert.match(clientSource, /commitmentTotal=\{state\.commitmentTotal\}/);
   assert.match(homeSource, /home\.coverage\.evidenceCount > 0 && commitmentTotal === 0/);
   for (const copy of [
-    "Seen once",
-    "Saved proof",
-    "Not called recurring yet",
-    "Add a matching receipt",
-    "One charge is evidence, not a pattern",
-    "Inspect exact evidence",
-    "Copy summary",
-    "This is a floor from receipts checked, not every software bill.",
+    "Not enough history yet",
+    "Add another from the same tool",
   ]) {
     assert.ok(homeSource.includes(copy), `one-observation Home must render ${copy}`);
   }
   assert.match(homeSource, /home\.recentObservations\.map/);
   assert.match(homeSource, /observation\.merchant/);
   assert.match(homeSource, /observation\.amount/);
-  assert.match(homeSource, /observation\.date/);
-  for (const step of [
-    "Paste 2–5 recent software bills, invoices, or billing emails",
-    "Prefer more than one vendor, and two records from the same vendor",
-    "Vognary reconstructs current commitments, upcoming renewals, and changes only when the evidence supports them",
-  ]) {
-    assert.ok(addEvidenceSource.includes(step), `first-value guide must render ${step}`);
-  }
+  assert.match(allSource, /Drop invoices or receipts here/);
+  assert.match(addEvidenceSource, /Paste text/);
 });
 
 test("commitments use ordinary language and three primary choices", () => {
@@ -277,58 +225,40 @@ test("commitments use ordinary language and three primary choices", () => {
     INVESTIGATE: "I don’t recognize this",
   });
   assert.match(commitmentsSource, /const primaryDecisions = \["KEEP", "CANCEL", "MONITOR"\]/);
-  assert.match(commitmentsSource, /What do you want to do\?/);
-  assert.match(commitmentsSource, /Planning to cancel records your intent; Vognary does not cancel the service\./);
-  assert.match(commitmentsSource, /Why Vognary thinks this/);
-  assert.match(commitmentsSource, /Expected vs observed/);
-  assert.match(commitmentsSource, /Amount history/);
-  assert.match(commitmentsSource, /Absence is not treated as cancellation/);
-  assert.match(commitmentsSource, /detail\.expectation/);
+  assert.match(commitmentsSource, /Planning to cancel records your intent/);
+  assert.match(commitmentsSource, /label: "Why"/);
+  assert.match(commitmentsSource, /presentExpectedObservation/);
   assert.match(commitmentsSource, /detail\.memory/);
   assert.doesNotMatch(commitmentsSource, />Your decision</);
   assert.doesNotMatch(commitmentsSource, />Evidence behind this</);
+  assert.doesNotMatch(commitmentsSource, /Suggested:/);
 });
 
-test("Sources keeps forwarding as stay-current infrastructure and paste as the empty-workspace first action", () => {
+test("Sources keeps forwarding as stay-current infrastructure and paste as a manual action", () => {
   assert.ok(recoveryFiles.includes("recovery-sources.tsx"), "Recovery Sources view must exist");
   const sourcesSource = sourceOf("recovery-sources.tsx");
   for (const copy of [
-    "Your Vognary receipt address",
-    "Vognary never accesses or scans your inbox",
-    "Create receipt address",
-    "Waiting for a receipt",
-    "Receipt received",
-    "Looking for renewals",
-    "Matching billing mail should arrive on its own",
+    "Stay up to date",
+    "Private billing inbox",
+    "Add a bill manually",
     "Rotate address",
     "Stop receiving",
-    "Add more bills",
-    "Keep Vognary current",
-    "How Vognary stays current",
-    "If Gmail sends a confirmation challenge",
-    "Other inboxes and banks are not offered in this release",
+    "Disconnect source",
+    "Reconnect source",
   ]) {
-    assert.ok(sourcesSource.includes(copy), `Sources must render ${copy}`);
+    assert.ok(allSource.includes(copy), `Sources must render ${copy}`);
   }
   assert.doesNotMatch(sourcesSource, /Sources are sensors/);
   assert.doesNotMatch(sourcesSource, /gmailOauthReady:\s*true/);
-  assert.match(sourcesSource, /availability === "SETUP" \? "pill pill-partial"/);
   assert.doesNotMatch(sourcesSource, /Connect Google|Connect Gmail|Connect Microsoft|Connect Zoho/i);
   assert.match(clientSource, /<RecoverySources/);
   assert.match(clientSource, /firstValue=\{workspaceEmpty\}/);
-  assert.match(clientSource, /keepCurrentOpen=\{keepCurrentOpen\}/);
   assert.match(clientSource, /onDisconnectEvidenceSource/);
   assert.match(clientSource, /onReconnectEvidenceSource/);
-  assert.match(sourcesSource, /Disconnect source/);
-  assert.match(sourcesSource, /Reconnect source/);
-  assert.match(sourcesSource, /stops it supporting future facts/);
-  assert.match(sourcesSource, /does not rotate the receipt address/);
-  assert.doesNotMatch(sourcesSource, /Nothing is connected|does not currently surface|do not use this address/i);
-  assert.match(clientSource, /manualFallback=\{/);
+  assert.match(clientSource, /ADD_BILLS_OPENED/);
   assert.match(clientSource, /window\.setInterval\(\(\) => void loadSources\(\), 10_000\)/);
   assert.match(clientSource, /state\.sourceStatus\.kind === "READY" && state\.refreshRequired[\s\S]*void loadSnapshot\(\)/);
   assert.match(clientSource, /state\.receiptInbox\?\.alias/);
-  assert.match(sourcesSource, /Source update failed/);
   assert.match(inboundStoreSource, /and \(\$2::uuid is null or alias_id = \$2\)/);
   assert.doesNotMatch(clientSource, /workspaceEmpty && state\.view === "HOME"/);
 });
@@ -336,28 +266,20 @@ test("Sources keeps forwarding as stay-current infrastructure and paste as the e
 test("Sources carries a user through billing-only forwarding and historical backfill", () => {
   const onboarding = `${sourcesSource}\n${billingSetupSource}`;
   for (const copy of [
-    "Address ready",
-    "Verify the forwarding address",
-    "Keep global forwarding disabled",
-    "Create one billing-only Gmail filter",
-    "Forward it to",
-    "Filters affect new matching mail only",
+    "Verify your private Vognary address",
+    "Confirm Google's request",
+    "Create a billing-only filter",
+    "Leave &quot;Forward a copy of incoming mail to&quot; off",
+    "Copy Gmail search",
     "Forward as attachment",
     "batches of up to 20",
-    "Gmail address verified",
-    "First matching billing email received",
-    "Historical backfill complete",
-    "Copy Gmail search",
+    "Using Outlook?",
   ]) {
     assert.ok(onboarding.includes(copy), `Sources onboarding must render ${copy}`);
   }
-  assert.match(billingSetupSource, /receiptInbox\.setupCompletedAt/);
-  assert.match(billingSetupSource, /receiptInbox\.forwardingVerifiedAt/);
-  assert.match(billingSetupSource, /receiptInbox\.backfillCompletedAt/);
   assert.match(billingSetupSource, /gmailForwardingHelpUrl|answer\/10957/);
   assert.match(billingSetupSource, /gmailFilterHelpUrl|answer\/6579/);
   assert.match(billingSetupSource, /gmailAttachmentHelpUrl|answer\/9261412/);
-  assert.match(billingSetupSource, /Leave &quot;Forward a copy of incoming mail to&quot; off/);
   assert.doesNotMatch(onboarding, /For each known billing sender/);
   assert.doesNotMatch(onboarding, /Forward billing emails manually, or use Gmail/);
 });

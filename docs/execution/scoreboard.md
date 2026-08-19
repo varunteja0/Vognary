@@ -10,7 +10,7 @@
 | Wedge sharpness | 8 | 2026-07-21 | Strategy review |
 | Intelligence engine | 6 | 2026-07-21 | Engines strong; corpus empty |
 | Trust & honesty | 9 | 2026-07-21 | Claims CI + fail-closed design |
-| Product UX | 8 | 2026-08-19 | B2B landing promise is committed-to-pay-next plus attention before the card fires. Value-first 2–5 bill scan. Quiet KEEP unless a cited reason exists. Sequential same-vendor receipts collapse to one commitment in unit/postgres tests. Real-human <3 min remains unmeasured |
+| Product UX | 8 | 2026-08-19 | B2B landing promise is committed-to-pay-next plus attention before the card fires. Signed-in IA is Home / Commitments / Sources with an add-bills overlay (PDF dropzone + paste). Quiet KEEP unless a cited reason exists. Sequential same-vendor receipts collapse to one commitment in unit/postgres tests. Real-human <3 min remains unmeasured |
 | Backend readiness | 8 | 2026-07-21 | SLOs met in production |
 | Production activation | 7 | 2026-08-19 | Code schema through `0054`. Durable R2 backup GET-restore remains proven at `0053` by GitHub run `32109925496`. Inbox processing is on (unsigned inbound 401). Google forwarding confirmation URL is stored; `forwarding_verified_at` is still null. HMAC key id remains `receipt-alias-v1`. Real automatic receipt, second automatic receipt, and replay remain unproven |
 | Live connector depth | 4 | 2026-07-21 | Registry ≠ live |

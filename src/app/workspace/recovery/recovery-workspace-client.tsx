@@ -24,7 +24,7 @@ import { VognaryMark } from "../../brand";
 import { correctionFieldLabels, decisionLabels } from "./labels";
 import { RecoveryAddEvidence } from "./recovery-add-evidence";
 import { RecoveryCommitments, type CommitmentsHandlers } from "./recovery-commitments";
-import { RecoveryDialog } from "./recovery-dialog";
+import { RecoveryOverlay } from "./ui/overlay";
 import { CorrectionForm, EvidenceInspector } from "./recovery-evidence-panels";
 import { RecoveryHome } from "./recovery-home";
 import { RecoveryMandate } from "./recovery-mandate";
@@ -104,8 +104,6 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   const [inspectedEvidence, setInspectedEvidence] = useState<EvidenceDto | null>(null);
   const [inspectedEvidenceFailure, setInspectedEvidenceFailure] = useState<TransportFailure | null>(null);
   const [inspectingEvidence, setInspectingEvidence] = useState(false);
-  const [manualFallbackOpen, setManualFallbackOpen] = useState(false);
-  const [keepCurrentOpen, setKeepCurrentOpen] = useState(false);
   const viewHeadingRef = useRef<HTMLHeadingElement>(null);
   const viewChangedRef = useRef(false);
 
@@ -354,7 +352,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         window.sessionStorage.removeItem(guestAuditTransferBindingKey);
         setGuestTransferStatus({
           kind: "SAVED",
-          detail: `${persisted.acceptedEvidenceCount} evidence item${persisted.acceptedEvidenceCount === 1 ? "" : "s"} saved into Recovery. The staged copy was cleared only after Home confirmed it.`,
+          detail: `${persisted.acceptedEvidenceCount === 1 ? "1 bill was" : `${persisted.acceptedEvidenceCount} bills were`} saved. The copy in this tab was cleared only after Home confirmed it.`,
         });
       } catch {
         setGuestTransferStatus({
@@ -391,6 +389,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
 
   useEffect(() => {
     if (state.view !== "ADD_EVIDENCE" || !state.receiptInbox?.alias) return;
+    if (state.receiptInbox.forwardingVerifiedAt && state.receiptInbox.setupCompletedAt && state.receiptInbox.state === "READY") return;
     const interval = window.setInterval(() => void loadSources(), 10_000);
     return () => window.clearInterval(interval);
   }, [loadSources, state.receiptInbox, state.view]);
@@ -665,11 +664,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     },
     onReverseCorrection: (correction) => void reverseCorrection(correction),
     onEvidencePage: (cursor) => dispatch({ type: "DETAIL_EVIDENCE_PAGE_REQUESTED", cursor }),
-    onAddEvidence: () => {
-      setKeepCurrentOpen(false);
-      setManualFallbackOpen(!workspaceEmpty);
-      selectView("ADD_EVIDENCE");
-    },
+    onAddEvidence: () => dispatch({ type: "ADD_BILLS_OPENED" }),
     onRetryDetail: () => dispatch({ type: "DETAIL_EVIDENCE_PAGE_REQUESTED", cursor: state.detailEvidenceCursor }),
     onLoadMoreCommitments: () => void loadMoreCommitments(),
     loadingMoreCommitments,
@@ -687,7 +682,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2.5">
             <VognaryMark size={24} />
-            <h1 className="font-display text-lg font-semibold text-(--ink)">Your commitments</h1>
+            <h1 className="font-display text-lg font-semibold text-(--ink)">Vognary</h1>
           </div>
           <div className="flex items-center gap-2">
             <p className="hidden font-data text-xs text-(--muted) sm:block">
@@ -760,10 +755,33 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         </div>
       </div>
 
+      {state.addBillsOpen ? (
+        <RecoveryOverlay
+          title="Add bills"
+          onClose={() => dispatch({ type: "ADD_BILLS_CLOSED" })}
+          returnFocusId={null}
+        >
+          <RecoveryAddEvidence
+            draft={state.evidenceDraft}
+            submission={state.submission}
+            failure={state.evidenceFailure}
+            pending={state.pending?.kind === "EVIDENCE"}
+            online={state.online}
+            handlers={{
+              onModeChange: (mode) => dispatch({ type: "EVIDENCE_MODE_SELECTED", mode }),
+              onReceiptChange: (text) => dispatch({ type: "RECEIPT_DRAFT_CHANGED", text }),
+              onFilesChosen: (files) => void prepareFiles(files),
+              onRemoveSource: (clientRef) => dispatch({ type: "CSV_SOURCE_REMOVED", clientRef }),
+              onSubmit: (mode) => void submitEvidence(mode),
+            }}
+          />
+        </RecoveryOverlay>
+      ) : null}
+
       {state.dialog?.kind === "EVIDENCE_INSPECTOR" ? (
-        <RecoveryDialog
-          title="Exact evidence"
-          description="This is the stored evidence, unedited. Vognary shows what it read, where it came from, and how sure it is."
+        <RecoveryOverlay
+          title="The receipt"
+          description="This is the stored bill, unedited."
           onClose={() => dispatch({ type: "DIALOG_CLOSED" })}
           returnFocusId={state.returnFocusId}
         >
@@ -772,15 +790,15 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           ) : inspectedEvidenceFailure ? (
             <FailureBlock failure={inspectedEvidenceFailure} />
           ) : inspectingEvidence ? (
-            <LoadingBlock label="Opening the exact saved evidence…" />
+            <LoadingBlock label="Opening the saved receipt…" />
           ) : (
-            <p className="text-sm leading-6 text-(--muted)">This evidence is not on the page any more. Close and reopen the commitment.</p>
+            <p className="text-sm leading-6 text-(--muted)">This receipt is not on the page any more. Close and reopen the commitment.</p>
           )}
-        </RecoveryDialog>
+        </RecoveryOverlay>
       ) : null}
 
       {state.dialog?.kind === "CORRECTION" && state.detail ? (
-        <RecoveryDialog
+        <RecoveryOverlay
           title={`Correct ${correctionFieldLabels[state.dialog.field].toLowerCase()}`}
           description="Corrections sit on top of your evidence. The evidence itself is never changed, and every correction can be reversed."
           onClose={() => dispatch({ type: "DIALOG_CLOSED" })}
@@ -802,7 +820,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
             onChange={(draft) => dispatch({ type: "CORRECTION_DRAFT_CHANGED", draft })}
             onSubmit={() => void submitCorrection()}
           />
-        </RecoveryDialog>
+        </RecoveryOverlay>
       ) : null}
     </main>
   );
@@ -824,28 +842,8 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           onRotate={() => void updateReceiptInbox("ROTATE")}
           onRevoke={() => void updateReceiptInbox("REVOKE")}
           onRetry={() => void loadSources()}
-          manualFallbackOpen={manualFallbackOpen}
-          onManualFallbackToggle={setManualFallbackOpen}
+          onAddBills={() => dispatch({ type: "ADD_BILLS_OPENED" })}
           firstValue={workspaceEmpty}
-          keepCurrentOpen={keepCurrentOpen}
-          onKeepCurrentToggle={setKeepCurrentOpen}
-          manualFallback={
-            <RecoveryAddEvidence
-              draft={state.evidenceDraft}
-              submission={state.submission}
-              failure={state.evidenceFailure}
-              pending={state.pending?.kind === "EVIDENCE"}
-              online={state.online}
-              variant={workspaceEmpty ? "EMPTY_WORKSPACE" : "FULL"}
-              handlers={{
-                onModeChange: (mode) => dispatch({ type: "EVIDENCE_MODE_SELECTED", mode }),
-                onReceiptChange: (text) => dispatch({ type: "RECEIPT_DRAFT_CHANGED", text }),
-                onFilesChosen: (files) => void prepareFiles(files),
-                onRemoveSource: (clientRef) => dispatch({ type: "CSV_SOURCE_REMOVED", clientRef }),
-                onSubmit: (mode) => void submitEvidence(mode),
-              }}
-            />
-          }
         />
       );
     }
@@ -876,20 +874,15 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     return state.home ? (
       <RecoveryHome
         home={state.home}
+        commitments={state.commitments}
         commitmentTotal={state.commitmentTotal}
+        showFirstResult={state.showFirstResult}
         receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable}
         onOpenCommitment={openCommitment}
-        onInspectEvidence={inspectEvidence}
-        onAddEvidence={() => {
-          setKeepCurrentOpen(false);
-          setManualFallbackOpen(!workspaceEmpty);
-          selectView("ADD_EVIDENCE");
-        }}
-        onOpenSources={() => {
-          setKeepCurrentOpen(true);
-          setManualFallbackOpen(false);
-          selectView("ADD_EVIDENCE");
-        }}
+        onAddEvidence={() => dispatch({ type: "ADD_BILLS_OPENED" })}
+        onOpenSources={() => selectView("ADD_EVIDENCE")}
+        onSeeAllCommitments={() => selectView("COMMITMENTS")}
+        onDismissFirstResult={() => dispatch({ type: "FIRST_RESULT_DISMISSED" })}
         onWorkspaceMutated={() => void loadSnapshot()}
         receiptInbox={state.receiptInbox}
         onVeto={(candidateId) => void vetoCandidate(candidateId)}
@@ -908,9 +901,9 @@ function GuestTransferBlock({ status, onRetry }: { status: GuestTransferStatus; 
     return (
       <div role="status" aria-live="polite">
         <StateBlock
-          eyebrow="Saving staged evidence"
-          title="Moving earlier evidence into your Recovery workspace"
-          detail="Recovery is saving each staged receipt and file through the canonical evidence path. The staged copy stays in this tab until Home confirms the persisted commitment."
+          eyebrow="Saving your bills"
+          title="Saving your bills…"
+          detail="Each bill is being saved. The copy stays in this tab until Home confirms it."
         />
       </div>
     );
@@ -918,14 +911,14 @@ function GuestTransferBlock({ status, onRetry }: { status: GuestTransferStatus; 
   if (status.kind === "SAVED") {
     return (
       <div role="status" aria-live="polite">
-        <StateBlock eyebrow="Evidence imported" title="Earlier evidence was saved" detail={status.detail} />
+        <StateBlock eyebrow="Bills imported" title="Earlier bills were saved" detail={status.detail} />
       </div>
     );
   }
   return (
     <div role="alert">
-      <StateBlock eyebrow="Staged evidence retained" title="The staged copy was not cleared" detail={status.detail} tone="caution">
-        {status.retryable ? <button type="button" onClick={onRetry} className="btn btn-sm btn-primary">Retry saving staged evidence</button> : null}
+      <StateBlock eyebrow="Staged bills retained" title="The staged copy was not cleared" detail={status.detail} tone="caution">
+        {status.retryable ? <button type="button" onClick={onRetry} className="btn btn-sm btn-primary">Retry saving staged bills</button> : null}
       </StateBlock>
     </div>
   );

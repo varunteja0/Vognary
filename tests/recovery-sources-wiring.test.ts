@@ -21,8 +21,9 @@ test("the workspace wires Sources and delegates account settings to the profile 
 
 test("Sources fails closed on authentication and preserves every fallback control", () => {
   assert.match(sourcesSource, /import \{ AuthRequiredBlock, LoadingBlock, StateBlock \}/);
-  assert.match(sourcesSource, /sourceStatus\.kind === "AUTH_REQUIRED" \? \([\s\S]*?<AuthRequiredBlock \/>/);
-  assert.match(sourcesSource, /Add more bills/);
+  assert.match(sourcesSource, /sourceStatus\.kind === "AUTH_REQUIRED"/);
+  assert.match(sourcesSource, /<AuthRequiredBlock \/>/);
+  assert.match(sourcesSource, /customerPhrases\.addBillManually/);
   assert.match(sourcesSource, /onRotate/);
   assert.match(sourcesSource, /Rotate address/);
   assert.match(sourcesSource, /onRevoke/);
@@ -32,49 +33,50 @@ test("Sources fails closed on authentication and preserves every fallback contro
 test("Sources stays available for manual evidence when receipt forwarding is not configured", () => {
   assert.match(sourcesRoute, /configurationRequired: false/);
   assert.match(inboundStore, /state: "UNAVAILABLE"/);
-  assert.match(sourcesSource, /receiptInbox\?\.state === "UNAVAILABLE"/);
-  assert.match(sourcesSource, /Paste or upload billing evidence/);
+  assert.match(sourcesSource, /if \(!receiptInboxPubliclyAvailable\)/);
+  assert.match(sourcesSource, /onAddBills/);
+  assert.match(sourcesSource, /Automatic forwarding is not available yet/);
 });
 
 test("Sources describes forwarding without pretending sender intent or inbox access is enforced", () => {
   assert.doesNotMatch(sourcesSource, /only messages you choose to send/i);
   assert.doesNotMatch(sourcesSource, /(?:Vognary|we) (?:access|scan|read|monitor)s? your inbox/i);
-  assert.match(sourcesSource, /Messages sent to that private address are processed as receipt evidence/);
+  assert.match(sourcesSource, /customerPhrases\.trustOnce/);
 });
 
 test("Sources translates internal source kinds and classification state into customer language", () => {
   assert.match(sourcesSource, /sourceLabels\[source\.kind\]/);
   assert.doesNotMatch(sourcesSource, /\{source\.kind\}/);
   assert.doesNotMatch(sourcesSource, /not in the current classification/);
-  assert.match(sourcesSource, /not currently supporting a commitment/);
+  assert.match(sourcesSource, /Connected/);
+  assert.match(sourcesSource, /Disconnected/);
 });
 
-test("failed receipt states surface the last failure code without inventing a renewal", () => {
-  assert.match(sourcesSource, /status\.lastFailureCode/);
-  assert.match(sourcesSource, /no receipt could be read from it \(\$\{status\.lastFailureCode\}\)/);
+test("failed receipt states surface the last failure without inventing a renewal", () => {
+  assert.match(sourcesSource, /inboxFailureCopy\(receiptInbox\.lastFailureCode\)/);
+  assert.doesNotMatch(sourcesSource, /PARSE_FAILED/);
+  assert.doesNotMatch(sourcesSource, /no receipt could be read from it/);
 });
 
 test("a Gmail forwarding confirmation is not rendered as a failed billing receipt", () => {
-  assert.match(sourcesSource, /if \(status\.gmailVerification\) return null;/);
-  assert.match(sourcesSource, /receiptInbox\.state === "READY" && !receiptInbox\.gmailVerification/);
+  assert.match(sourcesSource, /gmailWizardStep/);
+  assert.match(sourcesSource, /WAITING_CONFIRMATION|customerInboxStatus/);
   assert.match(readFileSync("src/app/workspace/recovery/recovery-billing-setup.tsx", "utf8"), /GmailForwardingConfirmation/);
   assert.match(readFileSync("src/app/workspace/recovery/recovery-gmail-confirmation.tsx", "utf8"), /Confirm forwarding with Google/);
 });
 
 test("the canonical Home keeps server-published action and coverage fields", () => {
-  assert.match(homeSource, /home\.needsMe/);
+  assert.match(homeSource, /homeAttentionItems/);
   assert.match(homeSource, /home\.next/);
   assert.match(homeSource, /home\.coverage/);
 });
 
 test("the canonical Home renders server totals without doing money math itself", () => {
   assert.match(homeSource, /home\.monthlyTotals/);
-  assert.match(homeSource, /home\.next30DayTotals/);
   assert.doesNotMatch(homeSource, /\.reduce\(|BigInt\(|parseFloat\(|Number\(/);
 });
 
 test("Source Hub does not style an unconnected billing inbox as already connected", () => {
-  assert.match(sourcesSource, /availability === "SETUP" \? "pill pill-partial"/);
   assert.doesNotMatch(sourcesSource, /availability === "CONNECTED" \|\| entry\.availability === "SETUP"/);
   assert.doesNotMatch(sourcesSource, /Connect Google|Connect Gmail|Connect Microsoft|Connect Zoho/i);
 });

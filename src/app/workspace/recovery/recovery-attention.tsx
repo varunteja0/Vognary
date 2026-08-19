@@ -68,10 +68,12 @@ async function fetchAttention(): Promise<AttentionPayload> {
 }
 
 export function RecoveryAttention({
+  embedded = false,
   onOpenCommitment,
   onOpenSources,
   onWorkspaceMutated,
 }: {
+  embedded?: boolean;
   onOpenCommitment: (commitmentId: string) => void;
   onOpenSources: () => void;
   onWorkspaceMutated?: () => void;
@@ -148,10 +150,12 @@ export function RecoveryAttention({
   }, [onWorkspaceMutated]);
 
   if (status === "LOADING" && !payload) {
+    if (embedded) return null;
     return <StateBlock eyebrow="Checking" title="Looking at what changed" detail="We are re-reading your receipts before showing you anything." />;
   }
 
   if (status === "FAILED" && !payload) {
+    if (embedded) return null;
     return (
       <StateBlock
         eyebrow="Could not load"
@@ -167,13 +171,16 @@ export function RecoveryAttention({
   if (status === "READY" && data.attention.length === 0 && !data.coverage.coverageBroken) {
     return null;
   }
+  if (embedded && data.attention.length === 0) return null;
 
   return (
-    <section aria-labelledby="attention-list" className="panel p-4 sm:p-5">
-      <h3 id="attention-list" className="font-display text-xl font-semibold text-(--ink)">What changed</h3>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
-        Only changes backed by stored evidence or a source that was actually watching. Missing evidence is not treated as cancellation.
-      </p>
+    <section aria-labelledby={embedded ? undefined : "attention-list"} aria-label={embedded ? "Also needs a look" : undefined} className={embedded ? "grid gap-3" : "panel p-4 sm:p-5"}>
+      {embedded ? null : <h3 id="attention-list" className="font-display text-xl font-semibold text-(--ink)">What changed</h3>}
+      {embedded ? null : (
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">
+          Only changes backed by stored evidence or a source that was actually watching. Missing evidence is not treated as cancellation.
+        </p>
+      )}
       {actionError ? <p role="alert" className="mt-2 text-sm text-ember">{actionError}</p> : null}
       <div className="mt-4 grid gap-3">
         {data.attention.length ? data.attention.map((card) => (

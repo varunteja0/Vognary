@@ -41,7 +41,7 @@ export default function ProfileClient() {
             Vognary
           </Link>
           <nav aria-label="Account shortcuts" className="flex flex-wrap gap-2">
-            <Link href="/app" className="btn btn-primary">Audit workspace</Link>
+            <Link href="/app" className="btn btn-primary">Back to app</Link>
             <Link href="/private-audit" className="btn btn-ghost">Private audit</Link>
           </nav>
         </header>
