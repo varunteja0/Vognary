@@ -17,6 +17,7 @@ import {
   type CorrectionField,
   type Decision,
   type EvidenceDto,
+  type PutCommitmentContextRequest,
   type SourceType,
 } from "@/lib/recovery/contracts";
 import { VognaryMark } from "../../brand";
@@ -485,6 +486,15 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     else dispatch({ type: "MUTATION_FAILED", failure: result });
   }
 
+  async function saveContext(commitmentId: string, request: PutCommitmentContextRequest) {
+    if (state.workspaceVersion === null) return;
+    const idempotencyKey = newIdempotencyKey();
+    dispatch({ type: "CONTEXT_STARTED", commitmentId, idempotencyKey });
+    const result = await transport.putCommitmentContext(commitmentId, request, { workspaceVersion: state.workspaceVersion, idempotencyKey });
+    if (result.ok) dispatch({ type: "CONTEXT_SAVED", detail: result.data.commitment, home: result.data.home, meta: result.meta });
+    else dispatch({ type: "MUTATION_FAILED", failure: result });
+  }
+
   async function submitCorrection() {
     const dialog = state.dialog;
     if (dialog?.kind !== "CORRECTION" || state.workspaceVersion === null) return;
@@ -642,6 +652,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   const commitmentsHandlers: CommitmentsHandlers = {
     onSelect: (commitmentId) => dispatch({ type: "COMMITMENT_SELECTED", commitmentId }),
     onDecide: (commitment, decision) => void decide(commitment, decision),
+    onSaveContext: (commitmentId, request) => void saveContext(commitmentId, request),
     onInspectEvidence: (evidence: EvidenceDto, buttonId: string) =>
       inspectEvidence(state.selectedCommitmentId ?? "", evidence.id, buttonId),
     onCorrect: (field: CorrectionField, buttonId: string) => {
@@ -955,6 +966,8 @@ function rollbackAttemptLabel(mutation: PendingMutation, commitment: CommitmentS
       return "your evidence submission";
     case "DECISION":
       return `“${decisionLabels[mutation.decision]}” for ${commitment?.merchant ?? "this commitment"}`;
+    case "CONTEXT":
+      return `how ${commitment?.merchant ?? "this software"} is used`;
     case "CORRECTION":
       return `the ${correctionFieldLabels[mutation.field].toLowerCase()} correction`;
     case "CORRECTION_REVERSAL":

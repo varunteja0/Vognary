@@ -108,6 +108,8 @@ export function RecoveryHome({
     <div className="grid gap-5">
       <WhatWeFound home={home} />
 
+      <PossibleOverlapQueue home={home} onOpenCommitment={onOpenCommitment} />
+
       {home.changed.state === "COMPARED" ? (
         <section aria-labelledby="recovery-changed" className="panel border-ochre p-4 sm:p-5">
           <p className="eyebrow eyebrow-xs text-ochre">New evidence compared</p>
@@ -181,7 +183,7 @@ export function RecoveryHome({
   );
 }
 
-const receiptsAlreadyHaveStory = "Start with the billing receipts you already have. Vognary will reconstruct your current commitments, upcoming renewals and changes from the evidence. Cadence and renewal dates appear only when the receipts support them.";
+const receiptsAlreadyHaveStory = "Start with the billing receipts you already have. Vognary will reconstruct your current commitments, upcoming renewals and changes from the evidence. Cadence and renewal dates appear only when the receipts support them. No mailbox access. No global forwarding. You choose the evidence Vognary analyzes.";
 
 function RecoveryFirstValueMetrics({
   home,
@@ -425,6 +427,9 @@ function WhatWeFound({ home }: { home: HomeProjectionDto }) {
         : `${home.uncertainDuplicateCommitmentCount.toLocaleString("en-IN")} items may be listed twice`,
     );
   }
+  for (const group of home.possibleOverlaps) {
+    facts.push(`${group.merchants.length.toLocaleString("en-IN")} tools may overlap (${group.label})`);
+  }
   if (!facts.length) return null;
   return (
     <section aria-labelledby="what-we-found" className="panel border-ochre p-4 sm:p-5">
@@ -459,6 +464,55 @@ function KeepCurrentOffer({
         Set up a private Vognary billing address and one billing-only forwarding filter so matching mail can keep arriving. Vognary does not read the mailbox and does not capture every bill. Coverage depends on the rule you create.
       </p>
       <button type="button" onClick={onOpenSources} className="btn btn-primary mt-4">Keep Vognary current</button>
+    </section>
+  );
+}
+
+function PossibleOverlapQueue({
+  home,
+  onOpenCommitment,
+}: {
+  home: HomeProjectionDto;
+  onOpenCommitment: (commitmentId: string) => void;
+}) {
+  if (!home.possibleOverlaps.length) return null;
+  return (
+    <section aria-labelledby="recovery-decisions" className="panel border-ochre p-4 sm:p-5">
+      <p className="eyebrow eyebrow-xs text-ochre">Software decisions</p>
+      <h3 id="recovery-decisions" className="mt-2 font-display text-xl font-semibold text-(--ink)">Decisions worth reviewing</h3>
+      <div className="mt-4 grid gap-3">
+        {home.possibleOverlaps.map((group) => (
+          <article key={group.family} className="inset p-4">
+            <p className="font-data text-xs uppercase tracking-[0.14em] text-ochre">Possible overlap</p>
+            <h4 className="mt-2 font-display text-base font-semibold text-(--ink)">{group.label}</h4>
+            <p className="mt-1 text-sm leading-6 text-(--ink-soft)">
+              {group.merchants.join(", ")}
+              {group.yearlyTotals[0]
+                ? ` — ${group.yearlyTotals.map((total) => total.amount.display).join(" and ")}/year across ${group.merchants.length.toLocaleString("en-IN")} tools.`
+                : "."}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-(--muted)">
+              {group.missingPurposeCount > 0
+                ? "These tools share a category. That does not mean they are interchangeable. Tell Vognary what each is used for before deciding."
+                : group.sharedPurpose
+                  ? "You told Vognary more than one of these is used for the same job. Review whether both are still needed."
+                  : "You told Vognary what each is used for. Keep or review each tool from its commitment."}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {group.items.map((item) => (
+                <button
+                  key={item.commitmentId}
+                  type="button"
+                  onClick={() => onOpenCommitment(item.commitmentId)}
+                  className="btn btn-sm btn-ghost"
+                >
+                  Open {item.merchant}
+                </button>
+              ))}
+            </div>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }

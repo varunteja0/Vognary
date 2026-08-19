@@ -49,6 +49,7 @@ const home: HomeProjectionDto = {
   unknownCadenceCommitmentCount: 0,
   uncertainDuplicateCommitmentCount: 0,
   reviewItemCount: 0,
+  possibleOverlaps: [],
   evidenceSources: [],
 };
 
@@ -72,6 +73,8 @@ const detail: CommitmentDetailDto = {
   memory: [],
   belief: null,
   because: [],
+  context: null,
+  overlap: null,
 };
 
 const meta = { requestId: "request-1", workspaceVersion: 4 };
@@ -203,6 +206,27 @@ test("a saved decision swaps the row in place and never reorders the list", () =
   assert.equal(saved.commitments[1].decision?.value, "KEEP");
   assert.equal(saved.workspaceVersion, 5);
   assert.equal(saved.announcement, "Saved. Notion is now Keep.");
+});
+
+test("saving purpose context updates the open commitment without inventing a decision", () => {
+  const withDetail = recoveryReducer(recoveryReducer(loaded(), { type: "COMMITMENT_SELECTED", commitmentId: "commitment-1" }), {
+    type: "DETAIL_LOADED",
+    detail,
+    meta,
+  });
+  const saved = recoveryReducer(withDetail, {
+    type: "CONTEXT_SAVED",
+    detail: {
+      ...detail,
+      context: { purpose: "CODING", importance: null, owner: "ENGINEERING", updatedAt: "2026-08-09T11:00:00.000Z" },
+    },
+    home,
+    meta: { requestId: "request-context", workspaceVersion: 5 },
+  });
+  assert.equal(saved.detail?.context?.purpose, "CODING");
+  assert.equal(saved.detail?.decision, null);
+  assert.equal(saved.workspaceVersion, 5);
+  assert.equal(saved.announcement, "Saved what this software is used for.");
 });
 
 test("mutation responses never leave a stale commitment detail visible", () => {

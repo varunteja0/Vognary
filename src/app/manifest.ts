@@ -9,7 +9,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Vognary - Commitment Intelligence",
     short_name: "Vognary",
     description:
-      "Know what your company is already committed to paying, what changed, what comes next, and why — from evidence you choose.",
+      "Know which software is worth paying for before you pay again — from evidence you choose.",
     id: "/app",
     start_url: "/app",
     scope: "/",

@@ -42,11 +42,14 @@ export function RecoveryAddEvidence({
           {variant === "EMPTY_WORKSPACE" ? "Add a few recent software bills" : "Paste a receipt or invoice"}
         </h3>
         {variant === "EMPTY_WORKSPACE" ? (
-          <ol className="mt-4 grid max-w-2xl gap-2 text-sm leading-6 text-(--muted)">
-            <li><strong className="text-(--ink-soft)">1.</strong> Paste 2–5 recent software bills, invoices, or billing emails.</li>
-            <li><strong className="text-(--ink-soft)">2.</strong> Prefer more than one vendor, and two records from the same vendor when you want Vognary to test a cadence.</li>
-            <li><strong className="text-(--ink-soft)">3.</strong> Vognary reconstructs current commitments, upcoming renewals, and changes only when the evidence supports them. Unknown stays unknown.</li>
-          </ol>
+          <>
+            <ol className="mt-4 grid max-w-2xl gap-2 text-sm leading-6 text-(--muted)">
+              <li><strong className="text-(--ink-soft)">1.</strong> Paste 2–5 recent software bills, invoices, or billing emails.</li>
+              <li><strong className="text-(--ink-soft)">2.</strong> Prefer more than one vendor, and two records from the same vendor when you want Vognary to test a cadence.</li>
+              <li><strong className="text-(--ink-soft)">3.</strong> Vognary reconstructs current commitments, upcoming renewals, and changes only when the evidence supports them. Unknown stays unknown.</li>
+            </ol>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-(--muted)">No mailbox access. No global forwarding. You choose the evidence Vognary analyzes.</p>
+          </>
         ) : (
           <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Paste the receipt text exactly as you received it. It is stored as evidence and never edited.</p>
         )}
@@ -83,16 +86,17 @@ export function RecoveryAddEvidence({
 
         <details className="mt-5 border-t border-line pt-4">
           <summary className="cursor-pointer select-none text-sm font-medium text-(--ink-soft)">
-            Import a statement file instead (fallback)
+            Import a text statement or email file instead (fallback)
           </summary>
           <div className="mt-4 grid gap-3">
             <p className="text-sm leading-6 text-(--muted)">
-              Files are read into text first so you can see exactly what will be stored. Up to {recoveryLimits.maxCsvSources} files.
+              Files are read into text first so you can see exactly what will be stored. Use a readable .txt, .csv, .eml, or .html export. Scans and image PDFs cannot be read here. Up to {recoveryLimits.maxCsvSources} files.
             </p>
             <input
               id="recovery-file-input"
               type="file"
               multiple
+              accept=".txt,.csv,.eml,.html,.htm"
               className="field h-auto py-2 text-sm"
               aria-label="Choose statement files"
               onChange={(event) => {

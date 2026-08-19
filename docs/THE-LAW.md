@@ -36,6 +36,8 @@ Until measured first-user evidence invalidates it, the canonical product is:
 - Source 0 (live rail): private billing inbox. Decision B (2026-08-18): one-time billing-only auto-forwarding is the primary **ongoing** loop after first value. Manual paste/upload/forward is the first-session path. Manual forwarding remains historical backfill assistance and recovery. Do not require Gmail setup before the user sees commitment intelligence.
 - **V1 production rail freeze (2026-08-18):** private billing inbox + one-time billing-only auto-forward + one-time historical backfill + existing evidence → commitment graph → changes / expectations / why. Do not implement Gmail OAuth, Outlook, Zoho, bank/AA, card feeds, vendor APIs, SSO/SCIM, procurement, seats, autonomous cancellation, or a mailbox-wide AI scanner in this release.
 - Product path: sign in → add 2–5 billing records (paste / upload / optional one-off forward) → cited commitments → what changed → upcoming money → why/evidence → correction → **then** keep current (private alias + one-time billing-only auto-forwarding) → honest source health.
+- External V1 promise: **Know which software is worth paying for before you pay again.** Customer category: Software Decision Intelligence. Primary CTA: Review my software stack. First session is value-first; mailbox access is not required.
+- Thin V1 decision layer (the only new product layer in this freeze): KEEP / REVIEW / POSSIBLE OVERLAP, with optional purpose, importance, and owner collected progressively. Do not invent KEEP/REVIEW/CANCEL NOW from category overlap alone. Do not ask an LLM whether the company should cancel.
 - Direct Gmail/Google Workspace OAuth stays fail-closed until restricted-scope verification and the required third-party security assessment are genuinely complete. Do not mark Gmail “Connect” or advertise mailbox sync.
 - **Future Gmail (prepare, do not build):** preferred later connector is selective direct mailbox intelligence — OAuth → candidate discovery → fetch likely billing evidence only → classify → normalize → retain minimum auditable evidence → discard unnecessary content → commitment graph. Historical selective backfill on first connection; incremental processing afterward. Not full mailbox warehousing. Status: **DEFERRED / BLOCKED BY EXTERNAL APPROVAL**.
 - Long-term vision: the control layer for recurring money.
@@ -46,13 +48,13 @@ Until measured first-user evidence invalidates it, the canonical product is:
 
 ## 1. One-line identity (every feature must serve this)
 
-> **The class-safe recurring autopilot that cites or shuts up — connect once, sign once, cancel supported discretionary subscriptions under explicit rules, India-first.**
+> **Know which software is worth paying for before you pay again — evidence-backed commitments, changes, upcoming money, and conservative review decisions for founder-led 2–20 person software/AI companies, India-first.**
 
 If a feature cannot be stated as a **proven** claim, it is not shippable copy and not shippable UI.
 
-**We are not:** a budget app, YNAB, CRED, Zylo, Rocket Money clone, generic AI money chat, or fake bank-sync dashboard.
+**We are not:** a budget app, YNAB, CRED, Zylo, Rocket Money clone, generic AI money chat, fake bank-sync dashboard, Gmail product, consumer subscription tracker, or autonomous cancellation agent.
 
-**We are:** evidence-first recurring commitments with proof beside every rupee, and a standing mandate that may cancel **supported discretionary** subscriptions only. EMI, SIP, insurance, utilities, and cloud infrastructure are hard-blocked from autopilot execution.
+**We are:** Software Decision Intelligence on a Commitment Graph. Every important claim cites evidence or stays Unknown. Autopilot cancellation remains built but switched off until a later founder decision.
 
 ---
 
@@ -70,7 +72,7 @@ If a feature cannot be stated as a **proven** claim, it is not shippable copy an
 
 **One-line strategy:**
 
-> After one connection and one standing mandate, cancel supported discretionary junk under the customer's rules, prove the debit is gone, and collect payment for that verified outcome.
+> Ship Commitment Intelligence to the first 10 founder-led 2–20 person software/AI companies, prove they get value from bills they already have, then keep Vognary current with a private billing address.
 
 Scaffolding is necessary. **Scaffolding is not the building.**
 

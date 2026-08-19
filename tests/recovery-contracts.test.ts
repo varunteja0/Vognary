@@ -171,6 +171,7 @@ const home = {
   unknownCadenceCommitmentCount: 0,
   uncertainDuplicateCommitmentCount: 0,
   reviewItemCount: 1,
+  possibleOverlaps: [],
   evidenceSources: [],
 } as const satisfies HomeProjectionDto;
 
@@ -194,6 +195,8 @@ const detail = {
   memory: [],
   belief: null,
   because: [],
+  context: null,
+  overlap: null,
 } as const satisfies CommitmentDetailDto;
 
 const compared = {
@@ -315,6 +318,7 @@ test("Recovery v1 freezes endpoint methods and paths without database vocabulary
   assert.deepEqual(recoveryEndpoints.reverseCorrection("commitment 1", "correction 1"), { method: "DELETE", path: "/api/workspaces/current/commitments/commitment%201/corrections/correction%201" });
   assert.deepEqual(recoveryEndpoints.decisions, { method: "GET", path: "/api/workspaces/current/decisions" });
   assert.deepEqual(recoveryEndpoints.decision, { method: "PUT", path: "/api/workspaces/current/decisions" });
+  assert.deepEqual(recoveryEndpoints.commitmentContext("commitment 1"), { method: "PUT", path: "/api/workspaces/current/commitments/commitment%201/context" });
   assert.deepEqual(recoveryEndpoints.sources, { method: "GET", path: "/api/workspaces/current/sources" });
   assert.deepEqual(recoveryEndpoints.receiptInbox, { method: "POST", path: "/api/workspaces/current/sources/receipt-inbox" });
   assert.deepEqual(recoveryEndpoints.rotateReceiptInbox, { method: "POST", path: "/api/workspaces/current/sources/receipt-inbox/rotate" });
@@ -370,6 +374,7 @@ test("Recovery v1 freezes bounded immutable evidence and typed endpoint payload 
     reverseCorrection: true,
     decisions: true,
     decision: true,
+    commitmentContext: true,
     sources: true,
     receiptInbox: true,
     rotateReceiptInbox: true,

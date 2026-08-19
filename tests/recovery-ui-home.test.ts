@@ -12,6 +12,9 @@ import {
   coverageStates,
   decisions,
   evidenceProvenanceKinds,
+  commitmentImportances,
+  commitmentOwners,
+  commitmentPurposes,
   confidenceTruthLayers,
   expectedVsObservedStatuses,
   projectionAmountProvenances,
@@ -38,8 +41,11 @@ import {
   formatDay,
   formatMoment,
   formatObservedInstant,
+  importanceLabels,
+  ownerLabels,
   projectionAmountProvenanceLabels,
   provenanceLabels,
+  purposeLabels,
   sourceLabels,
 } from "../src/app/workspace/recovery/labels";
 import { recoveryViewLabels, recoveryViews } from "../src/app/workspace/recovery/state";
@@ -69,6 +75,9 @@ test("every contract enum has presentation copy, so a contract change cannot ren
     [decisions, decisionLabels],
     [decisions, decisionMeanings],
     [decisions, decisionStamps],
+    [commitmentPurposes, purposeLabels],
+    [commitmentImportances, importanceLabels],
+    [commitmentOwners, ownerLabels],
     [cadences, cadenceLabels],
     [sourceTypes, sourceLabels],
     [commitmentStatuses, commitmentStatusLabels],
@@ -121,7 +130,7 @@ test("landing, login, and empty Home tell one receipts-to-decision product story
 });
 
 test("home leads with action, only shows real changes, and keeps source freshness compact", () => {
-  for (const heading of ["What we found", "Needs attention", "Since your last visit", "Coming up", "Currently committed", "Receipts checked"]) {
+  for (const heading of ["What we found", "Decisions worth reviewing", "Needs attention", "Since your last visit", "Coming up", "Currently committed", "Receipts checked"]) {
     assert.ok(homeSource.includes(heading), `home must render ${heading}`);
   }
   for (const label of ["Monthly recurring amount", "Annualized estimate", "Next 30 days", "Active commitments", "Needs review"]) {
@@ -262,7 +271,7 @@ test("one observation is coached toward a second matching receipt instead of ren
 test("commitments use ordinary language and three primary choices", () => {
   assert.deepEqual(decisionLabels, {
     KEEP: "Keep",
-    MONITOR: "Review later",
+    MONITOR: "Review",
     DOWNGRADE: "Consider a cheaper plan",
     CANCEL: "Plan to cancel",
     INVESTIGATE: "I don’t recognize this",

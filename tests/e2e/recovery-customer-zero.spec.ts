@@ -55,7 +55,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 1-3. Open landing and establish a saved identity independently of provider activation.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Know what your company is already committed to");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Know which software is worth paying for before you pay again");
   await tabToAndActivate(page, "Sign in");
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
@@ -101,8 +101,8 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await openCommitment(page, "OpenAI");
 
   // Save one decision on the first recurring commitment, then share the same Home facts.
-  await page.getByRole("button", { name: "Review later", exact: true }).click();
-  await expect(page.getByText(/Saved Review later on/)).toBeVisible();
+  await page.getByRole("button", { name: "Review", exact: true }).click();
+  await expect(page.getByText(/Saved Review on/)).toBeVisible();
   await selectRecoveryView(page, "Home");
   await page.getByRole("button", { name: "Copy for WhatsApp" }).click();
   await expect(page.getByText("WhatsApp summary copied.", { exact: true })).toBeVisible();
@@ -145,7 +145,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 22-26. Exercise every stored decision through three primary and two secondary user choices.
   await page.getByText("More choices").click();
-  for (const decision of ["Keep", "Review later", "Consider a cheaper plan", "Plan to cancel", "I don’t recognize this"]) {
+  for (const decision of ["Keep", "Review", "Consider a cheaper plan", "Plan to cancel", "I don’t recognize this"]) {
     const button = page.getByRole("button", { name: decision, exact: true });
     if (!(await button.isVisible())) await page.getByText("More choices", { exact: true }).click();
     await button.click();

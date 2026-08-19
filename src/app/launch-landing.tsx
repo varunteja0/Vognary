@@ -5,15 +5,15 @@ import { Nakul } from "./character";
 const outcomes = [
   {
     title: "What you are committed to",
-    detail: "Cited recurring software, AI, and cloud bills — only when receipts support them.",
+    detail: "Cited software, AI, and cloud bills — only when receipts support them.",
   },
   {
-    title: "What changed",
-    detail: "Price changes, new commitments, and duplicates, each tied to evidence.",
+    title: "What changed, and what is coming",
+    detail: "Price changes, renewals, and duplicates, each tied to evidence.",
   },
   {
-    title: "Why Vognary believes it",
-    detail: "Open the receipt behind every important amount, date, and cadence.",
+    title: "What deserves review, and why",
+    detail: "Possible overlap and uncertainty, with the receipt behind every important claim.",
   },
 ] as const;
 
@@ -23,7 +23,7 @@ export default function LaunchLanding({
   receiptInboxAvailable?: boolean;
 }) {
   const primaryHref = "/login?next=/app";
-  const primaryLabel = "See my commitments";
+  const primaryLabel = "Review my software stack";
   return (
     <main id="ledger-main" className="relative overflow-hidden px-4 pb-12 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
@@ -40,13 +40,13 @@ export default function LaunchLanding({
         <section className="scan relative flex min-h-[34rem] items-center overflow-hidden border-b border-line py-12 sm:min-h-[38rem] sm:py-16">
           <div className="relative z-10 max-w-3xl sm:pr-28 lg:pr-0">
             <p className="eyebrow eyebrow-xs text-ochre">
-              {receiptInboxAvailable ? "Commitment Intelligence for 2–20 person software teams" : "Commitment Intelligence, from receipts you choose"}
+              Software Decision Intelligence for founder-led software and AI companies
             </p>
             <h1 className="mt-5 max-w-3xl font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-6xl">
-              Know what your company is already committed to.
+              Know which software is worth paying for before you pay again.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-(--ink-soft) sm:text-lg">
-              Software renewals, price changes and recurring bills — continuously maintained from evidence. Start with the billing receipts you already have. Vognary shows what renews next when the receipts support it, what changed, and the receipt behind each claim.
+              Software, AI and cloud spend quietly accumulates across many tools. The founder cannot confidently answer what is still worth paying for. Add a few recent software bills. Vognary reconstructs your commitments, changes, upcoming decisions and evidence.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</Link>
@@ -54,8 +54,8 @@ export default function LaunchLanding({
             <p className="mt-6 flex max-w-2xl items-start gap-2 text-sm leading-6 text-(--muted)">
               <span className="live-dot mt-2 shrink-0" aria-hidden />
               <span>{receiptInboxAvailable
-                ? "Add the billing receipts you already have. After you see what Vognary found, you can keep it current with a private billing address. Vognary does not read the mailbox. No bank passwords."
-                : "Add the billing receipts you already have. Vognary shows the amount, the expected date, and the receipt behind each one. No bank passwords. No mailbox access."}</span>
+                ? "No mailbox access required. Add the billing receipts you already have. After you see what Vognary found, you can keep it current with a private billing address. No bank passwords."
+                : "No mailbox access required. Add the billing receipts you already have. Vognary shows the amount, the expected date, and the receipt behind each one. No bank passwords."}</span>
             </p>
           </div>
           <Nakul

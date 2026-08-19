@@ -26,7 +26,7 @@ type GoogleStartPayload = {
 type Tone = "info" | "error" | "success";
 type Banner = { tone: Tone; text: string } | null;
 
-const trustPoints = ["No bank passwords", "Google for sign-in only", "Saved workspace", "Export or delete your data"];
+const trustPoints = ["No mailbox access required", "No bank passwords", "Google for sign-in only", "Export or delete your data"];
 const isDevEnv = process.env.NODE_ENV !== "production";
 
 type LoginClientProps = {
@@ -177,8 +177,8 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
 
         <section className="panel p-6 sm:p-8 rise">
           <span className="folio" data-folio="01">Sign in</span>
-          <h1 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">See what you are already committed to</h1>
-          <p className="mt-2 text-sm leading-6 text-(--muted)">Sign in with Google to save the billing receipts you already have, review what renews next, and open the receipt behind each claim.</p>
+          <h1 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">Know which software is worth paying for</h1>
+          <p className="mt-2 text-sm leading-6 text-(--muted)">Sign in with Google to save the billing receipts you already have, review what renews next, and open the receipt behind each claim. No mailbox access required.</p>
 
           {session.authenticated ? (
             <div className="mt-6 rounded-xl border border-line bg-(--card-2) p-4" role="status" aria-live="polite">

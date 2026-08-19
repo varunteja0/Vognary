@@ -1,5 +1,8 @@
 import type {
   ChangeItemDto,
+  CommitmentImportance,
+  CommitmentOwner,
+  CommitmentPurpose,
   ConfidenceState,
   ConfidenceTruthLayer,
   Decision,
@@ -7,6 +10,7 @@ import type {
   HomeChangedDto,
   HomeProjectionDto,
   MoneyDto,
+  PossibleOverlapGroupDto,
   ProjectionTotalDto,
   WorkspaceDto,
   Cadence,
@@ -14,6 +18,7 @@ import type {
   CorrectionField,
   CorrectionStatus,
 } from "./contracts";
+import { groupStackOverlaps } from "./stack-overlap";
 
 const dayMs = 24 * 60 * 60 * 1_000;
 
@@ -42,6 +47,9 @@ export type CanonicalCommitmentRecord = {
   decision: DecisionDto | null;
   evidenceIds: readonly [string, ...string[]];
   factCorrections: readonly CommitmentFactCorrection[];
+  purpose?: CommitmentPurpose | null;
+  importance?: CommitmentImportance | null;
+  owner?: CommitmentOwner | null;
   updatedAt: string;
 };
 
@@ -171,6 +179,7 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
     unknownCadenceCommitmentCount: active.length - cadenceEstablished.length,
     uncertainDuplicateCommitmentCount: unresolvedDuplicateCount,
     reviewItemCount: needsMe.length,
+    possibleOverlaps: buildPossibleOverlaps(active.filter(inHeadline)),
     evidenceSources: [],
   };
 }
@@ -476,6 +485,37 @@ function parseDateOnly(value: string) {
 
 function dateOnly(value: Date) {
   return value.toISOString().slice(0, 10);
+}
+
+export function overlapForCommitment(
+  commitments: readonly CanonicalCommitmentRecord[],
+  commitmentId: string,
+): PossibleOverlapGroupDto | null {
+  return buildPossibleOverlaps(commitments).find((group) => group.commitmentIds.includes(commitmentId)) ?? null;
+}
+
+function buildPossibleOverlaps(commitments: readonly CanonicalCommitmentRecord[]): readonly PossibleOverlapGroupDto[] {
+  return groupStackOverlaps(commitments).map((group) => {
+    const established = group.members.filter((member) => member.cadence !== "IRREGULAR");
+    const purposes = group.members.flatMap((member) => member.purpose ? [member.purpose] : []);
+    const purposeCounts = new Map<string, number>();
+    for (const purpose of purposes) purposeCounts.set(purpose, (purposeCounts.get(purpose) ?? 0) + 1);
+    return {
+      family: group.family,
+      label: group.label,
+      commitmentIds: asNonEmpty(group.members.map((member) => member.id)),
+      merchants: asNonEmpty(unique(group.members.map((member) => member.merchant))),
+      items: group.members.map((member) => ({ commitmentId: member.id, merchant: member.merchant })),
+      yearlyTotals: established.length
+        ? buildAnnualizedEstimateTotals(
+          buildTotals(established, (commitment) => commitment.monthlyEquivalentMinor, monthlyTotalCorrectionFields),
+        )
+        : [],
+      missingCadenceCount: group.members.length - established.length,
+      missingPurposeCount: group.members.length - purposes.length,
+      sharedPurpose: [...purposeCounts.values()].some((count) => count >= 2),
+    };
+  });
 }
 
 function unique(values: readonly string[]) {

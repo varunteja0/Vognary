@@ -292,3 +292,14 @@ test("autopilot loop schema is additive and consolidated for fresh databases", (
   assert.match(schema, /recovery_covered_windows_billed_immutable/);
   assert.match(schema, /before insert or update or delete on recovery_covered_windows/i);
 });
+
+test("0054 adds an isolated purpose/importance overlay without rewriting evidence", () => {
+  const contextMigration = readFileSync(new URL("../infra/postgres/migrations/0054_recovery_commitment_context.sql", import.meta.url), "utf8");
+  for (const sql of [contextMigration, schema]) {
+    assert.match(sql, /create table if not exists recovery_commitment_context/i);
+    assert.match(sql, /primary key \(workspace_id, commitment_id\)/);
+    assert.match(sql, /foreign key \(workspace_id, commitment_id\)/);
+    assert.match(sql, /check \(purpose is not null or importance is not null or owner is not null\)/);
+  }
+  assert.doesNotMatch(contextMigration, /drop table|truncate|alter table recovery_commitments|alter table recovery_evidence/i);
+});

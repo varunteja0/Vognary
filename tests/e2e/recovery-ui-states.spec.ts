@@ -40,6 +40,7 @@ const emptyHome: HomeProjectionDto = {
   unknownCadenceCommitmentCount: 0,
   uncertainDuplicateCommitmentCount: 0,
   reviewItemCount: 0,
+  possibleOverlaps: [],
   evidenceSources: [],
 };
 
@@ -144,7 +145,7 @@ test("an empty workspace offers exactly one obvious receipt-paste action", async
   await expect(page.getByText(/Vognary reconstructs current commitments, upcoming renewals, and changes only when the evidence supports them/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Save this receipt as evidence" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Save this receipt as evidence" })).toBeDisabled();
-  await expect(page.getByText("Import a statement file instead (fallback)")).toBeVisible();
+  await expect(page.getByText("Import a text statement or email file instead (fallback)")).toBeVisible();
   await expect(page.getByRole("button", { name: /connect|Gmail|bank account/i })).toHaveCount(0);
   expect(activationCalls).toEqual([]);
 });

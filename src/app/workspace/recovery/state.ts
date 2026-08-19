@@ -74,6 +74,7 @@ export type RecoveryDialog =
 export type PendingMutation =
   | { kind: "EVIDENCE"; idempotencyKey: string }
   | { kind: "DECISION"; idempotencyKey: string; commitmentId: string; decision: Decision; previous: DecisionDto | null }
+  | { kind: "CONTEXT"; idempotencyKey: string; commitmentId: string }
   | { kind: "CORRECTION"; idempotencyKey: string; commitmentId: string; field: CorrectionField }
   | { kind: "CORRECTION_REVERSAL"; idempotencyKey: string; commitmentId: string; correctionId: string }
   | { kind: "MANDATE_SIGN"; idempotencyKey: string }
@@ -195,6 +196,8 @@ export type RecoveryAction =
   | { type: "EVIDENCE_SUBMIT_FAILED"; failure: TransportFailure }
   | { type: "DECISION_STARTED"; commitmentId: string; decision: Decision; previous: DecisionDto | null; idempotencyKey: string }
   | { type: "DECISION_SAVED"; commitment: CommitmentSummaryDto; home: HomeProjectionDto; meta: ResponseMeta }
+  | { type: "CONTEXT_STARTED"; commitmentId: string; idempotencyKey: string }
+  | { type: "CONTEXT_SAVED"; detail: CommitmentDetailDto; home: HomeProjectionDto; meta: ResponseMeta }
   | { type: "CORRECTION_DRAFT_CHANGED"; draft: Partial<CorrectionDraft> }
   | { type: "CORRECTION_STARTED"; commitmentId: string; field: CorrectionField; idempotencyKey: string }
   | { type: "CORRECTION_REVERSAL_STARTED"; commitmentId: string; correctionId: string; idempotencyKey: string }
@@ -550,6 +553,27 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
           : `Saved. ${action.commitment.merchant} has no recorded decision.`,
       };
           }
+
+    case "CONTEXT_STARTED":
+      return {
+        ...state,
+        pending: { kind: "CONTEXT", idempotencyKey: action.idempotencyKey, commitmentId: action.commitmentId },
+        rollback: null,
+        announcement: "Saving how you use this…",
+      };
+
+    case "CONTEXT_SAVED":
+      return {
+        ...state,
+        pending: null,
+        commitments: replaceCommitment(state.commitments, action.detail),
+        detail: action.detail,
+        detailStatus: { kind: "READY" },
+        home: action.home,
+        workspaceVersion: action.meta.workspaceVersion,
+        requestId: action.meta.requestId,
+        announcement: "Saved what this software is used for.",
+      };
 
     case "CORRECTION_DRAFT_CHANGED":
       return { ...state, correctionDraft: { ...state.correctionDraft, ...action.draft } };

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   RecoveryServiceError,
   getRecoveryMutationPreconditions,
+  normalizeContextRequest,
   normalizeCorrectionRequest,
   normalizeDecisionRequest,
   normalizeEvidenceRequest,
@@ -74,6 +75,9 @@ test("Recovery evidence, correction, and decision bodies are strict and bounded"
   for (const decision of ["KEEP", "MONITOR", "DOWNGRADE", "CANCEL", "INVESTIGATE"] as const) {
     assert.equal(normalizeDecisionRequest({ commitmentId: "2f626050-70f8-4cae-902d-caa9223cbebe", decision }).decision, decision);
   }
+  assert.deepEqual(normalizeContextRequest({ purpose: "CODING" }), { purpose: "CODING" });
+  assert.throws(() => normalizeContextRequest({}), /purpose, importance, or owner/i);
+  assert.throws(() => normalizeContextRequest({ purpose: "CODING", extra: true }), /field extra/i);
 });
 
 test("Recovery failures expose safe contract errors and never raw exception text", async () => {

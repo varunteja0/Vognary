@@ -67,6 +67,22 @@ test("mutations carry the exact contract headers and body the server requires", 
   assert.equal(calls[0].init?.cache, "no-store");
 });
 
+test("purpose context is saved against the encoded commitment path", async () => {
+  const { calls, fetchImpl } = recorder(() =>
+    json({ data: { context: { purpose: "CODING", importance: null, owner: null, updatedAt: "2026-08-09T10:00:00.000Z" }, commitment, home }, meta: { requestId: "request-context", workspaceVersion: 5 } }),
+  );
+  const result = await createRecoveryTransport(fetchImpl).putCommitmentContext(
+    "commitment 1",
+    { purpose: "CODING" },
+    { workspaceVersion: 4, idempotencyKey: "key-context" },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(calls[0].path, "/api/workspaces/current/commitments/commitment%201/context");
+  assert.equal(calls[0].init?.method, "PUT");
+  assert.equal(calls[0].init?.body, JSON.stringify({ purpose: "CODING" }));
+});
+
 test("correction paths percent-encode identifiers and reversal uses DELETE", async () => {
   const detail = { ...commitment, recommendationReason: "", riskTags: [], evidence: { items: [], total: 0, nextCursor: null }, corrections: [], expectation: { status: "INSUFFICIENT_HISTORY", expectedDate: null, expectedAmount: null, observedDate: null, observedAmount: null, windowStart: null, windowEnd: null, summary: "There is not enough settled rhythm yet to compare an expected charge with what arrived.", reasons: [] }, memory: [], belief: null, because: [] };
   const correction = { id: "correction 1", commitmentId: "commitment 1", patch: { field: "MERCHANT", value: { merchant: "OpenAI" } }, reason: null, status: "REVERSED", createdAt: "2026-08-09T10:00:00.000Z", reversedAt: "2026-08-09T10:01:00.000Z", supersededAt: null };

@@ -5,6 +5,7 @@ import {
   type ApiSuccess,
   type CommitmentDetailDto,
   type CommitmentSummaryDto,
+  type CommitmentContextDto,
   type CorrectionDto,
   type CreateCorrectionRequest,
   type DecisionDto,
@@ -16,6 +17,7 @@ import {
   type ListCommitmentsQuery,
   type LogoutResponse,
   type PrepareImportResponse,
+  type PutCommitmentContextRequest,
   type PutDecisionRequest,
   type ReceiptInboxStatusDto,
   type RecoveryError,
@@ -224,6 +226,13 @@ export function createRecoveryTransport(fetchImpl?: FetchLike) {
         doFetch,
         recoveryEndpoints.decision.path,
         { method: recoveryEndpoints.decision.method, headers: mutationHeaders(context), body: JSON.stringify(request) },
+      ),
+
+    putCommitmentContext: (commitmentId: string, request: PutCommitmentContextRequest, context: MutationContext) =>
+      call<{ context: CommitmentContextDto; commitment: CommitmentDetailDto; home: HomeProjectionDto }>(
+        doFetch,
+        recoveryEndpoints.commitmentContext(commitmentId).path,
+        { method: recoveryEndpoints.commitmentContext(commitmentId).method, headers: mutationHeaders(context), body: JSON.stringify(request) },
       ),
 
     createCorrection: (commitmentId: string, request: CreateCorrectionRequest, context: MutationContext) =>

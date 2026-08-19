@@ -29,12 +29,13 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.vognary.com"),
   applicationName: "Vognary",
   title: {
-    default: "Vognary - Know what your company is already committed to",
+    default: "Vognary - Know which software is worth paying for before you pay again",
     template: "%s - Vognary",
   },
   description:
-    "Vognary is Commitment Intelligence for 2–20 person software teams: what they are already committed to from submitted evidence, what changed, and why.",
+    "Vognary is Software Decision Intelligence for founder-led 2–20 person software and AI companies: know which software is worth paying for before you pay again.",
   keywords: [
+    "Software Decision Intelligence",
     "Commitment Intelligence",
     "software renewals",
     "recurring vendor commitments",
@@ -59,15 +60,15 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "Vognary",
     url: "/",
-    title: "Vognary - Know what your company is already committed to",
+    title: "Vognary - Know which software is worth paying for before you pay again",
     description:
-      "Vognary is Commitment Intelligence for 2–20 person software teams: what they are already committed to from submitted evidence, what changed, and why.",
+      "Vognary is Software Decision Intelligence for founder-led 2–20 person software and AI companies: know which software is worth paying for before you pay again.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vognary - Know what your company is already committed to",
+    title: "Vognary - Know which software is worth paying for before you pay again",
     description:
-      "Vognary is Commitment Intelligence for 2–20 person software teams: what they are already committed to from submitted evidence, what changed, and why.",
+      "Vognary is Software Decision Intelligence for founder-led 2–20 person software and AI companies: know which software is worth paying for before you pay again.",
   },
 };
 

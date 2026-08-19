@@ -172,6 +172,35 @@ test("Recovery home is an honest first baseline and keeps currency totals separa
   assert.deepEqual(home.next.map((item) => item.commitmentId), ["commitment-inr", "commitment-usd"]);
   assert.equal(home.coverage.state, "BASELINE_ONLY");
   assert.deepEqual(home.evidenceSources, []);
+  assert.deepEqual(home.possibleOverlaps, []);
+});
+
+test("Home publishes possible overlap only for two distinct family members and cites yearly totals from cadence-established amounts", () => {
+  const claude: CanonicalCommitmentRecord = {
+    ...commitments[0],
+    id: "commitment-claude",
+    merchant: "Claude",
+    amountMinor: BigInt(249_900),
+    monthlyEquivalentMinor: BigInt(249_900),
+    evidenceIds: ["evidence-claude-1"],
+  };
+  const home = buildHomeProjection({
+    workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
+    generatedAt: now,
+    commitments: [commitments[0], claude, commitments[1]],
+    sources: [],
+    changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 1, items: [] },
+  });
+
+  assert.equal(home.possibleOverlaps.length, 1);
+  const overlap = home.possibleOverlaps[0];
+  assert.equal(overlap?.family, "AI_RESEARCH");
+  assert.equal(overlap?.label, "AI / Research");
+  assert.deepEqual(overlap?.merchants, ["Claude", "OpenAI"]);
+  assert.equal(overlap?.missingPurposeCount, 2);
+  assert.equal(overlap?.sharedPurpose, false);
+  assert.equal(overlap?.yearlyTotals[0]?.amount.minor, "5397600");
+  assert.equal(overlap?.yearlyTotals[0]?.amount.display, "₹53,976.00");
 });
 
 test("active commitments with unknown cadence stay upcoming but never inflate monthly or annual totals", () => {

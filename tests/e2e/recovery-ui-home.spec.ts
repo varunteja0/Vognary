@@ -95,6 +95,8 @@ const detail = {
   memory: [],
   belief: null,
   because: [],
+  context: null,
+  overlap: null,
 };
 
 const home = {
@@ -150,6 +152,7 @@ const home = {
   unknownCadenceCommitmentCount: 0,
   uncertainDuplicateCommitmentCount: 0,
   reviewItemCount: 1,
+  possibleOverlaps: [],
   evidenceSources: [],
 };
 
@@ -377,7 +380,7 @@ test("three primary choices and two secondary choices preserve the server decisi
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   const group = page.getByRole("group", { name: "Your choice" });
-  for (const label of ["Keep", "Plan to cancel", "Review later"]) {
+  for (const label of ["Keep", "Plan to cancel", "Review"]) {
     await expect(group.getByRole("button", { name: new RegExp(`^${label}`) })).toBeVisible();
   }
   await page.getByText("More choices").click();

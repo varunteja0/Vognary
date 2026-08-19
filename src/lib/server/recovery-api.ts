@@ -1,6 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
   cadences,
+  commitmentImportances,
+  commitmentOwners,
+  commitmentPurposes,
   decisions,
   recoveryErrorStatusByCode,
   recoveryLimits,
@@ -10,6 +13,7 @@ import {
   type CreateCorrectionRequest,
   type EvidenceIngestRequest,
   type ForwardedEmailMaterializationRequest,
+  type PutCommitmentContextRequest,
   type PutDecisionRequest,
   type RecoveryErrorCode,
   type SenderAuthenticationAssertionDto,
@@ -202,6 +206,29 @@ export function normalizeDecisionRequest(value: unknown): PutDecisionRequest {
   if (!isUuid(commitmentId)) throw invalid("commitmentId must be a UUID.");
   if (typeof record.decision !== "string" || !decisions.includes(record.decision as (typeof decisions)[number])) throw invalid("decision is not supported.");
   return { commitmentId, decision: record.decision as (typeof decisions)[number] };
+}
+
+export function normalizeContextRequest(value: unknown): PutCommitmentContextRequest {
+  const record = requireRecord(value, "Context request");
+  rejectUnknown(record, new Set(["purpose", "importance", "owner"]), "context request");
+  const purpose = optionalBoundedEnum(record.purpose, commitmentPurposes, "purpose");
+  const importance = optionalBoundedEnum(record.importance, commitmentImportances, "importance");
+  const owner = optionalBoundedEnum(record.owner, commitmentOwners, "owner");
+  if (purpose === undefined && importance === undefined && owner === undefined) {
+    throw invalid("Tell Vognary the purpose, importance, or owner.");
+  }
+  return {
+    ...(purpose !== undefined ? { purpose } : {}),
+    ...(importance !== undefined ? { importance } : {}),
+    ...(owner !== undefined ? { owner } : {}),
+  };
+}
+
+function optionalBoundedEnum<T extends string>(value: unknown, allowed: readonly T[], name: string): T | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== "string" || !allowed.includes(value as T)) throw invalid(`${name} is not supported.`);
+  return value as T;
 }
 
 export function hashRecoveryRequest(value: unknown) {

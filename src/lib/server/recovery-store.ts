@@ -6,6 +6,10 @@ import {
   recoveryLimits,
   type Cadence,
   type ChangeItemDto,
+  type CommitmentContextDto,
+  type CommitmentImportance,
+  type CommitmentOwner,
+  type CommitmentPurpose,
   type CommitmentDetailDto,
   type CommitmentStatus,
   type CommitmentSummaryDto,
@@ -20,6 +24,7 @@ import {
   type ForwardedEmailMaterializationRequest,
   type HomeChangedDto,
   type HomeProjectionDto,
+  type PutCommitmentContextRequest,
   type PutDecisionRequest,
   type RecoveryCutoverStatus,
   type SenderProvenanceDto,
@@ -32,6 +37,7 @@ import {
   decimalToMinorUnits,
   minorUnitsToDecimal,
   normalizeMinorUnits,
+  overlapForCommitment,
   projectCadenceMonthlyMinor,
   toMoneyDto,
   type CanonicalCommitmentRecord,
@@ -146,6 +152,13 @@ type CommitmentRow = {
   decided_at: Date | null;
   decision_updated_at: Date | null;
   evidence_ids: string[];
+};
+
+type ContextRow = {
+  purpose: CommitmentPurpose | null;
+  importance: CommitmentImportance | null;
+  owner: CommitmentOwner | null;
+  updated_at: Date;
 };
 
 type SourceRow = {
@@ -963,9 +976,104 @@ export async function putRecoveryDecision(input: {
   }
 }
 
+export async function putRecoveryCommitmentContext(input: {
+  workspaceId: string;
+  actorUserId: string;
+  commitmentId: string;
+  expectedVersion: number;
+  idempotencyKey: string;
+  request: PutCommitmentContextRequest;
+  now?: Date;
+}) {
+  const client = await getDatabasePool().connect();
+  const operation = "recovery.put-context";
+  const requestHash = hashRecoveryRequest({ operation, commitmentId: input.commitmentId, request: input.request });
+  const now = input.now ?? new Date();
+  try {
+    await client.query("begin");
+    await lockAutopilotAuthorityGate(client);
+    await lockRecoveryWorkspace(client, input.workspaceId);
+    const membership = await assertRecoveryRole(client, input.actorUserId, input.workspaceId, "member");
+    const replay = await readIdempotent<PutContextMutationData>(client, input.workspaceId, input.idempotencyKey, operation, requestHash);
+    if (replay) {
+      await client.query("commit");
+      return { data: replay.response, workspaceVersion: replay.workspaceVersion, replayed: true };
+    }
+    const state = await ensureWorkspaceState(client, input.workspaceId);
+    assertWorkspaceVersion(state, input.expectedVersion);
+    const commitment = await getCommitmentRow(client, input.workspaceId, input.commitmentId);
+    if (!commitment) throw new RecoveryServiceError("NOT_FOUND");
+    const current = await client.query<ContextRow>(
+      `select purpose, importance, owner, updated_at
+       from recovery_commitment_context
+       where workspace_id = $1 and commitment_id = $2
+       limit 1`,
+      [input.workspaceId, input.commitmentId],
+    );
+    const nextPurpose = input.request.purpose !== undefined ? input.request.purpose : current.rows[0]?.purpose ?? null;
+    const nextImportance = input.request.importance !== undefined ? input.request.importance : current.rows[0]?.importance ?? null;
+    const nextOwner = input.request.owner !== undefined ? input.request.owner : current.rows[0]?.owner ?? null;
+    if (nextPurpose === null && nextImportance === null && nextOwner === null) {
+      throw new RecoveryServiceError("INVALID_EVIDENCE", "Tell Vognary the purpose, importance, or owner before saving.");
+    }
+    const saved = await client.query<ContextRow>(
+      `insert into recovery_commitment_context (
+         workspace_id, commitment_id, purpose, importance, owner, updated_by_user_id, updated_at
+       ) values ($1, $2, $3, $4, $5, $6, $7)
+       on conflict (workspace_id, commitment_id)
+       do update set purpose = excluded.purpose,
+                     importance = excluded.importance,
+                     owner = excluded.owner,
+                     updated_by_user_id = excluded.updated_by_user_id,
+                     updated_at = excluded.updated_at
+       returning purpose, importance, owner, updated_at`,
+      [input.workspaceId, input.commitmentId, nextPurpose, nextImportance, nextOwner, input.actorUserId, now],
+    );
+    const workspaceVersion = await advanceWorkspaceVersion(client, {
+      workspaceId: input.workspaceId,
+      actorUserId: input.actorUserId,
+      currentState: state,
+      mutationKind: "DECISION",
+      changes: [],
+    });
+    const savedRow = saved.rows[0];
+    if (!savedRow) throw new RecoveryServiceError("SAVE_FAILED");
+    const data: PutContextMutationData = {
+      context: {
+        purpose: savedRow.purpose,
+        importance: savedRow.importance,
+        owner: savedRow.owner,
+        updatedAt: savedRow.updated_at.toISOString(),
+      },
+      commitment: await buildCommitmentDetail(client, input.workspaceId, commitment),
+      home: await loadHome(client, membership, now),
+    };
+    await writeIdempotent(client, input.workspaceId, input.idempotencyKey, operation, requestHash, data, workspaceVersion);
+    await writeRecoveryAudit(client, input.workspaceId, input.actorUserId, "recovery.context.saved", input.commitmentId, {
+      purpose: nextPurpose,
+      importance: nextImportance,
+      owner: nextOwner,
+      workspaceVersion,
+    });
+    await client.query("commit");
+    return { data, workspaceVersion, replayed: false };
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw normalizeStoreError(error);
+  } finally {
+    client.release();
+  }
+}
+
 type PutDecisionMutationData = {
   decision: { value: Decision; decidedAt: string; updatedAt: string };
   commitment: CommitmentSummaryDto;
+  home: HomeProjectionDto;
+};
+
+type PutContextMutationData = {
+  context: CommitmentContextDto;
+  commitment: CommitmentDetailDto;
   home: HomeProjectionDto;
 };
 
@@ -2215,8 +2323,10 @@ async function loadChanged(
 async function loadCommitmentRecords(client: PoolClient, workspaceId: string): Promise<CanonicalCommitmentRecord[]> {
   const rows = await loadCommitmentRows(client, workspaceId);
   const correctionMap = await loadActiveCorrectionMap(client, workspaceId);
+  const contextMap = await loadContextMap(client, workspaceId);
   return rows.map((row) => {
     const evidenceIds = asNonEmpty(row.evidence_ids);
+    const context = contextMap.get(row.id);
     return {
       id: row.id,
       version: Number(row.version),
@@ -2242,6 +2352,9 @@ async function loadCommitmentRecords(client: PoolClient, workspaceId: string): P
       factCorrections: (correctionMap.get(row.id) ?? [])
         .filter((correction) => correction.field !== "MERCHANT")
         .map((correction) => ({ id: correction.id, field: correction.field, status: correction.status })),
+      purpose: context?.purpose ?? null,
+      importance: context?.importance ?? null,
+      owner: context?.owner ?? null,
       updatedAt: row.updated_at.toISOString(),
     };
   });
@@ -2364,6 +2477,8 @@ async function buildCommitmentDetail(
     },
     corrections: corrections.rows.map((correction) => toCorrectionDto(correction, commitment.base_currency)),
     ...truth,
+    context: toContextDto((await loadContextMap(client, workspaceId)).get(commitment.id) ?? null),
+    overlap: overlapForCommitment(await loadCommitmentRecords(client, workspaceId), commitment.id),
   };
 }
 
@@ -2508,6 +2623,26 @@ async function loadAllEvidenceRows(client: PoolClient, workspaceId: string) {
     [workspaceId],
   );
   return result.rows;
+}
+
+async function loadContextMap(client: PoolClient, workspaceId: string) {
+  const result = await client.query<ContextRow & { commitment_id: string }>(
+    `select commitment_id, purpose, importance, owner, updated_at
+     from recovery_commitment_context
+     where workspace_id = $1`,
+    [workspaceId],
+  );
+  return new Map(result.rows.map((row) => [row.commitment_id, row]));
+}
+
+function toContextDto(row: ContextRow | null | undefined): CommitmentContextDto | null {
+  if (!row) return null;
+  return {
+    purpose: row.purpose,
+    importance: row.importance,
+    owner: row.owner,
+    updatedAt: row.updated_at.toISOString(),
+  };
 }
 
 function toCommitmentSummary(row: CommitmentRow): CommitmentSummaryDto {

@@ -1,21 +1,21 @@
-# CONTINUE HERE — live handoff (2026-08-18)
+# CONTINUE HERE — live handoff (2026-08-19)
 
 > Read [`docs/THE-LAW.md`](THE-LAW.md) first. This file is **live state only**.
 > Market: [`docs/execution/phase-a-market-contact.md`](execution/phase-a-market-contact.md).
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## Live state — independently verified 2026-08-18 21:00 IST
+## Live state — independently verified 2026-08-19
 
-**VALUE-FIRST FIRST SESSION is in this tree.** Empty Home leads with adding 2–5 bills. Gmail/private inbox is Keep Vognary current after value. **DURABLE BACKUP + RESTORE is 99%+ PROVEN** by GitHub run [`32109925496`](https://github.com/varunteja0/Vognary/actions/runs/32109925496) on `ec79022`. Inbox on. HMAC key id `receipt-alias-v1`. Alias unchanged.
+**B2B V1 product freeze is in this tree on parent `9e14265`.** External promise: “Know which software is worth paying for before you pay again.” Primary CTA: Review my software stack. First session remains value-first: add 2–5 software bills, then Keep Vognary current. Thin decision layer: KEEP / REVIEW / POSSIBLE OVERLAP with optional purpose, importance, and owner overlays (`0054_recovery_commitment_context`). Overlap is conservative named-vendor families only; category sharing is not interchangeability. HMAC key id stays `receipt-alias-v1`. Do not rotate aliases. Unsigned inbound must stay 401.
 
-Google's forwarding confirmation **was parsed** on the founder v1 alias at 2026-08-18 15:06 UTC: inbound `TERMINAL_FAILED` / `GMAIL_VERIFICATION_PENDING`, `gmail_verification_received_at` set, confirmation **URL stored** (`mail-settings.google.com/mail/vf-…`, 223 chars). No numeric code in the real Google message (URL-only, wrapped lines). `forwarding_verified_at` remains null until a matching billing email arrives after the founder confirms in Gmail.
+**DURABLE BACKUP + RESTORE remains 99%+ PROVEN** by GitHub run [`32109925496`](https://github.com/varunteja0/Vognary/actions/runs/32109925496) on `ec79022` through `0053_phase_a_receipt_activation`. Live current-profile verification now requires head `0054_recovery_commitment_context`. Apply `0054` to production before this SHA serves Home, or Home 500s on `recovery_commitment_context`. Inbox on. Gmail forwarding confirmation is still parsed/stored; `forwarding_verified_at` remains null. Do not create the Gmail filter and do not send a receipt until the founder confirms in Gmail after this deploy. HMAC v2 deferred.
 
-**Production UX defect on `bfeb457`:** Sources mapped that confirmation as a failed billing receipt (`Needs another receipt` / `could not prove a renewal` / `GMAIL_VERIFICATION_PENDING`). Step 2 still said “return here for Google's confirmation link or code” and did not embed the CTA. An older Aug 12 `PARSE_FAILED` event exists on the same alias and is not the confirmation. This commit skips `GMAIL_VERIFICATION_PENDING` for inbox health, hides failed-receipt copy while confirmation is pending, and puts **Confirm forwarding with Google** in step 2. HMAC v2 deferred. Do not create the Gmail filter and do not send a receipt until the founder confirms in Gmail after this deploy.
+Google's forwarding confirmation **was parsed** on the founder v1 alias at 2026-08-18 15:06 UTC: inbound `TERMINAL_FAILED` / `GMAIL_VERIFICATION_PENDING`, `gmail_verification_received_at` set, confirmation **URL stored**. No numeric code in the real Google message. First automatic receipt, second automatic receipt, and provider replay remain **NOT PROVEN**.
+
+**CODE GATES on this B2B V1 freeze (this checkout, 2026-08-19):** lint **0 errors** (1 pre-existing `no-location-assign-relative-destination` warning in untouched `src/app/instant-audit.tsx`) · typecheck **PASS** · `claims:check` **PASS** (25 surfaces) · `tokens:check` **PASS** · unit **919/919** · PostgreSQL **156/156** · Customer #0 desktop+mobile **PASS** · public Playwright **58/58** (signed-in suites skipped in that run) · production build **PASS** · `perf:budget` **PASS**. Do not treat these gates as live-receipt proof. Market metrics remain NOT YET PROVEN. Composite stays **1.5**.
 
 Proof in that log, in order: `pg_dump` → AES-256-GCM (`keyFingerprint=8it2LaCH1w__ilS1`, same as Vercel Production) → `storage.status=uploaded` to `vognary-postgres/vognary-postgres-2026-08-18T07-07-54-751Z.dump.enc` (etag `d0638a31123d332675aca57f0c31d075`) → local `*.dump.enc` deleted → `BACKUP_RESTORE_SOURCE=storage` GET → `storageRestore.source=durable-object-get` → decrypt `plaintextSha256=45eb736e98ea2f286448df3d6229eb154c4e0649f1c4cfdd970eda60cf81b5a4` → isolated PostgreSQL 18 restore-drill-passed (schema through `0053_phase_a_receipt_activation`; restored counts include inbound_aliases 2, inbound_events 4, evidence 5, commitments 4). Artifact after dump deletion was the manifest only (1488 bytes). Public `/security` Proven now requires that recorded object GET, not only `BACKUP_RESTORE_DRILL_STATUS=passed`.
-
-**CODE GATES on this Gmail-confirmation UX fix (this checkout, 2026-08-18):** lint **0 errors** (1 pre-existing `no-location-assign-relative-destination` warning in untouched `src/app/instant-audit.tsx`) · typecheck **PASS** · `claims:check` **PASS** (25 surfaces) · `tokens:check` **PASS** · unit **910/910** · PostgreSQL **155/155** (first-run flake on global `connectedActiveMandates` is the documented shared-database artifact; clean on re-run) · production build **PASS** · `perf:budget` **PASS**. Do not treat these gates as live-receipt proof. Playwright not re-run.
 
 ## 0. Founder scope freeze — current strategy
 
@@ -29,8 +29,8 @@ Proof in that log, in order: `pg_dump` → AES-256-GCM (`keyFingerprint=8it2LaCH
 ## 1. Exact checkout
 
 - Folder: `/Users/varunteja/Desktop/CVT Group/Vognary`
-- Branch: `main`. Next production SHA is this value-first first-session commit on parent `dc39f8e23cfcd5ab43d32642467484c84f057cb4`. Keep `ENABLE_RECEIPT_INBOX=true` and `RECEIPT_INBOX_ALIAS_HMAC_KEY_ID=receipt-alias-v1`. Do not rotate aliases. Unsigned inbound must stay 401 unauthorized.
-- This commit is the Commitment Intelligence / Decision B / golden-corpus / honest Source Hub / expected-vs-observed / backup-truth hardening set. Do not discard it. Do not deploy a dirty tree.
+- Branch: `main`. Next production SHA is this B2B V1 freeze commit on parent `9e142659e687ce5a1e6afd42f175f45b5140bfd9` (which itself sits on `dc39f8e23cfcd5ab43d32642467484c84f057cb4`). Keep `ENABLE_RECEIPT_INBOX=true` and `RECEIPT_INBOX_ALIAS_HMAC_KEY_ID=receipt-alias-v1`. Do not rotate aliases. Unsigned inbound must stay 401 unauthorized. Apply additive `0054_recovery_commitment_context` on production Postgres before this SHA.
+- This commit is the B2B Software Decision Intelligence freeze: landing/CTA, value-first scan, thin KEEP/REVIEW/POSSIBLE OVERLAP, purpose/importance overlay. Do not discard `9e14265`. Do not deploy a dirty tree.
 - Operations commits `5b983bf` and `f9b8a14` are pushed. They add the guarded `0053` migration and exact pre/current encrypted backup-restore profiles.
 - Safety commit `4fa6575` (`fix(recovery): honest cadence totals, receipt semantics, token-free veto, dead-code removal`) preserved the whole repair pass on top of `051444f` and is pushed.
 - Do **not** `git worktree add ../vognary-*`, clone a sibling, or redo WP-A.
@@ -39,7 +39,7 @@ Proof in that log, in order: `pg_dump` → AES-256-GCM (`keyFingerprint=8it2LaCH
 
 ## 2. What is merged on `main`
 
-- `main` / `origin/main` were at `b2355fb`. This release converges `main` by **fast-forward** to the tested `feat/autopilot-loop` head — no merge commit, no force-push. Verify the SHA with `git rev-parse main origin/main feat/autopilot-loop origin/feat/autopilot-loop`; all four must match before trusting this line.
+- Live `main` parent before this freeze is `9e14265` (`feat(recovery): value-first first session before Gmail setup`), which sits on `dc39f8e` (origin/main and production at the start of this freeze). WP-A through Recovery v1 remain on this history; do not reset to `feat/autopilot-loop`.
 - WP-A PR #32 `2e3c776` · WP-A.1 PR #33 `d84e778` · WP-A.2 PR #34 `1542dda`
 - Recovery v1 PR #31. Public landing is Commitment Intelligence copy on the receipts-first path; the inbox remains founder-gated.
 - Composite scoreboard remains **1.5**. Do not invent mandates, payments, or reviewer approvals.

@@ -1,7 +1,18 @@
 "use client";
 
-import { decisions, type CommitmentSummaryDto, type CorrectionDto, type CorrectionField, type Decision, type EvidenceDto } from "@/lib/recovery/contracts";
-import { correctionFieldLabels, cadenceLabels, commitmentStatusLabels, decisionLabels, decisionMeanings, decisionStamps, expectedVsObservedLabels, formatDay, formatMoment, sourceLabels } from "./labels";
+import {
+  commitmentImportances,
+  commitmentOwners,
+  commitmentPurposes,
+  decisions,
+  type CommitmentSummaryDto,
+  type CorrectionDto,
+  type CorrectionField,
+  type Decision,
+  type EvidenceDto,
+  type PutCommitmentContextRequest,
+} from "@/lib/recovery/contracts";
+import { correctionFieldLabels, cadenceLabels, commitmentStatusLabels, decisionLabels, decisionMeanings, decisionStamps, expectedVsObservedLabels, formatDay, formatMoment, importanceLabels, ownerLabels, purposeLabels, sourceLabels } from "./labels";
 import { CorrectionHistory, EvidenceRow } from "./recovery-evidence-panels";
 import { ConfidenceBadge, ConfidenceDetail, FailureBlock, LoadingBlock, MoneyValue, StateBlock } from "./recovery-states";
 import { displayedDecision, type PendingMutation, type RecoveryState } from "./state";
@@ -12,6 +23,7 @@ const secondaryDecisions = ["DOWNGRADE", "INVESTIGATE"] as const satisfies reado
 export type CommitmentsHandlers = {
   onSelect: (commitmentId: string | null) => void;
   onDecide: (commitment: CommitmentSummaryDto, decision: Decision) => void;
+  onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
   onInspectEvidence: (evidence: EvidenceDto, buttonId: string) => void;
   onCorrect: (field: CorrectionField, buttonId: string) => void;
   onReverseCorrection: (correction: CorrectionDto) => void;
@@ -207,6 +219,64 @@ function CommitmentDetailPanel({ state, handlers }: { state: RecoveryState; hand
         </section>
       ) : null}
 
+      {detail.overlap ? (
+        <section aria-labelledby="recovery-overlap-heading" className="panel p-4 sm:p-5">
+          <h4 id="recovery-overlap-heading" className="font-display text-xl font-semibold text-(--ink)">Possible overlap</h4>
+          <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
+            {detail.overlap.merchants.join(", ")}
+            {detail.overlap.yearlyTotals[0]
+              ? ` — ${detail.overlap.yearlyTotals.map((total) => total.amount.display).join(" and ")}/year across ${detail.overlap.merchants.length.toLocaleString("en-IN")} ${detail.overlap.label.toLowerCase()} tools.`
+              : ` share a ${detail.overlap.label.toLowerCase()} category.`}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-(--muted)">
+            Sharing a category does not mean these tools are interchangeable. Tell Vognary what each is used for before Keep or Review.
+          </p>
+        </section>
+      ) : null}
+
+      <section aria-labelledby="recovery-context-heading" className="panel p-4 sm:p-5">
+        <h4 id="recovery-context-heading" className="font-display text-xl font-semibold text-(--ink)">How you use this</h4>
+        <p className="mt-2 text-sm leading-6 text-(--muted)">Optional. Answer only when it helps you decide. This does not change the receipt.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <ContextSelect
+            id="recovery-purpose"
+            label="What do you use this for?"
+            value={detail.context?.purpose ?? ""}
+            disabled={state.pending !== null}
+            options={commitmentPurposes.map((value) => [value, purposeLabels[value]] as const)}
+            onChange={(value) => {
+              if (commitmentPurposes.includes(value as typeof commitmentPurposes[number])) {
+                handlers.onSaveContext(detail.id, { purpose: value as typeof commitmentPurposes[number] });
+              }
+            }}
+          />
+          <ContextSelect
+            id="recovery-importance"
+            label="If you stop using this?"
+            value={detail.context?.importance ?? ""}
+            disabled={state.pending !== null}
+            options={commitmentImportances.map((value) => [value, importanceLabels[value]] as const)}
+            onChange={(value) => {
+              if (commitmentImportances.includes(value as typeof commitmentImportances[number])) {
+                handlers.onSaveContext(detail.id, { importance: value as typeof commitmentImportances[number] });
+              }
+            }}
+          />
+          <ContextSelect
+            id="recovery-owner"
+            label="Who owns this?"
+            value={detail.context?.owner ?? ""}
+            disabled={state.pending !== null}
+            options={commitmentOwners.map((value) => [value, ownerLabels[value]] as const)}
+            onChange={(value) => {
+              if (commitmentOwners.includes(value as typeof commitmentOwners[number])) {
+                handlers.onSaveContext(detail.id, { owner: value as typeof commitmentOwners[number] });
+              }
+            }}
+          />
+        </div>
+      </section>
+
       <section aria-labelledby="recovery-decision-heading" className="panel p-4 sm:p-5">
         <h4 id="recovery-decision-heading" className="font-display text-xl font-semibold text-(--ink)">What do you want to do?</h4>
         <p className="mt-3 text-sm leading-6 text-(--ink-soft)">
@@ -339,5 +409,39 @@ function DetailFact({ label, value, note }: { label: string; value: string; note
       <dd className="font-data mt-1.5 text-base font-semibold tnum text-(--ink)">{value}</dd>
       {note ? <dd className="mt-1 font-data text-xs text-(--muted)">{note}</dd> : null}
     </div>
+  );
+}
+
+function ContextSelect({
+  id,
+  label,
+  value,
+  disabled,
+  options,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  disabled: boolean;
+  options: readonly (readonly [string, string])[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label htmlFor={id} className="grid gap-1">
+      <span className="field-label">{label}</span>
+      <select
+        id={id}
+        className="field"
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">Not told yet</option>
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>{optionLabel}</option>
+        ))}
+      </select>
+    </label>
   );
 }

@@ -11,10 +11,10 @@ test("manual financial evidence is not exposed before sign-in", async ({ page })
 test("landing contains no sample ledger or illustrative financial totals", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Know what your company is already committed to." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Know which software is worth paying for before you pay again." })).toBeVisible();
   await expect(page.getByText("What you are committed to", { exact: true })).toBeVisible();
-  await expect(page.getByText("What changed", { exact: true })).toBeVisible();
-  await expect(page.getByText("Why Vognary believes it", { exact: true })).toBeVisible();
+  await expect(page.getByText("What changed, and what is coming", { exact: true })).toBeVisible();
+  await expect(page.getByText("What deserves review, and why", { exact: true })).toBeVisible();
   await expect(page.getByText(/sample audit|illustrative sample|not live output/i)).toHaveCount(0);
   await expect(page.locator("#product-ledger")).toHaveCount(0);
 });

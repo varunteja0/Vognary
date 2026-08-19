@@ -71,6 +71,7 @@ const home: HomeProjectionDto = {
   unknownCadenceCommitmentCount: 0,
   uncertainDuplicateCommitmentCount: 0,
   reviewItemCount: 1,
+  possibleOverlaps: [],
   evidenceSources: [],
 };
 

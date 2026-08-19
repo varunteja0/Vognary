@@ -8,6 +8,51 @@ export type { WorkspaceActivationWrite };
 export const decisions = ["KEEP", "MONITOR", "DOWNGRADE", "CANCEL", "INVESTIGATE"] as const;
 export type Decision = (typeof decisions)[number];
 
+export const overlapFamilies = [
+  "AI_RESEARCH",
+  "PROJECT_MANAGEMENT",
+  "DOCUMENTATION",
+  "COMMUNICATION",
+  "DESIGN",
+  "ENGINEERING",
+] as const;
+export type OverlapFamily = (typeof overlapFamilies)[number];
+
+export const commitmentPurposes = [
+  "CODING",
+  "RESEARCH",
+  "WRITING",
+  "DESIGN",
+  "INFRASTRUCTURE",
+  "CRM",
+  "MARKETING",
+  "COMMUNICATION",
+  "ANALYTICS",
+  "OPERATIONS",
+  "OTHER",
+] as const;
+export type CommitmentPurpose = (typeof commitmentPurposes)[number];
+
+export const commitmentImportances = [
+  "PRODUCTION_BREAKS",
+  "TEAM_WORKFLOW_BREAKS",
+  "CUSTOMER_FACING_BREAKS",
+  "PRODUCTIVITY_DECREASES",
+  "NOTHING_IMPORTANT",
+  "NOT_SURE",
+] as const;
+export type CommitmentImportance = (typeof commitmentImportances)[number];
+
+export const commitmentOwners = [
+  "FOUNDER",
+  "ENGINEERING",
+  "SALES",
+  "MARKETING",
+  "OPERATIONS",
+  "OTHER",
+] as const;
+export type CommitmentOwner = (typeof commitmentOwners)[number];
+
 export const cadences = [
   "WEEKLY",
   "BIWEEKLY",
@@ -267,6 +312,25 @@ export type CommitmentSummaryDto = {
   updatedAt: string;
 };
 
+export type CommitmentContextDto = {
+  purpose: CommitmentPurpose | null;
+  importance: CommitmentImportance | null;
+  owner: CommitmentOwner | null;
+  updatedAt: string;
+};
+
+export type PossibleOverlapGroupDto = {
+  family: OverlapFamily;
+  label: string;
+  commitmentIds: readonly [string, ...string[]];
+  merchants: readonly [string, ...string[]];
+  items: readonly { commitmentId: string; merchant: string }[];
+  yearlyTotals: readonly ProjectionTotalDto[];
+  missingCadenceCount: number;
+  missingPurposeCount: number;
+  sharedPurpose: boolean;
+};
+
 export const expectedVsObservedStatuses = [
   "MATCHED",
   "AMOUNT_CHANGED",
@@ -309,6 +373,8 @@ export type CommitmentDetailDto = CommitmentSummaryDto & {
   memory: readonly CommitmentMemoryPointDto[];
   belief: string | null;
   because: readonly string[];
+  context: CommitmentContextDto | null;
+  overlap: PossibleOverlapGroupDto | null;
 };
 
 export type AttentionItemDto = {
@@ -502,6 +568,7 @@ export type HomeProjectionDto = {
   unknownCadenceCommitmentCount: number;
   uncertainDuplicateCommitmentCount: number;
   reviewItemCount: number;
+  possibleOverlaps: readonly PossibleOverlapGroupDto[];
   evidenceSources: readonly RecoveryEvidenceSourceDto[];
   autopilot?: AutopilotHomeDto;
 };
@@ -628,6 +695,12 @@ export type PutDecisionRequest = {
   decision: Decision;
 };
 
+export type PutCommitmentContextRequest = {
+  purpose?: CommitmentPurpose | null;
+  importance?: CommitmentImportance | null;
+  owner?: CommitmentOwner | null;
+};
+
 export type ListCommitmentsQuery = {
   limit?: number;
   cursor?: string;
@@ -694,6 +767,12 @@ export type PutDecisionResponse = ApiSuccess<{
   home: HomeProjectionDto;
 }>;
 
+export type PutCommitmentContextResponse = ApiSuccess<{
+  context: CommitmentContextDto;
+  commitment: CommitmentDetailDto;
+  home: HomeProjectionDto;
+}>;
+
 export type ListDecisionsResponse = ApiSuccess<{
   decisions: readonly (DecisionDto & { commitmentId: string })[];
 }>;
@@ -727,6 +806,7 @@ export type RecoveryEndpointContracts = {
   reverseCorrection: { ownership: "RECOVERY_V1"; request: never; response: ReverseCorrectionResponse | ApiFailure; headers: RecoveryMutationHeaders };
   decisions: { ownership: "RECOVERY_V1"; request: never; response: ListDecisionsResponse | ApiFailure; headers: never };
   decision: { ownership: "RECOVERY_V1"; request: PutDecisionRequest; response: PutDecisionResponse | ApiFailure; headers: RecoveryMutationHeaders };
+  commitmentContext: { ownership: "RECOVERY_V1"; request: PutCommitmentContextRequest; response: PutCommitmentContextResponse | ApiFailure; headers: RecoveryMutationHeaders };
   sources: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<ReceiptInboxStatusDto> | ApiFailure; headers: never };
   receiptInbox: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<ReceiptInboxStatusDto> | ApiFailure; headers: never };
   rotateReceiptInbox: { ownership: "RECOVERY_V1"; request: never; response: ApiSuccess<ReceiptInboxStatusDto> | ApiFailure; headers: ReceiptInboxRotationHeaders };
@@ -774,6 +854,10 @@ export const recoveryEndpoints = {
   }),
   decisions: { method: "GET", path: "/api/workspaces/current/decisions" },
   decision: { method: "PUT", path: "/api/workspaces/current/decisions" },
+  commitmentContext: (commitmentId: string) => ({
+    method: "PUT" as const,
+    path: `/api/workspaces/current/commitments/${encodePathSegment(commitmentId)}/context`,
+  }),
   sources: { method: "GET", path: "/api/workspaces/current/sources" },
   receiptInbox: { method: "POST", path: "/api/workspaces/current/sources/receipt-inbox" },
   rotateReceiptInbox: { method: "POST", path: "/api/workspaces/current/sources/receipt-inbox/rotate" },

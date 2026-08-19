@@ -89,6 +89,7 @@ export type PrivacyExportDocument = {
     commitmentEvidence: Array<Record<string, unknown>>;
     corrections: Array<Record<string, unknown>>;
     decisions: Array<Record<string, unknown>>;
+    commitmentContext: Array<Record<string, unknown>>;
     changes: Array<Record<string, unknown>>;
     inboundAliases: Array<Record<string, unknown>>;
     inboundEvents: Array<Record<string, unknown>>;

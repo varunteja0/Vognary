@@ -3,6 +3,9 @@ import type {
   AttentionReason,
   Cadence,
   ChangeKind,
+  CommitmentImportance,
+  CommitmentOwner,
+  CommitmentPurpose,
   CommitmentStatus,
   ConfidenceState,
   ConfidenceTruthLayer,
@@ -23,7 +26,7 @@ import type {
 
 export const decisionLabels: Record<Decision, string> = {
   KEEP: "Keep",
-  MONITOR: "Review later",
+  MONITOR: "Review",
   DOWNGRADE: "Consider a cheaper plan",
   CANCEL: "Plan to cancel",
   INVESTIGATE: "I don’t recognize this",
@@ -31,7 +34,7 @@ export const decisionLabels: Record<Decision, string> = {
 
 export const decisionMeanings: Record<Decision, string> = {
   KEEP: "Keep tracking it and ask again only when something changes.",
-  MONITOR: "Leave it undecided and bring it back for review later.",
+  MONITOR: "Mark this for review. Nothing is cancelled.",
   DOWNGRADE: "Keep the service but consider moving to a cheaper plan.",
   CANCEL: "Record that you plan to cancel it at the service itself.",
   INVESTIGATE: "Mark this for review because you do not recognize it.",
@@ -43,6 +46,38 @@ export const decisionStamps: Record<Decision, string> = {
   DOWNGRADE: "stamp stamp-downgrade",
   CANCEL: "stamp stamp-cancel",
   INVESTIGATE: "stamp stamp-investigate",
+};
+
+export const purposeLabels: Record<CommitmentPurpose, string> = {
+  CODING: "Coding",
+  RESEARCH: "Research",
+  WRITING: "Writing",
+  DESIGN: "Design",
+  INFRASTRUCTURE: "Infrastructure",
+  CRM: "CRM",
+  MARKETING: "Marketing",
+  COMMUNICATION: "Communication",
+  ANALYTICS: "Analytics",
+  OPERATIONS: "Operations",
+  OTHER: "Other",
+};
+
+export const importanceLabels: Record<CommitmentImportance, string> = {
+  PRODUCTION_BREAKS: "Production breaks",
+  TEAM_WORKFLOW_BREAKS: "Team workflow breaks",
+  CUSTOMER_FACING_BREAKS: "Customer-facing workflow breaks",
+  PRODUCTIVITY_DECREASES: "Productivity decreases",
+  NOTHING_IMPORTANT: "Nothing important",
+  NOT_SURE: "Not sure",
+};
+
+export const ownerLabels: Record<CommitmentOwner, string> = {
+  FOUNDER: "Founder",
+  ENGINEERING: "Engineering",
+  SALES: "Sales",
+  MARKETING: "Marketing",
+  OPERATIONS: "Operations",
+  OTHER: "Other",
 };
 
 export const cadenceLabels: Record<Cadence, string> = {
