@@ -12,6 +12,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
       DATABASE_URL: postgresql://postgres:vognary_ci@127.0.0.1:5432/vognary_ci
       POSTGRES_SSL: "false"
@@ -61,7 +62,9 @@ jobs:
           RECEIPT_INBOX_ALIAS_HMAC_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           RECEIPT_INBOX_ALIAS_HMAC_KEY_ID: receipt-alias-v1
       - run: npm run perf:budget
-      - run: npx playwright install --with-deps chromium
+      - name: Install Playwright Chromium
+        timeout-minutes: 10
+        run: npx playwright install chromium
       - name: Enforce Lighthouse budgets
         run: CHROME_PATH="$(node -e "console.log(require('@playwright/test').chromium.executablePath())")" npm run perf:lighthouse
       - run: npm run test:e2e

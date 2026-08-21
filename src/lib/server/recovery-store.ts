@@ -484,7 +484,7 @@ export async function materializeForwardedEmailEvidence(input: {
       stage = "REANALYSIS";
       const audit = await analyzePersistedEvidence(client, input.workspaceId, now);
       stage = "COMMITMENT_UPSERT";
-      await upsertCanonicalCommitments(client, input.workspaceId, audit.recurringItems);
+      await upsertCanonicalCommitments(client, input.workspaceId, audit.recurringItems, now);
       stage = "EVIDENCE_LINKING";
       await linkCanonicalEvidence(client, input.workspaceId, audit.recurringItems);
       const after = await loadCommitmentRecords(client, input.workspaceId);
@@ -844,7 +844,7 @@ export async function submitRecoveryEvidence(input: {
     if (materialized.acceptedSourceIds.length) {
       const before = await loadCommitmentRecords(client, input.workspaceId);
       const audit = await analyzePersistedEvidence(client, input.workspaceId, now);
-      await upsertCanonicalCommitments(client, input.workspaceId, audit.recurringItems);
+      await upsertCanonicalCommitments(client, input.workspaceId, audit.recurringItems, now);
       await linkCanonicalEvidence(client, input.workspaceId, audit.recurringItems);
       const after = await loadCommitmentRecords(client, input.workspaceId);
       const nextVersion = workspaceVersion + 1;
@@ -1871,7 +1871,12 @@ function transactionAnalysisDescription(row: EvidenceRow) {
     : row.excerpt;
 }
 
-async function upsertCanonicalCommitments(client: PoolClient, workspaceId: string, items: readonly RecurringItem[]) {
+async function upsertCanonicalCommitments(
+  client: PoolClient,
+  workspaceId: string,
+  items: readonly RecurringItem[],
+  detectedAt: Date,
+) {
   const rows = await loadCommitmentRows(client, workspaceId);
   const existing = new Map(rows.map((row) => [row.identity_key, row]));
   const corrections = await loadActiveCorrectionMap(client, workspaceId);
@@ -1904,10 +1909,11 @@ async function upsertCanonicalCommitments(client: PoolClient, workspaceId: strin
            base_next_expected_date, effective_status, effective_merchant,
            effective_cadence, effective_amount_minor, effective_monthly_minor,
            effective_next_expected_date, confidence_score, confidence_reasons,
-           recommended_decision, recommendation_reason, risk_tags
+           recommended_decision, recommendation_reason, risk_tags,
+           first_detected_at
          ) values (
            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $3, $4, $6, $8, $9, $10,
-           $11, $12::jsonb, $13, $14, $15
+           $11, $12::jsonb, $13, $14, $15, $16
          ) returning id`,
         [
           workspaceId,
@@ -1925,6 +1931,7 @@ async function upsertCanonicalCommitments(client: PoolClient, workspaceId: strin
           recommendationDecision(item.recommendationType),
           item.recommendationReason,
           item.riskTags,
+          detectedAt.toISOString(),
         ],
       );
       const id = inserted.rows[0]?.id;

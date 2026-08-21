@@ -53,6 +53,15 @@ test("sequential OpenAI and Notion receipts collapse to two commitments, not fou
     assert.equal(first.data.commitments.length, 1);
     assert.equal(first.data.commitments[0]?.merchant, "OpenAI");
     assert.equal(first.data.commitments[0]?.recommendedDecision, "KEEP");
+    const firstDetected = await pool.query<{ first_detected_at: Date }>(
+      `select first_detected_at from recovery_commitments where workspace_id = $1`,
+      [workspaceId],
+    );
+    assert.equal(
+      firstDetected.rows[0]?.first_detected_at.toISOString(),
+      "2026-08-19T10:00:00.000Z",
+      "first detection must use the operation clock instead of the database wall clock",
+    );
 
     const second = await submitRecoveryEvidence({
       workspaceId,

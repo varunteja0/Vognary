@@ -94,13 +94,14 @@ test("CI executes the production schema against PostgreSQL before application ch
   const workflowSource = read(".github/workflows/ci.yml");
   const workflow = parse(workflowSource) as {
     permissions?: { contents?: string };
-    jobs?: { validate?: { services?: { postgres?: { image?: string } }; env?: { DATABASE_URL?: string }; steps?: Array<{ run?: string; uses?: string; with?: { "node-version"?: string; "persist-credentials"?: boolean } }> } };
+    jobs?: { validate?: { "timeout-minutes"?: number; services?: { postgres?: { image?: string } }; env?: { DATABASE_URL?: string }; steps?: Array<{ "timeout-minutes"?: number; run?: string; uses?: string; with?: { "node-version"?: string; "persist-credentials"?: boolean } }> } };
   };
   assert.equal(workflow.permissions?.contents, "read");
   assert.match(workflowSource, new RegExp(`uses: ${checkoutAction}`));
   assert.match(workflowSource, new RegExp(`uses: ${setupNodeAction}`));
   assert.doesNotMatch(workflowSource, /uses: actions\/(?:checkout|setup-node)@v\d+/);
   const validate = workflow.jobs?.validate;
+  assert.equal(validate?.["timeout-minutes"], 60);
   assert.equal(validate?.services?.postgres?.image, postgresImage);
   assert.equal(validate?.env?.DATABASE_URL, "postgresql://postgres:vognary_ci@127.0.0.1:5432/vognary_ci");
   const checkout = (validate?.steps ?? []).find((step) => step.uses === checkoutAction);
@@ -113,6 +114,9 @@ test("CI executes the production schema against PostgreSQL before application ch
   assert.ok(commands.includes("npm audit --omit=dev --audit-level=high"));
   assert.ok(commands.includes("npm audit --audit-level=high"));
   assert.ok(commands.includes("npm run ci:database"));
+  const playwrightInstall = (validate?.steps ?? []).find((step) => step.run === "npx playwright install chromium");
+  assert.equal(playwrightInstall?.["timeout-minutes"], 10);
+  assert.doesNotMatch(workflowSource, /playwright install --with-deps/);
   assert.ok(
     commands.indexOf("npm run ci:database") < commands.indexOf("npm run lint"),
     "schema migrations must run before application validation",
