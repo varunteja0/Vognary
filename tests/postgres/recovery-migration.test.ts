@@ -1422,13 +1422,16 @@ test("concurrent update and insert ordering cannot produce a cross-workspace evi
          ) values ($1, $2, 'receipt', 'Uncommitted same-workspace evidence', current_date, 100.00)`,
         [tenants.itemA, tenants.sourceA],
       );
-      const sourceMove = mover.query(
-        `update data_sources set workspace_id = $1 where id = $2`,
-        [tenants.workspaceB, tenants.sourceA],
+      const sourceMove = assert.rejects(
+        mover.query(
+          `update data_sources set workspace_id = $1 where id = $2`,
+          [tenants.workspaceB, tenants.sourceA],
+        ),
+        /Legacy workspace ownership is immutable/i,
       );
       await waitUntilSessionIsWaiting(pool, moverPid);
       await inserter.query("commit");
-      await assert.rejects(() => sourceMove, /Legacy workspace ownership is immutable/i);
+      await sourceMove;
       assert.equal(await countCrossWorkspaceEvidence(pool), "0");
 
       await inserter.query("begin");
@@ -1438,13 +1441,16 @@ test("concurrent update and insert ordering cannot produce a cross-workspace evi
          ) values ($1, $2, 'receipt', 'Uncommitted item-guard evidence', current_date, 100.00)`,
         [tenants.itemA, tenants.sourceA],
       );
-      const itemMove = mover.query(
-        `update recurring_items set workspace_id = $1 where id = $2`,
-        [tenants.workspaceB, tenants.itemA],
+      const itemMove = assert.rejects(
+        mover.query(
+          `update recurring_items set workspace_id = $1 where id = $2`,
+          [tenants.workspaceB, tenants.itemA],
+        ),
+        /Legacy workspace ownership is immutable/i,
       );
       await waitUntilSessionIsWaiting(pool, moverPid);
       await inserter.query("commit");
-      await assert.rejects(() => itemMove, /Legacy workspace ownership is immutable/i);
+      await itemMove;
       assert.equal(await countCrossWorkspaceEvidence(pool), "0");
     } finally {
       await inserter.query("rollback").catch(() => undefined);
