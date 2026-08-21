@@ -106,7 +106,7 @@ jobs:
           if [ -f /tmp/vognary-dev.pid ]; then kill "$(cat /tmp/vognary-dev.pid)" || true; fi
       - name: Start production server
         run: |
-          ALLOW_IN_MEMORY_RATE_LIMITS=true INTERNAL_SYNC_SECRET=ci-internal-sync-secret PORT=3000 \
+          ALLOW_IN_MEMORY_RATE_LIMITS=true INTERNAL_SYNC_SECRET=ci-internal-sync-secret-at-least-32-bytes PORT=3000 \
             ENABLE_RECEIPT_INBOX=true RESEND_RECEIVING_API_KEY=ci-receiving-api-key \
             RESEND_INBOUND_WEBHOOK_SECRET=whsec_Y2ktcmVjZWlwdC13ZWJob29rLXNlY3JldA== \
             RESEND_RECEIVING_DOMAIN=receipts.vognary.test \
@@ -124,7 +124,7 @@ jobs:
         env:
           ENABLE_RECEIPT_INBOX: "true"
           SMOKE_BASE_URL: http://127.0.0.1:3000
-          SMOKE_INTERNAL_SECRET: ci-internal-sync-secret
+          SMOKE_INTERNAL_SECRET: ci-internal-sync-secret-at-least-32-bytes
           SMOKE_ALLOW_UNCONFIGURED: "true"
       - name: Stop production server
         if: always()

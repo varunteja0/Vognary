@@ -415,6 +415,12 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.doesNotMatch(source, /fetch\(`\$\{baseUrl\}\/api\/audit-intake`,\s*\{[\s\S]*?method:\s*"POST"/);
   assert.match(source, /Recovery Sources without session/);
   assert.match(ci, /SMOKE_BASE_URL: http:\/\/127\.0\.0\.1:3000[\s\S]*SMOKE_ALLOW_UNCONFIGURED: "true"/);
+  const serverSecret = ci.match(/INTERNAL_SYNC_SECRET=([^\s\\]+)/)?.[1];
+  const smokeSecret = ci.match(/SMOKE_INTERNAL_SECRET:\s*([^\s]+)/)?.[1];
+  assert.ok(serverSecret, "CI production server must configure an internal secret");
+  assert.equal(smokeSecret, serverSecret, "the smoke client must use the production server's internal secret");
+  assert.ok(Buffer.byteLength(serverSecret, "utf8") >= 32, "CI internal secret must satisfy the production guard");
+  assert.ok(source.includes(`|| "${serverSecret}"`), "the local smoke fallback must satisfy the same guard");
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[410\]/);
   assert.match(activation, /Feature migrations 0002 through 0054/);

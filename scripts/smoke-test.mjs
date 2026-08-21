@@ -29,7 +29,7 @@ const health = await (await assertOk("/api/health")).json();
 if (health.status !== "ok") throw new Error("Health endpoint did not return ok");
 
 const readiness = await (await assertOk("/api/readiness", {
-  headers: { authorization: `Bearer ${process.env.SMOKE_INTERNAL_SECRET || "ci-internal-sync-secret"}` },
+  headers: { authorization: `Bearer ${process.env.SMOKE_INTERNAL_SECRET || "ci-internal-sync-secret-at-least-32-bytes"}` },
 })).json();
 if (!["ok", "degraded"].includes(readiness.status)) throw new Error("Readiness endpoint returned an invalid status");
 if (!readiness.database?.status) throw new Error("Readiness endpoint did not report database status");
