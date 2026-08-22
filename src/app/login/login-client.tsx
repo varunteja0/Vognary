@@ -175,7 +175,7 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
           <Link href="/" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Home</Link>
         </nav>
 
-        <section className="panel p-6 sm:p-8 rise">
+        <section className="panel p-6 sm:p-8">
           <span className="folio" data-folio="01">Sign in</span>
           <h1 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">Know what your company is committed to pay next</h1>
           <p className="mt-2 text-sm leading-6 text-(--muted)">Sign in with Google to remember the bills you already reviewed, review what renews next, and open the receipt behind each claim.</p>

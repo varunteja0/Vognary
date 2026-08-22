@@ -34,10 +34,15 @@ export function proxy(request: NextRequest) {
 
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDevelopment = process.env.NODE_ENV !== "production";
+  const isHttps = request.nextUrl.protocol === "https:"
+    || request.headers.get("x-forwarded-proto") === "https";
   const contentSecurityPolicy = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ""}`,
-    `style-src 'self' 'nonce-${nonce}' 'sha256-8CATYECnQ0vJS3WqLz4Gjr6++smCUyiY9GrMfmRXs4A='`,
+    // Keep style-src nonce-free. CSP3 ignores 'unsafe-inline' for styles when a
+    // nonce is present, and Next/React still emit <style> tags plus style
+    // attributes. Script XSS stays nonce + strict-dynamic.
+    "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "connect-src 'self' https://www.googleapis.com https://oauth2.googleapis.com",
@@ -48,7 +53,7 @@ export function proxy(request: NextRequest) {
     "base-uri 'self'",
     "form-action 'self'",
     "manifest-src 'self'",
-    ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
+    ...(isDevelopment || !isHttps ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("content-security-policy", contentSecurityPolicy);
