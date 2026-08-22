@@ -170,10 +170,30 @@ test("Recovery home is an honest first baseline and keeps currency totals separa
   assert.deepEqual(home.next30DayTotals.map((total) => [total.amount.currency, total.amount.minor]), [["INR", "199900"]]);
   assert.equal(home.needsMe.some((item) => item.commitmentId === "commitment-inr"), true);
   assert.equal(home.needsMe.some((item) => item.commitmentId === "commitment-ignored"), false);
+  assert.deepEqual(home.decisionQueue.map((item) => item.commitmentId), ["commitment-inr"]);
   assert.deepEqual(home.next.map((item) => item.commitmentId), ["commitment-inr", "commitment-usd"]);
   assert.equal(home.coverage.state, "BASELINE_ONLY");
   assert.deepEqual(home.evidenceSources, []);
   assert.deepEqual(home.possibleOverlaps, []);
+});
+
+test("upcoming rows name the most recent cited bill, never a blended amount no receipt contains", () => {
+  const home = buildHomeProjection({
+    workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
+    generatedAt: now,
+    commitments: [{
+      ...commitments[0],
+      // Engine effective amount (e.g. a blend across price points)…
+      amountMinor: BigInt(204_900),
+      monthlyEquivalentMinor: BigInt(204_900),
+      // …versus what the most recent receipt actually contains.
+      latestObservedMinor: BigInt(209_900),
+      nextExpectedDate: "2026-09-06",
+    }],
+    sources: [],
+    changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 1, items: [] },
+  });
+  assert.deepEqual(home.next.map((item) => [item.merchant, item.amount.minor]), [["OpenAI", "209900"]]);
 });
 
 test("Home publishes possible overlap only for two distinct family members and cites yearly totals from cadence-established amounts", () => {
@@ -230,6 +250,7 @@ test("active commitments with unknown cadence stay upcoming but never inflate mo
   assert.deepEqual(home.annualizedEstimateTotals.map((total) => total.amount.minor), ["2398800"]);
   assert.deepEqual(home.next30DayTotals.map((total) => total.amount.minor), ["5199900"]);
   assert.equal(home.unknownCadenceCommitmentCount, 1);
+  assert.equal(home.decisionQueue.some((item) => item.commitmentId === irregular.id), true);
   assert.equal(home.next.some((item) => item.commitmentId === irregular.id), true);
 });
 
@@ -251,6 +272,7 @@ test("a provisional single receipt stays on the queue without inflating monthly 
   });
   assert.equal(home.monthlyTotals.length, 0);
   assert.equal(home.next30DayTotals.length, 0);
+  assert.equal(home.decisionQueue[0]?.commitmentId, "commitment-provisional");
   assert.equal(home.next[0]?.commitmentId, "commitment-provisional");
 });
 
@@ -467,6 +489,7 @@ test("upcoming reminders accept cited KEEP charges for the 1-day window and stil
     sources: [],
     changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 1, items: [] },
   });
+  assert.equal(irregular.next[0]?.commitmentId, commitments[0]?.id);
   assert.equal(irregular.next[0]?.reminderEligible, false);
 });
 

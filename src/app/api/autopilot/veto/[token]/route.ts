@@ -47,7 +47,12 @@ export async function GET() {
 
 export async function POST(request: Request, context: RouteContext) {
   const { token: rawToken } = await context.params;
-  const token = decodeURIComponent(rawToken ?? "").trim();
+  let token = "";
+  try {
+    token = decodeURIComponent(rawToken ?? "").trim();
+  } catch {
+    return htmlResponse("invalid", 403);
+  }
   if (!token || token.length > 2_000) {
     return htmlResponse("invalid", 403);
   }

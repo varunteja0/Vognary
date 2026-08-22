@@ -406,7 +406,8 @@ function nextQuietCharge(
   return {
     commitmentId: next.fact.commitmentId,
     merchant: next.fact.merchant,
-    amount: toMoneyDto(next.fact.amountMinor, next.fact.currency),
+    // Same receipt-cited rule as decision cards and upcoming rows.
+    amount: toMoneyDto(next.fact.latestObservedMinor ?? next.fact.amountMinor, next.fact.currency),
     date: next.fact.nextExpectedDate,
   };
 }

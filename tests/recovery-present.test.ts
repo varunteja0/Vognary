@@ -9,6 +9,7 @@ import {
   customerStatusForCommitment,
   firstResultBrief,
   gmailWizardStep,
+  comingLaterItems,
   homeAttentionItems,
   homeHasAttention,
   inboxFailureCopy,
@@ -199,6 +200,55 @@ test("inbox failures never print PARSE_FAILED", () => {
   assert.doesNotMatch(inboxFailureCopy("PARSE_FAILED").title, /PARSE_FAILED/);
   assert.doesNotMatch(inboxFailureCopy("PARSE_FAILED").detail, /PARSE_FAILED/);
   assert.equal(inboxFailureCopy("MYSTERIOUS_CODE").title, errorCopy.PARSE_FAILED.title);
+});
+
+test("Coming later omits vendors that are already in the decision queue", () => {
+  const queued = home({
+    decisionQueue: [{
+      commitmentId: "commitment-1",
+      merchant: "OpenAI",
+      dueDate: "2026-09-06",
+      daysAway: 28,
+      charge: money,
+      stake: money,
+      headline: "Decide before Sunday",
+      sentence: "OpenAI charges ₹1,999.00.",
+      excerpt: null,
+      citedEvidenceId: "evidence-1",
+      provisional: false,
+      reasonKeys: ["RENEWS_SOON"],
+      reasons: ["Expected in 28 days."],
+      overlapMerchants: [],
+      askPurpose: false,
+      evidenceIds: ["evidence-1"],
+    }],
+    next: [
+      {
+        commitmentId: "commitment-1",
+        merchant: "OpenAI",
+        date: "2026-09-06",
+        daysAway: 28,
+        amount: money,
+        decision: null,
+        confidence,
+        reminderEligible: true,
+        evidenceIds: ["evidence-1"],
+      },
+      {
+        commitmentId: "commitment-2",
+        merchant: "GitHub",
+        date: "2026-09-30",
+        daysAway: 52,
+        amount: money,
+        decision: { value: "KEEP", decidedAt: "2026-08-09T10:00:00.000Z", updatedAt: "2026-08-09T10:00:00.000Z" },
+        confidence,
+        reminderEligible: true,
+        evidenceIds: ["evidence-2"],
+      },
+    ],
+  });
+  const later = comingLaterItems(queued);
+  assert.deepEqual(later.map((item) => item.merchant), ["GitHub"]);
 });
 
 test("keep-current is offered only before forwarding is verified", () => {

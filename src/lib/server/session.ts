@@ -157,7 +157,12 @@ function readCookie(request: Request, name: string) {
   const cookies = cookieHeader.split(";").map((cookie) => cookie.trim());
   const target = `${name}=`;
   const cookie = cookies.find((value) => value.startsWith(target));
-  return cookie ? decodeURIComponent(cookie.slice(target.length)) : null;
+  if (!cookie) return null;
+  try {
+    return decodeURIComponent(cookie.slice(target.length));
+  } catch {
+    return null;
+  }
 }
 
 function hashSessionToken(token: string) {

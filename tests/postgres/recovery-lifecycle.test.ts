@@ -487,8 +487,9 @@ test("upcoming-only receipt evidence never appears as a recent observed charge",
 
     assert.equal(submitted.data.submission.acceptedEvidenceCount, 1);
     assert.equal(submitted.data.home.recentObservations.length, 0);
-    // Upcoming-only evidence surfaces as a provisional decision card naming
-    // the pre-debit date — never as a recent observed charge.
+    // The pre-debit date surfaces as upcoming AND as a provisional decision
+    // card; it never becomes a recent observed charge.
+    assert.equal(submitted.data.home.next[0]?.date, "2026-08-20");
     assert.equal(submitted.data.home.decisionQueue[0]?.merchant, "MAX BUPA HEALTH");
     assert.equal(submitted.data.home.decisionQueue[0]?.dueDate, "2026-08-20");
   } finally {

@@ -183,7 +183,8 @@ test("home leads with the pre-renewal decision queue and cited spend activation"
     "active Autopilot actions must render above cited spend metrics",
   );
   assert.match(homeSource, /Coming later/);
-  assert.match(homeSource, /home\.next/);
+  assert.match(homeSource, /comingLaterItems\(home\)/);
+  assert.doesNotMatch(homeSource, /home\.next\.map/);
   assert.match(homeSource, /No recurring amount yet/);
   assert.match(homeSource, /shouldShowRecentChange/);
   assert.doesNotMatch(homeSource, /WHAT NEEDS ME\?|WHAT CHANGED\?|WHAT HAPPENS NEXT\?|COVERAGE/);

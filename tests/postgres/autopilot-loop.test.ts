@@ -429,9 +429,7 @@ test("persisted private-pilot loop reaches cited picture, mandate, delivered vet
     const homeBeforeMandate = extras.data.home;
     assert.ok(homeBeforeMandate.monthlyTotals.length >= 1);
     assert.ok(homeBeforeMandate.activeCommitmentCount >= 1);
-    // Fresh commitments surface as decision cards; the quiet next list only
-    // carries charges with a recorded decision, so money stays visible either way.
-    assert.ok(homeBeforeMandate.next.length + homeBeforeMandate.decisionQueue.length >= 1);
+    assert.ok(homeBeforeMandate.next.length >= 1);
 
     await pool.query(`update recovery_commitments set confidence_score = 90 where workspace_id = $1`, [workspaceId]);
     const signed = await signStandingMandate({
@@ -573,9 +571,7 @@ test("persisted private-pilot loop reaches cited picture, mandate, delivered vet
     const home = await getRecoveryHome({ workspaceId, actorUserId: ownerUserId });
     assert.equal(home.autopilot?.mandate?.status, "ACTIVE");
     assert.ok(home.monthlyTotals.length >= 1);
-    // Undecided charges surface as decision cards; decided ones return to the
-    // quiet next list. The commitment's money stays visible either way.
-    assert.ok(home.next.length + home.decisionQueue.length >= 1);
+    assert.ok(home.next.length >= 1);
   } finally {
     process.env.AUTOPILOT_EXECUTION_ENABLED = previous.execution ?? "";
     process.env.AUTOPILOT_NOTICE_ENABLED = previous.notice ?? "";

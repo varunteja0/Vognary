@@ -6,6 +6,8 @@
 > **Exit:** Day-21 stop/go using THE-LAW scoreboard metrics.
 > **Historical field memory (pre-autopilot paste-audit campaign):** [`people-conversation-learning.md`](people-conversation-learning.md) — read as history; do not rewrite those quotes as new pilot evidence.
 
+> **FREEZE OVERRIDE (2026-08-18, independently restated 2026-08-22):** THE-LAW outranks this file on the product offer. Live V1 is Commitment Intelligence: add 2–5 software bills → cited Keep / Review later / Plan to cancel before the charge. Vognary does not cancel a service and does not move money. **Do not send §3, §3.5, §3.6, §4, §9 (mandate/cancel questions), or §10 as live copy.** Those sections are historical Autopilot-era scripts. Live first-10 copy is the top “SEND NOW” block in gitignored `docs/execution/private-autopilot-outreach-draft.md` only — not the “Historical — Private Autopilot” block later in that same file. Funnel counts in §0 remain the measurement skeleton; do not invent connected / mandate / paid.
+
 ---
 
 ## 0. Success / stop criteria
@@ -139,6 +141,8 @@ Veto or mandate revocation returns queued cases to withdrawn immediately. Except
 ---
 
 ## 3. Outreach scripts (copy-paste)
+
+**DO NOT SEND. Historical Autopilot-era copy. See the freeze override at the top of this file.**
 
 These replace the free paste-audit scripts. Do not offer a free PDF audit as the product.
 
@@ -319,6 +323,8 @@ Copy result into `docs/CONTINUE-HERE.md` under a short “Phase A result” note
 ---
 
 ## 9. 15-minute behavioral interview (do not treat as qualification)
+
+**DO NOT use the mandate / 48-hour-veto / ₹999 questions below as the live first-10 script.** Under the freeze, the live session is: paste 2–5 bills, see cited decisions, ask whether that beat memory. Keep every CRM outcome column blank until the matching event exists.
 
 Use after a sourced target replies “pilot” or agrees to a call. This is **not** a sales demo and does **not** mark the CRM row qualified. Keep every outcome column blank until the matching event exists.
 

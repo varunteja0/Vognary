@@ -74,7 +74,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await expect(page.getByText("OpenAI").first()).toBeVisible();
   await page.getByRole("button", { name: "See Home" }).click();
   await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Coming later" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Coming later" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "What we found" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);

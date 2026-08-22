@@ -20,6 +20,7 @@ import {
   chargeWhenLine,
   customerPhrases,
   decisionOutcomeTone,
+  comingLaterItems,
   firstResultBrief,
   shouldOfferKeepCurrent,
   shouldShowComingUp,
@@ -682,12 +683,13 @@ function ComingLater({
   onOpenCommitment: (commitmentId: string) => void;
   onSeeAllCommitments: () => void;
 }) {
-  if (!shouldShowComingUp(home)) return null;
+  const later = comingLaterItems(home);
+  if (!shouldShowComingUp(home) || later.length === 0) return null;
   return (
     <section aria-labelledby="recovery-next" className="stack-section">
       <SectionHeading id="recovery-next">Coming later</SectionHeading>
       <ul className="ledger-list grid">
-        {home.next.map((item) => (
+        {later.map((item) => (
           <UpcomingRow key={`${item.commitmentId}-${item.date}`} item={item} onOpenCommitment={onOpenCommitment} />
         ))}
       </ul>

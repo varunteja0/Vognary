@@ -58,6 +58,7 @@ test("start cards quote the most recent bill, not an average no receipt contains
   const openai = cards.find((card) => card.id === "openai");
   assert.ok(openai);
   assert.equal(openai?.amountDisplay, "₹2,099.00");
+  assert.equal(openai?.excerpt, "Invoice paid INR 2,099.00");
   assert.match(openai?.sentence ?? "", /OpenAI charges ₹2,099\.00/);
 });
 

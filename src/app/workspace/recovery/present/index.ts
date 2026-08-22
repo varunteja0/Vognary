@@ -13,6 +13,7 @@ export {
   homeHasAttention,
   homeAttentionCount,
   shouldShowRecentChange,
+  comingLaterItems,
   shouldShowComingUp,
   shouldOfferKeepCurrent,
   firstResultBrief,

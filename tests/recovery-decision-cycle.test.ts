@@ -255,6 +255,23 @@ test("acceptance 5: stable GitHub with KEEP 21 days out stays quiet", () => {
   assert.equal(home.nextQuietCharge?.date, "2026-09-09");
 });
 
+test("quiet charge names the most recent cited bill, not the blended effective amount", () => {
+  const home = buildDecisionHome([
+    fact({
+      commitmentId: "github",
+      merchant: "GitHub",
+      amountMinor: BigInt(40_000),
+      latestObservedMinor: BigInt(45_900),
+      cadence: "MONTHLY",
+      nextExpectedDate: "2026-09-09",
+      stamp: "KEEP",
+      firstDetectedOn: "2025-01-01",
+      observationCount: 12,
+    }),
+  ], today);
+  assert.equal(home.nextQuietCharge?.amount.minor, "45900");
+});
+
 test("acceptance 6: price increase due in 5 days ranks first with a cited delta", () => {
   const home = buildDecisionHome([
     fact({

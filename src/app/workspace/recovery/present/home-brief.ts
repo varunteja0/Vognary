@@ -4,6 +4,7 @@ import type {
   HomeProjectionDto,
   PossibleOverlapGroupDto,
   ReceiptInboxStatusDto,
+  UpcomingItemDto,
 } from "@/lib/recovery/contracts";
 
 export type FirstResultBrief = {
@@ -31,8 +32,13 @@ export function shouldShowRecentChange(home: HomeProjectionDto): boolean {
   return home.changed.state === "COMPARED" && home.changed.items.length > 0;
 }
 
+export function comingLaterItems(home: HomeProjectionDto): readonly UpcomingItemDto[] {
+  const queued = new Set(home.decisionQueue.map((card) => card.commitmentId));
+  return home.next.filter((item) => !queued.has(item.commitmentId));
+}
+
 export function shouldShowComingUp(home: HomeProjectionDto): boolean {
-  return home.next.length > 0;
+  return comingLaterItems(home).length > 0;
 }
 
 export function shouldOfferKeepCurrent(

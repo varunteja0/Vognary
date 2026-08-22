@@ -36,6 +36,16 @@ export type StartCard = {
   overlapMerchants: readonly string[];
 };
 
+function latestCitedEvidence(item: RecurringItemLike) {
+  const links = item.evidence ?? [];
+  const dated = links.filter((link) => typeof link.date === "string" && link.date.length >= 10);
+  if (dated.length) {
+    return [...dated].sort((left, right) => String(right.date).localeCompare(String(left.date)))[0];
+  }
+  // Merged evidence is stored oldest-first, so without dates the last row is the newest.
+  return links.at(-1);
+}
+
 export function startCardsFromRecurringItems(items: readonly RecurringItemLike[], today: string): StartCard[] {
   const prepared = items.flatMap((item, index) => {
     const merchant = item.merchant?.trim();
@@ -43,16 +53,11 @@ export function startCardsFromRecurringItems(items: readonly RecurringItemLike[]
     // One charge per card: the most recent cited bill. The engine's averaged
     // effective amount is only a fallback, so a price-increase card never shows
     // an average that no receipt contains.
-    const cited = (item.evidence ?? []).filter((link) => (
-      typeof link.amountDecimal === "string" || (typeof link.amount === "number" && Number.isFinite(link.amount) && link.amount > 0)
-    ));
-    const dated = cited.filter((link) => typeof link.date === "string" && link.date.length >= 10);
-    const newestDated = dated.length
-      ? [...dated].sort((left, right) => String(right.date).localeCompare(String(left.date)))[0]
-      : undefined;
-    // Merged evidence is stored oldest-first, so without dates the last row is the newest.
-    const latestCited = newestDated ?? cited.at(-1);
-    const latestDecimal = latestCited?.amountDecimal ?? (typeof latestCited?.amount === "number" ? latestCited.amount.toFixed(2) : undefined);
+    const latestCited = latestCitedEvidence(item);
+    const latestDecimal = latestCited?.amountDecimal
+      ?? (typeof latestCited?.amount === "number" && Number.isFinite(latestCited.amount) && latestCited.amount > 0
+        ? latestCited.amount.toFixed(2)
+        : undefined);
     const numericAmount = item.averageAmount ?? item.amount ?? item.evidence?.[0]?.amount;
     const amountDecimal = latestDecimal
       ?? item.amountDecimal
@@ -73,7 +78,7 @@ export function startCardsFromRecurringItems(items: readonly RecurringItemLike[]
       amountDisplay,
       dueDate,
       provisional,
-      excerpt: receiptQuote(item.evidence?.[0]?.description ?? null),
+      excerpt: receiptQuote(latestCited?.description ?? null),
     }];
   });
 

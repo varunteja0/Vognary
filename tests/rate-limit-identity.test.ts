@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import test from "node:test";
 
 import { getClientIdentity, getRateLimitBackendStatus } from "../src/lib/rate-limit";
+import { readSession } from "../src/lib/server/session";
 
 test("Postgres is the shared production rate-limit backend when Upstash is absent", () => {
   const previous = {
@@ -40,6 +41,22 @@ test("authenticated requests share a user bucket across changing IP addresses", 
     assert.equal(first, second);
     assert.match(first, /^user:/);
     assert.doesNotMatch(first, /123e4567/);
+  } finally {
+    if (previous === undefined) delete process.env.SESSION_SECRET;
+    else process.env.SESSION_SECRET = previous;
+  }
+});
+
+test("a malformed percent-encoded session cookie does not crash identity", () => {
+  const previous = process.env.SESSION_SECRET;
+  process.env.SESSION_SECRET = "rate-limit-test-secret-at-least-32-bytes";
+  try {
+    const request = new Request("https://vognary.test/api/audit", {
+      headers: { cookie: "vognary_session=%zz", "x-forwarded-for": "203.0.113.9" },
+    });
+    assert.equal(readSession(request), null);
+    const identity = getClientIdentity(request);
+    assert.match(identity, /^network:/);
   } finally {
     if (previous === undefined) delete process.env.SESSION_SECRET;
     else process.env.SESSION_SECRET = previous;

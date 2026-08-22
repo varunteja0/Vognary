@@ -760,7 +760,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     ? recoveryViews
     : recoveryViews.filter((view) => view !== "MANDATE");
   return (
-    <main id="recovery-workspace" className="relative px-4 pb-28 pt-5 text-foreground sm:px-6 sm:pb-10 lg:px-8">
+    <main id="recovery-workspace" className="relative px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-5 text-foreground sm:px-6 sm:pb-10 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2.5">

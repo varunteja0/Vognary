@@ -162,7 +162,10 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
       merchant: commitment.merchant,
       date: commitment.nextExpectedDate!,
       daysAway,
-      amount: toMoneyDto(commitment.amountMinor, commitment.currency),
+      // Per-merchant upcoming rows name a charge a receipt actually contains
+      // (same rule as decision cards); the blended effective amount is only a
+      // fallback when no dated observation exists.
+      amount: toMoneyDto(commitment.latestObservedMinor ?? commitment.amountMinor, commitment.currency),
       decision: commitment.decision,
       confidence: toConfidence(commitment),
       reminderEligible: isRecoveryReminderEligible(commitment),
