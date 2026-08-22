@@ -39,6 +39,45 @@ test("an observed receipt still needs a merchant, an amount, and a real charge d
   assert.equal(extractObservedReceipt("OpenAI ChatGPT Plus renews on 6 August 2026"), null);
 });
 
+test("an unknown vendor pasted the way /start suggests still parses", () => {
+  // The first-session placeholder teaches "Merchant paid CURRENCY amount on DATE."
+  // A vendor outside the brand list must not need a label or a known name.
+  const paid = extractObservedReceipt("Acme Cloud paid USD 20.00 on 28 August 2026.");
+  assert.ok(paid, "the placeholder paste format should parse for an unknown vendor");
+  assert.equal(paid?.merchant, "Acme Cloud");
+  assert.equal(paid?.amountDecimal, "20.00");
+  assert.equal(paid?.currency, "USD");
+  assert.equal(paid?.observedDate, "2026-08-28");
+});
+
+test("a capitalized billing line after a standalone vendor name still parses", () => {
+  const observed = extractObservedReceipt([
+    "Linear",
+    "Invoice paid INR 1,900.00",
+    "Payment date: 6 August 2026",
+    "Linear Business renews monthly on 6 September 2026.",
+  ].join("\n"));
+  assert.ok(observed, "a capitalized 'Invoice paid' line is common on real receipts");
+  assert.equal(observed?.merchant, "Linear");
+  assert.equal(observed?.amountDecimal, "1900.00");
+  assert.equal(observed?.observedDate, "2026-08-06");
+});
+
+test("receipt vocabulary itself never becomes the merchant", () => {
+  for (const text of [
+    "Invoice paid INR 1,900.00 on 6 August 2026.",
+    "Paid INR 1,900.00 on 6 August 2026.",
+    "Statement paid INR 1,900.00 on 6 August 2026.",
+    "Total paid INR 1,900.00 on 6 August 2026.",
+  ]) {
+    const observed = extractObservedReceipt(text);
+    assert.ok(
+      observed === null || !/^(invoice|paid|statement|total)$/i.test(observed.merchant),
+      `"${text}" must not mint a merchant from receipt vocabulary (got ${observed?.merchant})`,
+    );
+  }
+});
+
 test("splits pasted text into separate receipt snippets", () => {
   const snippets = splitReceiptSnippets(sampleReceipts);
   assert.equal(snippets.length, 2);

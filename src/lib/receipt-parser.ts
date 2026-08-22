@@ -17,8 +17,13 @@ const merchantPatterns = [
   // Mandate/pre-debit phrasing: "... mandate towards ACME FITNESS for INR 999 ...".
   /(?:towards|in favou?r of)\s+(?!INR\b|Rs\.?\b|USD\b)([A-Z][A-Za-z0-9 .&-]{2,40}?)(?:\s+(?:on|via|of|dated|will|is|has|for)\b|[.,]|$)/,
   // Leading proper-noun phrase directly before a billing keyword, e.g.
-  // "Acme Cloud invoice ..." or "Foo domain renewal notice ...".
-  /^([A-Z][A-Za-z0-9.&+-]*(?:\s+[A-Z][A-Za-z0-9.&+-]*){0,2})\s+(?:domain|invoice|receipt|subscription|renewal|premium|bill|plan|membership)\b/,
+  // "Acme Cloud invoice ..." or "Foo domain renewal notice ...". Real receipts
+  // capitalize the billing line ("Invoice paid …") and /start teaches the
+  // "Vendor paid CURRENCY amount on DATE" format, so each keyword accepts both
+  // cases inline and paid/charged count too. The merchant stays deliberately
+  // uppercase-sensitive, and the lookahead keeps receipt vocabulary itself
+  // from becoming the merchant.
+  /^(?!(?:Invoice|Receipt|Statement|Total|Amount|Payment|Bill|Subscription|Renewal|Premium|Plan|Membership|Domain|Paid|Charged)\b)([A-Z][A-Za-z0-9.&+-]*(?:[ \t]+[A-Z][A-Za-z0-9.&+-]*){0,2})\s+(?:[Dd]omain|[Ii]nvoice|[Rr]eceipt|[Ss]ubscription|[Rr]enewal|[Pp]remium|[Bb]ill|[Pp]lan|[Mm]embership|[Pp]aid|[Cc]harged)\b/,
 ];
 
 const mandateLikePattern = /pre-?debit|e-?mandate|\bmandate\b|standing instruction|autopay|auto-?debit/i;
