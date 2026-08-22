@@ -1,6 +1,6 @@
 # SEND TODAY — historical pre-autopilot outreach (retired 2026-08-13)
 
-> **Historical; retired by the 2026-08-13 autopilot pivot.** Live Phase A scripts live in [`phase-a-market-contact.md`](phase-a-market-contact.md). Do not treat this queue as the current product offer. Preserve the measured send record below; do not rewrite it as new pilot evidence.
+> **Historical; retired by the 2026-08-13 autopilot pivot.** Live Phase A scripts live in [`phase-a-market-contact.md`](phase-a-market-contact.md). Do not treat this queue as the current product offer. Preserve the measured send record below; do not rewrite it as new pilot evidence. Every `/private-audit` URL below is a dead historical artifact that now redirects to current sign-in and cannot collect a lead or payment.
 
 You send. Nothing auto-sends. Mark CRM after each send.
 
@@ -128,7 +128,7 @@ money, surprise, pay, or consent fields without the matching real event.
 
 **Your name in messages:** replace `Varun` if that is not you.
 
-**Intake link (same for all DMs):**  
+**Retired historical intake link (do not send):**
 https://www.vognary.com/private-audit?src=dm
 
 **Product link (if they ask what Vognary is):**  

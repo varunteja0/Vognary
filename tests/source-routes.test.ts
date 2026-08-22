@@ -17,6 +17,7 @@ test("legacy public URLs redirect to canonical launch destinations", async () =>
       "/beta-readiness",
       "/integration-model",
       "/launch",
+      "/private-audit",
     ].includes(entry.source)),
     [
       { source: "/connect", destination: "/app", permanent: true },
@@ -26,13 +27,14 @@ test("legacy public URLs redirect to canonical launch destinations", async () =>
       { source: "/partners", destination: "/", permanent: true },
       { source: "/beta-readiness", destination: "/", permanent: true },
       { source: "/integration-model", destination: "/", permanent: true },
-      { source: "/launch", destination: "/private-audit", permanent: true },
+      { source: "/launch", destination: "/login?next=/app", permanent: true },
+      { source: "/private-audit", destination: "/login?next=/app", permanent: true },
     ],
   );
 });
 
 test("direct brand and verification utilities stay out of search discovery", () => {
-  for (const path of ["src/app/brand/page.tsx", "src/app/verify/page.tsx"]) {
+  for (const path of ["src/app/brand/page.tsx", "src/app/verify/page.tsx", "src/app/start/page.tsx"]) {
     const page = source(path);
     assert.match(page, /robots: \{ index: false, follow: false \}/);
   }

@@ -366,7 +366,12 @@ test("two realistic receipt observations infer one canonical monthly subscriptio
       now: new Date("2026-08-09T10:00:00.000Z"),
     });
     assert.equal(first.data.submission.acceptedEvidenceCount, 1);
-    assert.equal(first.data.commitments.length, 0, "one observed charge must not fabricate recurrence");
+    assert.equal(first.data.commitments.length, 1, "one named receipt is a provisional decision");
+    assert.equal(first.data.commitments[0]?.merchant, "OpenAI");
+    assert.equal(first.data.commitments[0]?.evidenceCount, 1);
+    assert.equal(first.data.home.decisionQueue[0]?.provisional, true);
+    assert.ok(first.data.home.decisionQueue[0]?.reasonKeys.includes("PROVISIONAL_SINGLE"));
+    assert.equal(first.data.home.monthlyTotals.length, 0, "a hypothesized cadence must not inflate monthly totals");
     assert.equal(first.data.home.recentObservations.length, 1);
     assert.ok(first.data.home.recentObservations[0]?.evidenceId);
     assert.equal(first.data.home.recentObservations[0]?.merchant, "OpenAI");
@@ -396,6 +401,8 @@ test("two realistic receipt observations infer one canonical monthly subscriptio
     assert.equal(second.data.commitments[0]?.amount.minor, "199900");
     assert.equal(second.data.commitments[0]?.evidenceCount, 2);
     assert.equal(second.data.commitments[0]?.nextExpectedDate, "2026-09-06");
+    assert.equal(second.data.home.decisionQueue.some((card) => card.provisional), false);
+    assert.equal(second.data.home.monthlyTotals[0]?.amount.minor, "199900");
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
     await pool.query(`delete from users where id = $1`, [ownerUserId]);

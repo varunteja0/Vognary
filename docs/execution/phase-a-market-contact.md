@@ -36,7 +36,7 @@ This is the only private-pilot conversion sequence agents may count. Empty cells
 
 ```text
 20 sourced targets
-  → 5 conversations
+  → 5 conversations (current: 1 — Prashanth Vaidya, 2026-08-20/22)
   → 2 connected sources plus standing mandates
   → 1 financially meaningful cited aha
   → 1 explicit payment ask
@@ -45,7 +45,7 @@ This is the only private-pilot conversion sequence agents may count. Empty cells
 | Step | Current (2026-08-15) | Rule |
 | --- | ---: | --- |
 | Sourced targets in gitignored CRM | 20 | Direct public sources only; no invented spend or identity |
-| Conversations | 0 | Founder-confirmed reply or call. Drafts are not conversations. |
+| Conversations | 1 | Founder-confirmed reply or call. Drafts are not conversations. Evidence 2026-08-22: Prashanth Vaidya replied in https://x.com/pvbuilds/status/2090155802158084243 |
 | Connected sources + mandates | 0 | Both events on the same workspace |
 | Financially meaningful cited aha | 0 | Customer sees an unexpected cited commitment from their evidence |
 | Explicit payment ask | 0 | Founder asked; `actual_payment_at` stays blank until money arrives |

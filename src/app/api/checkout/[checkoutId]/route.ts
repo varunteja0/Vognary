@@ -16,7 +16,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "A valid checkout reference is required." }, { status: 400 });
   }
   if (!isDatabaseConfigured()) {
-    return NextResponse.json({ status: "not-configured", requiredEnv: ["DATABASE_URL"] }, { status: 501 });
+    return NextResponse.json(
+      {
+        status: "unavailable",
+        message: "Historical checkout status is temporarily unavailable. No settlement conclusion can be drawn yet.",
+      },
+      { status: 503, headers: { "cache-control": "no-store" } },
+    );
   }
 
   let checkout;

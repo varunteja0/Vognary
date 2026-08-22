@@ -563,7 +563,7 @@ test("correction drafts only become contract patches when they are complete", ()
 });
 
 test("evidence requests are built from the chosen mode, not from stale draft state", () => {
-  const draft = { mode: "CSV_IMPORT" as const, receiptText: "  OpenAI invoice  ", preparing: false, csvSources: [{ clientRef: "csv-1", name: "statement.csv", text: "Date,Description", rowCount: 1, warnings: [] }] };
+  const draft = { mode: "CSV_IMPORT" as const, receiptText: "  OpenAI invoice  ", preparing: false, csvSources: [{ clientRef: "csv-1", name: "statement.csv", text: "Date,Description", rowCount: 1, warnings: [] }], imageDrafts: [] };
 
   assert.deepEqual(evidenceRequestFromDraft(draft, "RECEIPT_PASTE"), { kind: "RECEIPT_PASTE", receipts: [{ clientRef: "receipt-paste-1", text: "OpenAI invoice" }] });
   assert.deepEqual(evidenceRequestFromDraft(draft, "CSV_IMPORT"), { kind: "CSV_IMPORT", sources: [{ clientRef: "csv-1", name: "statement.csv", text: "Date,Description" }] });

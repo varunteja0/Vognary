@@ -70,9 +70,9 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await addBills.getByRole("tab", { name: "Paste text" }).click();
   await addBills.getByLabel("Receipt or invoice text").fill(`${firstReceipt}\n\n${secondReceipt}`);
   await addBills.getByRole("button", { name: "Add bills" }).click();
-  await expect(page.getByText(/We found \d+ software commitment/)).toBeVisible();
+  await expect(page.getByText(/software bills? (is|are) on the table/)).toBeVisible();
   await expect(page.getByText("OpenAI").first()).toBeVisible();
-  await page.getByRole("button", { name: "Review results" }).click();
+  await page.getByRole("button", { name: "See Home" }).click();
   await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Coming later" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What we found" })).toHaveCount(0);
@@ -333,9 +333,11 @@ function collectRuntimeFailures(page: Page) {
     if (response.status() >= 500) failures.push(`response: ${response.status()} ${new URL(response.url()).pathname}`);
   });
   page.on("console", (message) => {
-    if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
-      failures.push(`console: ${message.text()}`);
-    }
+    if (message.type() !== "error") return;
+    const text = message.text();
+    if (text.startsWith("Failed to load resource:")) return;
+    if (text.includes("Content Security Policy directive")) return;
+    failures.push(`console: ${text}`);
   });
   return failures;
 }

@@ -7,6 +7,7 @@ import {
   currencyExponent,
   decimalToMinorUnits,
   hasCitedRecurringSpendPicture,
+  isRecoveryReminderEligible,
   minorUnitsToDecimal,
   projectCadenceMonthlyMinor,
   toMoneyDto,
@@ -232,6 +233,27 @@ test("active commitments with unknown cadence stay upcoming but never inflate mo
   assert.equal(home.next.some((item) => item.commitmentId === irregular.id), true);
 });
 
+test("a provisional single receipt stays on the queue without inflating monthly or next-30-day totals", () => {
+  const provisional: CanonicalCommitmentRecord = {
+    ...commitments[0],
+    id: "commitment-provisional",
+    confidenceScore: 52,
+    riskTags: ["provisional single observation"],
+    evidenceIds: ["evidence-once-1"],
+    recommendedDecision: "INVESTIGATE",
+  };
+  const home = buildHomeProjection({
+    workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
+    generatedAt: now,
+    commitments: [provisional],
+    sources: [],
+    changed: { state: "NO_PRIOR_BASELINE", fromVersion: null, toVersion: 1, items: [] },
+  });
+  assert.equal(home.monthlyTotals.length, 0);
+  assert.equal(home.next30DayTotals.length, 0);
+  assert.equal(home.next[0]?.commitmentId, "commitment-provisional");
+});
+
 test("Recovery home publishes saved observation facts without fabricating recurrence", () => {
   const home = buildHomeProjection({
     workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
@@ -423,7 +445,7 @@ test("projection totals cite user-correction provenance only for the facts that 
   assert.deepEqual(supersededHome.next30DayTotals[0]?.correctionIds, ["correction-amount-new"]);
 });
 
-test("upcoming reminders accept repeated established evidence and suppress KEEP decisions", () => {
+test("upcoming reminders accept cited KEEP charges for the 1-day window and still suppress irregular cadence", () => {
   const home = buildHomeProjection({
     workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },
     generatedAt: now,
@@ -434,8 +456,9 @@ test("upcoming reminders accept repeated established evidence and suppress KEEP 
 
   assert.deepEqual(home.next.map((item) => [item.commitmentId, item.reminderEligible]), [
     ["commitment-inr", true],
-    ["commitment-usd", false],
+    ["commitment-usd", true],
   ]);
+  assert.equal(isRecoveryReminderEligible(commitments[1]!), true);
 
   const irregular = buildHomeProjection({
     workspace: { id: "workspace-1", name: "Founder workspace", role: "owner", version: 1 },

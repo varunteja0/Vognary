@@ -73,6 +73,7 @@ export const decisionReasonKeyLabels: Record<DecisionReasonKey, string> = {
   IDENTITY_UNCERTAIN: "Identity uncertain",
   AMOUNT_CONFLICT: "Amount conflict",
   NO_PRIOR_DECISION: "No prior decision",
+  PROVISIONAL_SINGLE: "Seen once",
 };
 
 export const decisionVerificationOutcomeLabels: Record<DecisionVerificationOutcome, string> = {
@@ -87,6 +88,7 @@ export const decisionOutcomeKindLabels: Record<DecisionOutcomeKind, string> = {
   NO_CHARGE_SEEN: "No new charge seen",
   CANNOT_VERIFY: "Cannot verify yet",
   DECISION_DUE_AGAIN: "Decision due again",
+  WATCHING: "Watching the next window",
 };
 
 export const purposeLabels: Record<CommitmentPurpose, string> = {
@@ -249,7 +251,7 @@ export const errorCopy: Record<RecoveryErrorCode, { title: string; detail: strin
   STALE_STATE: { title: "This page is behind", detail: "The workspace moved on while this page was open. Reload to continue." },
   SAVE_FAILED: { title: "Not saved", detail: "The change did not save. Nothing was changed." },
   REQUEST_TOO_LARGE: { title: "Too much at once", detail: "This submission is larger than the accepted limit. Send less at a time." },
-  UNSUPPORTED_MEDIA_TYPE: { title: "This file type isn't supported.", detail: "Use a text-based PDF, CSV, TXT, or spreadsheet." },
+  UNSUPPORTED_MEDIA_TYPE: { title: "This file type isn't supported.", detail: "Use a PDF, CSV, TXT, spreadsheet, or a photo of the bill and confirm the line." },
   FEATURE_UNAVAILABLE: { title: "Not available yet", detail: "This feature is not active for this deployment." },
   RATE_LIMITED: { title: "Too many requests", detail: "Too many requests were sent. Wait before retrying." },
   UNKNOWN: { title: "Unexplained failure", detail: "The workspace returned a failure it did not explain. Nothing is assumed about your money." },

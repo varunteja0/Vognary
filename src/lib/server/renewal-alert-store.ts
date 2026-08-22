@@ -35,8 +35,31 @@ function recoveryReminderEligibilitySql(alias: "commitment" | "recovery") {
   )`;
 }
 
-const commitmentReminderEligibilitySql = recoveryReminderEligibilitySql("commitment");
-const recoveryReminderEligibilitySqlFragment = recoveryReminderEligibilitySql("recovery");
+function oneDayCitedSql(alias: "commitment" | "recovery") {
+  return `(
+    ${alias}.effective_cadence <> 'IRREGULAR'
+    and exists (
+      select 1
+      from recovery_commitment_evidence reminder_evidence
+      where reminder_evidence.workspace_id = ${alias}.workspace_id
+        and reminder_evidence.commitment_id = ${alias}.id
+    )
+  )`;
+}
+
+function reminderWindowEligibilitySql(alias: "commitment" | "recovery", windowExpr: string) {
+  return `(
+    case ${windowExpr}
+      when '1_day' then ${oneDayCitedSql(alias)}
+      when '7_day' then ${recoveryReminderEligibilitySql(alias)}
+      else false
+    end
+  )`;
+}
+
+function reminderWindowAllowsDecisionSql(windowExpr: string) {
+  return `(${windowExpr} = '1_day' or decision.decision is distinct from 'KEEP')`;
+}
 
 const weeklyDigestItemsSql = `
   select
@@ -241,7 +264,6 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
            on commitment.workspace_id = p.workspace_id
           and commitment.effective_status = 'ACTIVE'
           and commitment.effective_next_expected_date is not null
-          and ${commitmentReminderEligibilitySql}
          left join recovery_decisions decision
            on decision.workspace_id = commitment.workspace_id
           and decision.commitment_id = commitment.id
@@ -252,7 +274,8 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
        where p.workspace_id = $1
          and p.enabled
          and reminder.enabled
-         and decision.decision is distinct from 'KEEP'
+         and ${reminderWindowEligibilitySql("commitment", "reminder.alert_window")}
+         and ${reminderWindowAllowsDecisionSql("reminder.alert_window")}
      ), eligible as (
        select * from candidates where scheduled_for > now()
      )
@@ -352,8 +375,8 @@ export async function scheduleRenewalAlertsForWorkspace(workspaceId: string, cli
          where preference.id = delivery.preference_id
            and preference.enabled
            and delivery.recovery_commitment_id is not null
-           and ${recoveryReminderEligibilitySqlFragment}
-           and decision.decision is distinct from 'KEEP'
+           and ${reminderWindowEligibilitySql("recovery", "delivery.alert_window")}
+           and ${reminderWindowAllowsDecisionSql("delivery.alert_window")}
            and case delivery.alert_window
              when '7_day' then preference.seven_day_enabled
              when '1_day' then preference.one_day_enabled
@@ -586,13 +609,13 @@ export async function claimDueRenewalAlerts(input: { limit: number; workerId: st
         and recovery.workspace_id = delivery.workspace_id
         and recovery.effective_status = 'ACTIVE'
         and recovery.effective_next_expected_date = delivery.renewal_date
-        and ${recoveryReminderEligibilitySqlFragment}
        left join recovery_decisions decision
          on decision.workspace_id = recovery.workspace_id
         and decision.commitment_id = recovery.id
        where delivery.attempt_count < $2
          and delivery.recurring_item_id is null
-         and decision.decision is distinct from 'KEEP'
+         and ${reminderWindowEligibilitySql("recovery", "delivery.alert_window")}
+         and ${reminderWindowAllowsDecisionSql("delivery.alert_window")}
          and case delivery.alert_window
            when '7_day' then preference.seven_day_enabled
            when '1_day' then preference.one_day_enabled
@@ -660,7 +683,6 @@ export async function isRenewalAlertStillDeliverable(deliveryId: string, workerI
           and recovery.workspace_id = delivery.workspace_id
           and recovery.effective_status = 'ACTIVE'
           and recovery.effective_next_expected_date = delivery.renewal_date
-          and ${recoveryReminderEligibilitySqlFragment}
          left join recovery_decisions decision
            on decision.workspace_id = recovery.workspace_id
           and decision.commitment_id = recovery.id
@@ -668,7 +690,8 @@ export async function isRenewalAlertStillDeliverable(deliveryId: string, workerI
            and delivery.status = 'sending'
            and delivery.locked_by = $2
            and delivery.recurring_item_id is null
-           and decision.decision is distinct from 'KEEP'
+           and ${reminderWindowEligibilitySql("recovery", "delivery.alert_window")}
+           and ${reminderWindowAllowsDecisionSql("delivery.alert_window")}
          and case delivery.alert_window
            when '7_day' then preference.seven_day_enabled
            when '1_day' then preference.one_day_enabled

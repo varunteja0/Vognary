@@ -42,7 +42,7 @@ export default function ProfileClient() {
           </Link>
           <nav aria-label="Account shortcuts" className="flex flex-wrap gap-2">
             <Link href="/app" className="btn btn-primary">Back to app</Link>
-            <Link href="/private-audit" className="btn btn-ghost">Private audit</Link>
+            <Link href="/security" className="btn btn-ghost">Security</Link>
           </nav>
         </header>
 

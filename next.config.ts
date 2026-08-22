@@ -44,7 +44,8 @@ const nextConfig: NextConfig = {
       { source: "/partners", destination: "/", permanent: true },
       { source: "/beta-readiness", destination: "/", permanent: true },
       { source: "/integration-model", destination: "/", permanent: true },
-      { source: "/launch", destination: "/private-audit", permanent: true },
+      { source: "/launch", destination: "/login?next=/app", permanent: true },
+      { source: "/private-audit", destination: "/login?next=/app", permanent: true },
     ];
   },
   async headers() {

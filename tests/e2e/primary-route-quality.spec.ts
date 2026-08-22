@@ -10,6 +10,7 @@ type PrimaryRoute = {
 
 const primaryRoutes: PrimaryRoute[] = [
   { label: "landing", path: "/", public: true },
+  { label: "start", path: "/start", public: true },
   { label: "signed app", path: "/app", resolvedPath: /\/login\?next=(?:%2F|\/)app$/, public: false },
   { label: "login", path: "/login", public: true },
   { label: "profile", path: "/profile", resolvedPath: /\/login(?:\?.*)?$/, public: false },

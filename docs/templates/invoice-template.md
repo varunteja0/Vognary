@@ -3,9 +3,9 @@
 Companion to [`invoice-template.html`](./invoice-template.html) (open in a browser →
 fill placeholders → Print → Save as PDF). Sanctioned by the revenue sprint
 (`docs/REVENUE_SPRINT_2026-07-16.md` §1): SKU A/B are founder-billed services paid by
-UPI + manual invoice from day 1. The product's tracked ₹999 checkout stays gated by
-`docs/billing-activation-runbook.md` and is a separate rail — never wire manual
-payment links into the product UI.
+UPI + manual invoice from day 1. The retired one-time ₹999 product checkout must
+stay off; never wire manual payment links into the product UI. Historical
+settlement handling lives in `docs/billing-activation-runbook.md`.
 
 ## Before the first invoice (one-time)
 
@@ -25,7 +25,7 @@ payment links into the product UI.
    "Burn Cut — success fee: 15% of verified first-year savings of ₹[X] (verification
    evidence: Verified Savings report dated [date])" and the amount accordingly;
    guarantee clause does not apply — delete term 1.
-3. SKU C (₹999): swap amount, and the guarantee threshold in term 1 to ₹10,000/year.
+3. Do not invoice the retired one-time assisted-audit SKU.
 4. Print → Save as PDF → filename `VOG-2026-001.pdf`.
 5. Send with the email below; mark Paid in the tracker when UPI settles.
 

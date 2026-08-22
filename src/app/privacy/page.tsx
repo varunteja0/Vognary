@@ -5,9 +5,15 @@ import { VognaryMark } from "../brand";
 export const metadata: Metadata = {
   title: "Privacy notice",
   description: "How Vognary collects, uses, protects, retains, exports, and deletes personal and financial evidence.",
+  alternates: { canonical: "/privacy" },
+  openGraph: {
+    url: "/privacy",
+    title: "Privacy notice - Vognary",
+    description: "How Vognary collects, uses, protects, retains, exports, and deletes personal and financial evidence.",
+  },
 };
 
-const effectiveDate = "11 August 2026";
+const effectiveDate = "21 August 2026";
 
 const sections = [
   {
@@ -29,7 +35,7 @@ const sections = [
         data can include recurring-payment evidence, merchant names, dates, amounts, currency, cadence, source references, decisions,
         notes, review history, and bounded text extracted from billing emails sent to your private Vognary receipt address. Operational
         data can include IP-derived rate-limit keys, request timestamps, error codes, device/browser
-        metadata, and synchronization status. Private-audit and contact forms store the information you submit when durable intake is configured.
+        metadata, and synchronization status. Legacy contact records, if previously submitted, remain subject to the retention and deletion controls in this notice.
       </>
     ),
   },

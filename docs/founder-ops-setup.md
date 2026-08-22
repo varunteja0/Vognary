@@ -144,28 +144,11 @@ This gate also needs a real Postgres (`DATABASE_URL`), a token key, and a sessio
 
 ---
 
-## 5. Razorpay + legal terms — ₹999 checkout (KYC: days)
+## 5. Razorpay + legal terms — deferred; retired checkout must stay off
 
-**Click-by-click**
-1. Go to **https://dashboard.razorpay.com** → **Sign up** → complete **Account activation / KYC** (business docs + bank account). *This approval is the slow part.*
-2. **Settings → API Keys → Generate Key** — do **Test mode** first to rehearse, **Live mode** for production → copy **Key ID** (`rzp_test_…` / `rzp_live_…`) + **Key Secret**.
-3. **Settings → Webhooks → Add New Webhook**:
-   - URL: `https://www.vognary.com/api/billing/webhooks/razorpay`
-   - **Secret:** invent a strong string → this becomes `RAZORPAY_WEBHOOK_SECRET`.
-   - **Active events:** `payment_link.paid`, `payment_link.cancelled`, `payment_link.expired`, `refund.processed`.
-   - **Create Webhook**.
+The one-time ₹999 assisted-audit checkout was retired on 2026-08-21. `/private-audit`, `/api/audit-intake`, and `/api/checkout` cannot be reactivated by setting environment variables. Do not provision Razorpay merely to make readiness look complete.
 
-**Set**
-```
-RAZORPAY_KEY_ID=rzp_live_...
-RAZORPAY_KEY_SECRET=...
-RAZORPAY_WEBHOOK_SECRET=...
-```
-- **Legal:** have qualified counsel review the current Terms + Privacy. **Only then** `ASSISTED_AUDIT_LEGAL_TERMS_STATUS=approved`.
-- After real live-KYC + provider proof: `RAZORPAY_ACCOUNT_STATUS=live-kyc-approved`, and the four proof flags (`RAZORPAY_WEBHOOK_PROOF_STATUS` / `REPLAY` / `REFUND` / `RECONCILIATION`) **only** after you attach the actual outputs to the launch record.
-- The **₹999 amount is server-owned** (`src/lib/public-offer.ts`) — do **not** add an env price override.
-
-**Verify:** rehearse the full flow in Test mode; `npm run billing:reconcile`. Deep detail: `docs/billing-activation-runbook.md`.
+Razorpay, tax, privacy, refund, and legal approval become founder work only after first-10 proof supports a current paid offer. Historical settlement/refund handling is documented in `docs/billing-activation-runbook.md`.
 
 ---
 

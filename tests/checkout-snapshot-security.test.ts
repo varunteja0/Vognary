@@ -6,7 +6,6 @@ import test from "node:test";
 import { NextRequest } from "next/server";
 
 import { POST as checkoutPost } from "../src/app/api/checkout/route";
-import { publicOffer } from "../src/lib/public-offer";
 import {
   DELETE as deleteAuditSnapshot,
   POST as saveAuditSnapshot,
@@ -18,54 +17,27 @@ function source(relativePath: string) {
   return readFileSync(path.join(root, relativePath), "utf8");
 }
 
-test("guest assisted-audit checkout rejects a missing audit lead before provider setup", async () => {
-  const names = [
-    "RAZORPAY_KEY_ID",
-    "RAZORPAY_KEY_SECRET",
-    "RAZORPAY_WEBHOOK_SECRET",
-    "NEXT_PUBLIC_APP_URL",
-    "ASSISTED_AUDIT_LEGAL_TERMS_STATUS",
-  ] as const;
-  const previous = new Map(names.map((name) => [name, process.env[name]]));
+test("guest assisted-audit checkout stays retired even when provider env is present", async () => {
+  const previous = process.env.RAZORPAY_KEY_ID;
   process.env.RAZORPAY_KEY_ID = "rzp_test_security";
-  process.env.RAZORPAY_KEY_SECRET = "secret_security";
-  process.env.RAZORPAY_WEBHOOK_SECRET = "webhook_security";
-  process.env.NEXT_PUBLIC_APP_URL = "https://vognary.test";
-  process.env.ASSISTED_AUDIT_LEGAL_TERMS_STATUS = "approved";
-
   try {
     const response = await checkoutPost(new NextRequest("https://vognary.test/api/checkout", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "idempotency-key": "security-test-checkout-0001",
-        "x-forwarded-for": "198.51.100.10",
-      },
-      body: JSON.stringify({ plan: publicOffer.plan, email: "lead@example.com", termsVersion: publicOffer.termsVersion }),
+      headers: { "content-type": "application/json", origin: "https://vognary.test", "sec-fetch-site": "same-origin" },
+      body: JSON.stringify({ plan: "assisted-audit", email: "lead@example.com" }),
     }));
-
-    assert.equal(response.status, 400);
-    assert.equal((await response.json()).code, "audit-lead-required");
+    assert.equal(response.status, 410);
+    assert.equal((await response.json()).status, "retired");
   } finally {
-    for (const name of names) {
-      const value = previous.get(name);
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
-    }
+    if (previous === undefined) delete process.env.RAZORPAY_KEY_ID;
+    else process.env.RAZORPAY_KEY_ID = previous;
   }
 });
 
-test("guest assisted-audit checkout binds lead identity before tracked payment readiness", () => {
+test("retired checkout has no lead, provider, or persistence path", () => {
   const route = source("src/app/api/checkout/route.ts");
-  const leadRequirement = route.indexOf("audit-lead-required");
-  const leadLookup = route.indexOf("const leadEmail = await getAuditLeadEmail");
-  const configuration = route.indexOf("const configuration = getBillingCheckoutConfiguration", leadLookup);
-
-  assert.ok(leadRequirement > -1, "anonymous assisted-audit checkout must require a lead id");
-  assert.ok(leadLookup > leadRequirement, "the required lead must be resolved from durable intake storage");
-  assert.ok(configuration > leadLookup, "lead/email binding must happen before payment configuration is evaluated");
-  assert.match(route, /leadEmail\.toLowerCase\(\) !== email\.toLowerCase\(\)/);
-  assert.doesNotMatch(route, /configuration\.status === "link-only"|PAYMENT_LINK_/);
+  assert.match(route, /assistedAuditRetiredResponse/);
+  assert.doesNotMatch(route, /getAuditLeadEmail|getBillingCheckoutConfiguration|createBillingCheckout|createRazorpayPaymentLink/);
 });
 
 test("idempotent checkout replay includes provider and server-owned price identity", () => {

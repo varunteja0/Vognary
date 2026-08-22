@@ -1,13 +1,59 @@
-# CONTINUE HERE — live handoff (2026-08-19)
+# CONTINUE HERE — live handoff (2026-08-22)
 
 > Read [`docs/THE-LAW.md`](THE-LAW.md) first. This file is **live state only**.
 > Market: [`docs/execution/phase-a-market-contact.md`](execution/phase-a-market-contact.md).
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## Live state — independently verified 2026-08-19
+## Live state — 2026-08-22 (persist + reminder + photo prefill)
+
+**Scoreboard row this raises:** Product UX. Loop step: first-session decision moment. Composite stays **1.5**.
+
+**PRODUCT — one named receipt is now a cited Recovery decision, not a crash.** A single observed charge persists as a provisional commitment with linked evidence. Cadence is a hypothesis; monthly and next-30-day totals stay empty until a second observation. `/api/audit` returns the same start cards Home uses. After Keep, a consented 1-day reminder can schedule; 7-day review noise stays off for KEEP. Photos still require Confirm this line; readable text (and optional local tesseract / AI transcription) can prefill, never invent money. `PROVISIONAL_SINGLE` is computed on the card and not written into the 0055 cycle check. Schema head remains `0055`. Do not start a distribution campaign from this SHA.
+
+**GATES on this checkout:** lint 0 errors (1 pre-existing warning in `instant-audit.tsx`) · typecheck PASS · claims:check PASS (25) · tokens:check PASS (61) · unit 986/986 · disposable PostgreSQL 159/159 · signed-in Home Playwright desktop PASS · Customer #0 desktop PASS · `/start` first-session Playwright PASS. Not proof of a live receipt, a live session, or this SHA on www.vognary.com.
+
+**NOT PROVEN (do not mark 100):** this SHA on production (tree is dirty vs `4e3e617`; live landing CTA is still `/login?next=/app`, not `/start`) · live ICP session · connected / paid / payment ask · first automatic receipt (`forwarding_verified_at` null; Gmail has no `forwarding-noreply@google.com` in the connected inbox) · reminder actually sent (Resend still fail-closed until configured) · consented corpus n≥200 · F03–F06 LinkedIn.
+
+**MARKET — do not fake sends.** Independently fetched 2026-08-22: Gmail shows Elevation/SaaSBoomi/AIBoomi/T-Hub distribution-node drafts were sent 2026-08-21; Elevation `saas@` bounced. Prashanth linger question still unanswered. F03–F06 LinkedIn unconfirmed.
+
+## Live state — 2026-08-22 (first-session same-product pass)
+
+**Scoreboard row this raises:** Product UX. Loop step: first-session decision moment.
+
+**PRODUCT — `/start` and signed-in Home now speak the same decision object.** Start cards are built with the same spoken sentence, receipt quote, overlap (including Cursor↔Claude), and Keep-primary rule as Home. PDFs/CSV ingest on `/start`; photos still confirm-the-line. Signed-in `/start` redirects to `/app`. After Google, decisions replay by merchant (including Cursor Pro → Cursor); unmatched names are stated on Home, never silently dropped. Reminder sending, Gmail OAuth, Autopilot execution, and live-receipt proof remain fail-closed / unproven. Do not start a distribution campaign from this SHA. Composite stays 1.5 until a live session.
+
+**MARKET — do not fake sends.** Independently fetched 2026-08-22:
+
+## Live state — 2026-08-22 (first-session wow wiring)
+
+**Scoreboard row this raises:** Product UX / business validation (first-session presentation). Loop step: first-session decision moment.
+
+**PRODUCT — first-session wow is now on the frozen decision object.** Home cards render the spoken sentence and receipt quote already on the DTO. Keep is gold only when the cited reasons are calm; overlap / price / single sighting makes Review later gold. After Keep or Plan to cancel, the next-window hook is the hero and the card is copyable. One observed receipt can become a provisional decision (cadence labeled as a hypothesis; provisional items do not inflate monthly totals). Photos are accepted only through confirm-the-line — Vognary does not OCR money. Landing CTA is `/start`: add a bill, then sign in to remember. Reminder consent is asked; sending stays fail-closed. `/app?guest=1` and `/app?demo=1` remain 410. Do not add procurement, Gmail OAuth, Autopilot send, or a redesign unless a live user invalidates the freeze.
+
+**MARKET — do not fake sends.** Independently fetched 2026-08-22:
+
+## Live state — 2026-08-22 (market execution + decision-moment freeze)
+
+**Scoreboard row this raises:** business validation / distribution (Phase A conversations). Loop step: first-session decision moment (presentation only).
+
+**PRODUCT — DECISION MOMENT FROZEN after this presentation pass.** Home decision cards now put on one object: merchant (what charges), amount, charge timing, why a decision is needed now, cited receipt count, Keep / Review later / Plan to cancel, and cycle memory (“Remembered for this billing cycle. The next matching receipt can verify what happened.”). First result shows every queued card, not only the first. No decision rule, money rule, cadence, overlap, or DecisionCycle semantic was changed. Do not add procurement, benchmarks, SSO, Gmail OAuth, usage engine, AI chat, connectors, autonomous cancellation, or dashboard sprawl unless a live user invalidates the freeze.
+
+**MARKET — do not fake sends.** Independently fetched 2026-08-22:
+
+- **F01 Prashanth Vaidya (@pvbuilds) is a live conversation**, not a first-touch. He posted Claude Max at ₹24k after Indian localisation ([2090155802158084243](https://x.com/pvbuilds/status/2090155802158084243)). Founder replied 2026-08-20; Prashanth answered he is sticking to Claude and Codex; founder asked whether old tools linger. That linger question is unanswered. **Do not resend the 2026-08-20 copy.** Next: public reply on the Fable-limits post, then a live 3-bill session if he engages.
+- **F02 Sid Jain (@TheBengaluruGuy) public reply was sent 2026-08-20.** No reply. Do not bump the same Cursor/GitHub thread. Optional: a new non-pitch reply on a later post.
+- **F03–F06 LinkedIn remain unconfirmed as sent.** Send those if the founder has not already. HOLD GodHands and Perseus.
+
+Gitignored send pack: `docs/execution/private-autopilot-outreach-draft.md` (today’s copy at the top). Conversations counted: **1** (Prashanth). Connected / mandate / paid / live session / payment ask: still **0**.
+
+## Live state — independently verified 2026-08-21
 
 **B2B V1 product freeze is in this tree on `main`.** External promise: “Know what your company is committed to pay next — and what deserves attention before the card fires.” The public landing now leads with the decision, not the inventory: H1 is “Decide before the charge, not after it.” Primary CTA: Review my software stack. First session remains value-first: add 2–5 software bills, then Keep Vognary current. Home identity is the pre-renewal decision queue: KEEP / REVIEW_LATER / PLAN_TO_CANCEL, remembered per due date, verified next cycle (`0055_recovery_decision_cycles`). Purpose is asked only on overlap cards. Overlap is conservative named-vendor families only; category sharing is not interchangeability. HMAC key id stays `receipt-alias-v1`. Do not rotate aliases. Unsigned inbound must stay 401.
+
+**PUBLIC TRUST HARDENING (2026-08-21).** The retired `/app?demo=1` and `/app?guest=1` modes now terminate in Proxy as cacheable `410 Gone` HTML with `X-Robots-Tag: noindex, nofollow`; `robots.txt` permits crawlers to observe page-level retirement and blocks only `/api/`. `/private-audit` permanently hands off to `/login?next=/app`; both methods on `/api/audit-intake` and `/api/checkout` return one safe `410` contract regardless of environment, cannot persist a lead or create a payment, and disclose no environment names. The retired 433-line client and its unused source planner are deleted; the path is absent from sitemap, current legal copy, navigation, outreach templates, readiness groups, and the public README. Historical settlement/refund code remains solely to preserve financial history. `/api/ai/status` exposes policy and customer-safe mode only. The landing is readiness-neutral static HTML with one-hour shared caching; the built local response was 161,578 bytes versus the earlier ~235 KB live probe. Sensitive product routes use per-request script nonces and a single exact Next runtime style hash; the raw public veto page hashes its exact script and style. The global static-shell CSP still carries framework-compatible inline policy because forcing per-request nonces on every page would destroy the restored public caching; do not describe CSP as globally nonce-only.
+
+Code evidence on this checkout: `git diff --check` clean · lint **0 errors** (1 pre-existing warning in untouched `src/app/instant-audit.tsx`) · typecheck **PASS** · `claims:check` **PASS** (24 surfaces) · `tokens:check` **PASS** (59 components) · unit **965/965** · disposable PostgreSQL through migration `0055` **159/159** · focused built-artifact Playwright **16/16** across desktop/mobile with runtime-console and axe checks · production Next build **PASS** via `next build --webpack` (the local Turbopack worker is blocked by this macOS sandbox from binding its internal CSS process port; normal GitHub CI Turbopack remains the publication gate) · `perf:budget` **PASS** (`/` 171.8 KB, `/app` 173.8 KB, `/verify` 175.1 KB) · Lighthouse median: `/` LCP 792 ms and all four scores 100; `/login?next=/app` LCP 1,852 ms and all measured scores 100; `/verify` LCP 851 ms and all measured scores 100 · production-artifact smoke **PASS**. This does not prove a live receipt, a second automatic receipt, a first ICP completion, or a measured under-three-minute first insight. Composite remains **1.5**.
 
 **DESIGN PASS (2026-08-19, presentation only).** No decision rule, money rule, cadence, confidence, commitment identity, or DecisionCycle semantic was changed; no connector, notification, or cancellation path was added. Home is a left-aligned `max-w-3xl` decision column: money and due date read first in tabular numerals, reasons are a real list, and the three choices carry hierarchy (`Keep` primary · `Review later` opens the snooze row · `Plan to cancel` deliberate, ember-outlined). The “Vognary records your decision … never cancels a service and never moves money” boundary is stated once per queue, not per card. Empty queue renders “Nothing to decide right now” instead of an empty “Decisions due soon” section — Customer #0 now asserts that quiet state after a decision is recorded. Outcomes are tiered by kind: `CHARGE_AFTER_CANCEL_PLAN` is an ember panel, `CONTINUED_AS_PLANNED` a quiet verdict rule, `CANNOT_VERIFY` neutral (unknown never reads as attention); the merchant is printed only when the server headline does not already name it. Four real defects were fixed: the Commitments list overflowed its fixed columns inside the 24rem pane so vendor names overlapped amounts (now two-line rows that cannot collide); `.btn` sets `display` outside Tailwind's layers so `lg:hidden` never hid the mobile Back button (now a wrapper); the view heading drew a full-width focus ring on every view change (now `data-focus-quiet`, never Tab-reachable); and `cadenceShortLabels` rendered `₹1,700.00/ month` with no space. Gold is now reserved for actions — view nav and tabs use the segmented control. Reduced-motion now disables `.rise`, `.stamp-animate`, `.live-dot`, `.tape` and `.scan`. **The landing deliberately carries no money at all**, example or otherwise; `loop-brief-killlist` now asserts that with a currency regex rather than only by test name.
 
@@ -169,6 +215,7 @@ Exact remaining activation blockers:
 4. ~~Set `RECEIPT_INBOX_RETENTION_REVIEW_STATUS=approved`, then `ENABLE_RECEIPT_INBOX=true`.~~ **DONE and independently verified 2026-08-18:** readiness missing list is empty; unsigned inbound is 401 unauthorized.
 5. ~~Flip `RECEIPT_INBOX_ALIAS_HMAC_KEY_ID` to `receipt-alias-v2` while inbox is live.~~ **DEFERRED.** Dual-key overlap is not implemented. Leave v1.
 6. ~~Gmail confirmation mail to the v1 alias.~~ **Parsed 2026-08-18 15:06 UTC** (`GMAIL_VERIFICATION_PENDING`, URL stored). Confirmation CTA shipped in `dc39f8e`. This commit is value-first first session. Founder must confirm in Gmail after this SHA is live, before any billing filter. `forwarding_verified_at` stays null until a later matching billing email.
+7. **After the 410 SHA is live, founder must submit the exact indexed `/app?demo=1` URL in Google Search Console Removals.** Code now lets Google observe permanent removal; repository work cannot submit an authenticated property-owner action.
 
 Do not declare the product live until one real automatic billing receipt, then a second automatic receipt without manual forwarding, is proven.
 
@@ -192,7 +239,7 @@ Quote the path. `DATABASE_URL` must be unset for `npm test`. Do not commit devel
 - Counsel / provider-authority validation for one merchant route. ChatGPT and Notion public help pages are login self-service, not zero-customer-work evidence.
 - Provision verified sending domain + Resend notice credentials + a real delivered webhook. Queueing is not delivery.
 - Google verification/CASA before public Gmail. Forwarding remains the private-pilot bridge.
-- Razorpay + tax/legal/privacy before live charges. Webhook must validate the raw body.
+- Razorpay + tax/legal/privacy only after first-10 proof supports a current paid offer. The retired one-time audit checkout must stay off; historical webhooks still validate the raw body for settlement integrity.
 - Do not wait for Gmail or Razorpay to start shadow conversations.
 
 ## 8. Ops (fail-closed)

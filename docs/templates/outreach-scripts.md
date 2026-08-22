@@ -1,22 +1,20 @@
 # Outreach scripts (quick reference)
 
 > Full Phase A doctrine: [`docs/execution/phase-a-market-contact.md`](../execution/phase-a-market-contact.md)  
-> Intake: `https://www.vognary.com/private-audit`
+> Current onboarding: `https://www.vognary.com/login?next=/app`
 
 ## First DM
 
 ```text
 Hi {Name} — quick one.
 
-I run private recurring-burn audits for founders (AI/SaaS/cloud + UPI/card mandates).
-Most people know revenue and runway; almost nobody has one evidence-backed list of what renews next.
+I am testing Vognary with 10 small software/AI teams.
+Most founders know revenue and runway; almost nobody has one evidence-backed list of the tools they are committed to paying for next.
 
-Offer this week: free redacted audit (no bank passwords). You paste receipts / statement exports / mandate screenshots.
-You get: monthly burn, next 45-day renewals, top 3 actions, missing-source checklist.
+Offer this week: a free founder-assisted pilot. Add three billing receipts or invoices—no bank passwords and no mailbox access.
+You get: what you are committed to pay next, what changed, what needs attention, and the exact supporting evidence.
 
-If useful, the one-time assisted audit is ₹999 (no auto-renew). Happy to do yours free in this batch.
-
-Intake: https://www.vognary.com/private-audit?src=dm
+Start: https://www.vognary.com/login?next=/app
 Or reply with a good time for a 20-min share-screen.
 
 — {Your name}, Vognary
@@ -41,52 +39,55 @@ Closing this batch Friday. If you want the free recurring-burn report, reply “
 ```text
 Perfect. Three options (pick one):
 
-1) Self-serve: https://www.vognary.com/private-audit?src=dm
-2) Fast path: paste 2–5 receipts here (redact account numbers)
-3) Share-screen 20 min — we import together
+1) Product: https://www.vognary.com/login?next=/app
+2) Fast path: bring three billing receipts (redact personal identifiers)
+3) Share-screen 20 min — we add them together
 
 I never need passwords, OTPs, or CVV.
 After the report, I’ll ask if we can keep a fully redacted fixture for parser quality (optional, consent-only).
 ```
 
-## Pay ask (post free audit)
+## Decision ask (post live session)
 
 ```text
-Here’s your report.
+Here’s what the bills support: {merchant} charges {amount} on {date}. Reason: {why}. Evidence: {N} cited receipts.
 
-Summary: ₹{monthly}/mo recurring · ₹{avoidable}/mo look avoidable or watch · next big debit {date}.
+Which did you choose — Keep, Review later, or Plan to cancel?
+```
 
-If this was worth it, the one-time assisted audit product is ₹999 (no subscription) once checkout is live — or you can pay that amount manually and I’ll invoice.
+## Payment ask (only after a useful decision)
 
-Either way: would a monthly refresh be useful? (research only — not a product promise yet)
+Exact question. Record the exact reply. Written intent is not a payment.
+
+```text
+If Vognary kept this current and caught these decisions before the charge, would you pay for it?
 ```
 
 ## LinkedIn post
 
 ```text
-Running 10 private recurring-burn audits this week for founders and freelancers.
+Running 10 founder-assisted Vognary pilots with small software/AI teams.
 
 People know salary / revenue / runway.
-They rarely know what quietly renews across SaaS, AI, cloud, domains, Play/App Store, UPI AutoPay, card mandates, EMIs, SIPs, insurance, and email receipts.
+They rarely have one cited picture of which software commitments are current, what changed, and what is expected next.
 
 Vognary turns that into an evidence-backed report:
-• monthly recurring burn
-• next debits (45 days)
-• avoidable / watch items
-• missing sources named honestly
-• proof beside every recommendation
+• committed payments expected next
+• what changed
+• Keep / Review decisions
+• evidence beside every claim
 
-Redact sensitive details. No bank passwords.
+Add three billing receipts. No bank passwords or mailbox access.
 
-Intake: https://www.vognary.com/private-audit?src=li-post
+Start: https://www.vognary.com/login?next=/app
 ```
 
 ## WhatsApp
 
 ```text
-Free founder audit this week: what renews next across UPI/SaaS/AI/cloud.
-Redacted OK. No passwords.
-Link: https://www.vognary.com/private-audit?src=wa
+Free founder-assisted pilot this week: three bills to a cited commitment picture and a Keep/Review decision.
+Redacted OK. No passwords or mailbox access.
+Link: https://www.vognary.com/login?next=/app
 ```
 
 ## Corpus consent

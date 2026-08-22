@@ -6,13 +6,21 @@ import { rejectedSubmissionCopy } from "./present";
 import { errorCopy } from "./labels";
 import { FailureBlock } from "./recovery-states";
 import type { EvidenceDraft, RecoveryFailure } from "./state";
+import { fetchReceiptLineProposal, type ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
+import { isReceiptImageFile } from "@/lib/recovery/wow-first-session";
+import type { ImageDraft } from "./state";
 import { BillDropzone } from "./ui/dropzone";
+import { ConfirmReceiptLine } from "./ui/confirm-receipt-line";
 
 export type AddEvidenceHandlers = {
   onModeChange: (mode: EvidenceDraft["mode"]) => void;
   onReceiptChange: (text: string) => void;
   onFilesChosen: (files: readonly File[]) => void;
+  onImageDrafts: (drafts: readonly ImageDraft[]) => void;
+  onImageProposal: (clientRef: string, proposal: ReceiptLineProposal | null) => void;
   onRemoveSource: (clientRef: string) => void;
+  onConfirmImageLine: (clientRef: string, text: string) => void;
+  onRemoveImageDraft: (clientRef: string) => void;
   onSubmit: (mode: EvidenceDraft["mode"]) => void;
 };
 
@@ -35,7 +43,7 @@ export function RecoveryAddEvidence({
   const [method, setMethod] = useState<"UPLOAD" | "PASTE">(draft.mode === "RECEIPT_PASTE" && draft.receiptText ? "PASTE" : "UPLOAD");
   const receiptLength = draft.receiptText.length;
   const overReceiptLimit = receiptLength > recoveryLimits.maxReceiptCharacters;
-  const canPaste = Boolean(draft.receiptText.trim()) && !overReceiptLimit && online && !pending;
+  const canPaste = Boolean(draft.receiptText.trim()) && !overReceiptLimit && online && !pending && draft.imageDrafts.length === 0;
   const canUpload = draft.csvSources.length > 0 && online && !pending;
 
   return (
@@ -55,10 +63,42 @@ export function RecoveryAddEvidence({
             disabled={!online || pending}
             preparing={draft.preparing}
             onFilesChosen={(files) => {
-              handlers.onModeChange("CSV_IMPORT");
-              handlers.onFilesChosen(files);
+              const images = files.filter((file) => isReceiptImageFile(file));
+              const documents = files.filter((file) => !isReceiptImageFile(file));
+              if (images.length) {
+                const drafts = images.map((file, index) => ({
+                  clientRef: `image-${Date.now()}-${index}`,
+                  name: file.name,
+                  previewUrl: URL.createObjectURL(file),
+                  proposalStatus: "reading" as const,
+                }));
+                handlers.onImageDrafts(drafts);
+                void Promise.all(images.map(async (file, index) => {
+                  const draft = drafts[index];
+                  if (!draft) return;
+                  const proposal = await fetchReceiptLineProposal(file);
+                  handlers.onImageProposal(draft.clientRef, proposal);
+                }));
+              }
+              if (documents.length) {
+                handlers.onModeChange("CSV_IMPORT");
+                handlers.onFilesChosen(documents);
+              }
             }}
           />
+          {draft.imageDrafts.length ? (
+            <div className="grid gap-3">
+              {draft.imageDrafts.map((image) => (
+                <ConfirmReceiptLine
+                  key={image.clientRef}
+                  draft={image}
+                  disabled={!online || pending}
+                  onConfirm={(text) => handlers.onConfirmImageLine(image.clientRef, text)}
+                  onRemove={() => handlers.onRemoveImageDraft(image.clientRef)}
+                />
+              ))}
+            </div>
+          ) : null}
           {draft.csvSources.length ? (
             <ul className="grid gap-2">
               {draft.csvSources.map((source) => (

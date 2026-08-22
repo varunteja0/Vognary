@@ -1,12 +1,7 @@
 import LaunchLanding from "./launch-landing";
-import { isReceiptInboxPubliclyAvailable } from "@/lib/server/recovery-inbound-store";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
-export default async function Home() {
-  return (
-    <LaunchLanding
-      receiptInboxAvailable={await isReceiptInboxPubliclyAvailable()}
-    />
-  );
+export default function Home() {
+  return <LaunchLanding />;
 }

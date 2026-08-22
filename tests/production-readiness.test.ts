@@ -302,14 +302,16 @@ test("internal readiness distinguishes schema, observed evidence, and operator a
   assert.match(source, /schema-ready-shared-rate-limit-required/);
   assert.match(source, /sharedRateLimiting/);
   assert.match(source, /configured-postgres/);
-  assert.match(source, /settlement-observed/);
+  assert.match(source, /payments: "retired-public-checkout"/);
+  assert.match(source, /leadPersistence: "retired-public-intake"/);
   assert.match(read("src/lib/server/feature-readiness.ts"), /checkout\.plan = \$1[\s\S]*checkout\.offer_id = \$2[\s\S]*orders\.status in \('pending', 'in_progress', 'delivered'\)/);
 });
 
-test("the public landing checks receipt availability at request time", () => {
+test("the public landing stays static while the signed product checks receipt availability", () => {
   const source = read("src/app/page.tsx");
-  assert.match(source, /export const dynamic = "force-dynamic"/);
-  assert.match(source, /await isReceiptInboxPubliclyAvailable\(\)/);
+  assert.match(source, /export const revalidate = 3600/);
+  assert.doesNotMatch(source, /force-dynamic|isReceiptInboxPubliclyAvailable/);
+  assert.match(read("src/app/app/page.tsx"), /isReceiptInboxPubliclyAvailable/);
 });
 
 test("activation probes are bounded and cover private lifecycle, renewal, decisions, and platform guards", () => {
@@ -357,13 +359,14 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.match(source, /betaReady: endpointReport\.every\(\(item\) => item\.ok\)/);
   assert.match(source, /envReport\.filter\(\(item\) => item\.launchBlocking\)/);
   assert.match(source, /activationProfile = "receipt-forwarding"/);
-  for (const optionalId of ["lead-persistence", "payments", "renewal-alerts", "encrypted-snapshots", "platform-api"]) {
+  for (const optionalId of ["renewal-alerts", "encrypted-snapshots", "platform-api"]) {
     assert.match(source, new RegExp(`id: "${optionalId}"[\\s\\S]*?launchBlocking: false`));
   }
   assert.match(source, /hardening\?\.receiptInbox/);
   assert.match(source, /return status === "google-ready"/);
   assert.doesNotMatch(source, /status === "magic-link-ready" \|\| status === "google-ready"/);
-  assert.match(source, /id: "audit-intake-status"/);
+  assert.match(source, /id: "audit-intake-retired"[\s\S]*?expected: \[410\]/);
+  assert.match(source, /id: "checkout-assisted-audit-retired"[\s\S]*?expected: \[410\]/);
   assert.doesNotMatch(source, /name: "Activation Check"/);
   assert.doesNotMatch(source, /id: "monitoring-delivery-test"/);
 });
@@ -411,7 +414,8 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.match(source, /payload\.status !== "retired"/);
   assert.match(source, /payload\.ledgerAuthority !== "RECOVERY_V1"/);
   assert.match(source, /fetch\(`\$\{baseUrl\}\/api\/audit-intake`\)/);
-  assert.match(source, /\['ready', 'not-configured'\]\.includes\(auditIntake\.status\)/);
+  assert.match(source, /auditIntakeResponse\.status !== 410/);
+  assert.match(source, /auditIntake\.status !== "retired"/);
   assert.doesNotMatch(source, /fetch\(`\$\{baseUrl\}\/api\/audit-intake`,\s*\{[\s\S]*?method:\s*"POST"/);
   assert.match(source, /Recovery Sources without session/);
   assert.match(ci, /SMOKE_BASE_URL: http:\/\/127\.0\.0\.1:3000[\s\S]*SMOKE_ALLOW_UNCONFIGURED: "true"/);

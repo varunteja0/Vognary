@@ -15,6 +15,7 @@ import type {
 } from "@/lib/recovery/contracts";
 import { decisionLabels } from "./labels";
 import type { FailureOrigin, ResponseMeta, TransportFailure } from "./transport";
+import type { ImageProposalStatus, ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
 import { decimalToMinorUnits, minorUnitsToDecimal } from "@/lib/recovery/domain";
 
 // Pure state for the Recovery workspace. It holds exactly two things: server
@@ -49,10 +50,19 @@ export type PreparedCsvSource = {
   warnings: readonly string[];
 };
 
+export type ImageDraft = {
+  clientRef: string;
+  name: string;
+  previewUrl: string | null;
+  proposal?: ReceiptLineProposal | null;
+  proposalStatus?: ImageProposalStatus;
+};
+
 export type EvidenceDraft = {
   mode: SourceType;
   receiptText: string;
   csvSources: readonly PreparedCsvSource[];
+  imageDrafts: readonly ImageDraft[];
   preparing: boolean;
 };
 
@@ -122,6 +132,7 @@ const emptyEvidenceDraft: EvidenceDraft = {
   mode: "RECEIPT_PASTE",
   receiptText: "",
   csvSources: [],
+  imageDrafts: [],
   preparing: false,
 };
 
@@ -197,6 +208,10 @@ export type RecoveryAction =
   | { type: "CSV_PREPARE_STARTED" }
   | { type: "CSV_SOURCES_PREPARED"; sources: readonly PreparedCsvSource[] }
   | { type: "CSV_SOURCE_REMOVED"; clientRef: string }
+  | { type: "IMAGE_DRAFTS_ADDED"; drafts: readonly ImageDraft[] }
+  | { type: "IMAGE_DRAFT_PROPOSAL"; clientRef: string; proposal: ReceiptLineProposal | null }
+  | { type: "IMAGE_DRAFT_REMOVED"; clientRef: string }
+  | { type: "IMAGE_LINE_CONFIRMED"; clientRef: string; text: string }
   | { type: "CSV_PREPARE_FAILED"; failure: TransportFailure }
   | { type: "EVIDENCE_SUBMIT_STARTED"; idempotencyKey: string }
   | { type: "EVIDENCE_SUBMITTED"; submission: EvidenceSubmissionDto; home: HomeProjectionDto; commitments: readonly CommitmentSummaryDto[]; total: number; meta: ResponseMeta }
@@ -492,6 +507,49 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         ...state,
         evidenceDraft: { ...state.evidenceDraft, csvSources: state.evidenceDraft.csvSources.filter((source) => source.clientRef !== action.clientRef) },
       };
+
+    case "IMAGE_DRAFTS_ADDED":
+      return {
+        ...state,
+        evidenceDraft: { ...state.evidenceDraft, imageDrafts: [...state.evidenceDraft.imageDrafts, ...action.drafts] },
+        announcement: `${action.drafts.length === 1 ? "1 photo" : `${action.drafts.length} photos`} ready. Confirm the merchant, amount, and date.`,
+      };
+
+    case "IMAGE_DRAFT_PROPOSAL":
+      return {
+        ...state,
+        evidenceDraft: {
+          ...state.evidenceDraft,
+          imageDrafts: state.evidenceDraft.imageDrafts.map((draft) => (
+            draft.clientRef === action.clientRef
+              ? { ...draft, proposal: action.proposal, proposalStatus: action.proposal ? "ready" : "unreadable" }
+              : draft
+          )),
+        },
+      };
+
+    case "IMAGE_DRAFT_REMOVED":
+      return {
+        ...state,
+        evidenceDraft: {
+          ...state.evidenceDraft,
+          imageDrafts: state.evidenceDraft.imageDrafts.filter((draft) => draft.clientRef !== action.clientRef),
+        },
+      };
+
+    case "IMAGE_LINE_CONFIRMED": {
+      const nextText = [state.evidenceDraft.receiptText.trim(), action.text.trim()].filter(Boolean).join("\n\n");
+      return {
+        ...state,
+        evidenceDraft: {
+          ...state.evidenceDraft,
+          mode: "RECEIPT_PASTE",
+          receiptText: nextText,
+          imageDrafts: state.evidenceDraft.imageDrafts.filter((draft) => draft.clientRef !== action.clientRef),
+        },
+        announcement: "Line confirmed. It will be added as receipt text, not as a guessed scan.",
+      };
+    }
 
     case "CSV_PREPARE_FAILED":
       return {

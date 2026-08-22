@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAiEnabled } from "@/lib/server/ai/client";
 import { readAiBudgetFromEnv, isAiBudgetOpen } from "@/lib/server/ai/budget-env";
-import { AI_MODELS } from "@/lib/server/ai/models";
 
 export const dynamic = "force-dynamic";
 
@@ -18,13 +17,10 @@ export async function GET() {
   return NextResponse.json(
     {
       status: live ? "live" : "deterministic-only",
-      keyConfigured: keyPresent,
-      budgetConfigured: budget.cap > 0,
-      models: AI_MODELS,
       policy: "cite-or-shut-up",
       message: live
-        ? "AI assist is live for extraction and narration under the monthly cap; every claim must cite evidence."
-        : "Product runs deterministic-only until ANTHROPIC_API_KEY and AI_MONTHLY_BUDGET_INR are set.",
+        ? "Optional AI assistance is available; every rendered financial claim must still cite evidence."
+        : "Vognary is using its deterministic evidence path. Uncited financial claims are not rendered.",
     },
     { headers: { "cache-control": "no-store" } },
   );

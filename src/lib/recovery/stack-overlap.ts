@@ -17,7 +17,7 @@ export const overlapFamilyLabels: Record<OverlapFamily, string> = {
 };
 
 const merchantFamilies: readonly { family: OverlapFamily; tokens: readonly string[] }[] = [
-  { family: "AI_RESEARCH", tokens: ["chatgpt", "openai", "claude", "anthropic", "perplexity", "gemini", "midjourney", "runway", "elevenlabs"] },
+  { family: "AI_RESEARCH", tokens: ["chatgpt", "openai", "claude", "anthropic", "perplexity", "gemini", "midjourney", "runway", "elevenlabs", "cursor", "windsurf"] },
   { family: "PROJECT_MANAGEMENT", tokens: ["linear", "asana", "clickup", "jira", "monday.com", "monday"] },
   { family: "DOCUMENTATION", tokens: ["notion", "confluence"] },
   { family: "COMMUNICATION", tokens: ["microsoft teams", "slack", "teams"] },

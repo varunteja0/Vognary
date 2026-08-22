@@ -28,6 +28,28 @@ test("stateless audit accepts semimonthly commitments supported by the engine", 
   assert.equal(response.status, 200);
   const payload = await response.json();
   assert.equal(payload.audit.recurringItems[0]?.frequency, "semimonthly");
+  assert.equal(payload.cards[0]?.merchant, "Twice Monthly Plan");
+});
+
+test("stateless audit returns the same first-session cards Recovery will remember", async () => {
+  const response = await POST(new Request("https://vognary.example/api/audit", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-forwarded-for": `audit-cards-${Date.now()}`,
+    },
+    body: JSON.stringify({
+      sources: [],
+      manualItems: [],
+      receiptTexts: ["Cursor invoice paid USD 20.00 on 2026-08-28."],
+    }),
+  }) as never);
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.cards[0]?.merchant, "Cursor");
+  assert.equal(payload.cards[0]?.provisional, true);
+  assert.match(payload.cards[0]?.sentence ?? "", /Seen once/);
 });
 
 test("stateless audit rejects malformed supplied currency codes", async () => {

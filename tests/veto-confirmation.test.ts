@@ -31,7 +31,7 @@ test("the public veto GET is a raw HTML shell without an RSC token prop", () => 
   const route = readFileSync("src/app/autopilot/veto/[token]/route.ts", "utf8");
   assert.doesNotMatch(route, /params|encodeURIComponent|action=/);
   assert.match(route, /window\.location\.pathname/);
-  assert.match(route, /fetch\(\\`\/api\\\$\{path\}\\`/);
+  assert.match(route, /fetch\(`\/api\$\{path\}`/);
   assert.match(route, /method: "POST"/);
   assert.match(route, /result could not be confirmed/);
   assert.doesNotMatch(route, /Nothing was recorded/);

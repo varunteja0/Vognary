@@ -18,11 +18,12 @@ await assertOk("/security");
 await assertOk("/private-audit");
 await assertOk("/login");
 
-for (const [legacy, destination] of [["/connect", "/app"], ["/integrations", "/app"], ["/sources", "/app"], ["/launch", "/private-audit"]]) {
+for (const [legacy, destination] of [["/connect", "/app"], ["/integrations", "/app"], ["/sources", "/app"], ["/launch", "/login?next=/app"], ["/private-audit", "/login?next=/app"]]) {
   const response = await fetch(`${baseUrl}${legacy}`, { redirect: "manual" });
   if (response.status !== 308) throw new Error(`${legacy} compatibility redirect returned ${response.status}`);
   const location = response.headers.get("location");
-  if (!location || new URL(location, baseUrl).pathname !== destination) throw new Error(`${legacy} did not redirect to ${destination}`);
+  const redirectUrl = location ? new URL(location, baseUrl) : null;
+  if (!redirectUrl || `${redirectUrl.pathname}${redirectUrl.search}` !== destination) throw new Error(`${legacy} did not redirect to ${destination}`);
 }
 
 const health = await (await assertOk("/api/health")).json();
@@ -164,12 +165,8 @@ if (invalidAuditResponse.status !== expectedInvalidAuditStatus) {
 }
 
 const auditIntakeResponse = await fetch(`${baseUrl}/api/audit-intake`);
-if (![200, 501].includes(auditIntakeResponse.status)) {
-  throw new Error(`Audit intake readiness endpoint returned ${auditIntakeResponse.status}`);
-}
+if (auditIntakeResponse.status !== 410) throw new Error(`Retired audit intake returned ${auditIntakeResponse.status}`);
 const auditIntake = await auditIntakeResponse.json();
-if (!['ready', 'not-configured'].includes(auditIntake.status) || typeof auditIntake.persisted !== "boolean") {
-  throw new Error("Audit intake readiness endpoint returned an invalid contract");
-}
+if (auditIntake.status !== "retired" || auditIntake.replacement !== "/login?next=/app") throw new Error("Retired audit intake returned an invalid contract");
 
 console.log(JSON.stringify({ status: "ok", baseUrl, routes: "verified" }, null, 2));

@@ -13,7 +13,7 @@ test("legacy product routes resolve to canonical launch destinations", async ({ 
   }
 
   await page.goto("/launch");
-  await expect(page).toHaveURL(/\/private-audit$/);
+  await expect(page).toHaveURL(/\/login\?next=(?:%2F|\/)app$/);
 });
 
 test("direct brand and verification utilities are noindexed", async ({ page }) => {

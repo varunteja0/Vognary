@@ -21,7 +21,7 @@ export default async function BillingReturnPage({ searchParams }: { searchParams
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/private-audit" className="btn btn-ghost">Private audit</Link>
+          <Link href="/app" className="btn btn-ghost">Open Vognary</Link>
         </div>
 
         <article className="panel p-6 sm:p-8 rise">

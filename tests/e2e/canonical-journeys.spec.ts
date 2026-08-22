@@ -6,18 +6,19 @@ test("canonical product entry keeps forwarding unavailable without seeded data",
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Decide before the charge, not after it." })).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/i)).toHaveCount(0);
-  await expect(page.getByText(/Add the billing receipts you already have/i)).toBeVisible();
+  await expect(page.getByText(/billing receipts you already have/i)).toBeVisible();
   await expect(page.getByText(/sample audit/i)).toHaveCount(0);
   await expect(page.locator('a[href*="demo="], a[href*="guest="]')).toHaveCount(0);
   await expectNoSeriousAxeViolations(page);
   expect(failures).toEqual([]);
 });
 
-test("legacy mode URLs canonicalize to the saved-workspace sign-in without loading demo records", async ({ page }) => {
+test("legacy mode URLs are crawlable tombstones without demo records", async ({ page }) => {
   for (const legacyUrl of ["/app?demo=1", "/app?guest=1"]) {
-    await page.goto(legacyUrl);
-    await expect(page).toHaveURL(/\/login\?next=(?:%2F|\/)app$/);
-    await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+    const response = await page.goto(legacyUrl);
+    expect(response?.status()).toBe(410);
+    await expect(page.getByRole("heading", { name: "This old Vognary demo is retired" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open current Vognary" })).toHaveAttribute("href", "/login?next=/app");
     await expect(page.getByLabel("Paste receipts or invoices")).toHaveCount(0);
   }
 });

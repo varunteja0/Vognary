@@ -8,6 +8,12 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Security",
   description: "How Vognary protects submitted evidence, account data, connected sources, and recurring-spend audit results.",
+  alternates: { canonical: "/security" },
+  openGraph: {
+    url: "/security",
+    title: "Security - Vognary",
+    description: "How Vognary protects submitted evidence, account data, connected sources, and recurring-spend audit results.",
+  },
 };
 
 const stateLabels: Record<TrustSignalState, string> = {

@@ -164,6 +164,9 @@ const home = {
     charge: money,
     stake: { currency: "INR", minor: "2398800", exponent: 2, display: "₹23,988.00" },
     headline: "Decide before Thursday",
+    sentence: "OpenAI charges ₹1,999.00. Charges in 3 days. You have not decided this cycle.",
+    excerpt: "OpenAI invoice paid INR 1,999. Renews monthly.",
+    provisional: false,
     reasonKeys: ["RENEWS_SOON"],
     reasons: ["Expected in 3 days."],
     overlapMerchants: [],
@@ -286,9 +289,10 @@ test("home renders attention, upcoming charges, and receipt freshness without in
 
   await expect.poll(() => activationResponses.length).toBe(1);
   expect(activationResponses).toEqual([201]);
-  await expect(page.getByText("₹1,999.00").first()).toBeVisible();
-  await expect(page.getByText("OpenAI").first()).toBeVisible();
-  await expect(page.getByText("₹23,988.00 / year at stake")).toBeVisible();
+  await expect(page.getByText("OpenAI charges ₹1,999.00").first()).toBeVisible();
+  await expect(page.getByText("OpenAI invoice paid INR 1,999. Renews monthly.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "See the cited receipt" })).toBeVisible();
+  await expect(page.getByText("Why a decision is needed now")).toBeVisible();
   await expect(page.getByRole("button", { name: "Keep", exact: true })).toBeVisible();
   await expect(page.getByText("Annualized estimate", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Copy summary" })).toHaveCount(0);

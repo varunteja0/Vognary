@@ -32,7 +32,7 @@ export function commitmentDecisionState(
 // confirmed one stays quiet, and an unknown one never reads as attention.
 export function decisionOutcomeTone(kind: DecisionOutcomeKind): "alert" | "settled" | "open" | "unknown" {
   if (kind === "CHARGE_AFTER_CANCEL_PLAN") return "alert";
-  if (kind === "CONTINUED_AS_PLANNED") return "settled";
+  if (kind === "CONTINUED_AS_PLANNED" || kind === "WATCHING") return "settled";
   if (kind === "CANNOT_VERIFY") return "unknown";
   return "open";
 }

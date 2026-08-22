@@ -24,6 +24,7 @@ import {
   identityLooksUncertain,
   type SavedDecisionCycle,
 } from "./decision-cycle";
+import { PROVISIONAL_RISK_TAG } from "./provisional-receipt";
 
 const dayMs = 24 * 60 * 60 * 1_000;
 
@@ -59,6 +60,7 @@ export type CanonicalCommitmentRecord = {
   priceChange?: { previousMinor: bigint; currentMinor: bigint } | null;
   amountConflict?: boolean;
   cycles?: readonly SavedDecisionCycle[];
+  excerpt?: string | null;
   updatedAt: string;
 };
 
@@ -114,10 +116,13 @@ export const renewalAlertMinimumConfidence = 80;
 export const renewalAlertRepeatedEvidenceMinimumConfidence = 70;
 
 export function isRecoveryReminderEligible(commitment: Pick<CanonicalCommitmentRecord, "cadence" | "confidenceScore" | "decision" | "evidenceIds">) {
-  if (commitment.decision?.value === "KEEP") return false;
+  if (commitment.cadence === "IRREGULAR") return false;
+  if (commitment.evidenceIds.length < 1) return false;
+  // KEEP still gets the 1-day "before this charge" reminder. 7-day review
+  // noise stays suppressed in the scheduler, not here.
+  if (commitment.decision?.value === "KEEP") return true;
   if (commitment.confidenceScore >= renewalAlertMinimumConfidence) return true;
   return commitment.confidenceScore >= renewalAlertRepeatedEvidenceMinimumConfidence
-    && commitment.cadence !== "IRREGULAR"
     && commitment.evidenceIds.length >= 2;
 }
 
@@ -128,7 +133,7 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
   const active = input.commitments.filter((commitment) => commitment.status === "ACTIVE");
   const excludedFromHeadline = commitmentIdsExcludedFromHeadlineTotals(input.duplicateState);
   const inHeadline = (commitment: CanonicalCommitmentRecord) => !excludedFromHeadline.has(commitment.id);
-  const cadenceEstablished = active.filter((commitment) => commitment.cadence !== "IRREGULAR");
+  const cadenceEstablished = active.filter((commitment) => countsTowardMonthly(commitment));
   const monthlyTotals = buildTotals(
     cadenceEstablished.filter(inHeadline),
     (commitment) => commitment.monthlyEquivalentMinor,
@@ -136,6 +141,7 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
   );
   const next30DayCommitments = active.filter((commitment) => {
     if (!inHeadline(commitment)) return false;
+    if (commitment.riskTags.includes(PROVISIONAL_RISK_TAG)) return false;
     const days = commitment.nextExpectedDate ? daysBetween(today, commitment.nextExpectedDate) : null;
     return days !== null && days >= 0 && days <= 30;
   });
@@ -561,9 +567,15 @@ export function toDecisionFacts(commitments: readonly CanonicalCommitmentRecord[
         .filter((member) => member.id !== commitment.id)
         .map((member) => ({ merchant: member.merchant, purpose: member.purpose ?? null })),
       evidenceIds: commitment.evidenceIds,
+      excerpt: commitment.excerpt ?? null,
       cycles: commitment.cycles ?? [],
     };
   });
+}
+
+function countsTowardMonthly(commitment: CanonicalCommitmentRecord): boolean {
+  if (commitment.cadence === "IRREGULAR") return false;
+  return !commitment.riskTags.includes(PROVISIONAL_RISK_TAG);
 }
 
 function unique(values: readonly string[]) {

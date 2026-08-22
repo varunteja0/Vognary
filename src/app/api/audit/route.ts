@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
-import { receiptTextToManualInputs } from "@/lib/receipt-parser";
+import { formatCalendarDate, parseIsoDateOnly } from "@/lib/date-only";
+import { manualsFromReceiptText } from "@/lib/recovery/first-session-receipts";
+import { startCardsFromRecurringItems } from "@/lib/recovery/start-cards";
 import { buildRenewalTimeline } from "@/lib/renewal-timeline";
 import { analyzeStatements, normalizeCurrencyCode, type Frequency, type ManualRecurringInput, type StatementSource } from "@/lib/recurring-audit";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
-import { parseIsoDateOnly } from "@/lib/date-only";
 
 export const dynamic = "force-dynamic";
 
@@ -76,13 +77,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Each receipt text must be a string under ${maxReceiptCharacters} characters.` }, { status: 400 });
   }
 
-  const receiptItems = receiptTexts.flatMap((text, index) => receiptTextToManualInputs(text, `Receipt text ${index + 1}`));
+  const today = formatCalendarDate(new Date());
+  const receiptItems = receiptTexts.flatMap((text, index) => manualsFromReceiptText(text, `Receipt text ${index + 1}`, today));
   const audit = analyzeStatements(sources, [...manualItems, ...receiptItems]);
 
   return NextResponse.json({
     mode: "stateless-audit-api",
     storage: "none",
     audit,
+    cards: startCardsFromRecurringItems(audit.recurringItems, today),
     timeline: buildRenewalTimeline(audit.recurringItems, { horizonDays: 45 }),
   });
 }

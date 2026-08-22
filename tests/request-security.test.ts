@@ -28,6 +28,7 @@ const guardedMutationRoutes: Array<[string, number]> = [
   ["src/app/api/privacy/requests/route.ts", 1],
   ["src/app/api/privacy/retention-policy/route.ts", 1],
   ["src/app/api/product-events/route.ts", 1],
+  ["src/app/api/receipt-image/propose/route.ts", 1],
   ["src/app/api/profile/route.ts", 1],
   ["src/app/api/platform/tokens/route.ts", 2],
   ["src/app/api/renewal-alerts/preferences/route.ts", 1],
@@ -162,12 +163,10 @@ test("provider callbacks, webhooks, and internal-secret workers stay explicit CS
 
 test("all guarded JSON handlers use bounded parsing", () => {
   const boundedJsonRoutes = [
-    "src/app/api/audit-intake/route.ts",
     "src/app/api/audit-packs/sign/route.ts",
     "src/app/api/audit/route.ts",
     "src/app/api/auth/login/route.ts",
     "src/app/api/auth/magic-link/request/route.ts",
-    "src/app/api/checkout/route.ts",
     "src/app/api/privacy/consents/route.ts",
     "src/app/api/privacy/requests/route.ts",
     "src/app/api/privacy/retention-policy/route.ts",

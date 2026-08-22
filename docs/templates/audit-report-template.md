@@ -12,8 +12,8 @@
 | Client / workspace | |
 | Audit date | |
 | Auditor | |
-| Mode | Free batch / Assisted ₹999 / Internal |
-| Evidence types received | ☐ Receipt paste ☐ CSV ☐ PDF ☐ Gmail ☐ Screenshots ☐ Manual |
+| Mode | Founder-assisted pilot / Internal |
+| Evidence types received | ☐ Receipt paste ☐ Receipt PDF ☐ Invoice PDF ☐ Manual |
 | Currencies present | |
 | Coverage confidence | High / Medium / Low — why: |
 

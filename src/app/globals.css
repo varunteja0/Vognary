@@ -705,6 +705,31 @@ select.field option {
   line-height: 1.2;
   color: var(--ochre);
 }
+.decision-sentence {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.decision-quote {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.decision-hook {
+  display: grid;
+  gap: 0.35rem;
+}
+.decision-hook-title {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--ink);
+}
 .decision-merchant {
   margin-top: 0.3rem;
   font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
@@ -733,6 +758,19 @@ select.field option {
   font-size: 0.76rem;
   line-height: 1.4;
   color: var(--muted);
+}
+.decision-evidence {
+  display: grid;
+  gap: 0.35rem;
+}
+.decision-evidence-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.85rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
 }
 
 @media (min-width: 34rem) {

@@ -3,6 +3,8 @@ import test from "node:test";
 import type { AttentionItemDto, ExpectedVsObservedDto, HomeProjectionDto } from "../src/lib/recovery/contracts";
 import { errorCopy } from "../src/app/workspace/recovery/labels";
 import {
+  chargeWhenLine,
+  citedEvidenceLine,
   customerInboxStatus,
   customerStatusForCommitment,
   firstResultBrief,
@@ -109,6 +111,9 @@ test("first-result brief uses server commitment order and counts queued decision
       charge: money,
       stake: null,
       headline: "Decision needed",
+      sentence: "OpenAI charges ₹1,999.00. You also pay Claude. You have not decided this cycle.",
+      excerpt: "OpenAI invoice paid INR 1,999.",
+      provisional: false,
       reasonKeys: ["PRICE_INCREASE"],
       reasons: ["Price increased ₹500"],
       overlapMerchants: ["Claude"],
@@ -122,6 +127,9 @@ test("first-result brief uses server commitment order and counts queued decision
       charge: money,
       stake: null,
       headline: "Decision needed",
+      sentence: "Claude charges ₹1,999.00. You also pay OpenAI. You have not decided this cycle.",
+      excerpt: "Claude Max · ₹24,000.",
+      provisional: false,
       reasonKeys: ["OVERLAP_NO_PURPOSE"],
       reasons: ["Possible overlap"],
       overlapMerchants: ["OpenAI"],
@@ -171,6 +179,17 @@ test("expected-vs-observed stays silent when matched and uses human sentences ot
     observedAmount: { ...money, display: "₹2,299.00", minor: "229900" },
   });
   assert.equal(changed?.sentence, "This bill was ₹2,299.00 instead of the usual ₹1,999.00.");
+});
+
+test("decision-moment copy cites receipt count and charge timing without inventing a date", () => {
+  assert.equal(citedEvidenceLine(0), "No cited receipt is attached yet.");
+  assert.equal(citedEvidenceLine(1), "Based on 1 cited receipt.");
+  assert.equal(citedEvidenceLine(2), "Based on 2 cited receipts.");
+  assert.equal(chargeWhenLine(null, null, null), "Date not established");
+  assert.equal(chargeWhenLine("2026-08-22", 0, "22 Aug 2026"), "Charges today · 22 Aug 2026");
+  assert.equal(chargeWhenLine("2026-08-23", 1, "23 Aug 2026"), "Charges tomorrow · 23 Aug 2026");
+  assert.equal(chargeWhenLine("2026-08-25", 3, "25 Aug 2026"), "Charges in 3 days · 25 Aug 2026");
+  assert.equal(chargeWhenLine("2026-09-06", null, "6 Sept 2026"), "Charges 6 Sept 2026");
 });
 
 test("inbox failures never print PARSE_FAILED", () => {

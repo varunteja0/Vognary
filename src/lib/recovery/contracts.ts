@@ -22,6 +22,7 @@ export const decisionReasonKeys = [
   "IDENTITY_UNCERTAIN",
   "AMOUNT_CONFLICT",
   "NO_PRIOR_DECISION",
+  "PROVISIONAL_SINGLE",
 ] as const;
 export type DecisionReasonKey = (typeof decisionReasonKeys)[number];
 
@@ -38,6 +39,7 @@ export const decisionOutcomeKinds = [
   "NO_CHARGE_SEEN",
   "CANNOT_VERIFY",
   "DECISION_DUE_AGAIN",
+  "WATCHING",
 ] as const;
 export type DecisionOutcomeKind = (typeof decisionOutcomeKinds)[number];
 
@@ -367,6 +369,9 @@ export type DecisionCardDto = {
   charge: MoneyDto;
   stake: MoneyDto | null;
   headline: string;
+  sentence: string;
+  excerpt: string | null;
+  provisional: boolean;
   reasonKeys: readonly DecisionReasonKey[];
   reasons: readonly string[];
   overlapMerchants: readonly string[];

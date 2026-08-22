@@ -25,6 +25,7 @@ export {
   decisionOutcomeTone,
   type DecisionStateTone,
 } from "./decision-state";
+export { citedEvidenceLine, chargeWhenLine } from "./decision-copy";
 export { customerErrorCopy, inboxFailureCopy, rejectedSubmissionCopy } from "./errors";
 export {
   customerInboxStatus,

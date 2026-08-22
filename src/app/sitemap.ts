@@ -5,7 +5,6 @@ const origin = "https://www.vognary.com";
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: `${origin}/`, changeFrequency: "weekly", priority: 1 },
-    { url: `${origin}/private-audit`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${origin}/security`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${origin}/privacy`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${origin}/terms`, changeFrequency: "monthly", priority: 0.4 },

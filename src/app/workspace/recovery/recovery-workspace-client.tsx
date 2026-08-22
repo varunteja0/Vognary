@@ -11,6 +11,13 @@ import {
   persistGuestRecoveryEvidenceTransfer,
 } from "@/lib/guest-audit-transfer";
 import {
+  clearStartSessionRecord,
+  matchStartDecision,
+  readStartSessionRecord,
+} from "@/lib/recovery/start-session";
+import { stampForCycleAction } from "@/lib/recovery/decision-cycle";
+import { isReceiptImageFile } from "@/lib/recovery/wow-first-session";
+import {
   recoveryLimits,
   type CommitmentSummaryDto,
   type CorrectionDto,
@@ -102,6 +109,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   const [loadingMoreCommitments, setLoadingMoreCommitments] = useState(false);
   const [guestTransferStatus, setGuestTransferStatus] = useState<GuestTransferStatus>({ kind: "IDLE" });
   const [guestTransferAttempt, setGuestTransferAttempt] = useState(0);
+  const [startReplayNotice, setStartReplayNotice] = useState<string | null>(null);
   const [inspectedEvidence, setInspectedEvidence] = useState<EvidenceDto | null>(null);
   const [inspectedEvidenceFailure, setInspectedEvidenceFailure] = useState<TransportFailure | null>(null);
   const [inspectingEvidence, setInspectingEvidence] = useState(false);
@@ -557,8 +565,10 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   }
 
   async function prepareFiles(files: readonly File[]) {
+    const documents = files.filter((file) => !isReceiptImageFile(file));
+    if (!documents.length) return;
     dispatch({ type: "CSV_PREPARE_STARTED" });
-    const result = await transport.prepareImport(files.slice(0, recoveryLimits.maxCsvSources));
+    const result = await transport.prepareImport(documents.slice(0, recoveryLimits.maxCsvSources));
     if (!result.ok) return dispatch({ type: "CSV_PREPARE_FAILED", failure: result });
     dispatch({
       type: "CSV_SOURCES_PREPARED",
@@ -571,6 +581,71 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
       })),
     });
   }
+
+  async function consentReminder() {
+    try {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata";
+      const response = await fetch("/api/renewal-alerts/preferences", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          enabled: true,
+          weeklyDigestEnabled: false,
+          sevenDayEnabled: false,
+          oneDayEnabled: true,
+          timeZone,
+          sendHourLocal: 9,
+        }),
+      });
+      if (!response.ok) {
+        window.sessionStorage.setItem("vognary.reminder-consent", "requested");
+      }
+    } catch {
+      try {
+        window.sessionStorage.setItem("vognary.reminder-consent", "requested");
+      } catch {
+        // Consent stays on-screen even if storage is unavailable.
+      }
+    }
+  }
+
+  const startReplayRef = useRef(false);
+  useEffect(() => {
+    if (startReplayRef.current) return;
+    if (state.status.kind !== "READY" || !state.home) return;
+    const record = readStartSessionRecord();
+    if (!record?.decisions.length) return;
+    if (!state.home.decisionQueue.length) return;
+    startReplayRef.current = true;
+    const home = state.home;
+    void (async () => {
+      const unmatched: string[] = [];
+      for (const decision of record.decisions) {
+        const card = home.decisionQueue.find((item) => matchStartDecision(item.merchant, [decision]));
+        if (!card) {
+          unmatched.push(decision.merchant);
+          continue;
+        }
+        await decide({
+          commitmentId: card.commitmentId,
+          decision: stampForCycleAction(decision.action),
+          action: decision.action,
+        });
+      }
+      if (record.reminderRequested) await consentReminder();
+      clearStartSessionRecord();
+      if (unmatched.length) {
+        setStartReplayNotice(
+          unmatched.length === 1
+            ? `Your bills were saved. We could not re-apply the decision for ${unmatched[0]}. Decide it again here. Nothing was cancelled.`
+            : `Your bills were saved. We could not re-apply decisions for ${unmatched.join(", ")}. Decide them again here. Nothing was cancelled.`,
+        );
+      }
+    })();
+    // One-shot replay of /start decisions; decide is the current snapshot writer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.home, state.status.kind]);
 
   async function updateReceiptInbox(action: "PROVISION" | "ROTATE" | "REVOKE") {
     const activeAliasId = state.receiptInbox?.alias?.id ?? null;
@@ -731,6 +806,11 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         <div className="mt-5 grid gap-4">
           {!state.online ? <OfflineBlock /> : null}
           <GuestTransferBlock status={guestTransferStatus} onRetry={() => setGuestTransferAttempt((attempt) => attempt + 1)} />
+          {startReplayNotice ? (
+            <div role="status" className="inset p-4">
+              <p className="text-sm leading-6 text-(--ink)">{startReplayNotice}</p>
+            </div>
+          ) : null}
           {state.refreshRequired ? (
             <StateBlock
               eyebrow="Out of date"
@@ -790,7 +870,11 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
               onModeChange: (mode) => dispatch({ type: "EVIDENCE_MODE_SELECTED", mode }),
               onReceiptChange: (text) => dispatch({ type: "RECEIPT_DRAFT_CHANGED", text }),
               onFilesChosen: (files) => void prepareFiles(files),
+              onImageDrafts: (drafts) => dispatch({ type: "IMAGE_DRAFTS_ADDED", drafts }),
+              onImageProposal: (clientRef, proposal) => dispatch({ type: "IMAGE_DRAFT_PROPOSAL", clientRef, proposal }),
               onRemoveSource: (clientRef) => dispatch({ type: "CSV_SOURCE_REMOVED", clientRef }),
+              onConfirmImageLine: (clientRef, text) => dispatch({ type: "IMAGE_LINE_CONFIRMED", clientRef, text }),
+              onRemoveImageDraft: (clientRef) => dispatch({ type: "IMAGE_DRAFT_REMOVED", clientRef }),
               onSubmit: (mode) => void submitEvidence(mode),
             }}
           />
@@ -903,6 +987,14 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         onSeeAllCommitments={() => selectView("COMMITMENTS")}
         onDismissFirstResult={() => dispatch({ type: "FIRST_RESULT_DISMISSED" })}
         onDecide={(request) => void decide(request)}
+        onReminderConsent={() => void consentReminder()}
+        onPaymentAsk={(answer) => {
+          try {
+            window.sessionStorage.setItem("vognary.payment-ask", answer);
+          } catch {
+            // Written intent is research-only; missing storage does not change money.
+          }
+        }}
         onSaveContext={(commitmentId, request) => void saveContext(commitmentId, request)}
         onWorkspaceMutated={() => void loadSnapshot()}
         receiptInbox={state.receiptInbox}

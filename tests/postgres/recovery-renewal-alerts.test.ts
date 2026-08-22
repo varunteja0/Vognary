@@ -110,7 +110,15 @@ test("Recovery date corrections and decisions reconcile reminder deliveries atom
       request: { commitmentId, decision: "KEEP" },
     });
     assert.equal(kept.workspaceVersion, 3);
-    assert.deepEqual(await deliveryCounts(pool, workspaceId, dates.new_date), { scheduled: 0, cancelled: 2 });
+    assert.deepEqual(await deliveryCounts(pool, workspaceId, dates.new_date), { scheduled: 1, cancelled: 1 });
+    const keptWindows = await pool.query<{ alert_window: string; status: string }>(
+      `select alert_window, status from renewal_alert_deliveries where workspace_id = $1 and renewal_date = $2 order by alert_window`,
+      [workspaceId, dates.new_date],
+    );
+    assert.deepEqual(keptWindows.rows, [
+      { alert_window: "1_day", status: "scheduled" },
+      { alert_window: "7_day", status: "cancelled" },
+    ]);
 
     const monitored = await putRecoveryDecision({
       workspaceId,

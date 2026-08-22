@@ -12,6 +12,7 @@ import {
   type RelationshipSnapshot,
 } from "./recovery/commitment-relationship";
 import { groupStackOverlaps } from "./recovery/stack-overlap";
+import { PROVISIONAL_RISK_TAG, PROVISIONAL_SINGLE_REASON } from "./recovery/provisional-receipt";
 
 export type Frequency =
   | "weekly"
@@ -134,6 +135,8 @@ export type ManualRecurringInput = {
   sourceName?: string;
   /** Raw proof text (e.g. pasted receipt) — used for mandate rails + evidence display. */
   evidenceDescription?: string;
+  /** One observation, hypothesized monthly next date. Not a proven cadence. */
+  provisional?: boolean;
 };
 
 export type AnalyzeOptions = {
@@ -482,6 +485,8 @@ function buildManualRecurringItem(input: ManualRecurringInput, today: Date): Rec
   if (currency !== primaryCurrency) riskTags.add(`foreign currency (${currency})`);
   const observedDate = input.observedDate || input.nextExpectedDate;
   const identitySnapshot = snapshotFromManual(input, normalized.merchant, currency, observedDate);
+  const provisional = input.provisional === true;
+  if (provisional) riskTags.add(PROVISIONAL_RISK_TAG);
 
   return {
     id: input.id,
@@ -503,9 +508,9 @@ function buildManualRecurringItem(input: ManualRecurringInput, today: Date): Rec
     annualCost: monthlyCost * 12,
     lastChargeDate: observedDate,
     nextExpectedDate: projected.date,
-    confidenceScore: 72,
-    recommendationType: recommendation.type,
-    recommendationReason: recommendation.reason,
+    confidenceScore: provisional ? 52 : 72,
+    recommendationType: provisional ? "investigate" : recommendation.type,
+    recommendationReason: provisional ? PROVISIONAL_SINGLE_REASON : recommendation.reason,
     riskTags: [...riskTags],
     evidence: [
       {

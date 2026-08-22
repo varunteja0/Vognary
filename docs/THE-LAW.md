@@ -269,7 +269,7 @@ Consumer audit alone is not $100B. **Commitment truth as infrastructure** might 
 | 3 | Resend domain + key | Magic link + renewal email |
 | 4 | Monitoring (Sentry or Better Stack) | Safe production |
 | 5 | Backup storage + restore drill | Financial data trust |
-| 6 | Razorpay + legal terms approval | ₹999 checkout |
+| 6 | Razorpay + legal terms approval, after first-10 proof | Any future paid offer; retired audit checkout stays off |
 | 7 | 10–20 redacted real statements → corpus | Intelligence truth |
 | 8 | Setu AA onboarding start | Long-lead rail |
 

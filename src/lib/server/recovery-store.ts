@@ -76,10 +76,15 @@ import {
   type StatementSource,
 } from "@/lib/recurring-audit";
 import { recoveryEvidenceFingerprint } from "@/lib/recovery/evidence-fingerprint";
+import {
+  provisionalManualsFromOrphans,
+  type OrphanReceiptObservation,
+} from "@/lib/recovery/provisional-receipt";
 import { evaluateExpectedCharge, type ChargeObservation } from "@/lib/recovery/absence";
 import {
   collectReasonKeys,
   decisionHistoryItems,
+  persistableCycleReasonKeys,
   resolveDecisionWrite,
   verificationFromEvaluation,
   type SavedDecisionCycle,
@@ -999,7 +1004,7 @@ export async function putRecoveryDecision(input: {
           dueDate,
           stake ? stake.minor : null,
           commitment.base_currency,
-          reasonKeys,
+          persistableCycleReasonKeys(reasonKeys),
           write.action,
           write.reviewAt,
           now,
@@ -1825,7 +1830,14 @@ async function analyzePersistedEvidence(client: PoolClient, workspaceId: string,
     name: sourceEngineName(sourceId),
     text: buildSyntheticCsv(rows),
   }));
-  const audit = analyzeStatements(sources, manualItems, { today });
+  const firstAudit = analyzeStatements(sources, manualItems, { today });
+  const covered = new Set(firstAudit.recurringItems.map((item) => item.identityKey));
+  const extras = provisionalManualsFromOrphans(
+    transactionObservations(evidence),
+    covered,
+    toDateOnly(today) ?? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
+  );
+  const audit = extras.length ? analyzeStatements(sources, [...manualItems, ...extras], { today }) : firstAudit;
   const sourceLabels = new Map(evidence.map((row) => [sourceEngineName(row.source_id), row.source_label]));
   return {
     ...audit,
@@ -1835,6 +1847,27 @@ async function analyzePersistedEvidence(client: PoolClient, workspaceId: string,
       sourceNames: item.sourceNames.map((name) => sourceLabels.get(name) ?? name),
     })),
   };
+}
+
+function transactionObservations(rows: readonly EvidenceRow[]): OrphanReceiptObservation[] {
+  return rows.flatMap((row) => {
+    if (row.evidence_kind !== "TRANSACTION" || !row.amount_minor || !row.currency || !row.evidence_date) return [];
+    const amountDecimal = minorUnitsToDecimal(row.amount_minor, currencyExponent(row.currency));
+    const observedDate = toDateOnly(row.evidence_date);
+    if (!observedDate) return [];
+    return [{
+      id: row.id,
+      merchant: row.merchant,
+      normalizedMerchant: row.normalized_merchant,
+      amountDecimal,
+      amount: toEngineAmount(amountDecimal),
+      currency: row.currency,
+      observedDate,
+      excerpt: row.excerpt,
+      sourceName: sourceEngineName(row.source_id),
+      category: row.category,
+    }];
+  });
 }
 
 function publishRecoverySourceLabels(value: string, sourceLabels: ReadonlyMap<string, string>) {
@@ -2176,6 +2209,33 @@ async function linkCanonicalEvidence(client: PoolClient, workspaceId: string, it
         );
       }
     }
+    const citedEvidenceId = evidenceIdFromRecurringItem(item);
+    if (citedEvidenceId) {
+      await client.query(
+        `insert into recovery_commitment_evidence (workspace_id, commitment_id, evidence_id)
+         select $1, $2, evidence.id
+         from recovery_evidence evidence
+         where evidence.workspace_id = $1 and evidence.id = $3::uuid
+         on conflict (workspace_id, commitment_id, evidence_id) do nothing`,
+        [workspaceId, commitment.id, citedEvidenceId],
+      );
+    }
+    await client.query(
+      `insert into recovery_commitment_evidence (workspace_id, commitment_id, evidence_id)
+       select $1, $2, evidence.id
+       from recovery_evidence evidence
+       where evidence.workspace_id = $1
+         and evidence.evidence_kind = 'TRANSACTION'
+         and evidence.currency = $3
+         and lower(evidence.normalized_merchant) = $4
+         and not exists (
+           select 1
+           from recovery_commitment_evidence existing
+           where existing.workspace_id = $1 and existing.evidence_id = evidence.id
+         )
+       on conflict (workspace_id, commitment_id, evidence_id) do nothing`,
+      [workspaceId, commitment.id, item.currency, item.normalizedMerchant.trim().toLowerCase()],
+    );
   }
 }
 
@@ -2461,6 +2521,7 @@ async function loadCommitmentRecords(client: PoolClient, workspaceId: string): P
   const contextMap = await loadContextMap(client, workspaceId);
   const cyclesByCommitment = await loadSavedDecisionCycles(client, workspaceId);
   const amountSignals = await loadAmountSignals(client, workspaceId);
+  const excerpts = await loadLatestExcerpts(client, workspaceId);
   return rows.map((row) => {
     const evidenceIds = asNonEmpty(row.evidence_ids);
     const context = contextMap.get(row.id);
@@ -2497,9 +2558,23 @@ async function loadCommitmentRecords(client: PoolClient, workspaceId: string): P
       priceChange: signal?.priceChange ?? null,
       amountConflict: signal?.amountConflict === true || /does not match the usual amount/i.test(row.recommendation_reason),
       cycles: cyclesByCommitment.get(row.id) ?? [],
+      excerpt: excerpts.get(row.id) ?? null,
       updatedAt: row.updated_at.toISOString(),
     };
   });
+}
+
+async function loadLatestExcerpts(client: PoolClient, workspaceId: string): Promise<Map<string, string>> {
+  const result = await client.query<{ commitment_id: string; excerpt: string }>(
+    `select distinct on (link.commitment_id) link.commitment_id, evidence.excerpt
+     from recovery_commitment_evidence link
+     join recovery_evidence evidence
+       on evidence.workspace_id = link.workspace_id and evidence.id = link.evidence_id
+     where link.workspace_id = $1
+     order by link.commitment_id, link.linked_at desc, link.evidence_id desc`,
+    [workspaceId],
+  );
+  return new Map(result.rows.map((row) => [row.commitment_id, row.excerpt]));
 }
 
 async function loadCommitmentRows(client: PoolClient, workspaceId: string) {
@@ -3290,6 +3365,14 @@ function recommendationDecision(value: RecurringItem["recommendationType"]): Dec
 
 function confidenceState(score: number) {
   return score >= 85 ? "HIGH" as const : score >= 65 ? "MEDIUM" as const : score > 0 ? "LOW" as const : "UNKNOWN" as const;
+}
+
+const recoveryEvidenceUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function evidenceIdFromRecurringItem(item: RecurringItem): string | null {
+  if (recoveryEvidenceUuidPattern.test(item.id)) return item.id;
+  const prefixed = item.id.startsWith("recovery-evidence-") ? item.id.slice("recovery-evidence-".length) : "";
+  return recoveryEvidenceUuidPattern.test(prefixed) ? prefixed : null;
 }
 
 function evidenceMatchKey(source: string, date: string | null, amountMinor: string | null, description: string) {

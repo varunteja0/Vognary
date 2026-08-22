@@ -294,7 +294,8 @@ test("saving one observed receipt does not activate a workspace without a cited 
     }));
     assert.equal(first.status, 201);
     const firstPayload = await first.json() as ApiSuccess<{ home: HomeProjectionDto }>;
-    assert.equal(firstPayload.data.home.activeCommitmentCount, 0);
+    assert.equal(firstPayload.data.home.activeCommitmentCount, 1, "one named receipt is a provisional decision");
+    assert.equal(firstPayload.data.home.monthlyTotals.length, 0, "a hypothesized cadence is not a cited spend picture");
     assert.equal(hasCitedPicture(firstPayload.data.home), false);
     const activationCount = async () => Number((await pool.query<{ n: string }>(
       `select count(*)::text as n from product_events where workspace_id = $1 and event_name = 'workspace.activated'`,

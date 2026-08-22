@@ -32,6 +32,7 @@ test("named vendors map to conservative overlap families and unknown vendors sta
 
 test("receipt AI-tools category can group Cursor with ChatGPT without treating cloud as overlap", () => {
   assert.equal(classifyStackOverlapFamily("Cursor", "AI tools"), "AI_RESEARCH");
+  assert.equal(classifyStackOverlapFamily("Cursor", "Other"), "AI_RESEARCH");
   assert.equal(classifyStackOverlapFamily("Render", "Cloud hosting"), null);
   assert.equal(overlapFamilyLabels.AI_RESEARCH, "AI / Research");
 });

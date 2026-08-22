@@ -44,6 +44,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Vognary" }],
   creator: "Vognary",
+  alternates: { canonical: "/" },
   appleWebApp: {
     capable: true,
     title: "Vognary",

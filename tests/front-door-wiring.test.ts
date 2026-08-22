@@ -9,19 +9,19 @@ const experienceSource = readFileSync("src/app/app/experience-client.tsx", "utf8
 const loginSource = readFileSync("src/app/login/login-client.tsx", "utf8");
 const layoutSource = readFileSync("src/app/layout.tsx", "utf8");
 
-test("the public page resolves receipt inbox readiness at request time", () => {
-  assert.match(pageSource, /export const dynamic = "force-dynamic"/);
-  assert.match(pageSource, /receiptInboxAvailable=\{await isReceiptInboxPubliclyAvailable\(\)\}/);
+test("the public page is a cacheable readiness-neutral shell", () => {
+  assert.match(pageSource, /export const revalidate = 3600/);
+  assert.doesNotMatch(pageSource, /force-dynamic|isReceiptInboxPubliclyAvailable/);
 });
 
 test("the landing selects the proven entry path without demo or instant-audit surfaces", () => {
-  assert.match(landingSource, /const primaryHref = "\/login\?next=\/app";/);
-  assert.match(landingSource, /const primaryLabel = "Review my software stack";/);
+  assert.match(landingSource, /const primaryHref = "\/start";/);
+  assert.match(landingSource, /const primaryLabel = "Add a bill";/);
   assert.doesNotMatch(landingSource, /sample|demo|InstantAudit|instant audit/i);
 });
 
 test("the landing states the inbound and retention boundaries without unsupported claims", () => {
-  assert.match(landingSource, /Messages sent to your private Vognary address are processed as receipt evidence/);
+  assert.match(landingSource, /Sources shows whether private billing forwarding is available\. When it is, set it up once\. Messages sent to that address are processed as receipt evidence/);
   assert.match(landingSource, /Provider-held email copies follow Resend's own retention schedule and are not immediately deletable by Vognary/);
   assert.doesNotMatch(landingSource, /30 days/i);
   assert.doesNotMatch(landingSource, /only billing evidence you intentionally forward/i);

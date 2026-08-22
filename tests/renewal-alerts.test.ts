@@ -134,6 +134,7 @@ test("renewal scheduling and delivery source enforce opt-in, idempotency, bounde
   assert.match(store, /recovery_commitment_evidence/);
   assert.match(store, /effective_cadence <> 'IRREGULAR'/);
   assert.match(store, /item\.user_decision is distinct from 'KEEP'/);
+  assert.match(store, /= '1_day' or decision\.decision is distinct from 'KEEP'/);
   assert.match(store, /item\.confidence_score >= 80/);
   assert.doesNotMatch(store, /exists \(select 1 from recurring_items item where item\.workspace_id = (?:preference|delivery)\.workspace_id\)/);
   assert.doesNotMatch(mailer, /console\./);

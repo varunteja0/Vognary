@@ -17,6 +17,7 @@ import {
 } from "@/lib/recovery/contracts";
 import { hasCitedRecurringSpendPicture } from "@/lib/recovery/domain";
 import {
+  chargeWhenLine,
   customerPhrases,
   decisionOutcomeTone,
   firstResultBrief,
@@ -24,6 +25,15 @@ import {
   shouldShowComingUp,
   shouldShowRecentChange,
 } from "./present";
+import {
+  actionFromDecision,
+  decisionArtefactText,
+  decisionHookCopy,
+  keepIsPrimary,
+  paymentAskQuestion,
+  reminderOffer,
+  shouldOfferPaymentAsk,
+} from "@/lib/recovery/wow-first-session";
 import { RecoveryAutopilotHome } from "./recovery-autopilot-home";
 import { RecoveryAttention } from "./recovery-attention";
 import {
@@ -48,6 +58,8 @@ export function RecoveryHome({
   onDismissFirstResult,
   onDecide,
   onSaveContext,
+  onReminderConsent,
+  onPaymentAsk,
   receiptInbox,
   onVeto,
   pendingVetoId,
@@ -67,12 +79,47 @@ export function RecoveryHome({
   onDismissFirstResult: () => void;
   onDecide: (request: PutDecisionRequest) => void;
   onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
+  onReminderConsent?: () => void;
+  onPaymentAsk?: (answer: "yes" | "no") => void;
   receiptInbox: ReceiptInboxStatusDto | null;
   onVeto?: (candidateId: string) => void;
   pendingVetoId?: string | null;
   pendingDecisionId?: string | null;
   onCitedPictureRendered?: (workspaceId: string) => void;
 }) {
+  const [lastHook, setLastHook] = useState<{ title: string; body: string; artefact: string } | null>(null);
+  const [paymentAnswer, setPaymentAnswer] = useState<"unasked" | "yes" | "no">("unasked");
+
+  function rememberDecision(request: PutDecisionRequest) {
+    const card = home.decisionQueue.find((item) => item.commitmentId === request.commitmentId);
+    const action = request.action ?? actionFromDecision(request.decision);
+    if (card && action) {
+      const hook = decisionHookCopy({
+        merchant: card.merchant,
+        action,
+        watchDate: card.dueDate ? formatDay(card.dueDate) : null,
+      });
+      setLastHook({
+        title: hook.title,
+        body: hook.body,
+        artefact: decisionArtefactText({
+          merchant: card.merchant,
+          amountDisplay: card.charge.display,
+          whenLine: chargeWhenLine(card.dueDate, card.daysAway, card.dueDate ? formatDay(card.dueDate) : null),
+          action,
+          excerpt: card.excerpt,
+        }),
+      });
+    }
+    onDecide(request);
+  }
+
+  const verifiedOutcomes = home.decisionOutcomes.filter((outcome) => (
+    outcome.kind === "CONTINUED_AS_PLANNED" || outcome.kind === "CHARGE_AFTER_CANCEL_PLAN"
+  )).length;
+  const showPaymentAsk = paymentAnswer === "unasked"
+    && shouldOfferPaymentAsk(home.decisionOutcomes.length, verifiedOutcomes);
+
   if (home.autopilot?.mandate?.status === "ACTIVE") {
     return (
       <div className="grid gap-6">
@@ -108,10 +155,12 @@ export function RecoveryHome({
         home={home}
         commitments={commitments}
         pendingDecisionId={pendingDecisionId}
+        lastHook={lastHook}
         onReview={onDismissFirstResult}
-        onDecide={onDecide}
+        onDecide={rememberDecision}
         onSaveContext={onSaveContext}
         onOpenCommitment={onOpenCommitment}
+        onReminderConsent={onReminderConsent}
       />
     );
   }
@@ -123,11 +172,21 @@ export function RecoveryHome({
         <DecisionQueue
           home={home}
           pendingDecisionId={pendingDecisionId}
-          onDecide={onDecide}
+          lastHook={lastHook}
+          onDecide={rememberDecision}
           onSaveContext={onSaveContext}
           onOpenCommitment={onOpenCommitment}
+          onReminderConsent={onReminderConsent}
         />
         <DecisionOutcomes home={home} onOpenCommitment={onOpenCommitment} />
+        {showPaymentAsk ? (
+          <PaymentAsk
+            onAnswer={(answer) => {
+              setPaymentAnswer(answer);
+              onPaymentAsk?.(answer);
+            }}
+          />
+        ) : null}
         <ComingLater home={home} onOpenCommitment={onOpenCommitment} onSeeAllCommitments={onSeeAllCommitments} />
         {shouldShowRecentChange(home) ? (
           <RecentChange items={home.changed.state === "COMPARED" ? home.changed.items : []} onOpenCommitment={onOpenCommitment} />
@@ -205,18 +264,22 @@ function FirstResultHome({
   home,
   commitments,
   pendingDecisionId,
+  lastHook,
   onReview,
   onDecide,
   onSaveContext,
   onOpenCommitment,
+  onReminderConsent,
 }: {
   home: HomeProjectionDto;
   commitments: readonly CommitmentSummaryDto[];
   pendingDecisionId?: string | null;
+  lastHook: { title: string; body: string; artefact: string } | null;
   onReview: () => void;
   onDecide: (request: PutDecisionRequest) => void;
   onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
   onOpenCommitment: (commitmentId: string) => void;
+  onReminderConsent?: () => void;
 }) {
   const brief = firstResultBrief(home, commitments);
   const count = brief.commitmentCount || brief.items.length;
@@ -225,27 +288,33 @@ function FirstResultHome({
   return (
     <section aria-label="Import results" className="w-full max-w-2xl py-4 sm:py-6">
       <p className="text-sm leading-6 text-(--muted)">
-        {count === 1 ? "We found 1 software commitment." : `We found ${count.toLocaleString("en-IN")} software commitments.`}
+        {count === 1 ? "1 software bill is on the table." : `${count.toLocaleString("en-IN")} software bills are on the table.`}
       </p>
+      {lastHook ? <DecisionHook hook={lastHook} onReminderConsent={onReminderConsent} /> : null}
       {queue.length ? (
         <>
           <h3 className="mt-2 font-display text-2xl font-semibold tracking-tight text-(--ink) sm:text-3xl">
             {queue.length === 1
-              ? "1 needs a decision before the next charge"
+              ? "Decide this before the next charge"
               : `${queue.length.toLocaleString("en-IN")} need a decision before the next charge`}
           </h3>
-          <div className="mt-6">
-            <DecisionCard
-              card={queue[0]!}
-              prominent
-              pending={pendingDecisionId === queue[0]!.commitmentId}
-              onDecide={onDecide}
-              onSaveContext={onSaveContext}
-              onOpenCommitment={onOpenCommitment}
-            />
+          <div className="mt-6 grid gap-3">
+            {queue.map((card, index) => (
+              <DecisionCard
+                key={card.commitmentId}
+                card={card}
+                prominent={index === 0}
+                pending={pendingDecisionId === card.commitmentId}
+                onDecide={onDecide}
+                onSaveContext={onSaveContext}
+                onOpenCommitment={onOpenCommitment}
+              />
+            ))}
           </div>
           <p className="mt-3 text-xs leading-5 text-(--muted)">{customerPhrases.decisionBoundary}</p>
         </>
+      ) : lastHook ? (
+        next ? <NextChargeLine next={next} className="mt-5" /> : null
       ) : (
         <>
           <h3 className="mt-2 font-display text-2xl font-semibold tracking-tight text-(--ink) sm:text-3xl">
@@ -254,7 +323,7 @@ function FirstResultHome({
           {next ? <NextChargeLine next={next} className="mt-5" /> : null}
         </>
       )}
-      <button type="button" onClick={onReview} className="btn btn-primary btn-lg mt-7">
+      <button type="button" onClick={onReview} className="btn btn-ghost mt-7">
         {customerPhrases.reviewResults}
       </button>
     </section>
@@ -334,27 +403,35 @@ function NextChargeLine({ next, className = "" }: { next: QuietNextChargeDto; cl
 function DecisionQueue({
   home,
   pendingDecisionId,
+  lastHook,
   onDecide,
   onSaveContext,
   onOpenCommitment,
+  onReminderConsent,
 }: {
   home: HomeProjectionDto;
   pendingDecisionId?: string | null;
+  lastHook: { title: string; body: string; artefact: string } | null;
   onDecide: (request: PutDecisionRequest) => void;
   onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
   onOpenCommitment: (commitmentId: string) => void;
+  onReminderConsent?: () => void;
 }) {
   const queue = home.decisionQueue;
   const next = home.nextQuietCharge;
   const comingUp = shouldShowComingUp(home);
+  const watching = home.decisionOutcomes.some((outcome) => outcome.kind === "WATCHING") || lastHook !== null;
   if (!queue.length) {
     return (
       <section aria-labelledby="recovery-decisions">
+        {lastHook ? <DecisionHook hook={lastHook} onReminderConsent={onReminderConsent} /> : null}
         <h3 id="recovery-decisions" className="font-display text-2xl font-semibold tracking-tight text-(--ink)">
-          {customerPhrases.quietHomeTitle}
+          {watching ? customerPhrases.watchingHomeTitle : customerPhrases.quietHomeTitle}
         </h3>
         <p className="mt-2 text-sm leading-6 text-(--muted)">
-          {comingUp || next ? customerPhrases.quietHomeBody : customerPhrases.quietHomeNothingExpected}
+          {watching
+            ? customerPhrases.watchingHomeBody
+            : comingUp || next ? customerPhrases.quietHomeBody : customerPhrases.quietHomeNothingExpected}
         </p>
         {next && !comingUp ? <NextChargeLine next={next} className="mt-4" /> : null}
       </section>
@@ -362,6 +439,7 @@ function DecisionQueue({
   }
   return (
     <section aria-labelledby="recovery-decisions" className="stack-section">
+      {lastHook ? <DecisionHook hook={lastHook} onReminderConsent={onReminderConsent} /> : null}
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <SectionHeading id="recovery-decisions">Decisions due soon</SectionHeading>
         {queue.length > 1 ? (
@@ -406,19 +484,31 @@ function DecisionCard({
   const [reviewOpen, setReviewOpen] = useState(false);
   const reviewPanelId = useId();
   const purposeId = useId();
+  const keepPrimary = keepIsPrimary(card.reasonKeys);
+  const sentence = card.sentence?.trim() || `${card.merchant} charges ${card.charge.display}.`;
+  const quote = card.excerpt?.trim() || null;
   return (
     <article className="decision" data-lead={prominent}>
-      <div className="decision-head">
-        <div className="min-w-0">
-          <p className="decision-cue">{card.headline}</p>
-          <h4 className="decision-merchant">{card.merchant}</h4>
-        </div>
-        <div className="decision-money">
-          <MoneyValue amount={card.charge} className="decision-amount" />
-          <p className="decision-due">{card.dueDate ? `due ${formatDay(card.dueDate)}` : "Date not established"}</p>
-          {card.stake ? <p className="decision-stake">{card.stake.display} / year at stake</p> : null}
-        </div>
+      <div className="min-w-0">
+        <p className="decision-cue">{card.headline}</p>
+        <h4 className="decision-sentence">{sentence}</h4>
       </div>
+
+      {quote ? (
+        <div className="decision-evidence">
+          <p className="eyebrow eyebrow-xs">{customerPhrases.citedEvidence}</p>
+          <blockquote className="decision-quote">“{quote}”</blockquote>
+          <button type="button" onClick={() => onOpenCommitment(card.commitmentId)} className="link-quiet mt-1">
+            {customerPhrases.seeCitedReceipt}
+          </button>
+        </div>
+      ) : (
+        <div className="decision-evidence">
+          <button type="button" onClick={() => onOpenCommitment(card.commitmentId)} className="link-quiet">
+            {customerPhrases.seeCitedReceipt}
+          </button>
+        </div>
+      )}
 
       {card.reasons.length ? (
         <div>
@@ -461,7 +551,7 @@ function DecisionCard({
               type="button"
               disabled={pending}
               onClick={() => onDecide({ commitmentId: card.commitmentId, decision: "KEEP", action: "KEEP" })}
-              className="btn btn-sm btn-primary"
+              className={`btn btn-sm ${keepPrimary ? "btn-primary" : "btn-ghost"}`}
             >
               Keep
             </button>
@@ -471,7 +561,7 @@ function DecisionCard({
               aria-expanded={reviewOpen}
               aria-controls={reviewPanelId}
               onClick={() => setReviewOpen((open) => !open)}
-              className="btn btn-sm btn-ghost"
+              className={`btn btn-sm ${keepPrimary ? "btn-ghost" : "btn-primary"}`}
             >
               Review later
             </button>
@@ -484,13 +574,6 @@ function DecisionCard({
               Plan to cancel
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => onOpenCommitment(card.commitmentId)}
-            className="link-quiet ms-auto px-1 py-2"
-          >
-            {customerPhrases.seeWhy}
-          </button>
         </div>
         <div id={reviewPanelId} hidden={!reviewOpen}>
           {reviewOpen ? (
@@ -591,6 +674,62 @@ function ComingLater({
         <button type="button" onClick={onSeeAllCommitments} className="btn btn-sm btn-ghost">
           {customerPhrases.seeAllCommitments}
         </button>
+      </div>
+    </section>
+  );
+}
+
+function DecisionHook({
+  hook,
+  onReminderConsent,
+}: {
+  hook: { title: string; body: string; artefact: string };
+  onReminderConsent?: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [reminderOn, setReminderOn] = useState(false);
+  async function copyArtefact() {
+    try {
+      await navigator.clipboard.writeText(hook.artefact);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+  return (
+    <aside className="decision-hook mb-6" aria-live="polite">
+      <h3 className="decision-hook-title">{hook.title}</h3>
+      <p className="mt-2 text-base leading-7 text-(--ink-soft)">{hook.body}</p>
+      <p className="mt-2 text-xs leading-5 text-(--muted)">{customerPhrases.rememberedThisCycle}</p>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button type="button" className="btn btn-sm btn-ghost" onClick={() => void copyArtefact()}>
+          {copied ? customerPhrases.copiedForCofounder : customerPhrases.copyForCofounder}
+        </button>
+        <label className="flex items-center gap-2 text-sm leading-6 text-(--ink-soft)">
+          <input
+            type="checkbox"
+            checked={reminderOn}
+            onChange={(event) => {
+              setReminderOn(event.target.checked);
+              if (event.target.checked) onReminderConsent?.();
+            }}
+          />
+          {reminderOffer}
+        </label>
+      </div>
+    </aside>
+  );
+}
+
+function PaymentAsk({ onAnswer }: { onAnswer: (answer: "yes" | "no") => void }) {
+  return (
+    <section className="stack-section" aria-labelledby="payment-ask">
+      <h3 id="payment-ask" className="font-display text-lg font-semibold tracking-tight text-(--ink)">
+        {paymentAskQuestion}
+      </h3>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="btn btn-sm btn-primary" onClick={() => onAnswer("yes")}>Yes</button>
+        <button type="button" className="btn btn-sm btn-ghost" onClick={() => onAnswer("no")}>Not yet</button>
       </div>
     </section>
   );

@@ -9,12 +9,12 @@ test("the landing sends every visitor to the product without claiming forwarding
   await expect(heading).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
 
-  const getStarted = hero.getByRole("link", { name: "Review my software stack", exact: true });
+  const getStarted = hero.getByRole("link", { name: "Add a bill", exact: true });
   const signIn = page.getByRole("navigation", { name: "Public" }).getByRole("link", { name: "Sign in", exact: true });
-  await expect(getStarted).toHaveAttribute("href", "/login?next=/app");
+  await expect(getStarted).toHaveAttribute("href", "/start");
   await expect(signIn).toHaveAttribute("href", "/login?next=/app");
 
-  await expect(page.getByText("No mailbox access required. Add the billing receipts you already have. Vognary shows the amount, the expected date, and the receipt behind each one, so you know what renews next. No bank passwords.")).toBeVisible();
+  await expect(page.getByText(/No bank passwords\. No mailbox access\. Add a bill first\./)).toBeVisible();
   await expect(page.getByRole("heading", { name: "What you get before the next charge" })).toBeVisible();
   await expect(page.getByText("What is due next", { exact: true })).toBeVisible();
   await expect(page.getByText("Why it deserves a look", { exact: true })).toBeVisible();
@@ -35,7 +35,7 @@ test("the mobile landing keeps the primary action visible without overflow", asy
   await page.goto("/");
 
   const heading = page.getByRole("heading", { level: 1, name: "Decide before the charge, not after it." });
-  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Review my software stack", exact: true });
+  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Add a bill", exact: true });
   await expect(getStarted).toBeVisible();
   const actionBottom = await getStarted.evaluate((element) => element.getBoundingClientRect().bottom);
   const metrics = await page.evaluate(() => ({
@@ -50,7 +50,7 @@ test("login presents one Google identity path without product detours", async ({
   await page.goto("/login?next=/app");
 
   await expect(page.getByRole("heading", { level: 1, name: "Know what your company is committed to pay next" })).toBeVisible();
-  await expect(page.getByText(/save the billing receipts you already have/)).toBeVisible();
+  await expect(page.getByText(/remember the bills you already reviewed/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await expect(page.getByText("Google is only for sign-in. Vognary does not access Gmail.")).toBeVisible();
 

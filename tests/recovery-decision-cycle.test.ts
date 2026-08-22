@@ -12,6 +12,7 @@ import {
   decisionHistoryItems,
   isInDecisionWindow,
   outcomeCopyNeverClaimsCancellation,
+  persistableCycleReasonKeys,
   stampForCycleAction,
   verificationFromEvaluation,
 } from "../src/lib/recovery/decision-cycle";
@@ -35,6 +36,7 @@ function fact(overrides: Partial<DecisionCycleFact> & Pick<DecisionCycleFact, "c
     priceChange: null,
     overlapPeers: [],
     evidenceIds: ["evidence-1", "evidence-2"],
+    excerpt: "Perplexity Pro · ₹1,700.00 · 22 Aug.",
     cycles: [],
     ...overrides,
   };
@@ -55,6 +57,13 @@ test("review-later snooze clamps into (today, dueDate]", () => {
   assert.equal(computeReviewAt(today, "2026-08-22", "THREE_DAYS_BEFORE"), "2026-08-20");
   assert.equal(computeReviewAt(today, "2026-08-20", "THREE_DAYS_BEFORE"), "2026-08-20");
   assert.equal(computeReviewAt(today, today, "TOMORROW"), today);
+});
+
+test("PROVISIONAL_SINGLE stays on the card and is not written to the 0055 cycle check", () => {
+  assert.deepEqual(
+    persistableCycleReasonKeys(["PROVISIONAL_SINGLE", "RENEWS_SOON", "NO_PRIOR_DECISION"]),
+    ["RENEWS_SOON", "NO_PRIOR_DECISION"],
+  );
 });
 
 test("cycle actions map onto existing decision stamps without inventing cancel execution", () => {
@@ -95,6 +104,9 @@ test("acceptance 1: Perplexity due in 3 days with ChatGPT overlap and no purpose
   assert.ok(card.reasonKeys.includes("RENEWS_SOON"));
   assert.ok(card.reasonKeys.includes("OVERLAP_NO_PURPOSE"));
   assert.equal(card.askPurpose, true);
+  assert.match(card.sentence, /Perplexity charges ₹1,700\.00/);
+  assert.match(card.sentence, /You also pay ChatGPT/);
+  assert.equal(card.excerpt, "Perplexity Pro · ₹1,700.00 · 22 Aug.");
   assert.match(card.reasons.join(" "), /Expected in 3 days/);
   assert.match(card.reasons.join(" "), /ChatGPT/);
   assert.equal(home.decisionQueue[0]?.commitmentId, "perplexity");
@@ -117,6 +129,8 @@ test("KEEP for this due date removes the cycle from the queue", () => {
     fact({ commitmentId: "perplexity", merchant: "Perplexity", stamp: "KEEP", cycles: [cycle] }),
   ], today);
   assert.equal(home.decisionQueue.length, 0);
+  assert.equal(home.decisionOutcomes[0]?.kind, "WATCHING");
+  assert.match(home.decisionOutcomes[0]?.headline ?? "", /kept for this cycle/);
 });
 
 test("acceptance 2: plan to cancel stores intent and leaves the queue immediately", () => {
@@ -136,8 +150,9 @@ test("acceptance 2: plan to cancel stores intent and leaves the queue immediatel
     fact({ commitmentId: "perplexity", merchant: "Perplexity", stamp: "CANCEL", cycles: [cycle] }),
   ], today);
   assert.equal(home.decisionQueue.length, 0);
-  assert.equal(home.decisionOutcomes[0]?.kind, "NO_CHARGE_SEEN");
-  assert.match(home.decisionOutcomes[0]?.headline ?? "", /No new charge seen yet/);
+  assert.equal(home.decisionOutcomes[0]?.kind, "WATCHING");
+  assert.match(home.decisionOutcomes[0]?.headline ?? "", /plan to cancel is recorded/);
+  assert.match(home.decisionOutcomes[0]?.detail ?? "", /If Perplexity charges again/);
   assert.ok(outcomeCopyNeverClaimsCancellation(home.decisionOutcomes[0]?.headline ?? ""));
   assert.ok(outcomeCopyNeverClaimsCancellation(home.decisionOutcomes[0]?.detail ?? ""));
 });

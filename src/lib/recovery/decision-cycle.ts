@@ -24,6 +24,8 @@ import type {
   QuietNextChargeDto,
 } from "./contracts";
 import { annualizedStake, toMoneyDto } from "./domain";
+import { spokenDecisionSentence, receiptQuote, decisionHookCopy } from "./wow-first-session";
+import { hypothesizedMonthlyNextDate } from "./provisional-receipt";
 
 export const decisionWindowLeadDays: Record<Cadence, number | null> = {
   WEEKLY: 3,
@@ -44,6 +46,7 @@ const materialReasonKeys = new Set<DecisionReasonKey>([
   "IDENTITY_UNCERTAIN",
   "AMOUNT_CONFLICT",
   "NEW_COMMITMENT",
+  "PROVISIONAL_SINGLE",
 ]);
 
 export type SavedDecisionCycle = {
@@ -76,6 +79,7 @@ export type DecisionCycleFact = {
   priceChange: { previousMinor: bigint; currentMinor: bigint } | null;
   overlapPeers: readonly { merchant: string; purpose: CommitmentPurpose | null }[];
   evidenceIds: readonly string[];
+  excerpt: string | null;
   cycles: readonly SavedDecisionCycle[];
 };
 
@@ -163,8 +167,23 @@ export function collectReasonKeys(fact: DecisionCycleFact, today: string): Decis
   if (isNewCommitment(fact, today)) keys.push("NEW_COMMITMENT");
   if (fact.identityUncertain) keys.push("IDENTITY_UNCERTAIN");
   if (fact.amountConflict) keys.push("AMOUNT_CONFLICT");
+  if (fact.observationCount < 2) keys.push("PROVISIONAL_SINGLE");
   if (!cycleForDueDate(fact, dueDate) && !silencingStamp(fact, dueDate)) keys.push("NO_PRIOR_DECISION");
   return keys;
+}
+
+const persistedCycleReasonKeys = new Set<DecisionReasonKey>([
+  "RENEWS_SOON",
+  "PRICE_INCREASE",
+  "OVERLAP_NO_PURPOSE",
+  "NEW_COMMITMENT",
+  "IDENTITY_UNCERTAIN",
+  "AMOUNT_CONFLICT",
+  "NO_PRIOR_DECISION",
+]);
+
+export function persistableCycleReasonKeys(keys: readonly DecisionReasonKey[]): DecisionReasonKey[] {
+  return keys.filter((key) => persistedCycleReasonKeys.has(key));
 }
 
 export function buildDecisionHome(facts: readonly DecisionCycleFact[], today: string): DecisionHomeProjection {
@@ -207,25 +226,41 @@ export function outcomeCopyNeverClaimsCancellation(text: string): boolean {
 function toQueueCard(fact: DecisionCycleFact, today: string): DecisionCardDto | null {
   if (isSilenced(fact, today)) return null;
   const keys = collectReasonKeys(fact, today);
-  const inWindow = isInDecisionWindow(today, fact.nextExpectedDate, fact.cadence);
+  const dueDate = fact.nextExpectedDate
+    ?? (fact.observationCount < 2 && fact.cadence === "MONTHLY" && fact.firstDetectedOn
+      ? hypothesizedMonthlyNextDate(fact.firstDetectedOn, today)
+      : null);
+  const inWindow = isInDecisionWindow(today, dueDate, fact.cadence === "IRREGULAR" && fact.observationCount < 2 ? "MONTHLY" : fact.cadence);
   const material = keys.some((key) => materialReasonKeys.has(key));
   if (!inWindow && !material) return null;
   const shownKeys = keys.filter((key) => key !== "NO_PRIOR_DECISION" || keys.length > 1);
   if (shownKeys.length === 0) return null;
   const charge = toMoneyDto(fact.amountMinor, fact.currency);
   const stake = annualizedStake(fact.amountMinor, fact.cadence, fact.currency);
-  const daysAway = fact.nextExpectedDate ? daysBetween(today, fact.nextExpectedDate) : null;
+  const daysAway = dueDate ? daysBetween(today, dueDate) : null;
   const overlapMerchants = fact.overlapPeers.map((peer) => peer.merchant);
+  const provisional = shownKeys.includes("PROVISIONAL_SINGLE");
+  const whenLine = spokenChargeWhenLine(today, dueDate);
   return {
     commitmentId: fact.commitmentId,
     merchant: fact.merchant,
-    dueDate: fact.nextExpectedDate,
+    dueDate,
     daysAway,
     charge,
     stake,
-    headline: decideHeadline(fact.nextExpectedDate, daysAway),
+    headline: decideHeadline(dueDate, daysAway),
+    sentence: spokenDecisionSentence({
+      merchant: fact.merchant,
+      amountDisplay: charge.display,
+      whenLine,
+      overlapMerchants,
+      provisional,
+      undecided: !fact.stamp,
+    }),
+    excerpt: receiptQuote(fact.excerpt),
+    provisional,
     reasonKeys: shownKeys,
-    reasons: shownKeys.map((key) => reasonSentence(key, fact, daysAway)),
+    reasons: shownKeys.map((key) => reasonSentence(key, { ...fact, nextExpectedDate: dueDate }, daysAway)),
     overlapMerchants,
     askPurpose: shownKeys.includes("OVERLAP_NO_PURPOSE"),
     evidenceIds: fact.evidenceIds,
@@ -263,14 +298,18 @@ function isNewCommitment(fact: DecisionCycleFact, today: string): boolean {
 function toOutcome(fact: DecisionCycleFact, cycle: SavedDecisionCycle): DecisionOutcomeDto | null {
   if (cycle.userAction === "REVIEW_LATER") return null;
 
-  const pending = cycle.verificationOutcome === null && cycle.userAction === "PLAN_TO_CANCEL";
-  if (cycle.userAction === "PLAN_TO_CANCEL" && pending) {
+  if (cycle.verificationOutcome === null && (cycle.userAction === "KEEP" || cycle.userAction === "PLAN_TO_CANCEL")) {
+    const hook = decisionHookCopy({
+      merchant: fact.merchant,
+      action: cycle.userAction,
+      watchDate: cycle.dueDate,
+    });
     return {
       commitmentId: fact.commitmentId,
       merchant: fact.merchant,
-      kind: "NO_CHARGE_SEEN",
-      headline: "No new charge seen yet",
-      detail: "The expected window is still open or has not been checked. This is not a cancellation.",
+      kind: "WATCHING",
+      headline: hook.title,
+      detail: hook.body,
       amount: toMoneyDto(fact.amountMinor, fact.currency),
       date: cycle.dueDate,
       evidenceIds: fact.evidenceIds,
@@ -391,7 +430,8 @@ function outcomeRank(kind: DecisionOutcomeKind): number {
   if (kind === "NO_CHARGE_SEEN") return 1;
   if (kind === "CANNOT_VERIFY") return 2;
   if (kind === "DECISION_DUE_AGAIN") return 3;
-  return 4;
+  if (kind === "WATCHING") return 4;
+  return 5;
 }
 
 function decideHeadline(dueDate: string | null, daysAway: number | null): string {
@@ -428,6 +468,12 @@ function reasonSentence(key: DecisionReasonKey, fact: DecisionCycleFact, daysAwa
   if (key === "NEW_COMMITMENT") return "This is a newly observed recurring commitment.";
   if (key === "IDENTITY_UNCERTAIN") return IDENTITY_UNCERTAIN_REASON;
   if (key === "AMOUNT_CONFLICT") return "The latest bill does not match the usual amount.";
+  if (key === "PROVISIONAL_SINGLE") {
+    if (fact.nextExpectedDate) {
+      return `Seen once. If this repeats monthly, next is ${fact.nextExpectedDate}. Not a proven cadence.`;
+    }
+    return "Seen once. If this repeats monthly, the next charge is a hypothesis, not a proven cadence.";
+  }
   return "You haven't reviewed this commitment before.";
 }
 
@@ -463,6 +509,15 @@ function addDays(value: string, days: number): string {
   const parsed = parseDate(value);
   if (parsed === null) return value;
   return new Date(parsed + days * dayMs).toISOString().slice(0, 10);
+}
+
+export function spokenChargeWhenLine(today: string, dueDate: string | null): string {
+  if (!dueDate) return "Date not established";
+  const daysAway = daysBetween(today, dueDate);
+  if (daysAway === 0) return "Charges today";
+  if (daysAway === 1) return "Charges tomorrow";
+  if (daysAway !== null && daysAway > 1) return `Charges in ${daysAway} days`;
+  return `Charges ${dueDate}`;
 }
 
 function daysBetween(from: string, to: string): number | null {

@@ -112,7 +112,7 @@ export default function BillingReturnClient({ checkoutId }: { checkoutId: string
     return (
       <StatusPanel tone="warn" heading="Payment not completed">
         This {label} checkout is {payload.status}. No money is due on it. You can start again from the
-        {" "}<Link href="/private-audit" className="underline">private audit page</Link> whenever you are ready.
+        {" "}<Link href="/app" className="underline">current Vognary workspace</Link> whenever you are ready.
       </StatusPanel>
     );
   }

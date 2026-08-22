@@ -138,9 +138,24 @@ test("landing, login, and empty Home tell one receipts-to-decision product story
   assert.doesNotMatch(landingSource, /Want it done for you\?/);
   assert.doesNotMatch(landingSource, /href="\/private-audit"/);
   assert.match(clientSource, />Vognary</);
-  assert.match(landingSource, /No bank passwords\. No mailbox access\. You choose which billing text to add\./);
+  assert.match(landingSource, /No bank passwords\. No mailbox access\. Add a bill first\./);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
   assert.doesNotMatch(landingSource, /Set up billing forwarding once so matching mail keeps arriving/);
+});
+
+test("the decision card puts cited evidence and cycle memory on the same object as Keep / Review later / Plan to cancel", () => {
+  assert.match(homeSource, /card\.sentence/);
+  assert.match(homeSource, /card\.excerpt/);
+  assert.match(homeSource, /keepIsPrimary\(card\.reasonKeys\)/);
+  assert.match(homeSource, /decisionHookCopy/);
+  assert.match(homeSource, /customerPhrases\.seeCitedReceipt/);
+  assert.match(homeSource, /customerPhrases\.rememberedThisCycle/);
+  assert.match(homeSource, /Why a decision is needed now|whyThisNeedsAttention/);
+  assert.match(allSource, /See the cited receipt/);
+  assert.match(allSource, /Remembered for this billing cycle/);
+  assert.match(homeSource, /queue\.map\(\(card, index\)/);
+  assert.doesNotMatch(homeSource, /card=\{queue\[0\]!\}/);
+  assert.doesNotMatch(homeSource, /citedEvidenceLine\(card\.evidenceIds\.length\)/);
 });
 
 test("home leads with the pre-renewal decision queue and cited spend activation", () => {

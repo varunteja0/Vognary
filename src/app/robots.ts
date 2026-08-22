@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/app", "/login", "/profile", "/billing/return", "/api/"],
+      disallow: ["/api/"],
     },
     sitemap: "https://www.vognary.com/sitemap.xml",
     host: "https://www.vognary.com",

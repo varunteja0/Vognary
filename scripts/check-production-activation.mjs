@@ -20,36 +20,6 @@ const targetInternalSecret = process.env.PRODUCTION_INTERNAL_SYNC_SECRET?.trim()
 
 const groups = [
   {
-    id: "lead-persistence",
-    label: "Lead persistence",
-    requiredAny: ["DATABASE_URL", "AUDIT_INTAKE_WEBHOOK_URL", "WAITLIST_WEBHOOK_URL"],
-    probe: isLeadPersistenceReady,
-    launchBlocking: false,
-    why: "Persists private audit and waitlist leads in Postgres or a webhook instead of preview-only responses.",
-  },
-  {
-    id: "payments",
-    label: "Tracked Razorpay billing",
-    required: [
-      "DATABASE_URL",
-      "NEXT_PUBLIC_APP_URL",
-      "RAZORPAY_KEY_ID",
-      "RAZORPAY_KEY_SECRET",
-      "RAZORPAY_WEBHOOK_SECRET",
-      "ASSISTED_AUDIT_LEGAL_TERMS_STATUS",
-    ],
-    requiredValues: {
-      RAZORPAY_ACCOUNT_STATUS: "live-kyc-approved",
-      RAZORPAY_WEBHOOK_PROOF_STATUS: "passed",
-      RAZORPAY_REPLAY_PROOF_STATUS: "passed",
-      RAZORPAY_REFUND_PROOF_STATUS: "passed",
-      RAZORPAY_RECONCILIATION_STATUS: "passed",
-    },
-    probe: isPaymentReady,
-    launchBlocking: false,
-    why: "Requires the versioned one-time assisted-audit offer, legal terms approval, tracked checkout creation, signed settlement webhooks, and an observed assisted-audit order. Static payment links stay hidden.",
-  },
-  {
     id: "receipt-inbox",
     label: "Recovery receipt inbox",
     required: [
@@ -152,7 +122,7 @@ const groups = [
 
 const endpointChecks = [
   { id: "home", path: "/", expected: [200] },
-  { id: "private-audit", path: "/private-audit", expected: [200] },
+  { id: "private-audit-retired-redirect", path: "/private-audit", expected: [308], init: { redirect: "manual" } },
   { id: "login", path: "/login", expected: [200] },
   { id: "health", path: "/api/health", expected: [200], captureJson: true },
   {
@@ -179,7 +149,7 @@ const endpointChecks = [
     },
   },
   { id: "auth-login-status", path: "/api/auth/login", expected: [200, 501], captureJson: true },
-  { id: "checkout-assisted-audit", path: "/api/checkout?plan=assisted-audit", expected: [200, 501], captureJson: true },
+  { id: "checkout-assisted-audit-retired", path: "/api/checkout?plan=assisted-audit", expected: [410], captureJson: true },
   { id: "audit-snapshot-auth-guard", path: "/api/workspaces/current/audit-snapshot", expected: [401] },
   { id: "workspace-connectors-auth-guard", path: "/api/workspaces/current/connectors", expected: [401] },
   { id: "workspace-decisions-auth-guard", path: "/api/workspaces/current/decisions", expected: [401] },
@@ -224,7 +194,7 @@ const endpointChecks = [
       }),
     },
   },
-  { id: "audit-intake-status", path: "/api/audit-intake", expected: [200, 501], captureJson: true },
+  { id: "audit-intake-retired", path: "/api/audit-intake", expected: [410], captureJson: true },
   { id: "billing-return-page", path: "/billing/return", expected: [200] },
   { id: "checkout-status-guard", path: "/api/checkout/00000000-0000-4000-8000-000000000000", expected: [404, 501, 503], captureJson: true },
   { id: "gmail-product-start", path: "/api/integrations/gmail/start?mode=json", expected: [410], captureJson: true },
@@ -392,19 +362,6 @@ function summarizeProbePayload(id, payload) {
     if (Object.hasOwn(payload, key)) detail[key] = payload[key];
   }
   return Object.keys(detail).length ? detail : undefined;
-}
-
-function isLeadPersistenceReady({ endpointPayloads }) {
-  const intake = endpointPayloads["audit-intake-status"];
-  if (typeof intake?.persisted === "boolean") return intake.persisted;
-  const readiness = endpointPayloads.readiness;
-  const status = readiness?.hardening?.leadPersistence;
-  return typeof status === "string" ? status.startsWith("configured") : undefined;
-}
-
-function isPaymentReady({ endpointPayloads }) {
-  return endpointPayloads["checkout-assisted-audit"]?.status === "ready"
-    && endpointPayloads.readiness?.hardening?.payments === "settlement-observed";
 }
 
 function isReceiptInboxReady({ endpointPayloads }) {

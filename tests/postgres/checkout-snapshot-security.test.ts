@@ -65,7 +65,7 @@ test("checkout replay rejects changed provider, amount, and currency", {
   }
 });
 
-test("guest assisted-audit checkout rejects a lead email mismatch", {
+test("guest assisted-audit checkout remains retired for historical lead records", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
   const pool = getDatabasePool();
@@ -86,8 +86,8 @@ test("guest assisted-audit checkout rejects a lead email mismatch", {
       },
       body: JSON.stringify({ plan: publicOffer.plan, email: "attacker@example.com", leadId, termsVersion: publicOffer.termsVersion }),
     }));
-    assert.equal(response.status, 409);
-    assert.match((await response.json()).error, /does not match/);
+    assert.equal(response.status, 410);
+    assert.equal((await response.json()).status, "retired");
   } finally {
     await pool.query(`delete from private_audit_leads where id = $1`, [leadId]);
   }

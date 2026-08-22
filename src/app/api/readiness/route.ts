@@ -1,11 +1,8 @@
-import { publicOffer } from "@/lib/billing";
 import { getRateLimitBackendStatus } from "@/lib/rate-limit";
 import { checkBackupConfiguration } from "@/lib/server/backup-readiness";
-import { getBillingCheckoutConfiguration } from "@/lib/server/billing-provider";
 import { checkDatabaseConnection } from "@/lib/server/database";
 import { checkFeatureReadiness, getUnconfiguredFeatureReadiness } from "@/lib/server/feature-readiness";
 import { checkGoogleAuthConfiguration } from "@/lib/server/google-auth";
-import { isLeadDatabaseConfigured } from "@/lib/server/lead-store";
 import { getMonitoringBackendStatus } from "@/lib/server/monitoring";
 import { checkRenewalAlertEmailConfiguration } from "@/lib/server/renewal-alert-mailer";
 import { isOperationalSecretValid } from "@/lib/server/internal-auth";
@@ -62,8 +59,8 @@ export async function GET(request: Request) {
       redisRateLimiting: getRedisRateLimitStatus(rateLimitBackend),
       oauthStateValidation: "ready",
       securityHeaders: "configured",
-      leadPersistence: getLeadPersistenceStatus(),
-      payments: getPaymentStatus(features.billing),
+      leadPersistence: "retired-public-intake",
+      payments: "retired-public-checkout",
       monitoring: getMonitoringStatus(monitoringBackend),
       backups: backups.status,
       backupReadiness: backups,
@@ -125,21 +122,6 @@ function getIdentityProviderStatus(googleAuth: ReturnType<typeof checkGoogleAuth
   if (googleAuth.status === "ready") return "google-ready";
   if (process.env.GOOGLE_AUTH_CLIENT_ID || process.env.GOOGLE_AUTH_CLIENT_SECRET) return `google-missing-${googleAuth.missing.join("-")}`;
   return "not-configured";
-}
-
-function getLeadPersistenceStatus() {
-  if (isLeadDatabaseConfigured()) return "configured-database";
-  if (process.env.AUDIT_INTAKE_WEBHOOK_URL || process.env.WAITLIST_WEBHOOK_URL) return "configured-webhook";
-  return "not-configured";
-}
-
-function getPaymentStatus(feature: { status: string; assistedAuditOrders: number | null; lastPaidAt: string | null }) {
-  if (feature.status === "migration-pending" || feature.status === "migration-ledger-unavailable" || feature.status === "schema-query-failed") return feature.status;
-  const configuration = getBillingCheckoutConfiguration(publicOffer.plan);
-  if (configuration.status !== "ready") return "not-configured";
-  if (feature.assistedAuditOrders && feature.assistedAuditOrders > 0 && feature.lastPaidAt) return "settlement-observed";
-  if (feature.lastPaidAt) return "payment-observed-no-assisted-audit-order";
-  return "tracked-checkout-ready-settlement-unproven";
 }
 
 function getPrivacyLifecycleStatus(feature: { status: string }) {

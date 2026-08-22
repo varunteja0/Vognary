@@ -17,13 +17,9 @@ const outcomes = [
   },
 ] as const;
 
-export default function LaunchLanding({
-  receiptInboxAvailable = false,
-}: {
-  receiptInboxAvailable?: boolean;
-}) {
-  const primaryHref = "/login?next=/app";
-  const primaryLabel = "Review my software stack";
+export default function LaunchLanding() {
+  const primaryHref = "/start";
+  const primaryLabel = "Add a bill";
   return (
     <main id="ledger-main" className="relative overflow-hidden px-4 pb-12 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
@@ -46,16 +42,14 @@ export default function LaunchLanding({
               Decide before the charge, not after it.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-(--ink-soft) sm:text-lg">
-              Add a few recent software bills. Vognary tells you what your company is committed to pay next, what deserves attention before the card fires, and what happened to the decision you made last time.
+              Add a few recent software bills. See what renews next in their language. Sign in only when you want that remembered.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</Link>
             </div>
             <p className="mt-6 flex max-w-xl items-start gap-2 text-sm leading-6 text-(--muted)">
               <span className="live-dot mt-2 shrink-0" aria-hidden />
-              <span>{receiptInboxAvailable
-                ? "No mailbox access required. Add the billing receipts you already have. After you see what renews next, you can keep it current with a private billing address. No bank passwords."
-                : "No mailbox access required. Add the billing receipts you already have. Vognary shows the amount, the expected date, and the receipt behind each one, so you know what renews next. No bank passwords."}</span>
+              <span>No bank passwords. No mailbox access. Add a bill first. Sign in only to remember it. Vognary shows the amount, expected date, and supporting receipt before Sources shows whether a private billing address is available.</span>
             </p>
           </div>
           <Nakul
@@ -88,18 +82,14 @@ export default function LaunchLanding({
             <p className="eyebrow eyebrow-xs text-ochre">After the first review</p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-(--ink)">Keep it current</h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-(--muted)">
-              {receiptInboxAvailable
-                ? "Set up billing forwarding once. Messages sent to your private Vognary address are processed as receipt evidence. Vognary stays current from the billing evidence you choose to forward. Vognary does not read the mailbox."
-                : "Add new billing receipts as they arrive and Vognary updates what renews next."}
+              After your first result, Sources shows whether private billing forwarding is available. When it is, set it up once. Messages sent to that address are processed as receipt evidence; Vognary does not read the mailbox.
             </p>
           </div>
           <div>
             <p className="eyebrow eyebrow-xs text-ochre">Clear boundaries</p>
             <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-(--ink)">Your data</h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-(--muted)">
-              {receiptInboxAvailable
-                ? "Vognary stores normalized receipt evidence and bounded excerpts. Provider-held email copies follow Resend's own retention schedule and are not immediately deletable by Vognary. Account controls export and deletion of data saved by Vognary."
-                : "No bank passwords. No mailbox access. You choose which billing text to add. Vognary stores only the evidence you submit, and Account controls its export and deletion."}
+              {"Vognary stores normalized receipt evidence and bounded excerpts. Provider-held email copies follow Resend's own retention schedule and are not immediately deletable by Vognary. Account controls export and deletion of data saved by Vognary."}
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <Link href="/privacy" className="btn btn-sm btn-ghost">Privacy</Link>
@@ -111,7 +101,7 @@ export default function LaunchLanding({
         <section className="dossier spotlight my-4 px-6 py-10 text-center sm:px-10 sm:py-14">
           <p className="eyebrow muted-on-dark">Your receipts. Your decisions.</p>
           <h2 className="mx-auto mt-3 max-w-2xl font-display text-3xl font-semibold tracking-tight text-(--dossier-ink) sm:text-4xl">
-            Start with the billing emails you already have.
+            Start with the billing receipts you already have.
           </h2>
           <Link href={primaryHref} className="btn btn-primary btn-lg mt-7">
             {primaryLabel}

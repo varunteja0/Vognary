@@ -87,16 +87,11 @@ test("revenue funnel events are allowlisted in code, migration, and consolidated
   }
 });
 
-test("checkouts bind to audit leads with email verification and replay-safe idempotency", () => {
+test("historical checkouts remain snapshot-bound while the public creation route is retired", () => {
   const migration = source("infra/postgres/migrations/0015_paid_audit_flow.sql");
   const schema = source("infra/postgres/schema.sql");
   assert.match(migration, /add column if not exists lead_id uuid references private_audit_leads\(id\) on delete set null/);
   assert.match(schema, /lead_id uuid references private_audit_leads\(id\) on delete set null/);
-
-  const route = source("src/app/api/checkout/route.ts");
-  assert.match(route, /getAuditLeadEmail/);
-  assert.match(route, /does not match the audit request on file/);
-  assert.match(route, /leadId,\n?\s*customerEmail: email/);
 
   const store = source("src/lib/server/billing-store.ts");
   assert.match(store, /checkout\.leadId !== input\.leadId/);
@@ -105,14 +100,9 @@ test("checkouts bind to audit leads with email verification and replay-safe idem
   assert.match(store, /checkout\.termsVersion !== input\.termsVersion/);
   assert.match(store, /billing\.checkout_started/);
 
-  assert.match(route, /plan !== publicOffer\.plan/);
-  assert.match(route, /body\.termsVersion !== publicOffer\.termsVersion/);
-  assert.match(route, /idempotency-key/);
-  const client = source("src/app/private-audit/private-audit-client.tsx");
-  assert.match(client, /\/api\/checkout\?plan=/);
-  assert.match(client, /settlementTracking === true/);
-  assert.match(client, /Pay for this audit/);
-  assert.doesNotMatch(client, /link-only|fallback payment link/i);
+  const route = source("src/app/api/checkout/route.ts");
+  assert.match(route, /assistedAuditRetiredResponse/);
+  assert.doesNotMatch(route, /requiredEnv|getBillingCheckoutConfiguration|createRazorpayPaymentLink/);
 });
 
 test("the one-time assisted-audit migration preserves legacy rows and adds fulfillment/refund identity", () => {
@@ -173,7 +163,7 @@ test("Recovery save guidance uses Google and keeps magic link deferred", () => {
   assert.match(source("src/lib/server/magic-link-auth.ts"), /ENABLE_MAGIC_LINK_LOGIN === "true"/);
 });
 
-test("public checkout status exposes settlement state without payment credentials or identity", () => {
+test("historical checkout status exposes settlement state without payment credentials or identity", () => {
   const store = source("src/lib/server/billing-store.ts");
   const statusFn = store.slice(store.indexOf("getPublicCheckoutStatus"), store.indexOf("export async function attachBillingProviderCheckout"));
   assert.match(statusFn, /select id, status, plan, currency, amount_minor::text, paid_at, refunded_at/);
@@ -183,19 +173,11 @@ test("public checkout status exposes settlement state without payment credential
   assert.match(route, /rateLimit\(request, \{ namespace: "checkout-status"/);
   assert.match(route, /uuidPattern\.test\(checkoutId\)/);
   assert.match(route, /"cache-control": "no-store"/);
+  assert.doesNotMatch(route, /requiredEnv|DATABASE_URL/);
 });
 
-test("audit intake emits the private_audit.requested funnel event after durable persistence", () => {
+test("retired audit intake cannot persist leads or emit funnel events", () => {
   const route = source("src/app/api/audit-intake/route.ts");
-  const persistIndex = route.indexOf("persistAuditLead(payload)");
-  const eventIndex = route.indexOf('eventName: "private_audit.requested"');
-  assert.ok(persistIndex > -1 && eventIndex > persistIndex);
-});
-
-test("outreach attribution tags are server-validated and bounded", () => {
-  const route = source("src/app/api/audit-intake/route.ts");
-  assert.match(route, /\/\^\[a-z0-9\]\[a-z0-9-\]\{0,31\}\$\//);
-  assert.match(route, /vognary-private-audit-intake:\$\{sourceTag\}/);
-  const client = source("src/app/private-audit/private-audit-client.tsx");
-  assert.match(client, /URLSearchParams\(window\.location\.search\)\.get\("src"\)/);
+  assert.match(route, /assistedAuditRetiredResponse/);
+  assert.doesNotMatch(route, /persistAuditLead|recordProductEvent|AUDIT_INTAKE_WEBHOOK_URL/);
 });

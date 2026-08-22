@@ -2,7 +2,7 @@
 
 import { useState, type DragEvent, type ReactNode } from "react";
 
-const acceptedExtensions = ".pdf,.txt,.csv,.xls,.xlsx";
+const acceptedExtensions = ".pdf,.txt,.csv,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.heic,.heif,image/*";
 
 export function BillDropzone({
   disabled,
@@ -58,7 +58,7 @@ export function BillDropzone({
       />
       <span className="font-display text-lg font-semibold text-(--ink)">Drop invoices or receipts here</span>
       <span className="mt-2 max-w-md text-sm leading-6 text-(--muted)">
-        {preparing ? "Reading your invoice…" : "Text-based PDFs, CSV, and spreadsheet files. Image scans cannot be read."}
+        {preparing ? "Reading your invoice…" : "PDFs, CSV, spreadsheets, or a photo of the bill. We'll read what we can. Confirm the line before it becomes a commitment."}
       </span>
       {children}
     </label>
