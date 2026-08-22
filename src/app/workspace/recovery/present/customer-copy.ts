@@ -15,6 +15,7 @@ export const customerPhrases = {
   whyThisNeedsAttention: "Why a decision is needed now",
   citedEvidence: "From your receipt",
   seeCitedReceipt: "See the cited receipt",
+  openCommitment: "Open this commitment",
   copyForCofounder: "Copy this for my cofounder",
   copiedForCofounder: "Copied. Forward it in ten seconds.",
   reviewWhen: "When should this come back?",

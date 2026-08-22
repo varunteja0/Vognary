@@ -63,6 +63,8 @@ export type CanonicalCommitmentRecord = {
   latestObservedMinor?: bigint | null;
   cycles?: readonly SavedDecisionCycle[];
   excerpt?: string | null;
+  /** The evidence row the excerpt was quoted from, when known. */
+  latestEvidenceId?: string | null;
   updatedAt: string;
 };
 
@@ -571,6 +573,7 @@ export function toDecisionFacts(commitments: readonly CanonicalCommitmentRecord[
         .map((member) => ({ merchant: member.merchant, purpose: member.purpose ?? null })),
       evidenceIds: commitment.evidenceIds,
       excerpt: commitment.excerpt ?? null,
+      latestEvidenceId: commitment.latestEvidenceId ?? null,
       cycles: commitment.cycles ?? [],
     };
   });

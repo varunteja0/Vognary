@@ -2562,15 +2562,16 @@ async function loadCommitmentRecords(client: PoolClient, workspaceId: string): P
         return latest ? BigInt(normalizeMinorUnits(latest)) : null;
       })(),
       cycles: cyclesByCommitment.get(row.id) ?? [],
-      excerpt: excerpts.get(row.id) ?? null,
+      excerpt: excerpts.get(row.id)?.excerpt ?? null,
+      latestEvidenceId: excerpts.get(row.id)?.evidenceId ?? null,
       updatedAt: row.updated_at.toISOString(),
     };
   });
 }
 
-async function loadLatestExcerpts(client: PoolClient, workspaceId: string): Promise<Map<string, string>> {
-  const result = await client.query<{ commitment_id: string; excerpt: string }>(
-    `select distinct on (link.commitment_id) link.commitment_id, evidence.excerpt
+async function loadLatestExcerpts(client: PoolClient, workspaceId: string): Promise<Map<string, { excerpt: string; evidenceId: string }>> {
+  const result = await client.query<{ commitment_id: string; excerpt: string; id: string }>(
+    `select distinct on (link.commitment_id) link.commitment_id, evidence.excerpt, evidence.id
      from recovery_commitment_evidence link
      join recovery_evidence evidence
        on evidence.workspace_id = link.workspace_id and evidence.id = link.evidence_id
@@ -2578,7 +2579,7 @@ async function loadLatestExcerpts(client: PoolClient, workspaceId: string): Prom
      order by link.commitment_id, link.linked_at desc, link.evidence_id desc`,
     [workspaceId],
   );
-  return new Map(result.rows.map((row) => [row.commitment_id, row.excerpt]));
+  return new Map(result.rows.map((row) => [row.commitment_id, { excerpt: row.excerpt, evidenceId: row.id }]));
 }
 
 async function loadCommitmentRows(client: PoolClient, workspaceId: string) {

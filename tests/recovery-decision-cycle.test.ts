@@ -38,6 +38,7 @@ function fact(overrides: Partial<DecisionCycleFact> & Pick<DecisionCycleFact, "c
     overlapPeers: [],
     evidenceIds: ["evidence-1", "evidence-2"],
     excerpt: "Perplexity Pro · ₹1,700.00 · 22 Aug.",
+    latestEvidenceId: "evidence-2",
     cycles: [],
     ...overrides,
   };
@@ -108,6 +109,8 @@ test("acceptance 1: Perplexity due in 3 days with ChatGPT overlap and no purpose
   assert.match(card.sentence, /Perplexity charges ₹1,700\.00/);
   assert.match(card.sentence, /You also pay ChatGPT/);
   assert.equal(card.excerpt, "Perplexity Pro · ₹1,700.00 · 22 Aug.");
+  // The card's quote names the exact receipt it was taken from.
+  assert.equal(card.citedEvidenceId, "evidence-2");
   assert.match(card.reasons.join(" "), /Expected in 3 days/);
   assert.match(card.reasons.join(" "), /ChatGPT/);
   assert.equal(home.decisionQueue[0]?.commitmentId, "perplexity");

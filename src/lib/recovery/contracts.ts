@@ -371,6 +371,8 @@ export type DecisionCardDto = {
   headline: string;
   sentence: string;
   excerpt: string | null;
+  /** The evidence row the excerpt was quoted from, when known. */
+  citedEvidenceId: string | null;
   provisional: boolean;
   reasonKeys: readonly DecisionReasonKey[];
   reasons: readonly string[];

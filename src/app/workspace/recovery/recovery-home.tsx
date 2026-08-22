@@ -51,6 +51,7 @@ export function RecoveryHome({
   showFirstResult,
   receiptInboxPubliclyAvailable,
   onOpenCommitment,
+  onInspectCitedReceipt,
   onAddEvidence,
   onOpenSources,
   onSeeAllCommitments,
@@ -72,6 +73,7 @@ export function RecoveryHome({
   showFirstResult: boolean;
   receiptInboxPubliclyAvailable: boolean;
   onOpenCommitment: (commitmentId: string) => void;
+  onInspectCitedReceipt?: (commitmentId: string, evidenceId: string) => void;
   onAddEvidence: () => void;
   onOpenSources: () => void;
   onSeeAllCommitments: () => void;
@@ -176,6 +178,7 @@ export function RecoveryHome({
           onDecide={rememberDecision}
           onSaveContext={onSaveContext}
           onOpenCommitment={onOpenCommitment}
+          onInspectCitedReceipt={onInspectCitedReceipt}
           onReminderConsent={onReminderConsent}
         />
         <DecisionOutcomes home={home} onOpenCommitment={onOpenCommitment} />
@@ -407,6 +410,7 @@ function DecisionQueue({
   onDecide,
   onSaveContext,
   onOpenCommitment,
+  onInspectCitedReceipt,
   onReminderConsent,
 }: {
   home: HomeProjectionDto;
@@ -415,6 +419,7 @@ function DecisionQueue({
   onDecide: (request: PutDecisionRequest) => void;
   onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
   onOpenCommitment: (commitmentId: string) => void;
+  onInspectCitedReceipt?: (commitmentId: string, evidenceId: string) => void;
   onReminderConsent?: () => void;
 }) {
   const queue = home.decisionQueue;
@@ -456,6 +461,7 @@ function DecisionQueue({
             onDecide={onDecide}
             onSaveContext={onSaveContext}
             onOpenCommitment={onOpenCommitment}
+            onInspectCitedReceipt={onInspectCitedReceipt}
           />
         ))}
       </div>
@@ -473,6 +479,7 @@ function DecisionCard({
   onDecide,
   onSaveContext,
   onOpenCommitment,
+  onInspectCitedReceipt,
 }: {
   card: DecisionCardDto;
   prominent: boolean;
@@ -480,7 +487,13 @@ function DecisionCard({
   onDecide: (request: PutDecisionRequest) => void;
   onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
   onOpenCommitment: (commitmentId: string) => void;
+  onInspectCitedReceipt?: (commitmentId: string, evidenceId: string) => void;
 }) {
+  // The label promises the receipt. When the cited evidence row is known it
+  // opens that receipt directly; otherwise the button says where it goes.
+  const openCited = card.citedEvidenceId && onInspectCitedReceipt
+    ? () => onInspectCitedReceipt(card.commitmentId, card.citedEvidenceId!)
+    : null;
   const [reviewOpen, setReviewOpen] = useState(false);
   const reviewPanelId = useId();
   const purposeId = useId();
@@ -498,14 +511,22 @@ function DecisionCard({
         <div className="decision-evidence">
           <p className="eyebrow eyebrow-xs">{customerPhrases.citedEvidence}</p>
           <blockquote className="decision-quote">“{quote}”</blockquote>
-          <button type="button" onClick={() => onOpenCommitment(card.commitmentId)} className="link-quiet mt-1">
-            {customerPhrases.seeCitedReceipt}
+          <button
+            type="button"
+            onClick={openCited ?? (() => onOpenCommitment(card.commitmentId))}
+            className="link-quiet mt-1"
+          >
+            {openCited ? customerPhrases.seeCitedReceipt : customerPhrases.openCommitment}
           </button>
         </div>
       ) : (
         <div className="decision-evidence">
-          <button type="button" onClick={() => onOpenCommitment(card.commitmentId)} className="link-quiet">
-            {customerPhrases.seeCitedReceipt}
+          <button
+            type="button"
+            onClick={openCited ?? (() => onOpenCommitment(card.commitmentId))}
+            className="link-quiet"
+          >
+            {openCited ? customerPhrases.seeCitedReceipt : customerPhrases.openCommitment}
           </button>
         </div>
       )}

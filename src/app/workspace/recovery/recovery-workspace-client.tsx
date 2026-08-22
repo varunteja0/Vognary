@@ -982,6 +982,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         showFirstResult={state.showFirstResult}
         receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable}
         onOpenCommitment={openCommitment}
+        onInspectCitedReceipt={(commitmentId, evidenceId) => inspectEvidence(commitmentId, evidenceId, "see-cited-receipt")}
         onAddEvidence={() => dispatch({ type: "ADD_BILLS_OPENED" })}
         onOpenSources={() => selectView("ADD_EVIDENCE")}
         onSeeAllCommitments={() => selectView("COMMITMENTS")}

@@ -82,6 +82,8 @@ export type DecisionCycleFact = {
   overlapPeers: readonly { merchant: string; purpose: CommitmentPurpose | null }[];
   evidenceIds: readonly string[];
   excerpt: string | null;
+  /** The evidence row the excerpt was quoted from, when known. */
+  latestEvidenceId: string | null;
   cycles: readonly SavedDecisionCycle[];
 };
 
@@ -264,6 +266,7 @@ function toQueueCard(fact: DecisionCycleFact, today: string): DecisionCardDto | 
       undecided: !fact.stamp,
     }),
     excerpt: receiptQuote(fact.excerpt),
+    citedEvidenceId: fact.latestEvidenceId,
     provisional,
     reasonKeys: shownKeys,
     reasons: shownKeys.map((key) => reasonSentence(key, { ...fact, nextExpectedDate: dueDate }, daysAway)),
