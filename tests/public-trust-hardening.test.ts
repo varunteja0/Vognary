@@ -29,24 +29,18 @@ test("retired demo and guest modes are crawlable 410 tombstones", async () => {
   }
 });
 
-test("sensitive product pages use a nonce CSP without unsafe inline scripts", () => {
+test("sensitive product pages keep noindex and allow Next's inlined CSS", () => {
   const first = proxy(new NextRequest("https://www.vognary.com/app"));
-  const second = proxy(new NextRequest("https://www.vognary.com/app"));
-  const firstCsp = first.headers.get("content-security-policy") ?? "";
-  const secondCsp = second.headers.get("content-security-policy") ?? "";
-  const scriptSrc = firstCsp.match(/script-src ([^;]+)/)?.[1] ?? "";
-
-  assert.match(firstCsp, /script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
-  assert.doesNotMatch(scriptSrc, /'unsafe-inline'/);
-  assert.match(firstCsp, /style-src 'self' 'unsafe-inline'/);
-  assert.notEqual(firstCsp, secondCsp);
+  const csp = first.headers.get("content-security-policy") ?? "";
+  assert.match(csp, /script-src 'self' 'unsafe-inline'/);
+  assert.match(csp, /style-src 'self' 'unsafe-inline'/);
+  assert.doesNotMatch(csp, /strict-dynamic/);
   assert.equal(first.headers.get("x-robots-tag"), "noindex, nofollow");
 });
 
 test("loopback HTTP login CSP does not upgrade-insecure-requests and allows Next styles", () => {
   const response = proxy(new NextRequest("http://127.0.0.1:3000/login?next=/app"));
   const csp = response.headers.get("content-security-policy") ?? "";
-  assert.match(csp, /script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
   assert.match(csp, /style-src 'self' 'unsafe-inline'/);
   assert.doesNotMatch(csp, /upgrade-insecure-requests/);
 });

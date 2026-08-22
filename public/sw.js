@@ -1,4 +1,4 @@
-const CACHE_VERSION = "vognary-static-v1";
+const CACHE_VERSION = "vognary-static-v2";
 const OFFLINE_URL = "/offline";
 const INSTALL_ASSETS = [
   OFFLINE_URL,

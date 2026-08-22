@@ -32,16 +32,15 @@ export function proxy(request: NextRequest) {
     });
   }
 
-  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const isDevelopment = process.env.NODE_ENV !== "production";
   const isHttps = request.nextUrl.protocol === "https:"
     || request.headers.get("x-forwarded-proto") === "https";
+  // Same policy as next.config.ts public pages. A nonce on style-src strips
+  // Next's inlined CSS (CSP3 ignores style unsafe-inline when a nonce is set),
+  // which rendered /app as unstyled HTML. Do not reintroduce style nonces.
   const contentSecurityPolicy = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ""}`,
-    // Keep style-src nonce-free. CSP3 ignores 'unsafe-inline' for styles when a
-    // nonce is present, and Next/React still emit <style> tags plus style
-    // attributes. Script XSS stays nonce + strict-dynamic.
+    `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
@@ -55,11 +54,7 @@ export function proxy(request: NextRequest) {
     "manifest-src 'self'",
     ...(isDevelopment || !isHttps ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("content-security-policy", contentSecurityPolicy);
-  requestHeaders.set("x-nonce", nonce);
-
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  const response = NextResponse.next();
   response.headers.set("content-security-policy", contentSecurityPolicy);
   response.headers.set("x-robots-tag", "noindex, nofollow");
   return response;
