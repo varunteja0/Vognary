@@ -68,3 +68,6 @@ docs/execution/private-autopilot-outreach-draft.md
 
 # transient local test capture
 test_output.log
+
+# Local product-audit captures (screenshots, video, journals). Never commit.
+audit-pack/

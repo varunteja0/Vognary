@@ -1,5 +1,6 @@
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { isDatabaseConfigured } from "@/lib/server/database";
+import { reportServerError } from "@/lib/server/monitoring";
 import { askWorkspaceProofGraph } from "@/lib/server/proof-question-store";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
@@ -29,6 +30,12 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) return Response.json({ error: "Question request is too large." }, { status: 413, headers: noStoreHeaders });
     if (error instanceof UnsupportedContentTypeError) return Response.json({ error: "Content-Type must be application/json." }, { status: 415, headers: noStoreHeaders });
-    return Response.json({ error: error instanceof Error ? error.message : "The Proof Graph could not answer that question." }, { status: 400, headers: noStoreHeaders });
+    // Question-validation copy is safe to echo; anything else (driver, storage)
+    // stays server-side so infrastructure detail never reaches the client.
+    if (error instanceof Error && error.message.startsWith("Question must ")) {
+      return Response.json({ error: error.message }, { status: 400, headers: noStoreHeaders });
+    }
+    void reportServerError(error, { path: "/api/workspaces/current/ask", method: "POST", headers: Object.fromEntries(request.headers) }, { workspaceId: session.workspaceId });
+    return Response.json({ error: "The Proof Graph could not answer that question." }, { status: 500, headers: noStoreHeaders });
   }
 }

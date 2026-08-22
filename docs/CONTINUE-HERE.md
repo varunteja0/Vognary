@@ -5,6 +5,23 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## Live state — 2026-08-22 (one truth about money + first-session parser reach)
+
+**Scoreboard row this raises:** Trust & honesty / Product UX. Loop step: first-session decision moment. Composite stays **1.5** (no live-user evidence yet).
+
+**PRODUCT — every decision surface now names a charge a receipt actually contains.** Decision cards, WATCHING / NO_CHARGE_SEEN / CANNOT_VERIFY outcome rows, and `/start` cards all display the **most recent cited bill** (`latestObservedMinor`), falling back to the engine's effective amount only when no dated observation exists. Previously the same screen said "OpenAI charges ₹2,049.00" (an average no bill contains) while its own reason said "Last bill increased from ₹1,999.00 to ₹2,099.00", and `/start` showed a third number (arbitrary first evidence row). Verified live in a real browser: Zoho 999→1099 renders ₹1,099.00 with the cited increase sentence; stable commitments are unchanged; verified outcomes keep their observed amounts. Estimate layers (Coming later, next quiet charge, headline totals) deliberately keep the effective/average basis — they are labeled estimates, not per-merchant claims. Stored money semantics untouched: `effective_amount_minor`, persisted 0055 cycle stakes, and absence verification all still run off the effective amount.
+
+**PRODUCT — unknown vendors can now complete the first session.** The receipt-parser's leading-name pattern was case-sensitive on its billing keywords and lacked paid/charged, so "Linear\nInvoice paid INR…" or the exact format `/start`'s placeholder teaches ("Acme Cloud paid USD 20.00 on …") returned "Nothing cited yet." for any vendor outside the brand list. Keywords now accept both cases inline, paid/charged count, receipt vocabulary is lookahead-blocked from becoming the merchant, and merchant capture stays uppercase-sensitive and same-line. Failing tests written red first.
+
+**PRODUCT — the `/start` post-decision hook names a calendar date.** It passed the spoken phrase ("Charges in 15 days") into `decisionHookCopy`, rendering "Vognary will watch around Charges in 15 days." It now formats `card.dueDate` exactly like signed-in Home ("watch around 6 Sept 2026"). e2e asserts both the date and the absent broken phrase.
+
+**Hardening in the same pass:** `/api/workspaces/current/ask` no longer echoes raw internal error text (question-validation copy still passes through; everything else becomes a generic 500 with server-side reporting). `audit-pack/` (local screenshots/video/journals) is gitignored so captures can never be committed.
+
+**GATES on this checkout:** lint 0 errors (1 pre-existing warning in `instant-audit.tsx`) · typecheck PASS · claims:check PASS (25) · tokens:check PASS (61) · unit **997/997** · disposable PostgreSQL **159/159** (the previously documented shared-database flake passed this run; it passes 40/40 in isolation when it fires) · production Next build via `next build --webpack` PASS · `perf:budget` PASS (`/` 171.8 KB, `/app` 173.9 KB) · Playwright desktop `start-first-session`, `recovery-customer-zero`, `recovery-ui-home` (15/15) PASS against a local dev server with dev secrets. Live browser verification with screenshots confirmed: `/start` cites ₹1,099 for an undecided pair, Keep hook shows "around 6 Sept 2026", replayed KEEP silences the card and records the watching outcome, clean import shows "2 bills were saved".
+
+**NOT PROVEN (unchanged):** live ICP session · connected / paid · automatic receipts (`forwarding_verified_at` null) · reminder delivery. Known observations for a future pass, not defects fixed here: "Coming later" rows keep average-based amounts by design (estimate layer); re-pasting identical bills into a dirty workspace surfaces the honest "staged copy was not cleared" banner (first-session users start empty and saw none of it); `tests/e2e/workspace-reset.ts` is an orphaned helper pinned to a retired 410 endpoint; audit-pack P1 findings that were stale or intended behavior: single-bill provisional honesty already worked for plain pastes, Cursor↔AI overlap is the deliberate named-family list, mobile tab bar does not cover content at scroll-bottom (old-layout fullPage-capture artifact).
+
+
 ## Live state — 2026-08-22 (persist + reminder + photo prefill)
 
 **Scoreboard row this raises:** Product UX. Loop step: first-session decision moment. Composite stays **1.5**.
