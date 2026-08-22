@@ -20,6 +20,7 @@ import {
   reminderOffer,
 } from "@/lib/recovery/wow-first-session";
 import { VognaryMark } from "../brand";
+import { formatDay } from "../workspace/recovery/labels";
 import { BillDropzone } from "../workspace/recovery/ui/dropzone";
 import { ConfirmReceiptLine, type ImageDraft } from "../workspace/recovery/ui/confirm-receipt-line";
 
@@ -95,10 +96,11 @@ export default function StartClient() {
       action,
     }];
     setDecisions(nextDecisions);
+    // The hook names a calendar date, not the card's spoken phrase.
     const copy = decisionHookCopy({
       merchant: card.merchant,
       action,
-      watchDate: card.whenLine === "Date not established" ? null : card.whenLine,
+      watchDate: card.dueDate ? formatDay(card.dueDate) : null,
     });
     setHook({
       title: copy.title,

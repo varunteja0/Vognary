@@ -16,6 +16,9 @@ test("an unauthenticated first session can paste a bill and see a spoken decisio
   await expect(page.getByRole("button", { name: "Plan to cancel" })).toBeVisible();
   await page.getByRole("button", { name: "Plan to cancel" }).click();
   await expect(page.getByText(/plan to cancel is recorded/i)).toBeVisible();
+  // The hook names the calendar date from the bill, not a spoken relative phrase.
+  await expect(page.getByText(/watch around 28 Sept 2026/)).toBeVisible();
+  await expect(page.getByText(/watch around Charges in/)).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Sign in to remember this" })).toHaveAttribute("href", "/login?next=/app");
   await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0);
 });
