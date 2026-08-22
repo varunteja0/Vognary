@@ -59,6 +59,8 @@ export type CanonicalCommitmentRecord = {
   firstDetectedAt?: string;
   priceChange?: { previousMinor: bigint; currentMinor: bigint } | null;
   amountConflict?: boolean;
+  /** Amount of the most recent cited bill in this commitment's currency, when known. */
+  latestObservedMinor?: bigint | null;
   cycles?: readonly SavedDecisionCycle[];
   excerpt?: string | null;
   updatedAt: string;
@@ -555,6 +557,7 @@ export function toDecisionFacts(commitments: readonly CanonicalCommitmentRecord[
       cadence: commitment.cadence,
       currency: commitment.currency,
       amountMinor: commitment.amountMinor,
+      latestObservedMinor: commitment.latestObservedMinor ?? null,
       nextExpectedDate: commitment.nextExpectedDate,
       firstDetectedOn: commitment.firstDetectedAt ?? null,
       observationCount: commitment.evidenceIds.length,

@@ -2557,6 +2557,10 @@ async function loadCommitmentRecords(client: PoolClient, workspaceId: string): P
       firstDetectedAt: toDateOnly(row.first_detected_at) ?? row.first_detected_at.toISOString(),
       priceChange: signal?.priceChange ?? null,
       amountConflict: signal?.amountConflict === true || /does not match the usual amount/i.test(row.recommendation_reason),
+      latestObservedMinor: (() => {
+        const latest = signal?.latestByCurrency?.[row.base_currency];
+        return latest ? BigInt(normalizeMinorUnits(latest)) : null;
+      })(),
       cycles: cyclesByCommitment.get(row.id) ?? [],
       excerpt: excerpts.get(row.id) ?? null,
       updatedAt: row.updated_at.toISOString(),
@@ -3010,18 +3014,23 @@ async function loadAmountSignals(client: PoolClient, workspaceId: string) {
   const signals = new Map<string, {
     priceChange: { previousMinor: bigint; currentMinor: bigint } | null;
     amountConflict: boolean;
+    /** Newest dated amount per currency; the caller picks its commitment's own currency. */
+    latestByCurrency: Record<string, string>;
   }>();
   for (const [commitmentId, amounts] of grouped) {
     const previous = amounts.at(-2);
     const current = amounts.at(-1);
+    const latestByCurrency: Record<string, string> = {};
+    if (current) latestByCurrency[current.currency] = current.amountMinor.toString();
     if (!previous || !current || previous.currency !== current.currency) {
-      signals.set(commitmentId, { priceChange: null, amountConflict: false });
+      signals.set(commitmentId, { priceChange: null, amountConflict: false, latestByCurrency });
       continue;
     }
     const increased = current.amountMinor > previous.amountMinor;
     signals.set(commitmentId, {
       priceChange: increased ? { previousMinor: previous.amountMinor, currentMinor: current.amountMinor } : null,
       amountConflict: current.amountMinor !== previous.amountMinor && !increased,
+      latestByCurrency,
     });
   }
   return signals;

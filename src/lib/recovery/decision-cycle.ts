@@ -69,6 +69,8 @@ export type DecisionCycleFact = {
   cadence: Cadence;
   currency: string;
   amountMinor: bigint;
+  /** Amount of the most recent cited bill in this commitment's currency, when known. */
+  latestObservedMinor: bigint | null;
   nextExpectedDate: string | null;
   firstDetectedOn: string | null;
   observationCount: number;
@@ -235,7 +237,11 @@ function toQueueCard(fact: DecisionCycleFact, today: string): DecisionCardDto | 
   if (!inWindow && !material) return null;
   const shownKeys = keys.filter((key) => key !== "NO_PRIOR_DECISION" || keys.length > 1);
   if (shownKeys.length === 0) return null;
-  const charge = toMoneyDto(fact.amountMinor, fact.currency);
+  // The card names one charge: the most recent cited bill. Only when no dated
+  // observation is known does it fall back to the effective amount, so a
+  // price-increase card never shows an average that no receipt contains.
+  const displayAmountMinor = fact.latestObservedMinor ?? fact.amountMinor;
+  const charge = toMoneyDto(displayAmountMinor, fact.currency);
   const stake = annualizedStake(fact.amountMinor, fact.cadence, fact.currency);
   const daysAway = dueDate ? daysBetween(today, dueDate) : null;
   const overlapMerchants = fact.overlapPeers.map((peer) => peer.merchant);
@@ -297,6 +303,10 @@ function isNewCommitment(fact: DecisionCycleFact, today: string): boolean {
 
 function toOutcome(fact: DecisionCycleFact, cycle: SavedDecisionCycle): DecisionOutcomeDto | null {
   if (cycle.userAction === "REVIEW_LATER") return null;
+  // Outcome rows that reference the watched commitment name the most recent
+  // cited bill, matching the decision card; verified rows keep the amount they
+  // actually observed.
+  const displayAmountMinor = fact.latestObservedMinor ?? fact.amountMinor;
 
   if (cycle.verificationOutcome === null && (cycle.userAction === "KEEP" || cycle.userAction === "PLAN_TO_CANCEL")) {
     const hook = decisionHookCopy({
@@ -310,7 +320,7 @@ function toOutcome(fact: DecisionCycleFact, cycle: SavedDecisionCycle): Decision
       kind: "WATCHING",
       headline: hook.title,
       detail: hook.body,
-      amount: toMoneyDto(fact.amountMinor, fact.currency),
+      amount: toMoneyDto(displayAmountMinor, fact.currency),
       date: cycle.dueDate,
       evidenceIds: fact.evidenceIds,
     };
@@ -355,7 +365,7 @@ function toOutcome(fact: DecisionCycleFact, cycle: SavedDecisionCycle): Decision
       kind: "NO_CHARGE_SEEN",
       headline: "We didn't see another charge in the expected window.",
       detail: "Missing evidence is not proof of cancellation.",
-      amount: toMoneyDto(fact.amountMinor, fact.currency),
+      amount: toMoneyDto(displayAmountMinor, fact.currency),
       date: cycle.dueDate,
       evidenceIds: fact.evidenceIds,
     };
@@ -368,7 +378,7 @@ function toOutcome(fact: DecisionCycleFact, cycle: SavedDecisionCycle): Decision
       kind: "CANNOT_VERIFY",
       headline: "Cannot verify yet",
       detail: "The sources that would have shown this charge were not watching reliably, or there is not enough history.",
-      amount: toMoneyDto(fact.amountMinor, fact.currency),
+      amount: toMoneyDto(displayAmountMinor, fact.currency),
       date: cycle.dueDate,
       evidenceIds: fact.evidenceIds,
     };

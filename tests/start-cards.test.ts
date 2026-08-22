@@ -40,6 +40,65 @@ test("start cards use the same spoken sentence and overlap rule as Home", () => 
   assert.equal(spokenChargeWhenLine("2026-08-22", "2026-08-25"), "Charges in 3 days");
 });
 
+test("start cards quote the most recent bill, not an average no receipt contains", () => {
+  const cards = startCardsFromRecurringItems([
+    {
+      id: "openai",
+      merchant: "OpenAI",
+      category: "AI tools",
+      currency: "INR",
+      averageAmount: 2049,
+      nextExpectedDate: "2026-09-06",
+      evidence: [
+        { description: "Invoice paid INR 1,999.00", amountDecimal: "1999.00", amount: 1999, date: "2026-07-06" },
+        { description: "Invoice paid INR 2,099.00", amountDecimal: "2099.00", amount: 2099, date: "2026-08-06" },
+      ],
+    },
+  ], "2026-08-22");
+  const openai = cards.find((card) => card.id === "openai");
+  assert.ok(openai);
+  assert.equal(openai?.amountDisplay, "₹2,099.00");
+  assert.match(openai?.sentence ?? "", /OpenAI charges ₹2,099\.00/);
+});
+
+test("start cards pick the newest bill by date even when evidence is listed newest-first", () => {
+  const cards = startCardsFromRecurringItems([
+    {
+      id: "zoho",
+      merchant: "Zoho",
+      category: "Productivity",
+      currency: "INR",
+      averageAmount: 2049,
+      nextExpectedDate: "2026-09-06",
+      evidence: [
+        { description: "Invoice paid INR 2,099.00", amountDecimal: "2099.00", amount: 2099, date: "2026-08-06" },
+        { description: "Invoice paid INR 1,999.00", amountDecimal: "1999.00", amount: 1999, date: "2026-07-06" },
+      ],
+    },
+  ], "2026-08-22");
+  const zoho = cards.find((card) => card.id === "zoho");
+  assert.ok(zoho);
+  assert.equal(zoho?.amountDisplay, "₹2,099.00");
+});
+
+test("start cards keep the effective amount when evidence carries no amounts", () => {
+  const cards = startCardsFromRecurringItems([
+    {
+      id: "github",
+      merchant: "GitHub",
+      category: "Developer tools",
+      currency: "INR",
+      averageAmount: 400,
+      amountDecimal: "400.00",
+      nextExpectedDate: "2026-09-01",
+      evidence: [{ description: "GitHub Team renews monthly." }],
+    },
+  ], "2026-08-22");
+  const github = cards.find((card) => card.id === "github");
+  assert.ok(github);
+  assert.equal(github?.amountDisplay, "₹400.00");
+});
+
 test("start-session replay matches Cursor Pro to Cursor and reports unmatched merchants", () => {
   const matched = matchStartDecision("Cursor", [{ merchant: "Cursor Pro", action: "PLAN_TO_CANCEL" }]);
   assert.equal(matched?.action, "PLAN_TO_CANCEL");

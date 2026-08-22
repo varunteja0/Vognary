@@ -26,6 +26,7 @@ function fact(overrides: Partial<DecisionCycleFact> & Pick<DecisionCycleFact, "c
     cadence: "MONTHLY",
     currency: "INR",
     amountMinor: BigInt(170_000),
+    latestObservedMinor: null,
     nextExpectedDate: "2026-08-22",
     firstDetectedOn: "2026-06-01",
     observationCount: 4,
@@ -131,6 +132,34 @@ test("KEEP for this due date removes the cycle from the queue", () => {
   assert.equal(home.decisionQueue.length, 0);
   assert.equal(home.decisionOutcomes[0]?.kind, "WATCHING");
   assert.match(home.decisionOutcomes[0]?.headline ?? "", /kept for this cycle/);
+});
+
+test("a watching outcome cites the latest bill, not an average nobody billed", () => {
+  const cycle: SavedDecisionCycle = {
+    dueDate: "2026-09-06",
+    userAction: "KEEP",
+    reviewAt: null,
+    decidedAt: "2026-08-19T10:00:00.000Z",
+    verificationOutcome: null,
+    verifiedAt: null,
+    observedAmountMinor: null,
+    observedDate: null,
+    observedCurrency: null,
+    observedEvidenceIds: [],
+  };
+  const home = buildDecisionHome([
+    fact({
+      commitmentId: "openai",
+      merchant: "OpenAI",
+      amountMinor: BigInt(204_900),
+      latestObservedMinor: BigInt(209_900),
+      stamp: "KEEP",
+      cycles: [cycle],
+    }),
+  ], today);
+  const watching = home.decisionOutcomes.find((outcome) => outcome.kind === "WATCHING");
+  assert.ok(watching);
+  assert.equal(watching.amount?.display, "₹2,099.00");
 });
 
 test("acceptance 2: plan to cancel stores intent and leaves the queue immediately", () => {
@@ -244,6 +273,37 @@ test("acceptance 6: price increase due in 5 days ranks first with a cited delta"
   assert.match(home.decisionQueue[0]?.reasons.join(" ") ?? "", /₹1,999\.00/);
   assert.match(home.decisionQueue[0]?.reasons.join(" ") ?? "", /₹2,499\.00/);
   assert.match(home.decisionQueue[0]?.reasons.join(" ") ?? "", /₹500\.00/);
+});
+
+test("a price-increase card cites the current bill, never an average no receipt contains", () => {
+  const home = buildDecisionHome([
+    fact({
+      commitmentId: "openai",
+      merchant: "OpenAI",
+      // Effective amount is the average of ₹1,999 and ₹2,099 — no receipt says ₹2,049.
+      amountMinor: BigInt(204_900),
+      latestObservedMinor: BigInt(209_900),
+      nextExpectedDate: "2026-08-24",
+      priceChange: { previousMinor: BigInt(199_900), currentMinor: BigInt(209_900) },
+    }),
+  ], today);
+  const card = home.decisionQueue[0];
+  assert.ok(card);
+  assert.equal(card.charge.display, "₹2,099.00");
+  assert.match(card.sentence, /OpenAI charges ₹2,099\.00/);
+  assert.match(card.reasons.join(" "), /Last bill increased from ₹1,999\.00 to ₹2,099\.00/);
+});
+
+test("without a dated observation the card keeps the effective amount", () => {
+  const home = buildDecisionHome([
+    fact({
+      commitmentId: "perplexity",
+      merchant: "Perplexity",
+      amountMinor: BigInt(170_000),
+      nextExpectedDate: "2026-08-22",
+    }),
+  ], today);
+  assert.equal(home.decisionQueue[0]?.charge.display, "₹1,700.00");
 });
 
 test("NEW_COMMITMENT is cited for a recently first-detected recurring commitment", () => {
