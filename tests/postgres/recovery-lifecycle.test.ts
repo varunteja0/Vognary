@@ -487,7 +487,10 @@ test("upcoming-only receipt evidence never appears as a recent observed charge",
 
     assert.equal(submitted.data.submission.acceptedEvidenceCount, 1);
     assert.equal(submitted.data.home.recentObservations.length, 0);
-    assert.equal(submitted.data.home.next[0]?.date, "2026-08-20");
+    // Upcoming-only evidence surfaces as a provisional decision card naming
+    // the pre-debit date — never as a recent observed charge.
+    assert.equal(submitted.data.home.decisionQueue[0]?.merchant, "MAX BUPA HEALTH");
+    assert.equal(submitted.data.home.decisionQueue[0]?.dueDate, "2026-08-20");
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
     await pool.query(`delete from users where id = $1`, [ownerUserId]);
