@@ -384,6 +384,8 @@ function isFeatureMigrationsReady({ endpointPayloads }) {
   return capabilities.schema?.status === "ready"
     && capabilities.schema.required?.includes("0055_recovery_decision_cycles") === true
     && capabilities.schema.applied?.includes("0055_recovery_decision_cycles") === true
+    && capabilities.schema.required?.includes("0056_decision_cycle_expected_amount") === true
+    && capabilities.schema.applied?.includes("0056_decision_cycle_expected_amount") === true
     && capabilities.privacyLifecycle?.status !== "schema-query-failed"
     && capabilities.renewalAlerts?.status !== "schema-query-failed"
     && capabilities.commitmentDecisions?.status !== "schema-query-failed"

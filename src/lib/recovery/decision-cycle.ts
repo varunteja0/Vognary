@@ -190,6 +190,39 @@ export function persistableCycleReasonKeys(keys: readonly DecisionReasonKey[]): 
   return keys.filter((key) => persistedCycleReasonKeys.has(key));
 }
 
+/** Amount the Decision Object displayed: latest cited bill, else the effective amount. */
+export function displayedChargeAmountMinor(
+  latestObservedMinor: bigint | null,
+  effectiveAmountMinor: bigint,
+): bigint {
+  return latestObservedMinor ?? effectiveAmountMinor;
+}
+
+/**
+ * Amount stored at decision time. A latest observation in another currency
+ * is ignored so the cycle never freezes a number the card did not show.
+ */
+export function freezeDecisionExpectedAmountMinor(input: {
+  latestObservedMinor: bigint | null;
+  latestObservedCurrency?: string | null;
+  effectiveAmountMinor: bigint;
+  baseCurrency: string;
+}): bigint {
+  if (input.latestObservedMinor === null) return input.effectiveAmountMinor;
+  const observedCurrency = input.latestObservedCurrency?.trim().toUpperCase();
+  const baseCurrency = input.baseCurrency.trim().toUpperCase();
+  if (observedCurrency && observedCurrency !== baseCurrency) return input.effectiveAmountMinor;
+  return input.latestObservedMinor;
+}
+
+/** Verification compares against the frozen decision-time amount; legacy null rows fall back. */
+export function verificationExpectedAmountMinor(
+  frozenExpectedMinor: bigint | null,
+  currentEffectiveMinor: bigint,
+): bigint {
+  return frozenExpectedMinor ?? currentEffectiveMinor;
+}
+
 export function buildDecisionHome(facts: readonly DecisionCycleFact[], today: string): DecisionHomeProjection {
   const active = facts.filter((fact) => fact.status === "ACTIVE");
   const queue = active

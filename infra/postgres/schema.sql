@@ -1469,6 +1469,7 @@ create table if not exists recovery_decision_cycles (
   due_date date not null,
   stake_minor bigint,
   currency text not null,
+  expected_amount_minor bigint,
   reason_keys text[] not null default '{}',
   user_action text not null check (user_action in ('KEEP', 'REVIEW_LATER', 'PLAN_TO_CANCEL')),
   review_at date,
@@ -1476,7 +1477,7 @@ create table if not exists recovery_decision_cycles (
   decided_by_user_id uuid references users(id) on delete set null,
   verification_outcome text check (
     verification_outcome is null
-    or verification_outcome in ('CHARGE_ARRIVED', 'NO_CHARGE_IN_WINDOW', 'CANNOT_EVALUATE')
+    or verification_outcome in ('CHARGE_ARRIVED', 'NO_CHARGE_IN_WINDOW', 'CANNOT_EVALUATE', 'AMOUNT_DIFFERED')
   ),
   verified_at timestamptz,
   created_at timestamptz not null default now(),

@@ -674,7 +674,9 @@ async function buildAccessExport(client: PoolClient, input: {
         ) record) as commitment_context,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
           select commitment_id as "commitmentId", due_date as "dueDate",
-                 stake_minor::text as "stakeMinor", currency, reason_keys as "reasonKeys",
+                 stake_minor::text as "stakeMinor", currency,
+                 expected_amount_minor::text as "expectedAmountMinor",
+                 reason_keys as "reasonKeys",
                  user_action as "userAction", review_at as "reviewAt",
                  decided_at as "decidedAt", verification_outcome as "verificationOutcome",
                  verified_at as "verifiedAt", created_at as "createdAt",

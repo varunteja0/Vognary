@@ -304,6 +304,16 @@ test("0055 adds remembered decision cycles without rewriting evidence", () => {
   assert.doesNotMatch(cycleMigration, /drop table|truncate|alter table recovery_commitments|alter table recovery_decisions|alter table recovery_evidence/i);
 });
 
+test("0056 freezes decision-time expected amount without backfilling history", () => {
+  const amountMigration = readFileSync(new URL("../infra/postgres/migrations/0056_decision_cycle_expected_amount.sql", import.meta.url), "utf8");
+  assert.match(amountMigration, /add column if not exists expected_amount_minor bigint/i);
+  assert.match(amountMigration, /AMOUNT_DIFFERED/);
+  assert.match(schema, /expected_amount_minor bigint/);
+  assert.match(schema, /AMOUNT_DIFFERED/);
+  assert.doesNotMatch(amountMigration, /drop table|truncate|update recovery_decision_cycles set expected_amount_minor/i);
+  assert.doesNotMatch(amountMigration, /alter table recovery_commitments|alter table recovery_evidence/i);
+});
+
 test("0054 adds an isolated purpose/importance overlay without rewriting evidence", () => {
   const contextMigration = readFileSync(new URL("../infra/postgres/migrations/0054_recovery_commitment_context.sql", import.meta.url), "utf8");
   for (const sql of [contextMigration, schema]) {

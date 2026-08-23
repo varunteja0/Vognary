@@ -10,7 +10,7 @@ Do not show the forwarding-first landing or set any receipt-inbox operator flag 
 
 Stop immediately when any of these is true:
 
-- PostgreSQL migrations through `0055_recovery_decision_cycles` are not applied.
+- PostgreSQL migrations through `0056_decision_cycle_expected_amount` are not applied.
 - A signed Resend event cannot produce one canonical Recovery submission.
 - Replaying that event creates another submission, source, evidence row, or commitment.
 - A raw provider address, alias token, message subject, body, or attachment appears in logs or privacy export.
@@ -37,14 +37,14 @@ Rollback means setting `ENABLE_RECEIPT_INBOX=false`, clearing the four operator 
 DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
 ```
 
-11. Query `schema_migrations` and verify the last row is `0055_recovery_decision_cycles`.
+11. Query `schema_migrations` and verify the last row is `0056_decision_cycle_expected_amount`.
 12. Verify PostgreSQL still contains the three cutover guards plus `recovery_inbound_alias_milestones_immutable`. Re-run the zero-nonterminal legacy queries from step 5.
 13. Run the fresh and staged upgrade migration tests against disposable PostgreSQL 16. The staged rehearsal must begin at the production resume point and end at `0053` without losing aliases, inbound events, Recovery evidence, commitments, corrections, or provenance.
 
 Expected success:
 
 - `/api/readiness` reports `capabilities.schema.status = ready`.
-- `capabilities.schema.status` is `ready`, and `capabilities.schema.applied` ends at `0055_recovery_decision_cycles`.
+- `capabilities.schema.status` is `ready`, and `capabilities.schema.applied` ends at `0056_decision_cycle_expected_amount`.
 - `capabilities.recoveryV1.status = schema-ready-clean-cutover`.
 
 Keep forwarding disabled and stop activation if the starting head is not exactly `0026`, the successful pre-`0053` backup/restore run is absent or stale, checksums differ, any cutover or milestone trigger is absent, a nonterminal legacy row remains, a fresh database fails, or an upgrade loses rows.
@@ -184,7 +184,7 @@ Expected success:
 
 - Every endpoint probe passes.
 - `Recovery receipt inbox` is `READY`.
-- Feature migrations are `READY` through `0055_recovery_decision_cycles`.
+- Feature migrations are `READY` through `0056_decision_cycle_expected_amount`.
 - Identity provider, persistent backend, shared rate limiting, privacy lifecycle, monitoring, backups, and any enabled billing/notification group are `READY`.
 - All retired connector endpoints return `410`.
 

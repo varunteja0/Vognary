@@ -23,6 +23,7 @@ export const requiredAutopilotIntegrityMigrations = [
   "0053_phase_a_receipt_activation",
   "0054_recovery_commitment_context",
   "0055_recovery_decision_cycles",
+  "0056_decision_cycle_expected_amount",
 ];
 export const requiredAutopilotIntegrityTriggers = [
   "product_events_workspace_activated_immutable",
@@ -122,7 +123,7 @@ function verificationProfile(value) {
       }
     : {
         profile,
-        migrationHead: "0055_recovery_decision_cycles",
+        migrationHead: "0056_decision_cycle_expected_amount",
         requiredMigrations: [requiredRecoveryMigration, ...requiredAutopilotIntegrityMigrations],
         integrityMigrations: requiredAutopilotIntegrityMigrations,
         requiredTriggers: requiredAutopilotIntegrityTriggers,

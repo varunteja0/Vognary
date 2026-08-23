@@ -60,6 +60,7 @@ export const productionFeatureMigrations = [
   "0053_phase_a_receipt_activation",
   "0054_recovery_commitment_context",
   "0055_recovery_decision_cycles",
+  "0056_decision_cycle_expected_amount",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];

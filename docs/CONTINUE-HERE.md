@@ -5,6 +5,22 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## Live state — 2026-08-23 (P0-1 expected amount freeze + P0-2 first-decision event)
+
+**Scoreboard row this raises:** Trust & honesty / Product UX. Loop step: first-session decision moment. Composite stays **1.5**.
+
+**PRODUCT — a KEEP/REVIEW/PLAN_TO_CANCEL now freezes the amount the Decision Object displayed.** Additive migration `0056_decision_cycle_expected_amount` adds `recovery_decision_cycles.expected_amount_minor` (nullable, no backfill) and reserves `AMOUNT_DIFFERED` on the verification-outcome CHECK without writing it. `putRecoveryDecision` stores `latestObservedMinor ?? effective_amount_minor`. Both verification readers (`refreshDecisionCycleVerification`, `loadSavedDecisionCycles`) compare later evidence against the frozen amount, falling back to current effective only for legacy null rows. Later receipts cannot silently rewrite what the founder decided against. P1 still maps `AMOUNT_CHANGED` → `CHARGE_ARRIVED` in persisted vocabulary; the frozen column is the irreversible capture.
+
+**PRODUCT — first decisions are measurable.** After a cycle write commits, `putRecoveryDecision` emits consented `review.action_recorded` with no metrics payload. Analytics failure cannot roll back the decision. Replay does not emit. No-consent workspaces write the cycle and no event.
+
+**GATES on this checkout:** lint 0 errors (1 pre-existing warning in `instant-audit.tsx`) · typecheck PASS · claims:check PASS (25) · tokens:check PASS (61) · unit **1003/1003** · disposable PostgreSQL **161/161** · production Next build PASS · `perf:budget` PASS (`/` 178.1 KB, `/app` 180.5 KB, `/verify` 181.2 KB).
+
+**SCHEMA:** 0056 checksum `7b0f25a129e7692968d5e30846035480a6a60c179ac526a84ecba4e56e038ef5`. Applied on local Postgres. **Production Neon is still head `0055_recovery_decision_cycles` until the founder applies 0056.** Do not push the SHA that writes `expected_amount_minor` before that apply.
+
+**NOT PROVEN (unchanged):** live ICP session · connected/paid · first automatic receipt (`forwarding_verified_at` still null) · reminder delivery. Founder-ops P0-0 remains: confirm Google forwarding, create the billing-only filter, Search Console `/app?demo=1` removal. P1 is locked until T0–T4 session evidence.
+
+**HARD STOP:** engineering stops after this P0 is deployed. Only P0-severity defects (money wrong / trust broken / journey impossible) may be coded until five founder sessions produce T0–T4 evidence.
+
 ## Live state — 2026-08-22 (Coming later vs queue + cookie decode)
 
 **Scoreboard row this raises:** Product UX / Trust. Loop step: first-session decision moment. Composite stays **1.5**.

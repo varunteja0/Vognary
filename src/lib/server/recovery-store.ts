@@ -84,8 +84,10 @@ import { evaluateExpectedCharge, type ChargeObservation } from "@/lib/recovery/a
 import {
   collectReasonKeys,
   decisionHistoryItems,
+  freezeDecisionExpectedAmountMinor,
   persistableCycleReasonKeys,
   resolveDecisionWrite,
+  verificationExpectedAmountMinor,
   verificationFromEvaluation,
   type SavedDecisionCycle,
 } from "@/lib/recovery/decision-cycle";
@@ -981,15 +983,23 @@ export async function putRecoveryDecision(input: {
         commitment.effective_cadence,
         commitment.base_currency,
       );
+      const expectedAmountMinor = fact
+        ? freezeDecisionExpectedAmountMinor({
+            latestObservedMinor: fact.latestObservedMinor,
+            effectiveAmountMinor: fact.amountMinor,
+            baseCurrency: fact.currency,
+          })
+        : BigInt(normalizeMinorUnits(commitment.effective_amount_minor));
       await client.query(
         `insert into recovery_decision_cycles (
-           workspace_id, commitment_id, due_date, stake_minor, currency, reason_keys,
+           workspace_id, commitment_id, due_date, stake_minor, currency, expected_amount_minor, reason_keys,
            user_action, review_at, decided_at, decided_by_user_id, created_at, updated_at
          )
-         values ($1, $2, $3::date, $4, $5, $6::text[], $7, $8::date, $9, $10, $9, $9)
+         values ($1, $2, $3::date, $4, $5, $6, $7::text[], $8, $9::date, $10, $11, $10, $10)
          on conflict (workspace_id, commitment_id, due_date)
          do update set stake_minor = excluded.stake_minor,
                        currency = excluded.currency,
+                       expected_amount_minor = excluded.expected_amount_minor,
                        reason_keys = excluded.reason_keys,
                        user_action = excluded.user_action,
                        review_at = excluded.review_at,
@@ -1004,6 +1014,7 @@ export async function putRecoveryDecision(input: {
           dueDate,
           stake ? stake.minor : null,
           commitment.base_currency,
+          expectedAmountMinor.toString(),
           persistableCycleReasonKeys(reasonKeys),
           write.action,
           write.reviewAt,
@@ -1042,6 +1053,20 @@ export async function putRecoveryDecision(input: {
       workspaceVersion,
     });
     await client.query("commit");
+    if (write.action && dueDate) {
+      try {
+        await recordConsentedProductEvent({
+          workspaceId: input.workspaceId,
+          userId: input.actorUserId,
+          eventName: "review.action_recorded",
+          occurredAt: now.toISOString(),
+          source: "workspace-api",
+          status: "succeeded",
+        });
+      } catch {
+        // Analytics must never roll back a recorded decision.
+      }
+    }
     return { data, workspaceVersion, replayed: false };
   } catch (error) {
     await client.query("rollback").catch(() => undefined);
@@ -2879,7 +2904,15 @@ type CycleRow = {
   verification_outcome: DecisionVerificationOutcome | null;
   verified_at: Date | null;
   currency: string;
+  expected_amount_minor: string | null;
 };
+
+function cycleVerificationAmount(cycle: CycleRow, commitment: CommitmentRow): bigint {
+  return verificationExpectedAmountMinor(
+    cycle.expected_amount_minor === null ? null : BigInt(normalizeMinorUnits(cycle.expected_amount_minor)),
+    BigInt(normalizeMinorUnits(commitment.effective_amount_minor)),
+  );
+}
 
 function cycleForRow(row: CommitmentRow, cycles: ReadonlyMap<string, readonly SavedDecisionCycle[]>) {
   const dueDate = toDateOnly(row.effective_next_expected_date);
@@ -2890,7 +2923,7 @@ function cycleForRow(row: CommitmentRow, cycles: ReadonlyMap<string, readonly Sa
 async function refreshDecisionCycleVerification(client: PoolClient, workspaceId: string, now: Date) {
   const pending = await client.query<CycleRow>(
     `select id, commitment_id, due_date, user_action, review_at, decided_at,
-            verification_outcome, verified_at, currency
+            verification_outcome, verified_at, currency, expected_amount_minor::text as expected_amount_minor
      from recovery_decision_cycles
      where workspace_id = $1 and verification_outcome is null`,
     [workspaceId],
@@ -2909,7 +2942,7 @@ async function refreshDecisionCycleVerification(client: PoolClient, workspaceId:
       expectedDate: dueDate,
       cadence: commitment.effective_cadence,
       currency: commitment.base_currency,
-      expectedAmountMinor: BigInt(normalizeMinorUnits(commitment.effective_amount_minor)),
+      expectedAmountMinor: cycleVerificationAmount(cycle, commitment),
       coverage: coverage.get(cycle.commitment_id) ?? uncoveredCommitment(),
       observations: observations.get(cycle.commitment_id) ?? [],
       cancellationClaimed: false,
@@ -2931,7 +2964,7 @@ async function loadSavedDecisionCycles(
 ): Promise<Map<string, SavedDecisionCycle[]>> {
   const result = await client.query<CycleRow>(
     `select id, commitment_id, due_date, user_action, review_at, decided_at,
-            verification_outcome, verified_at, currency
+            verification_outcome, verified_at, currency, expected_amount_minor::text as expected_amount_minor
      from recovery_decision_cycles
      where workspace_id = $1
      order by due_date asc, decided_at asc`,
@@ -2953,7 +2986,7 @@ async function loadSavedDecisionCycles(
           expectedDate: dueDate,
           cadence: commitment.effective_cadence,
           currency: commitment.base_currency,
-          expectedAmountMinor: BigInt(normalizeMinorUnits(commitment.effective_amount_minor)),
+          expectedAmountMinor: cycleVerificationAmount(row, commitment),
           coverage: coverage.get(row.commitment_id) ?? uncoveredCommitment(),
           observations: observations.get(row.commitment_id) ?? [],
           cancellationClaimed: false,

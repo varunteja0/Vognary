@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { ExpectedChargeEvaluation } from "../src/lib/recovery/absence";
+import { evaluateExpectedCharge, type ExpectedChargeEvaluation } from "../src/lib/recovery/absence";
 import { IDENTITY_UNCERTAIN_REASON } from "../src/lib/recovery/commitment-relationship";
 import type { DecisionCycleFact, SavedDecisionCycle } from "../src/lib/recovery/decision-cycle";
 import {
@@ -10,12 +10,16 @@ import {
   computeReviewAt,
   cycleActionFromStamp,
   decisionHistoryItems,
+  displayedChargeAmountMinor,
+  freezeDecisionExpectedAmountMinor,
   isInDecisionWindow,
   outcomeCopyNeverClaimsCancellation,
   persistableCycleReasonKeys,
   stampForCycleAction,
+  verificationExpectedAmountMinor,
   verificationFromEvaluation,
 } from "../src/lib/recovery/decision-cycle";
+import { assessCommitmentCoverage, assessSourceLiveness } from "../src/lib/recovery/source-liveness";
 import { toMoneyDto } from "../src/lib/recovery/domain";
 
 const today = "2026-08-19";
@@ -443,6 +447,73 @@ test("irregular cadence shows the known charge only, never a fabricated annual t
   assert.equal(home.decisionQueue[0]?.charge.display, "₹8,400.00");
 });
 
+test("the decision-time amount is the cited bill, never a later rewritten effective amount", () => {
+  const frozen = freezeDecisionExpectedAmountMinor({
+    latestObservedMinor: BigInt(199_900),
+    effectiveAmountMinor: BigInt(204_900),
+    baseCurrency: "INR",
+  });
+  assert.equal(frozen, BigInt(199_900));
+  assert.equal(displayedChargeAmountMinor(BigInt(199_900), BigInt(204_900)), BigInt(199_900));
+  assert.equal(displayedChargeAmountMinor(null, BigInt(204_900)), BigInt(204_900));
+  assert.equal(
+    freezeDecisionExpectedAmountMinor({
+      latestObservedMinor: BigInt(20_00),
+      latestObservedCurrency: "USD",
+      effectiveAmountMinor: BigInt(199_900),
+      baseCurrency: "INR",
+    }),
+    BigInt(199_900),
+  );
+  assert.equal(verificationExpectedAmountMinor(BigInt(199_900), BigInt(249_900)), BigInt(199_900));
+  assert.equal(verificationExpectedAmountMinor(null, BigInt(249_900)), BigInt(249_900));
+
+  const watching = assessSourceLiveness({
+    sourceId: "src-1",
+    kind: "FORWARDED_EMAIL",
+    connected: true,
+    credentialRevoked: false,
+    consecutiveFailureCount: 0,
+    evidenceCount: 6,
+    lastEvidenceAt: "2026-09-05T09:00:00.000Z",
+    lastDeliveryAt: "2026-09-06T09:00:00.000Z",
+    coverageStart: "2026-04-01",
+    coverageEnd: "2026-09-05",
+  }, new Date("2026-09-12T09:00:00.000Z"));
+  const coverage = assessCommitmentCoverage(["src-1"], [watching]);
+  const laterBill = {
+    evidenceId: "ev-sep",
+    date: "2026-09-05",
+    amountMinor: BigInt(249_900),
+    currency: "INR",
+  };
+  const againstFrozen = evaluateExpectedCharge({
+    evaluatedOn: "2026-09-12",
+    expectedDate: "2026-09-05",
+    cadence: "MONTHLY",
+    currency: "INR",
+    expectedAmountMinor: verificationExpectedAmountMinor(BigInt(199_900), BigInt(249_900)),
+    coverage,
+    observations: [laterBill],
+    cancellationClaimed: false,
+  });
+  assert.equal(againstFrozen.status === "EVALUATED" && againstFrozen.outcome, "AMOUNT_CHANGED");
+  const againstRewrittenEffective = evaluateExpectedCharge({
+    evaluatedOn: "2026-09-12",
+    expectedDate: "2026-09-05",
+    cadence: "MONTHLY",
+    currency: "INR",
+    expectedAmountMinor: BigInt(249_900),
+    coverage,
+    observations: [laterBill],
+    cancellationClaimed: false,
+  });
+  assert.equal(
+    againstRewrittenEffective.status === "EVALUATED" && againstRewrittenEffective.outcome,
+    "ARRIVED_AS_EXPECTED",
+  );
+});
+
 test("verification mapping never treats a pending window as a persisted outcome", () => {
   const pending: ExpectedChargeEvaluation = {
     status: "PENDING_WINDOW",
@@ -465,6 +536,15 @@ test("verification mapping never treats a pending window as a persisted outcome"
     citedEvidenceIds: ["evidence-new"],
   };
   assert.deepEqual(verificationFromEvaluation(arrived), { persist: true, outcome: "CHARGE_ARRIVED" });
+
+  const amountChanged: ExpectedChargeEvaluation = {
+    ...arrived,
+    outcome: "AMOUNT_CHANGED",
+    observedAmountMinor: BigInt(249_900),
+    deltaMinor: BigInt(50_000),
+    deltaBasisPoints: 2501,
+  };
+  assert.deepEqual(verificationFromEvaluation(amountChanged), { persist: true, outcome: "CHARGE_ARRIVED" });
 
   const missing: ExpectedChargeEvaluation = {
     ...arrived,
