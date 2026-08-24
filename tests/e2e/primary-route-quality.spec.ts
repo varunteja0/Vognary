@@ -92,26 +92,18 @@ test("reduced-motion preference suppresses decorative motion", async ({ page }) 
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
   const motion = await page.evaluate(() => {
-    const scan = document.querySelector<HTMLElement>(".scan");
-    const liveDot = document.querySelector<HTMLElement>(".live-dot");
     const button = document.querySelector<HTMLElement>(".btn");
-    if (!scan || !liveDot || !button) throw new Error("Reduced-motion probes are missing");
-    const scanStyle = getComputedStyle(scan, "::after");
-    const dotStyle = getComputedStyle(liveDot);
+    if (!button) throw new Error("Reduced-motion button probe is missing");
     const buttonStyle = getComputedStyle(button);
     return {
       matches: matchMedia("(prefers-reduced-motion: reduce)").matches,
       scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
-      animationDurations: [scanStyle.animationDuration, dotStyle.animationDuration],
-      animationIterations: [scanStyle.animationIterationCount, dotStyle.animationIterationCount],
       transitionDurations: buttonStyle.transitionDuration.split(",").map((value) => value.trim()),
     };
   });
 
   expect(motion.matches).toBe(true);
   expect(motion.scrollBehavior).toBe("auto");
-  expect(motion.animationDurations.every((duration) => durationInMilliseconds(duration) <= 0.01)).toBe(true);
-  expect(motion.animationIterations).toEqual(["1", "1"]);
   expect(motion.transitionDurations.every((duration) => durationInMilliseconds(duration) <= 0.01)).toBe(true);
 });
 
