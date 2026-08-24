@@ -1322,6 +1322,8 @@ test("cited amount changes invalidate the shadow hash while ids stay the same; d
       expectedVersion: first.workspaceVersion,
       idempotencyKey: `integrity-hash-sign-${suffix}`,
     });
+    const connectedBefore = await workspaceHasConnectedMandate(pool, workspaceId);
+    assert.equal(connectedBefore, true);
     const before = await measureShadowGate();
     await pool.query(
       `update recovery_action_candidates set amount_minor = amount_minor + 1 where workspace_id = $1`,
@@ -1329,7 +1331,7 @@ test("cited amount changes invalidate the shadow hash while ids stay the same; d
     );
     const after = await measureShadowGate();
     assert.notEqual(after.snapshotHash, before.snapshotHash);
-    assert.equal(after.connectedMandates, before.connectedMandates);
+    assert.equal(await workspaceHasConnectedMandate(pool, workspaceId), connectedBefore);
     assert.equal(after.eligibleCandidates, before.eligibleCandidates);
     assert.equal(after.protectedLeakage, before.protectedLeakage);
     const executionLetter = await pool.query<{ id: string }>(
@@ -1345,18 +1347,20 @@ test("cited amount changes invalidate the shadow hash while ids stay the same; d
     });
     assert.equal(skipped.replayed, false);
     assert.equal(skipped.reason, "KIND_NOT_REPLAYABLE");
-    const funnel = await queryAutopilotFunnel(pool);
-    assert.equal(funnel.connectedActiveMandates >= 1, true);
     const disconnected = await seedWorkspace();
     try {
+      const disconnectedBefore = await workspaceHasConnectedMandate(disconnected.pool, disconnected.workspaceId);
+      assert.equal(disconnectedBefore, false);
       await signStandingMandate({
         workspaceId: disconnected.workspaceId,
         actorUserId: disconnected.ownerUserId,
         expectedVersion: 0,
         idempotencyKey: `integrity-funnel-sign-${disconnected.suffix}`,
       });
-      const afterDisconnected = await queryAutopilotFunnel(pool);
-      assert.equal(afterDisconnected.connectedActiveMandates, funnel.connectedActiveMandates);
+      assert.equal(
+        await workspaceHasConnectedMandate(disconnected.pool, disconnected.workspaceId),
+        disconnectedBefore,
+      );
     } finally {
       await disconnected.pool.query(`delete from workspaces where id = $1`, [disconnected.workspaceId]);
       await disconnected.pool.query(`delete from users where id = $1`, [disconnected.ownerUserId]);
