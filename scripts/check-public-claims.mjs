@@ -25,6 +25,7 @@ const publicSurfaces = [
   "src/app/billing/return/billing-return-client.tsx",
   "src/app/privacy/page.tsx",
   "src/app/security/page.tsx",
+  "src/app/contact/page.tsx",
   "src/app/terms/page.tsx",
   "src/app/manifest.ts",
   "public/brand/vognary-social-card.svg",

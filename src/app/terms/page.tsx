@@ -43,7 +43,7 @@ export default function TermsPage() {
             Vognary
           </Link>
           <div className="flex gap-2">
-            <Link href="/privacy" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Privacy</Link>
+            <Link href="/privacy" className="btn btn-sm btn-ghost">Privacy</Link>
             <Link href="/app" className="btn btn-sm btn-ghost">Back to app</Link>
           </div>
         </div>

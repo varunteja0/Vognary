@@ -64,6 +64,7 @@ export default function LaunchLanding() {
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-(--muted)">
             <Link href="/privacy" className="transition hover:text-(--ink)">Privacy</Link>
             <Link href="/security" className="transition hover:text-(--ink)">Security</Link>
+            <Link href="/contact" className="transition hover:text-(--ink)">Contact</Link>
             <Link href="/terms" className="transition hover:text-(--ink)">Terms</Link>
           </div>
         </footer>

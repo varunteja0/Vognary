@@ -208,7 +208,7 @@ function TrustNav() {
         Vognary
       </Link>
       <div className="flex gap-2">
-        <Link href="/terms" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Terms</Link>
+        <Link href="/terms" className="btn btn-sm btn-ghost">Terms</Link>
         <Link href="/app" className="btn btn-sm btn-ghost">Back to app</Link>
       </div>
     </div>

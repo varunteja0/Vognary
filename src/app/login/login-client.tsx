@@ -172,7 +172,7 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/" className="btn btn-sm btn-ondark border-transparent text-(--ink-soft)">Home</Link>
+          <Link href="/" className="btn btn-sm btn-ghost">Home</Link>
         </nav>
 
         <section className="panel p-6 sm:p-8">
