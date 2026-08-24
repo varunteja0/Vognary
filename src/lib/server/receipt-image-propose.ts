@@ -12,7 +12,7 @@ import {
   receiptLineProposalIsPartial,
   type ReceiptLineProposal,
 } from "@/lib/recovery/image-receipt-proposal";
-import { ocrReceiptImage, prepareReceiptImage } from "@/lib/server/receipt-image-ocr";
+import { ocrReceiptImage, prepareReceiptImage, withTimeout } from "@/lib/server/receipt-image-ocr";
 
 const maxImageBytes = 8 * 1024 * 1024;
 
@@ -44,38 +44,23 @@ export async function proposeReceiptLineFromImageFile(file: File): Promise<{
 
   if (!looksLikeImage) return { proposal: null, reason: "not-image" };
 
-  let ocrText: string | null = null;
-  let visionBuffer = buffer;
-  let visionMediaType = visionMediaTypeFrom(mime, name);
   try {
     const prepared = await prepareReceiptImage(buffer);
-    visionBuffer = Buffer.from(prepared.vision);
-    visionMediaType = prepared.visionMediaType;
-    ocrText = await ocrReceiptImage(Buffer.from(prepared.ocr));
+    const visionBuffer = Buffer.from(prepared.vision);
+    const ocrPromise = ocrReceiptImage(Buffer.from(prepared.ocr));
+    const visionPromise = transcribeReceiptImage(visionBuffer, prepared.visionMediaType);
+    const ocrText = await withTimeout(ocrPromise, 12_000, null);
+    const fromOcr = proposeReceiptLineFromReadableText(ocrText ?? "");
+    if (fromOcr && !receiptLineProposalIsPartial(fromOcr) && (ocrText?.length ?? 0) >= 40) {
+      return { proposal: fromOcr, reason: "cited" };
+    }
+    const fromVision = proposalFromVisionExtraction(await withTimeout(visionPromise, 8_000, null));
+    const proposal = mergeReceiptLineProposals(fromOcr, fromVision);
+    if (proposal) return { proposal, reason: "cited" };
+    return { proposal: null, reason: "unreadable" };
   } catch {
-    ocrText = await ocrReceiptImage(buffer);
+    return { proposal: null, reason: "unreadable" };
   }
-
-  const fromOcr = proposeReceiptLineFromReadableText(ocrText ?? "");
-  if (fromOcr && !receiptLineProposalIsPartial(fromOcr) && (ocrText?.length ?? 0) >= 40) {
-    return { proposal: fromOcr, reason: "cited" };
-  }
-
-  const fromVision = visionMediaType
-    ? proposalFromVisionExtraction(await transcribeReceiptImage(visionBuffer, visionMediaType))
-    : null;
-  const proposal = mergeReceiptLineProposals(fromOcr, fromVision);
-  if (proposal) return { proposal, reason: "cited" };
-  return { proposal: null, reason: "unreadable" };
-}
-
-function visionMediaTypeFrom(mime: string, name: string): "image/jpeg" | "image/png" | "image/gif" | "image/webp" | null {
-  if (mime === "image/jpeg" || mime === "image/png" || mime === "image/gif" || mime === "image/webp") return mime;
-  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
-  if (name.endsWith(".png")) return "image/png";
-  if (name.endsWith(".gif")) return "image/gif";
-  if (name.endsWith(".webp")) return "image/webp";
-  return null;
 }
 
 function looksLikeText(buffer: Buffer) {

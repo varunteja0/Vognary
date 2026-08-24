@@ -30,6 +30,7 @@ const nextConfig: NextConfig = {
     "/api/receipt-image/propose": [
       "./node_modules/tesseract.js/**/*",
       "./node_modules/tesseract.js-core/**/*",
+      "./vendor/tessdata/**/*",
     ],
   },
   experimental: {

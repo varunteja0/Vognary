@@ -133,17 +133,22 @@ export function proposalFromVisionExtraction(input: unknown): ReceiptLineProposa
 export async function fetchReceiptLineProposal(file: File): Promise<ReceiptLineProposal | null> {
   const body = new FormData();
   body.append("file", file);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
   try {
     const response = await fetch("/api/receipt-image/propose", {
       method: "POST",
       credentials: "same-origin",
       body,
+      signal: controller.signal,
     });
     if (!response.ok) return null;
     const payload = await response.json() as { proposal?: ReceiptLineProposal | null };
     return sanitizeReceiptLineProposal(payload.proposal);
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

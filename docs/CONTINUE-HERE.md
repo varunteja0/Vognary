@@ -11,7 +11,7 @@
 
 **PRODUCT — a billing screenshot now prefills Confirm this line from what is printed.** `/api/receipt-image/propose` still never invents money. Dark UI photos are inverted, read with OCR (system tesseract or in-process tesseract.js), and optionally transcribed by vision when the Anthropic balance is live. Visible text is parsed for merchant, paid amount, currency, and charge date; the user still confirms. A ChatGPT Plus screenshot that shows `Paid ₹0.00` fills ChatGPT Plus and 7/24/2026 and leaves amount blank (plan price ₹1,999 is not used). A Cursor Pro paid `$20.00` line fills all four fields. Access-until dates are not the charge date. Vision fields are kept only when they already appear in the transcript. Confirm this line stays. P1 is still locked.
 
-**GATES on this checkout:** lint 0 errors on changed files · typecheck PASS · claims:check PASS (25) · tokens:check PASS (61) · unit **1012/1012**.
+**GATES on this checkout:** lint 0 errors on changed files · typecheck PASS · claims:check PASS (25) · tokens:check PASS (61) · unit **1012/1012**. Production 387d63a was live but first photo reads could hang on a CDN language download; OCR now uses vendored tessdata, 12s OCR / 20s client timeouts, and vision in parallel.
 
 ## Live state — 2026-08-23 (P0-1 expected amount freeze + P0-2 first-decision event)
 

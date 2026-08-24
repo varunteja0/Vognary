@@ -1,7 +1,7 @@
 import "server-only";
 
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -30,12 +30,28 @@ export async function prepareReceiptImage(buffer: Buffer): Promise<{
 }
 
 export async function ocrReceiptImage(png: Buffer): Promise<string | null> {
-  const native = await ocrWithSystemTesseract(png);
+  const native = process.env.VERCEL ? null : await ocrWithSystemTesseract(png);
   if (native && native.length >= 12) return repairOcrGlyphs(native);
   if (!wasmOcrAllowed(png)) return native ? repairOcrGlyphs(native) : null;
-  const wasm = await ocrWithWasmTesseract(png);
+  const wasm = await withTimeout(ocrWithWasmTesseract(png), 12_000, null);
   const chosen = denserText(native, wasm);
   return chosen ? repairOcrGlyphs(chosen) : null;
+}
+
+export function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
 }
 
 function wasmOcrAllowed(buffer: Buffer) {
@@ -58,9 +74,7 @@ async function ocrWithSystemTesseract(png: Buffer): Promise<string | null> {
   const input = join(dir, "receipt.png");
   try {
     await writeFile(input, png);
-    const first = await runTesseract(input, "6");
-    const sparse = await runTesseract(input, "11");
-    return denserText(first, sparse);
+    return await runTesseract(input, "6");
   } catch {
     return null;
   } finally {
@@ -75,7 +89,7 @@ function runTesseract(input: string, psm: string): Promise<string | null> {
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
       resolve(null);
-    }, 12_000);
+    }, 8_000);
     child.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
     child.on("error", () => {
       clearTimeout(timer);
@@ -93,20 +107,37 @@ function runTesseract(input: string, psm: string): Promise<string | null> {
   });
 }
 
-async function ocrWithWasmTesseract(png: Buffer): Promise<string | null> {
-  try {
-    const { createWorker, PSM } = await import("tesseract.js");
-    const worker = await createWorker("eng", 1, { cachePath: join(tmpdir(), "vognary-tess") });
+async function tessdataDir(): Promise<string | null> {
+  const candidates = [
+    join(process.cwd(), "vendor", "tessdata"),
+    join(process.cwd(), "..", "vendor", "tessdata"),
+  ];
+  for (const dir of candidates) {
     try {
-      await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
-      const block = await worker.recognize(png);
-      await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
-      const sparse = await worker.recognize(png);
-      return denserText(block.data.text?.trim() || null, sparse.data.text?.trim() || null);
-    } finally {
-      await worker.terminate();
+      await access(join(dir, "eng.traineddata.gz"));
+      return dir;
+    } catch {
+      // try the next path
     }
-  } catch {
-    return null;
+  }
+  return null;
+}
+
+async function ocrWithWasmTesseract(png: Buffer): Promise<string | null> {
+  const langPath = await tessdataDir();
+  if (!langPath) return null;
+  const { createWorker, PSM } = await import("tesseract.js");
+  const worker = await createWorker("eng", 1, {
+    langPath,
+    gzip: true,
+    cachePath: join(tmpdir(), "vognary-tess"),
+    logger: () => undefined,
+  });
+  try {
+    await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
+    const result = await worker.recognize(png);
+    return result.data.text?.trim() || null;
+  } finally {
+    await worker.terminate();
   }
 }
