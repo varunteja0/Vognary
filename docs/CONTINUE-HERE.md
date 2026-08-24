@@ -5,6 +5,40 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## Live state — 2026-08-24 (comprehension reset: one product, three questions)
+
+**Scoreboard row this raises:** Product UX. Loop step: public understanding -> first bill -> signed-in decision. Composite stays **1.5**; no user, payment, automatic-receipt, or retention evidence changed.
+
+**PRODUCT — founder comprehension failure was treated as a release blocker, not a request for more features.** The landing now says “Know what renews. Decide what stays.” and immediately demonstrates a cited ₹350 Cursor price change. `/start` is a compact task — “See the charge. Make the decision.” Signed-in navigation is plain `Now / Bills / Receipts`; Home answers `Decide now / What happened / Next charges / What changed`. The engine, evidence, money, decisions, corrections, sources, and fail-closed boundaries are unchanged.
+
+**VISUAL — the product no longer presents as a dark developer console.** The existing centralized tokens now render cool paper, graphite ink, white financial surfaces, and restrained gold action; dark dossier tokens remain exceptional surfaces. The shared muted text token was corrected after Axe measured 4.39:1; the final desktop/mobile matrix has zero serious contrast violations. No component or design-system rewrite was introduced.
+
+**GATES on this checkout:** `git diff --check` PASS · lint 0 errors (1 pre-existing `window.location.assign` warning in untouched `src/app/instant-audit.tsx`) · typecheck PASS · claims:check PASS (25) · tokens:check PASS (62) · unit **1013/1013** · configured production artifact public Playwright **34/34** desktop+mobile · signed-in Home/state Playwright **46/46** with 4 receipt-inbox cases correctly skipped because that separate E2E environment is not configured · database-backed Customer #0 **2/2** desktop+mobile · production build PASS · `perf:budget` PASS (`/` 180.8 KB, `/app` 180.5 KB, `/verify` 181.2 KB). No migration/store changed, so the PostgreSQL suite was not required; Customer #0 used the current local schema and real Recovery HTTP handlers.
+
+**RELEASE CLASSIFICATION:** Product commit `d6c7846` is a CODE-PROVEN presentation candidate, not yet deployed. Human comprehension, time-to-first-decision, trust, and preference for the light visual direction remain **UNPROVEN — FIVE T0–T4 SESSIONS REQUIRED**. P1 remains locked; do not turn this reset into another polish cycle.
+
+## Live state — 2026-08-24 (execution orchestrator: release truth + distribution)
+
+**Scoreboard row this raises:** business validation / distribution. Loop step: first ICP conversation toward a live session. Composite stays **1.5**. No live-user, payment, automatic-receipt, or reminder-delivery evidence changed.
+
+**HISTORICAL RELEASE RECORD:** `main` was clean at `4060f933cf6477e69f520950e44781312ab5e902`, synchronized with `origin/main`, before the comprehension-reset candidate above. That SHA is docs-only on top of product `d19fa34` and production-state `817dc1d`.
+
+**CI — exact-head PASS.** GitHub run [`32718636357`](https://github.com/varunteja0/Vognary/actions/runs/32718636357) completed success on `4060f93` (validate job `97405128939`). Every recorded step succeeded, including disposable PostgreSQL, lint, typecheck, claims, tokens, unit, build, perf budget, Lighthouse, public e2e, signed-in e2e, and production smoke. The previously cited run `32717033732` remains a valid pass on `817dc1d`; it is no longer HEAD.
+
+**LIVE — independently fetched 2026-08-24.** `https://www.vognary.com/api/health` returns `200` `{status:"ok"}`. Landing `200`, H1 “See what your company is about to pay. Decide before the card fires.”, title matches the frozen promise, `/start` is linked, no Gmail Connect, no `demo=1`. `/start` `200` with “Nothing is saved until you sign in.” `/security` shows encrypted backups **Proven**, receipt forwarding **Configured**, retention schedule **Not yet proven**, renewal alert delivery **Not yet proven**. `/app?demo=1` and `/api/integrations/gmail/start` remain `410`.
+
+**MARKET — do not fake sends.** Independently fetched 2026-08-24:
+
+- F01 public reply on the Fable-limits post **was sent** 2026-08-22 06:44 UTC by `@chvarunteja` on [2090153953493430306](https://x.com/pvbuilds/status/2090153953493430306). Zero replies from Prashanth. **Do not bump that thread or the linger thread.**
+- Prashanth posted 2026-08-23 17:25 UTC that a full Claude→Codex switch would be about Codex reliability ([2091577676771516759](https://x.com/pvbuilds/status/2091577676771516759)). That is the next public, non-pitch reply. Linger question on [2090155802158084243](https://x.com/pvbuilds/status/2090155802158084243) remains unanswered.
+- F03–F06 LinkedIn remain unconfirmed as sent.
+- Node emails of 2026-08-21: Elevation `saas@` bounced; SaaSBoomi / AIBoomi / T-Hub experiment emails have **no reply**. T-Hub later sent only event-registration mail, which is not a conversation.
+- Conversations **1**. Live sessions **0**. Payments **0**.
+
+**OPERATOR BOUNDARY — this session cannot attest retention.** Authenticated Vercel MCP is bound to the TradeLoop Hobby project, not Vognary. Do not set `RETENTION_SCHEDULER_STATUS=production-live` from configuration. Public `/security` still reads Not yet proven. Connected founder Gmail has no `forwarding-noreply@google.com` thread; Google confirmation remains on the v1 alias path (`gmail_verification_received_at` set, `forwarding_verified_at` null). Automatic inbound remains unproven.
+
+**HARD STOP unchanged.** P1 locked until five founder sessions produce T0–T4 evidence. No product pass from this check.
+
 ## Live state — 2026-08-24 (first 60 seconds: evidence -> decision -> verification)
 
 **Scoreboard row this raises:** Product UX / distribution artifact quality. Loop step: first-session decision moment and after-decision memory. Composite stays **1.5**; no live-user or payment evidence changed.
