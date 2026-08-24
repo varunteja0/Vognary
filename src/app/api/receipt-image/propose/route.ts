@@ -6,6 +6,7 @@ import { proposeReceiptLineFromImageFile } from "@/lib/server/receipt-image-prop
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const maxFileBytes = 8 * 1024 * 1024;
 const maxMultipartBytes = maxFileBytes + 2 * 1024 * 1024;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ImageProposalStatus, ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
+import { receiptLineProposalIsPartial, type ImageProposalStatus, type ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
 import { confirmedReceiptText } from "@/lib/recovery/wow-first-session";
 import { customerPhrases } from "../present/customer-copy";
 
@@ -27,12 +27,23 @@ export function ConfirmReceiptLine({
   const [edited, setEdited] = useState<{ merchant?: string; amount?: string; currency?: string; date?: string }>({});
   const merchant = edited.merchant ?? draft.proposal?.merchant ?? "";
   const amount = edited.amount ?? draft.proposal?.amount ?? "";
-  const currency = edited.currency ?? draft.proposal?.currency ?? "INR";
+  const currency = edited.currency ?? draft.proposal?.currency ?? (draft.proposalStatus === "reading" ? "" : "INR");
   const date = edited.date ?? draft.proposal?.date ?? "";
   const text = confirmedReceiptText({ merchant, amount, currency, date });
 
   const reading = draft.proposalStatus === "reading";
   const unreadable = draft.proposalStatus === "unreadable";
+  const guidance = reading
+    ? customerPhrases.readingInvoice
+    : unreadable
+      ? customerPhrases.imageUnreadable
+      : draft.proposal?.zeroPaidVisible
+        ? customerPhrases.confirmZeroPaid
+        : draft.proposal && receiptLineProposalIsPartial(draft.proposal)
+          ? customerPhrases.confirmPartial
+          : draft.proposal
+            ? customerPhrases.confirmPrefill
+            : customerPhrases.confirmTheLine;
 
   return (
     <article className="inset grid gap-3 p-4">
@@ -44,15 +55,7 @@ export function ConfirmReceiptLine({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={draft.previewUrl} alt={`Preview of ${draft.name}`} className="max-h-48 w-auto rounded-(--radius) border border-line" />
       ) : null}
-      <p className="text-sm leading-6 text-(--muted)">
-        {reading
-          ? customerPhrases.readingInvoice
-          : unreadable
-            ? customerPhrases.imageUnreadable
-            : draft.proposal
-              ? customerPhrases.confirmPrefill
-              : customerPhrases.confirmTheLine}
-      </p>
+      <p className="text-sm leading-6 text-(--muted)">{guidance}</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor={`${draft.clientRef}-merchant`} className="field-label">Merchant</label>

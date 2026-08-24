@@ -24,9 +24,13 @@ const nextConfig: NextConfig = {
   // pdf.js resolves its worker relative to its own module at runtime. Keep the
   // parser external so standalone output preserves that module boundary, then
   // trace the worker explicitly because pdf.js loads it dynamically.
-  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas"],
+  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas", "tesseract.js", "sharp"],
   outputFileTracingIncludes: {
     "/api/ingest": ["./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+    "/api/receipt-image/propose": [
+      "./node_modules/tesseract.js/**/*",
+      "./node_modules/tesseract.js-core/**/*",
+    ],
   },
   experimental: {
     inlineCss: true,
