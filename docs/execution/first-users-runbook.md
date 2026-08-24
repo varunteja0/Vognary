@@ -20,7 +20,7 @@ Therefore the first-10 scoreboard reports FOUR separate milestones:
 
 | Milestone | Truthful definition | How measured today |
 | --- | --- | --- |
-| **First value** | The user's own submitted evidence produced ≥1 cited decision card AND the user recorded ≥1 decision (Keep / Review later / Plan to cancel) on it | SQL: `recovery_decision_cycles` has ≥1 row for the workspace whose commitment links to user-submitted evidence (`commitments.detected` event exists for the same workspace). Decision actions currently write no product event — count from cycle rows, not from telemetry |
+| **First value** | The user's own submitted evidence produced ≥1 cited decision card AND the user recorded ≥1 decision (Keep / Review later / Plan to cancel) on it | Source of truth: `recovery_decision_cycles` has ≥1 row for the workspace whose commitment links to user-submitted evidence. Consented workspaces also emit `review.action_recorded`; no-consent workspaces still count from the cycle row, never from missing telemetry. |
 | **Strict recurring picture** (`workspace.activated`) | Consent-gated, insert-once event after the cited *cadence-established* monthly picture renders (`activation_semantic_version = 1`, `secondsToTrustworthyPicture` metric) | Existing `product_events` row. Do NOT bump the semantic version without both-agent review + real evidence that the definition is wrong |
 | **Activation (first-10 headline)** | First value — the minimum honest "a stranger reached trustworthy value unaided" bar for this mission | Reported next to strict numbers, always labeled separately |
 | **Return** | Second authenticated session with ≥1 new evidence or decision action | `workspace.returned` / new cycle rows after first value |

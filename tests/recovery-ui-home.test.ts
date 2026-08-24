@@ -130,7 +130,7 @@ test("primary navigation keeps Mandate hidden until delivery is proven or author
 });
 
 test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
-  assert.match(landingSource, /billing receipts you already have/);
+  assert.match(landingSource, /one billing receipt you already have/);
   assert.match(landingSource, /what renews next/);
   assert.match(loginSource, /what renews next/);
   assert.match(allSource, /Let's review your software stack/);
@@ -138,7 +138,7 @@ test("landing, login, and empty Home tell one receipts-to-decision product story
   assert.doesNotMatch(landingSource, /Want it done for you\?/);
   assert.doesNotMatch(landingSource, /href="\/private-audit"/);
   assert.match(clientSource, />Vognary</);
-  assert.match(landingSource, /No bank passwords\. No mailbox access\. Add a bill first\./);
+  assert.match(landingSource, /No account to start\. No bank password\. No mailbox access\./);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
   assert.doesNotMatch(landingSource, /Set up billing forwarding once so matching mail keeps arriving/);
 });
@@ -242,7 +242,7 @@ test("one observation is coached toward a second matching receipt instead of ren
   assert.match(homeSource, /home\.recentObservations\.map/);
   assert.match(homeSource, /observation\.merchant/);
   assert.match(homeSource, /observation\.amount/);
-  assert.match(allSource, /Drop invoices or receipts here/);
+  assert.match(allSource, /Drop bills or receipts here/);
   assert.match(addEvidenceSource, /Paste text/);
 });
 

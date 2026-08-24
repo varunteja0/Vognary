@@ -365,7 +365,7 @@ test("empty Home and the add-bills overlay fit a 390px phone", async ({ page }) 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   await page.getByRole("button", { name: "Add bills" }).click();
   const overlay = page.getByRole("dialog", { name: "Add bills" });
-  await expect(overlay.getByText("Drop invoices or receipts here")).toBeVisible();
+  await expect(overlay.getByText("Drop bills or receipts here")).toBeVisible();
   await overlay.getByRole("tab", { name: "Paste text" }).click();
   await expect(overlay.getByLabel("Receipt or invoice text")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);

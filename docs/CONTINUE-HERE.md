@@ -5,6 +5,18 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## Live state — 2026-08-24 (first 60 seconds: evidence -> decision -> verification)
+
+**Scoreboard row this raises:** Product UX / distribution artifact quality. Loop step: first-session decision moment and after-decision memory. Composite stays **1.5**; no live-user or payment evidence changed.
+
+**PRODUCT — the public path now demonstrates the frozen Decision Object instead of describing it.** The static landing leads with the outcome, keeps `/start` as the no-account primary path, and contains one explicitly illustrative, interactive Cursor decision: cited example receipt, reason, Keep / Review later / Plan to cancel, and next-window verification. It never presents the example as customer proof. The page was cut back to hero -> product object -> close and remains under the existing three-mobile-viewport budget (2,429px at 375x812 in direct measurement). `/start` is outcome-led, uses the same cited card semantics as Home, replaces apologetic parser copy, and names Evidence / Why / Decision before sign-in.
+
+**TRUST — guest memory is now honest.** A guest choice no longer says it is recorded or that Vognary is already watching. It says the decision remains in this browser tab and asks the founder to sign in before memory begins. The cofounder artifact carries the exact amount, timing, choice, receipt excerpt, and the no-cancellation / no-money-movement boundary. Signed-in Home retains its server-recorded copy.
+
+**GATES on this checkout:** `git diff --check` PASS · lint 0 errors (1 pre-existing `window.location.assign` warning in untouched `src/app/instant-audit.tsx`) · typecheck PASS · claims:check PASS (25) · tokens:check PASS (62) · unit **1013/1013** · public/guest Playwright 29/30 plus the sole disk-space screenshot case **1/1** on isolated rerun · signed-in Recovery Playwright **46/46** desktop+mobile with 4 receipt-inbox cases skipped because that E2E environment is not configured · production Turbopack build PASS · `perf:budget` PASS (`/` 180.9 KB, `/app` 180.5 KB, `/verify` 181.2 KB). No migration/store changed, so PostgreSQL was not rerun. Updated reduced-motion desktop/mobile screenshots are in `docs/evidence/surface-10/`.
+
+**NOT PROVEN (unchanged):** live ICP first session / time-to-insight · customer proof or retention · connected/paid · first automatic receipt (`forwarding_verified_at` remains unproven) · reminder delivery · production deployment of this checkout. Production migration 0056 remains founder-operated per the prior entry; do not deploy code that writes `expected_amount_minor` before it is applied.
+
 ## Live state — 2026-08-24 (photo confirm-the-line cites visible text)
 
 **Scoreboard row this raises:** Product UX / Trust & honesty. Loop step: first-session add-a-bill. Composite stays **1.5**.

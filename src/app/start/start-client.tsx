@@ -14,7 +14,7 @@ import {
 import { fetchReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
 import {
   decisionArtefactText,
-  decisionHookCopy,
+  guestDecisionHookCopy,
   isReceiptImageFile,
   keepIsPrimary,
   reminderOffer,
@@ -35,7 +35,13 @@ export default function StartClient() {
   const [imageDrafts, setImageDrafts] = useState<ImageDraft[]>([]);
   const [cards, setCards] = useState<StartCard[]>([]);
   const [decisions, setDecisions] = useState<StartSessionDecision[]>([]);
-  const [hook, setHook] = useState<{ title: string; body: string; artefact: string } | null>(null);
+  const [hook, setHook] = useState<{
+    title: string;
+    body: string;
+    artefact: string;
+    card: StartCard;
+    action: DecisionCycleAction;
+  } | null>(null);
   const [reminderRequested, setReminderRequested] = useState(false);
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -75,7 +81,7 @@ export default function StartClient() {
         ? payload.cards
         : startCardsFromRecurringItems(payload.audit?.recurringItems ?? [], formatCalendarDate(new Date()));
       if (!nextCards.length) {
-        setStatus("Nothing cited yet. Confirm the merchant, amount, and date in one line.");
+        setStatus("We couldn't verify a merchant, amount, and date from that text. Put them in one line and try again.");
         setCards([]);
         return;
       }
@@ -97,7 +103,7 @@ export default function StartClient() {
     }];
     setDecisions(nextDecisions);
     // The hook names a calendar date, not the card's spoken phrase.
-    const copy = decisionHookCopy({
+    const copy = guestDecisionHookCopy({
       merchant: card.merchant,
       action,
       watchDate: card.dueDate ? formatDay(card.dueDate) : null,
@@ -111,7 +117,10 @@ export default function StartClient() {
         whenLine: card.whenLine,
         action,
         excerpt: card.excerpt,
+        remembered: false,
       }),
+      card,
+      action,
     });
     persistTab(receiptText, statementSources, nextDecisions, reminderRequested);
   }
@@ -186,7 +195,7 @@ export default function StartClient() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
+    <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
       <nav className="flex items-center justify-between gap-3">
         <Link href="/" className="inline-flex items-center gap-2 font-display text-lg font-semibold text-(--ink)">
           <VognaryMark size={24} />
@@ -195,9 +204,15 @@ export default function StartClient() {
         <Link href="/login?next=/app" className="btn btn-sm btn-ghost">Sign in</Link>
       </nav>
 
-      <h1 className="mt-10 font-display text-4xl font-semibold tracking-tight text-(--ink)">Add a bill.</h1>
-      <p className="mt-3 max-w-xl text-base leading-7 text-(--muted)">
-        Nothing is saved until you sign in. Google is only for remembering this. Vognary does not read your mailbox.
+      <p className="eyebrow eyebrow-xs mt-10 text-ochre">Your first decision</p>
+      <h1 className="mt-3 max-w-2xl font-display text-4xl font-semibold leading-tight tracking-tight text-(--ink) sm:text-5xl">
+        See what this bill means before the next charge.
+      </h1>
+      <p className="mt-4 max-w-2xl text-base leading-7 text-(--muted)">
+        Drop or paste one real receipt. Vognary extracts only what it can verify, shows the evidence, and asks what you want remembered.
+      </p>
+      <p className="mt-3 max-w-2xl text-sm leading-6 text-(--muted)">
+        No account required. Nothing is saved to Vognary until you sign in. Google is only for sign-in; Vognary does not access Gmail.
       </p>
 
       <div className="mt-8 grid gap-4">
@@ -216,7 +231,7 @@ export default function StartClient() {
             onRemove={() => setImageDrafts((current) => current.filter((item) => item.clientRef !== draft.clientRef))}
           />
         ))}
-        <label htmlFor="start-receipt" className="field-label">Or paste the receipt text</label>
+        <label htmlFor="start-receipt" className="field-label">Paste a receipt instead</label>
         <textarea
           id="start-receipt"
           value={receiptText}
@@ -230,16 +245,33 @@ export default function StartClient() {
           disabled={pending || (!receiptText.trim() && statementSources.length === 0)}
           onClick={() => void analyzeWith(receiptText, statementSources)}
         >
-          {pending ? "Reading your invoice…" : "See the decision"}
+          {pending ? "Reading the bill…" : "Review this bill"}
         </button>
         {status ? <p role="alert" className="text-sm leading-6 text-ember">{status}</p> : null}
       </div>
 
       {hook ? (
-        <section className="decision-hook mt-10">
-          <h2 className="decision-hook-title">{hook.title}</h2>
-          <p className="mt-2 text-base leading-7 text-(--ink-soft)">{hook.body}</p>
+        <section className="decision mt-10" data-lead="true" aria-live="polite">
+          <div>
+            <p className="eyebrow eyebrow-xs text-ochre">Ready to remember</p>
+            <h2 className="decision-hook-title mt-2">{hook.title}</h2>
+            <p className="mt-3 text-base leading-7 text-(--ink-soft)">{hook.body}</p>
+          </div>
+          <div className="decision-evidence">
+            <p className="eyebrow eyebrow-xs">Decision artifact</p>
+            <p className="decision-evidence-line">
+              <strong className="font-display text-lg font-semibold text-(--ink)">{hook.card.amountDisplay}</strong>
+              <span>{hook.card.whenLine}</span>
+            </p>
+            {hook.card.excerpt ? <blockquote className="decision-quote">“{hook.card.excerpt}”</blockquote> : null}
+          </div>
+          <p className="text-xs leading-5 text-(--muted)">
+            This decision is still only in this browser tab. Sign in to save it and activate the next-window memory.
+          </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Link href="/login?next=/app" className="btn btn-primary">
+              Sign in to remember this decision
+            </Link>
             <button
               type="button"
               className="btn btn-sm btn-ghost"
@@ -273,10 +305,26 @@ export default function StartClient() {
         const keepPrimary = keepIsPrimary(card.reasonKeys);
         return (
           <article key={card.id} className="decision mt-6" data-lead="true">
-            <h2 className="decision-sentence">{card.sentence}</h2>
+            <div>
+              <p className="decision-cue">Decision before the next charge</p>
+              <h2 className="decision-sentence mt-2">{card.sentence}</h2>
+            </div>
             {card.excerpt ? (
-              <blockquote className="decision-quote mt-3">“{card.excerpt}”</blockquote>
+              <div className="decision-evidence">
+                <p className="eyebrow eyebrow-xs">From your receipt</p>
+                <blockquote className="decision-quote">“{card.excerpt}”</blockquote>
+              </div>
             ) : null}
+            <div>
+              <p className="eyebrow eyebrow-xs">Why a decision is needed now</p>
+              <ul className="reason-list mt-2">
+                {card.overlapMerchants.length ? (
+                  <li>{`${card.overlapMerchants.join(" and ")} also appears in the bills you added.`}</li>
+                ) : null}
+                {card.provisional ? <li>This is one cited charge. Its recurring cadence is not proven yet.</li> : null}
+                {!card.overlapMerchants.length && !card.provisional ? <li>You have not recorded a decision for this charge.</li> : null}
+              </ul>
+            </div>
             <div className="decision-actions mt-5">
               <div role="group" aria-label="Your choice" className="flex flex-wrap items-center gap-2">
                 <button type="button" className={`btn btn-sm ${keepPrimary ? "btn-primary" : "btn-ghost"}`} onClick={() => decide(card, "KEEP")}>Keep</button>
@@ -287,14 +335,6 @@ export default function StartClient() {
           </article>
         );
       })}
-
-      {decisions.length ? (
-        <p className="mt-8">
-          <Link href="/login?next=/app" className="btn btn-primary btn-lg">
-            Sign in to remember this
-          </Link>
-        </p>
-      ) : null}
     </main>
   );
 }

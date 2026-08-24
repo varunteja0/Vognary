@@ -1,24 +1,28 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-test("the landing sends every visitor to the product without claiming forwarding", async ({ page }) => {
+test("the landing demonstrates the decision loop and sends visitors to their own bill", async ({ page }) => {
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Decide before the charge, not after it." });
+  const heading = page.getByRole("heading", { level: 1, name: "See what your company is about to pay. Decide before the card fires." });
   const hero = page.locator("section").filter({ has: heading });
   await expect(heading).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
 
-  const getStarted = hero.getByRole("link", { name: "Add a bill", exact: true });
+  const getStarted = hero.getByRole("link", { name: "Review one bill", exact: true });
   const signIn = page.getByRole("navigation", { name: "Public" }).getByRole("link", { name: "Sign in", exact: true });
   await expect(getStarted).toHaveAttribute("href", "/start");
   await expect(signIn).toHaveAttribute("href", "/login?next=/app");
 
-  await expect(page.getByText(/No bank passwords\. No mailbox access\. Add a bill first\./)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "What you get before the next charge" })).toBeVisible();
-  await expect(page.getByText("What is due next", { exact: true })).toBeVisible();
-  await expect(page.getByText("Why it deserves a look", { exact: true })).toBeVisible();
-  await expect(page.getByText("What happened after you decided", { exact: true })).toBeVisible();
+  await expect(page.getByText(/No account to start\. No bank password\. No mailbox access\./)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "See Vognary do the work." })).toBeVisible();
+  await expect(page.getByText("From the example receipt", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Illustrative walkthrough, not a claim about your company/)).toBeVisible();
+  await expect(page.getByText(/Evidence → Decision → Verification/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Review later", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Cursor Pro — review later" })).toBeVisible();
+  await expect(page.getByText(/Nothing is cancelled/)).toBeVisible();
 
   await expect(page.getByRole("textbox")).toHaveCount(0);
   await expect(page.getByText(/sample audit/i)).toHaveCount(0);
@@ -34,8 +38,8 @@ test("the mobile landing keeps the primary action visible without overflow", asy
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Decide before the charge, not after it." });
-  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Add a bill", exact: true });
+  const heading = page.getByRole("heading", { level: 1, name: "See what your company is about to pay. Decide before the card fires." });
+  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Review one bill", exact: true });
   await expect(getStarted).toBeVisible();
   const actionBottom = await getStarted.evaluate((element) => element.getBoundingClientRect().bottom);
   const metrics = await page.evaluate(() => ({

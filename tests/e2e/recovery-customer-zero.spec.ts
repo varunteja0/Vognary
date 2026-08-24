@@ -55,7 +55,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 1-3. Open landing and establish a saved identity independently of provider activation.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Decide before the charge, not after it.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("See what your company is about to pay.");
   await tabToAndActivate(page, "Sign in");
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();

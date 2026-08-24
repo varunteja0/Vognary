@@ -5,8 +5,8 @@ import { readCurrentSession } from "@/lib/server/session";
 import StartClient from "./start-client";
 
 export const metadata: Metadata = {
-  title: "Add a bill",
-  description: "Add a software bill. Nothing is saved until you sign in.",
+  title: "Review a bill",
+  description: "See what a software bill means before the next charge. Nothing is saved until you sign in.",
   robots: { index: false, follow: false },
 };
 

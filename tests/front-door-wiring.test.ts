@@ -4,6 +4,7 @@ import test from "node:test";
 
 const pageSource = readFileSync("src/app/page.tsx", "utf8");
 const landingSource = readFileSync("src/app/launch-landing.tsx", "utf8");
+const landingPreviewSource = readFileSync("src/app/landing-decision-preview.tsx", "utf8");
 const appPageSource = readFileSync("src/app/app/page.tsx", "utf8");
 const experienceSource = readFileSync("src/app/app/experience-client.tsx", "utf8");
 const loginSource = readFileSync("src/app/login/login-client.tsx", "utf8");
@@ -14,15 +15,18 @@ test("the public page is a cacheable readiness-neutral shell", () => {
   assert.doesNotMatch(pageSource, /force-dynamic|isReceiptInboxPubliclyAvailable/);
 });
 
-test("the landing selects the proven entry path without demo or instant-audit surfaces", () => {
+test("the landing selects the guest-first proven entry path without instant-audit surfaces", () => {
   assert.match(landingSource, /const primaryHref = "\/start";/);
-  assert.match(landingSource, /const primaryLabel = "Add a bill";/);
+  assert.match(landingSource, /const primaryLabel = "Review one bill";/);
+  assert.match(landingSource, /<LandingDecisionPreview \/>/);
   assert.doesNotMatch(landingSource, /sample|demo|InstantAudit|instant audit/i);
 });
 
-test("the landing states the inbound and retention boundaries without unsupported claims", () => {
-  assert.match(landingSource, /Sources shows whether private billing forwarding is available\. When it is, set it up once\. Messages sent to that address are processed as receipt evidence/);
-  assert.match(landingSource, /Provider-held email copies follow Resend's own retention schedule and are not immediately deletable by Vognary/);
+test("the landing states concise evidence and action boundaries without unsupported claims", () => {
+  assert.match(landingSource, /When private billing forwarding is available, Sources can keep receipt evidence current without reading your mailbox/);
+  assert.match(landingPreviewSource, /From the example receipt/);
+  assert.match(landingPreviewSource, /Your review is built from evidence you add\. Unknown stays unknown/);
+  assert.match(landingSource, /Vognary never cancels a service or moves money/);
   assert.doesNotMatch(landingSource, /30 days/i);
   assert.doesNotMatch(landingSource, /only billing evidence you intentionally forward/i);
   assert.doesNotMatch(landingSource, /Gmail/i);

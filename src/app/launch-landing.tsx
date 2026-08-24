@@ -1,25 +1,11 @@
 import Link from "next/link";
 import { VognaryMark } from "./brand";
 import { Nakul } from "./character";
-
-const outcomes = [
-  {
-    title: "What is due next",
-    detail: "The amount and the date, taken from the receipts you added — not an estimate.",
-  },
-  {
-    title: "Why it deserves a look",
-    detail: "A price increase, a possible overlap, or a charge you never decided on.",
-  },
-  {
-    title: "What happened after you decided",
-    detail: "Vognary remembers the decision and tells you whether the next charge matched it.",
-  },
-] as const;
+import { LandingDecisionPreview } from "./landing-decision-preview";
 
 export default function LaunchLanding() {
   const primaryHref = "/start";
-  const primaryLabel = "Add a bill";
+  const primaryLabel = "Review one bill";
   return (
     <main id="ledger-main" className="relative overflow-hidden px-4 pb-12 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
@@ -33,23 +19,23 @@ export default function LaunchLanding() {
           </div>
         </nav>
 
-        <section className="scan relative flex items-center overflow-hidden border-b border-line py-12 sm:py-20">
+        <section className="scan relative flex min-h-[31rem] items-center overflow-hidden border-b border-line py-10 sm:min-h-[36rem] sm:py-16">
           <div className="relative z-10 max-w-3xl sm:pr-28 lg:pr-0">
             <p className="eyebrow eyebrow-xs text-ochre">
-              Software Decision Intelligence for founder-led software and AI companies
+              Commitment Intelligence for 2–20 person software and AI companies
             </p>
             <h1 className="mt-5 max-w-3xl font-display text-4xl font-semibold leading-[1.08] tracking-tight text-(--ink) sm:text-6xl">
-              Decide before the charge, not after it.
+              See what your company is about to pay. Decide before the card fires.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-(--ink-soft) sm:text-lg">
-              Add a few recent software bills. See what renews next in their language. Sign in only when you want that remembered.
+              Add one real bill. Vognary cites what it can verify, shows what renews next, and remembers what to check after you decide.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</Link>
             </div>
-            <p className="mt-6 flex max-w-xl items-start gap-2 text-sm leading-6 text-(--muted)">
+            <p className="mt-6 flex max-w-2xl items-start gap-2 text-sm leading-6 text-(--muted)">
               <span className="live-dot mt-2 shrink-0" aria-hidden />
-              <span>No bank passwords. No mailbox access. Add a bill first. Sign in only to remember it. Vognary shows the amount, expected date, and supporting receipt before Sources shows whether a private billing address is available.</span>
+              <span>No account to start. No bank password. No mailbox access. Vognary never cancels a service or moves money.</span>
             </p>
           </div>
           <Nakul
@@ -60,50 +46,17 @@ export default function LaunchLanding() {
           />
         </section>
 
-        <section aria-labelledby="outcomes-heading" className="py-10 sm:py-16">
-          <div className="max-w-2xl">
-            <p className="eyebrow eyebrow-xs text-ochre">One useful review</p>
-            <h2 id="outcomes-heading" className="mt-3 font-display text-3xl font-semibold tracking-tight text-(--ink)">
-              What you get before the next charge
-            </h2>
-          </div>
-          <div className="mt-8 grid border-y border-line sm:grid-cols-3">
-            {outcomes.map((outcome, index) => (
-              <article key={outcome.title} className={`py-6 sm:px-6 ${index > 0 ? "border-t border-line sm:border-l sm:border-t-0" : ""} ${index === 0 ? "sm:pl-0" : ""}`}>
-                <p className="font-display text-xl font-semibold text-(--ink)">{outcome.title}</p>
-                <p className="mt-2 max-w-prose text-sm leading-6 text-(--muted)">{outcome.detail}</p>
-              </article>
-            ))}
-          </div>
-        </section>
+        <LandingDecisionPreview />
 
-        <section className="grid gap-8 border-t border-line py-10 sm:py-16 lg:grid-cols-2 lg:gap-16">
-          <div>
-            <p className="eyebrow eyebrow-xs text-ochre">After the first review</p>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-(--ink)">Keep it current</h2>
-            <p className="mt-4 max-w-xl text-sm leading-7 text-(--muted)">
-              After your first result, Sources shows whether private billing forwarding is available. When it is, set it up once. Messages sent to that address are processed as receipt evidence; Vognary does not read the mailbox.
-            </p>
-          </div>
-          <div>
-            <p className="eyebrow eyebrow-xs text-ochre">Clear boundaries</p>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-(--ink)">Your data</h2>
-            <p className="mt-4 max-w-xl text-sm leading-7 text-(--muted)">
-              {"Vognary stores normalized receipt evidence and bounded excerpts. Provider-held email copies follow Resend's own retention schedule and are not immediately deletable by Vognary. Account controls export and deletion of data saved by Vognary."}
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Link href="/privacy" className="btn btn-sm btn-ghost">Privacy</Link>
-              <Link href="/security" className="btn btn-sm btn-ghost">Security</Link>
-            </div>
-          </div>
-        </section>
-
-        <section className="dossier spotlight my-4 px-6 py-10 text-center sm:px-10 sm:py-14">
-          <p className="eyebrow muted-on-dark">Your receipts. Your decisions.</p>
+        <section className="dossier spotlight my-4 px-6 py-8 text-center sm:px-10 sm:py-10">
+          <p className="eyebrow muted-on-dark">Your receipt. Your decision.</p>
           <h2 className="mx-auto mt-3 max-w-2xl font-display text-3xl font-semibold tracking-tight text-(--dossier-ink) sm:text-4xl">
-            Start with the billing receipts you already have.
+            Start with one billing receipt you already have.
           </h2>
-          <Link href={primaryHref} className="btn btn-primary btn-lg mt-7">
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-(--dossier-muted)">
+            Sign in to remember the decision. When private billing forwarding is available, Sources can keep receipt evidence current without reading your mailbox.
+          </p>
+          <Link href={primaryHref} className="btn btn-primary btn-lg mt-6">
             {primaryLabel}
           </Link>
         </section>

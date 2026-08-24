@@ -5,6 +5,7 @@ import {
   confirmedReceiptText,
   decisionArtefactText,
   decisionHookCopy,
+  guestDecisionHookCopy,
   isReceiptImageFile,
   keepIsPrimary,
   paymentAskQuestion,
@@ -45,6 +46,14 @@ test("the post-decision hook names the next window without claiming cancellation
   assert.doesNotMatch(hook.body, /\bcancelled\b/i);
 });
 
+test("the guest hook makes sign-in the boundary before memory begins", () => {
+  const hook = guestDecisionHookCopy({ merchant: "Cursor", action: "PLAN_TO_CANCEL", watchDate: "28 Sep 2026" });
+  assert.equal(hook.title, "Cursor — plan to cancel");
+  assert.match(hook.body, /^Sign in to remember this plan\./);
+  assert.match(hook.body, /will then watch around 28 Sep 2026/);
+  assert.doesNotMatch(hook.title, /recorded/i);
+});
+
 test("the artefact is a forwardable card, not a dashboard export", () => {
   const artefact = decisionArtefactText({
     merchant: "Cursor",
@@ -57,6 +66,17 @@ test("the artefact is a forwardable card, not a dashboard export", () => {
   assert.match(artefact, /plan to cancel this cycle/);
   assert.match(artefact, /From the receipt: Cursor Pro/);
   assert.match(artefact, /vognary\.com/);
+
+  const guestArtefact = decisionArtefactText({
+    merchant: "Cursor",
+    amountDisplay: "$20.00",
+    whenLine: "Charges Thursday",
+    action: "PLAN_TO_CANCEL",
+    excerpt: "Cursor Pro · $20.00 · Aug 28.",
+    remembered: false,
+  });
+  assert.match(guestArtefact, /^VOGNARY DECISION/);
+  assert.match(guestArtefact, /Sign in to ask Vognary to remember this/);
 });
 
 test("confirm-the-line never invents a cadence and rejects blank money", () => {

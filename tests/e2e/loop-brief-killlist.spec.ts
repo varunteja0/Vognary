@@ -8,16 +8,14 @@ test("manual financial evidence is not exposed before sign-in", async ({ page })
   await expect(page.getByText(/UPI AutoPay|mandate kill-list/i)).toHaveCount(0);
 });
 
-test("landing contains no sample ledger or illustrative financial totals", async ({ page }) => {
+test("landing walkthrough is explicitly illustrative and never presented as customer proof", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Decide before the charge, not after it." })).toBeVisible();
-  await expect(page.getByText("What is due next", { exact: true })).toBeVisible();
-  await expect(page.getByText("Why it deserves a look", { exact: true })).toBeVisible();
-  await expect(page.getByText("What happened after you decided", { exact: true })).toBeVisible();
-  await expect(page.getByText(/sample audit|illustrative sample|not live output/i)).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "See what your company is about to pay. Decide before the card fires." })).toBeVisible();
+  await expect(page.getByText(/Cursor Pro charges ₹1,700\.00/)).toBeVisible();
+  await expect(page.getByText("From the example receipt", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Illustrative walkthrough, not a claim about your company/)).toBeVisible();
+  await expect(page.getByText(/sample audit|customer result|verified saving/i)).toHaveCount(0);
   await expect(page.locator("#product-ledger")).toHaveCount(0);
-  // No money may appear before a visitor has cited a single receipt, labelled
-  // as an example or otherwise.
-  await expect(page.getByText(/[\u20b9$€£]\s?\d/)).toHaveCount(0);
+  await expect(page.getByText(/Vognary caught|founders saved|customers saved/i)).toHaveCount(0);
 });

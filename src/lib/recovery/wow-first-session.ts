@@ -70,6 +70,30 @@ export function decisionHookCopy(input: {
   };
 }
 
+export function guestDecisionHookCopy(input: {
+  merchant: string;
+  action: DecisionCycleAction;
+  watchDate: string | null;
+}): { title: string; body: string } {
+  const when = input.watchDate ? ` around ${input.watchDate}` : " at the next expected window";
+  if (input.action === "PLAN_TO_CANCEL") {
+    return {
+      title: `${input.merchant} — plan to cancel`,
+      body: `Sign in to remember this plan. Vognary will then watch${when}. If ${input.merchant} charges again, you will see it. Missing evidence is not cancellation. Vognary never cancels it for you.`,
+    };
+  }
+  if (input.action === "REVIEW_LATER") {
+    return {
+      title: `${input.merchant} — review before the charge`,
+      body: `Sign in to remember this review. Vognary will then bring it back before the charge and watch${when}. Nothing is cancelled.`,
+    };
+  }
+  return {
+    title: `${input.merchant} — keep this cycle`,
+    body: `Sign in to remember this decision. Vognary will then watch${when}. If the charge matches, this goes quiet. If it doesn't, you will see it.`,
+  };
+}
+
 export function actionFromDecision(decision: Decision): DecisionCycleAction | null {
   if (decision === "KEEP") return "KEEP";
   if (decision === "MONITOR") return "REVIEW_LATER";
@@ -89,15 +113,18 @@ export function decisionArtefactText(input: {
   whenLine: string | null;
   action: DecisionCycleAction | null;
   excerpt: string | null;
+  remembered?: boolean;
 }): string {
-  const lines = [`${input.merchant} · ${input.amountDisplay}`];
+  const lines = ["VOGNARY DECISION", `${input.merchant} · ${input.amountDisplay}`];
   if (input.whenLine && input.whenLine !== "Date not established") lines.push(input.whenLine);
   if (input.action === "KEEP") lines.push("Decision: kept for this cycle.");
   if (input.action === "REVIEW_LATER") lines.push("Decision: review before the charge.");
   if (input.action === "PLAN_TO_CANCEL") lines.push("Decision: plan to cancel this cycle.");
   if (!input.action) lines.push("You have not decided this cycle.");
   if (input.excerpt) lines.push(`From the receipt: ${input.excerpt}`);
-  lines.push("Vognary will watch the next window. It never cancels a service and never moves money.");
+  lines.push(input.remembered === false
+    ? "Sign in to ask Vognary to remember this and watch the next window. It never cancels a service and never moves money."
+    : "Vognary will watch the next window. It never cancels a service and never moves money.");
   lines.push("vognary.com");
   return lines.join("\n");
 }
