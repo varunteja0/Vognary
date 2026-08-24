@@ -101,6 +101,118 @@ test("a targeted migration refuses a fresh database before creating schema or le
   });
 });
 
+test("the bounded production 0055 to 0056 procedure refuses drift and preserves legacy cycles", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("bounded_0056", async (connectionString) => {
+    const seedPool = createPool(connectionString);
+    try {
+      await seedSchemaThrough0022(seedPool);
+    } finally {
+      await seedPool.end();
+    }
+
+    runMigrations(connectionString, ["--through=0054_recovery_commitment_context"]);
+    assert.throws(
+      () => runBounded0056Migration(connectionString),
+      /must start exactly at 0055_recovery_decision_cycles/i,
+    );
+
+    runMigrations(connectionString, ["--through=0055_recovery_decision_cycles"]);
+    const pool = createPool(connectionString);
+    const userId = randomUUID();
+    const workspaceId = randomUUID();
+    const commitmentId = randomUUID();
+    try {
+      await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, `${userId}@bounded-0056.test`]);
+      await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Bounded 0056')`, [workspaceId, userId]);
+      await pool.query(
+        `insert into recovery_commitments (
+           id, workspace_id, identity_key, base_status, base_merchant, base_category, base_cadence,
+           base_currency, base_amount_minor, base_monthly_minor, base_next_expected_date,
+           effective_status, effective_merchant, effective_cadence, effective_amount_minor,
+           effective_monthly_minor, effective_next_expected_date, confidence_score,
+           recommended_decision, recommendation_reason
+         ) values (
+           $1, $2, 'bounded-0056-cursor', 'ACTIVE', 'Cursor', 'Software', 'MONTHLY',
+           'INR', 199900, 199900, '2026-08-06', 'ACTIVE', 'Cursor', 'MONTHLY',
+           199900, 199900, '2026-08-06', 90, 'KEEP', 'Cited Cursor charge.'
+         )`,
+        [commitmentId, workspaceId],
+      );
+      await pool.query(
+        `insert into recovery_decision_cycles (
+           workspace_id, commitment_id, due_date, stake_minor, currency, user_action,
+           decided_by_user_id
+         ) values ($1, $2, '2026-08-06', 2398800, 'INR', 'KEEP', $3)`,
+        [workspaceId, commitmentId, userId],
+      );
+      const before = await pool.query<{ column_count: number; cycle_count: string }>(
+        `select
+           (select count(*)::int from information_schema.columns
+            where table_schema = 'public' and table_name = 'recovery_decision_cycles'
+              and column_name = 'expected_amount_minor') as column_count,
+           (select count(*)::text from recovery_decision_cycles) as cycle_count`,
+      );
+      assert.deepEqual(before.rows[0], { column_count: 0, cycle_count: "1" });
+    } finally {
+      await pool.end();
+    }
+
+    const applied = runBounded0056Migration(connectionString);
+    assert.deepEqual(applied, {
+      status: "ok",
+      mode: "bounded-one-off",
+      from: "0055_recovery_decision_cycles",
+      to: "0056_decision_cycle_expected_amount",
+      checksum: "7b0f25a129e7692968d5e30846035480a6a60c179ac526a84ecba4e56e038ef5",
+      cycleRowsPreserved: "1",
+      nonNullExpectedAmounts: "0",
+    });
+
+    const verify = createPool(connectionString);
+    try {
+      const result = await verify.query<{
+        head: string;
+        checksum: string;
+        data_type: string;
+        is_nullable: string;
+        column_default: string | null;
+        expected_amount_minor: string | null;
+        verification_check: string;
+      }>(
+        `select
+           (select id from schema_migrations order by id desc limit 1) as head,
+           (select checksum from schema_migrations where id = '0056_decision_cycle_expected_amount') as checksum,
+           column_info.data_type,
+           column_info.is_nullable,
+           column_info.column_default,
+           (select expected_amount_minor::text from recovery_decision_cycles limit 1) as expected_amount_minor,
+           (select pg_get_constraintdef(oid) from pg_constraint
+            where conname = 'recovery_decision_cycles_verification_outcome_check') as verification_check
+         from information_schema.columns column_info
+         where column_info.table_schema = 'public'
+           and column_info.table_name = 'recovery_decision_cycles'
+           and column_info.column_name = 'expected_amount_minor'`,
+      );
+      assert.equal(result.rows[0]?.head, "0056_decision_cycle_expected_amount");
+      assert.equal(result.rows[0]?.checksum, "7b0f25a129e7692968d5e30846035480a6a60c179ac526a84ecba4e56e038ef5");
+      assert.equal(result.rows[0]?.data_type, "bigint");
+      assert.equal(result.rows[0]?.is_nullable, "YES");
+      assert.equal(result.rows[0]?.column_default, null);
+      assert.equal(result.rows[0]?.expected_amount_minor, null);
+      assert.match(result.rows[0]?.verification_check ?? "", /AMOUNT_DIFFERED/);
+    } finally {
+      await verify.end();
+    }
+
+    assert.throws(
+      () => runBounded0056Migration(connectionString),
+      /must start exactly at 0055_recovery_decision_cycles/i,
+    );
+  });
+});
+
 test("the real migration runner installs and records the Recovery receipt inbox on a fresh database", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
@@ -2214,6 +2326,30 @@ function runMigrations(connectionString: string, args: string[] = []) {
   });
   return JSON.parse(output) as {
     applied: Array<{ id: string; mode: string }>;
+  };
+}
+
+function runBounded0056Migration(connectionString: string) {
+  const output = execFileSync(process.execPath, [
+    "scripts/apply-production-0056.mjs",
+    "--confirm-0055-to-0056-production",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      DATABASE_URL: connectionString,
+      POSTGRES_SSL: "false",
+    },
+  });
+  return JSON.parse(output) as {
+    status: string;
+    mode: string;
+    from: string;
+    to: string;
+    checksum: string;
+    cycleRowsPreserved: string;
+    nonNullExpectedAmounts: string;
   };
 }
 

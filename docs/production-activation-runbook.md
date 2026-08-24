@@ -4,6 +4,46 @@ This runbook activates the Recovery receipt-forwarding product. Direct Gmail rea
 
 Times in this runbook use IST.
 
+## Current bounded schema-only apply: `0055` → `0056`
+
+Production completed the one-time Recovery cutover and is documented at
+`0055_recovery_decision_cycles`. The `apply-latest` operation in
+`.github/workflows/production-database-activation.yml` is the historical
+bootstrap from exact head `0026_recovery_inbound_retention`; its pre-`0053`
+backup and zero-legacy-work guards must not be weakened or reused for an
+already-activated database.
+
+For P0 migration `0056_decision_cycle_expected_amount`, use only the bounded
+one-off operator command below from this clean checkout before pushing the
+application commits that read or write `expected_amount_minor`:
+
+```bash
+DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true \
+  npm run db:apply-production-0056 -- --confirm-0055-to-0056-production
+```
+
+The command acquires the canonical migration advisory lock and refuses unless:
+
+- the local migration head is exactly `0056`, immediately after `0055`;
+- production ledger head is exactly `0055_recovery_decision_cycles`;
+- the recorded `0055` checksum matches this repository;
+- migration `0056` has checksum
+  `7b0f25a129e7692968d5e30846035480a6a60c179ac526a84ecba4e56e038ef5`;
+- `expected_amount_minor` does not already exist;
+- the pre-migration verdict CHECK is exactly the `0055` vocabulary.
+
+Within one transaction it applies only `0056`, records that exact checksum,
+and verifies nullable `bigint` with no default, the four-value verdict CHECK,
+an unchanged cycle-row count, zero non-null expected amounts on legacy rows,
+and exact resulting head/checksum. It verifies again after commit. Any drift,
+lock timeout, statement timeout, or failed assertion exits nonzero. It performs
+no backfill and no application deployment. A second invocation refuses because
+the starting head is no longer `0055`.
+
+Rehearse this exact path first through the disposable PostgreSQL suite. This
+script is a bounded one-off for `0055` → `0056`, not the long-term generic
+migration runner and not a replacement for the historical bootstrap workflow.
+
 ## Phase 0: Stop Conditions
 
 Do not show the forwarding-first landing or set any receipt-inbox operator flag unless all earlier phases pass.
@@ -20,7 +60,10 @@ Stop immediately when any of these is true:
 
 Rollback means setting `ENABLE_RECEIPT_INBOX=false`, clearing the four operator evidence flags, redeploying, and confirming the landing says receipt forwarding is unavailable. Do not delete provider or database state during rollback.
 
-## Phase 1: Runtime And Database
+## Phase 1: Historical Recovery bootstrap runtime and database
+
+This phase documents the original exact-head `0026` Recovery cutover. Do not
+run it for the current incremental `0055` → `0056` apply above.
 
 1. Select Node `22.22.2` or a later `22.x` version allowed by `package.json`.
 2. Keep `ENABLE_RECEIPT_INBOX=false` and all four receipt-inbox operator evidence flags blank.
