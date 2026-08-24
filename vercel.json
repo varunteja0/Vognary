@@ -1,29 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run vercel-build",
-  "routes": [
-    {
-      "src": "^/$",
-      "continue": true,
-      "transforms": [
-        {
-          "type": "response.headers",
-          "op": "delete",
-          "target": {
-            "key": "Vary"
-          }
-        },
-        {
-          "type": "response.headers",
-          "op": "set",
-          "target": {
-            "key": "Vary"
-          },
-          "args": "Accept, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Accept-Encoding"
-        }
-      ]
-    }
-  ],
   "crons": [
     {
       "path": "/api/internal/renewal-alerts/due/run",

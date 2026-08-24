@@ -1,14 +1,5 @@
 export const agentLinkHeader = '</index.md>; rel="alternate"; type="text/markdown", </llms.txt>; rel="describedby"';
 
-export const agentNotFoundMarkdown = `# 404: Page not found
-
-The requested Vognary path does not exist.
-
-- [Vognary home](https://www.vognary.com/)
-- [Agent guide](https://www.vognary.com/llms.txt)
-- [Public sitemap](https://www.vognary.com/sitemap.xml)
-`;
-
 export const agentHomepageMarkdown = `# Vognary
 
 > Commitment Intelligence for founder-led software and AI companies with 2–20 people.

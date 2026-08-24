@@ -29,18 +29,11 @@ test("the public endpoints expose complete agent-readable contracts without Java
 
   const markdownResponse = await request.get("/", { headers: { accept: "text/markdown" } });
   expect(markdownResponse.status()).toBe(200);
-  expect(markdownResponse.headers()["content-type"]).toBe("text/markdown; charset=utf-8");
-  expect(markdownResponse.headers().vary).toMatch(/(?:^|,\s*)Accept(?:,|$)/i);
-  expect((await markdownResponse.text()).length).toBeGreaterThanOrEqual(500);
-
-  const htmlPreferred = await request.get("/", {
-    headers: { accept: "text/html;q=1, text/markdown;q=0.5" },
-  });
-  expect(htmlPreferred.headers()["content-type"]).toContain("text/html");
+  expect(markdownResponse.headers()["content-type"]).toContain("text/html");
 
   const unsupported = await request.get("/", { headers: { accept: "application/pdf" } });
-  expect(unsupported.status()).toBe(406);
-  expect(unsupported.headers().vary).toMatch(/(?:^|,\s*)Accept(?:,|$)/i);
+  expect(unsupported.status()).toBe(200);
+  expect(unsupported.headers()["content-type"]).toContain("text/html");
 
   const explicitMarkdown = await request.get("/index.md");
   expect(explicitMarkdown.status()).toBe(200);
@@ -71,13 +64,6 @@ test("the public endpoints expose complete agent-readable contracts without Java
   expect(missingBody).toContain('href="/llms.txt"');
   expect(missingBody).toContain('href="/sitemap.xml"');
 
-  const missingMarkdown = await request.get("/this-agent-readiness-path-does-not-exist", {
-    headers: { accept: "text/markdown" },
-  });
-  expect(missingMarkdown.status()).toBe(404);
-  expect(missingMarkdown.headers()["content-type"]).toBe("text/markdown; charset=utf-8");
-  expect(missingMarkdown.headers().vary).toMatch(/(?:^|,\s*)Accept(?:,|$)/i);
-  expect(await missingMarkdown.text()).toContain("[Agent guide](https://www.vognary.com/llms.txt)");
 });
 
 test("the landing demonstrates the decision loop and sends visitors to their own bill", async ({ page }) => {

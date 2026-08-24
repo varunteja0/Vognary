@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { agentLinkHeader, agentNotFoundMarkdown } from "./lib/agent-content";
-import { appendVaryAccept, preferredRepresentation } from "./lib/http-content-negotiation";
+import { agentLinkHeader } from "./lib/agent-content";
 
 const publicPagePaths = new Set([
   "/",
@@ -46,40 +45,12 @@ export function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/api/agent-home";
     url.search = "";
-    const response = NextResponse.rewrite(url);
-    appendVaryAccept(response.headers);
-    return response;
+    return NextResponse.rewrite(url);
   }
 
   if (pathname === "/") {
-    if (request.headers.has("rsc")) return NextResponse.next();
-
-    const accept = request.headers.get("accept");
-    const representation = preferredRepresentation(accept);
-
-    if (representation === "text/markdown") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/api/agent-home";
-      url.search = "";
-      const response = NextResponse.rewrite(url);
-      response.headers.set("link", agentLinkHeader);
-      appendVaryAccept(response.headers);
-      return response;
-    }
-
-    if (representation === null && accept) {
-      return new NextResponse("Not Acceptable\n\nAvailable: text/html, text/markdown\n", {
-        status: 406,
-        headers: {
-          "content-type": "text/plain; charset=utf-8",
-          vary: "Accept",
-        },
-      });
-    }
-
     const response = NextResponse.next();
     response.headers.set("link", agentLinkHeader);
-    appendVaryAccept(response.headers);
     return response;
   }
 
@@ -91,18 +62,6 @@ export function proxy(request: NextRequest) {
     || pathname.startsWith("/billing/");
 
   if (!isSensitiveProductPath) {
-    if (!publicPagePaths.has(pathname)
-      && preferredRepresentation(request.headers.get("accept")) === "text/markdown") {
-      return new NextResponse(agentNotFoundMarkdown, {
-        status: 404,
-        headers: {
-          "cache-control": "public, max-age=300",
-          "content-type": "text/markdown; charset=utf-8",
-          link: agentLinkHeader,
-          vary: "Accept",
-        },
-      });
-    }
     return NextResponse.next();
   }
 
