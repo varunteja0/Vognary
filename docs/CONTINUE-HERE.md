@@ -15,7 +15,7 @@
 
 **GATES on this checkout:** `git diff --check` PASS · lint 0 errors (1 pre-existing `window.location.assign` warning in untouched `src/app/instant-audit.tsx`) · typecheck PASS · claims:check PASS (25) · tokens:check PASS (62) · unit **1013/1013** · public/guest Playwright 29/30 plus the sole disk-space screenshot case **1/1** on isolated rerun · signed-in Recovery Playwright **46/46** desktop+mobile with 4 receipt-inbox cases skipped because that E2E environment is not configured · production Turbopack build PASS · `perf:budget` PASS (`/` 180.9 KB, `/app` 180.5 KB, `/verify` 181.2 KB). No migration/store changed, so PostgreSQL was not rerun. Updated reduced-motion desktop/mobile screenshots are in `docs/evidence/surface-10/`.
 
-**NOT PROVEN (unchanged):** live ICP first session / time-to-insight · customer proof or retention · connected/paid · first automatic receipt (`forwarding_verified_at` remains unproven) · reminder delivery · production deployment of this checkout. Production migration 0056 remains founder-operated per the prior entry; do not deploy code that writes `expected_amount_minor` before it is applied.
+**NOT PROVEN (unchanged):** live ICP first session / time-to-insight · customer proof or retention · connected/paid · first automatic receipt (`forwarding_verified_at` remains unproven) · reminder delivery · production deployment of this checkout.
 
 ## Live state — 2026-08-24 (photo confirm-the-line cites visible text)
 
@@ -35,7 +35,7 @@
 
 **GATES on this checkout:** lint 0 errors (1 pre-existing warning in `instant-audit.tsx`) · typecheck PASS · claims:check PASS (25) · tokens:check PASS (61) · unit **1003/1003** · disposable PostgreSQL **161/161** · production Next build PASS · `perf:budget` PASS (`/` 178.1 KB, `/app` 180.5 KB, `/verify` 181.2 KB).
 
-**SCHEMA:** 0056 checksum `7b0f25a129e7692968d5e30846035480a6a60c179ac526a84ecba4e56e038ef5`. Applied on local Postgres. **Production Neon is still head `0055_recovery_decision_cycles` until the founder applies 0056.** Do not push the SHA that writes `expected_amount_minor` before that apply.
+**SCHEMA — PRODUCTION VERIFIED 2026-08-24:** Neon head is `0056_decision_cycle_expected_amount` with checksum `7b0f25a129e7692968d5e30846035480a6a60c179ac526a84ecba4e56e038ef5`. `expected_amount_minor` is nullable `bigint` with no default; the verdict CHECK includes `CHARGE_ARRIVED`, `NO_CHARGE_IN_WINDOW`, `CANNOT_EVALUATE`, and reserved `AMOUNT_DEFERRED`. Both pre-existing cycle rows remain null, so no historical amount was fabricated. The bounded operator command correctly refuses a second invocation. This schema no longer blocks deployment.
 
 **NOT PROVEN (unchanged):** live ICP session · connected/paid · first automatic receipt (`forwarding_verified_at` still null) · reminder delivery. Founder-ops P0-0 remains: confirm Google forwarding, create the billing-only filter, Search Console `/app?demo=1` removal. P1 is locked until T0–T4 session evidence.
 

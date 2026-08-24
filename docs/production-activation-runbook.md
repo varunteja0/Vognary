@@ -4,18 +4,24 @@ This runbook activates the Recovery receipt-forwarding product. Direct Gmail rea
 
 Times in this runbook use IST.
 
-## Current bounded schema-only apply: `0055` → `0056`
+## Completed bounded schema-only apply: `0055` → `0056`
 
-Production completed the one-time Recovery cutover and is documented at
-`0055_recovery_decision_cycles`. The `apply-latest` operation in
+Production completed the one-time Recovery cutover and the incremental `0056`
+apply. Production was independently verified 2026-08-24 at
+`0056_decision_cycle_expected_amount` with checksum
+`7b0f25a129e7692968d5e30846035480a6a60c179ac526a84ecba4e56e038ef5`.
+The nullable `bigint` column has no default, all four verdict values are in the
+CHECK, and both legacy cycle rows remain null. **Do not run the bounded command
+again; it correctly refuses any starting head other than `0055`.**
+
+The `apply-latest` operation in
 `.github/workflows/production-database-activation.yml` is the historical
 bootstrap from exact head `0026_recovery_inbound_retention`; its pre-`0053`
 backup and zero-legacy-work guards must not be weakened or reused for an
 already-activated database.
 
-For P0 migration `0056_decision_cycle_expected_amount`, use only the bounded
-one-off operator command below from this clean checkout before pushing the
-application commits that read or write `expected_amount_minor`:
+The exact command used for the completed P0 migration is retained below for
+audit history only:
 
 ```bash
 DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true \
