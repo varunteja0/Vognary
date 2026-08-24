@@ -30,6 +30,8 @@ export const customerPhrases = {
   readablePdfs: "PDFs, CSV, spreadsheets, or a photo of the bill. We'll read what we can. Confirm the line before it becomes a commitment.",
   confirmTheLine: "Confirm the merchant, amount, and date. Vognary does not invent those from a photo.",
   confirmPrefill: "Check these fields against the photo. Confirm only if they match. Vognary does not invent money.",
+  confirmPartial: "We read part of this bill from the photo. Fill any blank from the image. Confirm only if it matches. Vognary does not invent money.",
+  confirmZeroPaid: "This photo shows a paid amount of 0. We did not fill a plan price. Enter the charge you can see, then confirm.",
   imageUnreadable: "This photo was not treated as money. Confirm the line, or paste the receipt text.",
   readingInvoice: "Reading your invoice…",
   stayUpToDate: "Stay up to date",

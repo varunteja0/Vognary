@@ -1,22 +1,31 @@
 import "server-only";
 
-import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { getAiClient } from "@/lib/server/ai/client";
 import { AI_MODELS } from "@/lib/server/ai/models";
 import { evaluateBudget } from "@/lib/server/ai/budget";
 import { isAiBudgetOpen, readAiBudgetFromEnv } from "@/lib/server/ai/budget-env";
 import { estimateCostPaise } from "@/lib/server/ai/pricing";
 import {
+  mergeReceiptLineProposals,
+  proposalFromVisionExtraction,
   proposeReceiptLineFromReadableText,
+  receiptLineProposalIsPartial,
   type ReceiptLineProposal,
 } from "@/lib/recovery/image-receipt-proposal";
+import { ocrReceiptImage, prepareReceiptImage } from "@/lib/server/receipt-image-ocr";
 
 const maxImageBytes = 8 * 1024 * 1024;
-const visionMediaTypes = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
+
+const visionPrompt = [
+  "Read this billing screenshot or receipt.",
+  "Return JSON only with this shape:",
+  '{"visible_text":"every visible character, line by line, exact","merchant":"printed merchant or plan name or empty","amount":"printed paid or total amount digits only or empty","currency":"INR or USD or EUR or GBP or empty","charge_date":"YYYY-MM-DD of the paid/charge date or empty","paid_amount_is_zero":false}',
+  "Copy. Do not infer.",
+  "Do not use a plan price, list price, or renewal price unless that exact amount is the paid or total line.",
+  "A paid line of 0 stays 0: amount must be empty and paid_amount_is_zero true.",
+  "charge_date is the transaction or paid date, never an access-until or expiry date.",
+  "If the image is unreadable, visible_text must be empty and every other field empty.",
+].join(" ");
 
 export async function proposeReceiptLineFromImageFile(file: File): Promise<{
   proposal: ReceiptLineProposal | null;
@@ -35,26 +44,37 @@ export async function proposeReceiptLineFromImageFile(file: File): Promise<{
 
   if (!looksLikeImage) return { proposal: null, reason: "not-image" };
 
-  const fromOcr = proposeReceiptLineFromReadableText(await ocrWithSystemTesseract(buffer) ?? "");
-  if (fromOcr) return { proposal: fromOcr, reason: "cited" };
-
-  const mediaType = visionMediaType(mime, name);
-  if (mediaType) {
-    const transcribed = await transcribeReceiptImage(buffer, mediaType);
-    const fromVision = transcribed ? proposeReceiptLineFromReadableText(transcribed) : null;
-    if (fromVision) return { proposal: fromVision, reason: "cited" };
+  let ocrText: string | null = null;
+  let visionBuffer = buffer;
+  let visionMediaType = visionMediaTypeFrom(mime, name);
+  try {
+    const prepared = await prepareReceiptImage(buffer);
+    visionBuffer = Buffer.from(prepared.vision);
+    visionMediaType = prepared.visionMediaType;
+    ocrText = await ocrReceiptImage(Buffer.from(prepared.ocr));
+  } catch {
+    ocrText = await ocrReceiptImage(buffer);
   }
 
+  const fromOcr = proposeReceiptLineFromReadableText(ocrText ?? "");
+  if (fromOcr && !receiptLineProposalIsPartial(fromOcr) && (ocrText?.length ?? 0) >= 40) {
+    return { proposal: fromOcr, reason: "cited" };
+  }
+
+  const fromVision = visionMediaType
+    ? proposalFromVisionExtraction(await transcribeReceiptImage(visionBuffer, visionMediaType))
+    : null;
+  const proposal = mergeReceiptLineProposals(fromOcr, fromVision);
+  if (proposal) return { proposal, reason: "cited" };
   return { proposal: null, reason: "unreadable" };
 }
 
-function visionMediaType(mime: string, name: string): "image/jpeg" | "image/png" | "image/gif" | "image/webp" | null {
+function visionMediaTypeFrom(mime: string, name: string): "image/jpeg" | "image/png" | "image/gif" | "image/webp" | null {
   if (mime === "image/jpeg" || mime === "image/png" || mime === "image/gif" || mime === "image/webp") return mime;
   if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
   if (name.endsWith(".png")) return "image/png";
   if (name.endsWith(".gif")) return "image/gif";
   if (name.endsWith(".webp")) return "image/webp";
-  if (visionMediaTypes.has(mime)) return mime as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
   return null;
 }
 
@@ -68,55 +88,21 @@ function looksLikeText(buffer: Buffer) {
   return printable / sample.length > 0.9;
 }
 
-async function ocrWithSystemTesseract(buffer: Buffer): Promise<string | null> {
-  const dir = await mkdtemp(join(tmpdir(), "vognary-ocr-"));
-  const input = join(dir, "receipt.bin");
-  try {
-    await writeFile(input, buffer);
-    return await new Promise((resolve) => {
-      const child = spawn("tesseract", [input, "stdout", "-l", "eng"], { stdio: ["ignore", "pipe", "ignore"] });
-      const chunks: Buffer[] = [];
-      const timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        resolve(null);
-      }, 8_000);
-      child.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
-      child.on("error", () => {
-        clearTimeout(timer);
-        resolve(null);
-      });
-      child.on("close", (code) => {
-        clearTimeout(timer);
-        if (code !== 0) {
-          resolve(null);
-          return;
-        }
-        const text = Buffer.concat(chunks).toString("utf8").trim();
-        resolve(text || null);
-      });
-    });
-  } catch {
-    return null;
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-
 async function transcribeReceiptImage(
   buffer: Buffer,
   mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp",
-): Promise<string | null> {
+): Promise<unknown> {
   const budget = readAiBudgetFromEnv();
   if (!isAiBudgetOpen(budget)) return null;
   const client = getAiClient();
   if (!client) return null;
-  const estimate = estimateCostPaise(AI_MODELS.extraction, { inputTokens: 1_200, outputTokens: 400 });
+  const estimate = estimateCostPaise(AI_MODELS.extraction, { inputTokens: 2_400, outputTokens: 800 });
   if (!evaluateBudget(budget, estimate).allowed) return null;
 
   try {
     const message = await client.messages.create({
       model: AI_MODELS.extraction,
-      max_tokens: 400,
+      max_tokens: 800,
       messages: [{
         role: "user",
         content: [
@@ -130,7 +116,7 @@ async function transcribeReceiptImage(
           },
           {
             type: "text",
-            text: "Transcribe every visible character from this receipt. Do not infer missing merchants, amounts, currencies, or dates. If the image is unreadable, reply EMPTY.",
+            text: visionPrompt,
           },
         ],
       }],

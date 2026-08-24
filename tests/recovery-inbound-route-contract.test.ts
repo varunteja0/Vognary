@@ -65,7 +65,7 @@ test("the receipt parser loads the Node canvas polyfill before pdf-parse", async
   assert.ok(parserImport > workerImport);
 
   const config = await readFile(new URL("../next.config.ts", import.meta.url), "utf8");
-  assert.match(config, /serverExternalPackages: \["pdf-parse", "@napi-rs\/canvas"\]/);
+  assert.match(config, /serverExternalPackages: \["pdf-parse", "@napi-rs\/canvas", "tesseract.js", "sharp"\]/);
 });
 
 function assertInvalidEvidence(request: Request) {

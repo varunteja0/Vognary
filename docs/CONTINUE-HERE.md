@@ -5,6 +5,14 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## Live state — 2026-08-24 (photo confirm-the-line cites visible text)
+
+**Scoreboard row this raises:** Product UX / Trust & honesty. Loop step: first-session add-a-bill. Composite stays **1.5**.
+
+**PRODUCT — a billing screenshot now prefills Confirm this line from what is printed.** `/api/receipt-image/propose` still never invents money. The photo is inverted when it is a dark UI, read with OCR (system tesseract or in-process tesseract.js), and optionally transcribed by vision when the Anthropic balance is live. Visible text is parsed for merchant, paid amount, currency, and charge date; the user still confirms before it becomes evidence. A ChatGPT Plus screenshot that shows `Paid ₹0.00` fills ChatGPT Plus and 7/24/2026 and leaves amount blank (plan price ₹1,999 is not used). A Cursor Pro paid `$20.00` line fills all four fields. Access-until dates are not the charge date. Vision fields are kept only when they already appear in the transcript. Confirm this line stays. P1 is still locked. Do not push until Neon 0056 is applied.
+
+**GATES on this checkout (photo work, uncommitted):** lint 0 errors (1 pre-existing warning in `instant-audit.tsx`) · typecheck PASS · claims:check PASS (25) · tokens:check PASS (61) · unit **1012/1012**. PostgreSQL / production build / perf not re-run (no schema change).
+
 ## Live state — 2026-08-23 (P0-1 expected amount freeze + P0-2 first-decision event)
 
 **Scoreboard row this raises:** Trust & honesty / Product UX. Loop step: first-session decision moment. Composite stays **1.5**.
