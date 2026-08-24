@@ -41,12 +41,14 @@
   --glow-soft: var(--gold-soft);
   --glow-deep: var(--gold-deep);
 
-  /* Verdict spectrum — desaturated, refined */
-  --ember: #bd493d;
+  /* Verdict spectrum — desaturated, refined.
+     Ink values are darkened against their own 10% tint so stamp/pill text
+     clears 4.5:1; the tints stay on the original hue. */
+  --ember: #a63a2f;
   --ember-tint: rgba(189, 73, 61, 0.10);
   --verdict: #19745b;
   --verdict-tint: rgba(25, 116, 91, 0.10);
-  --ochre: #95631c;
+  --ochre: #845515;
   --ochre-tint: rgba(149, 99, 28, 0.10);
   --indigo: #515aa6;
   --indigo-tint: rgba(81, 90, 166, 0.10);
@@ -111,12 +113,7 @@ html {
 }
 
 body {
-  background:
-    linear-gradient(rgba(23, 26, 31, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(23, 26, 31, 0.018) 1px, transparent 1px),
-    radial-gradient(70% 45% at 92% -8%, rgba(201, 154, 69, 0.12), transparent 60%),
-    var(--paper);
-  background-size: 32px 32px, 32px 32px, auto, auto;
+  background: var(--paper);
   color: var(--ink);
   font-family: var(--font-grotesk), ui-sans-serif, system-ui, sans-serif;
   letter-spacing: 0;

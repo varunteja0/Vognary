@@ -18,20 +18,29 @@ export default function LaunchLanding() {
           </div>
         </nav>
 
-        <section className="border-b border-line py-12 sm:py-16">
-          <div className="max-w-4xl">
-            <p className="eyebrow text-ochre">For small software teams</p>
-            <h1 className="mt-4 max-w-4xl font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-5xl">
-              Know what renews. Decide what stays.
-            </h1>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-(--ink-soft) sm:text-lg">
-              Vognary turns the software bills you already have into upcoming charges you can act on. Every amount opens to its receipt.
-            </p>
-            <div className="mt-7 flex flex-wrap items-center gap-3">
-              <Link href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</Link>
-              <Link href="#example-decision" className="btn btn-ghost btn-lg">See how it works</Link>
+        <section className="border-b border-line py-8 sm:py-10">
+          <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:gap-14">
+            <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+              <p className="eyebrow text-ochre">For small software teams</p>
+              <h1 className="mt-3 font-display text-[2.125rem] font-semibold leading-[1.08] tracking-tight text-(--ink) sm:text-5xl">
+                Know what renews. Decide what stays.
+              </h1>
+              <p className="mt-4 max-w-lg text-base leading-7 text-(--ink-soft)">
+                Vognary turns the software bills you already have into upcoming charges you can act on. Every amount opens to its receipt.
+              </p>
+              <div className="mt-6">
+                <Link href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</Link>
+              </div>
             </div>
-            <ul className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-sm text-(--muted)" aria-label="Product boundaries">
+
+            <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+              <LandingDecisionPreview />
+            </div>
+
+            <ul
+              className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-(--muted) lg:col-start-1 lg:row-start-2 lg:self-start"
+              aria-label="Product boundaries"
+            >
               <li>No account required</li>
               <li>No bank passwords</li>
               <li>No mailbox access</li>
@@ -39,10 +48,7 @@ export default function LaunchLanding() {
           </div>
         </section>
 
-        <LandingDecisionPreview />
-
-        <section className="my-4 flex flex-col justify-between gap-5 border-y border-line py-8 sm:flex-row sm:items-center">
-          <div>
+        <section className="my-4 flex flex-col justify-between gap-5 border-y border-line py-8 sm:flex-row sm:items-center">          <div>
             <p className="eyebrow text-ochre">Start with what you already have</p>
             <h2 className="mt-2 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">One receipt is enough to begin.</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Nothing is saved until you sign in. Vognary never cancels a service or moves money.</p>

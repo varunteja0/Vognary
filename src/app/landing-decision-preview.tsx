@@ -42,20 +42,13 @@ export function LandingDecisionPreview() {
   });
 
   return (
-    <section id="example-decision" aria-labelledby="product-review-heading" className="border-b border-line py-10 sm:py-14">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div className="max-w-2xl">
-          <p className="eyebrow text-ochre">A real decision, not a dashboard</p>
-          <h2 id="product-review-heading" className="mt-3 font-display text-3xl font-semibold tracking-tight text-(--ink) sm:text-4xl">
-            Cursor costs ₹350 more this month.
-          </h2>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-(--muted)">
-            Vognary shows the change, the receipts behind it, and one decision before the next charge.
-          </p>
-        </div>
-      </div>
+    <section id="example-decision" aria-labelledby="product-review-heading" className="min-w-0">
+      <p className="eyebrow text-ochre">A real decision, not a dashboard</p>
+      <h2 id="product-review-heading" className="mt-2 font-display text-xl font-semibold tracking-tight text-(--ink) sm:text-2xl">
+        Cursor costs ₹350 more this month.
+      </h2>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)] lg:gap-12">
+      <div className="mt-4 grid min-w-0 gap-5">
         <article className="decision" data-lead="true">
           <div className="min-w-0">
             <p className="decision-cue">Next charge · 28 Aug</p>
@@ -97,21 +90,24 @@ export function LandingDecisionPreview() {
           </div>
         </article>
 
-        <aside className="flex min-w-0 flex-col justify-between border-l border-line pl-5 sm:pl-8" aria-live="polite">
+        <aside
+          className="flex min-w-0 flex-col justify-between border-t border-line pt-5"
+          aria-live="polite"
+        >
           <div>
             <p className="eyebrow eyebrow-xs">Your decision</p>
-            <p className={`stamp stamp-${presentation.tone} mt-4`}>{presentation.label}</p>
-            <h3 className="mt-5 font-display text-2xl font-semibold leading-tight text-(--ink)">{hook.title}</h3>
-            <p className="mt-3 text-sm leading-6 text-(--ink-soft)">{hook.body}</p>
+            <p className={`stamp stamp-${presentation.tone} mt-3`}>{presentation.label}</p>
+            <h3 className="mt-4 font-display text-lg font-semibold leading-snug text-(--ink)">{hook.title}</h3>
+            <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{hook.body}</p>
           </div>
-          <div className="mt-5 border-t border-line pt-4">
+          <div className="mt-4 border-t border-line pt-3">
             <p className="eyebrow eyebrow-xs">What happens next</p>
             <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{presentation.nextCheck}</p>
           </div>
         </aside>
       </div>
 
-      <p className="mt-5 text-xs leading-5 text-(--muted)">
+      <p className="mt-4 text-xs leading-5 text-(--muted)">
         Example only. Your review uses your receipts, and unsupported facts stay unknown.
       </p>
     </section>
