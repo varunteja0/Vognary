@@ -66,6 +66,57 @@ where not exists (
 group by w.id, w.name;
 ```
 
+**T3 / First value — consent-independent (use this one during sessions).**
+`product_events` is consent-gated, so a no-consent workspace can reach real
+first value and emit nothing. §1 makes `recovery_decision_cycles` the source of
+truth; this is that query. Run it after each session against the session's
+workspace:
+
+```sql
+-- First value for one session workspace: submitted evidence -> linked commitment -> decision
+select w.id,
+       w.name,
+       w.created_at,
+       count(distinct e.id) filter (
+         where source.source_type in ('RECEIPT_PASTE', 'CSV_IMPORT')
+       )                                                 as submitted_evidence_rows,
+       count(distinct c.id) filter (
+         where source.source_type in ('RECEIPT_PASTE', 'CSV_IMPORT')
+       )                                                 as commitments_from_submitted_evidence,
+       count(distinct d.id) filter (
+         where source.source_type in ('RECEIPT_PASTE', 'CSV_IMPORT')
+       )                                                 as decisions_on_submitted_evidence,
+       min(d.decided_at) filter (
+         where source.source_type in ('RECEIPT_PASTE', 'CSV_IMPORT')
+       )                                                 as first_decision_at,
+       extract(epoch from (
+         min(d.decided_at) filter (
+           where source.source_type in ('RECEIPT_PASTE', 'CSV_IMPORT')
+         ) - w.created_at
+       ))::int                                           as seconds_workspace_to_decision,
+       count(distinct d.id) filter (
+         where source.source_type in ('RECEIPT_PASTE', 'CSV_IMPORT')
+       ) > 0                                             as first_value
+from workspaces w
+left join recovery_commitments c      on c.workspace_id = w.id
+left join recovery_commitment_evidence link
+  on link.workspace_id = c.workspace_id and link.commitment_id = c.id
+left join recovery_evidence e
+  on e.workspace_id = link.workspace_id and e.id = link.evidence_id
+left join recovery_sources source
+  on source.workspace_id = e.workspace_id and source.id = e.source_id
+left join recovery_decision_cycles d
+  on d.workspace_id = c.workspace_id and d.commitment_id = c.id
+where w.id = '<session-workspace-uuid>'::uuid
+group by w.id, w.name, w.created_at
+order by w.created_at desc;
+```
+
+`seconds_workspace_to_decision` measures workspace creation → decision, **not**
+landing → decision. It may understate a new user's session by omitting pre-signup
+time or greatly overstate a returning workspace. Treat it as diagnosis only;
+only the stopwatch in §9 produces time-to-first-decision.
+
 Founder-rescue rate is manual: count sessions where you had to intervene (see §3 log).
 
 ## 3. Per-user observation log (append to gitignored CRM notes, same day)
@@ -198,3 +249,55 @@ Ask them to add 2–3 REAL bills they already have (paste or PDF). Then be quiet
 
 - Fill §3 observation log in the gitignored CRM notes.
 - Record first value strictly per §1 (cycle row exists?), founder rescues, WTP level per §5.
+- Score T0–T4 per §9. Five scored sessions are the P1 unlock gate.
+
+## 9. T0–T4 session gate (the P1 unlock criterion)
+
+`docs/CONTINUE-HERE.md` and `scoreboard.md` require "five T0–T4 sessions"
+before P1 reopens, but the ladder was never written down, so the freeze had no
+objective exit. Defined here, **derived** from the four items CONTINUE-HERE
+names as unproven — human comprehension, time-to-first-decision, trust, and
+preference for the light visual direction — plus First value from §1. No new
+metric is invented; every row is observable in one session.
+
+Score each step **PASS** / **RESCUED** / **FAIL**. `RESCUED` means they could
+not continue without you (§3 founder rescue) — never score it as a pass.
+
+| Step | Question it answers | PASS requires (behavior, not agreement) |
+| --- | --- | --- |
+| **T0** Comprehension | Does the promise land before any input? | Within ~10s of the landing, unaided and unprompted, they say what Vognary does in their own words, naming renewal/upcoming charges *and* deciding. Reading the H1 aloud is not a pass |
+| **T1** Own evidence | Can a stranger get their real bill in? | They add ≥1 of **their own** real bills via `/start` with no click-by-click guidance |
+| **T2** Cited trust | Is the evidence believed? | Unprompted, they open or point at the cited receipt, or ask "how do you know?" and are satisfied by the citation. Silence is not a pass |
+| **T3** Decision (**= First value**, §1) | Do they act before the charge? | They record Keep / Review later / Plan to cancel on their own-evidence card. Verify the `recovery_decision_cycles` row exists — do not score from telemetry |
+| **T4** Continuation | Do they want the loop after first value? | Without a founder pitch, they ask how Vognary stays current, add a second evidence batch, open Sources, or begin the private billing-forwarding setup. Saying “useful” without continuation behavior is a FAIL |
+
+**Also record, once per session:**
+
+```text
+Seconds landing → T3               <n>   ← the only time-to-first-decision number
+Memory check, asked after T3: "what happens next?" <verbatim>  ← record whether
+  they name the frozen amount/date or next matching receipt; "it reminds me" is insufficient
+Visual direction, asked only at the end: "does this look like something you'd
+  put a card behind?"  <verbatim>       ← statement-class evidence (§3), weakest
+  tier; never let it outrank a T0–T4 behavior
+Founder rescues: <n>   Errors seen: <exact text>   Useful? honest/useful-not-yet/not useful
+```
+
+### What the five sessions are allowed to authorize
+
+After **five** independent scored sessions (not five reruns with one person):
+
+- A step scoring `FAIL` or `RESCUED` in **≥2 of 5** sessions is a real defect.
+  It enters the existing Phase-N gate in §3 — it does **not** auto-authorize a
+  build.
+- One person's dislike authorizes nothing. Fix the underlying job, not the
+  literal request (§3).
+- Visual/aesthetic preference alone never authorizes a design pass. Only a
+  T0/T2 behavioral failure can, and then only the specific surface that failed.
+- If T0–T3 each pass in **≥4 of 5**, T4 passes in **≥2 of 5**, and no
+  money/trust P0 appears, the first-session presentation is not the constraint
+  and the bounded retention P1 may enter the existing Phase-N gate. This is
+  eligibility to evaluate P1, not automatic permission to implement every
+  documented item.
+- If T0–T3 pass but T4 fails in 4 or 5 sessions, do not build notification or
+  verdict delivery. Investigate why the ongoing evidence loop is unwanted.
