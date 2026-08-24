@@ -4,13 +4,13 @@ test("the first-value path leads into the product without a cancel promise", asy
   const failures = collectRuntimeFailures(page);
   await page.goto("/");
 
-  const primary = page.locator("section").filter({ has: page.getByRole("heading", { name: "See what your company is about to pay. Decide before the card fires." }) })
-    .getByRole("link", { name: "Review one bill", exact: true });
+  const primary = page.locator("section").filter({ has: page.getByRole("heading", { name: "Know what renews. Decide what stays." }) })
+    .getByRole("link", { name: "Check a bill", exact: true });
   await expect(primary).toBeVisible();
   await expect(primary).toHaveAttribute("href", "/start");
   await primary.click();
   await expect(page).toHaveURL(/\/start/);
-  await expect(page.getByRole("heading", { name: "See what this bill means before the next charge." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "See the charge. Make the decision." })).toBeVisible();
   await page.goto("/");
   await expect(page.getByRole("link", { name: "Request a private audit" })).toHaveCount(0);
   expect(failures).toEqual([]);

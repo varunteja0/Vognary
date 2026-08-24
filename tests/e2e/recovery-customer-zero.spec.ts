@@ -55,7 +55,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 1-3. Open landing and establish a saved identity independently of provider activation.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("See what your company is about to pay.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Know what renews. Decide what stays.");
   await tabToAndActivate(page, "Sign in");
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
@@ -63,18 +63,18 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
 
   // 4-7. Add bills from empty Home, not Gmail setup.
-  await expect(page.getByRole("heading", { name: "Let's review your software stack." })).toBeVisible();
-  await page.getByRole("button", { name: "Add bills" }).click();
+  await expect(page.getByRole("heading", { name: "Start with a software bill." })).toBeVisible();
+  await page.getByRole("button", { name: "Add a bill" }).click();
   const addBills = page.getByRole("dialog", { name: "Add bills" });
   await expect(addBills).toBeVisible();
   await addBills.getByRole("tab", { name: "Paste text" }).click();
   await addBills.getByLabel("Receipt or invoice text").fill(`${firstReceipt}\n\n${secondReceipt}`);
   await addBills.getByRole("button", { name: "Add bills" }).click();
-  await expect(page.getByText(/software bills? (is|are) on the table/)).toBeVisible();
+  await expect(page.getByText(/software bills? found/)).toBeVisible();
   await expect(page.getByText("OpenAI").first()).toBeVisible();
-  await page.getByRole("button", { name: "See Home" }).click();
-  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Coming later" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Next charges" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "What we found" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
@@ -108,10 +108,10 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   }
   await reviewChoice.click();
   await expect(page.getByText(/Saved Review later on/)).toBeVisible();
-  await selectRecoveryView(page, "Home");
+  await selectRecoveryView(page, "Now");
   // The decision is remembered for this cycle, so Home stops asking for it.
-  await expect(page.getByRole("heading", { name: "Nothing to decide right now" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "You're caught up" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decide now" })).toHaveCount(0);
   await openCommitment(page, "OpenAI");
 
   // 16-20. Correct every contract field through the modal UI.
@@ -176,23 +176,24 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);
   await loginAsDevelopmentUser(page);
-  await expect(page.getByText("OpenAI India").first()).toBeVisible();
+  await openCommitment(page, "OpenAI India");
+  await expect(page.getByText(/Saved I don’t recognize this on/)).toBeVisible();
 
   // 29. Add later evidence and verify a real Changed event replaces the baseline.
   await openAddBills(page);
   await page.getByLabel("Receipt or invoice text").fill(laterReceipt);
   await page.getByRole("dialog", { name: "Add bills" }).getByRole("button", { name: "Add bills" }).click();
-  await expect(page.getByRole("heading", { name: "Recent change" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
   await expect(page.getByText("Amount changed").first()).toBeVisible();
 
   // 30. Unproven automation authority stays out of the public workspace.
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   // The next charge is months away, so Home stays calm instead of manufacturing urgency.
-  await expect(page.getByRole("heading", { name: "Nothing to decide right now" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "You're caught up" })).toBeVisible();
 
   // 31. Exercise canonical export and canonical deletion through Account settings.
   await openAccount(page);
@@ -254,7 +255,7 @@ async function loginAsDevelopmentUser(page: Page) {
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
 }
 
-async function selectRecoveryView(page: Page, name: "Home" | "Commitments" | "Sources" | "Mandate") {
+async function selectRecoveryView(page: Page, name: "Now" | "Bills" | "Receipts" | "Automation") {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name }).click();
 }
 
@@ -264,19 +265,19 @@ async function openAddBills(page: Page) {
     await overlay.getByRole("tab", { name: "Paste text" }).click();
     return;
   }
-  const addBills = page.getByRole("button", { name: "Add bills" });
+  const addBills = page.getByRole("button", { name: "Add a bill" });
   if (await addBills.first().isVisible()) {
     await addBills.first().click();
   } else {
-    await selectRecoveryView(page, "Sources");
-    await page.getByRole("button", { name: "Add bills" }).click();
+    await selectRecoveryView(page, "Receipts");
+    await page.getByRole("button", { name: "Add a bill" }).click();
   }
   await expect(overlay).toBeVisible();
   await overlay.getByRole("tab", { name: "Paste text" }).click();
 }
 
 async function openCommitment(page: Page, merchant: string) {
-  await selectRecoveryView(page, "Commitments");
+  await selectRecoveryView(page, "Bills");
   const heading = page.getByRole("heading", { name: merchant, exact: true });
   if (await heading.isVisible()) return;
   const commitment = page.getByRole("button", { name: new RegExp(merchant) }).first();

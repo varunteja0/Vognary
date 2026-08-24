@@ -9,7 +9,7 @@ test("legacy product routes resolve to canonical launch destinations", async ({ 
   for (const legacyPath of ["/guide", "/partners", "/beta-readiness", "/integration-model"]) {
     await page.goto(legacyPath);
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByRole("heading", { name: "See what your company is about to pay. Decide before the card fires." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Know what renews. Decide what stays." })).toBeVisible();
   }
 
   await page.goto("/launch");

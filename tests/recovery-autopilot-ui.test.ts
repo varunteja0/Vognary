@@ -51,7 +51,7 @@ test("active mandate still publishes the first-value spend strip when no recurri
 });
 
 test("landing copy stays on the commitment decision; autopilot claims do not leak onto public pages", () => {
-  assert.match(landingSource, /one billing receipt you already have/);
+  assert.match(landingSource, /One receipt is enough to begin/);
   assert.doesNotMatch(landingSource, /standing mandate|Exception-only home|money stops without chores/i);
   assert.match(homeSource, /home\.autopilot\?\.mandate\?\.status === "ACTIVE"/);
 });

@@ -11,10 +11,10 @@ test("manual financial evidence is not exposed before sign-in", async ({ page })
 test("landing walkthrough is explicitly illustrative and never presented as customer proof", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "See what your company is about to pay. Decide before the card fires." })).toBeVisible();
-  await expect(page.getByText(/Cursor Pro charges ₹1,700\.00/)).toBeVisible();
-  await expect(page.getByText("From the example receipt", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Illustrative walkthrough, not a claim about your company/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Know what renews. Decide what stays." })).toBeVisible();
+  await expect(page.getByText("Cursor Pro · ₹1,700", { exact: true })).toBeVisible();
+  await expect(page.getByText("From two example receipts", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Example only\. Your review uses your receipts/)).toBeVisible();
   await expect(page.getByText(/sample audit|customer result|verified saving/i)).toHaveCount(0);
   await expect(page.locator("#product-ledger")).toHaveCount(0);
   await expect(page.getByText(/Vognary caught|founders saved|customers saved/i)).toHaveCount(0);

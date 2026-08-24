@@ -204,19 +204,39 @@ export default function StartClient() {
         <Link href="/login?next=/app" className="btn btn-sm btn-ghost">Sign in</Link>
       </nav>
 
-      <p className="eyebrow eyebrow-xs mt-10 text-ochre">Your first decision</p>
-      <h1 className="mt-3 max-w-2xl font-display text-4xl font-semibold leading-tight tracking-tight text-(--ink) sm:text-5xl">
-        See what this bill means before the next charge.
+      <p className="eyebrow mt-10 text-ochre">Check a software bill</p>
+      <h1 className="mt-3 max-w-2xl font-display text-3xl font-semibold leading-tight text-(--ink) sm:text-4xl">
+        See the charge. Make the decision.
       </h1>
-      <p className="mt-4 max-w-2xl text-base leading-7 text-(--muted)">
-        Drop or paste one real receipt. Vognary extracts only what it can verify, shows the evidence, and asks what you want remembered.
+      <p className="mt-3 max-w-2xl text-base leading-7 text-(--muted)">
+        Upload or paste a receipt. Vognary pulls out the merchant, amount, and date, then asks whether to keep it, review it, or plan to cancel.
       </p>
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-(--muted)">
-        No account required. Nothing is saved to Vognary until you sign in. Google is only for sign-in; Vognary does not access Gmail.
+      <p className="mt-2 text-sm leading-6 text-(--muted)">
+        No account needed. Nothing is saved until you sign in.
       </p>
 
-      <div className="mt-8 grid gap-4">
-        <BillDropzone disabled={pending} preparing={pending} onFilesChosen={(files) => void addFiles(files)} />
+      <section className="mt-7 border-y border-line py-6">
+        <div className="grid gap-5 lg:grid-cols-2">
+          <BillDropzone disabled={pending} preparing={pending} onFilesChosen={(files) => void addFiles(files)} />
+          <div className="grid content-start gap-3">
+            <label htmlFor="start-receipt" className="field-label">Or paste the receipt</label>
+            <textarea
+              id="start-receipt"
+              value={receiptText}
+              onChange={(event) => setReceiptText(event.target.value)}
+              className="field min-h-40 resize-y"
+              placeholder="Cursor Pro paid USD 20.00 on 28 August 2026."
+            />
+            <button
+              type="button"
+              className="btn btn-primary btn-lg justify-self-start"
+              disabled={pending || (!receiptText.trim() && statementSources.length === 0)}
+              onClick={() => void analyzeWith(receiptText, statementSources)}
+            >
+              {pending ? "Reading the bill…" : "Check this bill"}
+            </button>
+          </div>
+        </div>
         {imageDrafts.map((draft) => (
           <ConfirmReceiptLine
             key={draft.clientRef}
@@ -231,34 +251,18 @@ export default function StartClient() {
             onRemove={() => setImageDrafts((current) => current.filter((item) => item.clientRef !== draft.clientRef))}
           />
         ))}
-        <label htmlFor="start-receipt" className="field-label">Paste a receipt instead</label>
-        <textarea
-          id="start-receipt"
-          value={receiptText}
-          onChange={(event) => setReceiptText(event.target.value)}
-          className="field min-h-40 resize-y"
-          placeholder="Cursor Pro paid USD 20.00 on 28 August 2026."
-        />
-        <button
-          type="button"
-          className="btn btn-primary btn-lg justify-self-start"
-          disabled={pending || (!receiptText.trim() && statementSources.length === 0)}
-          onClick={() => void analyzeWith(receiptText, statementSources)}
-        >
-          {pending ? "Reading the bill…" : "Review this bill"}
-        </button>
         {status ? <p role="alert" className="text-sm leading-6 text-ember">{status}</p> : null}
-      </div>
+      </section>
 
       {hook ? (
         <section className="decision mt-10" data-lead="true" aria-live="polite">
           <div>
-            <p className="eyebrow eyebrow-xs text-ochre">Ready to remember</p>
+            <p className="eyebrow eyebrow-xs text-ochre">Your decision</p>
             <h2 className="decision-hook-title mt-2">{hook.title}</h2>
             <p className="mt-3 text-base leading-7 text-(--ink-soft)">{hook.body}</p>
           </div>
           <div className="decision-evidence">
-            <p className="eyebrow eyebrow-xs">Decision artifact</p>
+            <p className="eyebrow eyebrow-xs">From your receipt</p>
             <p className="decision-evidence-line">
               <strong className="font-display text-lg font-semibold text-(--ink)">{hook.card.amountDisplay}</strong>
               <span>{hook.card.whenLine}</span>
@@ -266,7 +270,7 @@ export default function StartClient() {
             {hook.card.excerpt ? <blockquote className="decision-quote">“{hook.card.excerpt}”</blockquote> : null}
           </div>
           <p className="text-xs leading-5 text-(--muted)">
-            This decision is still only in this browser tab. Sign in to save it and activate the next-window memory.
+            Sign in to save this decision and have Vognary check the next bill.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Link href="/login?next=/app" className="btn btn-primary">
@@ -306,7 +310,7 @@ export default function StartClient() {
         return (
           <article key={card.id} className="decision mt-6" data-lead="true">
             <div>
-              <p className="decision-cue">Decision before the next charge</p>
+              <p className="decision-cue">Needs your decision</p>
               <h2 className="decision-sentence mt-2">{card.sentence}</h2>
             </div>
             {card.excerpt ? (
@@ -316,7 +320,7 @@ export default function StartClient() {
               </div>
             ) : null}
             <div>
-              <p className="eyebrow eyebrow-xs">Why a decision is needed now</p>
+              <p className="eyebrow eyebrow-xs">Why now</p>
               <ul className="reason-list mt-2">
                 {card.overlapMerchants.length ? (
                   <li>{`${card.overlapMerchants.join(" and ")} also appears in the bills you added.`}</li>

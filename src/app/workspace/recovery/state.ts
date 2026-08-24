@@ -27,10 +27,10 @@ export const recoveryViews = ["HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"] 
 export type RecoveryView = (typeof recoveryViews)[number];
 
 export const recoveryViewLabels: Record<RecoveryView, string> = {
-  HOME: "Home",
-  COMMITMENTS: "Commitments",
-  ADD_EVIDENCE: "Sources",
-  MANDATE: "Mandate",
+  HOME: "Now",
+  COMMITMENTS: "Bills",
+  ADD_EVIDENCE: "Receipts",
+  MANDATE: "Automation",
 };
 
 export type RecoveryFailure = { error: RecoveryError; origin: FailureOrigin };

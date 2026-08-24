@@ -14,42 +14,42 @@
      and a single champagne-gold accent for money and action. Legacy
      token names are re-pointed so the whole product re-skins here. --- */
 
-  /* Graphite base */
-  --paper: #0b0c0f;      /* body base */
-  --paper-2: #0e1013;
-  --card: #131519;       /* raised panel */
-  --card-2: #0f1114;     /* recessed inset / field */
-  --card-3: #1a1d23;     /* elevated / hover */
+  /* Cool paper base; graphite is the ink, not a wall of black. */
+  --paper: #f3f5f7;
+  --paper-2: #e9edf1;
+  --card: #ffffff;
+  --card-2: #f7f8fa;
+  --card-3: #edf0f3;
 
   /* Text */
-  --ink: #edeef1;        /* primary */
-  --ink-soft: #a6aab4;   /* secondary */
-  --muted: #8a8e98;      /* labels / muted body */
+  --ink: #171a1f;
+  --ink-soft: #4f5864;
+  --muted: #626b76;
 
-  /* Structure — hairline on graphite */
-  --line: rgba(255, 255, 255, 0.075);
-  --line-strong: rgba(255, 255, 255, 0.13);
+  /* Structure — exact graphite hairlines on paper */
+  --line: rgba(23, 26, 31, 0.10);
+  --line-strong: rgba(23, 26, 31, 0.18);
 
   /* Accent — champagne gold (money / primary / focus) */
-  --gold: #d8b87a;
-  --gold-soft: #e7ce9b;
-  --gold-deep: #bd9c5f;
-  --gold-line: rgba(216, 184, 122, 0.34);
-  --ink-on-gold: #17130a; /* dark ink readable on the gold accent */
-  --dossier-fill: rgba(243, 234, 214, 0.04); /* warm parchment wash on dossier panels */
+  --gold: #c99a45;
+  --gold-soft: #d8b267;
+  --gold-deep: #9b6d22;
+  --gold-line: rgba(155, 109, 34, 0.34);
+  --ink-on-gold: #17130a;
+  --dossier-fill: rgba(155, 109, 34, 0.06);
   --glow: var(--gold);
   --glow-soft: var(--gold-soft);
   --glow-deep: var(--gold-deep);
 
   /* Verdict spectrum — desaturated, refined */
-  --ember: #f0705e;      /* cancel / money out / danger */
-  --ember-tint: rgba(240, 112, 94, 0.12);
-  --verdict: #43c6a0;    /* keep / positive */
-  --verdict-tint: rgba(67, 198, 160, 0.12);
-  --ochre: #e0a54e;      /* watch */
-  --ochre-tint: rgba(224, 165, 78, 0.12);
-  --indigo: #8891e8;     /* downgrade / info */
-  --indigo-tint: rgba(136, 145, 232, 0.14);
+  --ember: #bd493d;
+  --ember-tint: rgba(189, 73, 61, 0.10);
+  --verdict: #19745b;
+  --verdict-tint: rgba(25, 116, 91, 0.10);
+  --ochre: #95631c;
+  --ochre-tint: rgba(149, 99, 28, 0.10);
+  --indigo: #515aa6;
+  --indigo-tint: rgba(81, 90, 166, 0.10);
 
   /* Featured dark surfaces (hero / exhibit) */
   --dossier: #0c0e12;
@@ -80,8 +80,8 @@
   --space-6: 2rem;
   --space-7: 3rem;
   --space-8: 4rem;
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.035), 0 20px 46px -26px rgba(0, 0, 0, 0.8);
+  --shadow-1: 0 1px 2px rgba(23, 26, 31, 0.08);
+  --shadow-2: 0 1px 2px rgba(23, 26, 31, 0.05), 0 18px 42px -28px rgba(23, 26, 31, 0.28);
   --shadow-ink: var(--shadow-2);
   --motion-fast: 160ms;
   --motion-enter: 450ms;
@@ -112,9 +112,11 @@ html {
 
 body {
   background:
-    radial-gradient(90% 60% at 50% -12%, rgba(255, 255, 255, 0.030), transparent 60%),
-    radial-gradient(60% 40% at 94% -4%, rgba(216, 184, 122, 0.05), transparent 55%),
+    linear-gradient(rgba(23, 26, 31, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 26, 31, 0.018) 1px, transparent 1px),
+    radial-gradient(70% 45% at 92% -8%, rgba(201, 154, 69, 0.12), transparent 60%),
     var(--paper);
+  background-size: 32px 32px, 32px 32px, auto, auto;
   color: var(--ink);
   font-family: var(--font-grotesk), ui-sans-serif, system-ui, sans-serif;
   letter-spacing: 0;
@@ -122,14 +124,14 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Vignette — seats content in the dark */
+/* A quiet edge wash keeps the paper from reading as an empty white canvas. */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(130% 100% at 50% 26%, transparent 58%, rgba(0, 0, 0, 0.42));
+  background: radial-gradient(130% 100% at 50% 20%, transparent 66%, rgba(23, 26, 31, 0.035));
 }
 
 button,
@@ -161,12 +163,12 @@ select {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(23, 26, 31, 0.18);
   border: 3px solid var(--paper);
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(23, 26, 31, 0.28);
 }
 
 /* ------------------------------------------------------------------ *
@@ -250,7 +252,7 @@ select {
 .panel {
   position: relative;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 38%),
+    linear-gradient(180deg, rgba(23, 26, 31, 0.012), transparent 38%),
     var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -351,7 +353,7 @@ select {
 }
 .btn-ghost:hover {
   border-color: var(--line-strong);
-  background: #21252c;
+  background: var(--paper-2);
 }
 .btn-ondark {
   background: transparent;
@@ -648,7 +650,7 @@ select.field option {
 }
 .stamp-investigate {
   color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(23, 26, 31, 0.05);
 }
 
 /* Status pills (readiness / coverage) */
@@ -667,7 +669,7 @@ select.field option {
 .pill-ready { color: var(--verdict); background: var(--verdict-tint); }
 .pill-partial { color: var(--indigo); background: var(--indigo-tint); }
 .pill-blocked { color: var(--ember); background: var(--ember-tint); }
-.pill-planned { color: var(--ink-soft); background: rgba(255, 255, 255, 0.05); }
+.pill-planned { color: var(--ink-soft); background: rgba(23, 26, 31, 0.05); }
 
 /* ------------------------------------------------------------------ *
  * Decision objects — the pre-renewal queue

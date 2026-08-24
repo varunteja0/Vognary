@@ -118,7 +118,7 @@ test("every contract enum has presentation copy, so a contract change cannot ren
 
 test("primary navigation keeps Mandate hidden until delivery is proven or authority already exists", () => {
   assert.deepEqual([...recoveryViews], ["HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
-  assert.deepEqual(Object.values(recoveryViewLabels), ["Home", "Commitments", "Sources", "Mandate"]);
+  assert.deepEqual(Object.values(recoveryViewLabels), ["Now", "Bills", "Receipts", "Automation"]);
   assert.match(clientSource, /<nav aria-label="Primary"/);
   assert.match(clientSource, /mandateAvailable/);
   assert.match(clientSource, /noticeReadiness\.state === "proven-ready"/);
@@ -130,15 +130,17 @@ test("primary navigation keeps Mandate hidden until delivery is proven or author
 });
 
 test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
-  assert.match(landingSource, /one billing receipt you already have/);
-  assert.match(landingSource, /what renews next/);
+  assert.match(landingSource, /One receipt is enough to begin/);
+  assert.match(landingSource, /Know what renews/);
   assert.match(loginSource, /what renews next/);
-  assert.match(allSource, /Let's review your software stack/);
-  assert.match(allSource, /Add a few recent software bills/);
+  assert.match(allSource, /Start with a software bill/);
+  assert.match(allSource, /Add a receipt to see the charge/);
   assert.doesNotMatch(landingSource, /Want it done for you\?/);
   assert.doesNotMatch(landingSource, /href="\/private-audit"/);
   assert.match(clientSource, />Vognary</);
-  assert.match(landingSource, /No account to start\. No bank password\. No mailbox access\./);
+  assert.match(landingSource, /No account required/);
+  assert.match(landingSource, /No bank passwords/);
+  assert.match(landingSource, /No mailbox access/);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
   assert.doesNotMatch(landingSource, /Set up billing forwarding once so matching mail keeps arriving/);
 });
@@ -159,7 +161,7 @@ test("the decision card puts cited evidence and cycle memory on the same object 
 });
 
 test("home leads with the pre-renewal decision queue and cited spend activation", () => {
-  for (const heading of ["Decisions due soon", "Coming later", "Recent change"]) {
+  for (const heading of ["Decide now", "Next charges", "What changed"]) {
     assert.ok(homeSource.includes(heading), `home must render ${heading}`);
   }
   assert.doesNotMatch(homeSource, /What we found/);
@@ -182,7 +184,7 @@ test("home leads with the pre-renewal decision queue and cited spend activation"
     homeSource.indexOf("<RecoveryAutopilotHome") < homeSource.indexOf("<SpendHero"),
     "active Autopilot actions must render above cited spend metrics",
   );
-  assert.match(homeSource, /Coming later/);
+  assert.match(homeSource, /Next charges/);
   assert.match(homeSource, /comingLaterItems\(home\)/);
   assert.doesNotMatch(homeSource, /home\.next\.map/);
   assert.match(homeSource, /No recurring amount yet/);
@@ -193,7 +195,7 @@ test("home leads with the pre-renewal decision queue and cited spend activation"
 });
 
 test("returning Home stays quiet unless a real change or attention item exists", () => {
-  assert.match(allSource, /Keep Vognary current/);
+  assert.match(allSource, /Keep receipts coming/);
   assert.doesNotMatch(homeSource, /Sheets go stale when new charges land/);
   assert.doesNotMatch(homeSource, /This is a floor from receipts checked, not every software bill\./);
   assert.doesNotMatch(homeSource, /home\.confidenceLayers/);
@@ -209,8 +211,8 @@ test("returning Home stays quiet unless a real change or attention item exists",
 test("an empty Home leads with adding bills, not Gmail setup", () => {
   assert.match(clientSource, /void loadSources\(\)/);
   assert.match(clientSource, /receiptInbox=\{state\.receiptInbox\}/);
-  assert.match(allSource, /Let's review your software stack/);
-  assert.match(allSource, /Add a few recent software bills/);
+  assert.match(allSource, /Start with a software bill/);
+  assert.match(allSource, /Add a receipt to see the charge/);
   assert.match(allSource, /No mailbox access required/);
   assert.match(clientSource, /onOpenSources=/);
   assert.doesNotMatch(homeSource, /Finish one-time billing setup/);

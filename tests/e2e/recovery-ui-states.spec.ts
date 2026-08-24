@@ -124,7 +124,7 @@ async function mockEmptyWorkspace(page: Page, home = emptyHome) {
 }
 
 async function openAddBills(page: Page) {
-  await page.getByRole("button", { name: "Add bills" }).first().click();
+  await page.getByRole("button", { name: "Add a bill" }).first().click();
   const overlay = page.getByRole("dialog", { name: "Add bills" });
   await expect(overlay).toBeVisible();
   await overlay.getByRole("tab", { name: "Paste text" }).click();
@@ -136,8 +136,8 @@ test("an empty workspace offers exactly one obvious add-bills action", async ({ 
   const { activationCalls } = await mockEmptyWorkspace(page);
   await page.goto("/app");
 
-  await expect(page.getByRole("heading", { name: "Let's review your software stack." })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add bills" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start with a software bill." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add a bill" })).toBeVisible();
   await expect(page.getByText("No mailbox access required.")).toBeVisible();
   const overlay = await openAddBills(page);
   await expect(overlay.getByRole("heading", { name: "Add bills" })).toBeVisible();
@@ -158,10 +158,10 @@ test("one observed charge asks for a matching receipt instead of rendering an al
   await expect(observed.getByText("Figma", { exact: true })).toBeVisible();
   await expect(observed.getByText("₹1,499.00", { exact: true })).toBeVisible();
   await expect(page.getByText("Nothing needs attention right now")).toHaveCount(0);
-  await expect(observed.getByRole("button", { name: "Add bills" })).toBeVisible();
+  await expect(observed.getByRole("button", { name: "Add a bill" })).toBeVisible();
   await expectNoSeriousAxeViolations(page, "one-observation Home");
 
-  await observed.getByRole("button", { name: "Add bills" }).click();
+  await observed.getByRole("button", { name: "Add a bill" }).click();
   await expect(page.getByRole("dialog", { name: "Add bills" })).toBeVisible();
   expect(activationCalls).toEqual([]);
 });
@@ -229,7 +229,7 @@ test("receipt onboarding shows proven forwarding, backfill, and sender trust", a
   }));
 
   await page.goto("/app");
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Receipts" }).click();
   await expect(page.getByRole("heading", { name: "Stay up to date" })).toBeVisible();
   await expect(page.getByText("Status: On")).toBeVisible();
   await page.getByText("Older bills", { exact: true }).click();
@@ -238,7 +238,7 @@ test("receipt onboarding shows proven forwarding, backfill, and sender trust", a
   await expect(page.getByRole("link", { name: "Google's attachment instructions" })).toHaveAttribute("href", /answer\/9261412/);
   await expectNoSeriousAxeViolations(page, "receipt onboarding");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Home" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Now" }).click();
   await expect(page.getByRole("heading", { name: "Not enough history yet" })).toBeVisible();
 });
 
@@ -361,9 +361,9 @@ test("empty Home and the add-bills overlay fit a 390px phone", async ({ page }) 
   await signIn(page);
   await mockEmptyWorkspace(page);
   await page.goto("/app");
-  await expect(page.getByRole("heading", { name: "Let's review your software stack." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start with a software bill." })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
-  await page.getByRole("button", { name: "Add bills" }).click();
+  await page.getByRole("button", { name: "Add a bill" }).click();
   const overlay = page.getByRole("dialog", { name: "Add bills" });
   await expect(overlay.getByText("Drop bills or receipts here")).toBeVisible();
   await overlay.getByRole("tab", { name: "Paste text" }).click();
@@ -403,7 +403,7 @@ test("Gmail wizard step 1 fits a 390px phone", async ({ page }) => {
     }),
   }));
   await page.goto("/app");
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Receipts" }).click();
   await expect(page.getByRole("heading", { name: "Stay up to date" })).toBeVisible();
   await page.getByRole("button", { name: "Continue setup" }).click();
   await expect(page.getByRole("heading", { name: "Verify your private Vognary address" })).toBeVisible();

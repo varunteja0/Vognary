@@ -17,15 +17,16 @@ test("the public page is a cacheable readiness-neutral shell", () => {
 
 test("the landing selects the guest-first proven entry path without instant-audit surfaces", () => {
   assert.match(landingSource, /const primaryHref = "\/start";/);
-  assert.match(landingSource, /const primaryLabel = "Review one bill";/);
+  assert.match(landingSource, /const primaryLabel = "Check a bill";/);
   assert.match(landingSource, /<LandingDecisionPreview \/>/);
   assert.doesNotMatch(landingSource, /sample|demo|InstantAudit|instant audit/i);
 });
 
 test("the landing states concise evidence and action boundaries without unsupported claims", () => {
-  assert.match(landingSource, /When private billing forwarding is available, Sources can keep receipt evidence current without reading your mailbox/);
-  assert.match(landingPreviewSource, /From the example receipt/);
-  assert.match(landingPreviewSource, /Your review is built from evidence you add\. Unknown stays unknown/);
+  assert.match(landingSource, /No bank passwords/);
+  assert.match(landingSource, /No mailbox access/);
+  assert.match(landingPreviewSource, /From two example receipts/);
+  assert.match(landingPreviewSource, /unsupported facts stay unknown/);
   assert.match(landingSource, /Vognary never cancels a service or moves money/);
   assert.doesNotMatch(landingSource, /30 days/i);
   assert.doesNotMatch(landingSource, /only billing evidence you intentionally forward/i);

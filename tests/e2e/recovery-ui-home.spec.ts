@@ -275,14 +275,14 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 
   const nav = page.getByRole("navigation", { name: "Primary" });
-  for (const label of ["Home", "Commitments", "Sources"]) {
+  for (const label of ["Now", "Bills", "Receipts"]) {
     await expect(nav.getByRole("button", { name: label })).toBeVisible();
   }
-  await expect(nav.getByRole("button", { name: "Mandate" })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Automation" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: `Account for ${email}` })).toHaveAttribute("href", "/profile");
 
-  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Coming later" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Next charges" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What we found" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Since your last visit" })).toHaveCount(0);
@@ -293,7 +293,7 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByText("OpenAI charges ₹1,999.00").first()).toBeVisible();
   await expect(page.getByText("OpenAI invoice paid INR 1,999. Renews monthly.")).toBeVisible();
   await expect(page.getByRole("button", { name: "See the cited receipt" })).toBeVisible();
-  await expect(page.getByText("Why a decision is needed now")).toBeVisible();
+  await expect(page.getByText("Why now")).toBeVisible();
   await expect(page.getByRole("button", { name: "Keep", exact: true })).toBeVisible();
   await expect(page.getByText("Annualized estimate", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Copy summary" })).toHaveCount(0);
@@ -332,9 +332,9 @@ test("later evidence produces a genuine changed list instead of a baseline", asy
   );
   await page.goto("/app");
 
-  await expect(page.getByRole("heading", { name: "Recent change" })).toBeVisible();
-  const changedBox = await page.getByRole("heading", { name: "Recent change" }).boundingBox();
-  const decisionsBox = await page.getByRole("heading", { name: "Decisions due soon" }).boundingBox();
+  await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
+  const changedBox = await page.getByRole("heading", { name: "What changed" }).boundingBox();
+  const decisionsBox = await page.getByRole("heading", { name: "Decide now" }).boundingBox();
   expect(decisionsBox?.y).toBeLessThan(changedBox?.y ?? 0);
   await expect(page.getByText("Amount changed")).toBeVisible();
   await expect(page.getByText("OpenAI").first()).toBeVisible();
@@ -346,7 +346,7 @@ test("a commitment exposes its exact evidence and returns focus after inspection
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   await expect(page.getByRole("heading", { name: "OpenAI" })).toBeVisible();
@@ -380,7 +380,7 @@ test("three primary choices and two secondary choices preserve the server decisi
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   const group = page.getByRole("group", { name: "Your choice" });
@@ -407,7 +407,7 @@ test("a rejected decision rolls back visibly and states what the workspace still
   });
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
   await page.getByRole("group", { name: "Your choice" }).getByRole("button", { name: /^Plan to cancel/ }).click();
 
@@ -423,7 +423,7 @@ test("correcting a commitment offers every contract field and shows reversible h
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   await page.getByText("Something wrong?").click();
@@ -453,10 +453,10 @@ test("the workspace stays usable and keyboard-reachable on a 390px phone", async
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   expect(overflow).toBe(false);
 
-  const commitmentsTab = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" });
+  const commitmentsTab = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" });
   await commitmentsTab.focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 2, name: "Commitments" })).toBeFocused();
+  await expect(page.getByRole("heading", { level: 2, name: "Bills" })).toBeFocused();
 });
 
 test("Mandate stays hidden until notice delivery is proven", async ({ page }) => {
@@ -464,7 +464,7 @@ test("Mandate stays hidden until notice delivery is proven", async ({ page }) =>
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toHaveCount(0);
 });
 
@@ -587,10 +587,10 @@ test("an active mandate still shows the spend strip when no recurring amount is 
   await page.goto("/app");
 
   await expect(page.getByText("Exception-only home")).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Mandate" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toBeVisible();
   await expect(page.getByText("Software commitments")).toBeVisible();
   await expect(page.getByText("No recurring amount yet")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Coming later" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Next charges" })).toBeVisible();
 });
 
 test("Home posts activation only after a cited recurring-spend picture actually renders", async ({ page }) => {
@@ -633,7 +633,7 @@ test("Home posts activation only after a cited recurring-spend picture actually 
   );
 
   await signIn(page);
-  await expect(page.getByRole("heading", { level: 2, name: "Home" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Now" })).toBeVisible();
   await expect(page.getByText("Software commitments")).toHaveCount(0);
   expect(activationCalls).toEqual([]);
 
@@ -649,10 +649,10 @@ test("Home posts activation only after a cited recurring-spend picture actually 
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
   await page.goto("/app");
-  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(1);
 });
@@ -686,20 +686,20 @@ test("Home records activation after analytics opt-in on a tab that previously re
   });
 
   await signIn(page);
-  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   expect(activationCalls[0]).toEqual({ status: 202 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
 
   consented = true;
   await page.goto("/app");
-  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(2);
   expect(activationCalls[1]).toEqual({ status: 201 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBe("1");
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(2);
 });
@@ -737,19 +737,19 @@ test("Home records activation after a 401 once the tab can authenticate again", 
   });
 
   await signIn(page);
-  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   expect(activationCalls[0]).toEqual({ status: 401 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
 
   authenticated = true;
   await page.goto("/app");
-  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(2);
   expect(activationCalls[1]).toEqual({ status: 201 });
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Decisions due soon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(activationCalls).toHaveLength(2);
 });
@@ -929,7 +929,7 @@ test("Sources tab disconnects cited Recovery sources without rotating the receip
     });
   });
   await page.goto("/app");
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Receipts" }).click();
   await page.getByText("Advanced").click();
   await expect(page.getByText("Pasted OpenAI receipt")).toBeVisible();
   await expect(page.getByText("Pasted bill · Connected")).toBeVisible();
@@ -955,7 +955,7 @@ test("Sources tab disconnects cited Recovery sources without rotating the receip
     }),
   );
   await page.reload();
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Receipts" }).click();
   await page.getByText("Advanced").click();
   await expect(page.getByText("Pasted bill · Disconnected")).toBeVisible();
   await page.getByRole("button", { name: "Reconnect source" }).click();

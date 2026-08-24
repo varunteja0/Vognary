@@ -292,15 +292,15 @@ function FirstResultHome({
   return (
     <section aria-label="Import results" className="w-full max-w-2xl py-4 sm:py-6">
       <p className="text-sm leading-6 text-(--muted)">
-        {count === 1 ? "1 software bill is on the table." : `${count.toLocaleString("en-IN")} software bills are on the table.`}
+        {count === 1 ? "1 software bill found." : `${count.toLocaleString("en-IN")} software bills found.`}
       </p>
       {lastHook ? <DecisionHook hook={lastHook} onReminderConsent={onReminderConsent} /> : null}
       {queue.length ? (
         <>
           <h3 className="mt-2 font-display text-2xl font-semibold tracking-tight text-(--ink) sm:text-3xl">
             {queue.length === 1
-              ? "Decide this before the next charge"
-              : `${queue.length.toLocaleString("en-IN")} need a decision before the next charge`}
+              ? "Choose what happens next"
+              : `${queue.length.toLocaleString("en-IN")} charges need a decision`}
           </h3>
           <div className="mt-6 grid gap-3">
             {queue.map((card, index) => (
@@ -447,9 +447,9 @@ function DecisionQueue({
     <section aria-labelledby="recovery-decisions" className="stack-section">
       {lastHook ? <DecisionHook hook={lastHook} onReminderConsent={onReminderConsent} /> : null}
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <SectionHeading id="recovery-decisions">Decisions due soon</SectionHeading>
+        <SectionHeading id="recovery-decisions">Decide now</SectionHeading>
         {queue.length > 1 ? (
-          <p className="font-data text-xs text-(--muted)">{`${queue.length.toLocaleString("en-IN")} charges are close`}</p>
+          <p className="font-data text-xs text-(--muted)">{`${queue.length.toLocaleString("en-IN")} charges need you`}</p>
         ) : null}
       </div>
       <div className="grid gap-3">
@@ -687,7 +687,7 @@ function ComingLater({
   if (!shouldShowComingUp(home) || later.length === 0) return null;
   return (
     <section aria-labelledby="recovery-next" className="stack-section">
-      <SectionHeading id="recovery-next">Coming later</SectionHeading>
+      <SectionHeading id="recovery-next">Next charges</SectionHeading>
       <ul className="ledger-list grid">
         {later.map((item) => (
           <UpcomingRow key={`${item.commitmentId}-${item.date}`} item={item} onOpenCommitment={onOpenCommitment} />
@@ -781,7 +781,7 @@ function RecentChange({
 }) {
   return (
     <section aria-labelledby="recovery-changed" className="stack-section">
-      <SectionHeading id="recovery-changed">Recent change</SectionHeading>
+      <SectionHeading id="recovery-changed">What changed</SectionHeading>
       <ul className="ledger-list grid">
         {items.map((item) => (
           <li key={item.id}>

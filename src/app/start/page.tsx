@@ -6,7 +6,7 @@ import StartClient from "./start-client";
 
 export const metadata: Metadata = {
   title: "Review a bill",
-  description: "See what a software bill means before the next charge. Nothing is saved until you sign in.",
+  description: "Check a software bill, see the next charge, and decide what should happen. Nothing is saved until you sign in.",
   robots: { index: false, follow: false },
 };
 

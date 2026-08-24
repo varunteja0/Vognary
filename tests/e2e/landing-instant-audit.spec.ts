@@ -4,21 +4,22 @@ import { expect, test } from "@playwright/test";
 test("the landing demonstrates the decision loop and sends visitors to their own bill", async ({ page }) => {
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "See what your company is about to pay. Decide before the card fires." });
+  const heading = page.getByRole("heading", { level: 1, name: "Know what renews. Decide what stays." });
   const hero = page.locator("section").filter({ has: heading });
   await expect(heading).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
 
-  const getStarted = hero.getByRole("link", { name: "Review one bill", exact: true });
+  const getStarted = hero.getByRole("link", { name: "Check a bill", exact: true });
   const signIn = page.getByRole("navigation", { name: "Public" }).getByRole("link", { name: "Sign in", exact: true });
   await expect(getStarted).toHaveAttribute("href", "/start");
   await expect(signIn).toHaveAttribute("href", "/login?next=/app");
 
-  await expect(page.getByText(/No account to start\. No bank password\. No mailbox access\./)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "See Vognary do the work." })).toBeVisible();
-  await expect(page.getByText("From the example receipt", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Illustrative walkthrough, not a claim about your company/)).toBeVisible();
-  await expect(page.getByText(/Evidence → Decision → Verification/)).toBeVisible();
+  await expect(page.getByText("No account required", { exact: true })).toBeVisible();
+  await expect(page.getByText("No bank passwords", { exact: true })).toBeVisible();
+  await expect(page.getByText("No mailbox access", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cursor costs ₹350 more this month." })).toBeVisible();
+  await expect(page.getByText("From two example receipts", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Example only\. Your review uses your receipts/)).toBeVisible();
 
   await page.getByRole("button", { name: "Review later", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Cursor Pro — review later" })).toBeVisible();
@@ -38,8 +39,8 @@ test("the mobile landing keeps the primary action visible without overflow", asy
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "See what your company is about to pay. Decide before the card fires." });
-  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Review one bill", exact: true });
+  const heading = page.getByRole("heading", { level: 1, name: "Know what renews. Decide what stays." });
+  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Check a bill", exact: true });
   await expect(getStarted).toBeVisible();
   const actionBottom = await getStarted.evaluate((element) => element.getBoundingClientRect().bottom);
   const metrics = await page.evaluate(() => ({
