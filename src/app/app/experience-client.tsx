@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import type { RecoveryCutoverStatus } from "@/lib/recovery/contracts";
 
 // Signed-in readers get the canonical Recovery workspace. The retired monolith
@@ -40,7 +41,7 @@ function LegacyContinuityBlock({ counts }: { counts: RecoveryCutoverStatus["coun
             </div>
           ))}
         </dl>
-        <a href="/profile#privacy-export" className="btn btn-primary mt-5">Open canonical data export</a>
+        <Link href="/profile#privacy-export" className="btn btn-primary mt-5">Open canonical data export</Link>
       </section>
     </main>
   );

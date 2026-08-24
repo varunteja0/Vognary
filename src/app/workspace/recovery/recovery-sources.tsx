@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import type { ReceiptInboxStatusDto, RecoveryEvidenceSourceDto } from "@/lib/recovery/contracts";
 import { customerInboxStatus, customerInboxStatusLabel, customerPhrases, gmailWizardStep, inboxFailureCopy, type CustomerInboxStatus } from "./present";
@@ -62,7 +63,7 @@ export function RecoverySources({
           <StayUpToDateHeading />
           <p className="text-sm leading-6 text-(--muted)">
             Automatic forwarding is not available yet. Add bills manually. {customerPhrases.trustOnce}{" "}
-            <a href="/security" className="link-quiet">See how your data is handled</a>
+            <Link href="/security" className="link-quiet">See how your data is handled</Link>
           </p>
           <ManualAdd onAddBills={onAddBills} />
           <AdvancedPanel
@@ -127,7 +128,7 @@ export function RecoverySources({
             </StateBlock>
           ) : null}
           <p className="text-sm leading-6 text-(--muted)">
-            {customerPhrases.trustOnce} <a href="/security" className="link-quiet">See how your data is handled</a>
+            {customerPhrases.trustOnce} <Link href="/security" className="link-quiet">See how your data is handled</Link>
           </p>
         </section>
 

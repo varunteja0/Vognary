@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 import type { ConfidenceDto, MoneyDto } from "@/lib/recovery/contracts";
 import { confidenceLabels, confidenceUncertainty, errorCopy } from "./labels";
@@ -77,7 +78,7 @@ export function AuthRequiredBlock() {
       title="This workspace is not open on this device"
       detail="Your saved commitments stay on the server. Sign in with the same account to open them again."
     >
-      <a href="/login?next=/app" className="btn btn-primary">Sign in to continue</a>
+      <Link href="/login?next=/app" className="btn btn-primary">Sign in to continue</Link>
     </StateBlock>
   );
 }

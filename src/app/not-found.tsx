@@ -6,10 +6,11 @@ export default function NotFound() {
     <ErrorState
       eyebrow="Error 404"
       title="Page not found."
-      description="The page you are looking for is not here. Go back to the app or open the brand page."
+      description="The page you are looking for is not here. Return home or use a public index to find the current path."
     >
       <Link href="/" className="btn btn-primary">Back home</Link>
-      <Link href="/brand" className="btn btn-ghost">Brand</Link>
+      <Link href="/llms.txt" className="btn btn-ghost">Agent guide</Link>
+      <Link href="/sitemap.xml" className="btn btn-ghost">Sitemap</Link>
     </ErrorState>
   );
 }

@@ -1,5 +1,84 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { convert } from "html-to-text";
+
+test("the public endpoints expose complete agent-readable contracts without JavaScript", async ({ request }) => {
+  const htmlResponse = await request.get("/", { headers: { accept: "text/html" } });
+  expect(htmlResponse.status()).toBe(200);
+  expect(htmlResponse.headers()["content-type"]).toContain("text/html");
+  expect(htmlResponse.headers().link).toContain('</index.md>; rel="alternate"; type="text/markdown"');
+  expect(htmlResponse.headers().link).toContain('</llms.txt>; rel="describedby"');
+
+  const html = await htmlResponse.text();
+  const visibleText = convert(html, {
+    selectors: [
+      { selector: "script", format: "skip" },
+      { selector: "style", format: "skip" },
+    ],
+  });
+  expect(visibleText.length).toBeGreaterThanOrEqual(500);
+  expect(html.match(/<h1\b/gi)?.length).toBe(1);
+  expect(html.match(/<h2\b/gi)?.length ?? 0).toBeGreaterThanOrEqual(2);
+
+  const jsonLdMatch = html.match(/<script type="application\/ld\+json">([^<]+)<\/script>/);
+  expect(jsonLdMatch).not.toBeNull();
+  const jsonLd = JSON.parse(jsonLdMatch?.[1] ?? "{}") as Record<string, unknown>;
+  expect(jsonLd["@type"]).toBe("SoftwareApplication");
+  expect(jsonLd.name).toBe("Vognary");
+  expect(jsonLd.url).toBe("https://www.vognary.com/");
+
+  const markdownResponse = await request.get("/", { headers: { accept: "text/markdown" } });
+  expect(markdownResponse.status()).toBe(200);
+  expect(markdownResponse.headers()["content-type"]).toBe("text/markdown; charset=utf-8");
+  expect(markdownResponse.headers().vary).toMatch(/(?:^|,\s*)Accept(?:,|$)/i);
+  expect((await markdownResponse.text()).length).toBeGreaterThanOrEqual(500);
+
+  const htmlPreferred = await request.get("/", {
+    headers: { accept: "text/html;q=1, text/markdown;q=0.5" },
+  });
+  expect(htmlPreferred.headers()["content-type"]).toContain("text/html");
+
+  const unsupported = await request.get("/", { headers: { accept: "application/pdf" } });
+  expect(unsupported.status()).toBe(406);
+  expect(unsupported.headers().vary).toMatch(/(?:^|,\s*)Accept(?:,|$)/i);
+
+  const explicitMarkdown = await request.get("/index.md");
+  expect(explicitMarkdown.status()).toBe(200);
+  expect(explicitMarkdown.headers()["content-type"]).toBe("text/markdown; charset=utf-8");
+
+  const llms = await request.get("/llms.txt");
+  expect(llms.status()).toBe(200);
+  expect(llms.headers()["content-type"]).toBe("text/plain; charset=utf-8");
+  expect(await llms.text()).toContain("**When to use Vognary**");
+
+  const robots = await request.get("/robots.txt");
+  expect(robots.status()).toBe(200);
+  expect(robots.headers()["content-type"]).toContain("text/plain");
+  expect(await robots.text()).toContain("Sitemap: https://www.vognary.com/sitemap.xml");
+
+  const sitemap = await request.get("/sitemap.xml");
+  expect(sitemap.status()).toBe(200);
+  expect(sitemap.headers()["content-type"]).toContain("application/xml");
+  expect(await sitemap.text()).toContain("<loc>https://www.vognary.com/</loc>");
+
+  const security = await request.get("/.well-known/security.txt");
+  expect(security.status()).toBe(200);
+  expect(security.headers()["content-type"]).toContain("text/plain");
+
+  const missing = await request.get("/this-agent-readiness-path-does-not-exist");
+  expect(missing.status()).toBe(404);
+  const missingBody = await missing.text();
+  expect(missingBody).toContain('href="/llms.txt"');
+  expect(missingBody).toContain('href="/sitemap.xml"');
+
+  const missingMarkdown = await request.get("/this-agent-readiness-path-does-not-exist", {
+    headers: { accept: "text/markdown" },
+  });
+  expect(missingMarkdown.status()).toBe(404);
+  expect(missingMarkdown.headers()["content-type"]).toBe("text/markdown; charset=utf-8");
+  expect(missingMarkdown.headers().vary).toMatch(/(?:^|,\s*)Accept(?:,|$)/i);
+  expect(await missingMarkdown.text()).toContain("[Agent guide](https://www.vognary.com/llms.txt)");
+});
 
 test("the landing demonstrates the decision loop and sends visitors to their own bill", async ({ page }) => {
   await page.goto("/");

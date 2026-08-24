@@ -1,4 +1,26 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { agentLinkHeader, agentNotFoundMarkdown } from "./lib/agent-content";
+import { appendVaryAccept, preferredRepresentation } from "./lib/http-content-negotiation";
+
+const publicPagePaths = new Set([
+  "/",
+  "/brand",
+  "/security",
+  "/privacy",
+  "/terms",
+  "/start",
+  "/offline",
+  "/verify",
+  "/connect",
+  "/integrations",
+  "/sources",
+  "/guide",
+  "/partners",
+  "/beta-readiness",
+  "/integration-model",
+  "/launch",
+  "/private-audit",
+]);
 
 const retiredModeHtml = `<!doctype html>
 <html lang="en">
@@ -18,7 +40,73 @@ const retiredModeHtml = `<!doctype html>
 </html>`;
 
 export function proxy(request: NextRequest) {
-  if (request.nextUrl.pathname === "/app"
+  const pathname = request.nextUrl.pathname;
+
+  if (pathname === "/index.md") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/api/agent-home";
+    url.search = "";
+    const response = NextResponse.rewrite(url);
+    appendVaryAccept(response.headers);
+    return response;
+  }
+
+  if (pathname === "/") {
+    if (request.headers.has("rsc")) return NextResponse.next();
+
+    const accept = request.headers.get("accept");
+    const representation = preferredRepresentation(accept);
+
+    if (representation === "text/markdown") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/api/agent-home";
+      url.search = "";
+      const response = NextResponse.rewrite(url);
+      response.headers.set("link", agentLinkHeader);
+      appendVaryAccept(response.headers);
+      return response;
+    }
+
+    if (representation === null && accept) {
+      return new NextResponse("Not Acceptable\n\nAvailable: text/html, text/markdown\n", {
+        status: 406,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          vary: "Accept",
+        },
+      });
+    }
+
+    const response = NextResponse.next();
+    response.headers.set("link", agentLinkHeader);
+    appendVaryAccept(response.headers);
+    return response;
+  }
+
+  const isSensitiveProductPath = pathname === "/app"
+    || pathname.startsWith("/app/")
+    || pathname === "/login"
+    || pathname === "/profile"
+    || pathname.startsWith("/profile/")
+    || pathname.startsWith("/billing/");
+
+  if (!isSensitiveProductPath) {
+    if (!publicPagePaths.has(pathname)
+      && preferredRepresentation(request.headers.get("accept")) === "text/markdown") {
+      return new NextResponse(agentNotFoundMarkdown, {
+        status: 404,
+        headers: {
+          "cache-control": "public, max-age=300",
+          "content-type": "text/markdown; charset=utf-8",
+          link: agentLinkHeader,
+          vary: "Accept",
+        },
+      });
+    }
+    return NextResponse.next();
+  }
+
+  if (pathname === "/app"
     && (request.nextUrl.searchParams.has("demo") || request.nextUrl.searchParams.has("guest"))) {
     return new NextResponse(retiredModeHtml, {
       status: 410,
@@ -61,5 +149,8 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/login", "/profile/:path*", "/billing/:path*"],
+  matcher: [
+    "/index.md",
+    "/((?!api|_next/static|_next/image|autopilot|pwa|favicon.ico|icon.svg|apple-icon|opengraph-image.png|twitter-image.png|manifest.webmanifest|robots.txt|sitemap.xml|llms.txt|sw.js).*)",
+  ],
 };
