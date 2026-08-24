@@ -15,7 +15,7 @@
         },
         {
           "type": "response.headers",
-          "op": "append",
+          "op": "set",
           "target": {
             "key": "Vary"
           },

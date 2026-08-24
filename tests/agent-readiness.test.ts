@@ -126,7 +126,7 @@ test("homepage identity and 404 recovery are machine-readable without changing t
   )));
   const finalVary = rootRoute?.transforms?.find((transform) => (
     transform.type === "response.headers"
-    && transform.op === "append"
+    && transform.op === "set"
     && transform.target?.key?.toLowerCase() === "vary"
   ))?.args ?? "";
   for (const token of ["Accept", "RSC", "Next-Router-State-Tree", "Next-Router-Prefetch", "Next-Router-Segment-Prefetch", "Accept-Encoding"]) {
