@@ -4,11 +4,11 @@ import test from "node:test";
 
 const commitmentsSource = readFileSync("src/app/workspace/recovery/recovery-commitments.tsx", "utf8");
 
-test("commitment choices lead with keep, cancel, and monitor", () => {
+test("commitment choices use the same three choices, in the same order, as the Now queue", () => {
   const primaryDecisionSource = commitmentsSource.match(/const primaryDecisions = \[([^\]]+)\] as const/);
 
   assert.ok(primaryDecisionSource, "primary decisions must be declared explicitly");
-  assert.deepEqual(primaryDecisionSource[1].match(/[A-Z]+/g), ["KEEP", "CANCEL", "MONITOR"]);
+  assert.deepEqual(primaryDecisionSource[1].match(/[A-Z]+/g), ["KEEP", "MONITOR", "CANCEL"]);
   assert.match(commitmentsSource, /\{primaryDecisions\.map\(\(decision\) =>/);
   assert.match(commitmentsSource, /aria-label="Your choice"/);
 });

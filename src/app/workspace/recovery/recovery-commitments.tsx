@@ -41,7 +41,9 @@ import { FailureBlock, LoadingBlock, MoneyValue, StateBlock } from "./recovery-s
 import { displayedDecision, type PendingMutation, type RecoveryState } from "./state";
 import { DisclosureTabs } from "./ui/disclosure-tabs";
 
-const primaryDecisions = ["KEEP", "CANCEL", "MONITOR"] as const satisfies readonly Decision[];
+// Same three choices, same order as the Now decision queue: Keep, Review later,
+// then the deliberate one last.
+const primaryDecisions = ["KEEP", "MONITOR", "CANCEL"] as const satisfies readonly Decision[];
 const secondaryDecisions = ["DOWNGRADE", "INVESTIGATE"] as const satisfies readonly Decision[];
 
 export type CommitmentsHandlers = {

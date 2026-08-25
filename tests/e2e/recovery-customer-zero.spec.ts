@@ -65,15 +65,13 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   // 4-7. Add bills from empty Home, not Gmail setup.
   await expect(page.getByRole("heading", { name: "Start with a software bill." })).toBeVisible();
   await page.getByRole("button", { name: "Add a bill" }).click();
-  const addBills = page.getByRole("dialog", { name: "Add bills" });
+  const addBills = page.getByRole("dialog", { name: "Add a bill" });
   await expect(addBills).toBeVisible();
   await addBills.getByRole("tab", { name: "Paste text" }).click();
   await addBills.getByLabel("Receipt or invoice text").fill(`${firstReceipt}\n\n${secondReceipt}`);
-  await addBills.getByRole("button", { name: "Add bills" }).click();
-  await expect(page.getByText(/software bills? found/)).toBeVisible();
-  await expect(page.getByText("OpenAI").first()).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await addBills.getByRole("button", { name: "Add a bill" }).click();
   await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Next charges" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "What we found" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Receipts checked" })).toHaveCount(0);
@@ -182,7 +180,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   // 29. Add later evidence and verify a real Changed event replaces the baseline.
   await openAddBills(page);
   await page.getByLabel("Receipt or invoice text").fill(laterReceipt);
-  await page.getByRole("dialog", { name: "Add bills" }).getByRole("button", { name: "Add bills" }).click();
+  await page.getByRole("dialog", { name: "Add a bill" }).getByRole("button", { name: "Add a bill" }).click();
   await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
   await expect(page.getByText("Amount changed").first()).toBeVisible();
 
@@ -260,7 +258,7 @@ async function selectRecoveryView(page: Page, name: "Now" | "Bills" | "Receipts"
 }
 
 async function openAddBills(page: Page) {
-  const overlay = page.getByRole("dialog", { name: "Add bills" });
+  const overlay = page.getByRole("dialog", { name: "Add a bill" });
   if (await overlay.isVisible()) {
     await overlay.getByRole("tab", { name: "Paste text" }).click();
     return;

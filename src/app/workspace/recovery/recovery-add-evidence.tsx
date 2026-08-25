@@ -121,7 +121,11 @@ export function RecoveryAddEvidence({
             disabled={!canUpload}
             className="btn btn-primary btn-lg justify-self-start"
           >
-            {pending && draft.mode === "CSV_IMPORT" ? "Reading your invoice…" : "Add bills"}
+            {pending && draft.mode === "CSV_IMPORT"
+              ? "Reading your invoice…"
+              : draft.csvSources.length > 1
+                ? "Add bills"
+                : "Add a bill"}
           </button>
         </div>
       ) : (
@@ -150,7 +154,7 @@ export function RecoveryAddEvidence({
               disabled={!canPaste}
               className="btn btn-primary btn-lg"
             >
-              {pending && draft.mode === "RECEIPT_PASTE" ? "Reading your invoice…" : "Add bills"}
+              {pending && draft.mode === "RECEIPT_PASTE" ? "Reading your invoice…" : "Add a bill"}
             </button>
             {!online ? <span className="font-data text-xs text-ochre">Offline — nothing can be sent right now.</span> : null}
           </div>

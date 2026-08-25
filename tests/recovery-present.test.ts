@@ -7,7 +7,6 @@ import {
   citedEvidenceLine,
   customerInboxStatus,
   customerStatusForCommitment,
-  firstResultBrief,
   gmailWizardStep,
   comingLaterItems,
   homeAttentionItems,
@@ -99,65 +98,6 @@ test("Home hides renewals from Needs attention and hides empty last-visit change
     before: money,
     after: { ...money, display: "₹2,099.00", minor: "209900" },
   }] } })), true);
-});
-
-test("first-result brief uses server commitment order and counts queued decisions", () => {
-  const brief = firstResultBrief(home({
-    activeCommitmentCount: 2,
-    decisionQueue: [{
-      commitmentId: "commitment-1",
-      merchant: "OpenAI",
-      dueDate: "2026-09-06",
-      daysAway: 18,
-      charge: money,
-      stake: null,
-      headline: "Decision needed",
-      sentence: "OpenAI charges ₹1,999.00. You also pay Claude. You have not decided this cycle.",
-      excerpt: "OpenAI invoice paid INR 1,999.",
-      citedEvidenceId: "evidence-1",
-      provisional: false,
-      reasonKeys: ["PRICE_INCREASE"],
-      reasons: ["Price increased ₹500"],
-      overlapMerchants: ["Claude"],
-      askPurpose: false,
-      evidenceIds: ["evidence-1"],
-    }, {
-      commitmentId: "commitment-2",
-      merchant: "Claude",
-      dueDate: "2026-09-01",
-      daysAway: 13,
-      charge: money,
-      stake: null,
-      headline: "Decision needed",
-      sentence: "Claude charges ₹1,999.00. You also pay OpenAI. You have not decided this cycle.",
-      excerpt: "Claude Max · ₹24,000.",
-      citedEvidenceId: "evidence-2",
-      provisional: false,
-      reasonKeys: ["OVERLAP_NO_PURPOSE"],
-      reasons: ["Possible overlap"],
-      overlapMerchants: ["OpenAI"],
-      askPurpose: true,
-      evidenceIds: ["evidence-2"],
-    }],
-    needsMe: [attention("LOW_CONFIDENCE")],
-    possibleOverlaps: [{
-      family: "AI_RESEARCH",
-      label: "AI / Research",
-      commitmentIds: ["commitment-2", "commitment-3"] as const,
-      merchants: ["Claude", "ChatGPT"] as const,
-      items: [{ commitmentId: "commitment-2", merchant: "Claude" }, { commitmentId: "commitment-3", merchant: "ChatGPT" }],
-      yearlyTotals: [],
-      missingCadenceCount: 0,
-      missingPurposeCount: 1,
-      sharedPurpose: false,
-    }],
-  }), [
-    { id: "commitment-1", version: 1, status: "ACTIVE", merchant: "OpenAI", category: "AI", cadence: "MONTHLY", amount: money, monthlyEquivalent: money, nextExpectedDate: "2026-09-06", confidence, recommendedDecision: "KEEP", decision: null, evidenceCount: 2, updatedAt: "2026-08-09T10:00:00.000Z" },
-    { id: "commitment-2", version: 1, status: "ACTIVE", merchant: "Claude", category: "AI", cadence: "MONTHLY", amount: money, monthlyEquivalent: money, nextExpectedDate: "2026-09-01", confidence, recommendedDecision: "KEEP", decision: null, evidenceCount: 1, updatedAt: "2026-08-09T10:00:00.000Z" },
-  ]);
-  assert.equal(brief.commitmentCount, 2);
-  assert.equal(brief.attentionCount, 2);
-  assert.deepEqual(brief.items.map((item) => item.merchant), ["OpenAI", "Claude"]);
 });
 
 test("expected-vs-observed stays silent when matched and uses human sentences otherwise", () => {

@@ -98,7 +98,6 @@ export type RollbackNotice = { mutation: PendingMutation; failure: RecoveryFailu
 export type RecoveryState = {
   view: RecoveryView;
   addBillsOpen: boolean;
-  showFirstResult: boolean;
   online: boolean;
   session: RecoverySessionResponse | null;
   status: LoadState;
@@ -150,7 +149,6 @@ const emptyCorrectionDraft: CorrectionDraft = {
 export const initialRecoveryState: RecoveryState = {
   view: "HOME",
   addBillsOpen: false,
-  showFirstResult: false,
   online: true,
   session: null,
   status: { kind: "LOADING" },
@@ -190,7 +188,6 @@ export type RecoveryAction =
   | { type: "VIEW_SELECTED"; view: RecoveryView }
   | { type: "ADD_BILLS_OPENED" }
   | { type: "ADD_BILLS_CLOSED" }
-  | { type: "FIRST_RESULT_DISMISSED" }
   | { type: "COMMITMENT_SELECTED"; commitmentId: string | null }
   | { type: "DETAIL_EVIDENCE_PAGE_REQUESTED"; cursor: string | null }
   | { type: "DETAIL_LOADED"; detail: CommitmentDetailDto; meta: ResponseMeta }
@@ -369,13 +366,10 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
       return { ...state, view: action.view, announcement: `${recoveryViewLabels[action.view]} view.` };
 
     case "ADD_BILLS_OPENED":
-      return { ...state, addBillsOpen: true, evidenceFailure: null, announcement: "Add bills." };
+      return { ...state, addBillsOpen: true, evidenceFailure: null, announcement: "Add a bill." };
 
     case "ADD_BILLS_CLOSED":
       return { ...state, addBillsOpen: false };
-
-    case "FIRST_RESULT_DISMISSED":
-      return { ...state, showFirstResult: false };
 
     case "COMMITMENT_SELECTED":
       return {
@@ -572,7 +566,6 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
       const everyResultAccepted = action.submission.results.every((result) => result.status === "ACCEPTED");
       const refreshSelectedDetail = state.selectedCommitmentId !== null;
       const accepted = everyResultAccepted && action.submission.acceptedEvidenceCount > 0;
-      const firstCitedPicture = (state.home?.coverage.evidenceCount ?? 0) === 0;
       return {
         ...state,
         pending: null,
@@ -590,7 +583,6 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         evidenceDraft: everyResultAccepted ? emptyEvidenceDraft : { ...state.evidenceDraft, preparing: false },
         view: accepted ? "HOME" : state.view,
         addBillsOpen: accepted ? false : state.addBillsOpen,
-        showFirstResult: accepted && firstCitedPicture && action.total > 0,
         announcement: evidenceSubmissionAnnouncement(action.submission),
       };
     }

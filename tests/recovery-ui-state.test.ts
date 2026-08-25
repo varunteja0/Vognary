@@ -439,7 +439,6 @@ test("evidence results decide whether the draft is cleared or kept for repair", 
   assert.equal(accepted.evidenceDraft.receiptText, "");
   assert.equal(accepted.view, "HOME");
   assert.equal(accepted.addBillsOpen, false);
-  assert.equal(accepted.showFirstResult, false);
 
   const fromEmpty = recoveryReducer(
     {
@@ -457,7 +456,7 @@ test("evidence results decide whether the draft is cleared or kept for repair", 
       meta,
     },
   );
-  assert.equal(fromEmpty.showFirstResult, true);
+  assert.equal(fromEmpty.view, "HOME", "first accepted evidence must land directly on canonical Now");
   assert.equal(accepted.announcement, "Saved 1 bill from 1 submitted bill.");
 
   const expanded = recoveryReducer(withDraft, {
@@ -511,7 +510,7 @@ test("evidence results decide whether the draft is cleared or kept for repair", 
   });
   assert.equal(mixedFromSources.view, "ADD_EVIDENCE");
 
-  const returning = recoveryReducer({ ...accepted, home: { ...home, activeCommitmentCount: 0 }, showFirstResult: false }, {
+  const returning = recoveryReducer({ ...accepted, home: { ...home, activeCommitmentCount: 0 } }, {
     type: "EVIDENCE_SUBMITTED",
     submission: { id: "submission-later", type: "RECEIPT_PASTE", ingestedAt: "2026-08-09T11:00:00.000Z", acceptedEvidenceCount: 1, results: [{ clientRef: "receipt-paste-1", status: "ACCEPTED", code: null, message: null }] },
     home: { ...home, activeCommitmentCount: 1 },
@@ -519,7 +518,7 @@ test("evidence results decide whether the draft is cleared or kept for repair", 
     total: 2,
     meta,
   });
-  assert.equal(returning.showFirstResult, false);
+  assert.equal(returning.view, "HOME");
 });
 
 test("dialogs record where focus must return and prefill corrections from server values only", () => {

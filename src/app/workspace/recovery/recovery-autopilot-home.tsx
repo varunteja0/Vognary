@@ -25,7 +25,7 @@ export function RecoveryAutopilotHome({
           : "A standing mandate is active. Cases are classified in shadow. Execution is switched off, so nothing is cancelled from here."}
         tone="neutral"
       >
-        <button type="button" className="btn btn-sm btn-ghost" onClick={onAddEvidence}>Add evidence</button>
+        <button type="button" className="btn btn-sm btn-ghost" onClick={onAddEvidence}>Add a bill</button>
       </StateBlock>
 
       <CandidateSection

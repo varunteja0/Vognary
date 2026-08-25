@@ -178,6 +178,8 @@ test("home leads with the pre-renewal decision queue and cited spend activation"
   assert.doesNotMatch(sourcesSource, /recordWorkspaceActivation|onCitedPictureRendered/);
   assert.match(homeSource, /SpendHero/);
   assert.match(homeSource, /<RecoveryAttention/);
+  assert.doesNotMatch(homeSource, /FirstResultHome|showFirstResult/);
+  assert.doesNotMatch(clientSource, /FIRST_RESULT_DISMISSED|onDismissFirstResult/);
   const quietHome = homeSource.slice(homeSource.indexOf("className=\"stack-page\""));
   assert.ok(quietHome.indexOf("<DecisionQueue") < quietHome.indexOf("<ComingLater"), "Decision queue must lead Coming later");
   assert.ok(
@@ -256,7 +258,7 @@ test("commitments use ordinary language and three primary choices", () => {
     CANCEL: "Plan to cancel",
     INVESTIGATE: "I don’t recognize this",
   });
-  assert.match(commitmentsSource, /const primaryDecisions = \["KEEP", "CANCEL", "MONITOR"\]/);
+  assert.match(commitmentsSource, /const primaryDecisions = \["KEEP", "MONITOR", "CANCEL"\]/);
   assert.match(commitmentsSource, /Planning to cancel records your intent/);
   assert.match(commitmentsSource, /label: "Why"/);
   assert.match(commitmentsSource, /presentExpectedObservation/);

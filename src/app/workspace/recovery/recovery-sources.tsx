@@ -62,7 +62,7 @@ export function RecoverySources({
         <div className="stack-page">
           <StayUpToDateHeading />
           <p className="text-sm leading-6 text-(--muted)">
-            Automatic forwarding is not available yet. Add bills manually. {customerPhrases.trustOnce}{" "}
+            Automatic forwarding is not available yet. Add a bill manually. {customerPhrases.trustOnce}{" "}
             <Link href="/security" className="link-quiet">See how your data is handled</Link>
           </p>
           <ManualAdd onAddBills={onAddBills} />

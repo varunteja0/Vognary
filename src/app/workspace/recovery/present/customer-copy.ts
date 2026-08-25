@@ -20,7 +20,6 @@ export const customerPhrases = {
   copiedForCofounder: "Copied. Forward it in ten seconds.",
   reviewWhen: "When should this come back?",
   noActionNeeded: "No action needed.",
-  reviewResults: "Continue",
   seeAllCommitments: "See all bills",
   keepCurrent: "Keep receipts coming",
   somethingWrong: "Something wrong?",

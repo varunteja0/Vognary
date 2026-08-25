@@ -125,7 +125,7 @@ async function mockEmptyWorkspace(page: Page, home = emptyHome) {
 
 async function openAddBills(page: Page) {
   await page.getByRole("button", { name: "Add a bill" }).first().click();
-  const overlay = page.getByRole("dialog", { name: "Add bills" });
+  const overlay = page.getByRole("dialog", { name: "Add a bill" });
   await expect(overlay).toBeVisible();
   await overlay.getByRole("tab", { name: "Paste text" }).click();
   return overlay;
@@ -140,9 +140,9 @@ test("an empty workspace offers exactly one obvious add-bills action", async ({ 
   await expect(page.getByRole("button", { name: "Add a bill" })).toBeVisible();
   await expect(page.getByText("No mailbox access required.")).toBeVisible();
   const overlay = await openAddBills(page);
-  await expect(overlay.getByRole("heading", { name: "Add bills" })).toBeVisible();
+  await expect(overlay.getByRole("heading", { name: "Add a bill" })).toBeVisible();
   await expect(overlay.getByLabel("Receipt or invoice text")).toBeVisible();
-  await expect(overlay.getByRole("button", { name: "Add bills" })).toBeDisabled();
+  await expect(overlay.getByRole("button", { name: "Add a bill" })).toBeDisabled();
   await expect(overlay.getByText(/connect|Gmail|bank account/i)).toHaveCount(0);
   expect(activationCalls).toEqual([]);
 });
@@ -162,7 +162,7 @@ test("one observed charge asks for a matching receipt instead of rendering an al
   await expectNoSeriousAxeViolations(page, "one-observation Home");
 
   await observed.getByRole("button", { name: "Add a bill" }).click();
-  await expect(page.getByRole("dialog", { name: "Add bills" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Add a bill" })).toBeVisible();
   expect(activationCalls).toEqual([]);
 });
 
@@ -281,7 +281,7 @@ test("submitted evidence reports accepted, invalid, unreadable, and duplicate re
   const overlay = await openAddBills(page);
 
   await overlay.getByLabel("Receipt or invoice text").fill("OpenAI invoice paid INR 1,999 on 2026-07-06. Renews monthly.");
-  await overlay.getByRole("button", { name: "Add bills" }).click();
+  await overlay.getByRole("button", { name: "Add a bill" }).click();
 
   const receipt = overlay.getByRole("region", { name: "What happened" });
   await expect(receipt).toBeVisible();
@@ -364,7 +364,7 @@ test("empty Home and the add-bills overlay fit a 390px phone", async ({ page }) 
   await expect(page.getByRole("heading", { name: "Start with a software bill." })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   await page.getByRole("button", { name: "Add a bill" }).click();
-  const overlay = page.getByRole("dialog", { name: "Add bills" });
+  const overlay = page.getByRole("dialog", { name: "Add a bill" });
   await expect(overlay.getByText("Drop bills or receipts here")).toBeVisible();
   await overlay.getByRole("tab", { name: "Paste text" }).click();
   await expect(overlay.getByLabel("Receipt or invoice text")).toBeVisible();

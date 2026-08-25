@@ -1,17 +1,10 @@
 import type {
   AttentionItemDto,
-  CommitmentSummaryDto,
   HomeProjectionDto,
   PossibleOverlapGroupDto,
   ReceiptInboxStatusDto,
   UpcomingItemDto,
 } from "@/lib/recovery/contracts";
-
-export type FirstResultBrief = {
-  commitmentCount: number;
-  attentionCount: number;
-  items: readonly CommitmentSummaryDto[];
-};
 
 const homeAttentionReasons = new Set(["DECISION_REQUIRED", "LOW_CONFIDENCE", "PRICE_INCREASE", "EVIDENCE_CONFLICT"]);
 
@@ -48,17 +41,6 @@ export function shouldOfferKeepCurrent(
   if (!receiptInboxPubliclyAvailable) return false;
   if (receiptInbox?.forwardingVerifiedAt && receiptInbox.setupCompletedAt) return false;
   return true;
-}
-
-export function firstResultBrief(
-  home: HomeProjectionDto,
-  commitments: readonly CommitmentSummaryDto[],
-): FirstResultBrief {
-  return {
-    commitmentCount: home.activeCommitmentCount,
-    attentionCount: home.decisionQueue.length,
-    items: commitments,
-  };
 }
 
 export function overlapIdsForWorkspace(home: HomeProjectionDto): ReadonlySet<string> {

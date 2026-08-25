@@ -16,7 +16,6 @@ export {
   comingLaterItems,
   shouldShowComingUp,
   shouldOfferKeepCurrent,
-  firstResultBrief,
   overlapIdsForWorkspace,
 } from "./home-brief";
 export { presentExpectedObservation, type ExpectedObservationCopy } from "./expected-observation";

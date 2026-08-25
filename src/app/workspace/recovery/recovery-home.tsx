@@ -3,7 +3,6 @@
 import { useEffect, useId, useState } from "react";
 import {
   commitmentPurposes,
-  type CommitmentSummaryDto,
   type DecisionCardDto,
   type DecisionOutcomeDto,
   type DecisionReviewSnooze,
@@ -21,7 +20,6 @@ import {
   customerPhrases,
   decisionOutcomeTone,
   comingLaterItems,
-  firstResultBrief,
   shouldOfferKeepCurrent,
   shouldShowComingUp,
   shouldShowRecentChange,
@@ -47,9 +45,7 @@ import { MoneyValue } from "./recovery-states";
 
 export function RecoveryHome({
   home,
-  commitments,
   commitmentTotal,
-  showFirstResult,
   receiptInboxPubliclyAvailable,
   onOpenCommitment,
   onInspectCitedReceipt,
@@ -57,7 +53,6 @@ export function RecoveryHome({
   onOpenSources,
   onSeeAllCommitments,
   onWorkspaceMutated,
-  onDismissFirstResult,
   onDecide,
   onSaveContext,
   onReminderConsent,
@@ -69,9 +64,7 @@ export function RecoveryHome({
   onCitedPictureRendered,
 }: {
   home: HomeProjectionDto;
-  commitments: readonly CommitmentSummaryDto[];
   commitmentTotal: number;
-  showFirstResult: boolean;
   receiptInboxPubliclyAvailable: boolean;
   onOpenCommitment: (commitmentId: string) => void;
   onInspectCitedReceipt?: (commitmentId: string, evidenceId: string) => void;
@@ -79,7 +72,6 @@ export function RecoveryHome({
   onOpenSources: () => void;
   onSeeAllCommitments: () => void;
   onWorkspaceMutated?: () => void;
-  onDismissFirstResult: () => void;
   onDecide: (request: PutDecisionRequest) => void;
   onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
   onReminderConsent?: () => void;
@@ -150,22 +142,6 @@ export function RecoveryHome({
 
   if (!home.coverage.evidenceCount) {
     return <EmptyRecoveryHome onAddEvidence={onAddEvidence} />;
-  }
-
-  if (showFirstResult) {
-    return (
-      <FirstResultHome
-        home={home}
-        commitments={commitments}
-        pendingDecisionId={pendingDecisionId}
-        lastHook={lastHook}
-        onReview={onDismissFirstResult}
-        onDecide={rememberDecision}
-        onSaveContext={onSaveContext}
-        onOpenCommitment={onOpenCommitment}
-        onReminderConsent={onReminderConsent}
-      />
-    );
   }
 
   return (
@@ -260,76 +236,6 @@ function FirstObservationHome({
         </ul>
       ) : null}
       <button type="button" onClick={onAddEvidence} className="btn btn-primary mt-6">{customerPhrases.addBills}</button>
-    </section>
-  );
-}
-
-function FirstResultHome({
-  home,
-  commitments,
-  pendingDecisionId,
-  lastHook,
-  onReview,
-  onDecide,
-  onSaveContext,
-  onOpenCommitment,
-  onReminderConsent,
-}: {
-  home: HomeProjectionDto;
-  commitments: readonly CommitmentSummaryDto[];
-  pendingDecisionId?: string | null;
-  lastHook: { title: string; body: string; artefact: string } | null;
-  onReview: () => void;
-  onDecide: (request: PutDecisionRequest) => void;
-  onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
-  onOpenCommitment: (commitmentId: string) => void;
-  onReminderConsent?: () => void;
-}) {
-  const brief = firstResultBrief(home, commitments);
-  const count = brief.commitmentCount || brief.items.length;
-  const queue = home.decisionQueue;
-  const next = home.nextQuietCharge;
-  return (
-    <section aria-label="Import results" className="w-full max-w-2xl py-4 sm:py-6">
-      <p className="text-sm leading-6 text-(--muted)">
-        {count === 1 ? "1 software bill found." : `${count.toLocaleString("en-IN")} software bills found.`}
-      </p>
-      {lastHook ? <DecisionHook hook={lastHook} onReminderConsent={onReminderConsent} /> : null}
-      {queue.length ? (
-        <>
-          <h3 className="mt-2 font-display text-2xl font-semibold tracking-tight text-(--ink) sm:text-3xl">
-            {queue.length === 1
-              ? "Choose what happens next"
-              : `${queue.length.toLocaleString("en-IN")} charges need a decision`}
-          </h3>
-          <div className="mt-6 grid gap-3">
-            {queue.map((card, index) => (
-              <DecisionCard
-                key={card.commitmentId}
-                card={card}
-                prominent={index === 0}
-                pending={pendingDecisionId === card.commitmentId}
-                onDecide={onDecide}
-                onSaveContext={onSaveContext}
-                onOpenCommitment={onOpenCommitment}
-              />
-            ))}
-          </div>
-          <p className="mt-3 text-xs leading-5 text-(--muted)">{customerPhrases.decisionBoundary}</p>
-        </>
-      ) : lastHook ? (
-        next ? <NextChargeLine next={next} className="mt-5" /> : null
-      ) : (
-        <>
-          <h3 className="mt-2 font-display text-2xl font-semibold tracking-tight text-(--ink) sm:text-3xl">
-            No decision is due yet.
-          </h3>
-          {next ? <NextChargeLine next={next} className="mt-5" /> : null}
-        </>
-      )}
-      <button type="button" onClick={onReview} className="btn btn-ghost mt-7">
-        {customerPhrases.reviewResults}
-      </button>
     </section>
   );
 }

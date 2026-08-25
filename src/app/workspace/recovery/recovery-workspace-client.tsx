@@ -186,7 +186,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         });
         setGuestTransferStatus({
           kind: "RETAINED",
-          detail: "This browser would not allow the workspace to read earlier staged evidence. Nothing was cleared. Allow session storage, then retry.",
+          detail: "Your browser blocked the bills you checked before signing in. Nothing was lost. Allow site storage, then try again.",
           retryable: true,
         });
         return;
@@ -222,7 +222,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         });
         setGuestTransferStatus({
           kind: "RETAINED",
-          detail: "The earlier staged evidence is expired or unreadable. It remains in this tab and was not treated as saved evidence.",
+          detail: "The bills you checked before signing in are no longer readable. Add them again here.",
           retryable: false,
         });
         return;
@@ -251,7 +251,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           });
           setGuestTransferStatus({
             kind: "RETAINED",
-            detail: "This staged evidence belongs to a different signed account in this tab. It was not imported or cleared.",
+            detail: "Those earlier bills belong to a different account. They were not added here.",
             retryable: false,
           });
           return;
@@ -272,7 +272,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         });
         setGuestTransferStatus({
           kind: "RETAINED",
-          detail: "This browser could not bind the staged audit to the signed account. Nothing was imported or cleared.",
+          detail: "Your browser could not link those earlier bills to this account. Add them again here.",
           retryable: true,
         });
         return;
@@ -304,7 +304,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
       if (!finalSnapshot.ok) {
         setGuestTransferStatus({
           kind: "RETAINED",
-          detail: "The workspace could not verify the final saved view. The staged evidence remains in this tab.",
+          detail: "We could not confirm those bills were added. Reload, and add any that are missing.",
           retryable: true,
         });
         return dispatch({ type: "SNAPSHOT_FAILED", failure: finalSnapshot.failure });
@@ -320,10 +320,10 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
 
       if (!persisted.ok) {
         const detail = persisted.reason === "SUBMISSION_FAILED"
-          ? `Saving stopped before every staged item was confirmed. The staged evidence remains in this tab.${transferFailure.current ? ` Reference ${transferFailure.current.error.requestId}.` : ""}`
+          ? `Adding stopped partway. Nothing was lost — try again.${transferFailure.current ? ` Reference ${transferFailure.current.error.requestId}.` : ""}`
           : persisted.reason === "PERSISTENCE_UNCONFIRMED"
-            ? "The workspace did not accept every staged item. The staged evidence remains in this tab and was not labelled fully saved."
-            : "The staged copy contains no supported evidence that Recovery can save. It remains in this tab.";
+            ? "Not every bill could be added. Add the missing ones again here."
+            : "None of those bills could be read. Add a bill here to start.";
         setGuestTransferStatus({ kind: "RETAINED", detail, retryable: persisted.reason === "SUBMISSION_FAILED" });
         return;
       }
@@ -334,7 +334,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
       if (!reflectedInWorkspace) {
         setGuestTransferStatus({
           kind: "RETAINED",
-          detail: "The workspace accepted evidence but did not yet confirm a canonical commitment in Home. The staged evidence remains in this tab.",
+          detail: "Your bills were added, but they are still being read. Reload in a moment to see them.",
           retryable: true,
         });
         return;
@@ -342,7 +342,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
       if (persisted.unsupportedSourceNames.length || persisted.unsupportedManualItemCount) {
         setGuestTransferStatus({
           kind: "RETAINED",
-          detail: "Supported staged evidence is saved, but some file or manual-only claims were not promoted to canonical truth. The complete staged copy remains in this tab.",
+          detail: "Your bills were added. Some could not be turned into tracked charges yet.",
           retryable: false,
         });
         return;
@@ -352,7 +352,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         if (window.sessionStorage.getItem(guestAuditTransferKey) !== rawTransfer) {
           setGuestTransferStatus({
             kind: "RETAINED",
-            detail: "The staged evidence changed while saving. The newer copy remains in this tab and was not cleared.",
+            detail: "Those bills changed while they were being added. Add the newest copy again here.",
             retryable: true,
           });
           return;
@@ -361,12 +361,12 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         window.sessionStorage.removeItem(guestAuditTransferBindingKey);
         setGuestTransferStatus({
           kind: "SAVED",
-          detail: `${persisted.acceptedEvidenceCount === 1 ? "1 bill was" : `${persisted.acceptedEvidenceCount} bills were`} saved. The copy in this tab was cleared only after Home confirmed it.`,
+          detail: `${persisted.acceptedEvidenceCount === 1 ? "1 bill was" : `${persisted.acceptedEvidenceCount} bills were`} added to your account.`,
         });
       } catch {
         setGuestTransferStatus({
           kind: "RETAINED",
-          detail: "Recovery confirmed the saved evidence, but this browser would not clear the staged guest copy. It remains available for safety.",
+          detail: "Your bills were added. A copy also stayed in this browser tab.",
           retryable: false,
         });
       }
@@ -805,12 +805,11 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
 
         <div className="mt-5 grid gap-4">
           {!state.online ? <OfflineBlock /> : null}
-          <GuestTransferBlock status={guestTransferStatus} onRetry={() => setGuestTransferAttempt((attempt) => attempt + 1)} />
-          {startReplayNotice ? (
-            <div role="status" className="inset p-4">
-              <p className="text-sm leading-6 text-(--ink)">{startReplayNotice}</p>
-            </div>
-          ) : null}
+          <GuestTransferBlock
+            status={guestTransferStatus}
+            replayNotice={startReplayNotice}
+            onRetry={() => setGuestTransferAttempt((attempt) => attempt + 1)}
+          />
           {state.refreshRequired ? (
             <StateBlock
               eyebrow="Out of date"
@@ -856,7 +855,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
 
       {state.addBillsOpen ? (
         <RecoveryOverlay
-          title="Add bills"
+          title="Add a bill"
           onClose={() => dispatch({ type: "ADD_BILLS_CLOSED" })}
           returnFocusId={null}
         >
@@ -977,16 +976,13 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     return state.home ? (
       <RecoveryHome
         home={state.home}
-        commitments={state.commitments}
         commitmentTotal={state.commitmentTotal}
-        showFirstResult={state.showFirstResult}
         receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable}
         onOpenCommitment={openCommitment}
         onInspectCitedReceipt={(commitmentId, evidenceId) => inspectEvidence(commitmentId, evidenceId, "see-cited-receipt")}
         onAddEvidence={() => dispatch({ type: "ADD_BILLS_OPENED" })}
         onOpenSources={() => selectView("ADD_EVIDENCE")}
         onSeeAllCommitments={() => selectView("COMMITMENTS")}
-        onDismissFirstResult={() => dispatch({ type: "FIRST_RESULT_DISMISSED" })}
         onDecide={(request) => void decide(request)}
         onReminderConsent={() => void consentReminder()}
         onPaymentAsk={(answer) => {
@@ -1010,15 +1006,32 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   }
 }
 
-function GuestTransferBlock({ status, onRetry }: { status: GuestTransferStatus; onRetry: () => void }) {
-  if (status.kind === "IDLE") return null;
+// One guest-handoff notice. Saving, saved, retained and un-replayed decisions all
+// describe the same hand-off, so the most actionable state wins the single slot.
+function GuestTransferBlock({
+  status,
+  replayNotice,
+  onRetry,
+}: {
+  status: GuestTransferStatus;
+  replayNotice: string | null;
+  onRetry: () => void;
+}) {
+  if (status.kind === "IDLE") {
+    if (!replayNotice) return null;
+    return (
+      <div role="status" aria-live="polite">
+        <StateBlock eyebrow="Decide again" title="Some decisions need you again" detail={replayNotice} tone="caution" />
+      </div>
+    );
+  }
   if (status.kind === "SAVING") {
     return (
       <div role="status" aria-live="polite">
         <StateBlock
-          eyebrow="Saving your bills"
-          title="Saving your bills…"
-          detail="Each bill is being saved. The copy stays in this tab until Home confirms it."
+          eyebrow="Adding bills"
+          title="Adding the bills you checked"
+          detail="This takes a moment. Your earlier copy is kept until they are safely added."
         />
       </div>
     );
@@ -1026,14 +1039,17 @@ function GuestTransferBlock({ status, onRetry }: { status: GuestTransferStatus; 
   if (status.kind === "SAVED") {
     return (
       <div role="status" aria-live="polite">
-        <StateBlock eyebrow="Bills imported" title="Earlier bills were saved" detail={status.detail} />
+        <StateBlock eyebrow="Bills added" title="Your earlier bills were added" detail={status.detail}>
+          {replayNotice ? <p className="text-sm leading-6 text-(--ink-soft)">{replayNotice}</p> : null}
+        </StateBlock>
       </div>
     );
   }
   return (
     <div role="alert">
-      <StateBlock eyebrow="Staged bills retained" title="The staged copy was not cleared" detail={status.detail} tone="caution">
-        {status.retryable ? <button type="button" onClick={onRetry} className="btn btn-sm btn-primary">Retry saving staged bills</button> : null}
+      <StateBlock eyebrow="Needs another try" title="Some bills were not added" detail={status.detail} tone="caution">
+        {replayNotice ? <p className="text-sm leading-6 text-(--ink-soft)">{replayNotice}</p> : null}
+        {status.retryable ? <button type="button" onClick={onRetry} className="btn btn-sm btn-primary">Try adding them again</button> : null}
       </StateBlock>
     </div>
   );
