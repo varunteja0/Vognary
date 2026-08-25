@@ -20,6 +20,43 @@ consent, and legal boundaries remain hard constraints. This governance change
 does not by itself raise any scoreboard row or prove users, retention, revenue,
 or a new product thesis.
 
+## Live state — 2026-08-26 (independent review: REWORK the market test, freeze product scope)
+
+**Scoreboard rows:** business validation / distribution. **Loop step:** qualified
+contact → behavioral discovery → explicit offer → paid working session. Composite
+remains **1.5**. The independent Fable review is strategic input, not customer
+evidence; it did not create a qualified target, conversation, offer, payment,
+proposal, changed decision, or renewal.
+
+**DECISION — REWORK, bounded to market execution.** Preserve Commitment Control
+CC-0 through CC-7 and the existing Day-10/Day-30 kill gates. Freeze product code
+except for money-wrong, trust-broken, security/privacy, or journey-impossible
+defects. The rework is the beachhead filter, founder-delivered offer framing,
+behavioral discovery instrument, private CRM, and first-user session ladder —
+not a new product thesis, integration build, public redesign, or roadmap.
+
+**MARKET INSTRUMENTS PREPARED LOCALLY, EXECUTION UNPROVEN.** Phase A now narrows
+the first operating beachhead to India-registered, recently funded 20–100-person
+AI-native companies with a named finance owner; buyer-confirmed controllable
+exposure remains required before the spend threshold is treated as true. The
+₹40,000/month upfront offer is framed as a founder-delivered control desk with
+setup and weekly reconciliation. The committed CRM field contract, gitignored
+private CRM, behavioral questions, proposal→decision T0–T4 ladder, and focused
+instrument test exist in the working tree. The private CRM contains **20 sourced
+candidates** from public YC company records, each explicitly marked not to
+contact until funding recency, India entity, AI-native fit, named finance owner,
+and spend criteria are verified. Qualified targets **0**, contacted **0**,
+conversations **0**, offers **0**, payments **0**. Research rows do not satisfy
+the Day-10 target and no old-thesis status was carried forward.
+
+**NEXT ACTION IS HUMAN CONTACT, NOT CODE.** Founder qualifies 20 companies from
+public evidence, sends 20 first touches, runs 10 behavior-first conversations,
+makes five explicit offers, and requires cleared funds for the payment gate.
+Production Control activation remains separately blocked on repaired GitHub
+Actions billing, an exact-head `pre-0057` encrypted backup drill, bounded `0057`
+apply, and explicit production pilot UUIDs. Do not use activation work as a
+substitute for contact while the external workflow is blocked.
+
 ## Live state — 2026-08-25 (Commitment Control authorized; implementation started)
 
 **Commitment Control replaces Commitment Intelligence as the company direction.** Scoreboard row: business validation. Loop step: proposal → policy → human decision → reconciliation. Composite remains **1.5** because no new conversation, proposal, payment, or renewal has been measured.

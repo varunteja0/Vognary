@@ -4,12 +4,17 @@
 > high-upside distribution experiment with a deadline and kill metric over safe
 > low-signal activity. Full doctrine: [`THE-LAW.md`](../THE-LAW.md).
 
+> **SUPERSEDED FOR LIVE OUTREACH — 2026-08-26.** Every offer draft and action
+> below targets the retired bills/renewals experiment. Do not send or adapt it
+> silently. Channel facts may seed research only; live qualification, discovery,
+> and copy come from [`phase-a-market-contact.md`](phase-a-market-contact.md).
+
 > **Status:** research only, 2026-08-22. Not a send log. Nothing here has been contacted unless the founder marks CRM.
 > **Scoreboard this raises:** Distribution 1.5 and Business validation 1.5 (market-contact map). Does **not** raise either row until a real conversation exists.
 > **Product freeze this document obeys:** private experiment for **5–10** founder-led 2–30 person software/AI companies. Decision before the charge. No bank login. No Gmail OAuth. First session is add 2–5 bills. Vognary never cancels a service and never moves money.
 > **Honesty rule:** named people and emails appear only if they are on a public org page, a public government/investor directory, or a bylined article. Scraped “reveal email” sites are not sources. If the person is unknown, the field is **UNKNOWN**.
 
-## How to use this today
+## Historical usage instructions (do not execute)
 
 Do not blast. One node, one named person (or one public inbox), one tailored note. Stop after five outbound touches unless a reply arrives.
 

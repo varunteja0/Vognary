@@ -1,13 +1,176 @@
-# First-10 users — operating runbook (activation, funnel, observation, value, WTP)
+# First-10 Commitment Control pilots — operating runbook
 
 > **Operating motto: Take smart risks. Do not play safe.** Prefer a decisive
 > customer test over another internal refinement; record the success threshold,
 > kill threshold, and downside bound. Full doctrine: [`THE-LAW.md`](../THE-LAW.md).
 
 > **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md) · Live state: [`docs/CONTINUE-HERE.md`](../CONTINUE-HERE.md)
-> Purpose: run the first 10 qualified users professionally. This is an operating runbook, not a plan.
-> Interview script lives in [`phase-a-market-contact.md`](phase-a-market-contact.md) §9 (do not duplicate it here).
+> Purpose: run the first 10 qualified Commitment Control conversations and working sessions professionally. This is an operating runbook, not a plan.
+> Behavioral discovery script: [`phase-a-market-contact.md`](phase-a-market-contact.md) §4.
 > Rule that binds every field below: never invent a value; empty means unmeasured.
+
+## 1. Commitment Control live session contract
+
+The live loop is a real upcoming proposal → cited existing exposure → policy
+context → named human decision → frozen cap → later observed evidence. A
+retrospective bill review does not prove this thesis. Do not count historical
+Recovery/Autopilot sessions, old CRM replies, product praise, or a demo proposal.
+
+| Milestone | Truthful definition | Source of truth |
+| --- | --- | --- |
+| **Conversation** | A substantive reply or call completes the behavioral questions in Phase A §4 | Private CRM `conversation_at` plus redacted notes |
+| **Working session** | The company brings one real upcoming commitment that does not yet exist | CRM `working_session_at`; private timing evidence |
+| **Proposal evaluated** | Their proposal is stored with `USER_ENTERED_ASSUMPTION` and deterministic policy context | `commitment_control_proposals` + `commitment_control_evaluations` |
+| **First value** | An owner/admin records APPROVE, APPROVE_WITH_CAP, or DECLINE on that proposal; approval/cap remains human authority | `commitment_control_decisions` |
+| **Observed outcome** | Later same-workspace Recovery evidence is appended against the frozen decision | `commitment_control_reconciliations` |
+| **Continuation** | The company submits a second real proposal before spend without the founder prompting that specific request | Second product proposal plus CRM `pre_spend_status=YES` |
+| **Paid pilot** | Cleared ₹40,000 upfront payment | CRM `payment_received_at`; intent/invoice do not count |
+
+## 2. Before the 20-minute working session
+
+- Confirm the CRM row meets the public 20–100-person, India entity, recent funding, AI-native, and named-finance-owner criteria.
+- Confirm the buyer described pre-spend pain and ≥₹8 lakh/month controllable exposure. Leave both blank if not confirmed.
+- Require one real upcoming AI, cloud, software, contractor, or campaign commitment. Do not manufacture a demo case.
+- Identify the owner/admin who can decide. A member submitting without an authorized human present cannot complete T3.
+- Prepare an enrolled private workspace and policy workshop; never use the production wildcard.
+- Start one stopwatch when the Control desk becomes visible. Keep private proposal contents and identities out of git, screenshots, and public notes.
+
+## 3. Commitment Control live session (20 minutes)
+
+| Min | Participant behavior | Founder behavior |
+| ---: | --- | --- |
+| 0–2 | Explain what the Control desk does in their own words | Ask “What do you think happens here?”; do not pitch |
+| 2–5 | Name the real proposed obligation, its amount, currency, first charge, cadence, and purpose | Clarify facts only; label unknowns |
+| 5–8 | Record policy version 1 together if none exists | Explain category posture and limits; state that policy never decides |
+| 8–12 | Submit the proposal and choose any existing commitments that genuinely inform exposure | Stay silent unless the journey is impossible; every intervention is a rescue |
+| 12–15 | Read the assumption/evidence separation and open at least one cited receipt when exposure exists | Ask “What is evidence here, and what did you tell us?” |
+| 15–18 | Owner/admin approves, caps, or declines; then explains the frozen amount/cap | Re-state that Vognary does not purchase, provision, or move money |
+| 18–20 | Name the next proposal they expect and how they would route it before spend | Ask for the paid pilot only if the real behavior and ICP fit are present |
+
+Do not guide click-by-click, rescue before about 60 seconds of genuine struggle,
+pitch integrations, promise enforcement, or turn post-spend pain into a
+pre-spend claim. The paid service includes founder-led setup and weekly
+reconciliation; operator help is not disguised as autonomous software.
+
+## 4. T0–T4 behavior ladder
+
+Score each step `PASS`, `RESCUED`, `FAIL`, or `UNMEASURED`. `RESCUED` never
+counts as a pass. Five independent people are required; reruns with one person
+do not satisfy the gate.
+
+| Step | Question | PASS requires |
+| --- | --- | --- |
+| **T0 — Pre-spend comprehension** | Do they understand the job before input? | Within about 10 seconds of seeing Control, they describe a proposed obligation reaching a named human before commitment, without reading interface copy aloud |
+| **T1 — Real proposal** | Will behavior begin before spend? | They enter one real upcoming commitment that does not yet exist; a retrospective bill or hypothetical example fails |
+| **T2 — Evidence boundary** | Do they distinguish fact from assumption? | They correctly identify user-entered assumptions versus cited existing exposure and open/point to cited evidence when exposure exists |
+| **T3 — Human authorization** | Does the desk change or formalize a decision? | An owner/admin records approve, approve with cap, or decline and can state the frozen expected amount or frozen cap; verify the decision row |
+| **T4 — Repeated habit** | Does the loop continue without founder push? | Within seven days they submit a second proposal that is real and arrives before spend, without the founder prompting that specific proposal; “useful” or naming a future idea is not enough |
+
+Record separately:
+
+```text
+Session date / private CRM id:
+Proposal created before obligation? YES / NO / UNKNOWN
+Seconds Control visible → proposal submitted:
+Seconds Control visible → decision recorded:
+T0 / T1 / T2 / T3 / T4:
+Founder rescues (exact):
+Evidence opened / cited:
+Decision action and whether it changed from the initial intent:
+Participant's explanation of what remains frozen:
+Enforcement objection? none / advisory-insufficient / money-movement-required
+Next real proposal submitted unprompted at:
+```
+
+## 5. Consent-independent product verification
+
+Use product rows for financial/authorization facts and the private CRM for
+conversation, payment, and pre-spend timing. Product events are consent-gated
+and cannot replace either source.
+
+```sql
+select proposal.id as proposal_id,
+       proposal.created_at as proposed_at,
+       proposal.merchant,
+       proposal.amount_minor::text,
+       proposal.currency,
+       proposal.assumption_basis,
+       evaluation.status as policy_status,
+       evaluation.policy_version,
+       decision.action,
+       decision.expected_amount_minor::text,
+       decision.approved_cap_minor::text,
+       decision.decided_at,
+       count(reconciliation.id)::int as reconciliation_count
+from commitment_control_proposals proposal
+join commitment_control_evaluations evaluation
+  on evaluation.workspace_id = proposal.workspace_id
+ and evaluation.proposal_id = proposal.id
+left join commitment_control_decisions decision
+  on decision.workspace_id = proposal.workspace_id
+ and decision.proposal_id = proposal.id
+left join commitment_control_reconciliations reconciliation
+  on reconciliation.workspace_id = proposal.workspace_id
+ and reconciliation.proposal_id = proposal.id
+where proposal.workspace_id = '<session-workspace-uuid>'::uuid
+group by proposal.id, evaluation.id, decision.id
+order by proposal.created_at;
+```
+
+Never infer pre-spend timing from `first_charge_date`. Compare product
+`created_at` with the buyer-confirmed obligation creation time in the private
+CRM; classify `UNKNOWN` when that time is unavailable.
+
+## 6. Session note and WTP record
+
+Append one redacted block to the gitignored Commitment Control CRM on the same
+day:
+
+```text
+Session: <date> <private CRM id>
+Last real commitment described: <date / amount / currency or UNMEASURED>
+Pain class: PRE_SPEND / POST_SPEND / BOTH / NONE
+Steps completed: policy → proposal → evidence → decision → cap → outcome(if later)
+Hesitations/questions (short, verbatim):
+Founder rescues:
+Value moment (behavior or exact words):
+Initial intended decision → recorded decision:
+Enforcement objection:
+Offer made? yes/no  Invoice sent? yes/no  Payment cleared? yes/no
+Classification: BUG / UX-FRICTION / COPY / TRUST / ICP-MISMATCH / NO-PAIN / POST-SPEND-ONLY / PRICE / NEEDS-ENFORCEMENT
+Next action:
+```
+
+WTP ladder remains strict: `INTEREST` (asks about price), `INTENT` (written
+would-pay), `COMMITMENT` (specific invoice path), `PAYMENT` (cleared funds).
+Only `PAYMENT` satisfies the paid gate.
+
+## 7. What session evidence may authorize
+
+- Before the first cleared payment: only money-wrong, trust-broken, security, privacy, or journey-impossible fixes. No new feature work.
+- A `FAIL` or `RESCUED` result in at least 2 of 5 sessions identifies a repeated problem; it does not automatically authorize the buyer's requested feature.
+- T0–T3 should each pass in at least 4 of 5 sessions. T4 is observed over seven days and should pass in at least 2 of 5 before treating the habit as promising.
+- After the first cleared payment, the aggregate reconciliation read model may enter review only if a real pilot needs multiple observations compared with a period cap. It is not pre-authorized work.
+- If fewer than half of proposals arrive before spend or 30 proposals change zero decisions, apply THE-LAW's rework/kill gate. Do not rescue the thesis with integrations.
+
+## 8. Ten-day session scoreboard
+
+```text
+Publicly qualified targets: <n>  Contacted: <n>  Conversations: <n>
+Pre-spend pain: <n>  Post-spend-only pain: <n>  Working sessions: <n>
+Explicit ₹40,000 offers: <n>  Invoices: <n>  Cleared payments: <n>
+Real proposals: <n>  Pre-spend YES / NO / UNKNOWN: <n>/<n>/<n>
+Decisions recorded: <n>  Capped/declined/materially changed: <n>
+T0/T1/T2/T3/T4 PASS counts: <n>/<n>/<n>/<n>/<n>
+Founder-rescue rate: <rescues / sessions>
+Top pain-class result: <one line>  Top trust blocker: <one line>
+```
+
+## Historical Recovery instrument — superseded 2026-08-25
+
+The material below preserves the previous bills/renewals first-user instrument
+for audit history. It is not the live Commitment Control discovery script,
+session packet, T0–T4 ladder, CRM, or product gate.
 
 ## 1. Encoded milestones (four different things — never collapse them)
 

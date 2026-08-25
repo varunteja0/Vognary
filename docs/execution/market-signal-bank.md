@@ -7,6 +7,11 @@
 > Parent law: [`docs/THE-LAW.md`](../THE-LAW.md). Built 2026-08-22 from public web research.
 > Every entry is labeled FACT (observable in the linked source), INFERENCE (our reasoning), or HYPOTHESIS (untested belief).
 > Never promote an inference into copy as if it were a fact. Vendor blogs are marketing — lowest confidence tier.
+>
+> **Commitment Control boundary — 2026-08-26:** A1–A10 are evidence for the
+> previous post-spend renewal thesis. They are not pre-spend discovery, do not
+> qualify the new 20–100-person beachhead, and count as zero Commitment Control
+> conversations, offers, payments, or habit evidence.
 
 ## A. Signal entries
 

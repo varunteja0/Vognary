@@ -53,6 +53,7 @@ Current Commitment Control counts: targets **0**, conversations **0**, offers **
 ## 1. CRM schema (canonical)
 
 **Working file (gitignored; may contain PII):** `docs/execution/private-commitment-control-pilot-crm.csv`. Do not commit names, emails, private proposals, contracts, or payment records.
+**Committed field contract:** [`private-commitment-control-pilot-crm.csv.example`](private-commitment-control-pilot-crm.csv.example).
 
 Agents never infer `qualified`, `offered`, `paid`, `renewed`, or `decision_changed`. The founder records those transitions from direct evidence.
 
@@ -61,27 +62,50 @@ Agents never infer `qualified`, `offered`, `paid`, `renewed`, or `decision_chang
 | Column | Type | Values / notes |
 | --- | --- | --- |
 | `id` | string | `P01`, `P02`, … stable |
-| `public_source_url` | string | Public source used to establish ICP fit; no assumed spend |
-| `qualified_at` | datetime | Founder-confirmed fit against the locked ICP |
+| `company_name` | string | Private working identity; never commit the populated row |
+| `company_public_url` | URL | Canonical company source |
+| `india_entity_evidence_url` | URL | Public evidence of an India-registered operating entity |
+| `headcount_evidence_url` | URL | Public evidence supporting 20–100 people; record uncertainty |
+| `funding_evidence_url` | URL | Public funding announcement or database source |
+| `funding_date` | date | Must be within the last 24 months for the first beachhead |
+| `ai_native_evidence_url` | URL | Public evidence that AI is core to product or operations |
+| `finance_owner_role` | string | Finance lead, fractional CFO, or ops-owning cofounder; `UNKNOWN` is not qualified |
+| `finance_owner_public_url` | URL | Public source for the role, not assumed identity |
+| `qualified_at` | datetime | Public beachhead criteria verified; spend is still unmeasured until a conversation |
+| `contacted_at` | datetime | A message was actually sent; drafts stay blank |
 | `conversation_at` | datetime | A real call or substantive reply, not a sent message |
+| `last_real_commitment_at` | datetime | Last specific obligation discussed; blank until the buyer names it |
+| `last_real_commitment_amount_minor` | integer string | Exact amount only when the buyer states or cites it |
+| `last_real_commitment_currency` | char(3) | Currency paired with the amount |
+| `pain_class` | enum | `PRE_SPEND` \| `POST_SPEND` \| `BOTH` \| `NONE` \| `UNMEASURED` |
+| `spend_threshold_confirmed_at` | datetime | Buyer confirmed ≥₹8 lakh/month controllable exposure; public proxies do not count |
+| `monthly_controllable_spend_minor` | integer string | Buyer-stated/cited amount only |
+| `monthly_controllable_spend_currency` | char(3) | Usually INR; never convert FX |
+| `working_session_at` | datetime | One real upcoming commitment was brought to the desk |
 | `offer_at` | datetime | Explicit ₹40,000/month offer made |
 | `invoice_sent_at` | datetime | Invoice delivery; does not count as payment |
 | `payment_received_at` | datetime | Cleared upfront payment; the paid gate |
+| `payment_amount_inr` | integer | Cleared gross INR amount |
 | `proposal_count` | integer | Proposals actually evaluated |
 | `pre_spend_proposal_count` | integer | Proposals received before an obligation existed |
+| `obligation_created_at` | datetime | Buyer-confirmed creation time for the latest proposal; needed to classify pre-spend honestly |
+| `pre_spend_status` | enum | `YES` \| `NO` \| `UNKNOWN`; first-charge date is not a substitute |
 | `changed_decision_count` | integer | Capped, declined, or materially changed after evaluation |
 | `renewal_offered_at` | datetime | Renewal explicitly offered |
 | `renewal_paid_at` | datetime | Cleared renewal payment |
 | `status` | enum | Exact state below |
-| `notes` | text | Redacted learning only; no private proposal contents |
+| `loss_reason` | enum | `NO_PAIN` \| `POST_SPEND_ONLY` \| `PRICE` \| `NEEDS_ENFORCEMENT` \| `NO_HABIT` \| `OTHER` \| blank |
+| `notes` | text | Redacted behavioral learning only; no private proposal contents |
 
 ### Status machine (use exactly)
 
 ```
-not-contacted
+  sourced
+  → qualified
   → contacted
   → conversation
   → offered
+  → invoice-sent
   → paid-pilot
   → active-pilot
   → renewed | closed-lost | refunded
@@ -97,25 +121,58 @@ not-contacted
 
 ## 2. ICP (who to contact first)
 
-**Priority:** India-first, 5–100-person AI-native companies with at least ₹5 lakh/month in AI, cloud, software, contractor, or campaign exposure; a founder, finance lead, or operator who can bring real proposed obligations before spend; and authority to run a ₹40,000/month pilot.
+**First beachhead:** India-registered, 20–100-person AI-native companies that raised seed through Series B in the last 24 months and have a named finance owner: finance lead, fractional CFO, or ops-owning cofounder. Public sources must support entity, size, funding recency, AI relevance, and finance ownership before `qualified_at` is set.
 
-**Deprioritize:** solo consumers, enterprise procurement transformations, teams seeking spend cards or payments, companies unable to provide a pre-spend proposal, and anyone requiring autonomous approval or purchasing.
+**Conversation gate:** the buyer confirms at least ₹8 lakh/month of controllable AI, cloud, software, contractor, or campaign exposure and can bring one real upcoming commitment before spend. Until then, spend remains `UNMEASURED`; never infer it from funding or headcount.
+
+**Deprioritize:** solo/duo builders, agencies whose total annual stack is below the pilot fee, companies under 20 or over 100 people, teams without a named finance owner, enterprise procurement transformations, teams seeking spend cards or payments, companies unable to provide a pre-spend proposal, and anyone requiring autonomous approval or purchasing.
 
 ---
 
 ## 3. Offer and delivery contract
 
-The paid pilot includes policy setup, up to 50 commitment evaluations, a 13-week obligation register, weekly reconciliation, and a one-business-day response SLA. It records decisions; it does not purchase, provision, cancel, or move money.
+Position this as a **founder-delivered control desk**, not naked SaaS. The paid pilot includes a policy workshop, up to 50 commitment evaluations, a 13-week obligation register, weekly reconciliation, and a one-business-day response SLA. It records decisions; it does not purchase, provision, cancel, or move money. Compare the job with adding fractional finance/procurement capacity; do not quote third-party market prices without a source in the private notes.
 
 ### First-touch frame
 
 ```text
-We are piloting Vognary Commitment Control with a small number of AI-native teams.
+Hi {Name} — I’m running a founder-delivered Commitment Control pilot for recently funded AI-native teams with a named finance owner.
 
-Before a new AI, cloud, software, contractor, or campaign obligation is created, Vognary shows the exact exposure, checks your stated policy, and records an authorized human decision and cap. Later evidence is reconciled against that frozen approval.
+Before the next AI, cloud, software, contractor, or campaign obligation is created, the desk shows cited existing exposure, checks your stated policy, and records a named human decision and frozen cap. Later bills are reconciled against that approval.
 
-The pilot is ₹40,000/month, paid upfront. Vognary never auto-approves or moves money. Would you bring one real upcoming commitment to a 20-minute working session this week?
+The pilot is ₹40,000/month, paid upfront, including setup and weekly reconciliation. Vognary never auto-approves or moves money. Do you have one real upcoming commitment we could put through a 20-minute working session this week?
 ```
+
+Do not discount, add a menu, or offer free implementation before the offer-ten gate. Record price-specific rejection separately from rejection of the underlying job.
+
+## 4. Live behavioral discovery (before a demo)
+
+Ask about the last real financial obligation; do not explain Vognary until question 6.
+
+| Min | Ask | Evidence sought |
+| ---: | --- | --- |
+| 0–3 | “Walk me through the last real commitment your company made for AI, cloud, software, a contractor, or a campaign.” | A dated, specific obligation — not general frustration |
+| 3–6 | “When was the company committed: before the invoice, when someone said yes, or only when the card/bill arrived?” | `PRE_SPEND`, `POST_SPEND`, `BOTH`, or `NONE` |
+| 6–9 | “Who could have capped or declined it, and what information did they have at that moment?” | Named authority and missing context |
+| 9–12 | “Show me how that approval happened — message, call, sheet, accounting tool, or nothing.” | Actual incumbent behavior, not feature preference |
+| 12–15 | “What did the obligation cost, over what period, and what would have changed the decision?” | Exact amount/currency and counterfactual decision |
+| 15–17 | “What happens if someone ignores an approved cap today?” | Whether advisory accountability is valuable or physical enforcement is mandatory |
+| 17–20 | Only if the pain is pre-spend: explain the control desk in one sentence and ask them to bring the next real commitment. | Working-session behavior, not praise |
+
+Classify the conversation the same day. If most buyers describe only post-hoc bill surprise, that supports Recovery, not Commitment Control. If they require cards or money movement to pay, record `NEEDS_ENFORCEMENT`; do not build rails.
+
+## 5. Ten-day execution cadence
+
+| Day | Founder action | Evidence |
+| ---: | --- | --- |
+| 1–2 | Source and qualify 20 beachhead companies from public evidence; create no assumed spend facts | 20 CRM rows with source URLs |
+| 3–4 | Send 20 first touches in two batches | `contacted_at`, never drafts |
+| 5–8 | Run 10 behavioral conversations; book working sessions only for pre-spend pain | `conversation_at`, pain class, exact notes |
+| 6–9 | Make five explicit ₹40,000/month offers; invoice same day on yes | `offer_at`, `invoice_sent_at` |
+| 8–10 | Run paid working sessions with a real upcoming commitment | product rows plus CRM timing fields |
+| 10 | Apply the two-payment gate with cleared funds only | GO / REWORK / KILL worksheet in CONTINUE-HERE |
+
+Agents may prepare sources, copy, redaction, and aggregate reports. Only the founder sends messages, confirms identities, records private notes, invoices, and marks payment.
 
 ### Session proof
 

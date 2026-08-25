@@ -61,6 +61,7 @@ docs/archive/private-audit-pipeline.csv
 docs/private-audit-pipeline.csv
 docs/execution/private-audit-crm.csv
 docs/execution/private-autopilot-pilot-crm.csv
+docs/execution/private-commitment-control-pilot-crm.csv
 docs/execution/private-autopilot-outreach-draft.md
 
 # Parked sibling worktrees moved into this repo. Never lint, typecheck, or commit them.
