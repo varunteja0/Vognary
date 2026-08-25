@@ -16,6 +16,14 @@ const publicPagePaths = new Set([
   "/verify",
 ]);
 
+// Browsers, next/image and link-preview crawlers request assets with an Accept
+// header that carries no text/html, so the negotiated agent 404 below would
+// otherwise claim every real file under public/ and answer with Markdown.
+// Anything holding a static asset extension belongs to Next's file handler,
+// which serves the file or raises its own 404.
+const staticAssetPathPattern =
+  /\.(?:avif|css|gif|ico|jpe?g|js|json|map|mjs|mp4|otf|pdf|png|svg|ttf|txt|webm|webp|woff2?)$/i;
+
 function prefersAgentNotFound(accept: string | null): boolean {
   if (!accept) return true;
   const entries = accept.split(",").map((entry) => {
@@ -101,6 +109,7 @@ export function proxy(request: NextRequest) {
 
   if (!isSensitiveProductPath) {
     if (!publicPagePaths.has(pathname)
+      && !staticAssetPathPattern.test(pathname)
       && !request.headers.has("rsc")
       && prefersAgentNotFound(request.headers.get("accept"))) {
       // Vercel may normalize Vary on Next responses, so this negotiated 404 must never enter a shared cache.

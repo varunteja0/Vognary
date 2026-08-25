@@ -94,6 +94,33 @@ test("homepage negotiates uncacheable Markdown and advertises explicit agent rou
   assert.equal(missingForBrowser.headers.get("x-middleware-next"), "1");
 });
 
+test("real files under public/ survive agent 404 negotiation", () => {
+  // Browsers request images, stylesheets and fonts with an Accept header that
+  // carries no text/html, so the negotiated agent 404 used to swallow every
+  // real file under public/brand and serve Markdown in its place.
+  const assetAccept = "image/avif,image/webp,image/apng,*/*;q=0.8";
+  for (const pathname of [
+    "/brand/vognary-x-header.png",
+    "/brand/vognary-x-avatar.png",
+    "/brand/vognary-social-card.png",
+    "/brand/vognary-mark.svg",
+    "/brand/manifest.json",
+  ]) {
+    const asset = proxy(new NextRequest(`https://www.vognary.com${pathname}`, {
+      headers: { accept: assetAccept },
+    }));
+    assert.equal(asset.headers.get("x-middleware-next"), "1", `${pathname} must reach the static handler`);
+    assert.equal(asset.headers.get("content-type"), null, `${pathname} must not be rewritten to Markdown`);
+  }
+
+  // A missing page with the same wildcard Accept still negotiates the agent 404.
+  const missingPage = proxy(new NextRequest("https://www.vognary.com/not-a-real-public-path", {
+    headers: { accept: assetAccept },
+  }));
+  assert.equal(missingPage.status, 404);
+  assert.equal(missingPage.headers.get("content-type"), "text/markdown; charset=utf-8");
+});
+
 test("homepage Markdown is useful, cache-safe, and linked to its agent guide", async () => {
   const response = await getAgentHome();
   const body = await response.text();
