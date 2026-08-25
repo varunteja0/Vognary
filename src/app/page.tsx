@@ -22,6 +22,27 @@ const jsonLd = {
     "@id": "https://www.vognary.com/#organization",
     name: "Vognary",
     url: "https://www.vognary.com/",
+    email: "support@vognary.com",
+    contactPoint: [
+      {
+        "@type": "ContactPoint",
+        contactType: "customer support",
+        email: "support@vognary.com",
+        url: "https://www.vognary.com/contact",
+        availableLanguage: ["English"],
+      },
+      {
+        "@type": "ContactPoint",
+        contactType: "security",
+        email: "security@vognary.com",
+        url: "https://www.vognary.com/.well-known/security.txt",
+        availableLanguage: ["English"],
+      },
+    ],
+    address: {
+      "@type": "PostalAddress",
+      addressCountry: "IN",
+    },
   },
 };
 

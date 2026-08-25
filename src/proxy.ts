@@ -1,25 +1,33 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { agentLinkHeader } from "./lib/agent-content";
+import { agentLinkHeader, agentNotFoundMarkdown } from "./lib/agent-content";
 
 const publicPagePaths = new Set([
   "/",
+  "/.well-known/security.txt",
   "/brand",
+  "/about",
+  "/contact",
   "/security",
   "/privacy",
   "/terms",
   "/start",
   "/offline",
   "/verify",
-  "/connect",
-  "/integrations",
-  "/sources",
-  "/guide",
-  "/partners",
-  "/beta-readiness",
-  "/integration-model",
-  "/launch",
-  "/private-audit",
 ]);
+
+function prefersAgentNotFound(accept: string | null): boolean {
+  if (!accept) return true;
+  const entries = accept.split(",").map((entry) => {
+    const [rawType = "", ...parameters] = entry.trim().toLowerCase().split(";");
+    const qualityParameter = parameters.find((parameter) => parameter.trim().startsWith("q="));
+    const quality = qualityParameter ? Number(qualityParameter.trim().slice(2)) : 1;
+    return { type: rawType.trim(), quality: Number.isFinite(quality) ? quality : 0 };
+  });
+  if (entries.some(({ type, quality }) => quality > 0 && (type === "text/html" || type === "application/xhtml+xml"))) {
+    return false;
+  }
+  return entries.some(({ type, quality }) => quality > 0 && (type === "text/markdown" || type === "*/*"));
+}
 
 const retiredModeHtml = `<!doctype html>
 <html lang="en">
@@ -62,6 +70,21 @@ export function proxy(request: NextRequest) {
     || pathname.startsWith("/billing/");
 
   if (!isSensitiveProductPath) {
+    if (!publicPagePaths.has(pathname)
+      && !request.headers.has("rsc")
+      && prefersAgentNotFound(request.headers.get("accept"))) {
+      // Vercel may normalize Vary on Next responses, so this negotiated 404 must never enter a shared cache.
+      return new NextResponse(agentNotFoundMarkdown, {
+        status: 404,
+        headers: {
+          "cache-control": "private, no-store",
+          "content-type": "text/markdown; charset=utf-8",
+          link: agentLinkHeader,
+          vary: "Accept",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    }
     return NextResponse.next();
   }
 

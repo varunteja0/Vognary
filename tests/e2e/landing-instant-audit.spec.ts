@@ -22,10 +22,24 @@ test("the public endpoints expose complete agent-readable contracts without Java
 
   const jsonLdMatch = html.match(/<script type="application\/ld\+json">([^<]+)<\/script>/);
   expect(jsonLdMatch).not.toBeNull();
-  const jsonLd = JSON.parse(jsonLdMatch?.[1] ?? "{}") as Record<string, unknown>;
+  const jsonLd = JSON.parse(jsonLdMatch?.[1] ?? "{}") as {
+    "@type"?: string;
+    name?: string;
+    url?: string;
+    provider?: {
+      "@type"?: string;
+      contactPoint?: Array<{ contactType?: string; email?: string }>;
+      address?: { "@type"?: string; addressCountry?: string };
+    };
+  };
   expect(jsonLd["@type"]).toBe("SoftwareApplication");
   expect(jsonLd.name).toBe("Vognary");
   expect(jsonLd.url).toBe("https://www.vognary.com/");
+  expect(jsonLd.provider?.["@type"]).toBe("Organization");
+  expect(jsonLd.provider?.contactPoint).toEqual(expect.arrayContaining([
+    expect.objectContaining({ contactType: "customer support", email: "support@vognary.com" }),
+  ]));
+  expect(jsonLd.provider?.address).toEqual({ "@type": "PostalAddress", addressCountry: "IN" });
 
   const markdownResponse = await request.get("/", { headers: { accept: "text/markdown" } });
   expect(markdownResponse.status()).toBe(200);
@@ -53,16 +67,47 @@ test("the public endpoints expose complete agent-readable contracts without Java
   expect(sitemap.status()).toBe(200);
   expect(sitemap.headers()["content-type"]).toContain("application/xml");
   expect(await sitemap.text()).toContain("<loc>https://www.vognary.com/</loc>");
+  expect(await (await request.get("/sitemap.xml")).text()).toContain("<loc>https://www.vognary.com/about</loc>");
+
+  const about = await request.get("/about");
+  expect(about.status()).toBe(200);
+  expect(about.headers()["content-type"]).toContain("text/html");
+  const aboutHtml = await about.text();
+  const aboutText = convert(aboutHtml, {
+    selectors: [
+      { selector: "script", format: "skip" },
+      { selector: "style", format: "skip" },
+    ],
+  });
+  expect(aboutText.length).toBeGreaterThanOrEqual(500);
+  expect(aboutHtml.match(/<h1\b/gi)?.length).toBe(1);
+  expect(aboutHtml.match(/<h2\b/gi)?.length ?? 0).toBeGreaterThanOrEqual(4);
 
   const security = await request.get("/.well-known/security.txt");
   expect(security.status()).toBe(200);
   expect(security.headers()["content-type"]).toContain("text/plain");
 
-  const missing = await request.get("/this-agent-readiness-path-does-not-exist");
+  const missing = await request.get("/this-agent-readiness-path-does-not-exist", {
+    headers: { accept: "text/html" },
+  });
   expect(missing.status()).toBe(404);
   const missingBody = await missing.text();
   expect(missingBody).toContain('href="/llms.txt"');
   expect(missingBody).toContain('href="/sitemap.xml"');
+
+  const missingMarkdown = await request.get("/this-agent-readiness-path-does-not-exist", {
+    headers: { accept: "text/markdown" },
+  });
+  expect(missingMarkdown.status()).toBe(404);
+  expect(missingMarkdown.headers()["content-type"]).toBe("text/markdown; charset=utf-8");
+  expect(missingMarkdown.headers()["cache-control"]).toContain("no-store");
+  expect(await missingMarkdown.text()).toContain("[Public sitemap](https://www.vognary.com/sitemap.xml)");
+
+  const missingCurlStyle = await request.get("/this-agent-readiness-path-does-not-exist", {
+    headers: { accept: "*/*" },
+  });
+  expect(missingCurlStyle.status()).toBe(404);
+  expect(missingCurlStyle.headers()["content-type"]).toBe("text/markdown; charset=utf-8");
 
 });
 

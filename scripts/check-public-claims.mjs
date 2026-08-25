@@ -23,6 +23,7 @@ const publicSurfaces = [
   "src/app/login/login-client.tsx",
   "src/app/billing/return/page.tsx",
   "src/app/billing/return/billing-return-client.tsx",
+  "src/app/about/page.tsx",
   "src/app/privacy/page.tsx",
   "src/app/security/page.tsx",
   "src/app/contact/page.tsx",

@@ -1,5 +1,18 @@
 export const agentLinkHeader = '</index.md>; rel="alternate"; type="text/markdown", </llms.txt>; rel="describedby"';
 
+export const agentNotFoundMarkdown = `# 404: Page not found
+
+The requested Vognary path does not exist.
+
+## Continue
+
+- [Homepage in Markdown](https://www.vognary.com/index.md)
+- [Agent guide](https://www.vognary.com/llms.txt)
+- [Public sitemap](https://www.vognary.com/sitemap.xml)
+- [About Vognary](https://www.vognary.com/about)
+- [Contact](https://www.vognary.com/contact)
+`;
+
 export const agentHomepageMarkdown = `# Vognary
 
 > Commitment Intelligence for founder-led software and AI companies with 2–20 people.
@@ -33,6 +46,8 @@ Vognary does not cancel a service, move money, ask for bank passwords, or requir
 
 - [Agent guide](https://www.vognary.com/llms.txt)
 - [Public sitemap](https://www.vognary.com/sitemap.xml)
+- [About Vognary](https://www.vognary.com/about)
+- [Contact](https://www.vognary.com/contact)
 - [Security and live readiness](https://www.vognary.com/security)
 - [Privacy](https://www.vognary.com/privacy)
 - [Terms](https://www.vognary.com/terms)
@@ -74,6 +89,8 @@ Important interpretation rules:
 
 ## Trust and policies
 
+- [About Vognary](https://www.vognary.com/about): Product purpose, operating principles, stage, and boundaries.
+- [Contact](https://www.vognary.com/contact): Product support, data, security, and legal contact channels.
 - [Security and live readiness](https://www.vognary.com/security): Measured controls and honest production status.
 - [Privacy](https://www.vognary.com/privacy): Data handling, consent, retention, and deletion boundaries.
 - [Terms](https://www.vognary.com/terms): Terms for authorized, evidence-backed use.

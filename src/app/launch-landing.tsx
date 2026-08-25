@@ -62,6 +62,7 @@ export default function LaunchLanding() {
             <span className="font-display font-semibold text-(--ink)">Vognary</span>
           </div>
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-(--muted)">
+            <Link href="/about" className="transition hover:text-(--ink)">About</Link>
             <Link href="/privacy" className="transition hover:text-(--ink)">Privacy</Link>
             <Link href="/security" className="transition hover:text-(--ink)">Security</Link>
             <Link href="/contact" className="transition hover:text-(--ink)">Contact</Link>
