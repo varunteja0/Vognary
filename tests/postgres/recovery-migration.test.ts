@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import test from "node:test";
-import { Pool } from "pg";
+import { Pool, type QueryResultRow } from "pg";
 
 import {
   countLegacyLedgerRows,
@@ -23,6 +23,7 @@ import {
   requiredAutopilotAuditCountKeys,
   requiredCommitmentControlCountKeys,
 } from "../../scripts/lib/recovery-backup-verification.mjs";
+import { readCommitmentControlPrivacyExport } from "../../src/lib/server/privacy-lifecycle-store";
 
 const zeroLegacyBlockers: LegacyLedgerBlockerCounts = {
   unsupportedSources: 0,
@@ -2790,6 +2791,23 @@ test("pg_dump/pg_restore preserves the exact pre-0057 production profile", {
       await source.query(`insert into users (id, email) values ($1, $2)`, [userId, `${userId}@pre-0057-dump.test`]);
       await source.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Pre-0057 dump')`, [workspaceId, userId]);
       await source.query(`insert into recovery_workspace_states (workspace_id, version) values ($1, 0)`, [workspaceId]);
+      let controlTablesQueried = false;
+      const controlExport = await readCommitmentControlPrivacyExport(
+        <Row extends QueryResultRow>(text: string, values?: unknown[]) => source.query<Row>(text, values),
+        async () => {
+          controlTablesQueried = true;
+          throw new Error("Control tables must not be queried before 0057.");
+        },
+      );
+      assert.equal(controlTablesQueried, false);
+      assert.deepEqual(controlExport.rows[0], {
+        policies: [],
+        proposals: [],
+        evaluations: [],
+        evaluation_evidence: [],
+        decisions: [],
+        reconciliations: [],
+      });
       const expected = await readRecoveryBackupVerification(source, "pre-0057");
       assert.equal(expected.migrationHead, "0056_decision_cycle_expected_amount");
       assert.equal("commitment_control_decisions" in expected.recoveryWorkspaceCounts, false);

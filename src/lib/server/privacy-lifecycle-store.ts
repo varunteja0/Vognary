@@ -836,7 +836,7 @@ async function buildAccessExport(client: PoolClient, input: {
         ) record) as source_disconnections`,
       [input.workspaceId, exportRowLimits.recoveryRecords + 1],
     ),
-    query<CommitmentControlExportRow>(
+    readCommitmentControlPrivacyExport(query, () => query<CommitmentControlExportRow>(
       `select
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
           select version, category_rules as "categoryRules", currency_limits as "currencyLimits",
@@ -888,7 +888,7 @@ async function buildAccessExport(client: PoolClient, input: {
           order by reconciled_at asc, id asc limit $2
         ) record) as reconciliations`,
       [input.workspaceId, exportRowLimits.recoveryRecords + 1],
-    ),
+    )),
     query<{
       id: string;
       user_id: string | null;
@@ -2184,6 +2184,39 @@ type CommitmentControlExportRow = {
   decisions: Array<Record<string, unknown>>;
   reconciliations: Array<Record<string, unknown>>;
 };
+
+export async function readCommitmentControlPrivacyExport(
+  query: ReturnType<typeof createSequentialQuery>,
+  load: () => Promise<{ rows: CommitmentControlExportRow[] }>,
+): Promise<{ rows: CommitmentControlExportRow[] }> {
+  const availability = await query<{ relation_count: number }>(
+    `select count(*)::int as relation_count
+     from unnest(array[
+       'commitment_control_policies',
+       'commitment_control_proposals',
+       'commitment_control_evaluations',
+       'commitment_control_evaluation_evidence',
+       'commitment_control_decisions',
+       'commitment_control_reconciliations'
+     ]) as requested(name)
+     where to_regclass('public.' || name) is not null`,
+  );
+  const relationCount = availability.rows[0]?.relation_count ?? 0;
+  if (relationCount === 0) {
+    return {
+      rows: [{
+        policies: [],
+        proposals: [],
+        evaluations: [],
+        evaluation_evidence: [],
+        decisions: [],
+        reconciliations: [],
+      }],
+    };
+  }
+  if (relationCount !== 6) throw new Error("Commitment Control privacy schema is partially installed.");
+  return load();
+}
 
 type ConsentExportRow = {
   id: string;
