@@ -18,7 +18,7 @@ on:
         required: true
         type: string
       backup_run_id:
-        description: Successful Encrypted Backup Drill run ID; pre-0053 for apply-latest, current for apply-control-0057
+        description: Successful Encrypted Backup Drill run ID; pre-0053 for apply-latest, pre-0057 for apply-control-0057
         required: false
         type: string
 
@@ -90,7 +90,7 @@ jobs:
           const token = process.env.GH_TOKEN;
           const currentSha = process.env.CURRENT_SHA;
           const artifactName = process.env.OPERATION === "apply-control-0057"
-            ? "encrypted-postgres-backup-current"
+            ? "encrypted-postgres-backup-pre-0057"
             : "encrypted-postgres-backup-pre-0053";
           async function github(path) {
             const response = await fetch(`https://api.github.com/repos/${repository}${path}`, {

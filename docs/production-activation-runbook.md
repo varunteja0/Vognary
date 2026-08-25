@@ -60,11 +60,11 @@ Commitment Control requires `0057_commitment_control_v0`. Production remains at
 the independently verified `0056` head until the founder runs this sequence; do
 not deploy the Control routes before the database reaches `0057`.
 
-1. Run the current-profile encrypted backup and restore drill from the exact candidate SHA.
+1. Run the `pre-0057` encrypted backup and restore drill from the exact candidate SHA. It must verify production head `0056_decision_cycle_expected_amount` and upload `encrypted-postgres-backup-pre-0057`.
 2. Run the complete disposable PostgreSQL migration and Commitment Control store/route/privacy tests.
 3. Prefer the GitHub **Production database activation** workflow with operation
 	`apply-control-0057`, confirmation `APPLY_CONTROL_0057_PRODUCTION`, and the
-	successful current-profile backup run ID from the previous 24 hours.
+	successful `pre-0057` backup run ID from the previous 24 hours.
 4. If GitHub Actions is unavailable, from a trusted founder-controlled terminal
 	run the bounded one-off directly:
 

@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - current
+          - pre-0057
           - pre-0053
   schedule:
     - cron: "30 2 * * *"

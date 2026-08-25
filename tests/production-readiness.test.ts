@@ -151,7 +151,7 @@ test("Commitment Control has a bounded production 0056 to 0057 operator", () => 
   assert.equal(packageJson.scripts?.["db:apply-production-0057"], "node scripts/apply-production-0057.mjs");
   assert.match(workflow, /apply-control-0057/);
   assert.match(workflow, /APPLY_CONTROL_0057_PRODUCTION/);
-  assert.match(workflow, /encrypted-postgres-backup-current/);
+  assert.match(workflow, /encrypted-postgres-backup-pre-0057/);
   assert.match(workflow, /run\.head_sha !== currentSha/);
   assert.match(workflow, /npm run db:apply-production-0057 -- --confirm-0056-to-0057-production/);
   assert.match(operator, /0056_decision_cycle_expected_amount/);
@@ -192,6 +192,8 @@ test("runtime and PostgreSQL tooling are pinned to one reproducible foundation",
   assert.match(backupWorkflow, /NEON_PROJECT_ID/);
   assert.match(backupWorkflow, /verification_profile/);
   assert.match(backupWorkflow, /pre-0053/);
+  assert.match(backupWorkflow, /pre-0057/);
+  assert.match(backupWorkflow, /encrypted-postgres-backup-\$\{\{ inputs\.verification_profile/);
   assert.match(backupWorkflow, /BACKUP_VERIFICATION_PROFILE/);
   assert.match(backupWorkflow, /postgres:18\.4@sha256:/);
   assert.match(backupWorkflow, /vognary_restore_drill@127\.0\.0\.1:5432\/vognary_restore/);

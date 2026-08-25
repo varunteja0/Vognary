@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   pre0053IntegrityTriggers,
   pre0053IntegrityMigrations,
+  pre0057IntegrityMigrations,
+  pre0057IntegrityTriggers,
   recoveryBackupVerificationMatches,
   requiredAutopilotAuditCountKeys,
   requiredCommitmentControlCountKeys,
@@ -53,12 +55,36 @@ function pre0053Verification(counts: Record<string, string> = {}) {
   };
 }
 
+function pre0057Verification(counts: Record<string, string> = {}) {
+  return {
+    profile: "pre-0057",
+    migrationHead: "0056_decision_cycle_expected_amount",
+    requiredMigration: requiredRecoveryMigration,
+    requiredIntegrityMigrations: [...pre0057IntegrityMigrations],
+    integrityTriggers: [...pre0057IntegrityTriggers],
+    recoveryWorkspaceCounts: Object.fromEntries(
+      requiredAutopilotAuditCountKeys.map((key) => [key, counts[key] ?? "0"]),
+    ),
+  };
+}
+
 test("pre-0053 verification accepts exact 0026 migrations, guards, and counts", () => {
   const expected = pre0053Verification({ inbound_events: "3" });
   const actual = pre0053Verification({ inbound_events: "3" });
   assert.equal(recoveryBackupVerificationMatches(expected, actual), true);
   actual.migrationHead = "0053_phase_a_receipt_activation";
   assert.equal(recoveryBackupVerificationMatches(expected, actual), false);
+});
+
+test("pre-0057 verification accepts exact 0056 integrity and rejects post-migration drift", () => {
+  const expected = pre0057Verification({ candidate_events: "2" });
+  const actual = pre0057Verification({ candidate_events: "2" });
+  assert.equal(recoveryBackupVerificationMatches(expected, actual), true);
+  actual.migrationHead = "0057_commitment_control_v0";
+  assert.equal(recoveryBackupVerificationMatches(expected, actual), false);
+  const missingAudit = pre0057Verification({ candidate_events: "2" });
+  delete missingAudit.recoveryWorkspaceCounts.execution_attempts;
+  assert.equal(recoveryBackupVerificationMatches(expected, missingAudit), false);
 });
 
 test("backup verification accepts matching manifests with honestly empty Autopilot audit tables", () => {

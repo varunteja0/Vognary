@@ -26,6 +26,9 @@ export const requiredAutopilotIntegrityMigrations = [
   "0056_decision_cycle_expected_amount",
   "0057_commitment_control_v0",
 ];
+export const pre0057IntegrityMigrations = requiredAutopilotIntegrityMigrations.filter(
+  (migration) => migration !== "0057_commitment_control_v0",
+);
 export const requiredAutopilotIntegrityTriggers = [
   "commitment_control_decisions_immutable",
   "commitment_control_evaluation_evidence_immutable",
@@ -51,6 +54,9 @@ export const requiredAutopilotIntegrityTriggers = [
   "recovery_standing_mandate_events_immutable",
   "recovery_standing_mandates_immutable",
 ];
+export const pre0057IntegrityTriggers = requiredAutopilotIntegrityTriggers.filter(
+  (trigger) => !trigger.startsWith("commitment_control_"),
+);
 
 export const requiredAutopilotAuditCountKeys = [
   "standing_mandate_events",
@@ -70,7 +76,7 @@ export const requiredCommitmentControlCountKeys = [
   "commitment_control_reconciliations",
 ];
 
-export const backupVerificationProfiles = ["pre-0053", "current"];
+export const backupVerificationProfiles = ["pre-0053", "pre-0057", "current"];
 
 export function normalizeBackupVerificationProfile(value) {
   const profile = value?.trim() || "current";
@@ -99,7 +105,7 @@ export function requiredRecoveryTablesForProfile(value) {
     "recovery_inbound_replay_keys",
   ];
   if (profile === "pre-0053") return base;
-  return [
+  const recoveryThrough0056 = [
     ...base,
     "recovery_commitment_context",
     "recovery_decision_cycles",
@@ -124,6 +130,10 @@ export function requiredRecoveryTablesForProfile(value) {
     "recovery_provider_disables",
     "recovery_inbound_sender_assessments",
     "recovery_source_health",
+  ];
+  if (profile === "pre-0057") return recoveryThrough0056;
+  return [
+    ...recoveryThrough0056,
     "commitment_control_policies",
     "commitment_control_proposals",
     "commitment_control_evaluations",
@@ -135,21 +145,31 @@ export function requiredRecoveryTablesForProfile(value) {
 
 function verificationProfile(value) {
   const profile = normalizeBackupVerificationProfile(value);
-  return profile === "pre-0053"
-    ? {
+  if (profile === "pre-0053") {
+    return {
         profile,
         migrationHead: "0026_recovery_inbound_retention",
         requiredMigrations: pre0053RecoveryMigrations,
         integrityMigrations: pre0053IntegrityMigrations,
         requiredTriggers: pre0053IntegrityTriggers,
-      }
-    : {
-        profile,
-        migrationHead: "0057_commitment_control_v0",
-        requiredMigrations: [requiredRecoveryMigration, ...requiredAutopilotIntegrityMigrations],
-        integrityMigrations: requiredAutopilotIntegrityMigrations,
-        requiredTriggers: requiredAutopilotIntegrityTriggers,
       };
+  }
+  if (profile === "pre-0057") {
+    return {
+      profile,
+      migrationHead: "0056_decision_cycle_expected_amount",
+      requiredMigrations: [requiredRecoveryMigration, ...pre0057IntegrityMigrations],
+      integrityMigrations: pre0057IntegrityMigrations,
+      requiredTriggers: pre0057IntegrityTriggers,
+    };
+  }
+  return {
+    profile,
+    migrationHead: "0057_commitment_control_v0",
+    requiredMigrations: [requiredRecoveryMigration, ...requiredAutopilotIntegrityMigrations],
+    integrityMigrations: requiredAutopilotIntegrityMigrations,
+    requiredTriggers: requiredAutopilotIntegrityTriggers,
+  };
 }
 
 export async function readRecoveryBackupVerification(client, requestedProfile = "current") {
@@ -183,7 +203,12 @@ export async function readRecoveryBackupVerification(client, requestedProfile = 
   const missingTriggers = profile.requiredTriggers.filter((name) => !foundTriggers.has(name));
   if (missingTriggers.length) throw new Error(`Database is missing required integrity triggers: ${missingTriggers.join(", ")}`);
 
-  const result = await client.query(profile.profile === "pre-0053" ? pre0053CountQuery : currentCountQuery);
+  const countQuery = profile.profile === "pre-0053"
+    ? pre0053CountQuery
+    : profile.profile === "pre-0057"
+      ? pre0057CountQuery
+      : currentCountQuery;
+  const result = await client.query(countQuery);
 
   return {
     profile: profile.profile,
@@ -211,7 +236,7 @@ const pre0053CountQuery = `select
        (select count(*)::text from recovery_inbound_events) as inbound_events,
        (select count(*)::text from recovery_inbound_replay_keys) as inbound_replay_keys`;
 
-const currentCountQuery =
+const pre0057CountQuery =
     `select
        (select count(*)::text from recovery_workspace_states) as workspace_states,
        (select count(*)::text from recovery_workspace_versions) as workspace_versions,
@@ -246,14 +271,16 @@ const currentCountQuery =
        (select count(*)::text from recovery_inbound_aliases) as inbound_aliases,
        (select count(*)::text from recovery_inbound_events) as inbound_events,
       (select count(*)::text from recovery_inbound_sender_assessments) as inbound_sender_assessments,
-      (select count(*)::text from recovery_source_health) as source_health,
+            (select count(*)::text from recovery_source_health) as source_health,
+        (select count(*)::text from recovery_inbound_replay_keys) as inbound_replay_keys`;
+
+      const currentCountQuery = `${pre0057CountQuery},
       (select count(*)::text from commitment_control_policies) as commitment_control_policies,
       (select count(*)::text from commitment_control_proposals) as commitment_control_proposals,
       (select count(*)::text from commitment_control_evaluations) as commitment_control_evaluations,
       (select count(*)::text from commitment_control_evaluation_evidence) as commitment_control_evaluation_evidence,
       (select count(*)::text from commitment_control_decisions) as commitment_control_decisions,
-      (select count(*)::text from commitment_control_reconciliations) as commitment_control_reconciliations,
-       (select count(*)::text from recovery_inbound_replay_keys) as inbound_replay_keys`;
+      (select count(*)::text from commitment_control_reconciliations) as commitment_control_reconciliations`;
 
 export function recoveryBackupVerificationMatches(expected, actual) {
   if (!expected || expected.requiredMigration !== requiredRecoveryMigration) return false;
@@ -272,8 +299,13 @@ export function recoveryBackupVerificationMatches(expected, actual) {
   const expectedCounts = expected.recoveryWorkspaceCounts;
   const actualCounts = actual.recoveryWorkspaceCounts;
   if (!expectedCounts || !actualCounts) return false;
+  if (profile.profile !== "pre-0053") {
+    for (const key of requiredAutopilotAuditCountKeys) {
+      if (!(key in expectedCounts) || !(key in actualCounts)) return false;
+    }
+  }
   if (profile.profile === "current") {
-    for (const key of [...requiredAutopilotAuditCountKeys, ...requiredCommitmentControlCountKeys]) {
+    for (const key of requiredCommitmentControlCountKeys) {
       if (!(key in expectedCounts) || !(key in actualCounts)) return false;
     }
   }

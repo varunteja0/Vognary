@@ -194,7 +194,7 @@ async function verifyRestoredSchema(connectionString) {
     if (missingTables.length) throw new Error(`Restore drill missing core tables: ${missingTables.join(", ")}`);
 
     const recoveryVerification = await readRecoveryBackupVerification(pool, manifest.verification?.profile);
-    if (manifest.verification?.profile === "current") {
+    if (manifest.verification?.profile !== "pre-0053") {
       const missingAuditCounts = requiredAutopilotAuditCountKeys.filter(
         (key) => recoveryVerification.recoveryWorkspaceCounts?.[key] == null,
       );

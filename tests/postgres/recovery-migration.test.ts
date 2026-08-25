@@ -2770,6 +2770,48 @@ test("pg_dump/pg_restore preserves the exact pre-0053 production profile", {
   });
 });
 
+test("pg_dump/pg_restore preserves the exact pre-0057 production profile", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("pre_0057_dump_source", async (sourceUrl) => {
+    const seed = createPool(sourceUrl);
+    try {
+      await seedSchemaThrough0022(seed);
+    } finally {
+      await seed.end();
+    }
+    runMigrations(sourceUrl, ["--through=0056_decision_cycle_expected_amount"]);
+    const source = createPool(sourceUrl);
+    const userId = randomUUID();
+    const workspaceId = randomUUID();
+    const dumpDir = mkdtempSync(path.join(tmpdir(), "vognary-pre-0057-dump-"));
+    const dumpPath = path.join(dumpDir, "pre-0057.dump");
+    try {
+      await source.query(`insert into users (id, email) values ($1, $2)`, [userId, `${userId}@pre-0057-dump.test`]);
+      await source.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Pre-0057 dump')`, [workspaceId, userId]);
+      await source.query(`insert into recovery_workspace_states (workspace_id, version) values ($1, 0)`, [workspaceId]);
+      const expected = await readRecoveryBackupVerification(source, "pre-0057");
+      assert.equal(expected.migrationHead, "0056_decision_cycle_expected_amount");
+      assert.equal("commitment_control_decisions" in expected.recoveryWorkspaceCounts, false);
+      execFileSync("pg_dump", ["--format=custom", "--no-owner", "--no-acl", `--dbname=${sourceUrl}`, `--file=${dumpPath}`]);
+      await withDisposableDatabase("pre_0057_dump_target", async (targetUrl) => {
+        execFileSync("pg_restore", ["--no-owner", "--no-acl", "--exit-on-error", `--dbname=${targetUrl}`, dumpPath]);
+        const restored = createPool(targetUrl);
+        try {
+          const actual = await readRecoveryBackupVerification(restored, "pre-0057");
+          assert.deepEqual(actual, expected);
+          assert.equal(recoveryBackupVerificationMatches(expected, actual), true);
+        } finally {
+          await restored.end();
+        }
+      });
+    } finally {
+      rmSync(dumpDir, { recursive: true, force: true });
+      await source.end();
+    }
+  });
+});
+
 test("pg_dump/pg_restore preserves the current Recovery and Commitment Control profile", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
