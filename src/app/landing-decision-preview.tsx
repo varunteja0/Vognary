@@ -43,16 +43,16 @@ export function LandingDecisionPreview() {
 
   return (
     <section id="example-decision" aria-labelledby="product-review-heading" className="min-w-0">
-      <p className="eyebrow text-ochre">A real decision, not a dashboard</p>
-      <h2 id="product-review-heading" className="mt-2 font-display text-xl font-semibold tracking-tight text-(--ink) sm:text-2xl">
+      <h2 className="eyebrow text-ochre">A real decision, not a dashboard</h2>
+      <h3 id="product-review-heading" className="mt-2 font-display text-xl font-semibold tracking-tight text-(--ink) sm:text-2xl">
         Cursor costs ₹350 more this month.
-      </h2>
+      </h3>
 
       <div className="mt-4 grid min-w-0 gap-5">
         <article className="decision" data-lead="true">
           <div className="min-w-0">
             <p className="decision-cue">Next charge · 28 Aug</p>
-            <h3 className="decision-sentence mt-2">Cursor Pro · ₹1,700</h3>
+            <h4 className="decision-sentence mt-2">Cursor Pro · ₹1,700</h4>
           </div>
 
           <div className="decision-evidence">
@@ -97,7 +97,7 @@ export function LandingDecisionPreview() {
           <div>
             <p className="eyebrow eyebrow-xs">Your decision</p>
             <p className={`stamp stamp-${presentation.tone} mt-3`}>{presentation.label}</p>
-            <h3 className="mt-4 font-display text-lg font-semibold leading-snug text-(--ink)">{hook.title}</h3>
+            <h4 className="mt-4 font-display text-lg font-semibold leading-snug text-(--ink)">{hook.title}</h4>
             <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{hook.body}</p>
           </div>
           <div className="mt-4 border-t border-line pt-3">

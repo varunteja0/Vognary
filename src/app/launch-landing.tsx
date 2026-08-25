@@ -49,8 +49,8 @@ export default function LaunchLanding() {
         </section>
 
         <section className="my-4 flex flex-col justify-between gap-5 border-y border-line py-8 sm:flex-row sm:items-center">          <div>
-            <p className="eyebrow text-ochre">Start with what you already have</p>
-            <h2 className="mt-2 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">One receipt is enough to begin.</h2>
+            <h2 className="eyebrow text-ochre">Start with what you already have</h2>
+            <h3 className="mt-2 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">One receipt is enough to begin.</h3>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Nothing is saved until you sign in. Vognary never cancels a service or moves money.</p>
           </div>
           <Link href={primaryHref} className="btn btn-primary btn-lg shrink-0">{primaryLabel}</Link>
