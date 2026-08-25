@@ -43,11 +43,14 @@ test("the public endpoints expose complete agent-readable contracts without Java
 
   const markdownResponse = await request.get("/", { headers: { accept: "text/markdown" } });
   expect(markdownResponse.status()).toBe(200);
-  expect(markdownResponse.headers()["content-type"]).toContain("text/html");
+  expect(markdownResponse.headers()["content-type"]).toBe("text/markdown; charset=utf-8");
+  expect(markdownResponse.headers()["cache-control"]).toContain("no-store");
+  expect(markdownResponse.headers().vary).toMatch(/(?:^|,\s*)Accept(?:,|$)/i);
+  expect(await markdownResponse.text()).toContain("## Product boundaries");
 
   const unsupported = await request.get("/", { headers: { accept: "application/pdf" } });
-  expect(unsupported.status()).toBe(200);
-  expect(unsupported.headers()["content-type"]).toContain("text/html");
+  expect(unsupported.status()).toBe(406);
+  expect(unsupported.headers()["content-type"]).toBe("text/plain; charset=utf-8");
 
   const explicitMarkdown = await request.get("/index.md");
   expect(explicitMarkdown.status()).toBe(200);

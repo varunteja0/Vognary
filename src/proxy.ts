@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { agentLinkHeader, agentNotFoundMarkdown } from "./lib/agent-content";
+import { agentHomepageMarkdown, agentLinkHeader, agentNotFoundMarkdown } from "./lib/agent-content";
+import { preferredRepresentation } from "./lib/http-content-negotiation";
 
 const publicPagePaths = new Set([
   "/",
@@ -57,6 +58,35 @@ export function proxy(request: NextRequest) {
   }
 
   if (pathname === "/") {
+    const accept = request.headers.get("accept");
+    if (request.headers.has("rsc") || accept?.toLowerCase().includes("text/x-component")) {
+      return NextResponse.next();
+    }
+
+    const representation = preferredRepresentation(accept);
+    if (representation === "text/markdown") {
+      return new NextResponse(agentHomepageMarkdown, {
+        headers: {
+          "cache-control": "private, no-store",
+          "content-type": "text/markdown; charset=utf-8",
+          link: agentLinkHeader,
+          vary: "Accept",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    }
+    if (representation === null && accept) {
+      return new NextResponse("Not Acceptable\n\nAvailable: text/html, text/markdown\n", {
+        status: 406,
+        headers: {
+          "cache-control": "private, no-store",
+          "content-type": "text/plain; charset=utf-8",
+          vary: "Accept",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    }
+
     const response = NextResponse.next();
     response.headers.set("link", agentLinkHeader);
     return response;

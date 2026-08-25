@@ -5,13 +5,35 @@ import { NextRequest } from "next/server";
 
 import { GET as getAgentHome } from "../src/app/api/agent-home/route";
 import { GET as getLlmsTxt } from "../src/app/llms.txt/route";
+import { preferredRepresentation } from "../src/lib/http-content-negotiation";
 import { proxy } from "../src/proxy";
 
-test("homepage has one representation and advertises explicit agent routes", () => {
+test("homepage negotiation honors q-values, specificity, wildcards, and malformed rejection", () => {
+  assert.equal(preferredRepresentation(null), "text/html");
+  assert.equal(preferredRepresentation("*/*"), "text/html");
+  assert.equal(preferredRepresentation("text/markdown"), "text/markdown");
+  assert.equal(preferredRepresentation("text/markdown, text/html"), "text/markdown");
+  assert.equal(preferredRepresentation("text/html;q=1, text/markdown;q=0.5"), "text/html");
+  assert.equal(preferredRepresentation("text/html;q=0, text/markdown;q=0.8"), "text/markdown");
+  assert.equal(preferredRepresentation("text/markdown;q=0, text/*;q=1"), "text/html");
+  assert.equal(preferredRepresentation("text/html;q=0, text/markdown;q=0"), null);
+  assert.equal(preferredRepresentation("application/pdf"), null);
+  assert.equal(preferredRepresentation("text/markdown;q=bogus"), null);
+  assert.equal(preferredRepresentation("text/markdown;q=1.5, text/html;q=0.5"), "text/html");
+  assert.equal(preferredRepresentation("text/markdown;q=0.1234, text/html;q=0.2"), "text/html");
+  assert.equal(preferredRepresentation("text/markdown;q=0.8;q=0.7, text/html;q=0.5"), "text/html");
+});
+
+test("homepage negotiates uncacheable Markdown and advertises explicit agent routes", async () => {
   const markdownRequest = proxy(new NextRequest("https://www.vognary.com/", {
     headers: { accept: "text/markdown" },
   }));
-  assert.equal(markdownRequest.headers.get("x-middleware-next"), "1");
+  assert.equal(markdownRequest.status, 200);
+  assert.equal(markdownRequest.headers.get("content-type"), "text/markdown; charset=utf-8");
+  assert.equal(markdownRequest.headers.get("cache-control"), "private, no-store");
+  assert.match(markdownRequest.headers.get("vary") ?? "", /(?:^|,\s*)Accept(?:,|$)/i);
+  assert.match(await markdownRequest.text(), /^# Vognary/m);
+  assert.equal(markdownRequest.headers.get("x-middleware-next"), null);
   assert.equal(markdownRequest.headers.get("x-middleware-rewrite"), null);
   assert.match(markdownRequest.headers.get("link") ?? "", /<\/index\.md>; rel="alternate"; type="text\/markdown"/);
 
@@ -23,8 +45,29 @@ test("homepage has one representation and advertises explicit agent routes", () 
   const unsupported = proxy(new NextRequest("https://www.vognary.com/", {
     headers: { accept: "application/pdf" },
   }));
-  assert.equal(unsupported.status, 200);
-  assert.equal(unsupported.headers.get("x-middleware-next"), "1");
+  assert.equal(unsupported.status, 406);
+  assert.equal(unsupported.headers.get("content-type"), "text/plain; charset=utf-8");
+  assert.match(unsupported.headers.get("vary") ?? "", /(?:^|,\s*)Accept(?:,|$)/i);
+
+  const htmlPreferred = proxy(new NextRequest("https://www.vognary.com/", {
+    headers: { accept: "text/html;q=1, text/markdown;q=0.5" },
+  }));
+  assert.equal(htmlPreferred.headers.get("x-middleware-next"), "1");
+
+  const markdownPreferred = proxy(new NextRequest("https://www.vognary.com/", {
+    headers: { accept: "text/html;q=0.5, text/markdown;q=1" },
+  }));
+  assert.equal(markdownPreferred.headers.get("content-type"), "text/markdown; charset=utf-8");
+
+  const rsc = proxy(new NextRequest("https://www.vognary.com/", {
+    headers: { accept: "text/x-component", rsc: "1" },
+  }));
+  assert.equal(rsc.headers.get("x-middleware-next"), "1");
+
+  const normalizedRsc = proxy(new NextRequest("https://www.vognary.com/", {
+    headers: { accept: "text/x-component" },
+  }));
+  assert.equal(normalizedRsc.headers.get("x-middleware-next"), "1");
 
   const explicitMarkdown = proxy(new NextRequest("https://www.vognary.com/index.md", {
     headers: { accept: "text/markdown" },
