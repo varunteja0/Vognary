@@ -399,6 +399,7 @@ async function buildAccessExport(client: PoolClient, input: {
     recommendationResult,
     workspaceStateResult,
     recoveryResult,
+    commitmentControlResult,
     productEventResult,
     renewalPreferenceResult,
     renewalDeliveryResult,
@@ -833,6 +834,59 @@ async function buildAccessExport(client: PoolClient, input: {
           from recovery_source_disconnections where workspace_id = $1
           order by disconnected_at asc, source_id asc limit $2
         ) record) as source_disconnections`,
+      [input.workspaceId, exportRowLimits.recoveryRecords + 1],
+    ),
+    query<CommitmentControlExportRow>(
+      `select
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select version, category_rules as "categoryRules", currency_limits as "currencyLimits",
+                 created_by_user_id as "createdByUserId", created_at as "createdAt"
+          from commitment_control_policies where workspace_id = $1
+          order by version asc limit $2
+        ) record) as policies,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, submitted_by_user_id as "submittedByUserId", merchant, purpose, category,
+                 amount_minor::text as "amountMinor", currency,
+                 first_charge_date as "firstChargeDate", cadence, as_of_date as "asOfDate",
+                 projected_13_week_minor::text as "projectedThirteenWeekMinor",
+                 projected_annual_minor::text as "projectedAnnualMinor",
+                 assumption_basis as "assumptionBasis", created_at as "createdAt"
+          from commitment_control_proposals where workspace_id = $1
+          order by created_at asc, id asc limit $2
+        ) record) as proposals,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, proposal_id as "proposalId", policy_version as "policyVersion", status,
+                 human_decision_required as "humanDecisionRequired",
+                 assumption_fields as "assumptionFields", reason_codes as "reasonCodes",
+                 currency_results as "currencyResults", evaluated_at as "evaluatedAt"
+          from commitment_control_evaluations where workspace_id = $1
+          order by evaluated_at asc, id asc limit $2
+        ) record) as evaluations,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select evaluation_id as "evaluationId", evidence_id as "evidenceId", linked_at as "linkedAt"
+          from commitment_control_evaluation_evidence where workspace_id = $1
+          order by linked_at asc, evaluation_id asc, evidence_id asc limit $2
+        ) record) as evaluation_evidence,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, proposal_id as "proposalId", evaluation_id as "evaluationId", action,
+                 expected_amount_minor::text as "expectedAmountMinor",
+                 approved_cap_minor::text as "approvedCapMinor", currency,
+                 decided_by_user_id as "decidedByUserId", decided_at as "decidedAt"
+          from commitment_control_decisions where workspace_id = $1
+          order by decided_at asc, id asc limit $2
+        ) record) as decisions,
+        (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, proposal_id as "proposalId", decision_id as "decisionId",
+                 evidence_id as "evidenceId", verdict,
+                 expected_amount_minor::text as "expectedAmountMinor",
+                 approved_cap_minor::text as "approvedCapMinor",
+                 authorization_currency as "authorizationCurrency",
+                 observed_amount_minor::text as "observedAmountMinor",
+                 observed_currency as "observedCurrency",
+                 reconciled_by_user_id as "reconciledByUserId", reconciled_at as "reconciledAt"
+          from commitment_control_reconciliations where workspace_id = $1
+          order by reconciled_at asc, id asc limit $2
+        ) record) as reconciliations`,
       [input.workspaceId, exportRowLimits.recoveryRecords + 1],
     ),
     query<{
@@ -1318,6 +1372,8 @@ async function buildAccessExport(client: PoolClient, input: {
   assertWithinExportLimit("recommendations", recommendationResult.rows.length);
   const recovery = recoveryResult.rows[0];
   if (!recovery) throw new Error("Recovery privacy export query returned no row.");
+  const commitmentControl = commitmentControlResult.rows[0];
+  if (!commitmentControl) throw new Error("Commitment Control privacy export query returned no row.");
   for (const records of [
     recovery.versions,
     recovery.submissions,
@@ -1348,6 +1404,16 @@ async function buildAccessExport(client: PoolClient, input: {
     recovery.provider_controls,
     recovery.connected_mandate_cohort,
     recovery.source_disconnections,
+  ]) {
+    assertWithinExportLimit("recoveryRecords", records.length);
+  }
+  for (const records of [
+    commitmentControl.policies,
+    commitmentControl.proposals,
+    commitmentControl.evaluations,
+    commitmentControl.evaluation_evidence,
+    commitmentControl.decisions,
+    commitmentControl.reconciliations,
   ]) {
     assertWithinExportLimit("recoveryRecords", records.length);
   }
@@ -1507,6 +1573,14 @@ async function buildAccessExport(client: PoolClient, input: {
       providerControls: recovery.provider_controls,
       connectedMandateCohort: recovery.connected_mandate_cohort,
       sourceDisconnections: recovery.source_disconnections,
+    },
+    commitmentControl: {
+      policies: commitmentControl.policies,
+      proposals: commitmentControl.proposals,
+      evaluations: commitmentControl.evaluations,
+      evaluationEvidence: commitmentControl.evaluation_evidence,
+      decisions: commitmentControl.decisions,
+      reconciliations: commitmentControl.reconciliations,
     },
     productEvents: productEventResult.rows.map((row) => ({
       id: row.id,
@@ -2100,6 +2174,15 @@ type RecoveryExportRow = {
   provider_controls: Array<Record<string, unknown>>;
   connected_mandate_cohort: Array<Record<string, unknown>>;
   source_disconnections: Array<Record<string, unknown>>;
+};
+
+type CommitmentControlExportRow = {
+  policies: Array<Record<string, unknown>>;
+  proposals: Array<Record<string, unknown>>;
+  evaluations: Array<Record<string, unknown>>;
+  evaluation_evidence: Array<Record<string, unknown>>;
+  decisions: Array<Record<string, unknown>>;
+  reconciliations: Array<Record<string, unknown>>;
 };
 
 type ConsentExportRow = {

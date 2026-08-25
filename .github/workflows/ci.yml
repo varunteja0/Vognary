@@ -76,6 +76,7 @@ jobs:
           SESSION_SECRET: ci-only-session-secret-0123456789abcdef0123456789abcdef01234567
           TOKEN_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           ALLOW_IN_MEMORY_RATE_LIMITS: "true"
+          COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS: "*"
         run: |
           npm run dev -- --hostname 127.0.0.1 --port 3005 > /tmp/vognary-dev.log 2>&1 &
           echo $! > /tmp/vognary-dev.pid
@@ -93,13 +94,13 @@ jobs:
           VOGNARY_E2E_DEV_LOGIN_CODE: ci-dev-login-code
           PLAYWRIGHT_EXTERNAL_SERVER: "1"
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3005
-        # Recovery v1 is the canonical signed launch path. Customer #0 performs
-        # the real database-backed desktop/mobile lifecycle; the two UI suites
-        # retain focused presentation/state coverage around that core proof.
+        # Commitment Control and Recovery share one signed-in workspace shell.
+        # Control owns the pre-spend authorization loop; Customer #0 and the two
+        # Recovery suites prove existing evidence workflows remain intact.
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
           npm run db:apply-schema
-          npm run test:e2e -- recovery-customer-zero recovery-ui-home recovery-ui-states
+          npm run test:e2e -- commitment-control-ui recovery-customer-zero recovery-ui-home recovery-ui-states
       - name: Stop dev server
         if: always()
         run: |

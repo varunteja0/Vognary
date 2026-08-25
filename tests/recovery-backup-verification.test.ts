@@ -6,6 +6,7 @@ import {
   pre0053IntegrityMigrations,
   recoveryBackupVerificationMatches,
   requiredAutopilotAuditCountKeys,
+  requiredCommitmentControlCountKeys,
   requiredAutopilotIntegrityMigrations,
   requiredAutopilotIntegrityTriggers,
   requiredRecoveryMigration,
@@ -14,12 +15,13 @@ import {
 function verification(auditFacts: Record<string, string> = {}) {
   return {
     profile: "current",
-    migrationHead: "0056_decision_cycle_expected_amount",
+    migrationHead: "0057_commitment_control_v0",
     requiredMigration: requiredRecoveryMigration,
     requiredIntegrityMigrations: [...requiredAutopilotIntegrityMigrations],
     integrityTriggers: [...requiredAutopilotIntegrityTriggers],
     recoveryWorkspaceCounts: Object.fromEntries(
-      requiredAutopilotAuditCountKeys.map((key) => [key, auditFacts[key] ?? "0"]),
+      [...requiredAutopilotAuditCountKeys, ...requiredCommitmentControlCountKeys]
+        .map((key) => [key, auditFacts[key] ?? "0"]),
     ),
   };
 }
@@ -75,6 +77,9 @@ test("backup verification rejects missing or mismatched required audit counts", 
   delete missing.recoveryWorkspaceCounts.execution_attempts;
   assert.equal(recoveryBackupVerificationMatches(expected, missing), false);
   assert.equal(recoveryBackupVerificationMatches(expected, verification({ candidate_events: "1" })), false);
+  const missingControl = verification({ candidate_events: "2" });
+  delete missingControl.recoveryWorkspaceCounts.commitment_control_decisions;
+  assert.equal(recoveryBackupVerificationMatches(expected, missingControl), false);
 });
 
 test("backup verification rejects missing integrity migrations or triggers", () => {

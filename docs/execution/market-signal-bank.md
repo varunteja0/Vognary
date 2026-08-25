@@ -1,5 +1,9 @@
 # Market signal bank — recurring software money (evidence-first)
 
+> **Operating motto: Take smart risks. Do not play safe.** Seek asymmetric,
+> falsifiable opportunities without promoting hypotheses into facts. Full
+> doctrine: [`THE-LAW.md`](../THE-LAW.md).
+
 > Parent law: [`docs/THE-LAW.md`](../THE-LAW.md). Built 2026-08-22 from public web research.
 > Every entry is labeled FACT (observable in the linked source), INFERENCE (our reasoning), or HYPOTHESIS (untested belief).
 > Never promote an inference into copy as if it were a fact. Vendor blogs are marketing — lowest confidence tier.

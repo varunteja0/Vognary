@@ -23,13 +23,14 @@ import { decimalToMinorUnits, minorUnitsToDecimal } from "@/lib/recovery/domain"
 // (draft input, selection, dialogs, focus, pending mutation, rollback metadata).
 // It never derives recurrence, totals, confidence, ordering, or exposure.
 
-export const recoveryViews = ["HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"] as const;
+export const recoveryViews = ["CONTROL", "HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"] as const;
 export type RecoveryView = (typeof recoveryViews)[number];
 
 export const recoveryViewLabels: Record<RecoveryView, string> = {
+  CONTROL: "Control",
   HOME: "Now",
   COMMITMENTS: "Bills",
-  ADD_EVIDENCE: "Receipts",
+  ADD_EVIDENCE: "Sources",
   MANDATE: "Automation",
 };
 

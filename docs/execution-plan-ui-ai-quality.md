@@ -1,5 +1,9 @@
 # Vognary — UI/UX Quality + AI Live-Path Execution Plan
 
+> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> falsifiable upside and bound irreversible downside. Full doctrine:
+> [`THE-LAW.md`](THE-LAW.md).
+
 > **Agents: read [THE-LAW.md](THE-LAW.md) first**, then
 > [execution/phase-b-loop-shipping.md](execution/phase-b-loop-shipping.md) for
 > company-ordered loop WPs. This file is the detailed WP-0…WP-6 UI/AI execution

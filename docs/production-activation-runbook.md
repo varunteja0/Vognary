@@ -1,5 +1,9 @@
 # Vognary Production Activation
 
+> **Operating motto: Take smart risks. Do not play safe.** Move quickly on
+> bounded experiments, never by weakening migration integrity, rollback,
+> authentication, or readiness proof. Full doctrine: [`THE-LAW.md`](THE-LAW.md).
+
 This runbook activates the Recovery receipt-forwarding product. Direct Gmail reading, Account Aggregator, API-key connectors, environment sync previews, and generic connector webhooks are retired for this launch and must return `410 Gone`.
 
 Times in this runbook use IST.
@@ -50,13 +54,35 @@ Rehearse this exact path first through the disposable PostgreSQL suite. This
 script is a bounded one-off for `0055` → `0056`, not the long-term generic
 migration runner and not a replacement for the historical bootstrap workflow.
 
+## Pending additive apply: `0056` → `0057`
+
+Commitment Control requires `0057_commitment_control_v0`. Production remains at
+the independently verified `0056` head until the founder runs this sequence; do
+not deploy the Control routes before the database reaches `0057`.
+
+1. Run the current-profile encrypted backup and restore drill from the exact candidate SHA.
+2. Run the complete disposable PostgreSQL migration and Commitment Control store/route/privacy tests.
+3. From a trusted founder-controlled terminal, run the generic additive runner once:
+
+```bash
+DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
+```
+
+4. Verify the ledger head is exactly `0057_commitment_control_v0` and its checksum matches this repository.
+5. Verify all six `commitment_control_*` tables and six immutable triggers exist.
+6. Verify existing Recovery and Autopilot tables, mutation kinds, and product-event names still pass their disposable integration suites.
+
+Rollback before application deployment means do not deploy the Control routes.
+After application deployment, fail closed by removing pilot enrollment; do not
+drop `0057` tables or rewrite immutable authorization rows.
+
 ## Phase 0: Stop Conditions
 
 Do not show the forwarding-first landing or set any receipt-inbox operator flag unless all earlier phases pass.
 
 Stop immediately when any of these is true:
 
-- PostgreSQL migrations through `0056_decision_cycle_expected_amount` are not applied.
+- PostgreSQL migrations through `0057_commitment_control_v0` are not applied for a Commitment Control deployment.
 - A signed Resend event cannot produce one canonical Recovery submission.
 - Replaying that event creates another submission, source, evidence row, or commitment.
 - A raw provider address, alias token, message subject, body, or attachment appears in logs or privacy export.
@@ -86,14 +112,14 @@ run it for the current incremental `0055` → `0056` apply above.
 DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
 ```
 
-11. Query `schema_migrations` and verify the last row is `0056_decision_cycle_expected_amount`.
+11. Query `schema_migrations` and verify the last row is `0057_commitment_control_v0` for the current candidate.
 12. Verify PostgreSQL still contains the three cutover guards plus `recovery_inbound_alias_milestones_immutable`. Re-run the zero-nonterminal legacy queries from step 5.
 13. Run the fresh and staged upgrade migration tests against disposable PostgreSQL 16. The staged rehearsal must begin at the production resume point and end at `0053` without losing aliases, inbound events, Recovery evidence, commitments, corrections, or provenance.
 
 Expected success:
 
 - `/api/readiness` reports `capabilities.schema.status = ready`.
-- `capabilities.schema.status` is `ready`, and `capabilities.schema.applied` ends at `0056_decision_cycle_expected_amount`.
+- `capabilities.schema.status` is `ready`, and `capabilities.schema.applied` ends at `0057_commitment_control_v0`.
 - `capabilities.recoveryV1.status = schema-ready-clean-cutover`.
 
 Keep forwarding disabled and stop activation if the starting head is not exactly `0026`, the successful pre-`0053` backup/restore run is absent or stale, checksums differ, any cutover or milestone trigger is absent, a nonterminal legacy row remains, a fresh database fails, or an upgrade loses rows.
@@ -233,7 +259,7 @@ Expected success:
 
 - Every endpoint probe passes.
 - `Recovery receipt inbox` is `READY`.
-- Feature migrations are `READY` through `0056_decision_cycle_expected_amount`.
+- Feature migrations are `READY` through `0057_commitment_control_v0`.
 - Identity provider, persistent backend, shared rate limiting, privacy lifecycle, monitoring, backups, and any enabled billing/notification group are `READY`.
 - All retired connector endpoints return `410`.
 

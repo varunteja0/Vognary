@@ -1,146 +1,136 @@
-# Phase A — Private autopilot pilots (21 days)
+# Phase A — Paid Commitment Control pilots (30 days)
+
+> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> falsifiable upside and bound irreversible downside. Every market bet needs a
+> deadline and kill metric. Full doctrine: [`THE-LAW.md`](../THE-LAW.md).
 
 > **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md)
-> **Goal:** Prove humans will connect once, sign a standing mandate, and pay for zero-chore discretionary cancellation. Not more product features. Not free paste audits.
-> **Owner:** Founder primary; agents support CRM hygiene, redaction helpers, and copy polish.
-> **Exit:** Day-21 stop/go using THE-LAW scoreboard metrics.
-> **Historical field memory (pre-autopilot paste-audit campaign):** [`people-conversation-learning.md`](people-conversation-learning.md) — read as history; do not rewrite those quotes as new pilot evidence.
-
-> **FREEZE OVERRIDE (2026-08-18, independently restated 2026-08-22):** THE-LAW outranks this file on the product offer. Live V1 is Commitment Intelligence: add 2–5 software bills → cited Keep / Review later / Plan to cancel before the charge. Vognary does not cancel a service and does not move money. **Do not send §3, §3.5, §3.6, §4, §9 (mandate/cancel questions), or §10 as live copy.** Those sections are historical Autopilot-era scripts. Live first-10 copy is the top “SEND NOW” block in gitignored `docs/execution/private-autopilot-outreach-draft.md` only — not the “Historical — Private Autopilot” block later in that same file. Funnel counts in §0 remain the measurement skeleton; do not invent connected / mandate / paid.
+> **Goal:** Prove companies will put Vognary before a real obligation and pay ₹40,000/month for a human-approved control workflow.
+> **Owner:** Founder owns targeting, conversations, offers, contracts, and payment evidence. Agents support CRM structure, proposal intake, and evidence-safe artifacts.
+> **Day 10 gate:** 20 qualified targets contacted, 10 conversations, five explicit offers, and two upfront payments.
+> **Day 30 gate:** three paid pilots, 30 pre-spend proposals, three materially changed/capped/declined decisions, at least 80% pre-spend arrival, and two paid renewals.
 
 ---
 
 ## 0. Success / stop criteria
 
-Actual payment and written pay intent are **separate metrics**. The paid 5/20 gate requires **actual payment**. Written pay intent is research signal only.
+### Day 10 success
 
-### Go (continue building loop + activation)
+- 20 companies match the ICP using public evidence only.
+- 10 founder-confirmed conversations happen.
+- Five explicit ₹40,000/month offers are made.
+- Two pilots pay upfront. Written intent, invoice sent, and payment received remain separate fields.
 
-- ≥10 connected accounts with active standing mandates
-- ≥5 produce an eligible discretionary candidate
-- ≥3 supported actions complete with **no post-mandate customer work**
-- ≥2 reach a covered clean financial window
-- ≥5 **actual payments** of 20 real ₹999/month + verified-savings offers
-- Zero protected-class, unauthorized, or premature executions
-- Median operator effort below 15 minutes on handled cases
+### Day 30 success
 
-### Stop / rework offer
+- Three paid pilots are active.
+- 30 proposals are evaluated; at least 80% arrive before spend.
+- At least three decisions are materially changed, capped, or declined.
+- Two pilots renew at the paid price.
+- Zero unauthorized decisions, invented money, cross-workspace evidence links, or autonomous actions.
 
-- People refuse even redacted evidence after a clear privacy pitch
-- Findings feel obvious / zero surprise
-- **0 actual payments** after 20 real autopilot offers (written intent does not save this gate)
-- Users only care if full bank/UPI auto-magic exists (wedge may be wrong timing)
-- Any protected-class or unauthorized execution
+### Kill / rework
 
-### Measurable funnel (do not mark ahead of events)
+- Fewer than two of ten offers pay.
+- Fewer than half of proposal requests arrive before spending.
+- 30 proposals change zero decisions.
+- Buyers require Vognary to move money, issue cards, or auto-approve before they will pay.
+- Any proposal, policy result, or reconciliation is presented as evidence when it is only an assumption.
 
-This is the only private-pilot conversion sequence agents may count. Empty cells and `not-contacted` mean unmeasured, not failure.
+### Measurable funnel
 
 ```text
-20 sourced targets
-  → 5 conversations (current: 1 — Prashanth Vaidya, 2026-08-20/22)
-  → 2 connected sources plus standing mandates
-  → 1 financially meaningful cited aha
-  → 1 explicit payment ask
+20 qualified targets
+  → 10 conversations
+  → 5 explicit ₹40,000/month offers
+  → 2 upfront payments by Day 10
 ```
 
-| Step | Current (2026-08-15) | Rule |
-| --- | ---: | --- |
-| Sourced targets in gitignored CRM | 20 | Direct public sources only; no invented spend or identity |
-| Conversations | 1 | Founder-confirmed reply or call. Drafts are not conversations. Evidence 2026-08-22: Prashanth Vaidya replied in https://x.com/pvbuilds/status/2090155802158084243 |
-| Connected sources + mandates | 0 | Both events on the same workspace |
-| Financially meaningful cited aha | 0 | Customer sees an unexpected cited commitment from their evidence |
-| Explicit payment ask | 0 | Founder asked; `actual_payment_at` stays blank until money arrives |
-
-Do **not** mark contacted, replied, activated, paid, or referred. Five founder-approval drafts live in gitignored `docs/execution/private-autopilot-outreach-draft.md`. Nothing sent.
+Current Commitment Control counts: targets **0**, conversations **0**, offers **0**, payments **0**. Historical Autopilot conversations do not count toward the new thesis.
 
 ---
 
 ## 1. CRM schema (canonical)
 
-**Working file (gitignored; may contain PII):** `docs/execution/private-autopilot-pilot-crm.csv` — sourced targets, not qualified prospects.
-**Committed headers:** [`private-autopilot-pilot-crm.csv.example`](private-autopilot-pilot-crm.csv.example)
-**Historical paste-audit CRM (gitignored; not new pilot evidence):** `docs/execution/private-audit-crm.csv`
+**Working file (gitignored; may contain PII):** `docs/execution/private-commitment-control-pilot-crm.csv`. Do not commit names, emails, private proposals, contracts, or payment records.
 
-Agents: never invent “connected”, “mandate accepted”, “paid”, or “verified saving” statuses. Founder owns status transitions.
+Agents never infer `qualified`, `offered`, `paid`, `renewed`, or `decision_changed`. The founder records those transitions from direct evidence.
 
 ### Required columns
 
 | Column | Type | Values / notes |
 | --- | --- | --- |
 | `id` | string | `P01`, `P02`, … stable |
-| `connected_account_at` | datetime | First proven connected evidence source |
-| `mandate_accepted_at` | datetime | Signed standing mandate |
-| `mandate_terms_version` | string | Exact terms version on the signed text |
-| `candidate_discovered_at` | datetime | First eligible discretionary candidate |
-| `notice_delivered_at` | datetime | 48-hour veto notice **successfully delivered** |
-| `veto_at` | datetime | User veto before execution |
-| `exception_at` | datetime | Password / OTP / login / UPI-app / bank-confirmation / unknown path |
-| `supported_execution_at` | datetime | Merchant API, authenticated support/agency, or equivalent supported channel |
-| `post_mandate_customer_work_minutes` | number | Minutes the customer spent after signing. Zero is the product promise. |
-| `verification_coverage` | enum | `covered` \| `pending` \| `missing` |
-| `clean_window_at` | datetime | Covered window with no baseline debit |
-| `verified_saving_minor` | integer | Exact minor units; empty until covered proof |
-| `verified_saving_currency` | char(3) | Usually `INR` |
-| `actual_payment_at` | datetime | Money received. **Required for the paid gate.** |
-| `actual_payment_amount_inr` | number | Gross collected |
-| `written_pay_intent_at` | datetime | Written intent only. **Does not satisfy the paid gate.** |
-| `refund_at` | datetime | |
-| `refund_amount_inr` | number | |
-| `operator_minutes` | number | Internal effort on this workspace |
-| `status` | enum | see below |
-| `notes` | text | |
+| `public_source_url` | string | Public source used to establish ICP fit; no assumed spend |
+| `qualified_at` | datetime | Founder-confirmed fit against the locked ICP |
+| `conversation_at` | datetime | A real call or substantive reply, not a sent message |
+| `offer_at` | datetime | Explicit ₹40,000/month offer made |
+| `invoice_sent_at` | datetime | Invoice delivery; does not count as payment |
+| `payment_received_at` | datetime | Cleared upfront payment; the paid gate |
+| `proposal_count` | integer | Proposals actually evaluated |
+| `pre_spend_proposal_count` | integer | Proposals received before an obligation existed |
+| `changed_decision_count` | integer | Capped, declined, or materially changed after evaluation |
+| `renewal_offered_at` | datetime | Renewal explicitly offered |
+| `renewal_paid_at` | datetime | Cleared renewal payment |
+| `status` | enum | Exact state below |
+| `notes` | text | Redacted learning only; no private proposal contents |
 
 ### Status machine (use exactly)
 
 ```
 not-contacted
-  → connected
-  → mandate-accepted
-  → candidate-found
-  → notice-delivered
-      → silence-authorized
-      → vetoed
-      → exception
-  → supported-execution
-  → verifying
-  → clean-window
-  → paid | refunded | closed-lost
+  → contacted
+  → conversation
+  → offered
+  → paid-pilot
+  → active-pilot
+  → renewed | closed-lost | refunded
 ```
-
-Veto or mandate revocation returns queued cases to withdrawn immediately. Exceptions are not “supported execution.”
 
 ### Minimum weekly CRM hygiene
 
-- Same day: `connected_account_at` / `mandate_accepted_at` / `notice_delivered_at`
-- Separate columns for `actual_payment_at` and `written_pay_intent_at`
-- Friday: export counts for THE-LAW scoreboard — never mix intent into paid
+- Same day: conversation, offer, invoice, and cleared payment timestamps.
+- Record proposal counts from product evidence; never reconstruct them from memory.
+- Friday: export aggregate counts to the scoreboard; never commit the private CRM.
 
 ---
 
 ## 2. ICP (who to contact first)
 
-**Priority 1 — Beachhead**
+**Priority:** India-first, 5–100-person AI-native companies with at least ₹5 lakh/month in AI, cloud, software, contractor, or campaign exposure; a founder, finance lead, or operator who can bring real proposed obligations before spend; and authority to run a ₹40,000/month pilot.
 
-- India-based founders / freelancers with AI + SaaS + cloud stacks who will connect a real mailbox or statement source
-- People who already said a spreadsheet still surprises them
-- People willing to sign a standing mandate with a 48-hour veto
-
-**Priority 2**
-
-- Fractional CFOs / CAs (channel pilots later in Phase E)
-- Indie hackers with multi-currency tools
-
-**Deprioritize for Phase A**
-
-- Enterprise procurement
-- Users who only want fully automated bank sync day-one
-- Anyone requesting credit products
-- Anyone asking Vognary to auto-stop EMI, SIP, insurance, utilities, or cloud infrastructure
+**Deprioritize:** solo consumers, enterprise procurement transformations, teams seeking spend cards or payments, companies unable to provide a pre-spend proposal, and anyone requiring autonomous approval or purchasing.
 
 ---
 
-## 3. Outreach scripts (copy-paste)
+## 3. Offer and delivery contract
+
+The paid pilot includes policy setup, up to 50 commitment evaluations, a 13-week obligation register, weekly reconciliation, and a one-business-day response SLA. It records decisions; it does not purchase, provision, cancel, or move money.
+
+### First-touch frame
+
+```text
+We are piloting Vognary Commitment Control with a small number of AI-native teams.
+
+Before a new AI, cloud, software, contractor, or campaign obligation is created, Vognary shows the exact exposure, checks your stated policy, and records an authorized human decision and cap. Later evidence is reconciled against that frozen approval.
+
+The pilot is ₹40,000/month, paid upfront. Vognary never auto-approves or moves money. Would you bring one real upcoming commitment to a 20-minute working session this week?
+```
+
+### Session proof
+
+1. Capture one real proposed obligation as user-entered assumptions.
+2. Show currency-separated 13-week and annual exposure plus cited existing exposure.
+3. Apply the workspace policy deterministically.
+4. Have an owner/admin approve, cap, or decline.
+5. Freeze the decision and later reconcile cited Recovery evidence without rewriting it.
+6. Ask for the upfront pilot payment; record received money separately from intent.
+
+## Historical Autopilot material — superseded 2026-08-25
+
+Everything below this marker is retained only for audit history. It is not a live offer, interview, workflow, or implementation instruction.
+
+### 3. Historical outreach scripts
 
 **DO NOT SEND. Historical Autopilot-era copy. See the freeze override at the top of this file.**
 
@@ -218,7 +208,7 @@ If you want to continue, pay the monitoring invoice. Written “I’ll pay” is
 
 ---
 
-## 4. Pilot delivery standard (every pilot identical)
+### 4. Historical pilot delivery standard
 
 Do **not** use the old free-audit report as the product. The product is the autopilot loop.
 
@@ -242,7 +232,7 @@ Do **not** use the old free-audit report as the product. The product is the auto
 
 ---
 
-## 5. Corpus consent (privacy-safe)
+### 5. Historical corpus consent
 
 **Never commit real statements to git.**  
 Store offline under local path (founder machine / encrypted drive).  
@@ -268,7 +258,7 @@ When 25+ fixtures exist: run `npm run corpus` and track precision/recall toward 
 
 ---
 
-## 6. 21-day calendar
+### 6. Historical 21-day calendar
 
 | Day | Founder | Agent support |
 | ---: | --- | --- |
@@ -283,7 +273,7 @@ When 25+ fixtures exist: run `npm run corpus` and track precision/recall toward 
 
 ---
 
-## 7. Agent rules for Phase A
+### 7. Historical agent rules for Phase A
 
 | Allowed | Forbidden |
 | --- | --- |
@@ -296,7 +286,7 @@ When 25+ fixtures exist: run `npm run corpus` and track precision/recall toward 
 
 ---
 
-## 8. Day-21 stop/go worksheet
+### 8. Historical Day-21 stop/go worksheet
 
 ```text
 Date:
@@ -322,7 +312,7 @@ Copy result into `docs/CONTINUE-HERE.md` under a short “Phase A result” note
 
 ---
 
-## 9. 15-minute behavioral interview (do not treat as qualification)
+### 9. Historical behavioral interview
 
 **DO NOT use the mandate / 48-hour-veto / ₹999 questions below as the live first-10 script.** Under the freeze, the live session is: paste 2–5 bills, see cited decisions, ask whether that beat memory. Keep every CRM outcome column blank until the matching event exists.
 
@@ -354,7 +344,7 @@ Use after a sourced target replies “pilot” or agrees to a call. This is **no
 
 ---
 
-## 10. Live-onboarding checklist (private Autopilot path)
+### 10. Historical Autopilot onboarding checklist
 
 Run only after the human agrees to the standing-mandate path. Same loop for every pilot. Empty cells mean unmeasured.
 

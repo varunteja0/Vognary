@@ -59,11 +59,12 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await tabToAndActivate(page, "Sign in");
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
+  const initialControlProbe = waitForControlProbe(page);
   await loginAsDevelopmentUser(page);
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
 
   // 4-7. Add bills from empty Home, not Gmail setup.
-  await expect(page.getByRole("heading", { name: "Start with a software bill." })).toBeVisible();
+  await openNowAfterWorkspaceLoad(page, "Start with a software bill.", initialControlProbe);
   await page.getByRole("button", { name: "Add a bill" }).click();
   const addBills = page.getByRole("dialog", { name: "Add a bill" });
   await expect(addBills).toBeVisible();
@@ -187,11 +188,12 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   // 30. Unproven automation authority stays out of the public workspace.
   await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toHaveCount(0);
+  const finalControlProbe = waitForControlProbe(page);
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
+  await openNowAfterWorkspaceLoad(page, "You're caught up", finalControlProbe);
   await expectNoHorizontalOverflow(page);
   // The next charge is months away, so Home stays calm instead of manufacturing urgency.
-  await expect(page.getByRole("heading", { name: "You're caught up" })).toBeVisible();
 
   // 31. Exercise canonical export and canonical deletion through Account settings.
   await openAccount(page);
@@ -253,7 +255,26 @@ async function loginAsDevelopmentUser(page: Page) {
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
 }
 
-async function selectRecoveryView(page: Page, name: "Now" | "Bills" | "Receipts" | "Automation") {
+function waitForControlProbe(page: Page) {
+  return page.waitForResponse((response) => (
+    new URL(response.url()).pathname === "/api/workspaces/current/control/brief"
+    && response.request().method() === "GET"
+  ));
+}
+
+async function openNowAfterWorkspaceLoad(page: Page, headingName: string, controlProbe: Promise<unknown>) {
+  await controlProbe;
+  const navigation = page.getByRole("navigation", { name: "Primary" });
+  const expectedHome = page.getByRole("heading", { name: headingName });
+  const control = navigation.getByRole("button", { name: "Control" });
+  if (await control.isVisible()) {
+    await expect(control).toHaveAttribute("aria-current", "page");
+    await navigation.getByRole("button", { name: "Now" }).click();
+  }
+  await expect(expectedHome).toBeVisible();
+}
+
+async function selectRecoveryView(page: Page, name: "Now" | "Bills" | "Sources" | "Automation") {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name }).click();
 }
 
@@ -267,7 +288,7 @@ async function openAddBills(page: Page) {
   if (await addBills.first().isVisible()) {
     await addBills.first().click();
   } else {
-    await selectRecoveryView(page, "Receipts");
+    await selectRecoveryView(page, "Sources");
     await page.getByRole("button", { name: "Add a bill" }).click();
   }
   await expect(overlay).toBeVisible();

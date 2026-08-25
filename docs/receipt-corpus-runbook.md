@@ -1,5 +1,9 @@
 # Private receipt corpus gate
 
+> **Operating motto: Take smart risks. Do not play safe.** Test ambitious parser
+> claims quickly, but never trade away consent, redaction, provenance, or the
+> precision and recall kill gates. Full doctrine: [`THE-LAW.md`](THE-LAW.md).
+
 The receipt-quality launch gate uses 200 consented, redacted real receipts stored outside Git. Raw receipt text, manifest consent references, and generated reports must remain in approved private storage.
 
 Place the working corpus at `corpus/receipt-fixtures/` (or set `RECEIPT_CORPUS_DIR`) with a `manifest.yaml` using this shape:

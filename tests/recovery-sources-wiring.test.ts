@@ -13,8 +13,9 @@ test("the workspace wires Sources and delegates account settings to the profile 
   assert.match(workspaceSource, /import \{ RecoverySources \} from "\.\/recovery-sources"/);
   assert.match(workspaceSource, /<RecoverySources/);
   assert.match(workspaceSource, /href="\/profile"/);
-  assert.match(workspaceSource, /primaryViews.length === 4 \? "grid-cols-4" : "grid-cols-3"/);
-  assert.doesNotMatch(workspaceSource, /grid-cols-5/);
+  assert.match(workspaceSource, /primaryViews\.length >= 5\s*\n?\s*\? "grid-cols-5"/);
+  assert.match(workspaceSource, /primaryViews\.length === 4 \? "grid-cols-4" : "grid-cols-3"/);
+  assert.doesNotMatch(workspaceSource, /grid-cols-6/);
   assert.doesNotMatch(workspaceSource, /RecoveryProfile/);
   assert.doesNotMatch(workspaceSource, /\bPROFILE\b/);
 });

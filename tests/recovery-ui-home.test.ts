@@ -116,12 +116,13 @@ test("every contract enum has presentation copy, so a contract change cannot ren
   }
 });
 
-test("primary navigation keeps Mandate hidden until delivery is proven or authority already exists", () => {
-  assert.deepEqual([...recoveryViews], ["HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
-  assert.deepEqual(Object.values(recoveryViewLabels), ["Now", "Bills", "Receipts", "Automation"]);
+test("primary navigation keeps Control and Mandate hidden until each is genuinely available", () => {
+  assert.deepEqual([...recoveryViews], ["CONTROL", "HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
+  assert.deepEqual(Object.values(recoveryViewLabels), ["Control", "Now", "Bills", "Sources", "Automation"]);
   assert.match(clientSource, /<nav aria-label="Primary"/);
   assert.match(clientSource, /mandateAvailable/);
   assert.match(clientSource, /noticeReadiness\.state === "proven-ready"/);
+  assert.match(clientSource, /view !== "CONTROL" \|\| controlAvailable/);
   assert.match(clientSource, /primaryViews\.map/);
   assert.match(clientSource, /aria-current=\{state\.view === view \? "page" : undefined\}/);
   assert.match(clientSource, /href="\/profile"/);
@@ -197,7 +198,7 @@ test("home leads with the pre-renewal decision queue and cited spend activation"
 });
 
 test("returning Home stays quiet unless a real change or attention item exists", () => {
-  assert.match(allSource, /Keep receipts coming/);
+  assert.match(allSource, /Set up receipt forwarding/);
   assert.doesNotMatch(homeSource, /Sheets go stale when new charges land/);
   assert.doesNotMatch(homeSource, /This is a floor from receipts checked, not every software bill\./);
   assert.doesNotMatch(homeSource, /home\.confidenceLayers/);

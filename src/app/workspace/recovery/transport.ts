@@ -83,10 +83,11 @@ export function readContractFailure(payload: unknown): RecoveryError | null {
   return (payload as ApiFailure).error;
 }
 
-function readSuccess<T>(payload: unknown): { data: T; meta: ResponseMeta } | null {
+function readSuccess<T>(payload: unknown, accept?: (data: unknown) => data is T): { data: T; meta: ResponseMeta } | null {
   if (!isRecord(payload) || !("data" in payload) || !isRecord(payload.meta)) return null;
   const { requestId, workspaceVersion } = payload.meta;
   if (typeof requestId !== "string" || typeof workspaceVersion !== "number") return null;
+  if (accept && !accept(payload.data)) return null;
   return { data: payload.data as T, meta: { requestId, workspaceVersion } };
 }
 
@@ -119,10 +120,15 @@ async function requestJson(doFetch: FetchLike, path: string, init?: RequestInit)
   return { payload };
 }
 
-async function call<T>(doFetch: FetchLike, path: string, init?: RequestInit): Promise<TransportResult<T>> {
+async function call<T>(
+  doFetch: FetchLike,
+  path: string,
+  init?: RequestInit,
+  accept?: (data: unknown) => data is T,
+): Promise<TransportResult<T>> {
   const outcome = await requestJson(doFetch, path, init);
   if ("failure" in outcome) return outcome.failure;
-  const success = readSuccess<T>(outcome.payload);
+  const success = readSuccess<T>(outcome.payload, accept);
   if (!success) return clientFailure("The workspace replied in a shape this app does not recognise. Nothing is assumed about your money.", false);
   return { ok: true, data: success.data, meta: success.meta };
 }
@@ -317,3 +323,7 @@ export function createRecoveryTransport(fetchImpl?: FetchLike) {
 }
 
 export type RecoveryTransport = ReturnType<typeof createRecoveryTransport>;
+
+// Shared with the Commitment Control transport so both speak one envelope, one
+// failure vocabulary, and one set of mutation preconditions.
+export { call as callWorkspaceApi, mutationHeaders as workspaceMutationHeaders };

@@ -113,6 +113,14 @@ export type PrivacyExportDocument = {
     connectedMandateCohort: Array<Record<string, unknown>>;
     sourceDisconnections: Array<Record<string, unknown>>;
   };
+  commitmentControl: {
+    policies: Array<Record<string, unknown>>;
+    proposals: Array<Record<string, unknown>>;
+    evaluations: Array<Record<string, unknown>>;
+    evaluationEvidence: Array<Record<string, unknown>>;
+    decisions: Array<Record<string, unknown>>;
+    reconciliations: Array<Record<string, unknown>>;
+  };
   productEvents: Array<Record<string, unknown>>;
   renewalAlertPreferences: Array<Record<string, unknown>>;
   renewalAlertDeliveries: Array<Record<string, unknown>>;

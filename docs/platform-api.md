@@ -1,5 +1,10 @@
 # Vognary Read-Only Platform API
 
+> **Operating motto: Take smart risks. Do not play safe.** Pursue a
+> category-defining API outcome through bounded, falsifiable use cases; never
+> weaken scopes, tenant isolation, token handling, or auditability. Full
+> doctrine: [`THE-LAW.md`](THE-LAW.md).
+
 The first stable API surface is intentionally read-only. It lets an approved
 workspace feed its canonical recurring ledger and source-health state into an
 internal finance workflow without exposing provider credentials or raw source

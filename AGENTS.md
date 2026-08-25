@@ -1,5 +1,9 @@
 # AGENTS — mandatory instructions for every model and coding agent
 
+> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> falsifiable upside and bound irreversible downside. The full doctrine in
+> [`docs/THE-LAW.md`](docs/THE-LAW.md) outranks incremental scope convenience.
+
 ## 0. Read order (do this before writing code or plans)
 
 1. **[`docs/THE-LAW.md`](docs/THE-LAW.md)** — company + product + agent supreme directive
@@ -13,11 +17,11 @@
 
 ## 1. What we are building
 
-**Founder scope freeze (2026-08-18):** Vognary is Commitment Intelligence: the evidence-backed model of what a 2–20 person software/AI company is committed to, what changed, what comes next, and why. Source 0 is the private billing inbox (one-time billing-only auto-forwarding). Direct Gmail OAuth stays fail-closed until Google restricted-scope verification and a security assessment are complete. Do not mark Gmail Connect. The long-term vision is the control layer for recurring money.
+**Founder scope freeze (2026-08-25): Commitment Control replaces Commitment Intelligence.** Vognary is the human-authorized commitment firewall for India-first, 5–100-person AI-native companies: proposed obligation → policy context → human authorization → approved cap → observed outcome. Recovery remains the evidence and reconciliation foundation.
 
-Current loop: private receipt alias → one-time billing-only auto-forwarding + historical backfill → sender provenance → cited commitments → what changed → upcoming money → why/evidence → user correction → honest source health.
+Current loop: user-entered proposal → cited existing exposure → deterministic policy → owner/admin decision → frozen cap → later Recovery evidence → reconciliation.
 
-Only complete production usability for the first 10 ICP users. Do **not** build cancellation/autonomous action, Account Aggregator, bank integrations, Gmail OAuth, Outlook/Zoho connectors, generic SaaS management, budgeting, procurement, SSO/SCIM, seats, new architecture, or another redesign until real users invalidate the freeze. Surfacing already-built graph facts in customer language is in scope.
+Build only the thin ten-day V0 needed for paid pilots at ₹40,000/month. V0 never auto-approves, auto-denies, purchases, provisions, cancels, or moves money. Do **not** build cards, wallets, payments, autonomous agents, Slack, Gmail OAuth, bank connectors, automatic merchant matching, procurement suites, contract negotiation, or a public redesign. Existing billing evidence may reconcile an approved proposal.
 
 AI must **cite or shut up**. Never invent amounts, merchants, or connector liveness.
 
@@ -30,13 +34,13 @@ AI must **cite or shut up**. Never invent amounts, merchants, or connector liven
 - Use the canonical `src/app/workspace/*` implementation; do not recreate the retired monolith.
 - Founder-only ops: API keys, Google verification, Razorpay, legal, Setu — agents prepare, never fake READY
 
-### Autopilot loop — same-repo sequential branch
+### Commitment Control loop — same-repo sequential branch
 
-Commitment Intelligence freeze continues on `main` in this folder. One Git owner. No sibling worktrees. Do not invent Codex/Opus approvals.
+Commitment Control V0 continues on `main` in this folder. One Git owner. No sibling worktrees. Do not invent payments, usage, readiness, or reviewer approvals.
 
 ## 3. Hard stops
 
-No new connectors (except Gmail/statement India path), no design-system rewrite, no uncited AI, no platform sales theater, no PII in git, no work outside this repo, no $100B-feature justifications that skip Stage 0 metrics.
+No new connectors, payment rails, autonomous action, design-system rewrite, uncited AI, platform sales theater, PII in git, work outside this repo, or $100B-feature justifications that skip the paid-pilot gates.
 
 ## 4. Next.js note
 

@@ -36,6 +36,10 @@ export const productEventNames = [
   "correction.recorded",
   "source.health_observed",
   "workspace.returned",
+  "control.policy_recorded",
+  "control.proposal_submitted",
+  "control.decision_recorded",
+  "control.reconciliation_recorded",
 ] as const;
 
 export const productEventSources = ["sync-runner", "living-ledger", "workspace-api", "product-ui"] as const;

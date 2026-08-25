@@ -14,9 +14,16 @@ import { getDatabasePool } from "../../src/lib/server/database";
 import { authorizeWorkspaceActionCase, createWorkspaceActionCase } from "../../src/lib/server/outcome-case-store";
 import { outcomeOffer } from "../../src/lib/outcome-cases";
 import { disconnectRecoverySource, signStandingMandate } from "../../src/lib/server/recovery-autopilot-store";
+import {
+  createCommitmentControlProposal,
+  decideCommitmentControlProposal,
+  putCommitmentControlPolicy,
+  reconcileCommitmentControlProposal,
+} from "../../src/lib/server/commitment-control-store";
 import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
+process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "*";
 
 test("privacy export includes held product data and excludes all credential material", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
@@ -181,12 +188,65 @@ test("privacy export includes held product data and excludes all credential mate
       [workspaceId],
     );
     assert.ok(source.rows[0]?.id);
-    await disconnectRecoverySource({
+    const disconnected = await disconnectRecoverySource({
       workspaceId,
       actorUserId: userId,
       sourceId: source.rows[0]!.id,
       expectedVersion: signed.workspaceVersion,
       idempotencyKey: `privacy-disconnect:${randomUUID()}`,
+    });
+
+    const controlPolicy = await putCommitmentControlPolicy({
+      workspaceId,
+      actorUserId: userId,
+      expectedVersion: disconnected.workspaceVersion,
+      idempotencyKey: `privacy-control-policy:${randomUUID()}`,
+      request: {
+        categoryRules: [{ category: "AI_MODEL", posture: "ALLOW" }],
+        currencyLimits: [{
+          currency: "INR",
+          maxPerChargeMinor: "500000",
+          maxThirteenWeekMinor: "3000000",
+          maxAnnualMinor: "12000000",
+        }],
+      },
+    });
+    const controlProposal = await createCommitmentControlProposal({
+      workspaceId,
+      actorUserId: userId,
+      expectedVersion: controlPolicy.workspaceVersion,
+      idempotencyKey: `privacy-control-proposal:${randomUUID()}`,
+      request: {
+        merchant: "OpenAI",
+        purpose: "Production model capacity",
+        category: "AI_MODEL",
+        amountMinor: "199900",
+        currency: "INR",
+        firstChargeDate: recoveryDates.renews_on,
+        cadence: "MONTHLY",
+        existingCommitmentIds: [],
+      },
+    });
+    const controlDecision = await decideCommitmentControlProposal({
+      workspaceId,
+      actorUserId: userId,
+      proposalId: controlProposal.data.proposal.id,
+      expectedVersion: controlProposal.workspaceVersion,
+      idempotencyKey: `privacy-control-decision:${randomUUID()}`,
+      request: { action: "APPROVE_WITH_CAP", approvedCapMinor: "180000" },
+    });
+    const controlEvidenceId = (await pool.query<{ id: string }>(
+      `select id from recovery_evidence where workspace_id = $1 order by created_at asc limit 1`,
+      [workspaceId],
+    )).rows[0]?.id;
+    assert.ok(controlEvidenceId);
+    await reconcileCommitmentControlProposal({
+      workspaceId,
+      actorUserId: userId,
+      proposalId: controlProposal.data.proposal.id,
+      expectedVersion: controlDecision.workspaceVersion,
+      idempotencyKey: `privacy-control-reconciliation:${randomUUID()}`,
+      request: { evidenceId: controlEvidenceId },
     });
 
     const request = await createAccessExportRequest({ workspaceId, actorUserId: userId });
@@ -233,6 +293,14 @@ test("privacy export includes held product data and excludes all credential mate
     assert.doesNotMatch(JSON.stringify(document.recovery), /contentHash|fingerprint/i);
     assert.equal(document.recovery.commitmentEvidence.length, 3);
     assert.equal(document.recovery.decisions.length, 0);
+    assert.equal(document.commitmentControl.policies.length, 1);
+    assert.equal(document.commitmentControl.proposals.length, 1);
+    assert.equal(document.commitmentControl.proposals[0].assumptionBasis, "USER_ENTERED_ASSUMPTION");
+    assert.equal(document.commitmentControl.evaluations.length, 1);
+    assert.equal(document.commitmentControl.decisions.length, 1);
+    assert.equal(document.commitmentControl.decisions[0].approvedCapMinor, "180000");
+    assert.equal(document.commitmentControl.reconciliations.length, 1);
+    assert.equal(document.commitmentControl.reconciliations[0].verdict, "OVER_CAP");
     assert.ok(document.productEvents.some((event: { eventName: string }) => event.eventName === "review.completed"));
     assert.ok(
       document.productEvents.length >= 1,

@@ -3,8 +3,8 @@
  * -> 0056_decision_cycle_expected_amount.
  *
  * This is intentionally not a general migration command. It refuses any
- * starting head other than 0055, any local migration head other than 0056,
- * schema drift, checksum drift, or a second invocation after success.
+ * starting head other than 0055, non-adjacent local 0055/0056 files, schema
+ * drift, checksum drift, or a second invocation after success.
  */
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
@@ -47,9 +47,11 @@ const localMigrationIds = (await readdir(migrationsPath))
   .filter((entry) => /^\d{4}_.+\.sql$/.test(entry))
   .sort()
   .map((entry) => entry.replace(/\.sql$/, ""));
-assert(localMigrationIds.at(-1) === toMigration,
-  `Bounded one-off requires local migration head ${toMigration}; found ${localMigrationIds.at(-1) ?? "none"}.`);
-assert(localMigrationIds.at(-2) === fromMigration,
+const fromMigrationIndex = localMigrationIds.indexOf(fromMigration);
+const toMigrationIndex = localMigrationIds.indexOf(toMigration);
+assert(fromMigrationIndex >= 0 && toMigrationIndex >= 0,
+  `Bounded one-off requires local ${fromMigration} and ${toMigration} migration files.`);
+assert(toMigrationIndex === fromMigrationIndex + 1,
   `Bounded one-off requires ${fromMigration} immediately before ${toMigration}.`);
 
 const { Pool } = pg;

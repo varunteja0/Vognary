@@ -42,6 +42,10 @@ const guardedMutationRoutes: Array<[string, number]> = [
   ["src/app/api/workspaces/current/commitments/[commitmentId]/corrections/[correctionId]/route.ts", 1],
   ["src/app/api/workspaces/current/commitments/[commitmentId]/corrections/route.ts", 1],
   ["src/app/api/workspaces/current/commitments/[commitmentId]/context/route.ts", 1],
+  ["src/app/api/workspaces/current/control/policy/route.ts", 1],
+  ["src/app/api/workspaces/current/control/proposals/route.ts", 1],
+  ["src/app/api/workspaces/current/control/proposals/[proposalId]/decision/route.ts", 1],
+  ["src/app/api/workspaces/current/control/proposals/[proposalId]/reconciliations/route.ts", 1],
   ["src/app/api/workspaces/current/decisions/route.ts", 2],
   ["src/app/api/workspaces/current/evidence/route.ts", 1],
   ["src/app/api/workspaces/current/recovery-attention/route.ts", 1],
@@ -179,6 +183,10 @@ test("all guarded JSON handlers use bounded parsing", () => {
     "src/app/api/workspaces/current/ask/route.ts",
     "src/app/api/workspaces/current/commitments/[commitmentId]/corrections/route.ts",
     "src/app/api/workspaces/current/commitments/[commitmentId]/context/route.ts",
+    "src/app/api/workspaces/current/control/policy/route.ts",
+    "src/app/api/workspaces/current/control/proposals/route.ts",
+    "src/app/api/workspaces/current/control/proposals/[proposalId]/decision/route.ts",
+    "src/app/api/workspaces/current/control/proposals/[proposalId]/reconciliations/route.ts",
     "src/app/api/workspaces/current/decisions/route.ts",
     "src/app/api/workspaces/current/evidence/route.ts",
     "src/app/api/workspaces/current/standing-mandate/route.ts",
@@ -187,7 +195,7 @@ test("all guarded JSON handlers use bounded parsing", () => {
 
   for (const route of boundedJsonRoutes) {
     const source = readRoute(route);
-    assert.match(source, /read(?:Limited|Recovery)Json/, `${route} must bound JSON bytes`);
+    assert.match(source, /read(?:Limited|Recovery)Json|readCommitmentControlRequest/, `${route} must bound JSON bytes`);
     assert.doesNotMatch(source, /request\.json\s*\(/, `${route} must not bypass bounded parsing`);
   }
 });

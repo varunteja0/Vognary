@@ -24,8 +24,15 @@ export const requiredAutopilotIntegrityMigrations = [
   "0054_recovery_commitment_context",
   "0055_recovery_decision_cycles",
   "0056_decision_cycle_expected_amount",
+  "0057_commitment_control_v0",
 ];
 export const requiredAutopilotIntegrityTriggers = [
+  "commitment_control_decisions_immutable",
+  "commitment_control_evaluation_evidence_immutable",
+  "commitment_control_evaluations_immutable",
+  "commitment_control_policies_immutable",
+  "commitment_control_proposals_immutable",
+  "commitment_control_reconciliations_immutable",
   "product_events_workspace_activated_immutable",
   "recovery_billing_year_anchors_immutable",
   "recovery_cancellation_events_append_only_trigger",
@@ -52,6 +59,15 @@ export const requiredAutopilotAuditCountKeys = [
   "classification_snapshots",
   "executions",
   "execution_attempts",
+];
+
+export const requiredCommitmentControlCountKeys = [
+  "commitment_control_policies",
+  "commitment_control_proposals",
+  "commitment_control_evaluations",
+  "commitment_control_evaluation_evidence",
+  "commitment_control_decisions",
+  "commitment_control_reconciliations",
 ];
 
 export const backupVerificationProfiles = ["pre-0053", "current"];
@@ -108,6 +124,12 @@ export function requiredRecoveryTablesForProfile(value) {
     "recovery_provider_disables",
     "recovery_inbound_sender_assessments",
     "recovery_source_health",
+    "commitment_control_policies",
+    "commitment_control_proposals",
+    "commitment_control_evaluations",
+    "commitment_control_evaluation_evidence",
+    "commitment_control_decisions",
+    "commitment_control_reconciliations",
   ];
 }
 
@@ -123,7 +145,7 @@ function verificationProfile(value) {
       }
     : {
         profile,
-        migrationHead: "0056_decision_cycle_expected_amount",
+        migrationHead: "0057_commitment_control_v0",
         requiredMigrations: [requiredRecoveryMigration, ...requiredAutopilotIntegrityMigrations],
         integrityMigrations: requiredAutopilotIntegrityMigrations,
         requiredTriggers: requiredAutopilotIntegrityTriggers,
@@ -225,6 +247,12 @@ const currentCountQuery =
        (select count(*)::text from recovery_inbound_events) as inbound_events,
       (select count(*)::text from recovery_inbound_sender_assessments) as inbound_sender_assessments,
       (select count(*)::text from recovery_source_health) as source_health,
+      (select count(*)::text from commitment_control_policies) as commitment_control_policies,
+      (select count(*)::text from commitment_control_proposals) as commitment_control_proposals,
+      (select count(*)::text from commitment_control_evaluations) as commitment_control_evaluations,
+      (select count(*)::text from commitment_control_evaluation_evidence) as commitment_control_evaluation_evidence,
+      (select count(*)::text from commitment_control_decisions) as commitment_control_decisions,
+      (select count(*)::text from commitment_control_reconciliations) as commitment_control_reconciliations,
        (select count(*)::text from recovery_inbound_replay_keys) as inbound_replay_keys`;
 
 export function recoveryBackupVerificationMatches(expected, actual) {
@@ -245,7 +273,7 @@ export function recoveryBackupVerificationMatches(expected, actual) {
   const actualCounts = actual.recoveryWorkspaceCounts;
   if (!expectedCounts || !actualCounts) return false;
   if (profile.profile === "current") {
-    for (const key of requiredAutopilotAuditCountKeys) {
+    for (const key of [...requiredAutopilotAuditCountKeys, ...requiredCommitmentControlCountKeys]) {
       if (!(key in expectedCounts) || !(key in actualCounts)) return false;
     }
   }

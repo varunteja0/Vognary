@@ -1,5 +1,9 @@
 # Founder-ops setup — click-by-click
 
+> **Operating motto: Take smart risks. Do not play safe.** Accelerate the
+> falsifiable customer outcome, never secret handling, consent, legal review, or
+> readiness claims. Full doctrine: [`THE-LAW.md`](THE-LAW.md).
+
 The **only** things that block production/AI/rails. The code is already written and
 degrades safely without these; each one just needs an external account + a key.
 
@@ -32,6 +36,19 @@ cp .env.example .env.local     # then paste keys into .env.local
 ⚠️ **Never commit `.env.local` / `.env.production.local`** (they're git-ignored). Never
 set any `*_STATUS=...` value until the matching real proof exists — those are
 attestations, not evidence, and the honesty gate treats a blank as "not proven."
+
+### Commitment Control private-pilot enrollment
+
+Control is fail-closed until the founder sets exact enrolled workspace UUIDs:
+
+```bash
+COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS=uuid-one,uuid-two
+```
+
+Blank means no workspace sees or can call Control. `*` is accepted only outside
+`NODE_ENV=production`; production rejects it. Add a workspace only after the
+pilot agreement and access decision are real. This flag does not prove a
+conversation, offer, payment, proposal, decision, renewal, or production schema.
 
 ---
 

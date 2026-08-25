@@ -1,5 +1,9 @@
 # Vognary — Master Build Plan (AI / Twin / UI implementation law)
 
+> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> falsifiable upside and bound irreversible downside. Full doctrine:
+> [`THE-LAW.md`](THE-LAW.md).
+
 > **STOP — agents open [`docs/THE-LAW.md`](THE-LAW.md) first.**  
 > THE-LAW is the company + product + agent supreme directive.  
 > This file remains the **implementation law** for the AI layer (Part 3), Twin

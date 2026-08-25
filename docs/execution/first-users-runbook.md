@@ -1,5 +1,9 @@
 # First-10 users — operating runbook (activation, funnel, observation, value, WTP)
 
+> **Operating motto: Take smart risks. Do not play safe.** Prefer a decisive
+> customer test over another internal refinement; record the success threshold,
+> kill threshold, and downside bound. Full doctrine: [`THE-LAW.md`](../THE-LAW.md).
+
 > **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md) · Live state: [`docs/CONTINUE-HERE.md`](../CONTINUE-HERE.md)
 > Purpose: run the first 10 qualified users professionally. This is an operating runbook, not a plan.
 > Interview script lives in [`phase-a-market-contact.md`](phase-a-market-contact.md) §9 (do not duplicate it here).

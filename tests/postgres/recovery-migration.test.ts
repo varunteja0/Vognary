@@ -21,6 +21,7 @@ import {
   readRecoveryBackupVerification,
   recoveryBackupVerificationMatches,
   requiredAutopilotAuditCountKeys,
+  requiredCommitmentControlCountKeys,
 } from "../../scripts/lib/recovery-backup-verification.mjs";
 
 const zeroLegacyBlockers: LegacyLedgerBlockerCounts = {
@@ -78,6 +79,12 @@ const recoveryRelations = [
   "recovery_candidate_events",
   "recovery_operator_actions",
   "recovery_provider_disables",
+  "commitment_control_policies",
+  "commitment_control_proposals",
+  "commitment_control_evaluations",
+  "commitment_control_evaluation_evidence",
+  "commitment_control_decisions",
+  "commitment_control_reconciliations",
 ] as const;
 
 test("a targeted migration refuses a fresh database before creating schema or ledger state", {
@@ -218,21 +225,23 @@ test("the real migration runner installs and records the Recovery receipt inbox 
 }, async () => {
   await withDisposableDatabase("recovery_fresh", async (connectionString) => {
     const result = runMigrations(connectionString);
-    assert.equal(result.applied.at(-1)?.id, "0056_decision_cycle_expected_amount");
+    assert.equal(result.applied.at(-1)?.id, "0057_commitment_control_v0");
 
     const pool = createPool(connectionString);
     try {
       const migrations = await pool.query<{ id: string }>(
         `select id from schema_migrations order by id`,
       );
-      assert.equal(migrations.rows.at(-1)?.id, "0056_decision_cycle_expected_amount");
-      assert.equal(migrations.rows.length, 56);
+      assert.equal(migrations.rows.at(-1)?.id, "0057_commitment_control_v0");
+      assert.equal(migrations.rows.length, 57);
       await assertRecoveryRelations(pool);
       const phaseA = await pool.query<{
         milestone_columns: number;
         immutable_trigger: boolean;
         event_names: string;
         metric_names: string;
+        mutation_kinds: string;
+        control_triggers: number;
       }>(
         `select
            (select count(*)::int
@@ -242,13 +251,27 @@ test("the real migration runner installs and records the Recovery receipt inbox 
               and column_name = any(array['setup_completed_at', 'forwarding_verified_at', 'backfill_completed_at'])) as milestone_columns,
            exists(select 1 from pg_trigger where tgname = 'recovery_inbound_alias_milestones_immutable') as immutable_trigger,
            (select pg_get_constraintdef(oid) from pg_constraint where conname = 'product_events_event_name_check') as event_names,
-           (select pg_get_constraintdef(oid) from pg_constraint where conname = 'product_events_metrics_check1') as metric_names`,
+           (select pg_get_constraintdef(oid) from pg_constraint where conname = 'product_events_metrics_check1') as metric_names,
+           (select pg_get_constraintdef(oid) from pg_constraint where conname = 'recovery_workspace_versions_mutation_kind_check') as mutation_kinds,
+           (select count(*)::int from pg_trigger where tgname = any(array[
+             'commitment_control_policies_immutable',
+             'commitment_control_proposals_immutable',
+             'commitment_control_evaluations_immutable',
+             'commitment_control_evaluation_evidence_immutable',
+             'commitment_control_decisions_immutable',
+             'commitment_control_reconciliations_immutable'
+           ])) as control_triggers`,
       );
       assert.equal(phaseA.rows[0]?.milestone_columns, 3);
       assert.equal(phaseA.rows[0]?.immutable_trigger, true);
       assert.match(phaseA.rows[0]?.event_names ?? "", /receipt_setup\.completed/);
       assert.match(phaseA.rows[0]?.event_names ?? "", /receipt_backfill\.completed/);
+      assert.match(phaseA.rows[0]?.event_names ?? "", /control\.proposal_submitted/);
+      assert.match(phaseA.rows[0]?.event_names ?? "", /control\.decision_recorded/);
       assert.match(phaseA.rows[0]?.metric_names ?? "", /secondsToTrustworthyPicture/);
+      assert.match(phaseA.rows[0]?.mutation_kinds ?? "", /MANDATE/);
+      assert.match(phaseA.rows[0]?.mutation_kinds ?? "", /CONTROL_RECONCILIATION/);
+      assert.equal(phaseA.rows[0]?.control_triggers, 6);
       const integrity = await pool.query<{ conname: string | null; trigger: string | null }>(
         `select
            (select conname from pg_constraint where conname = 'commitment_decisions_workspace_recurring_item_fkey') as conname,
@@ -502,14 +525,15 @@ test("the real migration runner upgrades an existing 0022 database through Recov
       { id: "0054_recovery_commitment_context", mode: "applied-migration" },
       { id: "0055_recovery_decision_cycles", mode: "applied-migration" },
       { id: "0056_decision_cycle_expected_amount", mode: "applied-migration" },
+      { id: "0057_commitment_control_v0", mode: "applied-migration" },
     ]);
 
     const verifyPool = createPool(connectionString);
     try {
       const migration = await verifyPool.query<{ id: string }>(
-        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source', '0029_legacy_tenant_integrity', '0030_legacy_tenant_ownership_immutable', '0031_autopilot_loop', '0032_autopilot_proof_integrity', '0033_autopilot_integrity', '0034_autopilot_repair', '0035_autopilot_codex_repair', '0036_autopilot_notice_hold', '0037_autopilot_clock_integrity', '0038_autopilot_reconcile_integrity', '0039_autopilot_frozen_notice_integrity', '0040_autopilot_review_integrity', '0041_workspace_activation_integrity', '0042_workspace_activation_semantic_reset', '0043_workspace_activation_semantic_version', '0044_autopilot_audit_immutability', '0045_autopilot_mandate_execution_immutability', '0046_billed_window_immutability', '0047_billed_window_insert_immutability', '0048_receipt_sender_provenance', '0049_recovery_merchant_identity', '0050_recovery_commitment_lifecycle', '0051_recovery_change_signals', '0052_recovery_correction_learning', '0053_phase_a_receipt_activation', '0054_recovery_commitment_context', '0055_recovery_decision_cycles', '0056_decision_cycle_expected_amount')`,
+        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source', '0029_legacy_tenant_integrity', '0030_legacy_tenant_ownership_immutable', '0031_autopilot_loop', '0032_autopilot_proof_integrity', '0033_autopilot_integrity', '0034_autopilot_repair', '0035_autopilot_codex_repair', '0036_autopilot_notice_hold', '0037_autopilot_clock_integrity', '0038_autopilot_reconcile_integrity', '0039_autopilot_frozen_notice_integrity', '0040_autopilot_review_integrity', '0041_workspace_activation_integrity', '0042_workspace_activation_semantic_reset', '0043_workspace_activation_semantic_version', '0044_autopilot_audit_immutability', '0045_autopilot_mandate_execution_immutability', '0046_billed_window_immutability', '0047_billed_window_insert_immutability', '0048_receipt_sender_provenance', '0049_recovery_merchant_identity', '0050_recovery_commitment_lifecycle', '0051_recovery_change_signals', '0052_recovery_correction_learning', '0053_phase_a_receipt_activation', '0054_recovery_commitment_context', '0055_recovery_decision_cycles', '0056_decision_cycle_expected_amount', '0057_commitment_control_v0')`,
       );
-      assert.equal(migration.rowCount, 34);
+      assert.equal(migration.rowCount, 35);
       await assertRecoveryRelations(verifyPool);
 
       const preserved = await verifyPool.query<{
@@ -704,6 +728,7 @@ test("the real migration runner upgrades 0027 through 0028 without dropping Reco
       { id: "0054_recovery_commitment_context", mode: "applied-migration" },
       { id: "0055_recovery_decision_cycles", mode: "applied-migration" },
       { id: "0056_decision_cycle_expected_amount", mode: "applied-migration" },
+      { id: "0057_commitment_control_v0", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -1185,6 +1210,7 @@ test("0029 installs over historical cross-workspace rows without rewriting owner
       { id: "0054_recovery_commitment_context", mode: "applied-migration" },
       { id: "0055_recovery_decision_cycles", mode: "applied-migration" },
       { id: "0056_decision_cycle_expected_amount", mode: "applied-migration" },
+      { id: "0057_commitment_control_v0", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{ decision_workspace: string; item_workspace: string }>(
@@ -1431,6 +1457,7 @@ test("0030 leaves historical cross-workspace rows untouched and they remain cuto
       { id: "0054_recovery_commitment_context", mode: "applied-migration" },
       { id: "0055_recovery_decision_cycles", mode: "applied-migration" },
       { id: "0056_decision_cycle_expected_amount", mode: "applied-migration" },
+      { id: "0057_commitment_control_v0", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{
@@ -1641,6 +1668,7 @@ test("upgrading from 0030 through 0033 cannot insert fee rows until 0034 sets fi
       { id: "0054_recovery_commitment_context", mode: "applied-migration" },
       { id: "0055_recovery_decision_cycles", mode: "applied-migration" },
       { id: "0056_decision_cycle_expected_amount", mode: "applied-migration" },
+      { id: "0057_commitment_control_v0", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -1809,6 +1837,7 @@ test("upgrading a genuinely frozen 0037 notice retries through the real store an
       { id: "0054_recovery_commitment_context", mode: "applied-migration" },
       { id: "0055_recovery_decision_cycles", mode: "applied-migration" },
       { id: "0056_decision_cycle_expected_amount", mode: "applied-migration" },
+      { id: "0057_commitment_control_v0", mode: "applied-migration" },
     ]);
     const retryOutput = execFileSync(
       process.execPath,
@@ -1971,6 +2000,7 @@ test("0042 purges legacy workspace.activated rows that 0041 would have preserved
       { id: "0054_recovery_commitment_context", mode: "applied-migration" },
       { id: "0055_recovery_decision_cycles", mode: "applied-migration" },
       { id: "0056_decision_cycle_expected_amount", mode: "applied-migration" },
+      { id: "0057_commitment_control_v0", mode: "applied-migration" },
     ]);
 
     const helperOutput = execFileSync(
@@ -2070,6 +2100,7 @@ test("0043 requires a semantic-version marker so old-style activations cannot be
       { id: "0054_recovery_commitment_context", mode: "applied-migration" },
       { id: "0055_recovery_decision_cycles", mode: "applied-migration" },
       { id: "0056_decision_cycle_expected_amount", mode: "applied-migration" },
+      { id: "0057_commitment_control_v0", mode: "applied-migration" },
     ]);
 
     const after = createPool(connectionString);
@@ -2251,6 +2282,7 @@ test("production-upgrade rehearsal from 0030 preserves Recovery facts through 00
       "0054_recovery_commitment_context",
       "0055_recovery_decision_cycles",
       "0056_decision_cycle_expected_amount",
+      "0057_commitment_control_v0",
     ]);
 
     const after = createPool(connectionString);
@@ -2541,6 +2573,78 @@ async function seedAutopilotAuditFacts(
   );
 }
 
+async function seedCommitmentControlAuditFacts(
+  pool: Pool,
+  ids: { workspaceId: string; userId: string; evidenceId: string },
+) {
+  const proposalId = randomUUID();
+  const evaluationId = randomUUID();
+  const decisionId = randomUUID();
+  await pool.query(
+    `insert into commitment_control_policies (
+       workspace_id, version, category_rules, currency_limits, created_by_user_id
+     ) values ($1, 1, $2::jsonb, $3::jsonb, $4)`,
+    [
+      ids.workspaceId,
+      JSON.stringify([{ category: "AI_MODEL", posture: "ALLOW" }]),
+      JSON.stringify([{ currency: "INR", maxPerChargeMinor: "500000", maxThirteenWeekMinor: "3000000", maxAnnualMinor: "12000000" }]),
+      ids.userId,
+    ],
+  );
+  await pool.query(
+    `insert into commitment_control_proposals (
+       id, workspace_id, submitted_by_user_id, merchant, purpose, category,
+       amount_minor, currency, first_charge_date, cadence, as_of_date,
+       projected_13_week_minor, projected_annual_minor
+     ) values ($1, $2, $3, 'OpenAI', 'Restore drill', 'AI_MODEL', 199900, 'INR',
+       '2026-09-01', 'MONTHLY', '2026-08-25', 599700, 2398800)`,
+    [proposalId, ids.workspaceId, ids.userId],
+  );
+  await pool.query(
+    `insert into commitment_control_evaluations (
+       id, workspace_id, proposal_id, policy_version, status, assumption_fields,
+       reason_codes, currency_results
+     ) values ($1, $2, $3, 1, 'WITHIN_POLICY', $4::text[], '{}', $5::jsonb)`,
+    [
+      evaluationId,
+      ids.workspaceId,
+      proposalId,
+      ["amountMinor", "currency", "category", "thirteenWeekMinor", "annualMinor"],
+      JSON.stringify([{
+        currency: "INR",
+        existingThirteenWeekMinor: "0",
+        proposedThirteenWeekMinor: "599700",
+        combinedThirteenWeekMinor: "599700",
+        thirteenWeekHeadroomMinor: "2400300",
+        existingAnnualMinor: "0",
+        proposedAnnualMinor: "2398800",
+        combinedAnnualMinor: "2398800",
+        annualHeadroomMinor: "9601200",
+      }]),
+    ],
+  );
+  await pool.query(
+    `insert into commitment_control_evaluation_evidence (workspace_id, evaluation_id, evidence_id)
+     values ($1, $2, $3)`,
+    [ids.workspaceId, evaluationId, ids.evidenceId],
+  );
+  await pool.query(
+    `insert into commitment_control_decisions (
+       id, workspace_id, proposal_id, evaluation_id, action, expected_amount_minor,
+       approved_cap_minor, currency, decided_by_user_id
+     ) values ($1, $2, $3, $4, 'APPROVE_WITH_CAP', 199900, 180000, 'INR', $5)`,
+    [decisionId, ids.workspaceId, proposalId, evaluationId, ids.userId],
+  );
+  await pool.query(
+    `insert into commitment_control_reconciliations (
+       workspace_id, proposal_id, decision_id, evidence_id, verdict,
+       expected_amount_minor, approved_cap_minor, authorization_currency,
+       observed_amount_minor, observed_currency, reconciled_by_user_id
+     ) values ($1, $2, $3, $4, 'CANNOT_EVALUATE', 199900, 180000, 'INR', null, null, $5)`,
+    [ids.workspaceId, proposalId, decisionId, ids.evidenceId, ids.userId],
+  );
+}
+
 test("pg_dump/pg_restore preserves the exact pre-0053 production profile", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
@@ -2577,7 +2681,7 @@ test("pg_dump/pg_restore preserves the exact pre-0053 production profile", {
   });
 });
 
-test("pg_dump/pg_restore preserves Recovery and audit counts through 0054", {
+test("pg_dump/pg_restore preserves the current Recovery and Commitment Control profile", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
   await withDisposableDatabase("autopilot_dump_source", async (sourceUrl) => {
@@ -2623,8 +2727,12 @@ test("pg_dump/pg_restore preserves Recovery and audit counts through 0054", {
         [commitmentId, workspaceId],
       );
       await seedAutopilotAuditFacts(source, { workspaceId, userId, commitmentId, evidenceId });
+      await seedCommitmentControlAuditFacts(source, { workspaceId, userId, evidenceId });
       const expected = await readRecoveryBackupVerification(source);
       for (const key of requiredAutopilotAuditCountKeys) {
+        assert.notEqual(expected.recoveryWorkspaceCounts[key], "0", key);
+      }
+      for (const key of requiredCommitmentControlCountKeys) {
         assert.notEqual(expected.recoveryWorkspaceCounts[key], "0", key);
       }
       const dumpDir = mkdtempSync(path.join(tmpdir(), "vognary-pg-dump-"));
@@ -2639,6 +2747,9 @@ test("pg_dump/pg_restore preserves Recovery and audit counts through 0054", {
             assert.deepEqual(actual, expected, "restored Recovery verification must exactly match the source manifest");
             assert.equal(recoveryBackupVerificationMatches(expected, actual), true);
             for (const key of requiredAutopilotAuditCountKeys) {
+              assert.notEqual(actual.recoveryWorkspaceCounts[key], "0", key);
+            }
+            for (const key of requiredCommitmentControlCountKeys) {
               assert.notEqual(actual.recoveryWorkspaceCounts[key], "0", key);
             }
           } finally {

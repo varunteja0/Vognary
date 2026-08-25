@@ -68,6 +68,11 @@ const oneObservationHome: HomeProjectionDto = {
 
 async function signIn(page: Page) {
   await page.context().setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${Math.floor(Math.random() * 180) + 50}` });
+  await page.route("**/api/workspaces/current/control/brief", (route) => route.fulfill({
+    status: 503,
+    contentType: "application/json",
+    body: JSON.stringify({ error: { code: "FEATURE_UNAVAILABLE", message: "not enrolled", retryable: false, requestId: "recovery-states-control-gate" } }),
+  }));
   await page.goto("/login");
   await page.getByText("Other ways to sign in").click();
   await page.getByPlaceholder("developer@example.com").fill(email!);
@@ -229,7 +234,7 @@ test("receipt onboarding shows proven forwarding, backfill, and sender trust", a
   }));
 
   await page.goto("/app");
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Receipts" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
   await expect(page.getByRole("heading", { name: "Stay up to date" })).toBeVisible();
   await expect(page.getByText("Status: On")).toBeVisible();
   await page.getByText("Older bills", { exact: true }).click();
@@ -403,7 +408,7 @@ test("Gmail wizard step 1 fits a 390px phone", async ({ page }) => {
     }),
   }));
   await page.goto("/app");
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Receipts" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
   await expect(page.getByRole("heading", { name: "Stay up to date" })).toBeVisible();
   await page.getByRole("button", { name: "Continue setup" }).click();
   await expect(page.getByRole("heading", { name: "Verify your private Vognary address" })).toBeVisible();

@@ -1,5 +1,32 @@
 # THE LAW — Vognary company, product, and agent directive
 
+## Founder motto — supreme operating principle
+
+> **Take smart risks. Do not play safe.**
+
+Vognary exists to pursue category-defining outcomes, not to preserve a familiar
+product through incremental polish. Prefer an asymmetric bet with a spectacular
+measurable upside over a comfortable feature when the bet has all of these:
+
+1. A named customer and company outcome, not novelty for its own sake.
+2. The cheapest real-world test that can disprove it.
+3. An owner, deadline, success threshold, and kill threshold.
+4. A bounded and preferably reversible downside.
+5. Evidence captured quickly enough to change course.
+
+When an existing product rule would preserve inertia instead of testing a
+founder-authorized, falsifiable bet, this doctrine wins **on strategy**. Update
+the live scope explicitly before implementation; never silently ignore a rule.
+Green code, more features, and polished screens are not spectacular outcomes.
+Paid behavior, retained use, a materially better customer decision, or a proven
+new capability are.
+
+**Smart risk is not reckless risk.** This doctrine never authorizes invented
+claims, uncited money, fake readiness, PII exposure, insecure financial paths,
+legal or consent bypasses, irreversible customer harm, or hidden production
+experiments. Honesty, security, privacy, consent, and cite-or-shut-up remain hard
+constraints because violating them destroys the upside.
+
 > **Status:** CANONICAL. Effective 2026-07-21. Live checkout process: CONTINUE-HERE.
 > **Audience:** every human, every agent, every model (including Fable / top-tier coding models).  
 > **Priority:** This file outranks all other plans when they conflict.  
@@ -24,37 +51,33 @@
 
 Prior-generation material lives only in `docs/archive/`. Treat it as history, not instructions.
 
-### 0.1 Founder scope freeze — 2026-08-18 (Commitment Intelligence)
+### 0.1 Founder scope freeze — 2026-08-25 (Commitment Control)
 
-Until measured first-user evidence invalidates it, the canonical product is:
+**Commitment Control replaces Commitment Intelligence as the company direction.** Recovery remains the evidence and reconciliation foundation; the product moves one step earlier, before a new obligation is created.
 
-> **Vognary is Commitment Intelligence: the continuously maintained, evidence-backed model of what a 2–20 person software/AI company is financially committed to, what changed, what comes next, how certain Vognary is, and why it believes every important claim.**
+> **Vognary is the human-authorized commitment firewall for AI-native companies: proposed obligation → policy context → human authorization → approved cap → observed outcome.**
 
-- First ICP: 2–20 person software/AI companies without dedicated finance/procurement ops.
-- First domain: software, AI, cloud, and recurring vendor commitments.
-- Source law: many replaceable sources → one normalized evidence layer → one commitment graph → one financial truth model. No connector owns the truth.
-- Source 0 (live rail): private billing inbox. Decision B (2026-08-18): one-time billing-only auto-forwarding is the primary **ongoing** loop after first value. Manual paste/upload/forward is the first-session path. Manual forwarding remains historical backfill assistance and recovery. Do not require Gmail setup before the user sees commitment intelligence.
-- **V1 production rail freeze (2026-08-18):** private billing inbox + one-time billing-only auto-forward + one-time historical backfill + existing evidence → commitment graph → changes / expectations / why. Do not implement Gmail OAuth, Outlook, Zoho, bank/AA, card feeds, vendor APIs, SSO/SCIM, procurement, seats, autonomous cancellation, or a mailbox-wide AI scanner in this release.
-- Product path: sign in → add 2–5 billing records (paste / upload / optional one-off forward) → cited commitments → what changed → upcoming money → why/evidence → correction → **then** keep current (private alias + one-time billing-only auto-forwarding) → honest source health.
-- External V1 promise: **Know what your company is committed to pay next — and what deserves attention before the card fires.** Customer category: Software Decision Intelligence. Primary CTA: Review my software stack. First session is value-first; mailbox access is not required.
-- Thin V1 decision layer (the only new product layer in this freeze): KEEP / REVIEW_LATER / PLAN_TO_CANCEL, remembered per expected charge date, with next-cycle expected-vs-observed verification. Optional purpose is asked only on overlap cards. Do not invent KEEP/REVIEW/CANCEL NOW from category overlap alone. Do not ask an LLM whether the company should cancel. Absence is never cancellation.
-- Direct Gmail/Google Workspace OAuth stays fail-closed until restricted-scope verification and the required third-party security assessment are genuinely complete. Do not mark Gmail “Connect” or advertise mailbox sync.
-- **Future Gmail (prepare, do not build):** preferred later connector is selective direct mailbox intelligence — OAuth → candidate discovery → fetch likely billing evidence only → classify → normalize → retain minimum auditable evidence → discard unnecessary content → commitment graph. Historical selective backfill on first connection; incremental processing afterward. Not full mailbox warehousing. Status: **DEFERRED / BLOCKED BY EXTERNAL APPROVAL**.
-- Long-term vision: the control layer for recurring money.
-- Engineering stops after the production forwarding path, one real automatic receipt, returning-user Changes/Why/memory from real state, first-10 instrumentation, and clean pushed `main` are proven.
-- Surfacing already-built commitment-graph, absence, and change-intelligence **facts** in customer language is in scope. Do not rebuild those engines. Do not enable notification sending, cancellation/autonomous action, AA/bank rails, Gmail OAuth, Outlook/Zoho connectors, generic SaaS management, budgeting, procurement, SSO/SCIM, seats, new architecture, or a redesign without real-user evidence and a new founder decision.
+- First ICP: India-first, 5–100-person AI-native companies with at least ₹5 lakh/month in AI, cloud, software, contractor, or campaign exposure.
+- V0 offer: a private paid pilot at **₹40,000/month**, delivered with a thin product build in 10 days.
+- V0 loop: proposal → deterministic exposure → stated policy → authorized human decision → frozen cap → later Recovery evidence → reconciliation.
+- Recovery remains the sole evidence authority. Existing commitment graph facts may inform exposure, but a proposal is not evidence that money was spent.
+- Every amount is an exact minor-unit value with an explicit currency. Existing evidence is cited; user-entered proposal values are labeled assumptions.
+- Only workspace owners/admins may approve, approve with a cap, or decline. V0 **never auto-approves, auto-denies, purchases, provisions, cancels, or moves money**.
+- Direct Gmail OAuth, banks, cards, wallets, Slack, agent execution, procurement workflows, and autonomous action remain deferred. The existing private billing inbox may supply later reconciliation evidence; it is not a prerequisite for proposing or deciding.
+- The first irreversible bet is paid behavior, not payment infrastructure: 20 qualified contacts, 10 conversations, five explicit offers, and two upfront payments by Day 10. If the first five are inconclusive, the kill decision is mandatory no later than offer ten.
+- Kill or rework if fewer than two of ten offers pay, fewer than half of requests arrive before spending, or 30 proposals change zero decisions.
 
 ---
 
 ## 1. One-line identity (every feature must serve this)
 
-> **Know what your company is committed to pay next — evidence-backed commitments, changes, upcoming money, and conservative review decisions for founder-led 2–20 person software/AI companies, India-first.**
+> **Decide what the company may commit to before the obligation exists, then prove the outcome against the frozen authorization.**
 
 If a feature cannot be stated as a **proven** claim, it is not shippable copy and not shippable UI.
 
-**We are not:** a budget app, YNAB, CRED, Zylo, Rocket Money clone, generic AI money chat, fake bank-sync dashboard, Gmail product, consumer subscription tracker, or autonomous cancellation agent.
+**We are not:** a budget app, generic SaaS inventory, autonomous purchasing agent, payment rail, card, bank connector, cancellation service, or procurement suite.
 
-**We are:** Software Decision Intelligence on a Commitment Graph. Every important claim cites evidence or stays Unknown. Autopilot cancellation remains built but switched off until a later founder decision.
+**We are:** Commitment Control backed by a Commitment Graph. Every financial fact cites evidence or is explicitly labeled as a user-entered assumption. Every decision names its human actor and preserves its original cap.
 
 ---
 
@@ -72,7 +95,7 @@ If a feature cannot be stated as a **proven** claim, it is not shippable copy an
 
 **One-line strategy:**
 
-> Ship Commitment Intelligence to the first 10 founder-led 2–20 person software/AI companies, prove they get value from bills they already have, then keep Vognary current with a private billing address.
+> Sell the human-approved control workflow to ten qualified AI-native companies while shipping only the proposal → policy → decision → reconciliation spine needed to make it repeatable.
 
 Scaffolding is necessary. **Scaffolding is not the building.**
 
@@ -81,17 +104,15 @@ Scaffolding is necessary. **Scaffolding is not the building.**
 ## 3. The only product loop that matters
 
 ```
-passive evidence (paste / CSV / inbound mail; Gmail OAuth when proven)
-        → cited classification
-        → deterministic eligibility rules
-        → 48-hour veto
-        → supported execution (discretionary only)
-        → proof
-        → covered clean windows
-        → outcome billing
+proposed obligation (user-entered assumption)
+        → cited existing exposure
+        → deterministic policy evaluation
+        → authorized human decision and frozen cap
+        → later Recovery evidence
+        → exact reconciliation against that authorization
 ```
 
-**Any PR that does not raise this loop or unblock a private autopilot pilot is out of scope until Stage 0 exit.**
+**Any PR that does not raise this loop or unblock a paid Commitment Control pilot is out of scope until the Day 30 gate.**
 
 ---
 
@@ -126,7 +147,7 @@ npm run build && npm run perf:budget
 | Production activation | 3.5 | `production:check --strict` green on prod |
 | Live connector depth | 4 | Gmail public-verified + ≥1 regulated rail |
 | Data / network moat | 3 | Opt-in merchant intelligence with n≥25 |
-| **Business validation** | **1.5** | Paid autopilot pilots + retention + ARR path |
+| **Business validation** | **1.5** | Paid Commitment Control pilots + renewals + ARR path |
 | **Distribution** | **1.5** | Artifact loop + CA loop without founder push |
 
 **Composite ≈ 1.5–2.** Agents optimize the **minimum**, not the average.
@@ -135,13 +156,12 @@ npm run build && npm run perf:budget
 
 | Metric | Day 30 | Day 90 | Kill / pivot if |
 | --- | ---: | ---: | --- |
-| Connected accounts with active mandates | **10** | **40** | <5 by day 30 |
-| Accounts with an eligible candidate | **5** | **15** | <2 by day 30 |
-| Supported actions with no post-mandate customer work | **3** | **10** | 0 after 10 connected |
-| Covered clean financial windows | **2** | **8** | 0 after 10 connected |
-| Actual payments of 20 real offers | **5** | **15** | 0 actual payments after 20 real offers |
-| Written pay intent (separate; does not satisfy the paid gate) | track | track | — |
-| D30 active-source-and-mandate retention | ≥40% | ≥60% | <20% |
+| Qualified conversations | **10** | **30** | <10 by day 10 |
+| Explicit ₹40,000/month offers | **10** | **30** | <10 by day 10 |
+| Upfront paid pilots | **3** | **10** | <2 of 10 offers pay by day 10 |
+| Pre-spend proposals evaluated | **30** | **150** | <50% arrive before spend |
+| Decisions materially changed / capped / declined | **3** | **15** | 0 after 30 proposals |
+| Paid pilot renewals | **2** | **7** | <2 by day 30 |
 
 ---
 
@@ -150,8 +170,8 @@ npm run build && npm run perf:budget
 | Phase | Name | Goal | Gate to exit |
 | --- | --- | --- | --- |
 | **0** | Hygiene | One repo, one doc chain | **DONE** 2026-07-21 |
-| **A** | Market proof | 10 operational autopilot pilots; paid gate is actual payment | Day-21 stop/go |
-| **B** | Loop undeniable | WP-A through WP-E lock the autopilot loop | e2e + real user <3 min |
+| **A** | Paid proof | Sell ten explicit ₹40,000/month offers | Two upfront payments by Day 10 |
+| **B** | Control V0 | Proposal, policy, human decision, reconciliation | Private V0 in 10 days |
 | **C** | Production min | Identity, monitor, backup, pay, email | activation rows READY |
 | **D** | Intelligence moat | Corpus 100, formats, first verified saving | corpus:strict green |
 | **E** | Distribution | Artifact + CA loops | organic inbound |
@@ -167,9 +187,9 @@ Detail:
 
 | Bucket | Next 60 days | After PMF signal |
 | --- | ---: | ---: |
-| Users / autopilot pilots / sales | **45%** | 25% |
-| Founder-ops (keys, legal, Google, pay) | **25%** | 15% |
-| Product on the loop only | **25%** | 35% |
+| Users / paid pilots / sales | **55%** | 25% |
+| Founder-ops (contracts, invoicing, access) | **15%** | 15% |
+| Product on the control loop only | **25%** | 35% |
 | Long-horizon (AA, platform) | **5%** | 25% |
 | New strategy docs | **0%** | 0% (quarterly only) |
 
@@ -180,11 +200,11 @@ Detail:
 Agents **must refuse** or redirect:
 
 1. New plan / leap / perfection / surface-N docs  
-2. New connectors except Gmail path + statement/India evidence for 60 days  
+2. New connectors, cards, wallets, payment rails, or agent execution in V0
 3. Platform API partner sales before 25 active workspaces  
 4. Design-system rewrite (enforce `globals.css`; no restyle)  
 5. Uncited AI financial claims  
-6. Setu/Razorpay *product code* ahead of provisioning (use runbooks only)  
+6. Razorpay/Setu product code or money movement for the pilot
 7. `/app` route restructure during monolith decomposition  
 8. “$100B architecture” features that skip Stage 0 metrics  
 9. Fake social proof, fake live bank sync, demo data as production claim  
@@ -236,7 +256,7 @@ You are not hired to impress with architecture. You are hired to:
 2. **Never lie** about money or connectors.  
 3. **Prefer boring, tested paths** over clever new systems.  
 4. **Ask the founder** only for external ops (keys, legal, Google, Razorpay, Setu).  
-5. When unsure, choose the option that produces **a protected, zero-chore discretionary cancellation this week**.
+5. When unsure, choose the option that gets **a real proposal in before spend and a named human decision recorded this week**.
 
 ---
 
@@ -244,11 +264,11 @@ You are not hired to impress with architecture. You are hired to:
 
 | Do | Don’t |
 | --- | --- |
-| Sell *verified discretionary cancellation with a 48-hour veto* | Sell “another budget app” or a spreadsheet replica |
-| Win the 10-minute pre-bank moment | Pretend full UPI/bank magic exists |
+| Sell a human decision before a real obligation | Sell “another SaaS dashboard” or a spreadsheet replica |
+| Win the pre-commitment moment | Pretend Vognary can purchase, provision, or move money |
 | Name missing sources as a feature | Hide incompleteness like competitors |
 | Stay neutral (no credit/lending cross-sell) | Become CRED-shaped |
-| Compound corpus + verified savings | Race feature checklists |
+| Compound proposal → decision → outcome data | Race feature checklists |
 | India rails literacy | US-only copy pasted into INR |
 
 **Game-changer status:** category *potential* yes; *today* no. Potential becomes real only with users, habit, quoted numbers, distribution.
@@ -269,9 +289,9 @@ Consumer audit alone is not $100B. **Commitment truth as infrastructure** might 
 | 3 | Resend domain + key | Magic link + renewal email |
 | 4 | Monitoring (Sentry or Better Stack) | Safe production |
 | 5 | Backup storage + restore drill | Financial data trust |
-| 6 | Razorpay + legal terms approval, after first-10 proof | Any future paid offer; retired audit checkout stays off |
+| 6 | Pilot agreement, invoice, and founder-controlled payment collection | Upfront ₹40,000 pilot payment |
 | 7 | 10–20 redacted real statements → corpus | Intelligence truth |
-| 8 | Setu AA onboarding start | Long-lead rail |
+| 8 | Setu AA onboarding | Deferred until paid control usage earns a rail |
 
 Agents may draft configs, checklists, and verification commands. Agents must **not** invent READY statuses.
 
@@ -281,13 +301,13 @@ Agents may draft configs, checklists, and verification commands. Agents must **n
 
 | Day | Who | Work |
 | --- | --- | --- |
-| 1 | Founder | Start Google restricted-scope verification / CASA; counsel review of standing-mandate agency |
-| 1–2 | Agent | WP-A Recovery evidence spine (this package) |
-| 2–3 | Founder | One real inbound receipt attestation; Razorpay/legal readiness |
-| 3–5 | Both | First operational autopilot pilots (connect + mandate), not paste-PDF audits |
-| 4–6 | Agent | WP-B class lock + shadow evaluator |
-| 5–7 | Founder | 10 connected accounts with active mandates |
-| 7 | Founder | Scoreboard update only with measured pilot evidence |
+| 1 | Founder | Contact qualified ICPs and make the first explicit ₹40,000/month offers |
+| 1–3 | Agent | Exact multi-currency exposure and policy domain, red tests first |
+| 3–5 | Agent | Proposal, evaluation, evidence-link, and append-only decision persistence |
+| 5–7 | Both | Run proposals through the same human-approved pilot workflow |
+| 6–8 | Agent | Private Control-first UI and owner/admin decision boundary |
+| 8–9 | Agent | Recovery-linked reconciliation without rewriting authorization |
+| 10 | Founder | Two-payment gate; GO / REWORK using measured evidence only |
 
 Full 21-day grid: Phase A doc. Full engineering WPs: Phase B doc.
 
@@ -303,8 +323,8 @@ Full 21-day grid: Phase A doc. Full engineering WPs: Phase B doc.
 | Conflict with master-build-plan on AI/Twin APIs | master-build-plan Parts 3–5 win for *implementation law* |
 | Adding features outside A–B | **Forbidden** until Stage 0 metrics move |
 
-**Last strategic review:** 2026-08-13 founder-authorized discretionary-autopilot pivot.
-**Next allowed strategic rewrite:** after the paid-20 gate with measured numbers only.
+**Last strategic review:** 2026-08-25 founder-authorized Commitment Control pivot.
+**Next allowed strategic rewrite:** after the Day 30 paid-pilot gate with measured numbers only.
 
 ---
 
@@ -313,6 +333,6 @@ Full 21-day grid: Phase A doc. Full engineering WPs: Phase B doc.
 The repository is a **high-trust foundation** for a category-defining India-first recurring-money company.  
 The company is still **pre-PMF**.
 
-Act like builders of **truth about money** — not curators of an unused proof graph.
+Act like builders of **human authority over future obligations** — with exact money and evidence that survives reconciliation.
 
 **Read next:** [`docs/execution/phase-a-market-contact.md`](execution/phase-a-market-contact.md) and [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).

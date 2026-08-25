@@ -1,31 +1,145 @@
-# Phase B — Autopilot loop shipping (WP-A through WP-E)
+# Phase B — Commitment Control V0 (10 days)
+
+> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> falsifiable upside and bound irreversible downside. Full doctrine:
+> [`THE-LAW.md`](../THE-LAW.md).
 
 > **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md)
 > **Live state:** [`docs/CONTINUE-HERE.md`](../CONTINUE-HERE.md)
 > **Market proof:** [`phase-a-market-contact.md`](phase-a-market-contact.md)
 > **UI/AI implementation law (historical, still binding for tokens/AI):** `docs/execution-plan-ui-ai-quality.md` and `docs/master-build-plan.md` Parts 3–5
 
-**Goal:** Make the locked autopilot loop inevitable so private pilots (Phase A) are wrap-care, not a spreadsheet.
+**Goal:** Ship the minimum repeatable proposal → policy → human decision → reconciliation workflow while the founder sells paid pilots.
 
 ```
-passive evidence
-  → cited classification
-  → deterministic eligibility
-  → versioned standing mandate
-  → delivered 48-hour veto notice
-  → supported discretionary execution
-  → execution proof
-  → financially covered clean windows
-  → customer-safe billing
+user-entered proposal assumptions
+  → cited existing exposure
+  → deterministic policy evaluation
+  → owner/admin decision and frozen cap
+  → later cited Recovery evidence
+  → exact reconciliation
 ```
 
-The customer connects once and signs once. They are contacted only for vetoes and genuine exceptions.
+V0 records authority. It never purchases, provisions, cancels, auto-approves, auto-denies, or moves money.
 
-Historical WP-B0…B8 (landing honesty, guest first-value, assistant brief, UPI kill-list, monolith extraction) shipped the pre-autopilot Recovery loop. They are **not** the live roadmap. Do not reopen them as parallel work.
+## 0. Locked V0 invariants
+
+1. Recovery is the sole authority for observed financial evidence.
+2. Proposal values are user-entered assumptions until evidence proves an outcome.
+3. Money is an integer minor-unit string at boundaries and `bigint` internally; every amount has an uppercase ISO currency.
+4. Different currencies are never summed or converted.
+5. Projection fails closed on invalid recurrence, invalid calendar dates, non-positive amounts, and signed-64-bit overflow.
+6. Policy evaluation is deterministic and versioned. AI may explain cited results but cannot decide.
+7. Only owners/admins may approve, approve with a cap, or decline.
+8. Decisions and caps are append-only and cannot be rewritten by later evidence.
+9. Reconciliation links same-workspace Recovery evidence and returns `MATCHED`, `WITHIN_CAP`, `OVER_CAP`, `CURRENCY_MISMATCH`, or `CANNOT_EVALUATE`.
+10. Private pilot enrollment fails closed; no public launch or broad redesign.
+
+## 1. Architecture boundary
+
+```text
+src/lib/commitment-control/
+  project.ts       exact proposal projection by currency
+  policy.ts        pure versioned policy evaluation
+  decision.ts      decision and cap invariants
+  reconcile.ts     frozen-decision vs observed-evidence verdict
+
+src/lib/server/
+  commitment-control-store.ts   tenant-safe persistence and transactions
+
+src/app/api/workspaces/current/control/
+  brief · proposals · decisions · reconciliations
+
+src/app/workspace/recovery/control/
+  private pilot proposal and decision experience
+```
+
+Do not route authorization through `src/lib/twin/project.ts`; that module uses JavaScript `number` and remains presentation-only. Reuse its calendar primitives only when their behavior is covered by exact-money tests.
+
+## 2. Work packages (ordered)
+
+### CC-0 — Authority and paid proof contract
+
+Update THE-LAW, CONTINUE-HERE, Phase A, this file, and the scoreboard. Preserve measured scores. **Status: complete 2026-08-25; authority tests 3/3.**
+
+### CC-1 — Exact projection (days 1–3)
+
+Write red tests first for exact minor units, 13-week and annual recurrence, monthly end-of-month behavior, currency separation, invalid dates, and overflow. Implement a pure bounded projection with no database or UI dependency.
+
+**Status:** complete 2026-08-25. Exact projection and Recovery exposure adaptation are covered by the full unit/PostgreSQL gates.
+
+### CC-2 — Proposal and policy domain (days 2–4)
+
+Define proposal assumptions, 13-week and annual exposure, policy inputs, policy results, uncertainty, and evidence citations. Evaluation may return allowed, review-required, or blocked; it never records a human decision by itself.
+
+**Status:** complete 2026-08-25. Deterministic statuses are `WITHIN_POLICY`, `REVIEW_REQUIRED`, and `OUTSIDE_POLICY`; all still require a human decision.
+
+### CC-3 — Pilot persistence and authority (days 3–5)
+
+Add `0057_commitment_control_v0.sql`: workspace policy settings, proposals, immutable evaluations, evidence links, append-only decisions, and reconciliations. Require tenant-safe composite foreign keys, signed-64-bit money, explicit currency, idempotency keys, request hashes, workspace versions, role checks, audit, privacy export, and cascade erasure.
+
+**Status:** complete in code 2026-08-25; fresh migration and disposable PostgreSQL gates pass. Production apply remains founder-controlled and unrun.
+
+### CC-4 — Authenticated APIs (days 5–6)
+
+Add `/api/workspaces/current/control/` routes for brief, proposals, decisions, and reconciliations. Use the existing workspace session/RBAC boundary. Members may create proposals only if policy permits; only owners/admins may decide. Stale versions and replay mismatches fail closed.
+
+**Status:** complete in code 2026-08-25. Brief, policy, proposal, decision, and reconciliation routes pass authenticated PostgreSQL integration.
+
+### CC-5 — Private Control-first experience (days 6–8)
+
+For enrolled pilot workspaces, lead with “What are you considering committing to?” Show user-entered assumptions separately from cited existing exposure, then 13-week/annual exposure, policy headroom, uncertainty, and Approve / Approve with cap / Decline. Preserve current tokens and canonical workspace shell.
+
+**Status:** complete in code 2026-08-25. Control-first desktop/mobile experience passes 20/20 focused browser cases with Axe, keyboard, reduced-motion, and overflow checks; existing signed-in Recovery journeys also pass.
+
+### CC-6 — Reconciliation (days 8–9)
+
+Allow an admin to link later same-workspace Recovery evidence to an approved proposal. Compare exact observed amount and currency to the frozen authorization; append a verdict without updating the original evaluation, decision, or cap.
+
+**Status:** complete in code 2026-08-25; all five verdicts, cross-workspace refusal, and cap immutability are tested.
+
+### CC-7 — Private release (days 9–10)
+
+Add privacy export/deletion coverage, consented product events, desktop/mobile accessibility, migration rehearsal, disposable PostgreSQL tests, and fail-closed pilot enrollment. Complete the full gate chain before deployment.
+
+**Status:** code-controlled release obligations complete and gated. Exact-head CI, production backup/apply of `0057`, production enrollment configuration, deployment, and measured pilots remain pending founder/release work.
+
+## 3. Acceptance gates
+
+- Exact projection never loses a minor unit and never crosses currencies.
+- Owner/admin authorization succeeds; member authorization is refused.
+- Idempotent replay returns the same result; changed payload under the same key conflicts.
+- Stale workspace versions and concurrent decisions serialize or fail closed.
+- Cross-workspace evidence linking is refused.
+- Later observed evidence cannot mutate the approved cap.
+- Privacy export contains the complete proposal → evaluation → decision → reconciliation chain; workspace erasure removes it.
+- No customer-facing amount lacks either an evidence citation or an assumption label.
+
+## 4. Verification
+
+```bash
+git diff --check
+npm run lint
+npm run typecheck
+npm run claims:check
+npm run tokens:check
+env -u DATABASE_URL npm test
+DATABASE_URL='postgres://…' POSTGRES_SSL=false npm run test:postgres
+npm run build
+npm run perf:budget
+```
+
+## 5. Explicitly deferred
+
+Cards, wallets, payments, autonomous agents, Slack integration, Gmail expansion, bank connectors, automatic merchant matching, procurement suites, contract negotiation, public redesign, and any action that creates or terminates an obligation.
+
+## Historical Autopilot implementation record — superseded 2026-08-25
+
+Everything below this marker is retained for architecture and safety history. It is not the live roadmap, branch instruction, offer, or product authority.
 
 ---
 
-## 0. Locked product invariants
+### 0. Historical locked product invariants
 
 1. Recovery is the only active financial authority.
 2. AI cites evidence or produces no financial claim.
@@ -42,7 +156,7 @@ Historical WP-B0…B8 (landing honesty, guest first-value, assistant brief, UPI 
 
 ---
 
-## 1. Architecture map (do not redesign)
+### 1. Historical architecture map
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -88,7 +202,7 @@ Historical WP-B0…B8 (landing honesty, guest first-value, assistant brief, UPI 
 
 ---
 
-## 2. Work packages (ordered)
+### 2. Historical work packages
 
 Default process is one PR per WP. **Founder override (2026-08-14):** WP-B through WP-E continue on one branch, `feat/autopilot-loop`, in this repository folder so chats do not spawn isolated copies. Do not restart WP-A.
 
@@ -150,7 +264,7 @@ Locked pricing: monitoring ₹999/month; outcome 15% of verified savings; monito
 
 ---
 
-## 3. File ownership map
+### 3. Historical file ownership map
 
 | Area | Prefer editing | Avoid |
 | --- | --- | --- |
@@ -163,7 +277,7 @@ Locked pricing: monitoring ₹999/month; outcome 15% of verified savings; monito
 
 ---
 
-## 4. Parallelism rules
+### 4. Historical parallelism rules
 
 | Safe parallel | Must serialize |
 | --- | --- |
@@ -174,7 +288,7 @@ Locked pricing: monitoring ₹999/month; outcome 15% of verified savings; monito
 
 ---
 
-## 5. Verification commands
+### 5. Historical verification commands
 
 ```bash
 git diff --check
@@ -193,7 +307,7 @@ Do not claim a WP merge-ready while PostgreSQL is untested. Do not land temporar
 
 ---
 
-## 6. Out of scope until the matching WP and external gate
+### 6. Historical out-of-scope list
 
 - Merchant intelligence network
 - Public Gmail OAuth before CASA/verification
@@ -206,7 +320,7 @@ Do not claim a WP merge-ready while PostgreSQL is untested. Do not land temporar
 
 ---
 
-## 7. Agent implementation prompt (copy into new sessions)
+### 7. Historical agent implementation prompt
 
 ```text
 You are implementing Vognary Autopilot under docs/THE-LAW.md.
@@ -218,7 +332,7 @@ Continue WP-B–E on the named branch. Do not redo merged WP-A / PR #34.
 
 ---
 
-## 8. Exit criteria (Phase B engineering complete)
+### 8. Historical exit criteria
 
 - [ ] WP-A through WP-E merged with Codex + Opus review on the same final head SHA
 - [ ] Every agent-controlled acceptance criterion green

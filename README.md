@@ -1,5 +1,9 @@
 # Vognary
 
+> **Operating motto: Take smart risks. Do not play safe.** Vognary pursues
+> category-defining, falsifiable outcomes with bounded downside; it does not
+> confuse incremental polish with progress. See [THE-LAW](docs/THE-LAW.md).
+
 Vognary is Commitment Intelligence for 2–20 person software and AI companies: an evidence-backed picture of what the company is committed to pay, what changed, what comes next, and why.
 
 The product is public but not yet operationally proven. No first ICP company has completed the production receipt-to-decision-to-next-receipt loop, so this repository must not be read as customer, distribution, or automatic-receipt proof.

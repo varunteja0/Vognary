@@ -1,5 +1,9 @@
 # Claude / coding agents — start here
 
+> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> falsifiable upside and bound irreversible downside. Full doctrine:
+> [`docs/THE-LAW.md`](docs/THE-LAW.md).
+
 @AGENTS.md
 
 **Supreme directive:** [docs/THE-LAW.md](docs/THE-LAW.md)  
@@ -7,4 +11,4 @@
 **Phase A (market):** [docs/execution/phase-a-market-contact.md](docs/execution/phase-a-market-contact.md)  
 **Phase B (loop product):** [docs/execution/phase-b-loop-shipping.md](docs/execution/phase-b-loop-shipping.md)
 
-Do not invent parallel roadmaps. Raise the minimum scoreboard row. Cite-or-shut-up AI. India-first.
+Commitment Control is canonical: proposal → policy → human authorization → reconciliation. Do not invent parallel roadmaps, payments, or autonomous action. Raise the minimum scoreboard row. Cite-or-shut-up AI. India-first.

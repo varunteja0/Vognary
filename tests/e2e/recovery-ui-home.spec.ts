@@ -248,6 +248,11 @@ async function mockRecoveryApi(page: Page, options: { decision?: DecisionOutcome
 
 async function signIn(page: Page) {
   await page.context().setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${Math.floor(Math.random() * 180) + 50}` });
+  await page.route("**/api/workspaces/current/control/brief", (route) => route.fulfill({
+    status: 503,
+    contentType: "application/json",
+    body: JSON.stringify({ error: { code: "FEATURE_UNAVAILABLE", message: "not enrolled", retryable: false, requestId: "recovery-home-control-gate" } }),
+  }));
   await page.goto("/login");
   await page.getByText("Other ways to sign in").click();
   await page.getByPlaceholder("developer@example.com").fill(email!);
@@ -275,11 +280,16 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 
   const nav = page.getByRole("navigation", { name: "Primary" });
-  for (const label of ["Now", "Bills", "Receipts"]) {
+  for (const label of ["Now", "Bills", "Sources"]) {
     await expect(nav.getByRole("button", { name: label })).toBeVisible();
   }
   await expect(nav.getByRole("button", { name: "Automation" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: `Account for ${email}` })).toHaveAttribute("href", "/profile");
+  const addBill = page.locator("#workspace-add-bill");
+  await expect(addBill).toBeVisible();
+  await addBill.click();
+  await expect(page.getByRole("dialog", { name: "Add a bill" })).toBeVisible();
+  await page.keyboard.press("Escape");
 
   await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Next charges" })).toBeVisible();
@@ -929,7 +939,7 @@ test("Sources tab disconnects cited Recovery sources without rotating the receip
     });
   });
   await page.goto("/app");
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Receipts" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
   await page.getByText("Advanced").click();
   await expect(page.getByText("Pasted OpenAI receipt")).toBeVisible();
   await expect(page.getByText("Pasted bill · Connected")).toBeVisible();
@@ -955,7 +965,7 @@ test("Sources tab disconnects cited Recovery sources without rotating the receip
     }),
   );
   await page.reload();
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Receipts" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
   await page.getByText("Advanced").click();
   await expect(page.getByText("Pasted bill · Disconnected")).toBeVisible();
   await page.getByRole("button", { name: "Reconnect source" }).click();

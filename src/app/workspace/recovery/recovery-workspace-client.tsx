@@ -30,6 +30,7 @@ import {
 } from "@/lib/recovery/contracts";
 import { VognaryMark } from "../../brand";
 import { correctionFieldLabels, decisionLabels } from "./labels";
+import { ControlView, useCommitmentControl } from "./control/control-view";
 import { RecoveryAddEvidence } from "./recovery-add-evidence";
 import { RecoveryCommitments, type CommitmentsHandlers } from "./recovery-commitments";
 import { RecoveryOverlay } from "./ui/overlay";
@@ -115,6 +116,19 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   const [inspectingEvidence, setInspectingEvidence] = useState(false);
   const viewHeadingRef = useRef<HTMLHeadingElement>(null);
   const viewChangedRef = useRef(false);
+  const viewChosenByReaderRef = useRef(false);
+
+  const loadControlEvidence = useCallback(async (commitmentId: string) => {
+    const result = await transport.commitment(commitmentId, { evidenceLimit: recoveryLimits.maxCommitmentEvidencePageSize });
+    return result.ok ? { ok: true as const, items: result.data.evidence.items } : { ok: false as const, failure: result };
+  }, [transport]);
+
+  const controlDesk = useCommitmentControl({
+    enabled: state.status.kind === "READY",
+    workspaceId: state.home?.workspace.id ?? null,
+    loadEvidence: loadControlEvidence,
+  });
+  const controlAvailable = controlDesk.available;
 
   const loadSnapshot = useCallback(async () => {
     dispatch({ type: "SNAPSHOT_REQUESTED" });
@@ -462,7 +476,19 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     viewHeadingRef.current?.focus();
   }, [state.view]);
 
+  const controlDefaultRef = useRef(false);
+  useEffect(() => {
+    if (controlDefaultRef.current || !controlAvailable) return;
+    controlDefaultRef.current = true;
+    if (viewChosenByReaderRef.current || state.view !== "HOME") return;
+    // Opening on Control is not a view change the reader made, so the heading
+    // focus that follows a deliberate switch is suppressed for this one hop.
+    viewChangedRef.current = false;
+    dispatch({ type: "VIEW_SELECTED", view: "CONTROL" });
+  }, [controlAvailable, state.view]);
+
   function selectView(view: RecoveryView) {
+    viewChosenByReaderRef.current = true;
     dispatch({ type: "VIEW_SELECTED", view });
   }
 
@@ -754,11 +780,18 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   };
 
   const accountEmail = state.session?.authenticated ? state.session.session.email : null;
+  const hasGuidedAddStep = state.home !== null
+    && (workspaceEmpty || (state.home.coverage.evidenceCount > 0 && state.commitmentTotal === 0));
+  const showPersistentAdd = state.status.kind === "READY" && state.home !== null && !hasGuidedAddStep;
   const mandateAvailable = Boolean(state.home?.autopilot?.mandate)
     || state.home?.autopilot?.noticeReadiness.state === "proven-ready";
-  const primaryViews = mandateAvailable
-    ? recoveryViews
-    : recoveryViews.filter((view) => view !== "MANDATE");
+  // A workspace outside the private Control pilot never sees the destination:
+  // no tab, no disabled command, no copy suggesting access.
+  const primaryViews = recoveryViews.filter((view) =>
+    (view !== "MANDATE" || mandateAvailable) && (view !== "CONTROL" || controlAvailable));
+  const navColumnsClass = primaryViews.length >= 5
+    ? "grid-cols-5"
+    : primaryViews.length === 4 ? "grid-cols-4" : "grid-cols-3";
   return (
     <main id="recovery-workspace" className="relative px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-5 text-foreground sm:px-6 sm:pb-10 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
@@ -771,6 +804,18 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
             <p className="hidden font-data text-xs text-(--muted) sm:block">
               {state.workspaceVersion === null ? "Loading your workspace…" : "Saved to Vognary"}
             </p>
+            {showPersistentAdd ? (
+              <button
+                id="workspace-add-bill"
+                type="button"
+                aria-label="Add a bill"
+                className="btn btn-sm btn-primary"
+                onClick={() => dispatch({ type: "ADD_BILLS_OPENED" })}
+              >
+                <span aria-hidden>+</span>
+                <span>Add bill</span>
+              </button>
+            ) : null}
             <Link
               href="/profile"
               aria-label={accountEmail ? `Account for ${accountEmail}` : "Account"}
@@ -785,7 +830,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         </header>
 
         <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 py-2 sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
-          <ul className={`viewnav ${primaryViews.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+          <ul className={`viewnav ${navColumnsClass}`}>
             {primaryViews.map((view) => (
               <li key={view} className="min-w-0">
                 <button
@@ -830,7 +875,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           tabIndex={-1}
           data-focus-quiet
           className={
-            state.view === "HOME"
+            state.view === "HOME" || state.view === "CONTROL"
               ? "sr-only"
               : "mt-6 w-fit font-display text-2xl font-semibold tracking-tight text-(--ink) outline-none"
           }
@@ -928,6 +973,17 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   );
 
   function renderView() {
+    if (state.view === "CONTROL") {
+      return (
+        <ControlView
+          desk={controlDesk}
+          commitments={state.commitments}
+          online={state.online}
+          onInspectEvidence={(evidenceId, buttonId) => inspectEvidence(null, evidenceId, buttonId)}
+        />
+      );
+    }
+
     if (state.view === "ADD_EVIDENCE") {
       return (
         <RecoverySources

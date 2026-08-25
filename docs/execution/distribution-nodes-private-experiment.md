@@ -1,5 +1,9 @@
 # Distribution nodes — private stack-review experiment
 
+> **Operating motto: Take smart risks. Do not play safe.** Prefer a bounded,
+> high-upside distribution experiment with a deadline and kill metric over safe
+> low-signal activity. Full doctrine: [`THE-LAW.md`](../THE-LAW.md).
+
 > **Status:** research only, 2026-08-22. Not a send log. Nothing here has been contacted unless the founder marks CRM.
 > **Scoreboard this raises:** Distribution 1.5 and Business validation 1.5 (market-contact map). Does **not** raise either row until a real conversation exists.
 > **Product freeze this document obeys:** private experiment for **5–10** founder-led 2–30 person software/AI companies. Decision before the charge. No bank login. No Gmail OAuth. First session is add 2–5 bills. Vognary never cancels a service and never moves money.

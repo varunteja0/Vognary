@@ -1,5 +1,9 @@
 # Renewal Alert Activation Runbook
 
+> **Operating motto: Take smart risks. Do not play safe.** Test retention value
+> decisively, but never bypass opt-in, delivery evidence, unsubscribe, or
+> fail-closed provider controls. Full doctrine: [`THE-LAW.md`](THE-LAW.md).
+
 This rail sends individual renewal reminders and a separate weekly recurring-money digest. Both are off by default; a user must explicitly enable each choice through the authenticated preferences API before any delivery row can be scheduled. Deploying the code or configuring Resend does not opt anyone in.
 
 ## Runtime requirements

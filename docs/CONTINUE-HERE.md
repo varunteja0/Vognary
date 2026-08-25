@@ -1,9 +1,42 @@
 # CONTINUE HERE — live handoff (2026-08-22)
 
+> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> falsifiable upside and bound irreversible downside. Full doctrine:
+> [`THE-LAW.md`](THE-LAW.md).
+
 > Read [`docs/THE-LAW.md`](THE-LAW.md) first. This file is **live state only**.
 > Market: [`docs/execution/phase-a-market-contact.md`](execution/phase-a-market-contact.md).
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
+
+## Live governance — 2026-08-25 (smart-risk doctrine)
+
+The founder motto is now the supreme strategic decision rule: category-defining,
+measurable bets beat comfortable feature work when the test, owner, deadline,
+success threshold, kill threshold, and downside bound are explicit. Existing
+scope may be challenged only through an explicit founder-authorized experiment;
+agents may not silently ignore it. Honesty, citations, security, privacy,
+consent, and legal boundaries remain hard constraints. This governance change
+does not by itself raise any scoreboard row or prove users, retention, revenue,
+or a new product thesis.
+
+## Live state — 2026-08-25 (Commitment Control authorized; implementation started)
+
+**Commitment Control replaces Commitment Intelligence as the company direction.** Scoreboard row: business validation. Loop step: proposal → policy → human decision → reconciliation. Composite remains **1.5** because no new conversation, proposal, payment, or renewal has been measured.
+
+**LOCKED V0:** India-first 5–100-person AI-native teams; ₹40,000/month private pilot; ten-day thin build in parallel with 20 qualified contacts, 10 conversations, and five explicit offers by Day 10. Only owners/admins may approve, approve with a cap, or decline. V0 never auto-approves, auto-denies, purchases, provisions, cancels, or moves money. Recovery remains evidence authority and supplies later observed outcomes.
+
+**COMMERCIAL GATES:** two upfront payments by Day 10; by Day 30, three paid pilots, 30 pre-spend proposals, three materially changed/capped/declined decisions, at least 80% of requests before spend, and two renewals. Kill or rework if fewer than two of ten offers pay, fewer than half of requests arrive before spending, or 30 proposals change zero decisions.
+
+**IMPLEMENTATION CHECKPOINT:** CC-0 through CC-7 are code-complete on the shared dirty checkout. Exact minor-unit projection, Asia/Kolkata proposal dates, runtime-validated Control DTOs, deterministic versioned policy, user-assumption vs cited multi-currency exposure, owner/admin-only immutable decisions, frozen caps, all five reconciliation verdicts, and a Control-first workspace experience are implemented. Additive `0057_commitment_control_v0` owns tenant-safe policies, proposals, evaluations, evidence links, decisions, reconciliations, privacy-safe actor erasure, immutable triggers, consented events, privacy export, cascade erasure, shared Recovery version/idempotency semantics, and authenticated `/api/workspaces/current/control/**` routes. Blank pilot enrollment fails closed; production requires exact UUIDs in `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS`. The JavaScript `number` Financial Twin remains presentation-only.
+
+**PRODUCT EXPERIENCE:** enrolled workspaces open on “What are you considering committing to?” inside the canonical `/app` shell. The single-screen composer, exact policy/exposure table, member read-only state, owner/admin decision dialog, frozen authorization card, evidence picker, reconciliation outcomes, immutable policy versions, stale-draft recovery, offline/conflict states, non-enrolled zero-UI fallback, desktop navigation, and mobile bottom navigation are complete. Desktop/mobile captures were inspected; the proposal form is first-viewport, the queue remains visible below it, and the populated over-cap artifact preserves the ₹40,000 cap beside the ₹51,000 observation.
+
+**GATES on this dirty shared checkout:** `git diff --check` PASS · lint PASS · typecheck PASS · claims **29** · tokens **62** · unit **1066/1066** · disposable PostgreSQL **169/169** · fresh `0057` migration rehearsal PASS · nonzero Control `pg_dump`/`pg_restore` PASS · Control browser **20/20** desktop+Pixel 7 with Axe/reduced-motion/overflow/keyboard coverage · Recovery Customer Zero **2/2** · Recovery Home **30/30** · Recovery states **16/16** with 4 receipt-inbox cases skipped because that separate environment is not configured · production Next 16.3.0 Turbopack build PASS · performance budget PASS (`/` 180.6 KB, `/app` 183.5 KB, `/verify` 181.1 KB).
+
+**STILL UNPROVEN / BLOCKED:** production remains at verified head `0056`; founder must run the documented current backup/restore and additive `0057` apply before deploying Control routes. Exact-head CI, deployment, production pilot UUIDs, real conversations, offers, payments, pre-spend proposals, changed decisions, renewals, and live customer comprehension remain unproven. Code completion does not raise the business-validation score.
+
+**CHECKOUT:** `/Users/varunteja/Desktop/CVT Group/Vognary`, branch `main`, same-repo sequential work. Preserve the existing dirty doctrine and UX deltas; do not create a sibling worktree. Historical entries below remain evidence, not current product authority.
 
 ## Live state — 2026-08-24 (comprehension reset: one product, three questions)
 
@@ -188,7 +221,7 @@ Google's forwarding confirmation **was parsed** on the founder v1 alias at 2026-
 
 Proof in that log, in order: `pg_dump` → AES-256-GCM (`keyFingerprint=8it2LaCH1w__ilS1`, same as Vercel Production) → `storage.status=uploaded` to `vognary-postgres/vognary-postgres-2026-08-18T07-07-54-751Z.dump.enc` (etag `d0638a31123d332675aca57f0c31d075`) → local `*.dump.enc` deleted → `BACKUP_RESTORE_SOURCE=storage` GET → `storageRestore.source=durable-object-get` → decrypt `plaintextSha256=45eb736e98ea2f286448df3d6229eb154c4e0649f1c4cfdd970eda60cf81b5a4` → isolated PostgreSQL 18 restore-drill-passed (schema through `0053_phase_a_receipt_activation`; restored counts include inbound_aliases 2, inbound_events 4, evidence 5, commitments 4). Artifact after dump deletion was the manifest only (1488 bytes). Public `/security` Proven now requires that recorded object GET, not only `BACKUP_RESTORE_DRILL_STATUS=passed`.
 
-## 0. Founder scope freeze — current strategy
+## Historical strategy record — superseded 2026-08-25
 
 - Canonical product: **Commitment Intelligence**. Vognary maintains an evidence-backed model of what a 2–20 person software/AI company is already committed to, what changed, what comes next, how certain it is, and why.
 - First ICP: 2–20 person software/AI companies without finance/procurement ops.

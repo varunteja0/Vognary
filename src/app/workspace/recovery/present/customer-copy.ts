@@ -21,7 +21,7 @@ export const customerPhrases = {
   reviewWhen: "When should this come back?",
   noActionNeeded: "No action needed.",
   seeAllCommitments: "See all bills",
-  keepCurrent: "Keep receipts coming",
+  keepCurrent: "Set up receipt forwarding",
   somethingWrong: "Something wrong?",
   seeWhy: "Why?",
   seeTheReceipt: "See the receipt",

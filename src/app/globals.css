@@ -1357,3 +1357,359 @@ select.field option {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Commitment Control desk
+ *
+ * Four unframed bands separated by hairlines. Cards exist only for a
+ * repeated proposal row, never nested inside another card. Money, dates,
+ * versions and verdicts are always tabular mono so two rows can be
+ * compared without reading them twice.
+ * ------------------------------------------------------------------ */
+
+.control-desk {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.control-band {
+  display: grid;
+  gap: var(--space-4);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+.control-band:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.control-heading {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-optical-sizing: auto;
+  font-size: 1.3rem;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  color: var(--ink);
+}
+@media (min-width: 40rem) {
+  .control-heading {
+    font-size: 1.5rem;
+  }
+}
+
+.control-note {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.control-error {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--ember);
+}
+
+/* Composer */
+
+.control-form {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 44rem;
+}
+.control-field {
+  display: block;
+  min-width: 0;
+}
+.control-form-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+.control-form-money {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(6.5rem, 1fr);
+  gap: var(--space-3);
+}
+.control-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.control-disclosure {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--card-2);
+}
+.control-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0.6rem 0.85rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.control-disclosure-body {
+  padding: 0 0.85rem 0.85rem;
+}
+.control-exposure-set {
+  display: grid;
+  gap: 0.35rem;
+  border: 0;
+}
+.control-exposure-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.82rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+.control-exposure-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.control-exposure-amount {
+  font-size: 0.8rem;
+}
+.control-exposure-row > span:last-child {
+  grid-column: 2 / -1;
+}
+
+/* Proposal cards */
+
+.control-card-list {
+  display: grid;
+  gap: var(--space-3);
+}
+.control-card {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+.control-card-head {
+  display: grid;
+  gap: 0.25rem;
+}
+.control-card-title {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.control-card-purpose {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.control-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Evaluation */
+
+.control-evaluation {
+  display: grid;
+  gap: var(--space-4);
+}
+.control-band-split {
+  display: grid;
+  gap: var(--space-4);
+}
+@media (min-width: 48rem) {
+  .control-band-split {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.control-facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.5rem var(--space-4);
+  margin-top: 0.6rem;
+}
+.control-fact {
+  min-width: 0;
+}
+.control-fact > dt {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.control-fact > dd {
+  font-size: 0.85rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.control-evidence-list {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.6rem;
+}
+
+.control-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.74rem;
+  table-layout: fixed;
+}
+.control-table-caption {
+  text-align: left;
+  padding-bottom: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.control-table th,
+.control-table td {
+  padding: 0.4rem 0.3rem;
+  border-top: 1px solid var(--line);
+  text-align: right;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.control-table thead th {
+  border-top: 0;
+  color: var(--muted);
+  font-weight: 500;
+}
+.control-table th[scope="row"],
+.control-table thead th:first-child {
+  text-align: left;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.control-verdict {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.control-reasons {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.control-decision-required {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--ink);
+}
+
+.control-pill-review {
+  color: var(--ochre);
+  background: var(--ochre-tint);
+}
+
+/* Decision, outcomes and policy */
+
+.control-decision,
+.control-outcomes {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.control-outcome-list {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: 0.6rem;
+}
+.control-outcome {
+  display: grid;
+  gap: 0.4rem;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.control-outcome:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.control-choice-set {
+  display: grid;
+  gap: 0.4rem;
+  border: 0;
+}
+.control-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.2rem 0.6rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+.control-choice > input {
+  grid-row: 1 / span 2;
+  margin-top: 0.22rem;
+}
+.control-choice > span {
+  grid-column: 2;
+  min-width: 0;
+}
+.control-choice-title {
+  font-size: 0.88rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.control-policy-summary {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+.control-policy-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+@media (min-width: 40rem) {
+  .control-policy-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.control-policy-limit {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.control-review-list {
+  display: grid;
+  gap: 0.3rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.control-review-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
