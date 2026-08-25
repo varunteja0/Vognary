@@ -11,7 +11,9 @@ test("an unauthenticated first session can paste a bill and see a spoken decisio
     "Cursor Pro renews monthly on 28 September 2026.",
   ].join("\n"));
   await page.getByRole("button", { name: "Check this bill" }).click();
-  await expect(page.getByText(/Cursor charges/i)).toBeVisible({ timeout: 20_000 });
+  // The result leads with merchant and amount; timing and proof are their own lines.
+  await expect(page.getByRole("heading", { name: /^Cursor · \$20\.00$/ })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/Cursor charges \$20\.00\. Charges in/i)).toHaveCount(0);
   await expect(page.getByText("From your receipt", { exact: true })).toBeVisible();
   await expect(page.getByText("Why now", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Keep", exact: true })).toBeVisible();

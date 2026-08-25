@@ -772,6 +772,70 @@ select.field option {
   color: var(--ink-soft);
 }
 
+/* ------------------------------------------------------------------ *
+ * Cycle rail — the same commitment across time.
+ *
+ * Cited periods are solid because a receipt proves them. The next period
+ * is drawn open and dashed because nothing has proven it yet: that empty
+ * cell is the whole reason this product exists, so it is the one element
+ * allowed to look unfinished.
+ * ------------------------------------------------------------------ */
+.cycle-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+.cycle-cell {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  padding: 0.6rem 0.7rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--card);
+  min-width: 0;
+}
+.cycle-cell-open {
+  border-style: dashed;
+  border-color: var(--line-strong);
+  background: transparent;
+}
+.cycle-period {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cycle-amount {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.cycle-cell-open .cycle-amount {
+  color: var(--muted);
+}
+.cycle-note {
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+@media (min-width: 34rem) {
+  .cycle-rail {
+    gap: 0.65rem;
+  }
+  .cycle-amount {
+    font-size: 1.15rem;
+  }
+}
+
 @media (min-width: 34rem) {
   .decision {
     gap: 1.25rem;

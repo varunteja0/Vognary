@@ -12,6 +12,7 @@ import {
   type StartSessionDecision,
 } from "@/lib/recovery/start-session";
 import { fetchReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
+import { splitReceiptTexts } from "@/lib/recovery/receipt-input";
 import {
   decisionArtefactText,
   guestDecisionHookCopy,
@@ -63,7 +64,7 @@ export default function StartClient() {
         headers: { "content-type": "application/json" },
         credentials: "same-origin",
         body: JSON.stringify({
-          receiptTexts: trimmed ? [trimmed] : [],
+          receiptTexts: splitReceiptTexts(trimmed),
           sources: sources.map((source) => ({ name: source.name, text: source.text })),
           manualItems: [],
         }),
@@ -81,7 +82,7 @@ export default function StartClient() {
         ? payload.cards
         : startCardsFromRecurringItems(payload.audit?.recurringItems ?? [], formatCalendarDate(new Date()));
       if (!nextCards.length) {
-        setStatus("We couldn't verify a merchant, amount, and date from that text. Put them in one line and try again.");
+        setStatus("We couldn't verify a merchant, amount, and date from that text. Put each bill on its own line, or separate them with a blank line.");
         setCards([]);
         return;
       }
@@ -208,15 +209,23 @@ export default function StartClient() {
       <h1 className="mt-3 max-w-2xl font-display text-3xl font-semibold leading-tight text-(--ink) sm:text-4xl">
         See the charge. Make the decision.
       </h1>
-      <p className="mt-3 max-w-2xl text-base leading-7 text-(--muted)">
-        Upload or paste a receipt. Vognary pulls out the merchant, amount, and date, then asks whether to keep it, review it, or plan to cancel.
-      </p>
-      <p className="mt-2 text-sm leading-6 text-(--muted)">
-        No account needed. Nothing is saved until you sign in.
-      </p>
+      {!cards.length ? (
+        <>
+          <p className="mt-3 max-w-2xl text-base leading-7 text-(--muted)">
+            Upload or paste a receipt. Vognary pulls out the merchant, amount, and date, then asks whether to keep it, review it, or plan to cancel.
+          </p>
+          <p className="mt-2 text-sm leading-6 text-(--muted)">
+            No account needed. Nothing is saved until you sign in.
+          </p>
+        </>
+      ) : null}
 
-      <section className="mt-7 border-y border-line py-6">
-        <div className="grid gap-5 lg:grid-cols-2">
+      {/* Once a bill is cited the decision is the page; the form steps aside. */}
+      <details open={!cards.length} className="mt-7 border-y border-line py-6">
+        <summary className="cursor-pointer list-none font-medium text-(--ink)">
+          {cards.length ? "Add another bill" : "Upload or paste a bill"}
+        </summary>
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
           <BillDropzone disabled={pending} preparing={pending} onFilesChosen={(files) => void addFiles(files)} />
           <div className="grid content-start gap-3">
             <label htmlFor="start-receipt" className="field-label">Or paste the receipt</label>
@@ -225,7 +234,7 @@ export default function StartClient() {
               value={receiptText}
               onChange={(event) => setReceiptText(event.target.value)}
               className="field min-h-40 resize-y"
-              placeholder="Cursor Pro paid USD 20.00 on 28 August 2026."
+              placeholder={"Cursor Pro paid USD 20.00 on 28 August 2026.\nSeveral bills? Put each on its own line."}
             />
             <button
               type="button"
@@ -252,7 +261,7 @@ export default function StartClient() {
           />
         ))}
         {status ? <p role="alert" className="text-sm leading-6 text-ember">{status}</p> : null}
-      </section>
+      </details>
 
       {hook ? (
         <section className="decision mt-10" data-lead="true" aria-live="polite">
@@ -309,9 +318,12 @@ export default function StartClient() {
         const keepPrimary = keepIsPrimary(card.reasonKeys);
         return (
           <article key={card.id} className="decision mt-6" data-lead="true">
-            <div>
+            <div className="min-w-0">
               <p className="decision-cue">Needs your decision</p>
-              <h2 className="decision-sentence mt-2">{card.sentence}</h2>
+              <h2 className="decision-sentence mt-2">{card.merchant} · {card.amountDisplay}</h2>
+              {card.whenLine && card.whenLine !== "Date not established" ? (
+                <p className="decision-due mt-1">{card.whenLine}</p>
+              ) : null}
             </div>
             {card.excerpt ? (
               <div className="decision-evidence">

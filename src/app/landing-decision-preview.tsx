@@ -57,7 +57,23 @@ export function LandingDecisionPreview() {
 
           <div className="decision-evidence">
             <p className="eyebrow eyebrow-xs">From two example receipts</p>
-            <blockquote className="decision-quote">July ₹1,350 · August ₹1,700</blockquote>
+            <ol className="cycle-rail mt-2" aria-label="Cursor Pro across three billing periods">
+              <li className="cycle-cell">
+                <span className="cycle-period">Jul</span>
+                <span className="cycle-amount">₹1,350</span>
+                <span className="cycle-note">Receipt</span>
+              </li>
+              <li className="cycle-cell">
+                <span className="cycle-period">Aug</span>
+                <span className="cycle-amount">₹1,700</span>
+                <span className="cycle-note">Receipt</span>
+              </li>
+              <li className="cycle-cell cycle-cell-open">
+                <span className="cycle-period">Sep</span>
+                <span className="cycle-amount" aria-label="Not yet known">—</span>
+                <span className="cycle-note">Not charged yet</span>
+              </li>
+            </ol>
           </div>
 
           <div>
