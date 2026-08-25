@@ -19,7 +19,7 @@ export default function LaunchLanding() {
         </nav>
 
         <section className="border-b border-line py-8 sm:py-10">
-          <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:gap-14">
+          <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:grid-rows-[auto_1fr] lg:gap-x-14 lg:gap-y-6">
             <div className="min-w-0 lg:col-start-1 lg:row-start-1">
               <p className="eyebrow text-ochre">For small software teams</p>
               <h1 className="mt-3 font-display text-[2.125rem] font-semibold leading-[1.08] tracking-tight text-(--ink) sm:text-5xl">
