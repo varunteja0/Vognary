@@ -146,19 +146,32 @@ test("the first-10 report covers the frozen receipt experiment without PII", () 
     "setupCompleted",
     "forwardingVerified",
     "backfillCompleted",
+    "firstValueWorkspaces",
+    "decisionsOnSubmittedEvidence",
+    "recurringPictureWorkspaces",
+    "decisionCyclesAwaitingOutcome",
+    "continuedAsPlanned",
+    "chargeAfterCancelPlan",
+    "noChargeInWindow",
+    "cannotEvaluate",
     "commitmentsDetected",
     "userCorrectionCount",
     "medianSecondsToTrustworthyPicture",
     "sourcesRemainingHealthy",
-    "returnVisits",
-    "checkoutAttempts",
-    "paymentsCompleted",
-    "firstAutomaticReceipt",
-    "secondAutomaticReceipt",
+    "sourceHealthMeasurement",
+    "consentedReturnEvents",
+    "historicalCheckoutAttempts",
+    "historicalPaymentsSettled",
+    "processedInboundWorkspaces",
+    "workspacesWithTwoProcessedInboundEvents",
     "medianSetupDurationMs",
   ]) {
     assert.match(report, new RegExp(`\\b${metric}\\b`), `first-10 report must include ${metric}`);
   }
+  assert.match(report, /recovery_decision_cycles/);
+  assert.match(report, /recovery_commitment_evidence/);
+  assert.match(report, /count\(distinct source\.workspace_id\)/);
+  assert.match(report, /source\.source_type in \('RECEIPT_PASTE', 'CSV_IMPORT'\)/);
   assert.match(report, /recovery_inbound_aliases/);
   assert.match(report, /recovery_inbound_events/);
   assert.match(report, /event\.status = 'PROCESSED'/);
@@ -171,5 +184,11 @@ test("the first-10 report covers the frozen receipt experiment without PII", () 
   assert.match(report, /billing\.checkout_started/);
   assert.match(report, /billing\.payment_settled/);
   assert.match(report, /duration_ms/);
+  assert.match(report, /cannot prove untouched automatic forwarding/i);
+  assert.match(report, /Source health measurement:/);
+  assert.match(report, /unavailable-key-id-not-configured/);
+  assert.match(report, /historical retired checkout/i);
+  assert.match(report, /Longitudinal outcomes:/);
+  assert.doesNotMatch(report, /\bfirstAutomaticReceipt\b|\bsecondAutomaticReceipt\b|\bpaymentsCompleted\b/);
   assert.doesNotMatch(report, /select[\s\S]{0,120}\b(?:email|subject|excerpt|raw_evidence|encrypted_display|alias_hmac)\b/i);
 });

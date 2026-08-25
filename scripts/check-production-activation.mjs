@@ -51,7 +51,7 @@ const groups = [
   },
   {
     id: "feature-migrations",
-    label: "Feature migrations 0002 through 0054",
+    label: "Feature migrations through current Recovery head",
     required: ["DATABASE_URL"],
     probe: isFeatureMigrationsReady,
     why: "Confirms the target database recorded every forward migration through the commitment graph and can query persistent capability schema.",

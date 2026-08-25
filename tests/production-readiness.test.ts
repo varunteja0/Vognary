@@ -354,7 +354,8 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.match(source, /target activation evidence/);
   assert.match(source, /capabilities\?\.schema\?\.status === "ready"/);
   assert.match(source, /capabilities\.recoveryV1\?\.status === "schema-ready-clean-cutover"/);
-  assert.match(source, /Feature migrations 0002 through 0054/);
+  assert.match(source, /Feature migrations through current Recovery head/);
+  assert.doesNotMatch(source, /Feature migrations 0002 through 0054/);
   assert.match(source, /required\?\.includes\("0055_recovery_decision_cycles"\)/);
   assert.match(source, /applied\?\.includes\("0055_recovery_decision_cycles"\)/);
   assert.match(source, /required\?\.includes\("0056_decision_cycle_expected_amount"\)/);
@@ -430,5 +431,5 @@ test("production smoke accepts disabled code login and materialization-aware con
   assert.ok(source.includes(`|| "${serverSecret}"`), "the local smoke fallback must satisfy the same guard");
   const activation = read("scripts/check-production-activation.mjs");
   assert.match(activation, /id: "gmail-product-start"[\s\S]*expected: \[410\]/);
-  assert.match(activation, /Feature migrations 0002 through 0054/);
+  assert.match(activation, /Feature migrations through current Recovery head/);
 });

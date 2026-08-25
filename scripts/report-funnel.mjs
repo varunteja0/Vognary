@@ -37,16 +37,21 @@ try {
     )).rows.map((row) => ({ day: row.day, signups: Number(row.n) }));
 
     const activation = {
-      workspacesWithEvidence: await count(
+      workspacesWithSubmittedEvidence: await count(
         client,
-        "select count(distinct workspace_id)::text as n from recovery_submissions",
+        `select count(distinct source.workspace_id)::text as n
+         from recovery_sources source
+         join recovery_evidence evidence
+           on evidence.workspace_id = source.workspace_id and evidence.source_id = source.id
+         where source.source_type in ('RECEIPT_PASTE', 'CSV_IMPORT')`,
       ),
-      activationEvents: await count(
+      recurringPictureWorkspaces: await count(
         client,
-        "select count(*)::text as n from product_events where event_name = 'workspace.activated'",
+        "select count(distinct workspace_id)::text as n from product_events where event_name = 'workspace.activated'",
       ),
       commitments: await count(client, "select count(*)::text as n from recovery_commitments"),
-      decisions: await count(client, "select count(*)::text as n from recovery_decisions"),
+      decisionRecords: await count(client, "select count(*)::text as n from recovery_decisions"),
+      decisionCycles: await count(client, "select count(*)::text as n from recovery_decision_cycles"),
     };
 
     const first10Row = (await client.query(
@@ -57,14 +62,63 @@ try {
          (select count(distinct workspace_id)::text from recovery_inbound_aliases where backfill_completed_at is not null) as backfill_completed,
          (select count(distinct workspace_id)::text from recovery_commitments) as commitments_detected,
          (select count(*)::text from recovery_corrections) as user_correction_count,
-         (select count(distinct workspace_id)::text from recovery_inbound_events where status = 'PROCESSED') as first_automatic_receipt,
+         (select count(distinct cycle.workspace_id)::text
+          from recovery_decision_cycles cycle
+          where exists (
+            select 1
+            from recovery_commitment_evidence link
+            join recovery_evidence evidence
+              on evidence.workspace_id = link.workspace_id and evidence.id = link.evidence_id
+            join recovery_sources source
+              on source.workspace_id = evidence.workspace_id and source.id = evidence.source_id
+            where link.workspace_id = cycle.workspace_id
+              and link.commitment_id = cycle.commitment_id
+              and source.source_type in ('RECEIPT_PASTE', 'CSV_IMPORT')
+          )) as first_value_workspaces,
+         (select count(distinct cycle.id)::text
+          from recovery_decision_cycles cycle
+          where exists (
+            select 1
+            from recovery_commitment_evidence link
+            join recovery_evidence evidence
+              on evidence.workspace_id = link.workspace_id and evidence.id = link.evidence_id
+            join recovery_sources source
+              on source.workspace_id = evidence.workspace_id and source.id = evidence.source_id
+            where link.workspace_id = cycle.workspace_id
+              and link.commitment_id = cycle.commitment_id
+              and source.source_type in ('RECEIPT_PASTE', 'CSV_IMPORT')
+          )) as decisions_on_submitted_evidence,
+         (select count(distinct workspace_id)::text
+          from product_events where event_name = 'workspace.activated') as recurring_picture_workspaces,
+         (select count(*)::text
+          from recovery_decision_cycles
+          where user_action in ('KEEP', 'PLAN_TO_CANCEL')
+            and verification_outcome is null) as decision_cycles_awaiting_outcome,
+         (select count(*)::text
+          from recovery_decision_cycles
+          where user_action = 'KEEP'
+            and verification_outcome = 'CHARGE_ARRIVED') as continued_as_planned,
+         (select count(*)::text
+          from recovery_decision_cycles
+          where user_action = 'PLAN_TO_CANCEL'
+            and verification_outcome = 'CHARGE_ARRIVED') as charge_after_cancel_plan,
+         (select count(*)::text
+          from recovery_decision_cycles
+          where user_action = 'PLAN_TO_CANCEL'
+            and verification_outcome = 'NO_CHARGE_IN_WINDOW') as no_charge_in_window,
+         (select count(*)::text
+          from recovery_decision_cycles
+          where user_action in ('KEEP', 'PLAN_TO_CANCEL')
+            and verification_outcome = 'CANNOT_EVALUATE') as cannot_evaluate,
+         (select count(distinct workspace_id)::text
+          from recovery_inbound_events where status = 'PROCESSED') as processed_inbound_workspaces,
          (select count(*)::text from (
             select workspace_id
             from recovery_inbound_events
             where status = 'PROCESSED'
             group by workspace_id
             having count(*) >= 2
-          ) second_receipt) as second_automatic_receipt,
+          ) repeated_inbound) as workspaces_with_two_processed_inbound_events,
          (select percentile_cont(0.5) within group (
             order by duration_ms
           )
@@ -91,9 +145,9 @@ try {
                 and event.status = 'PROCESSED'
                 and event.processed_at >= now() - interval '45 days'
             )) as sources_remaining_healthy,
-         (select count(*)::text from product_events where event_name = 'workspace.returned') as return_visits,
-            (select count(*)::text from product_events where event_name = 'billing.checkout_started') as checkout_attempts,
-            (select count(*)::text from product_events where event_name = 'billing.payment_settled') as payments_completed`,
+            (select count(*)::text from product_events where event_name = 'workspace.returned') as consented_return_events,
+            (select count(*)::text from product_events where event_name = 'billing.checkout_started') as historical_checkout_attempts,
+            (select count(*)::text from product_events where event_name = 'billing.payment_settled') as historical_payments_settled`,
          [receiptAliasHmacKeyId],
           )).rows[0] ?? {};
     const first10Experiment = {
@@ -101,8 +155,16 @@ try {
       setupCompleted: Number(first10Row.setup_completed ?? 0),
       forwardingVerified: Number(first10Row.forwarding_verified ?? 0),
       backfillCompleted: Number(first10Row.backfill_completed ?? 0),
-      firstAutomaticReceipt: Number(first10Row.first_automatic_receipt ?? 0),
-      secondAutomaticReceipt: Number(first10Row.second_automatic_receipt ?? 0),
+      firstValueWorkspaces: Number(first10Row.first_value_workspaces ?? 0),
+      decisionsOnSubmittedEvidence: Number(first10Row.decisions_on_submitted_evidence ?? 0),
+      recurringPictureWorkspaces: Number(first10Row.recurring_picture_workspaces ?? 0),
+      decisionCyclesAwaitingOutcome: Number(first10Row.decision_cycles_awaiting_outcome ?? 0),
+      continuedAsPlanned: Number(first10Row.continued_as_planned ?? 0),
+      chargeAfterCancelPlan: Number(first10Row.charge_after_cancel_plan ?? 0),
+      noChargeInWindow: Number(first10Row.no_charge_in_window ?? 0),
+      cannotEvaluate: Number(first10Row.cannot_evaluate ?? 0),
+      processedInboundWorkspaces: Number(first10Row.processed_inbound_workspaces ?? 0),
+      workspacesWithTwoProcessedInboundEvents: Number(first10Row.workspaces_with_two_processed_inbound_events ?? 0),
       medianSetupDurationMs: first10Row.median_setup_duration_ms === null
         || first10Row.median_setup_duration_ms === undefined
         ? null
@@ -114,9 +176,10 @@ try {
         ? null
         : Number(first10Row.median_seconds_to_trustworthy_picture),
       sourcesRemainingHealthy: Number(first10Row.sources_remaining_healthy ?? 0),
-      returnVisits: Number(first10Row.return_visits ?? 0),
-      checkoutAttempts: Number(first10Row.checkout_attempts ?? 0),
-      paymentsCompleted: Number(first10Row.payments_completed ?? 0),
+      sourceHealthMeasurement: receiptAliasHmacKeyId ? "measured" : "unavailable-key-id-not-configured",
+      consentedReturnEvents: Number(first10Row.consented_return_events ?? 0),
+      historicalCheckoutAttempts: Number(first10Row.historical_checkout_attempts ?? 0),
+      historicalPaymentsSettled: Number(first10Row.historical_payments_settled ?? 0),
     };
 
     const dailyActiveUsers = (await client.query(
@@ -180,12 +243,17 @@ try {
     console.log(JSON.stringify(report, null, 2));
     console.log("");
     console.log(`Signups: ${signups.total} total (${signups.last7Days} in 7d, ${signups.last30Days} in 30d)`);
-    console.log(`Activated workspaces (saved evidence): ${activation.workspacesWithEvidence}`);
+    console.log(`Workspaces with submitted evidence: ${activation.workspacesWithSubmittedEvidence}`);
+    console.log(`First value (submitted evidence → decision): ${first10Experiment.firstValueWorkspaces} workspaces; ${first10Experiment.decisionsOnSubmittedEvidence} decisions`);
+    console.log(`Strict recurring picture: ${first10Experiment.recurringPictureWorkspaces} workspaces`);
+    console.log(`Longitudinal outcomes: ${first10Experiment.decisionCyclesAwaitingOutcome} awaiting; ${first10Experiment.continuedAsPlanned} continued as planned; ${first10Experiment.chargeAfterCancelPlan} charged after cancel plan; ${first10Experiment.noChargeInWindow} no charge in window; ${first10Experiment.cannotEvaluate} cannot evaluate`);
     console.log(`Receipt setup: ${first10Experiment.setupCompleted}/${first10Experiment.setupStarted} completed`);
     console.log(`Forwarding verified: ${first10Experiment.forwardingVerified}; backfills completed: ${first10Experiment.backfillCompleted}`);
-    console.log(`Processed inbound workspaces: ${first10Experiment.firstAutomaticReceipt}; two-or-more processed: ${first10Experiment.secondAutomaticReceipt}`);
-    console.log("Inbound processed counts do not distinguish Gmail-filter mail from manual forwards.");
-    console.log(`Checkout attempts: ${first10Experiment.checkoutAttempts}; payments settled: ${first10Experiment.paymentsCompleted}`);
+    console.log(`Processed inbound workspaces: ${first10Experiment.processedInboundWorkspaces}; two-or-more processed: ${first10Experiment.workspacesWithTwoProcessedInboundEvents}`);
+    console.log("Processed inbound events cannot prove untouched automatic forwarding; retain operator evidence for that milestone.");
+    console.log(`Source health measurement: ${first10Experiment.sourceHealthMeasurement}; healthy forwarding sources: ${first10Experiment.sourcesRemainingHealthy}`);
+    console.log(`Historical retired checkout — attempts: ${first10Experiment.historicalCheckoutAttempts}; settled: ${first10Experiment.historicalPaymentsSettled}. These are not current-offer payments.`);
+    console.log(`Consented return events: ${first10Experiment.consentedReturnEvents}`);
     console.log(`Users returning on 2+ days: ${returningUsers}`);
     console.log(
       report.returnVisits.d30.rate === null || report.returnVisits.d30.eligibleUsers === 0
