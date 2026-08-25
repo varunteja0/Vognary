@@ -143,6 +143,24 @@ test("production migration workflow requires a pre-0053 backup restore and exact
   assert.doesNotMatch(workflow, /apply-0026|APPLY_0026_PRODUCTION/);
 });
 
+test("Commitment Control has a bounded production 0056 to 0057 operator", () => {
+  const packageJson = JSON.parse(read("package.json")) as { scripts?: Record<string, string> };
+  const workflow = read(".github/workflows/production-database-activation.yml");
+  const operator = read("scripts/apply-production-0057.mjs");
+
+  assert.equal(packageJson.scripts?.["db:apply-production-0057"], "node scripts/apply-production-0057.mjs");
+  assert.match(workflow, /apply-control-0057/);
+  assert.match(workflow, /APPLY_CONTROL_0057_PRODUCTION/);
+  assert.match(workflow, /encrypted-postgres-backup-current/);
+  assert.match(workflow, /run\.head_sha !== currentSha/);
+  assert.match(workflow, /npm run db:apply-production-0057 -- --confirm-0056-to-0057-production/);
+  assert.match(operator, /0056_decision_cycle_expected_amount/);
+  assert.match(operator, /0057_commitment_control_v0/);
+  assert.match(operator, /eb1145d8248f5044c38472870525209560122fad5b4aa3175fb26f6edc9afc4f/);
+  assert.match(operator, /pg_try_advisory_lock/);
+  assert.match(operator, /commitment_control_reconciliations_immutable/);
+});
+
 test("runtime and PostgreSQL tooling are pinned to one reproducible foundation", () => {
   const packageJson = JSON.parse(read("package.json")) as {
     engines?: { node?: string; npm?: string };

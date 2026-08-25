@@ -62,15 +62,23 @@ not deploy the Control routes before the database reaches `0057`.
 
 1. Run the current-profile encrypted backup and restore drill from the exact candidate SHA.
 2. Run the complete disposable PostgreSQL migration and Commitment Control store/route/privacy tests.
-3. From a trusted founder-controlled terminal, run the generic additive runner once:
+3. Prefer the GitHub **Production database activation** workflow with operation
+	`apply-control-0057`, confirmation `APPLY_CONTROL_0057_PRODUCTION`, and the
+	successful current-profile backup run ID from the previous 24 hours.
+4. If GitHub Actions is unavailable, from a trusted founder-controlled terminal
+	run the bounded one-off directly:
 
 ```bash
-DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
+DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true \
+  npm run db:apply-production-0057 -- --confirm-0056-to-0057-production
 ```
 
-4. Verify the ledger head is exactly `0057_commitment_control_v0` and its checksum matches this repository.
-5. Verify all six `commitment_control_*` tables and six immutable triggers exist.
-6. Verify existing Recovery and Autopilot tables, mutation kinds, and product-event names still pass their disposable integration suites.
+5. The operator must start exactly at `0056_decision_cycle_expected_amount`,
+	acquire the canonical migration advisory lock, verify both migration
+	checksums, apply only `0057`, and refuse a second invocation.
+6. Verify the ledger head is exactly `0057_commitment_control_v0` and its checksum matches this repository.
+7. Verify all six `commitment_control_*` tables and six immutable triggers exist.
+8. Verify existing Recovery and Autopilot row counts, mutation kinds, and product-event names are unchanged.
 
 Rollback before application deployment means do not deploy the Control routes.
 After application deployment, fail closed by removing pilot enrollment; do not

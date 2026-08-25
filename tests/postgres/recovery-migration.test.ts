@@ -220,6 +220,70 @@ test("the bounded production 0055 to 0056 procedure refuses drift and preserves 
   });
 });
 
+test("the bounded production 0056 to 0057 procedure preserves Recovery and installs Control", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("bounded_0057", async (connectionString) => {
+    const seedPool = createPool(connectionString);
+    try {
+      await seedSchemaThrough0022(seedPool);
+    } finally {
+      await seedPool.end();
+    }
+    runMigrations(connectionString, ["--through=0056_decision_cycle_expected_amount"]);
+
+    const pool = createPool(connectionString);
+    const userId = randomUUID();
+    const workspaceId = randomUUID();
+    try {
+      await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, `${userId}@bounded-0057.test`]);
+      await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Bounded 0057')`, [workspaceId, userId]);
+      await pool.query(`insert into workspace_members (workspace_id, user_id, role) values ($1, $2, 'owner')`, [workspaceId, userId]);
+      await pool.query(`insert into recovery_workspace_states (workspace_id, version) values ($1, 0)`, [workspaceId]);
+      await pool.query(
+        `insert into product_events (workspace_id, user_id, event_name, source, status)
+         values ($1, $2, 'review.completed', 'workspace-api', 'succeeded')`,
+        [workspaceId, userId],
+      );
+    } finally {
+      await pool.end();
+    }
+
+    const applied = runBounded0057Migration(connectionString);
+    assert.equal(applied.status, "ok");
+    assert.equal(applied.mode, "bounded-one-off");
+    assert.equal(applied.from, "0056_decision_cycle_expected_amount");
+    assert.equal(applied.to, "0057_commitment_control_v0");
+    assert.equal(applied.checksum, "eb1145d8248f5044c38472870525209560122fad5b4aa3175fb26f6edc9afc4f");
+    assert.equal(applied.preservedCounts.recovery_workspace_states, "1");
+    assert.equal(applied.preservedCounts.product_events, "1");
+    assert.equal(applied.controlTables.length, 6);
+    assert.equal(applied.controlTriggers.length, 6);
+
+    const verify = createPool(connectionString);
+    try {
+      const state = await verify.query<{ head: string; checksum: string; control_rows: string }>(
+        `select
+           (select id from schema_migrations order by id desc limit 1) as head,
+           (select checksum from schema_migrations where id = '0057_commitment_control_v0') as checksum,
+           (select count(*)::text from commitment_control_proposals) as control_rows`,
+      );
+      assert.deepEqual(state.rows[0], {
+        head: "0057_commitment_control_v0",
+        checksum: "eb1145d8248f5044c38472870525209560122fad5b4aa3175fb26f6edc9afc4f",
+        control_rows: "0",
+      });
+    } finally {
+      await verify.end();
+    }
+
+    assert.throws(
+      () => runBounded0057Migration(connectionString),
+      /must start exactly at 0056_decision_cycle_expected_amount/i,
+    );
+  });
+});
+
 test("the real migration runner installs and records the Recovery receipt inbox on a fresh database", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
@@ -2382,6 +2446,31 @@ function runBounded0056Migration(connectionString: string) {
     checksum: string;
     cycleRowsPreserved: string;
     nonNullExpectedAmounts: string;
+  };
+}
+
+function runBounded0057Migration(connectionString: string) {
+  const output = execFileSync(process.execPath, [
+    "scripts/apply-production-0057.mjs",
+    "--confirm-0056-to-0057-production",
+  ], {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      DATABASE_URL: connectionString,
+      POSTGRES_SSL: "false",
+    },
+  });
+  return JSON.parse(output) as {
+    status: string;
+    mode: string;
+    from: string;
+    to: string;
+    checksum: string;
+    preservedCounts: Record<string, string>;
+    controlTables: string[];
+    controlTriggers: string[];
   };
 }
 
