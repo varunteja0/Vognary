@@ -145,7 +145,7 @@ export function RecoveryHome({
   }
 
   return (
-    <div className="w-full max-w-3xl">
+    <div className="w-full max-w-4xl">
       <div className="stack-page">
         <CitedPictureActivation home={home} onCitedPictureRendered={onCitedPictureRendered} />
         <DecisionQueue
@@ -159,14 +159,6 @@ export function RecoveryHome({
           onReminderConsent={onReminderConsent}
         />
         <DecisionOutcomes home={home} onOpenCommitment={onOpenCommitment} />
-        {showPaymentAsk ? (
-          <PaymentAsk
-            onAnswer={(answer) => {
-              setPaymentAnswer(answer);
-              onPaymentAsk?.(answer);
-            }}
-          />
-        ) : null}
         <ComingLater home={home} onOpenCommitment={onOpenCommitment} onSeeAllCommitments={onSeeAllCommitments} />
         {shouldShowRecentChange(home) ? (
           <RecentChange items={home.changed.state === "COMPARED" ? home.changed.items : []} onOpenCommitment={onOpenCommitment} />
@@ -178,6 +170,15 @@ export function RecoveryHome({
             </button>
           </p>
         ) : null}
+        {/* Asked after the work, never between the founder and their decisions. */}
+        {showPaymentAsk ? (
+          <PaymentAsk
+            onAnswer={(answer) => {
+              setPaymentAnswer(answer);
+              onPaymentAsk?.(answer);
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -185,7 +186,7 @@ export function RecoveryHome({
 
 function SectionHeading({ id, children }: { id: string; children: string }) {
   return (
-    <h3 id={id} className="font-display text-lg font-semibold tracking-tight text-(--ink)">
+    <h3 id={id} className="eyebrow">
       {children}
     </h3>
   );

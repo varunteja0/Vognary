@@ -8,7 +8,7 @@ export const customerPhrases = {
   quietHomeTitle: "You're caught up",
   quietHomeBody: "No upcoming charge needs you right now.",
   quietHomeNothingExpected: "No upcoming charge is known from the receipts you added.",
-  watchingHomeTitle: "Vognary is watching",
+  watchingHomeTitle: "Your decisions are saved",
   watchingHomeBody: "Your decision is saved. The next matching receipt will show whether reality followed it.",
   decisionBoundary: "Vognary records your decision. It never cancels a service and never moves money.",
   rememberedThisCycle: "Remembered for this billing cycle. The next matching receipt can verify what happened.",

@@ -370,7 +370,7 @@ function toOutcome(fact: DecisionCycleFact, cycle: SavedDecisionCycle): Decision
       merchant: fact.merchant,
       kind: "CONTINUED_AS_PLANNED",
       headline: "Continued as planned",
-      detail: observedDetail(cycle, "The matching charge arrived."),
+      detail: "The matching charge arrived.",
       amount: observedAmount(cycle) ?? toMoneyDto(fact.amountMinor, fact.currency),
       date: cycle.observedDate ?? cycle.dueDate,
       evidenceIds: cycle.observedEvidenceIds.length ? cycle.observedEvidenceIds : fact.evidenceIds,
@@ -385,9 +385,7 @@ function toOutcome(fact: DecisionCycleFact, cycle: SavedDecisionCycle): Decision
       merchant: fact.merchant,
       kind: "CHARGE_AFTER_CANCEL_PLAN",
       headline: `${fact.merchant} charged again after you planned to cancel.`,
-      detail: amount && date
-        ? `${amount.display} arrived on ${date}. Vognary did not cancel this.`
-        : "Another matching charge arrived. Vognary did not cancel this.",
+      detail: "Vognary did not cancel this.",
       amount,
       date,
       evidenceIds: cycle.observedEvidenceIds.length ? cycle.observedEvidenceIds : fact.evidenceIds,
@@ -527,12 +525,6 @@ function reasonSentence(key: DecisionReasonKey, fact: DecisionCycleFact, daysAwa
 function observedAmount(cycle: SavedDecisionCycle): MoneyDto | null {
   if (cycle.observedAmountMinor === null || !cycle.observedCurrency) return null;
   return toMoneyDto(cycle.observedAmountMinor, cycle.observedCurrency);
-}
-
-function observedDetail(cycle: SavedDecisionCycle, fallback: string): string {
-  const amount = observedAmount(cycle);
-  if (amount && cycle.observedDate) return `${amount.display} arrived on ${cycle.observedDate}.`;
-  return fallback;
 }
 
 function historyVerificationHeadline(cycle: SavedDecisionCycle): string | null {

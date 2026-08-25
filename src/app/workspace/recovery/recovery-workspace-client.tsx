@@ -831,7 +831,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           data-focus-quiet
           className={
             state.view === "HOME"
-              ? "mt-6 w-fit font-data text-xs font-medium text-(--muted) outline-none"
+              ? "sr-only"
               : "mt-6 w-fit font-display text-2xl font-semibold tracking-tight text-(--ink) outline-none"
           }
         >

@@ -637,3 +637,29 @@ test("currencies are never converted when ranking stake", () => {
 test("money dto helper still formats INR for copy", () => {
   assert.equal(toMoneyDto(BigInt(50_000), "INR").display, "₹500.00");
 });
+
+test("outcome detail never prints a raw ISO date or repeats the card's own amount", () => {
+  const cycle: SavedDecisionCycle = {
+    dueDate: "2026-08-01",
+    userAction: "PLAN_TO_CANCEL",
+    reviewAt: null,
+    decidedAt: "2026-07-20T10:00:00.000Z",
+    verificationOutcome: "CHARGE_ARRIVED",
+    verifiedAt: "2026-08-02T10:00:00.000Z",
+    observedAmountMinor: BigInt(83_000),
+    observedDate: "2026-08-01",
+    observedCurrency: "INR",
+    observedEvidenceIds: ["ev-1"],
+  };
+  const home = buildDecisionHome([
+    fact({ commitmentId: "notion", merchant: "Notion", amountMinor: BigInt(83_000), stamp: "CANCEL", cycles: [cycle] }),
+  ], today);
+  const outcome = home.decisionOutcomes.find((entry) => entry.kind === "CHARGE_AFTER_CANCEL_PLAN");
+  assert.ok(outcome);
+  // The card renders amount and date in its own formatted meta row.
+  assert.doesNotMatch(outcome.detail, /\d{4}-\d{2}-\d{2}/);
+  assert.doesNotMatch(outcome.detail, /₹/);
+  assert.match(outcome.detail, /did not cancel/i);
+  assert.equal(outcome.amount?.display, "₹830.00");
+  assert.equal(outcome.date, "2026-08-01");
+});
