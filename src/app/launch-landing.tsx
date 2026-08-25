@@ -37,14 +37,14 @@ export default function LaunchLanding() {
               <LandingDecisionPreview />
             </div>
 
-            <ul
-              className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-(--muted) lg:col-start-1 lg:row-start-2 lg:self-start"
-              aria-label="Product boundaries"
-            >
-              <li>No account required</li>
-              <li>No bank passwords</li>
-              <li>No mailbox access</li>
-            </ul>
+            <section className="lg:col-start-1 lg:row-start-2 lg:self-start" aria-labelledby="product-boundaries-heading">
+              <h2 id="product-boundaries-heading" className="eyebrow text-(--muted)">What you do not need</h2>
+              <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm text-(--muted)">
+                <li>No account required</li>
+                <li>No bank passwords</li>
+                <li>No mailbox access</li>
+              </ul>
+            </section>
           </div>
         </section>
 

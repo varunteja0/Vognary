@@ -20,8 +20,9 @@ test("the public endpoints expose complete agent-readable contracts without Java
   expect(html.match(/<h1\b/gi)?.length).toBe(1);
   expect(html.match(/<h2\b/gi)?.length ?? 0).toBeGreaterThanOrEqual(2);
   const headingLevels = [...html.matchAll(/<h([1-6])\b[^>]*>/gi)].map((match) => Number(match[1]));
-  expect(headingLevels).toEqual([1, 2, 3, 4, 4, 2, 3]);
+  expect(headingLevels).toEqual([1, 2, 3, 4, 4, 2, 2, 3]);
   expect(headingLevels.every((level, index) => index === 0 || level <= (headingLevels[index - 1] ?? level) + 1)).toBe(true);
+  expect(visibleText).toMatch(/What you do not need/i);
 
   const jsonLdMatch = html.match(/<script type="application\/ld\+json">([^<]+)<\/script>/);
   expect(jsonLdMatch).not.toBeNull();
