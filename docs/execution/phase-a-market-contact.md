@@ -46,7 +46,7 @@
   → 2 upfront payments by Day 10
 ```
 
-Current Commitment Control counts: targets **0**, conversations **0**, offers **0**, payments **0**. Historical Autopilot conversations do not count toward the new thesis.
+Current Commitment Control counts (private CRM, 2026-08-26): sourced rows **20**, founder-qualified **5**, contacted **0**, conversations **0**, offers **0**, payments **0**. Historical Autopilot conversations do not count toward the new thesis. Drafts are not contacts.
 
 ---
 

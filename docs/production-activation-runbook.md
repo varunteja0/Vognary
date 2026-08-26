@@ -56,9 +56,13 @@ migration runner and not a replacement for the historical bootstrap workflow.
 
 ## Pending additive apply: `0056` → `0057`
 
-Commitment Control requires `0057_commitment_control_v0`. Production remains at
-the independently verified `0056` head until the founder runs this sequence; do
-not deploy the Control routes before the database reaches `0057`.
+Commitment Control tables begin at `0057_commitment_control_v0`. Production remains at
+the independently verified `0056` head until the founder runs this sequence.
+Deploying an unenrolled Control SHA is `0056`-safe: Control routes short-circuit
+until a workspace UUID is enrolled. **Do not set
+`COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS` until `0059` is applied.** Enrolling on
+`0056` or `0057` without `0059` columns makes the Control brief
+`FEATURE_UNAVAILABLE`.
 
 1. Run the `pre-0057` encrypted backup and restore drill from the exact candidate SHA. It must verify production head `0056_decision_cycle_expected_amount` and upload `encrypted-postgres-backup-pre-0057`.
 2. Run the complete disposable PostgreSQL migration and Commitment Control store/route/privacy tests.
@@ -80,9 +84,37 @@ DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true \
 7. Verify all six `commitment_control_*` tables and six immutable triggers exist.
 8. Verify existing Recovery and Autopilot row counts, mutation kinds, and product-event names are unchanged.
 
-Rollback before application deployment means do not deploy the Control routes.
-After application deployment, fail closed by removing pilot enrollment; do not
-drop `0057` tables or rewrite immutable authorization rows.
+Rollback before enrollment means leave `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS`
+unset. After enrollment, fail closed by removing those UUIDs; do not drop
+`0057` tables or rewrite immutable authorization rows.
+
+## Pending additive apply after `0057`: `0058` then `0059`
+
+Do this only after the ledger head is exactly `0057_commitment_control_v0` with
+checksum `eb1145d8248f5044c38472870525209560122fad5b4aa3175fb26f6edc9afc4f`.
+Do **not** re-run `apply-control-0057`. Do **not** use `apply-latest` (that
+operator is locked to the `0026` Phase A cutover).
+
+From a trusted founder-controlled terminal, apply remaining pending files with
+the canonical schema applier:
+
+```bash
+DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
+```
+
+That command applies only unrecorded files in sorted order. After a successful
+`0057` apply, the pending files are:
+
+| id | checksum |
+| --- | --- |
+| `0058_workspace_invites` | `fa5c919f578376065d3db63e9efdc7cd06ac057a0882090583311b50eb9d27b9` |
+| `0059_control_authority_hardening` | `c9c873a20353690e14263a982a18cc95108f4887d76de777518e7a186375eaba` |
+
+Stop if either checksum drifts. Verify the resulting head is
+`0059_control_authority_hardening`. Then copy the finance-owner workspace UUID
+from Profile, set `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS` to that exact UUID,
+redeploy, and invite the engineering lead as `member`. Issue the ₹40,000 invoice
+only when someone actually pays.
 
 ## Phase 0: Stop Conditions
 
@@ -90,7 +122,7 @@ Do not show the forwarding-first landing or set any receipt-inbox operator flag 
 
 Stop immediately when any of these is true:
 
-- PostgreSQL migrations through `0057_commitment_control_v0` are not applied for a Commitment Control deployment.
+- An enrolled Commitment Control deployment is missing `0059_control_authority_hardening` (unenrolled deploys may remain on `0056`).
 - A signed Resend event cannot produce one canonical Recovery submission.
 - Replaying that event creates another submission, source, evidence row, or commitment.
 - A raw provider address, alias token, message subject, body, or attachment appears in logs or privacy export.
