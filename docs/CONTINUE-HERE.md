@@ -9,6 +9,68 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## Live state — 2026-08-26 (Control Operability: code-complete locally; sell + founder ops)
+
+**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Entries below are history. Do not
+open a new product wave, leap plan, design rewrite, or 10/10 polish pass.
+Composite remains **1.5**. Official scores do not rise until a conversation,
+offer, or payment is measured.
+
+**Scoreboard rows:** Product UX (journey-impossible, code-closed locally),
+production activation (still blocked), business validation (still 0 contact).
+**Loop:** proposal → policy → named human decision → frozen cap → Recovery
+evidence → reconciliation.
+
+**WHAT IS TRUE.** Waves 0–4 of the Control Operability Program are in `main` as
+sequential commits in this folder. Public and signed-in identity is Commitment
+Control (India-first 5–100). Mandate is omitted from customer nav. Guest `/start`
+is evidence intake, not Keep/Cancel. Unenrolled desks show workspace UUID.
+Additive `0058` invites plus Profile People and maker-checker when two authorizing
+admins exist. Additive `0059` binds complete policy, `EXPOSURE_NOT_CITED`, override
+reason, observation-only irregular cite, actor name snapshots, 42P01/42703 →
+`FEATURE_UNAVAILABLE`, Control desk evidence last-mile, pending-decision badge,
+and fail-closed Resend notify. Invoice pack is ₹40,000/month. `/api/checkout`
+stays 410. Local Control e2e **20/20**. Local code is 0056-safe via enrollment
+short-circuit; Control brief needs `0059` columns after enrollment. Autopilot
+engines (0031–0047) are retained and fail-closed; customers cannot reach them.
+
+**WHAT IS NOT TRUE.** Production Neon is still verified **0056**. No production
+pilot UUID is enrolled. Track F has not been executed. Contacted **0**,
+conversations **0**, offers **0**, payments **0**. The eight-item company test
+(two humans on production completing one proposal → named decision → linked
+receipt → verdict) is unrun. Do not claim READY.
+
+**NEXT HUMAN ACTIONS (parallel; do not wait for one to start the other):**
+
+1. **Sell.** Founder sends the five qualified first-touch drafts this week.
+   Frame a founder-delivered desk that runs after track F, not a live production
+   Control desk today. Do not send the remaining 15. A ready draft is not a sent
+   contact; update `contacted_at` only after send. P05 Smallest is rejected;
+   P11 iTuring stays unsendable until the finance-owner role is independently
+   proved.
+2. **Track F (founder executes; agents do not fake READY). Do not set a UUID
+   before `0057`.** Repair GitHub Actions billing → Encrypted Backup Drill
+   `pre-0057` from `main` → `apply-control-0057` with exact confirmation token
+   (head `0057_commitment_control_v0`, checksum
+   `eb1145d8248f5044c38472870525209560122fad5b4aa3175fb26f6edc9afc4f`) → apply
+   `0058_workspace_invites` then `0059_control_authority_hardening` with the
+   canonical schema applier (do **not** re-run `apply-control-0057`; do **not**
+   use `apply-latest`) → first finance-owner Google login → copy workspace UUID
+   from Profile → `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS` → redeploy → invite
+   the engineering lead as `member` → issue the Wave 4 invoice only when someone
+   pays.
+3. **After F, run the company test once** on production with those two people.
+
+**HARD STOP ON PRODUCT.** No SSO, RLS, vendor catalogs, Gmail OAuth, Slack,
+auto merchant-match, seats/GSTIN engine, design-system rewrite, in-app Razorpay,
+deleting Autopilot engines, or another operability/polish wave. Next product
+slice only from a live T0–T4 session, or money-wrong / trust-broken defects.
+Day-10 / Day-30 paid-pilot kills in THE-LAW still bind.
+
+**KILL / REVERT** if money meaning, DTO honesty, permissions, evidence links, or
+release gates regress. Do not auto-approve, auto-deny, purchase, provision,
+cancel, or move money.
+
 ## Live governance — 2026-08-25 (smart-risk doctrine)
 
 The founder motto is now the supreme strategic decision rule: category-defining,
@@ -20,7 +82,54 @@ consent, and legal boundaries remain hard constraints. This governance change
 does not by itself raise any scoreboard row or prove users, retention, revenue,
 or a new product thesis.
 
+## Live state — 2026-08-26 (founder override: bounded Control visual implementation)
+
+**Scoreboard row:** Product UX. **Loop step:** proposal → policy context → human
+decision → frozen cap → observed outcome. The founder explicitly authorizes one
+Opus implementation session, bounded to eight working hours, to repair the eight
+measured presentation and interaction defects from the `/private/tmp/vognary-visual-audit`
+baseline. This is a reversible frontend experiment under THE-LAW's smart-risk
+doctrine, not a repeal of the market-execution freeze.
+
+**AUTHORIZED SCOPE:** Control presentation and shared-shell hierarchy only:
+proof comparison, responsive composition, primary-action hierarchy, touch-target
+size, authorization-card density, status/label legibility, first-viewport
+operating context, and compact empty-state weight. Opus may edit the canonical
+`src/app/workspace/recovery/control/**` presentation, the narrow shared workspace
+shell registration needed for action hierarchy, additive feature-specific rules
+in `src/app/globals.css`, and focused unit/e2e tests. Backend, domain, API,
+migrations, financial semantics, DTOs, product capabilities, routes, public
+landing, integrations, analytics, and claims remain frozen.
+
+**SUCCESS THRESHOLD:** existing Control browser **20/20** remains green; Axe has
+zero serious/critical findings; every interactive target is at least 44×44 CSS
+pixels; exactly one gold primary appears in the active Control context; at
+1440px the frozen cap and observed amount share one comparison block with at
+most 24px horizontal separation; verdict text is at least 12px and truth-class
+labels at least 11px; desktop dead space falls below 15% of the Control content
+width; the populated authorization card is at most 1.35 viewport heights at
+360×800 and at 200% zoom; the first desktop viewport shows existing policy/
+queue context; the empty decision band is compact; there is zero horizontal
+overflow at all measured viewports; full lint/typecheck/claims/tokens/unit/
+PostgreSQL/build/performance gates and Recovery regressions pass. Capture
+identical-fixture before/after viewport and focused screenshots.
+
+**KILL / REVERT THRESHOLD:** revert this visual candidate if any financial
+meaning, DTO, route, permission, evidence link, cap, verdict, copy claim, or
+product capability changes; if any existing test is weakened; if any release
+gate regresses; or if the measured thresholds cannot be met within the single
+session. Completion may be called a **code-proven visual candidate**, never
+customer-proven `10/10`, until real T0–T3 sessions validate comprehension. This
+override does not raise business validation and does not authorize a second
+polish pass before customer evidence.
+
 ## Live state — 2026-08-26 (independent review: REWORK the market test, freeze product scope)
+
+> **SUPERSEDED as live instruction** by the Control Operability block at the top.
+> Market facts below remain true (5 qualified / 0 contacted). The product-code
+> freeze was later unfrozen for Waves 0–4 only; that unfreeze is now closed.
+> Do not read this section as permission to wait for production before sending
+> the five drafts, or as permission to start another product wave.
 
 **Scoreboard rows:** business validation / distribution. **Loop step:** qualified
 contact → behavioral discovery → explicit offer → paid working session. Composite
@@ -42,20 +151,27 @@ exposure remains required before the spend threshold is treated as true. The
 ₹40,000/month upfront offer is framed as a founder-delivered control desk with
 setup and weekly reconciliation. The committed CRM field contract, gitignored
 private CRM, behavioral questions, proposal→decision T0–T4 ladder, and focused
-instrument test exist in the working tree. The private CRM contains **20 sourced
-candidates** from public YC company records, each explicitly marked not to
-contact until funding recency, India entity, AI-native fit, named finance owner,
-and spend criteria are verified. Qualified targets **0**, contacted **0**,
-conversations **0**, offers **0**, payments **0**. Research rows do not satisfy
-the Day-10 target and no old-thesis status was carried forward.
+instrument test exist in the working tree. The private CRM was re-audited
+2026-08-26 from public sources: **5 founder-confirmed qualified** rows, **5 sourced
+near-complete** (finance owner still missing), **1 sourced incomplete**, and
+**9 rejected** for window/entity/fit/size failure. P02 and P03 are deliberately
+marked stress-test targets because of adjacent finance/consumer-credit fit.
+Contacted **0**, conversations **0**, offers **0**, payments **0**. Beachhead reachability is
+short 15 of 20 on both public evidence and founder qualification. No old-thesis status was
+carried forward. Report: `output/grok-commitment-control-customer-execution-report.md`.
 
-**NEXT ACTION IS HUMAN CONTACT, NOT CODE.** Founder qualifies 20 companies from
-public evidence, sends 20 first touches, runs 10 behavior-first conversations,
-makes five explicit offers, and requires cleared funds for the payment gate.
-Production Control activation remains separately blocked on repaired GitHub
-Actions billing, an exact-head `pre-0057` encrypted backup drill, bounded `0057`
-apply, and explicit production pilot UUIDs. Do not use activation work as a
-substitute for contact while the external workflow is blocked.
+**NEXT ACTION IS HUMAN CONTACT, NOT CODE.** Founder reviews and sends only the
+five qualified first-touch drafts. Do not send the remaining 15. A ready draft
+is not a sent contact; update `contacted_at` only after founder confirmation.
+P05 Smallest is rejected on live 105-person evidence; P11 iTuring
+remains unsendable until the exact finance-owner role is independently proved.
+Continue public finance-owner research in parallel. Day-10
+still requires 20 qualified contacts; the verified shortfall is a failed
+beachhead-reachability assumption for founder review. Production Control
+activation remains separately blocked on repaired GitHub Actions billing, an
+exact-head `pre-0057` encrypted backup drill, bounded `0057` apply, and
+explicit production pilot UUIDs. Do not use activation work as a substitute
+for contact while the external workflow is blocked.
 
 ## Live state — 2026-08-25 (Commitment Control authorized; implementation started)
 
