@@ -68,6 +68,7 @@ export type ControlEvidenceLoader = (commitmentId: string) => Promise<
 export type CommitmentControlDesk = {
   state: ControlState;
   available: boolean;
+  unavailable: boolean;
   evidence: ControlEvidenceState;
   reload: () => void;
   handlers: {
@@ -85,6 +86,7 @@ export type CommitmentControlDesk = {
     submitReconciliation: () => void;
     changePolicyDraft: (draft: Partial<ControlPolicyDraft>) => void;
     submitPolicy: () => void;
+    focusProposal: (proposalId: string) => void;
     clearFocus: () => void;
   };
 };
@@ -163,7 +165,7 @@ export function useCommitmentControl({
     if (current.dialog?.kind !== "DECISION" || current.workspaceVersion === null || current.pending) return;
     const entry = proposalFor(current.dialog.proposalId);
     if (!entry) return;
-    const built = controlDecisionRequest(current.decisionDraft, entry.proposal);
+    const built = controlDecisionRequest(current.decisionDraft, entry.proposal, entry.evaluation);
     if (!built.ok) {
       dispatch({ type: "DECISION_DRAFT_CHANGED", draft: { error: built.message } });
       return;
@@ -240,6 +242,7 @@ export function useCommitmentControl({
   return {
     state,
     available: state.status.kind === "READY",
+    unavailable: state.status.kind === "UNAVAILABLE",
     evidence,
     reload: () => void loadBrief(false),
     handlers: {
@@ -265,6 +268,7 @@ export function useCommitmentControl({
       submitReconciliation: () => void submitReconciliation(),
       changePolicyDraft: (draft) => dispatch({ type: "POLICY_DRAFT_CHANGED", draft }),
       submitPolicy: () => void submitPolicy(),
+      focusProposal: (proposalId) => dispatch({ type: "FOCUS_SET", proposalId }),
       clearFocus: () => dispatch({ type: "FOCUS_CLEARED" }),
     },
   };
@@ -274,8 +278,6 @@ export function useCommitmentControl({
 export function eligibleExposureCommitments(commitments: readonly CommitmentSummaryDto[]): readonly CommitmentSummaryDto[] {
   return commitments.filter((commitment) =>
     commitment.status === "ACTIVE"
-    && commitment.cadence !== "IRREGULAR"
-    && commitment.nextExpectedDate !== null
     && commitment.evidenceCount > 0);
 }
 
@@ -284,11 +286,13 @@ export function ControlView({
   commitments,
   online,
   onInspectEvidence,
+  onAddBill,
 }: {
   desk: CommitmentControlDesk;
   commitments: readonly CommitmentSummaryDto[];
   online: boolean;
   onInspectEvidence: ((evidenceId: string, buttonId: string) => void) | null;
+  onAddBill?: () => void;
 }) {
   const { state, handlers } = desk;
 
@@ -308,6 +312,7 @@ export function ControlView({
   const policy = brief.policy;
   const awaitingDecision = brief.proposals.filter((entry) => entry.evaluation !== null && entry.decision === null);
   const authorized = brief.proposals.filter((entry) => entry.decision !== null);
+  const awaitingEvidence = authorized.filter((entry) => entry.decision?.action !== "DECLINE" && entry.reconciliations.length === 0);
   const dialogProposalId = state.dialog && state.dialog.kind !== "POLICY" ? state.dialog.proposalId : null;
   const dialogEntry = dialogProposalId
     ? brief.proposals.find((entry) => entry.proposal.id === dialogProposalId) ?? null
@@ -322,6 +327,36 @@ export function ControlView({
   return (
     <div className="control-desk">
       <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{state.announcement}</p>
+
+      {/* What the desk already knows, before any new work is entered. Every
+          figure below is a count of server records or a published policy
+          version — nothing is derived, projected or estimated here. */}
+      <section aria-labelledby="control-masthead-heading" className="control-masthead">
+        <div className="control-masthead-top">
+          <h3 id="control-masthead-heading" className="control-masthead-title">The control desk</h3>
+          <p className="control-masthead-stamp">
+            {policy === null ? "No policy version recorded" : `Policy version ${policy.policyVersion} · recorded ${formatMoment(policy.createdAt)}`}
+          </p>
+        </div>
+        <dl className="control-figures">
+          <div className="control-figure truth-policy">
+            <dt>Policy in force</dt>
+            <dd>{policy === null ? "None" : `v${policy.policyVersion}`}<small>{policy === null ? "No proposal can be evaluated" : `${policy.categoryRules.length} of ${controlCategories.length} categories set`}</small></dd>
+          </div>
+          <div className="control-figure truth-frozen">
+            <dt>Currency limits</dt>
+            <dd>{policy === null ? "0" : String(policy.currencyLimits.length)}<small>{policy === null || policy.currencyLimits.length === 0 ? "No currency carries a limit" : policy.currencyLimits.map((limit) => limit.currency).join(" · ")}</small></dd>
+          </div>
+          <div className="control-figure truth-authority">
+            <dt>Needs a human decision</dt>
+            <dd>{String(awaitingDecision.length)}<small>{brief.capabilities.canDecide ? "You can decide these" : "Owner or admin only"}</small></dd>
+          </div>
+          <div className="control-figure truth-observed">
+            <dt>Awaiting evidence</dt>
+            <dd>{String(awaitingEvidence.length)}<small>{`${authorized.length} authorized in total`}</small></dd>
+          </div>
+        </dl>
+      </section>
 
       {state.staleNotice ? (
         <div role="alert">
@@ -347,7 +382,7 @@ export function ControlView({
             <button
               id="control-policy-setup"
               type="button"
-              className="btn btn-sm btn-primary"
+              className="btn btn-sm btn-seal"
               onClick={() => handlers.openPolicy("control-policy-setup")}
             >
               Set the policy
@@ -363,6 +398,7 @@ export function ControlView({
         errors={state.draftErrors}
         pending={state.pending?.kind === "PROPOSAL"}
         online={online}
+        primary={awaitingDecision.length === 0}
         blockedReason={blockedReason}
         eligibleCommitments={eligibleExposureCommitments(commitments)}
         handlers={{
@@ -372,8 +408,15 @@ export function ControlView({
         }}
       />
 
-      <section aria-labelledby="control-queue-heading" className="control-band">
-        <h3 id="control-queue-heading" className="control-heading">Needs a decision</h3>
+      <section
+        aria-labelledby="control-queue-heading"
+        className="control-band"
+        data-empty={awaitingDecision.length === 0 ? "true" : undefined}
+      >
+        <div className="control-band-head">
+          <h3 id="control-queue-heading" className="control-heading">Needs a decision</h3>
+          <p className="control-band-count">{awaitingDecision.length === 0 ? "Nothing waiting" : `${awaitingDecision.length} waiting`}</p>
+        </div>
         {awaitingDecision.length === 0 ? (
           <p className="control-note">
             {brief.proposals.length === 0
@@ -382,13 +425,14 @@ export function ControlView({
           </p>
         ) : (
           <div className="control-card-list">
-            {awaitingDecision.map((entry) => (
+            {awaitingDecision.map((entry, index) => (
               <ControlProposalRow
                 key={entry.proposal.id}
                 entry={entry}
                 canDecide={brief.capabilities.canDecide}
                 pendingKind={pendingKindFor(state, entry.proposal.id)}
                 focused={state.focusProposalId === entry.proposal.id}
+                lead={index === 0}
                 online={online}
                 onDecide={handlers.openDecision}
                 onReconcile={handlers.openReconciliation}
@@ -400,8 +444,15 @@ export function ControlView({
         )}
       </section>
 
-      <section aria-labelledby="control-authorized-heading" className="control-band">
-        <h3 id="control-authorized-heading" className="control-heading">Authorized commitments</h3>
+      <section
+        aria-labelledby="control-authorized-heading"
+        className="control-band"
+        data-empty={authorized.length === 0 ? "true" : undefined}
+      >
+        <div className="control-band-head">
+          <h3 id="control-authorized-heading" className="control-heading">Authorized commitments</h3>
+          <p className="control-band-count">{authorized.length === 0 ? "Nothing decided" : `${authorized.length} decided`}</p>
+        </div>
         {authorized.length === 0 ? (
           <p className="control-note">No proposal has been decided yet.</p>
         ) : (
@@ -413,6 +464,7 @@ export function ControlView({
                 canDecide={brief.capabilities.canDecide}
                 pendingKind={pendingKindFor(state, entry.proposal.id)}
                 focused={state.focusProposalId === entry.proposal.id}
+                lead={false}
                 online={online}
                 onDecide={handlers.openDecision}
                 onReconcile={handlers.openReconciliation}
@@ -424,30 +476,34 @@ export function ControlView({
         )}
       </section>
 
-      <section aria-labelledby="control-policy-heading" className="control-band">
-        <h3 id="control-policy-heading" className="control-heading">Policy</h3>
+      <section
+        aria-labelledby="control-policy-heading"
+        className="control-band"
+        data-empty={policy === null ? "true" : undefined}
+      >
+        <div className="control-band-head">
+          <h3 id="control-policy-heading" className="control-heading">Policy</h3>
+          <p className="control-band-count">{policy ? `Version ${policy.policyVersion} · recorded ${formatMoment(policy.createdAt)}` : "Not set"}</p>
+        </div>
         {policy ? (
           <div className="control-policy-summary">
-            <p className="font-data text-xs text-(--muted)">
-              Version {policy.policyVersion} · recorded {formatMoment(policy.createdAt)}
-            </p>
-            <ul className="control-review-list">
+            <dl className="control-posture-board">
               {controlCategories.map((category) => {
                 const rule = policy.categoryRules.find((entry) => entry.category === category);
                 return (
-                  <li key={category}>
-                    <span>{controlCategoryLabels[category]}</span>
-                    <span className="font-data text-xs text-(--ink)">{rule ? controlPostureLabels[rule.posture] : "Not set"}</span>
-                  </li>
+                  <div key={category} className="control-posture" data-posture={rule ? rule.posture : "UNSET"}>
+                    <dt>{controlCategoryLabels[category]}</dt>
+                    <dd>{rule ? controlPostureLabels[rule.posture] : "Not set"}</dd>
+                  </div>
                 );
               })}
-            </ul>
+            </dl>
             {policy.currencyLimits.length ? (
               <ul className="control-review-list">
                 {policy.currencyLimits.map((limit) => (
                   <li key={limit.currency}>
-                    <span className="font-data text-xs text-(--ink)">{limit.currency}</span>
-                    <span className="font-data tnum text-xs text-(--ink-soft)">
+                    <span className="font-data text-(--ink)">{limit.currency}</span>
+                    <span className="font-data tnum text-(--ink-soft)">
                       per charge {formatControlMoney(limit.maxPerChargeMinor, limit.currency)}
                       {" · 13 weeks "}{formatControlMoney(limit.maxThirteenWeekMinor, limit.currency)}
                       {" · annual "}{formatControlMoney(limit.maxAnnualMinor, limit.currency)}
@@ -506,6 +562,7 @@ export function ControlView({
           onSelectEvidence={handlers.selectReconciliationEvidence}
           onClose={handlers.closeDialog}
           onSubmit={handlers.submitReconciliation}
+          onAddBill={onAddBill}
         />
       ) : null}
 

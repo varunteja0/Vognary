@@ -62,6 +62,7 @@ test("evaluates cited exposure and proposal assumptions without making a decisio
     annualHeadroomMinor: "5000000",
   }]);
   assert.deepEqual(evaluation.reasonCodes, []);
+  assert.equal(evaluation.citedExposureBasis, "PROJECTED");
   assert.equal("decision" in evaluation, false);
 });
 
@@ -194,6 +195,7 @@ test("only owners and admins can append a human decision and the approved cap is
     expectedAmountMinor: "250000",
     decidedByUserId: "b1000000-0000-4000-8000-000000000001",
     decidedAt: "2026-08-25T10:00:00.000Z",
+    overrideReason: null,
   });
 
   assert.throws(
@@ -227,4 +229,63 @@ test("reconciles cited observed evidence against the frozen authorization withou
   assert.equal(reconcileAuthorizedProposal({ decision: approved, evidence: { evidenceId, amountMinor: "250000", currency: "USD" } }).verdict, "CURRENCY_MISMATCH");
   assert.equal(reconcileAuthorizedProposal({ decision: approved, evidence: { evidenceId, amountMinor: null, currency: null } }).verdict, "CANNOT_EVALUATE");
   assert.deepEqual(approved, frozen, "reconciliation cannot rewrite the frozen authorization");
+});
+
+test("uncited eligible exposure cannot be within policy and outside-policy approve needs a written override", () => {
+  const uncited = evaluateProposalPolicy({
+    proposal,
+    policy,
+    existingExposure: [],
+    eligibleUncited: true,
+  });
+  assert.equal(uncited.status, "REVIEW_REQUIRED");
+  assert.ok(uncited.reasonCodes.includes("EXPOSURE_NOT_CITED"));
+  assert.equal(uncited.citedExposureBasis, "NONE");
+
+  const outside = evaluateProposalPolicy({
+    proposal: { ...proposal, amountMinor: "600000", annualMinor: "13000000" },
+    policy,
+    existingExposure: [],
+  });
+  assert.throws(
+    () => authorizeProposalDecision({
+      actorRole: "owner",
+      actorUserId: "b1000000-0000-4000-8000-000000000001",
+      evaluation: outside,
+      action: "APPROVE",
+    }),
+    /override reason/i,
+  );
+  const overridden = authorizeProposalDecision({
+    actorRole: "owner",
+    actorUserId: "b1000000-0000-4000-8000-000000000001",
+    evaluation: outside,
+    action: "APPROVE",
+    overrideReason: "Board-approved exception for this vendor.",
+  });
+  assert.equal(overridden.overrideReason, "Board-approved exception for this vendor.");
+});
+
+test("a second owner or admin must decide when the workspace is not a solo desk", () => {
+  const evaluation = evaluateProposalPolicy({ proposal, policy, existingExposure: [] });
+  assert.throws(
+    () => authorizeProposalDecision({
+      actorRole: "owner",
+      actorUserId: "b1000000-0000-4000-8000-000000000001",
+      submittedByUserId: "b1000000-0000-4000-8000-000000000001",
+      authorizingAdminCount: 2,
+      evaluation,
+      action: "APPROVE",
+    }),
+    /second owner or admin/i,
+  );
+  const approved = authorizeProposalDecision({
+    actorRole: "owner",
+    actorUserId: "b1000000-0000-4000-8000-000000000002",
+    submittedByUserId: "b1000000-0000-4000-8000-000000000001",
+    authorizingAdminCount: 2,
+    evaluation,
+    action: "APPROVE",
+  });
+  assert.equal(approved.decidedByUserId, "b1000000-0000-4000-8000-000000000002");
 });

@@ -122,7 +122,7 @@ export function ControlPolicyDialog({
             <div className="grid gap-4">
               {draft.currencyLimits.map((limit, index) => (
                 <div key={limit.currency} className="control-policy-limit">
-                  <p className="font-data text-xs text-(--ink)">{limit.currency}</p>
+                  <p className="font-data text-(--ink)">{limit.currency}</p>
                   <div className="control-policy-grid">
                     <div className="control-field">
                       <label className="field-label" htmlFor={`control-limit-charge-${limit.currency}`}>Maximum per charge</label>
@@ -200,12 +200,12 @@ export function ControlPolicyDialog({
       ) : (
         <div className="grid gap-4">
           <section>
-            <p className="eyebrow eyebrow-xs">Category posture</p>
-            <ul className="control-review-list">
+            <p className="truth-label truth-policy">Category posture</p>
+            <ul className="control-review-list mt-2">
               {controlCategories.map((category) => (
                 <li key={category}>
                   <span>{controlCategoryLabels[category]}</span>
-                  <span className="font-data text-xs text-(--ink)">
+                  <span className="font-data text-(--ink)">
                     {postureFor(category) === "" ? "Not set" : controlPostureLabels[postureFor(category) as (typeof controlPostures)[number]]}
                   </span>
                 </li>
@@ -213,15 +213,15 @@ export function ControlPolicyDialog({
             </ul>
           </section>
           <section>
-            <p className="eyebrow eyebrow-xs">Limits per currency</p>
+            <p className="truth-label truth-frozen">Limits per currency</p>
             {draft.currencyLimits.length === 0 ? (
-              <p className="control-note">No currency limits. Every proposal will report a missing currency policy.</p>
+              <p className="control-note mt-2">No currency limits. Every proposal will report a missing currency policy.</p>
             ) : (
-              <ul className="control-review-list">
+              <ul className="control-review-list mt-2">
                 {draft.currencyLimits.map((limit) => (
                   <li key={limit.currency}>
-                    <span className="font-data text-xs text-(--ink)">{limit.currency}</span>
-                    <span className="font-data tnum text-xs text-(--ink-soft)">
+                    <span className="font-data text-(--ink)">{limit.currency}</span>
+                    <span className="font-data tnum text-(--ink-soft)">
                       per charge {limit.maxPerChargeText || "—"} · 13 weeks {limit.maxThirteenWeekText || "—"} · annual {limit.maxAnnualText || "—"}
                     </span>
                   </li>

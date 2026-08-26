@@ -13,7 +13,8 @@ export type PolicyReasonCode =
   | "CURRENCY_POLICY_MISSING"
   | "PER_CHARGE_LIMIT_EXCEEDED"
   | "THIRTEEN_WEEK_LIMIT_EXCEEDED"
-  | "ANNUAL_LIMIT_EXCEEDED";
+  | "ANNUAL_LIMIT_EXCEEDED"
+  | "EXPOSURE_NOT_CITED";
 
 export type ProposalPolicy = {
   policyVersion: number;
@@ -40,6 +41,7 @@ export type ExistingExposure = {
   thirteenWeekMinor: string;
   annualMinor: string;
   evidenceIds: readonly string[];
+  basis?: "PROJECTED" | "OBSERVATION_ONLY";
 };
 
 export type ProposalPolicyEvaluation = {
@@ -49,6 +51,7 @@ export type ProposalPolicyEvaluation = {
   humanDecisionRequired: true;
   assumptionFields: readonly ["amountMinor", "currency", "category", "thirteenWeekMinor", "annualMinor"];
   citedEvidenceIds: string[];
+  citedExposureBasis: "NONE" | "PROJECTED" | "OBSERVATION_ONLY";
   reasonCodes: PolicyReasonCode[];
   currencyResults: Array<{
     currency: string;
@@ -71,12 +74,14 @@ const reasonOrder: readonly PolicyReasonCode[] = [
   "PER_CHARGE_LIMIT_EXCEEDED",
   "THIRTEEN_WEEK_LIMIT_EXCEEDED",
   "ANNUAL_LIMIT_EXCEEDED",
+  "EXPOSURE_NOT_CITED",
 ];
 
 export function evaluateProposalPolicy(input: {
   proposal: ProposalForPolicy;
   policy: ProposalPolicy;
   existingExposure: readonly ExistingExposure[];
+  eligibleUncited?: boolean;
 }): ProposalPolicyEvaluation {
   const proposal = normalizeProposal(input.proposal);
   const policy = parsePolicy(input.policy);
@@ -132,11 +137,20 @@ export function evaluateProposalPolicy(input: {
   });
 
   const reasonCodes = reasonOrder.filter((reason) => reasons.has(reason));
-  const status: PolicyEvaluationStatus = reasonCodes.some((reason) => reason === "CATEGORY_OUTSIDE_POLICY" || reason.endsWith("_EXCEEDED"))
+  if (input.eligibleUncited && input.existingExposure.length === 0) {
+    reasons.add("EXPOSURE_NOT_CITED");
+  }
+  const orderedReasons = reasonOrder.filter((reason) => reasons.has(reason) || reasonCodes.includes(reason));
+  const status: PolicyEvaluationStatus = orderedReasons.some((reason) => reason === "CATEGORY_OUTSIDE_POLICY" || reason.endsWith("_EXCEEDED"))
     ? "OUTSIDE_POLICY"
-    : reasonCodes.length
+    : orderedReasons.length
       ? "REVIEW_REQUIRED"
       : "WITHIN_POLICY";
+  const citedExposureBasis = input.existingExposure.some((entry) => entry.basis === "OBSERVATION_ONLY")
+    ? "OBSERVATION_ONLY" as const
+    : input.existingExposure.length
+      ? "PROJECTED" as const
+      : "NONE" as const;
 
   return {
     proposal,
@@ -145,7 +159,8 @@ export function evaluateProposalPolicy(input: {
     humanDecisionRequired: true,
     assumptionFields: ["amountMinor", "currency", "category", "thirteenWeekMinor", "annualMinor"],
     citedEvidenceIds: [...citedEvidenceIds].sort(),
-    reasonCodes,
+    citedExposureBasis,
+    reasonCodes: orderedReasons,
     currencyResults,
   };
 }
@@ -164,6 +179,7 @@ function normalizeProposal(proposal: ProposalForPolicy): ProposalForPolicy {
 
 export function normalizeProposalPolicy(policy: ProposalPolicy): ProposalPolicy {
   const normalized = parsePolicy(policy);
+  assertRecordableControlPolicy(normalized);
   return {
     policyVersion: normalized.policyVersion,
     categoryRules: normalized.categoryRules,
@@ -174,6 +190,19 @@ export function normalizeProposalPolicy(policy: ProposalPolicy): ProposalPolicy 
       maxAnnualMinor: limit.maxAnnualMinor.toString(),
     })),
   };
+}
+
+export function assertRecordableControlPolicy(policy: {
+  categoryRules: readonly { category: ProposalCategory }[];
+  currencyLimits: readonly unknown[];
+}) {
+  const seen = new Set(policy.categoryRules.map((rule) => rule.category));
+  if (proposalCategories.some((category) => !seen.has(category))) {
+    throw new Error("Policy must set a posture for every category.");
+  }
+  if (!policy.currencyLimits.length) {
+    throw new Error("Policy must include at least one currency with three positive caps.");
+  }
 }
 
 function parsePolicy(policy: ProposalPolicy) {

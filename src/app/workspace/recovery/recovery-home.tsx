@@ -33,8 +33,6 @@ import {
   reminderOffer,
   shouldOfferPaymentAsk,
 } from "@/lib/recovery/wow-first-session";
-import { RecoveryAutopilotHome } from "./recovery-autopilot-home";
-import { RecoveryAttention } from "./recovery-attention";
 import {
   changeKindLabels,
   decisionReviewSnoozeLabels,
@@ -58,8 +56,8 @@ export function RecoveryHome({
   onReminderConsent,
   onPaymentAsk,
   receiptInbox,
-  onVeto,
-  pendingVetoId,
+  onVeto: _onVeto,
+  pendingVetoId: _pendingVetoId,
   pendingDecisionId,
   onCitedPictureRendered,
 }: {
@@ -114,27 +112,6 @@ export function RecoveryHome({
   )).length;
   const showPaymentAsk = paymentAnswer === "unasked"
     && shouldOfferPaymentAsk(home.decisionOutcomes.length, verifiedOutcomes);
-
-  if (home.autopilot?.mandate?.status === "ACTIVE") {
-    return (
-      <div className="grid gap-6">
-        <RecoveryAutopilotHome
-          autopilot={home.autopilot}
-          onAddEvidence={onAddEvidence}
-          onVeto={onVeto ?? (() => undefined)}
-          pendingVetoId={pendingVetoId ?? null}
-        />
-        <RecoveryAttention
-          embedded
-          onOpenCommitment={onOpenCommitment}
-          onOpenSources={onOpenSources}
-          onWorkspaceMutated={onWorkspaceMutated}
-        />
-        <ComingLater home={home} onOpenCommitment={onOpenCommitment} onSeeAllCommitments={onSeeAllCommitments} />
-        <SpendHero home={home} onCitedPictureRendered={onCitedPictureRendered} />
-      </div>
-    );
-  }
 
   if (home.coverage.evidenceCount > 0 && commitmentTotal === 0) {
     return <FirstObservationHome home={home} onAddEvidence={onAddEvidence} />;
@@ -195,7 +172,7 @@ function SectionHeading({ id, children }: { id: string; children: string }) {
 function EmptyRecoveryHome({ onAddEvidence }: { onAddEvidence: () => void }) {
   return (
     <section aria-label="Get started" className="mx-auto max-w-xl py-8 text-center sm:py-14">
-      <h3 className="font-display text-3xl font-semibold tracking-tight text-(--ink)">{customerPhrases.emptyHomeTitle}</h3>
+      <h3 className="font-display text-3xl font-semibold text-(--ink)">{customerPhrases.emptyHomeTitle}</h3>
       <p className="mt-4 text-base leading-7 text-(--muted)">{customerPhrases.emptyHomeBody}</p>
       <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-8">
         {customerPhrases.addBills}
@@ -273,7 +250,7 @@ function SpendHero({
   return (
     <section aria-labelledby="home-spend">
       <p className="text-sm text-(--muted)">Software commitments</p>
-      <h3 id="home-spend" className="mt-1 font-display text-3xl font-semibold tracking-tight text-(--ink)">
+      <h3 id="home-spend" className="mt-1 font-display text-3xl font-semibold text-(--ink)">
         <MonthlyLine totals={home.monthlyTotals} />
       </h3>
       <p className="mt-2 text-sm text-(--muted)">
@@ -338,7 +315,7 @@ function DecisionQueue({
     return (
       <section aria-labelledby="recovery-decisions">
         {lastHook ? <DecisionHook hook={lastHook} onReminderConsent={onReminderConsent} /> : null}
-        <h3 id="recovery-decisions" className="font-display text-2xl font-semibold tracking-tight text-(--ink)">
+        <h3 id="recovery-decisions" className="font-display text-2xl font-semibold text-(--ink)">
           {watching ? customerPhrases.watchingHomeTitle : customerPhrases.quietHomeTitle}
         </h3>
         <p className="mt-2 text-sm leading-6 text-(--muted)">
@@ -654,7 +631,7 @@ function DecisionHook({
 function PaymentAsk({ onAnswer }: { onAnswer: (answer: "yes" | "no") => void }) {
   return (
     <section className="stack-section" aria-labelledby="payment-ask">
-      <h3 id="payment-ask" className="font-display text-lg font-semibold tracking-tight text-(--ink)">
+      <h3 id="payment-ask" className="font-display text-lg font-semibold text-(--ink)">
         {paymentAskQuestion}
       </h3>
       <div className="mt-3 flex flex-wrap gap-2">

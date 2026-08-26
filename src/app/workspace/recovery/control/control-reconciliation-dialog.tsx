@@ -34,6 +34,7 @@ export function ControlReconciliationDialog({
   onSelectEvidence,
   onClose,
   onSubmit,
+  onAddBill,
 }: {
   proposal: ControlProposalDto;
   decision: ControlDecisionDto;
@@ -48,7 +49,14 @@ export function ControlReconciliationDialog({
   onSelectEvidence: (evidenceId: string) => void;
   onClose: () => void;
   onSubmit: () => void;
+  onAddBill?: () => void;
 }) {
+  const merchantFilter = proposal.merchant.trim().toLowerCase();
+  const filteredCommitments = merchantFilter
+    ? commitments.filter((commitment) => commitment.merchant.toLowerCase().includes(merchantFilter) || merchantFilter.includes(commitment.merchant.toLowerCase()))
+    : commitments;
+  const listed = filteredCommitments.length ? filteredCommitments : commitments;
+  const selectedCommitment = commitments.find((commitment) => commitment.id === draft.commitmentId) ?? null;
   return (
     <RecoveryDialog
       title="Link observed evidence"
@@ -69,15 +77,16 @@ export function ControlReconciliationDialog({
         </>
       }
     >
-      <dl className="control-facts">
-        <ControlFact label="Merchant" value={proposal.merchant} />
-        <ControlFact label="Frozen expected" value={formatControlMoney(decision.expectedAmountMinor, decision.currency)} />
+      <p className="truth-label truth-frozen">Frozen authorization · never rewritten</p>
+      <dl className="proof mt-2">
+        <ControlFact label="Frozen expected" value={formatControlMoney(decision.expectedAmountMinor, decision.currency)} engraved />
         <ControlFact
           label="Frozen cap"
           value={decision.approvedCapMinor === null ? "No cap — declined" : formatControlMoney(decision.approvedCapMinor, decision.currency)}
+          engraved
         />
-        <ControlFact label="Authorized in" value={decision.currency} />
       </dl>
+      <p className="control-card-meta mt-2">{proposal.merchant} · authorized in {decision.currency}</p>
 
       <div className="control-field mt-5">
         <label className="field-label" htmlFor="control-reconcile-commitment">Saved bill to take the receipt from</label>
@@ -88,7 +97,7 @@ export function ControlReconciliationDialog({
           onChange={(event) => onSelectCommitment(event.target.value)}
         >
           <option value="">Choose a bill…</option>
-          {commitments.map((commitment) => (
+          {listed.map((commitment) => (
             <option key={commitment.id} value={commitment.id}>
               {commitment.merchant} · {commitment.amount.display}
             </option>
@@ -104,7 +113,12 @@ export function ControlReconciliationDialog({
         ) : evidence.kind === "FAILED" ? (
           <FailureBlock failure={evidence.failure} />
         ) : evidence.items.length === 0 ? (
-          <p className="control-note">This bill has no saved receipt to link.</p>
+          <div>
+            <p className="control-note">This bill has no saved receipt to link.</p>
+            {onAddBill ? (
+              <button type="button" className="btn btn-ghost mt-3" onClick={onAddBill}>Add a bill</button>
+            ) : null}
+          </div>
         ) : (
           <fieldset className="control-choice-set">
             <legend className="field-label">Receipt to compare</legend>
@@ -112,6 +126,7 @@ export function ControlReconciliationDialog({
               <label key={item.id} className="control-choice" htmlFor={`control-evidence-choice-${item.id}`}>
                 <input
                   id={`control-evidence-choice-${item.id}`}
+                  className="tick"
                   type="radio"
                   name="control-reconcile-evidence"
                   value={item.id}
@@ -119,8 +134,9 @@ export function ControlReconciliationDialog({
                   onChange={() => onSelectEvidence(item.id)}
                 />
                 <span className="control-choice-title font-data tnum">
-                  {item.amount ? item.amount.display : "No amount on this receipt"}
-                  {item.date ? ` · ${formatDay(item.date)}` : ""}
+                  {[selectedCommitment?.merchant, item.amount ? item.amount.display : "No amount on this receipt", item.date ? formatDay(item.date) : null]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </span>
                 <span className="control-note">{item.excerpt}</span>
               </label>

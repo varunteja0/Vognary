@@ -12,9 +12,12 @@ import {
   formatControlMoney,
 } from "./control-format";
 
-// The server's evaluation, rendered without reinterpretation. Two things are
-// permanently separated on screen: what the reader assumed, and what cited
-// evidence already shows. Policy never decides; a person does.
+// The server's evaluation, rendered without reinterpretation. Three truth
+// classes are held apart by label, rule colour and position: what the reader
+// assumed, what cited evidence already shows, and what policy recorded. Policy
+// never decides; a person does. Only the secondary exposure projection is
+// disclosed on demand — the verdict, its reasons and every citation stay on
+// the page.
 
 export function ControlEvaluation({
   proposal,
@@ -27,86 +30,53 @@ export function ControlEvaluation({
 }) {
   return (
     <div className="control-evaluation">
-      <div className="control-band-split">
-        <section aria-labelledby={`assumption-${evaluation.id}`}>
-          <p id={`assumption-${evaluation.id}`} className="eyebrow eyebrow-xs">User-entered assumption</p>
-          <dl className="control-facts">
-            <ControlFact label="Per charge" value={formatControlMoney(proposal.amountMinor, proposal.currency)} />
-            <ControlFact label="Category" value={controlCategoryLabels[proposal.category]} />
-            <ControlFact label="Cadence" value={controlCadenceLabels[proposal.cadence]} />
-            <ControlFact label="First charge" value={formatDay(proposal.firstChargeDate)} />
-            <ControlFact label="13 weeks" value={formatControlMoney(proposal.projectedThirteenWeekMinor, proposal.currency)} />
-            <ControlFact label="12 months" value={formatControlMoney(proposal.projectedAnnualMinor, proposal.currency)} />
-          </dl>
-        </section>
+      <section className="control-section" aria-labelledby={`assumption-${evaluation.id}`}>
+        <p id={`assumption-${evaluation.id}`} className="truth-label truth-assumption">User-entered assumption</p>
+        <dl className="control-facts">
+          <ControlFact label="Per charge" value={formatControlMoney(proposal.amountMinor, proposal.currency)} engraved />
+          <ControlFact label="13 weeks" value={formatControlMoney(proposal.projectedThirteenWeekMinor, proposal.currency)} engraved />
+          <ControlFact label="12 months" value={formatControlMoney(proposal.projectedAnnualMinor, proposal.currency)} engraved />
+        </dl>
+        <p className="control-card-meta">
+          {controlCategoryLabels[proposal.category]} · {controlCadenceLabels[proposal.cadence]} · first charge {formatDay(proposal.firstChargeDate)} · projected from {formatDay(proposal.asOfDate)}
+        </p>
+      </section>
 
-        <section aria-labelledby={`cited-${evaluation.id}`}>
-          <p id={`cited-${evaluation.id}`} className="eyebrow eyebrow-xs">Cited existing exposure</p>
-          {evaluation.citedEvidenceIds.length ? (
-            <ul className="control-evidence-list">
-              {evaluation.citedEvidenceIds.map((evidenceId, index) => (
-                <li key={evidenceId}>
-                  {onInspectEvidence ? (
-                    <button
-                      type="button"
-                      id={`control-evidence-${evaluation.id}-${index}`}
-                      className="link-quiet"
-                      onClick={() => onInspectEvidence(evidenceId, `control-evidence-${evaluation.id}-${index}`)}
-                    >
-                      Open cited receipt {index + 1}
-                    </button>
-                  ) : (
-                    <span className="font-data text-xs text-(--muted)">Cited receipt {index + 1}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="control-note">No existing commitment was cited, so the exposure below counts this proposal alone.</p>
-          )}
-        </section>
-      </div>
+      <section className="control-section" aria-labelledby={`cited-${evaluation.id}`}>
+        <p id={`cited-${evaluation.id}`} className="truth-label truth-citation">Cited existing exposure</p>
+        {evaluation.citedEvidenceIds.length ? (
+          <ul className="control-evidence-list">
+            {evaluation.citedEvidenceIds.map((evidenceId, index) => (
+              <li key={evidenceId}>
+                {onInspectEvidence ? (
+                  <button
+                    type="button"
+                    id={`control-evidence-${evaluation.id}-${index}`}
+                    className="link-quiet"
+                    onClick={() => onInspectEvidence(evidenceId, `control-evidence-${evaluation.id}-${index}`)}
+                  >
+                    Open cited receipt {index + 1}
+                  </button>
+                ) : (
+                  <span className="control-card-meta">Cited receipt {index + 1}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="control-note">No existing commitment was cited, so the exposure below counts this proposal alone.</p>
+        )}
+        {evaluation.citedExposureBasis === "OBSERVATION_ONLY" ? (
+          <p className="control-note">Cited exposure is assumption-grade: last observed amount only. It is not a 13-week or annual projection.</p>
+        ) : null}
+      </section>
 
-      {evaluation.currencyResults.map((result) => (
-        <table key={result.currency} className="control-table">
-          <caption className="control-table-caption">Exposure in {result.currency}</caption>
-          <thead>
-            <tr>
-              <th scope="col">Basis</th>
-              <th scope="col">13 weeks</th>
-              <th scope="col">12 months</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row">Cited now</th>
-              <td>{formatControlMoney(result.existingThirteenWeekMinor, result.currency)}</td>
-              <td>{formatControlMoney(result.existingAnnualMinor, result.currency)}</td>
-            </tr>
-            <tr>
-              <th scope="row">Proposed</th>
-              <td>{formatControlMoney(result.proposedThirteenWeekMinor, result.currency)}</td>
-              <td>{formatControlMoney(result.proposedAnnualMinor, result.currency)}</td>
-            </tr>
-            <tr>
-              <th scope="row">Combined</th>
-              <td>{formatControlMoney(result.combinedThirteenWeekMinor, result.currency)}</td>
-              <td>{formatControlMoney(result.combinedAnnualMinor, result.currency)}</td>
-            </tr>
-            <tr>
-              <th scope="row">Policy headroom</th>
-              <td>{result.thirteenWeekHeadroomMinor === null ? "No limit set" : formatControlMoney(result.thirteenWeekHeadroomMinor, result.currency)}</td>
-              <td>{result.annualHeadroomMinor === null ? "No limit set" : formatControlMoney(result.annualHeadroomMinor, result.currency)}</td>
-            </tr>
-          </tbody>
-        </table>
-      ))}
-
-      <div className="control-verdict">
-        <div className="flex flex-wrap items-center gap-2">
+      <section className="control-verdict" aria-labelledby={`policy-${evaluation.id}`}>
+        <p id={`policy-${evaluation.id}`} className="truth-label truth-policy">Deterministic policy context</p>
+        <p className="proof-head">
           <span className={controlStatusToneClass[evaluation.status]}>{controlStatusLabels[evaluation.status]}</span>
-          <span className="font-data text-xs text-(--muted)">Policy version {evaluation.policyVersion}</span>
-        </div>
+          <span className="control-card-meta">Policy version {evaluation.policyVersion}</span>
+        </p>
         <p className="control-note">{controlStatusMeanings[evaluation.status]}</p>
         {evaluation.reasonCodes.length ? (
           <ul className="control-reasons">
@@ -116,16 +86,66 @@ export function ControlEvaluation({
           </ul>
         ) : null}
         <p className="control-decision-required">Human decision required</p>
-      </div>
+      </section>
+
+      <details className="control-more">
+        <summary>Exposure this proposal is read against</summary>
+        <div className="control-more-body">
+          {evaluation.currencyResults.map((result) => (
+            <table key={result.currency} className="control-table">
+              <caption className="control-table-caption">Exposure in {result.currency}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Basis</th>
+                  <th scope="col">13 weeks</th>
+                  <th scope="col">12 months</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Cited now</th>
+                  <td>{formatControlMoney(result.existingThirteenWeekMinor, result.currency)}</td>
+                  <td>{formatControlMoney(result.existingAnnualMinor, result.currency)}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Proposed</th>
+                  <td>{formatControlMoney(result.proposedThirteenWeekMinor, result.currency)}</td>
+                  <td>{formatControlMoney(result.proposedAnnualMinor, result.currency)}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Combined</th>
+                  <td>{formatControlMoney(result.combinedThirteenWeekMinor, result.currency)}</td>
+                  <td>{formatControlMoney(result.combinedAnnualMinor, result.currency)}</td>
+                </tr>
+                <tr>
+                  <th scope="row">Policy headroom</th>
+                  <td>{result.thirteenWeekHeadroomMinor === null ? "No limit set" : formatControlMoney(result.thirteenWeekHeadroomMinor, result.currency)}</td>
+                  <td>{result.annualHeadroomMinor === null ? "No limit set" : formatControlMoney(result.annualHeadroomMinor, result.currency)}</td>
+                </tr>
+              </tbody>
+            </table>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }
 
-export function ControlFact({ label, value }: { label: string; value: string }) {
+export function ControlFact({
+  label,
+  value,
+  engraved = false,
+  observed = false,
+}: {
+  label: string;
+  value: string;
+  engraved?: boolean;
+  observed?: boolean;
+}) {
   return (
-    <div className="control-fact">
+    <div className="control-fact" data-observed={observed ? "true" : undefined}>
       <dt>{label}</dt>
-      <dd className="font-data tnum">{value}</dd>
+      <dd className={engraved || observed ? "font-data tnum" : undefined}>{value}</dd>
     </div>
   );
 }

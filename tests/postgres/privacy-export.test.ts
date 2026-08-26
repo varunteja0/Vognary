@@ -21,6 +21,8 @@ import {
   reconcileCommitmentControlProposal,
 } from "../../src/lib/server/commitment-control-store";
 import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
+import { createWorkspaceInvite } from "../../src/lib/server/workspace-invite-store";
+import { completeControlPolicyRequest } from "../commitment-control-policy-fixture";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
 process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "*";
@@ -201,15 +203,7 @@ test("privacy export includes held product data and excludes all credential mate
       actorUserId: userId,
       expectedVersion: disconnected.workspaceVersion,
       idempotencyKey: `privacy-control-policy:${randomUUID()}`,
-      request: {
-        categoryRules: [{ category: "AI_MODEL", posture: "ALLOW" }],
-        currencyLimits: [{
-          currency: "INR",
-          maxPerChargeMinor: "500000",
-          maxThirteenWeekMinor: "3000000",
-          maxAnnualMinor: "12000000",
-        }],
-      },
+      request: completeControlPolicyRequest(),
     });
     const controlProposal = await createCommitmentControlProposal({
       workspaceId,
@@ -247,6 +241,12 @@ test("privacy export includes held product data and excludes all credential mate
       expectedVersion: controlDecision.workspaceVersion,
       idempotencyKey: `privacy-control-reconciliation:${randomUUID()}`,
       request: { evidenceId: controlEvidenceId },
+    });
+    await createWorkspaceInvite({
+      workspaceId,
+      actorUserId: userId,
+      email: `privacy-invitee-${randomUUID().slice(0, 8)}@example.test`,
+      role: "member",
     });
 
     const request = await createAccessExportRequest({ workspaceId, actorUserId: userId });
@@ -301,6 +301,11 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.commitmentControl.decisions[0].approvedCapMinor, "180000");
     assert.equal(document.commitmentControl.reconciliations.length, 1);
     assert.equal(document.commitmentControl.reconciliations[0].verdict, "OVER_CAP");
+    assert.equal(document.commitmentControl.workspaceInvites.length, 1);
+    assert.equal(
+      document.commitmentControl.workspaceInvites.some((invite: Record<string, unknown>) => "tokenHash" in invite || "token_hash" in invite),
+      false,
+    );
     assert.ok(document.productEvents.some((event: { eventName: string }) => event.eventName === "review.completed"));
     assert.ok(
       document.productEvents.length >= 1,

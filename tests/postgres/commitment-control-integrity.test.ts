@@ -13,6 +13,7 @@ import {
 import { getDatabasePool } from "../../src/lib/server/database";
 import { RecoveryServiceError } from "../../src/lib/server/recovery-api";
 import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
+import { completeControlPolicyRequest } from "../commitment-control-policy-fixture";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
 process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "*";
@@ -55,13 +56,12 @@ test("selected Recovery exposure stays cited and currency-separated through pers
       actorUserId: ownerUserId,
       expectedVersion: evidence.workspaceVersion,
       idempotencyKey: `control-exposure-policy-${suffix}`,
-      request: {
-        categoryRules: [{ category: "AI_MODEL", posture: "ALLOW" }],
+      request: completeControlPolicyRequest({
         currencyLimits: [
           { currency: "INR", maxPerChargeMinor: "500000", maxThirteenWeekMinor: "5000000", maxAnnualMinor: "20000000" },
           { currency: "USD", maxPerChargeMinor: "50000", maxThirteenWeekMinor: "100000", maxAnnualMinor: "500000" },
         ],
-      },
+      }),
     });
     const proposal = await createCommitmentControlProposal({
       workspaceId,
@@ -121,10 +121,7 @@ test("concurrent decisions serialize, and consented events do not duplicate on r
       actorUserId: ownerUserId,
       expectedVersion: 0,
       idempotencyKey: `control-events-policy-${suffix}`,
-      request: {
-        categoryRules: [{ category: "AI_MODEL" as const, posture: "ALLOW" as const }],
-        currencyLimits: [{ currency: "INR", maxPerChargeMinor: "500000", maxThirteenWeekMinor: "3000000", maxAnnualMinor: "12000000" }],
-      },
+      request: completeControlPolicyRequest(),
     };
     const policy = await putCommitmentControlPolicy(policyInput);
     await putCommitmentControlPolicy(policyInput);
@@ -205,10 +202,7 @@ test("deleting an actor nulls identity fields without mutating immutable financi
       actorUserId: adminUserId,
       expectedVersion: 0,
       idempotencyKey: `control-erasure-policy-${suffix}`,
-      request: {
-        categoryRules: [{ category: "AI_MODEL", posture: "ALLOW" }],
-        currencyLimits: [{ currency: "INR", maxPerChargeMinor: "500000", maxThirteenWeekMinor: "3000000", maxAnnualMinor: "12000000" }],
-      },
+      request: completeControlPolicyRequest(),
     });
     const proposal = await createCommitmentControlProposal({
       workspaceId,
@@ -228,7 +222,7 @@ test("deleting an actor nulls identity fields without mutating immutable financi
     });
     const decision = await decideCommitmentControlProposal({
       workspaceId,
-      actorUserId: adminUserId,
+      actorUserId: ownerUserId,
       proposalId: proposal.data.proposal.id,
       expectedVersion: proposal.workspaceVersion,
       idempotencyKey: `control-erasure-decision-${suffix}`,
@@ -264,7 +258,9 @@ test("deleting an actor nulls identity fields without mutating immutable financi
     const item = brief.data.proposals.find((entry) => entry.proposal.id === proposal.data.proposal.id);
     assert.equal(brief.data.policy?.createdByUserId, null);
     assert.equal(item?.proposal.submittedByUserId, null);
-    assert.equal(item?.decision?.decidedByUserId, null);
+    assert.equal(item?.proposal.submittedByDisplayName, "Control admin");
+    assert.equal(item?.decision?.decidedByUserId, ownerUserId);
+    assert.equal(item?.decision?.decidedByDisplayName, "Control actor erasure owner");
     assert.equal(item?.decision?.approvedCapMinor, "180000");
     assert.equal(item?.reconciliations[0]?.reconciledByUserId, null);
     assert.equal(item?.reconciliations[0]?.verdict, "OVER_CAP");
@@ -300,10 +296,7 @@ test("analytics failure cannot roll back or duplicate a frozen Control decision"
       actorUserId: ownerUserId,
       expectedVersion: 0,
       idempotencyKey: `control-event-failure-policy-${suffix}`,
-      request: {
-        categoryRules: [{ category: "AI_MODEL", posture: "ALLOW" }],
-        currencyLimits: [{ currency: "INR", maxPerChargeMinor: "500000", maxThirteenWeekMinor: "3000000", maxAnnualMinor: "12000000" }],
-      },
+      request: completeControlPolicyRequest(),
     });
     const proposal = await createCommitmentControlProposal({
       workspaceId,

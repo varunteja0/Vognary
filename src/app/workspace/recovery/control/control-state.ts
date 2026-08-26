@@ -43,8 +43,9 @@ export type ControlProposalField = "merchant" | "purpose" | "amountText" | "firs
 export type ControlDraftErrors = Partial<Record<ControlProposalField, string>>;
 
 export type ControlDecisionDraft = {
-  action: ProposalDecisionAction;
+  action: ProposalDecisionAction | null;
   capText: string;
+  overrideReason: string;
   error: string | null;
 };
 
@@ -119,7 +120,7 @@ export const initialControlState: ControlState = {
   requestId: null,
   draft: emptyControlProposalDraft,
   draftErrors: {},
-  decisionDraft: { action: "APPROVE", capText: "", error: null },
+  decisionDraft: { action: null, capText: "", overrideReason: "", error: null },
   reconciliationDraft: { commitmentId: null, evidenceId: null },
   policyDraft: null,
   dialog: null,
@@ -156,6 +157,7 @@ export type ControlAction =
   | { type: "POLICY_STARTED"; idempotencyKey: string; signature: string }
   | { type: "POLICY_SAVED"; policy: ControlPolicyDto; meta: ResponseMeta }
   | { type: "POLICY_FAILED"; failure: TransportFailure }
+  | { type: "FOCUS_SET"; proposalId: string }
   | { type: "FOCUS_CLEARED" };
 
 const asFailure = (failure: TransportFailure): RecoveryFailure => ({ error: failure.error, origin: failure.origin });
@@ -213,15 +215,24 @@ export function controlProposalRequest(draft: ControlProposalDraft): { ok: true;
 export function controlDecisionRequest(
   draft: ControlDecisionDraft,
   proposal: ControlProposalDto,
+  evaluation: ControlEvaluationDto | null,
 ): { ok: true; request: DecideControlProposalRequest } | { ok: false; message: string } {
-  if (draft.action === "APPROVE") return { ok: true, request: { action: "APPROVE" } };
+  if (!draft.action) return { ok: false, message: "Choose Approve, Approve with cap, or Decline." };
+  const override = draft.overrideReason.trim();
+  if (evaluation?.status === "OUTSIDE_POLICY" && (draft.action === "APPROVE" || draft.action === "APPROVE_WITH_CAP") && !override) {
+    return { ok: false, message: "Write why you are authorizing an outside-policy proposal." };
+  }
+  const overrideField = override && evaluation?.status === "OUTSIDE_POLICY" && draft.action !== "DECLINE"
+    ? { overrideReason: override }
+    : {};
+  if (draft.action === "APPROVE") return { ok: true, request: { action: "APPROVE", ...overrideField } };
   if (draft.action === "DECLINE") return { ok: true, request: { action: "DECLINE" } };
   const cap = parseControlAmount(draft.capText, proposal.currency, "cap");
   if (!cap.ok) return { ok: false, message: cap.message };
   if (BigInt(cap.minor) > BigInt(proposal.amountMinor)) {
     return { ok: false, message: `The cap cannot be above the proposed ${formatControlMoney(proposal.amountMinor, proposal.currency)} per charge.` };
   }
-  return { ok: true, request: { action: "APPROVE_WITH_CAP", approvedCapMinor: cap.minor } };
+  return { ok: true, request: { action: "APPROVE_WITH_CAP", approvedCapMinor: cap.minor, ...overrideField } };
 }
 
 export function controlPolicyRequest(draft: ControlPolicyDraft): { ok: true; request: PutControlPolicyRequest } | { ok: false; message: string } {
@@ -245,6 +256,9 @@ export function controlPolicyRequest(draft: ControlPolicyDraft): { ok: true; req
       maxAnnualMinor: annual.minor,
     });
   }
+  if (!currencyLimits.length) return { ok: false, message: "Record at least one currency with three positive caps. INR is the default." };
+  const categories = new Set(draft.categoryRules.map((rule) => rule.category));
+  if (categories.size !== 6) return { ok: false, message: "Set a posture for every category before recording policy." };
   return {
     ok: true,
     request: { categoryRules: draft.categoryRules.map((rule) => ({ ...rule })), currencyLimits },
@@ -252,18 +266,28 @@ export function controlPolicyRequest(draft: ControlPolicyDraft): { ok: true; req
 }
 
 export function policyDraftFrom(policy: ControlPolicyDto | null, toMajor: (minor: string, currency: string) => string): ControlPolicyDraft {
+  const emptyLimit = { currency: "INR", maxPerChargeText: "", maxThirteenWeekText: "", maxAnnualText: "" };
   return {
     categoryRules: policy
-      ? policy.categoryRules.map((rule) => ({ ...rule }))
-      : [],
-    currencyLimits: policy
+      ? [
+        ...policy.categoryRules.map((rule) => ({ ...rule })),
+      ]
+      : [
+        { category: "AI_MODEL", posture: "REVIEW" },
+        { category: "CLOUD_INFRASTRUCTURE", posture: "REVIEW" },
+        { category: "SOFTWARE", posture: "REVIEW" },
+        { category: "CONTRACTOR", posture: "REVIEW" },
+        { category: "CAMPAIGN", posture: "REVIEW" },
+        { category: "OTHER", posture: "REVIEW" },
+      ],
+    currencyLimits: policy?.currencyLimits.length
       ? policy.currencyLimits.map((limit) => ({
         currency: limit.currency,
         maxPerChargeText: toMajor(limit.maxPerChargeMinor, limit.currency),
         maxThirteenWeekText: toMajor(limit.maxThirteenWeekMinor, limit.currency),
         maxAnnualText: toMajor(limit.maxAnnualMinor, limit.currency),
       }))
-      : [],
+      : [emptyLimit],
     step: "EDIT",
     error: null,
   };
@@ -402,7 +426,7 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
         dialog: action.dialog,
         returnFocusId: action.returnFocusId,
         failure: null,
-        decisionDraft: action.dialog.kind === "DECISION" ? { action: "APPROVE", capText: "", error: null } : state.decisionDraft,
+        decisionDraft: action.dialog.kind === "DECISION" ? { action: null, capText: "", overrideReason: "", error: null } : state.decisionDraft,
         reconciliationDraft: action.dialog.kind === "RECONCILIATION" ? { commitmentId: null, evidenceId: null } : state.reconciliationDraft,
         policyDraft: action.dialog.kind === "POLICY" ? action.policyDraft ?? state.policyDraft : state.policyDraft,
       };
@@ -534,6 +558,9 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
         staleNotice: isStale(action.failure) ? staleCopy : null,
         announcement: `Not recorded. ${action.failure.error.message}`,
       };
+
+    case "FOCUS_SET":
+      return { ...state, focusProposalId: action.proposalId };
 
     case "FOCUS_CLEARED":
       return state.focusProposalId === null ? state : { ...state, focusProposalId: null };

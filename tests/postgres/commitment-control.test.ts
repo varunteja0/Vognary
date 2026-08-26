@@ -12,6 +12,7 @@ import {
 } from "../../src/lib/server/commitment-control-store";
 import { RecoveryServiceError } from "../../src/lib/server/recovery-api";
 import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
+import { completeControlPolicyRequest } from "../commitment-control-policy-fixture";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
 process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "*";
@@ -52,18 +53,7 @@ test("Commitment Control persists one tenant-safe immutable authorization chain"
     [workspaceId, ownerUserId, memberUserId, otherWorkspaceId, otherUserId],
   );
 
-  const policyRequest = {
-    categoryRules: [
-      { category: "AI_MODEL" as const, posture: "ALLOW" as const },
-      { category: "CAMPAIGN" as const, posture: "REVIEW" as const },
-    ],
-    currencyLimits: [{
-      currency: "INR",
-      maxPerChargeMinor: "500000",
-      maxThirteenWeekMinor: "3000000",
-      maxAnnualMinor: "12000000",
-    }],
-  };
+  const policyRequest = completeControlPolicyRequest();
 
   try {
     const policy = await putCommitmentControlPolicy({
@@ -272,6 +262,8 @@ test("Commitment Control persists one tenant-safe immutable authorization chain"
     assert.equal(brief.workspaceVersion, 7);
     const approvedBrief = brief.data.proposals.find((item) => item.proposal.id === proposal.data.proposal.id);
     assert.equal(approvedBrief?.decision?.action, "APPROVE_WITH_CAP");
+    assert.equal(approvedBrief?.proposal.submittedByDisplayName, "Control member");
+    assert.equal(approvedBrief?.decision?.decidedByDisplayName, "Control owner");
     assert.equal(approvedBrief?.reconciliations[0]?.verdict, "OVER_CAP");
 
     await assert.rejects(

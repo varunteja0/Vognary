@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { commitmentControlEndpoints, type CreateControlProposalRequest } from "../src/lib/commitment-control/contracts";
+import { completeControlCategoryRules } from "./commitment-control-policy-fixture";
 import {
   createControlTransport,
   isFeatureUnavailable,
@@ -89,7 +90,12 @@ test("a policy version is written with PUT and the workspace version tag", async
   const { calls, fetchImpl } = recorder(() => json({ data: { policy: {} }, meta }, 201));
 
   await createControlTransport(fetchImpl).putPolicy(
-    { categoryRules: [{ category: "AI_MODEL", posture: "REVIEW" }], currencyLimits: [] },
+    { categoryRules: completeControlCategoryRules, currencyLimits: [{
+      currency: "INR",
+      maxPerChargeMinor: "2000000",
+      maxThirteenWeekMinor: "6000000",
+      maxAnnualMinor: "24000000",
+    }] },
     { workspaceVersion: 4, idempotencyKey: "key-policy" },
   );
 

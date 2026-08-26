@@ -157,6 +157,7 @@ const decisionId = "66666666-6666-4666-8666-666666666666";
 const proposal = {
   id: proposalId,
   submittedByUserId: "33333333-3333-4333-8333-333333333333",
+  submittedByDisplayName: "Founder",
   merchant: "Anthropic",
   purpose: "Claude API for the product loop",
   category: "AI_MODEL",
@@ -191,6 +192,7 @@ const evaluation = {
   humanDecisionRequired: true,
   assumptionFields: ["amountMinor", "currency", "category", "thirteenWeekMinor", "annualMinor"],
   citedEvidenceIds: [evidenceId],
+  citedExposureBasis: "PROJECTED",
   reasonCodes: ["CATEGORY_REQUIRES_REVIEW", "PER_CHARGE_LIMIT_EXCEEDED"],
   currencyResults: [currencyResult],
   evaluatedAt: "2026-08-25T09:00:00.000Z",
@@ -206,6 +208,8 @@ const decision = {
   currency: "INR",
   expectedAmountMinor: "4500000",
   decidedByUserId: "33333333-3333-4333-8333-333333333333",
+  decidedByDisplayName: "Founder",
+  overrideReason: "Board-approved exception for this vendor.",
   decidedAt: "2026-08-25T10:00:00.000Z",
 };
 
@@ -404,7 +408,9 @@ test("a workspace outside the private pilot sees no Control surface at all", asy
   await expect(nav.getByRole("button", { name: "Now" })).toBeVisible();
   await expect(nav.getByRole("button", { name: "Control" })).toHaveCount(0);
   await expect(page.getByText(composerHeading)).toHaveCount(0);
-  await expect(page.getByText(/Commitment Control|proposal|waitlist|coming soon/i)).toHaveCount(0);
+  await expect(page.getByText("The private Control pilot is not on for this workspace.")).toBeVisible();
+  await expect(page.getByText("workspace-1")).toBeVisible();
+  await expect(page.getByText(/waitlist|coming soon/i)).toHaveCount(0);
 
   await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await expect.poll(() => controlRequests.length).toBe(1);
@@ -462,12 +468,17 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
   await expect(dialog.getByText("Vognary records your decision. It does not purchase, provision, cancel, or move any money.")).toBeVisible();
   await dialog.getByRole("radio", { name: /Approve with cap/ }).check();
   await dialog.getByLabel("Approved cap per charge (INR)").fill("40000");
+  await dialog.getByLabel("Why this outside-policy proposal is authorized").fill("Board-approved exception for this vendor.");
   await dialog.getByRole("button", { name: "Record decision" }).click();
 
   const decisionCall = await waitForCall(controlRequests, (call) => call.url.endsWith("/decision"));
   expect(decisionCall.method).toBe("POST");
   expect(decisionCall.headers["if-match"]).toBe('"workspace:5"');
-  expect(JSON.parse(decisionCall.body ?? "{}")).toEqual({ action: "APPROVE_WITH_CAP", approvedCapMinor: "4000000" });
+  expect(JSON.parse(decisionCall.body ?? "{}")).toEqual({
+    action: "APPROVE_WITH_CAP",
+    approvedCapMinor: "4000000",
+    overrideReason: "Board-approved exception for this vendor.",
+  });
 
   const authorized = page.getByRole("article", { name: "Anthropic" });
   await expect(authorized.getByText("Approved with a cap")).toBeVisible();
@@ -524,7 +535,7 @@ test("all three policy statuses read as policy context, never as an authorizatio
       proposals: [
         {
           proposal: { ...proposal, id: "a4444444-4444-4444-8444-444444444401", merchant: "Vercel" },
-          evaluation: { ...evaluation, id: "a5555555-5555-4555-8555-555555555501", proposalId: "a4444444-4444-4444-8444-444444444401", status: "WITHIN_POLICY", reasonCodes: [], citedEvidenceIds: [] },
+          evaluation: { ...evaluation, id: "a5555555-5555-4555-8555-555555555501", proposalId: "a4444444-4444-4444-8444-444444444401", status: "WITHIN_POLICY", reasonCodes: [], citedEvidenceIds: [], citedExposureBasis: "NONE" },
           decision: null,
           reconciliations: [],
         },

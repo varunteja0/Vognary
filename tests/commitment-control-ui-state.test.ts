@@ -23,12 +23,14 @@ import {
 } from "../src/app/workspace/recovery/control/control-state";
 import { formatControlMoney, parseControlAmount } from "../src/app/workspace/recovery/control/control-format";
 import type { TransportFailure } from "../src/app/workspace/recovery/transport";
+import { completeControlCategoryRules } from "./commitment-control-policy-fixture";
 
 const meta = { requestId: "request-1", workspaceVersion: 7 };
 
 const proposal: ControlProposalDto = {
   id: "6f1a1f2c-7f52-4a76-9b0c-9d5b6a7c1d20",
   submittedByUserId: "1b1a1f2c-7f52-4a76-9b0c-9d5b6a7c1d21",
+  submittedByDisplayName: "Control member",
   merchant: "Anthropic",
   purpose: "Claude API for the product loop",
   category: "AI_MODEL",
@@ -51,6 +53,7 @@ const evaluation: ControlEvaluationDto = {
   humanDecisionRequired: true,
   assumptionFields: ["amountMinor", "currency", "category", "thirteenWeekMinor", "annualMinor"],
   citedEvidenceIds: ["3c1a1f2c-7f52-4a76-9b0c-9d5b6a7c1d23"],
+  citedExposureBasis: "PROJECTED",
   reasonCodes: ["PER_CHARGE_LIMIT_EXCEEDED"],
   currencyResults: [{
     currency: "INR",
@@ -76,6 +79,8 @@ const decision: ControlDecisionDto = {
   currency: "INR",
   expectedAmountMinor: "4500000",
   decidedByUserId: "1b1a1f2c-7f52-4a76-9b0c-9d5b6a7c1d21",
+  decidedByDisplayName: "Control owner",
+  overrideReason: null,
   decidedAt: "2026-08-25T10:00:00.000Z",
 };
 
@@ -96,7 +101,9 @@ const reconciliation: ControlReconciliationDto = {
 
 const policy: ControlPolicyDto = {
   policyVersion: 3,
-  categoryRules: [{ category: "AI_MODEL", posture: "REVIEW" }],
+  categoryRules: completeControlCategoryRules.map((rule) => (
+    rule.category === "AI_MODEL" ? { ...rule, posture: "REVIEW" as const } : rule
+  )),
   currencyLimits: [{ currency: "INR", maxPerChargeMinor: "2000000", maxThirteenWeekMinor: "6000000", maxAnnualMinor: "24000000" }],
   createdByUserId: "1b1a1f2c-7f52-4a76-9b0c-9d5b6a7c1d21",
   createdAt: "2026-08-20T09:00:00.000Z",
@@ -267,20 +274,35 @@ test("a recorded decision never rewrites the evaluation and a later observation 
 });
 
 test("an approved cap must be exact, positive, and never above the proposed per-charge amount", () => {
-  assert.deepEqual(controlDecisionRequest({ action: "APPROVE", capText: "", error: null }, proposal), {
+  const within = { ...evaluation, status: "WITHIN_POLICY" as const, reasonCodes: [] };
+  assert.deepEqual(controlDecisionRequest({ action: "APPROVE", capText: "", overrideReason: "", error: null }, proposal, within), {
     ok: true,
     request: { action: "APPROVE" },
   });
-  assert.deepEqual(controlDecisionRequest({ action: "DECLINE", capText: "999", error: null }, proposal), {
+  assert.deepEqual(controlDecisionRequest({ action: "DECLINE", capText: "999", overrideReason: "", error: null }, proposal, within), {
     ok: true,
     request: { action: "DECLINE" },
   });
-  assert.deepEqual(controlDecisionRequest({ action: "APPROVE_WITH_CAP", capText: "40000", error: null }, proposal), {
+  assert.deepEqual(controlDecisionRequest({ action: "APPROVE_WITH_CAP", capText: "40000", overrideReason: "", error: null }, proposal, within), {
     ok: true,
     request: { action: "APPROVE_WITH_CAP", approvedCapMinor: "4000000" },
   });
-  assert.equal(controlDecisionRequest({ action: "APPROVE_WITH_CAP", capText: "45000.01", error: null }, proposal).ok, false);
-  assert.equal(controlDecisionRequest({ action: "APPROVE_WITH_CAP", capText: "0", error: null }, proposal).ok, false);
+  assert.equal(controlDecisionRequest({ action: "APPROVE_WITH_CAP", capText: "45000.01", overrideReason: "", error: null }, proposal, within).ok, false);
+  assert.equal(controlDecisionRequest({ action: "APPROVE_WITH_CAP", capText: "0", overrideReason: "", error: null }, proposal, within).ok, false);
+  assert.equal(controlDecisionRequest({ action: "APPROVE", capText: "", overrideReason: "", error: null }, proposal, evaluation).ok, false);
+  assert.deepEqual(controlDecisionRequest({
+    action: "APPROVE_WITH_CAP",
+    capText: "40000",
+    overrideReason: "Board-approved exception for this vendor.",
+    error: null,
+  }, proposal, evaluation), {
+    ok: true,
+    request: {
+      action: "APPROVE_WITH_CAP",
+      approvedCapMinor: "4000000",
+      overrideReason: "Board-approved exception for this vendor.",
+    },
+  });
 });
 
 test("a policy draft round-trips exact minor units and refuses a silent duplicate currency", () => {
@@ -301,7 +323,9 @@ test("a policy draft round-trips exact minor units and refuses a silent duplicat
       maxThirteenWeekMinor: "6000000",
       maxAnnualMinor: "24000000",
     }]);
-    assert.deepEqual(built.request.categoryRules, [{ category: "AI_MODEL", posture: "REVIEW" }]);
+    assert.deepEqual(built.request.categoryRules, completeControlCategoryRules.map((rule) => (
+      rule.category === "AI_MODEL" ? { ...rule, posture: "REVIEW" as const } : rule
+    )));
   }
 
   const duplicated: ControlPolicyDraft = {

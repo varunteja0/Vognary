@@ -48,7 +48,7 @@ export function ControlDecisionDialog({
         <>
           {draft.error ? <p role="alert" className="mr-auto text-sm text-ember">{draft.error}</p> : null}
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" form="control-decision-form" className="btn btn-primary" disabled={pending || !online}>
+          <button type="submit" form="control-decision-form" className="btn btn-primary" disabled={pending || !online || !draft.action}>
             {pending ? "Recording…" : "Record decision"}
           </button>
         </>
@@ -57,14 +57,13 @@ export function ControlDecisionDialog({
       <dl className="control-facts">
         <ControlFact label="Merchant" value={proposal.merchant} />
         <ControlFact label="Purpose" value={proposal.purpose} />
-        <ControlFact label="Assumption per charge" value={formatControlMoney(proposal.amountMinor, proposal.currency)} />
-        <ControlFact label="Currency" value={proposal.currency} />
+        <ControlFact label="Assumption per charge" value={formatControlMoney(proposal.amountMinor, proposal.currency)} engraved />
       </dl>
 
       {evaluation ? (
-        <p className="mt-3 flex flex-wrap items-center gap-2">
+        <p className="proof-head mt-4">
           <span className={controlStatusToneClass[evaluation.status]}>{controlStatusLabels[evaluation.status]}</span>
-          <span className="font-data text-xs text-(--muted)">Policy version {evaluation.policyVersion}</span>
+          <span className="control-card-meta">Policy version {evaluation.policyVersion} · policy context only, not an authorization</span>
         </p>
       ) : null}
 
@@ -83,6 +82,7 @@ export function ControlDecisionDialog({
             <label key={action} className="control-choice" htmlFor={`control-action-${action}`}>
               <input
                 id={`control-action-${action}`}
+                className="tick"
                 type="radio"
                 name="control-decision-action"
                 value={action}
@@ -113,6 +113,21 @@ export function ControlDecisionDialog({
             <p id="control-cap-hint" className="field-hint">
               At or below {formatControlMoney(proposal.amountMinor, proposal.currency)}. This exact figure is frozen.
             </p>
+          </div>
+        ) : null}
+
+        {evaluation?.status === "OUTSIDE_POLICY" && draft.action && draft.action !== "DECLINE" ? (
+          <div className="control-field mt-4">
+            <label className="field-label" htmlFor="control-override-reason">Why this outside-policy proposal is authorized</label>
+            <textarea
+              id="control-override-reason"
+              className="field"
+              rows={3}
+              maxLength={500}
+              value={draft.overrideReason}
+              onChange={(event) => onChange({ overrideReason: event.target.value })}
+            />
+            <p className="field-hint">Required. This reason is stored with the decision and is never an automatic approval.</p>
           </div>
         ) : null}
       </form>

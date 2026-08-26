@@ -93,6 +93,7 @@ export const controlReasonLabels: Record<PolicyReasonCode, string> = {
   PER_CHARGE_LIMIT_EXCEEDED: "The per-charge limit is exceeded.",
   THIRTEEN_WEEK_LIMIT_EXCEEDED: "The 13-week exposure limit is exceeded.",
   ANNUAL_LIMIT_EXCEEDED: "The annual exposure limit is exceeded.",
+  EXPOSURE_NOT_CITED: "Eligible existing spend was not cited, so this cannot be within policy.",
 };
 
 export const controlDecisionActionLabels: Record<ProposalDecisionAction, string> = {

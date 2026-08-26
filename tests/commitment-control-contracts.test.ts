@@ -12,10 +12,12 @@ import {
   normalizeControlProposalRequest,
   normalizeControlReconciliationRequest,
 } from "../src/lib/commitment-control/contracts";
+import { completeControlPolicyRequest } from "./commitment-control-policy-fixture";
 
 const proposalDto = {
   id: "a1000000-0000-4000-8000-000000000001",
   submittedByUserId: "b1000000-0000-4000-8000-000000000001",
+  submittedByDisplayName: "Control member",
   merchant: "OpenAI",
   purpose: "Production capacity",
   category: "AI_MODEL",
@@ -38,6 +40,7 @@ const evaluationDto = {
   humanDecisionRequired: true,
   assumptionFields: ["amountMinor", "currency", "category", "thirteenWeekMinor", "annualMinor"],
   citedEvidenceIds: ["e1000000-0000-4000-8000-000000000001"],
+  citedExposureBasis: "NONE",
   reasonCodes: [],
   currencyResults: [{
     currency: "INR",
@@ -63,6 +66,8 @@ const decisionDto = {
   currency: "INR",
   expectedAmountMinor: "199900",
   decidedByUserId: null,
+  decidedByDisplayName: null,
+  overrideReason: null,
   decidedAt: "2026-08-25T09:05:00.000Z",
 } as const;
 
@@ -83,22 +88,14 @@ const reconciliationDto = {
 
 test("normalizes the complete Commitment Control request boundary", () => {
   assert.deepEqual(normalizeControlPolicyRequest({
-    categoryRules: [{ category: "AI_MODEL", posture: "ALLOW" }],
+    ...completeControlPolicyRequest(),
     currencyLimits: [{
       currency: " inr ",
       maxPerChargeMinor: "500000",
       maxThirteenWeekMinor: "3000000",
       maxAnnualMinor: "12000000",
     }],
-  }), {
-    categoryRules: [{ category: "AI_MODEL", posture: "ALLOW" }],
-    currencyLimits: [{
-      currency: "INR",
-      maxPerChargeMinor: "500000",
-      maxThirteenWeekMinor: "3000000",
-      maxAnnualMinor: "12000000",
-    }],
-  });
+  }), completeControlPolicyRequest());
 
   assert.deepEqual(normalizeControlProposalRequest({
     merchant: "  OpenAI ",
@@ -135,6 +132,15 @@ test("fails closed on unknown or structurally invalid request data", () => {
     categoryRules: [{ category: "AI_MODEL", posture: "AUTO_APPROVE" }],
     currencyLimits: [],
   }), /posture/i);
+  assert.throws(() => normalizeControlPolicyRequest({
+    categoryRules: [{ category: "AI_MODEL", posture: "ALLOW" }],
+    currencyLimits: [{
+      currency: "INR",
+      maxPerChargeMinor: "500000",
+      maxThirteenWeekMinor: "3000000",
+      maxAnnualMinor: "12000000",
+    }],
+  }), /every category/i);
   assert.throws(() => normalizeControlProposalRequest({
     merchant: "OpenAI",
     purpose: "Production",
@@ -182,13 +188,7 @@ test("publishes one canonical endpoint contract for the Control transport", () =
 test("runtime guards accept exact Control DTOs and reject malformed financial facts", () => {
   const policy = {
     policyVersion: 1,
-    categoryRules: [{ category: "AI_MODEL", posture: "ALLOW" }],
-    currencyLimits: [{
-      currency: "INR",
-      maxPerChargeMinor: "500000",
-      maxThirteenWeekMinor: "3000000",
-      maxAnnualMinor: "12000000",
-    }],
+    ...completeControlPolicyRequest(),
     createdByUserId: null,
     createdAt: "2026-08-25T08:00:00.000Z",
   } as const;

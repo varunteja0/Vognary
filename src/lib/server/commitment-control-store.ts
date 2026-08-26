@@ -32,6 +32,8 @@ import { advanceDateByFrequency, type Frequency } from "@/lib/recurring-audit";
 import { getDatabasePool } from "@/lib/server/database";
 import { hashRecoveryRequest, RecoveryServiceError } from "@/lib/server/recovery-api";
 import { recordConsentedProductEvent } from "@/lib/server/product-event-store";
+import { countAuthorizingAdmins } from "@/lib/server/workspace-invite-store";
+import { isResendConfigured, sendWithResend } from "@/lib/server/resend-mailer";
 
 type WorkspaceRole = "viewer" | "member" | "admin" | "owner";
 type ControlMutationKind = "CONTROL_POLICY" | "CONTROL_PROPOSAL" | "CONTROL_DECISION" | "CONTROL_RECONCILIATION";
@@ -82,7 +84,11 @@ export async function putCommitmentControlPolicy(input: {
       );
       const row = inserted.rows[0];
       if (!row) throw new RecoveryServiceError("SAVE_FAILED");
-      return { data: { policy: mapPolicy(row) }, entityId: input.workspaceId };
+      return {
+        data: { policy: mapPolicy(row) },
+        entityId: input.workspaceId,
+        auditMetadata: { action: "policy_recorded", policyVersion },
+      };
     },
   });
 }
@@ -116,6 +122,8 @@ export async function createCommitmentControlProposal(input: {
       const projected = projection.proposals[0];
       if (!projected) throw new RecoveryServiceError("INVALID_EVIDENCE", "Proposal projection is empty.");
       const existingExposure = await loadExistingExposure(client, input.workspaceId, input.request.existingCommitmentIds, asOfDate);
+      const eligibleUncited = input.request.existingCommitmentIds.length === 0
+        && await workspaceHasEligibleExposure(client, input.workspaceId);
       const evaluation = evaluateProposalPolicy({
         proposal: {
           proposalId,
@@ -127,20 +135,22 @@ export async function createCommitmentControlProposal(input: {
         },
         policy,
         existingExposure,
+        eligibleUncited,
       });
       const merchant = boundedText(input.request.merchant, "Proposal merchant", 1, 240);
       const purpose = boundedText(input.request.purpose, "Proposal purpose", 1, 500);
+      const submittedByDisplayName = await readActorDisplayName(client, input.actorUserId);
       const proposalResult = await client.query<ProposalRow>(
         `insert into commitment_control_proposals (
-           id, workspace_id, submitted_by_user_id, merchant, purpose, category,
+           id, workspace_id, submitted_by_user_id, submitted_by_display_name, merchant, purpose, category,
            amount_minor, currency, first_charge_date, cadence, as_of_date,
            projected_13_week_minor, projected_annual_minor, created_at
-         ) values ($1, $2, $3, $4, $5, $6, $7::bigint, $8, $9::date, $10, $11::date, $12::bigint, $13::bigint, $14)
-         returning id, submitted_by_user_id, merchant, purpose, category, amount_minor::text,
+         ) values ($1, $2, $3, $4, $5, $6, $7, $8::bigint, $9, $10::date, $11, $12::date, $13::bigint, $14::bigint, $15)
+         returning id, submitted_by_user_id, submitted_by_display_name, merchant, purpose, category, amount_minor::text,
            currency, first_charge_date, cadence, as_of_date, projected_13_week_minor::text,
            projected_annual_minor::text, assumption_basis, created_at`,
         [
-          proposalId, input.workspaceId, input.actorUserId, merchant, purpose, input.request.category,
+          proposalId, input.workspaceId, input.actorUserId, submittedByDisplayName, merchant, purpose, input.request.category,
           projected.amountMinor, projected.currency, projected.firstChargeDate, projected.cadence,
           asOfDate, projected.thirteenWeekMinor, projected.annualMinor, now,
         ],
@@ -149,13 +159,14 @@ export async function createCommitmentControlProposal(input: {
       const evaluationResult = await client.query<EvaluationRow>(
         `insert into commitment_control_evaluations (
            id, workspace_id, proposal_id, policy_version, status, human_decision_required,
-           assumption_fields, reason_codes, currency_results, evaluated_at
-         ) values ($1, $2, $3, $4, $5, true, $6::text[], $7::text[], $8::jsonb, $9)
+           assumption_fields, reason_codes, currency_results, cited_exposure_basis, evaluated_at
+         ) values ($1, $2, $3, $4, $5, true, $6::text[], $7::text[], $8::jsonb, $9, $10)
          returning id, proposal_id, policy_version, status, human_decision_required,
-           assumption_fields, reason_codes, currency_results, evaluated_at`,
+           assumption_fields, reason_codes, currency_results, cited_exposure_basis, evaluated_at`,
         [
           evaluationId, input.workspaceId, proposalId, evaluation.policyVersion, evaluation.status,
-          evaluation.assumptionFields, evaluation.reasonCodes, JSON.stringify(evaluation.currencyResults), now,
+          evaluation.assumptionFields, evaluation.reasonCodes, JSON.stringify(evaluation.currencyResults),
+          evaluation.citedExposureBasis, now,
         ],
       );
       for (const evidenceId of evaluation.citedEvidenceIds) {
@@ -174,6 +185,13 @@ export async function createCommitmentControlProposal(input: {
           evaluation: mapEvaluation(evaluationRow, evaluation.citedEvidenceIds),
         },
         entityId: proposalId,
+        auditMetadata: {
+          action: "proposal_submitted",
+          merchant,
+          currency: projected.currency,
+          amountMinor: projected.amountMinor,
+          policyVersion: evaluation.policyVersion,
+        },
       };
     },
   });
@@ -198,31 +216,56 @@ export async function decideCommitmentControlProposal(input: {
     write: async (client, now, membership) => {
       const loaded = await loadProposalEvaluation(client, input.workspaceId, proposalId);
       if (!loaded) throw new RecoveryServiceError("NOT_FOUND");
-      const authorized = authorizeProposalDecision({
-        actorRole: membership.role,
-        actorUserId: input.actorUserId,
-        evaluation: loaded.evaluation,
-        action: input.request.action,
-        approvedCapMinor: input.request.approvedCapMinor,
-        decidedAt: now.toISOString(),
-      });
+      const authorizingAdminCount = await countAuthorizingAdmins(client, input.workspaceId).catch(() => 1);
+      const decidedByDisplayName = await readActorDisplayName(client, input.actorUserId);
+      let authorized;
+      try {
+        authorized = authorizeProposalDecision({
+          actorRole: membership.role,
+          actorUserId: input.actorUserId,
+          evaluation: loaded.evaluation,
+          action: input.request.action,
+          approvedCapMinor: input.request.approvedCapMinor,
+          decidedAt: now.toISOString(),
+          submittedByUserId: loaded.proposal.submittedByUserId,
+          authorizingAdminCount,
+          overrideReason: input.request.overrideReason,
+        });
+      } catch (error) {
+        if (error instanceof Error && /second owner or admin/i.test(error.message)) {
+          throw new RecoveryServiceError("FORBIDDEN", error.message);
+        }
+        throw error;
+      }
       const decisionId = randomUUID();
       const result = await client.query<DecisionRow>(
         `insert into commitment_control_decisions (
            id, workspace_id, proposal_id, evaluation_id, action, expected_amount_minor,
-           approved_cap_minor, currency, decided_by_user_id, decided_at
-         ) values ($1, $2, $3, $4, $5, $6::bigint, $7::bigint, $8, $9, $10)
+           approved_cap_minor, currency, decided_by_user_id, decided_by_display_name,
+           override_reason, decided_at
+         ) values ($1, $2, $3, $4, $5, $6::bigint, $7::bigint, $8, $9, $10, $11, $12)
          returning id, proposal_id, evaluation_id, action, expected_amount_minor::text,
-           approved_cap_minor::text, currency, decided_by_user_id, decided_at`,
+           approved_cap_minor::text, currency, decided_by_user_id, decided_by_display_name,
+           override_reason, decided_at`,
         [
           decisionId, input.workspaceId, proposalId, loaded.evaluation.id, authorized.action,
           authorized.expectedAmountMinor, authorized.approvedCapMinor, authorized.currency,
-          input.actorUserId, authorized.decidedAt,
+          input.actorUserId, decidedByDisplayName, authorized.overrideReason, authorized.decidedAt,
         ],
       );
       const row = result.rows[0];
       if (!row) throw new RecoveryServiceError("SAVE_FAILED");
-      return { data: { decision: mapDecision(row, loaded.evaluation.policyVersion) }, entityId: decisionId };
+      return {
+        data: { decision: mapDecision(row, loaded.evaluation.policyVersion) },
+        entityId: decisionId,
+        auditMetadata: {
+          action: authorized.action,
+          merchant: loaded.proposal.merchant,
+          currency: authorized.currency,
+          amountMinor: authorized.expectedAmountMinor,
+          policyVersion: loaded.evaluation.policyVersion,
+        },
+      };
     },
   });
 }
@@ -303,7 +346,7 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
     );
     const policy = await loadLatestPolicyRow(client, input.workspaceId);
     const proposals = await client.query<ProposalRow>(
-      `select id, submitted_by_user_id, merchant, purpose, category, amount_minor::text,
+      `select id, submitted_by_user_id, submitted_by_display_name, merchant, purpose, category, amount_minor::text,
          currency, first_charge_date, cadence, as_of_date, projected_13_week_minor::text,
          projected_annual_minor::text, assumption_basis, created_at
        from commitment_control_proposals where workspace_id = $1
@@ -313,7 +356,7 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
     const evaluations = await client.query<EvaluationRow & { cited_evidence_ids: string[] }>(
       `select evaluation.id, evaluation.proposal_id, evaluation.policy_version, evaluation.status,
          evaluation.human_decision_required, evaluation.assumption_fields, evaluation.reason_codes,
-         evaluation.currency_results, evaluation.evaluated_at,
+         evaluation.currency_results, evaluation.cited_exposure_basis, evaluation.evaluated_at,
          coalesce(array_agg(link.evidence_id order by link.evidence_id)
            filter (where link.evidence_id is not null), '{}') as cited_evidence_ids
        from commitment_control_evaluations evaluation
@@ -327,7 +370,8 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
     const decisions = await client.query<DecisionRow & { policy_version: number }>(
       `select decision.id, decision.proposal_id, decision.evaluation_id, decision.action,
          decision.expected_amount_minor::text, decision.approved_cap_minor::text,
-         decision.currency, decision.decided_by_user_id, decision.decided_at,
+         decision.currency, decision.decided_by_user_id, decision.decided_by_display_name,
+         decision.override_reason, decision.decided_at,
          evaluation.policy_version
        from commitment_control_decisions decision
        join commitment_control_evaluations evaluation
@@ -389,7 +433,7 @@ async function runControlMutation<T>(input: {
   mutationKind: ControlMutationKind;
   requestForHash: unknown;
   now?: Date;
-  write: (client: PoolClient, now: Date, membership: { role: WorkspaceRole }) => Promise<{ data: T; entityId: string }>;
+  write: (client: PoolClient, now: Date, membership: { role: WorkspaceRole }) => Promise<{ data: T; entityId: string; auditMetadata?: Record<string, unknown> }>;
 }): Promise<{ data: T; workspaceVersion: number; replayed: boolean }> {
   assertControlEnrollment(input.workspaceId);
   const requestHash = hashRecoveryRequest({ operation: input.operation, request: input.requestForHash });
@@ -418,7 +462,10 @@ async function runControlMutation<T>(input: {
     await client.query(
       `insert into audit_log (workspace_id, user_id, action, entity_type, entity_id, metadata)
        values ($1, $2, $3, 'commitment-control', $4, $5::jsonb)`,
-      [input.workspaceId, input.actorUserId, input.operation, written.entityId, JSON.stringify({ workspaceVersion })],
+      [input.workspaceId, input.actorUserId, input.operation, written.entityId, JSON.stringify({
+        workspaceVersion,
+        ...(written.auditMetadata ?? {}),
+      })],
     );
     await client.query("commit");
     committed = { data: written.data, workspaceVersion, replayed: false };
@@ -436,7 +483,26 @@ async function runControlMutation<T>(input: {
     source: "workspace-api",
     status: "succeeded",
   }).catch(() => undefined);
+  if (input.mutationKind === "CONTROL_PROPOSAL") {
+    const proposal = (committed.data as { proposal?: { id?: string; merchant?: string; currency?: string; amountMinor?: string } }).proposal;
+    await notifyControlProposalSubmitted({
+      workspaceId: input.workspaceId,
+      actorUserId: input.actorUserId,
+      proposalId: proposal?.id ?? writtenEntity(committed.data),
+      merchant: proposal?.merchant ?? "a proposal",
+      currency: proposal?.currency,
+      amountMinor: proposal?.amountMinor,
+    }).catch(() => undefined);
+  }
   return committed;
+}
+
+function writtenEntity(data: unknown) {
+  if (!data || typeof data !== "object") return "";
+  if ("proposal" in data && data.proposal && typeof data.proposal === "object" && "id" in data.proposal) {
+    return String((data.proposal as { id?: unknown }).id ?? "");
+  }
+  return "";
 }
 
 async function loadExistingExposure(
@@ -470,22 +536,50 @@ async function loadExistingExposure(
     [workspaceId, uniqueIds],
   );
   if (result.rows.length !== uniqueIds.length) throw new RecoveryServiceError("NOT_FOUND", "An existing commitment was not found in this workspace.");
-  const totals = new Map<string, { thirteenWeekMinor: bigint; annualMinor: bigint; evidenceIds: Set<string> }>();
+  const totals = new Map<string, {
+    thirteenWeekMinor: bigint;
+    annualMinor: bigint;
+    evidenceIds: Set<string>;
+    basis: "PROJECTED" | "OBSERVATION_ONLY";
+  }>();
   for (const row of result.rows) {
-    if (!row.next_expected_date || row.cadence === "IRREGULAR" || !row.evidence_ids.length) {
-      throw new RecoveryServiceError("INVALID_EVIDENCE", "Existing exposure needs a settled cadence, next charge date, and persisted evidence.");
+    if (!row.evidence_ids.length) {
+      throw new RecoveryServiceError("INVALID_EVIDENCE", "Existing exposure needs persisted evidence.");
     }
-    const firstChargeDate = rollForwardDate(toDateOnly(row.next_expected_date), row.cadence, asOfDate);
+    const observationOnly = !row.next_expected_date || row.cadence === "IRREGULAR";
+    if (observationOnly) {
+      const amount = BigInt(row.amount_minor);
+      const current = totals.get(row.currency) ?? {
+        thirteenWeekMinor: BigInt(0),
+        annualMinor: BigInt(0),
+        evidenceIds: new Set<string>(),
+        basis: "OBSERVATION_ONLY" as const,
+      };
+      current.thirteenWeekMinor = addMinorUnits(current.thirteenWeekMinor, amount, "Existing observation exposure");
+      current.annualMinor = addMinorUnits(current.annualMinor, amount, "Existing observation exposure");
+      current.basis = "OBSERVATION_ONLY";
+      row.evidence_ids.forEach((id) => current.evidenceIds.add(id));
+      totals.set(row.currency, current);
+      continue;
+    }
+    const nextDate = row.next_expected_date;
+    if (!nextDate) throw new RecoveryServiceError("SAVE_FAILED", "Projected exposure is missing a next charge date.");
+    const firstChargeDate = rollForwardDate(toDateOnly(nextDate), row.cadence as ProposalCadence, asOfDate);
     const projection = projectProposalExposure([{
       proposalId: row.id,
       amountMinor: row.amount_minor,
       currency: row.currency,
       firstChargeDate,
-      cadence: row.cadence,
+      cadence: row.cadence as ProposalCadence,
     }], { asOfDate });
     const projected = projection.proposals[0];
     if (!projected) throw new RecoveryServiceError("INVALID_EVIDENCE", "Existing exposure projection is empty.");
-    const current = totals.get(projected.currency) ?? { thirteenWeekMinor: BigInt(0), annualMinor: BigInt(0), evidenceIds: new Set<string>() };
+    const current = totals.get(projected.currency) ?? {
+      thirteenWeekMinor: BigInt(0),
+      annualMinor: BigInt(0),
+      evidenceIds: new Set<string>(),
+      basis: "PROJECTED" as const,
+    };
     current.thirteenWeekMinor = addMinorUnits(current.thirteenWeekMinor, BigInt(projected.thirteenWeekMinor), "Existing 13-week exposure");
     current.annualMinor = addMinorUnits(current.annualMinor, BigInt(projected.annualMinor), "Existing annual exposure");
     row.evidence_ids.forEach((id) => current.evidenceIds.add(id));
@@ -496,12 +590,13 @@ async function loadExistingExposure(
     thirteenWeekMinor: total.thirteenWeekMinor.toString(),
     annualMinor: total.annualMinor.toString(),
     evidenceIds: [...total.evidenceIds].sort(),
+    basis: total.basis,
   }));
 }
 
 async function loadProposalEvaluation(client: PoolClient, workspaceId: string, proposalId: string) {
   const proposalResult = await client.query<ProposalRow>(
-    `select id, submitted_by_user_id, merchant, purpose, category, amount_minor::text,
+    `select id, submitted_by_user_id, submitted_by_display_name, merchant, purpose, category, amount_minor::text,
        currency, first_charge_date, cadence, as_of_date, projected_13_week_minor::text,
        projected_annual_minor::text, assumption_basis, created_at
      from commitment_control_proposals where workspace_id = $1 and id = $2`,
@@ -510,7 +605,7 @@ async function loadProposalEvaluation(client: PoolClient, workspaceId: string, p
   const evaluationResult = await client.query<EvaluationRow & { cited_evidence_ids: string[] }>(
     `select evaluation.id, evaluation.proposal_id, evaluation.policy_version, evaluation.status,
        evaluation.human_decision_required, evaluation.assumption_fields, evaluation.reason_codes,
-       evaluation.currency_results, evaluation.evaluated_at,
+       evaluation.currency_results, evaluation.cited_exposure_basis, evaluation.evaluated_at,
        coalesce(array_agg(link.evidence_id order by link.evidence_id)
          filter (where link.evidence_id is not null), '{}') as cited_evidence_ids
      from commitment_control_evaluations evaluation
@@ -537,7 +632,8 @@ async function loadProposalEvaluation(client: PoolClient, workspaceId: string, p
   };
   const decisionResult = await client.query<DecisionRow>(
     `select id, proposal_id, evaluation_id, action, expected_amount_minor::text,
-       approved_cap_minor::text, currency, decided_by_user_id, decided_at
+       approved_cap_minor::text, currency, decided_by_user_id, decided_by_display_name,
+       override_reason, decided_at
      from commitment_control_decisions where workspace_id = $1 and proposal_id = $2`,
     [workspaceId, proposalId],
   );
@@ -658,6 +754,7 @@ function mapProposal(row: ProposalRow): ControlProposalDto {
   return {
     id: row.id,
     submittedByUserId: row.submitted_by_user_id,
+    submittedByDisplayName: row.submitted_by_display_name ?? null,
     merchant: row.merchant,
     purpose: row.purpose,
     category: row.category,
@@ -682,6 +779,7 @@ function mapEvaluation(row: EvaluationRow, citedEvidenceIds: string[]): ControlE
     humanDecisionRequired: true,
     assumptionFields: row.assumption_fields,
     reasonCodes: row.reason_codes,
+    citedExposureBasis: row.cited_exposure_basis ?? (citedEvidenceIds.length ? "PROJECTED" : "NONE"),
     currencyResults: row.currency_results,
     citedEvidenceIds,
     evaluatedAt: row.evaluated_at.toISOString(),
@@ -699,6 +797,8 @@ function mapDecision(row: DecisionRow, policyVersion: number): ControlDecisionDt
     currency: row.currency,
     expectedAmountMinor: row.expected_amount_minor,
     decidedByUserId: row.decided_by_user_id,
+    decidedByDisplayName: row.decided_by_display_name ?? null,
+    overrideReason: row.override_reason ?? null,
     decidedAt: row.decided_at.toISOString(),
   };
 }
@@ -761,6 +861,9 @@ function toDateOnly(value: Date | string) {
 function normalizeStoreError(error: unknown) {
   if (error instanceof RecoveryServiceError) return error;
   const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+  if (code === "42P01" || code === "42703") {
+    return new RecoveryServiceError("FEATURE_UNAVAILABLE", "Commitment Control is not fully installed for this deployment.");
+  }
   if (code === "23503") return new RecoveryServiceError("NOT_FOUND");
   if (code === "23505" || code === "55000") return new RecoveryServiceError("CONFLICT");
   if (code === "23514" || error instanceof RangeError || error instanceof TypeError) return new RecoveryServiceError("INVALID_EVIDENCE");
@@ -768,6 +871,79 @@ function normalizeStoreError(error: unknown) {
     return new RecoveryServiceError("INVALID_EVIDENCE", error.message);
   }
   return new RecoveryServiceError("SAVE_FAILED", error instanceof Error ? error.message : undefined, { retryable: true });
+}
+
+async function workspaceHasEligibleExposure(client: PoolClient, workspaceId: string) {
+  const result = await client.query<{ exists: boolean }>(
+    `select exists (
+       select 1
+       from recovery_commitments commitment
+       where commitment.workspace_id = $1
+         and commitment.effective_status = 'ACTIVE'
+         and exists (
+           select 1 from recovery_commitment_evidence link
+           where link.workspace_id = commitment.workspace_id
+             and link.commitment_id = commitment.id
+         )
+     ) as exists`,
+    [workspaceId],
+  );
+  return result.rows[0]?.exists === true;
+}
+
+async function readActorDisplayName(client: PoolClient, userId: string) {
+  const result = await client.query<{ name: string | null }>(
+    `select left(coalesce(nullif(btrim(display_name), ''), split_part(email, '@', 1)), 120) as name
+     from users where id = $1`,
+    [userId],
+  );
+  const name = result.rows[0]?.name?.trim() ?? "";
+  return name.length ? name : null;
+}
+
+async function notifyControlProposalSubmitted(input: {
+  workspaceId: string;
+  actorUserId: string;
+  proposalId: string;
+  merchant: string;
+  currency?: string;
+  amountMinor?: string;
+}) {
+  if (!isResendConfigured() || !input.proposalId) return;
+  const origin = process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.APP_URL?.trim() || "";
+  const deskUrl = origin
+    ? `${origin.replace(/\/$/, "")}/app?view=CONTROL&proposal=${encodeURIComponent(input.proposalId)}`
+    : `/app?view=CONTROL&proposal=${encodeURIComponent(input.proposalId)}`;
+  const recipients = await getDatabasePool().query<{ email: string }>(
+    `select u.email
+     from workspace_members wm
+     join users u on u.id = wm.user_id
+     where wm.workspace_id = $1
+       and wm.role in ('owner', 'admin')
+       and wm.user_id <> $2
+       and u.deleted_at is null`,
+    [input.workspaceId, input.actorUserId],
+  );
+  const amountLine = input.amountMinor && input.currency
+    ? `${input.amountMinor} minor units ${input.currency}`
+    : "amount as recorded on the proposal";
+  for (const row of recipients.rows) {
+    const text = [
+      `A Commitment Control proposal for ${input.merchant} needs a human decision.`,
+      `Recorded amount: ${amountLine}.`,
+      `Open ${deskUrl}`,
+      "Vognary does not purchase, provision, cancel, or move money.",
+    ].join("\n");
+    await sendWithResend({
+      email: row.email,
+      idempotencyKey: `control-proposal/${input.proposalId}/${row.email}`,
+      message: {
+        subject: `Decision needed: ${input.merchant}`,
+        text,
+        html: `<p>${text.replaceAll("\n", "<br>")}</p>`,
+      },
+    }).catch(() => undefined);
+  }
 }
 
 function assertControlEnrollment(workspaceId: string) {
@@ -788,6 +964,7 @@ type PolicyRow = {
 type ProposalRow = {
   id: string;
   submitted_by_user_id: string | null;
+  submitted_by_display_name: string | null;
   merchant: string;
   purpose: string;
   category: ProposalCategory;
@@ -811,6 +988,7 @@ type EvaluationRow = {
   assumption_fields: ControlEvaluationDto["assumptionFields"];
   reason_codes: ControlEvaluationDto["reasonCodes"];
   currency_results: ControlEvaluationDto["currencyResults"];
+  cited_exposure_basis?: ControlEvaluationDto["citedExposureBasis"];
   evaluated_at: Date;
 };
 
@@ -823,6 +1001,8 @@ type DecisionRow = {
   approved_cap_minor: string | null;
   currency: string;
   decided_by_user_id: string | null;
+  decided_by_display_name?: string | null;
+  override_reason?: string | null;
   decided_at: Date;
 };
 

@@ -36,10 +36,8 @@ import { RecoveryCommitments, type CommitmentsHandlers } from "./recovery-commit
 import { RecoveryOverlay } from "./ui/overlay";
 import { CorrectionForm, EvidenceInspector } from "./recovery-evidence-panels";
 import { RecoveryHome } from "./recovery-home";
-import { RecoveryMandate } from "./recovery-mandate";
 import { RecoverySources } from "./recovery-sources";
 import { AuthRequiredBlock, FailureBlock, LoadingBlock, OfflineBlock, StateBlock } from "./recovery-states";
-import { offAutopilotNoticeReadiness } from "@/lib/recovery/notice-readiness";
 import {
   correctionPatchFromDraft,
   evidenceRequestFromDraft,
@@ -129,6 +127,13 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     loadEvidence: loadControlEvidence,
   });
   const controlAvailable = controlDesk.available;
+  const pendingDecisionCount = controlDesk.state.brief?.proposals.filter((entry) => entry.evaluation && !entry.decision).length ?? 0;
+  const awaitingControlEvidence = Boolean(
+    controlDesk.state.brief?.proposals.some((entry) =>
+      entry.decision
+      && entry.decision.action !== "DECLINE"
+      && entry.reconciliations.length === 0),
+  );
 
   const loadSnapshot = useCallback(async () => {
     dispatch({ type: "SNAPSHOT_REQUESTED" });
@@ -477,6 +482,19 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   }, [state.view]);
 
   const controlDefaultRef = useRef(false);
+  const urlDeepLinkRef = useRef(false);
+  useEffect(() => {
+    if (urlDeepLinkRef.current || typeof window === "undefined") return;
+    urlDeepLinkRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get("view");
+    const proposal = params.get("proposal");
+    if (view === "CONTROL" || proposal) {
+      viewChosenByReaderRef.current = true;
+      dispatch({ type: "VIEW_SELECTED", view: "CONTROL" });
+    }
+    if (proposal) controlDesk.handlers.focusProposal(proposal);
+  }, [controlDesk.handlers]);
   useEffect(() => {
     if (controlDefaultRef.current || !controlAvailable) return;
     controlDefaultRef.current = true;
@@ -642,6 +660,11 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     if (state.status.kind !== "READY" || !state.home) return;
     const record = readStartSessionRecord();
     if (!record?.decisions.length) return;
+    if (controlAvailable) {
+      startReplayRef.current = true;
+      clearStartSessionRecord();
+      return;
+    }
     if (!state.home.decisionQueue.length) return;
     startReplayRef.current = true;
     const home = state.home;
@@ -669,9 +692,9 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         );
       }
     })();
-    // One-shot replay of /start decisions; decide is the current snapshot writer.
+    // One-shot replay of leftover /start Keep-Cancel records; Control enrolled workspaces discard them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.home, state.status.kind]);
+  }, [state.home, state.status.kind, controlAvailable]);
 
   async function updateReceiptInbox(action: "PROVISION" | "ROTATE" | "REVOKE") {
     const activeAliasId = state.receiptInbox?.alias?.id ?? null;
@@ -684,30 +707,6 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         : await transport.revokeReceiptInbox();
     if (result.ok) dispatch({ type: "SOURCE_ACTION_SAVED", receiptInbox: result.data, meta: result.meta });
     else dispatch({ type: "SOURCE_ACTION_FAILED", failure: result });
-  }
-
-  async function signMandate() {
-    if (state.workspaceVersion === null) return;
-    const idempotencyKey = newIdempotencyKey();
-    dispatch({ type: "MANDATE_STARTED", action: "SIGN", idempotencyKey });
-    const result = await transport.signStandingMandate({ workspaceVersion: state.workspaceVersion, idempotencyKey });
-    if (!result.ok) {
-      dispatch({ type: "MUTATION_FAILED", failure: result });
-      return;
-    }
-    await loadSnapshot();
-  }
-
-  async function revokeMandate() {
-    if (state.workspaceVersion === null) return;
-    const idempotencyKey = newIdempotencyKey();
-    dispatch({ type: "MANDATE_STARTED", action: "REVOKE", idempotencyKey });
-    const result = await transport.revokeStandingMandate({ workspaceVersion: state.workspaceVersion, idempotencyKey });
-    if (!result.ok) {
-      dispatch({ type: "MUTATION_FAILED", failure: result });
-      return;
-    }
-    await loadSnapshot();
   }
 
   async function vetoCandidate(candidateId: string) {
@@ -782,28 +781,31 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   const accountEmail = state.session?.authenticated ? state.session.session.email : null;
   const hasGuidedAddStep = state.home !== null
     && (workspaceEmpty || (state.home.coverage.evidenceCount > 0 && state.commitmentTotal === 0));
-  const showPersistentAdd = state.status.kind === "READY" && state.home !== null && !hasGuidedAddStep;
-  const mandateAvailable = Boolean(state.home?.autopilot?.mandate)
-    || state.home?.autopilot?.noticeReadiness.state === "proven-ready";
-  // A workspace outside the private Control pilot never sees the destination:
-  // no tab, no disabled command, no copy suggesting access.
+  const showPersistentAdd = state.status.kind === "READY"
+    && state.home !== null
+    && !hasGuidedAddStep
+    && (state.view !== "CONTROL" || awaitingControlEvidence);
+  const controlPilotOff = controlDesk.unavailable;
+  const workspaceId = state.home?.workspace.id ?? null;
+  // Autopilot engines stay fail-closed. The customer nav never offers Mandate.
   const primaryViews = recoveryViews.filter((view) =>
-    (view !== "MANDATE" || mandateAvailable) && (view !== "CONTROL" || controlAvailable));
+    view !== "MANDATE" && (view !== "CONTROL" || controlAvailable));
   const navColumnsClass = primaryViews.length >= 5
     ? "grid-cols-5"
     : primaryViews.length === 4 ? "grid-cols-4" : "grid-cols-3";
   return (
-    <main id="recovery-workspace" className="relative px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-5 text-foreground sm:px-6 sm:pb-10 lg:px-8">
+    <main id="recovery-workspace" className="relative px-4 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] pt-4 text-foreground sm:px-6 sm:pb-12 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-2.5">
+        <header className="flex flex-wrap items-center justify-between gap-3 pb-3">
+          <div className="inline-flex min-w-0 items-center gap-2.5">
             <VognaryMark size={24} />
             <h1 className="font-display text-lg font-semibold text-(--ink)">Vognary</h1>
-          </div>
-          <div className="flex items-center gap-2">
+            <span aria-hidden className="hidden h-4 w-px bg-(--line-strong) sm:block" />
             <p className="hidden font-data text-xs text-(--muted) sm:block">
               {state.workspaceVersion === null ? "Loading your workspace…" : "Saved to Vognary"}
             </p>
+          </div>
+          <div className="flex items-center gap-2">
             {showPersistentAdd ? (
               <button
                 id="workspace-add-bill"
@@ -829,7 +831,14 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           </div>
         </header>
 
-        <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 py-2 sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
+        {controlPilotOff && workspaceId ? (
+          <p role="status" className="mt-3 text-sm leading-6 text-(--muted)">
+            The private Control pilot is not on for this workspace. Workspace id:{" "}
+            <span className="font-data break-all text-(--ink)">{workspaceId}</span>
+          </p>
+        ) : null}
+
+        <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 pb-[env(safe-area-inset-bottom,0px)] pt-1 sm:static sm:border-0 sm:border-b sm:border-b-line sm:bg-transparent sm:p-0">
           <ul className={`viewnav ${navColumnsClass}`}>
             {primaryViews.map((view) => (
               <li key={view} className="min-w-0">
@@ -840,11 +849,19 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
                   className="truncate"
                 >
                   {recoveryViewLabels[view]}
+                  {view === "CONTROL" && pendingDecisionCount > 0 ? (
+                    <span className="ml-1 font-data text-[11px] text-ember">({pendingDecisionCount})</span>
+                  ) : null}
                 </button>
               </li>
             ))}
           </ul>
         </nav>
+        {controlAvailable ? (
+          <p className="mt-2 hidden text-xs leading-5 text-(--muted) sm:block">
+            Control authorizes new spend. Now, Bills, and Sources hold cited evidence.
+          </p>
+        ) : null}
 
         <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{state.announcement}</p>
 
@@ -877,7 +894,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           className={
             state.view === "HOME" || state.view === "CONTROL"
               ? "sr-only"
-              : "mt-6 w-fit font-display text-2xl font-semibold tracking-tight text-(--ink) outline-none"
+              : "mt-6 w-fit font-display text-2xl font-semibold text-(--ink) outline-none"
           }
         >
           {recoveryViewLabels[state.view]}
@@ -980,6 +997,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           commitments={state.commitments}
           online={state.online}
           onInspectEvidence={(evidenceId, buttonId) => inspectEvidence(null, evidenceId, buttonId)}
+          onAddBill={() => dispatch({ type: "ADD_BILLS_OPENED" })}
         />
       );
     }
@@ -1011,22 +1029,34 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     }
 
     if (state.view === "MANDATE") {
-      return (
-        <RecoveryMandate
-          mandate={state.home?.autopilot?.mandate ?? null}
-          executionEnabled={state.home?.autopilot?.executionEnabled ?? false}
-          noticeReadiness={state.home?.autopilot?.noticeReadiness ?? offAutopilotNoticeReadiness}
-          pendingKind={state.pending?.kind === "MANDATE_SIGN" ? "SIGN" : state.pending?.kind === "MANDATE_REVOKE" ? "REVOKE" : null}
-          online={state.online}
-          canSign={state.home?.workspace.role === "owner"}
-          canOperate={state.home?.workspace.role === "owner" || state.home?.workspace.role === "admin"}
-          handled={state.home?.autopilot?.handled ?? []}
-          needsHelp={state.home?.autopilot?.needsHelp ?? []}
-          attempts={state.home?.autopilot?.attempts ?? []}
-          onSign={() => void signMandate()}
-          onRevoke={() => void revokeMandate()}
+      return state.home ? (
+        <RecoveryHome
+          home={state.home}
+          commitmentTotal={state.commitmentTotal}
+          receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable}
+          onOpenCommitment={openCommitment}
+          onInspectCitedReceipt={(commitmentId, evidenceId) => inspectEvidence(commitmentId, evidenceId, "see-cited-receipt")}
+          onAddEvidence={() => dispatch({ type: "ADD_BILLS_OPENED" })}
+          onOpenSources={() => selectView("ADD_EVIDENCE")}
+          onSeeAllCommitments={() => selectView("COMMITMENTS")}
+          onDecide={(request) => void decide(request)}
+          onReminderConsent={() => void consentReminder()}
+          onPaymentAsk={(answer) => {
+            try {
+              window.sessionStorage.setItem("vognary.payment-ask", answer);
+            } catch {
+              // Written intent is research-only; missing storage does not change money.
+            }
+          }}
+          onSaveContext={(commitmentId, request) => void saveContext(commitmentId, request)}
+          onWorkspaceMutated={() => void loadSnapshot()}
+          receiptInbox={state.receiptInbox}
+          onVeto={(candidateId) => void vetoCandidate(candidateId)}
+          pendingVetoId={state.pending?.kind === "CANDIDATE_VETO" ? state.pending.candidateId : null}
+          pendingDecisionId={state.pending?.kind === "DECISION" ? state.pending.commitmentId : null}
+          onCitedPictureRendered={recordCitedPictureActivation}
         />
-      );
+      ) : null;
     }
 
     return state.home ? (

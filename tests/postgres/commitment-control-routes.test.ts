@@ -18,6 +18,7 @@ import type { ApiFailure, ApiSuccess } from "../../src/lib/recovery/contracts";
 import { getDatabasePool } from "../../src/lib/server/database";
 import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
 import { createSessionCookie } from "../../src/lib/server/session";
+import { completeControlPolicyRequest } from "../commitment-control-policy-fixture";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
 const baseUrl = "https://vognary.test";
@@ -86,9 +87,9 @@ test("Commitment Control HTTP routes preserve auth, RBAC, ETags, and the complet
     assert.equal(oversized.status, 413);
     assert.equal((await oversized.json() as ApiFailure).error.code, "REQUEST_TOO_LARGE");
 
-    const policyRequest = () => new Request(`${baseUrl}/api/workspaces/current/control/policy`, {
+    const incomplete = await putControlPolicy(new Request(`${baseUrl}/api/workspaces/current/control/policy`, {
       method: "PUT",
-      headers: headers(ownerCookieHeader, 0, `control-route-policy-${suffix}`),
+      headers: headers(ownerCookieHeader, 0, `control-route-incomplete-${suffix}`),
       body: JSON.stringify({
         categoryRules: [{ category: "AI_MODEL", posture: "ALLOW" }],
         currencyLimits: [{
@@ -98,6 +99,14 @@ test("Commitment Control HTTP routes preserve auth, RBAC, ETags, and the complet
           maxAnnualMinor: "12000000",
         }],
       }),
+    }));
+    assert.equal(incomplete.status, 400);
+    assert.equal((await incomplete.json() as ApiFailure).error.code, "INVALID_EVIDENCE");
+
+    const policyRequest = () => new Request(`${baseUrl}/api/workspaces/current/control/policy`, {
+      method: "PUT",
+      headers: headers(ownerCookieHeader, 0, `control-route-policy-${suffix}`),
+      body: JSON.stringify(completeControlPolicyRequest()),
     });
     const policy = await putControlPolicy(policyRequest());
     assert.equal(policy.status, 201);

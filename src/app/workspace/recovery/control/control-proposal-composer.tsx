@@ -11,9 +11,9 @@ import {
 } from "./control-format";
 import type { ControlDraftErrors, ControlProposalDraft } from "./control-state";
 
-// The primary working surface. One screen, no wizard: what are you considering
-// committing to, how much, how often, and what already exists that this should
-// be read against. The command is Evaluate, never Approve.
+// The primary working surface. One instrument rail, no wizard: what are you
+// considering committing to, how much, how often, and what already exists that
+// this should be read against. The command is Evaluate, never Approve.
 
 export type ControlComposerHandlers = {
   onChange: (draft: Partial<ControlProposalDraft>) => void;
@@ -26,6 +26,7 @@ export function ControlProposalComposer({
   errors,
   pending,
   online,
+  primary,
   blockedReason,
   eligibleCommitments,
   handlers,
@@ -34,14 +35,18 @@ export function ControlProposalComposer({
   errors: ControlDraftErrors;
   pending: boolean;
   online: boolean;
+  primary: boolean;
   blockedReason: string | null;
   eligibleCommitments: readonly CommitmentSummaryDto[];
   handlers: ControlComposerHandlers;
 }) {
   const selectedCount = draft.existingCommitmentIds.length;
   return (
-    <section aria-labelledby="control-composer-heading" className="control-band">
-      <h3 id="control-composer-heading" className="control-heading">What are you considering committing to?</h3>
+    <section aria-labelledby="control-composer-heading" className="control-band control-band-open">
+      <div className="control-band-head">
+        <h3 id="control-composer-heading" className="control-heading">What are you considering committing to?</h3>
+        <p className="control-band-count">Evaluating never authorizes. A person still decides.</p>
+      </div>
 
       <form
         id="control-proposal-form"
@@ -52,7 +57,12 @@ export function ControlProposalComposer({
           handlers.onSubmit();
         }}
       >
-        <ControlField label="Merchant or counterparty" htmlFor="control-merchant" error={errors.merchant}>
+        <ControlField
+          label="Merchant or counterparty"
+          htmlFor="control-merchant"
+          error={errors.merchant}
+          className="control-field-merchant"
+        >
           <input
             id="control-merchant"
             name="merchant"
@@ -67,7 +77,7 @@ export function ControlProposalComposer({
           />
         </ControlField>
 
-        <ControlField label="Purpose" htmlFor="control-purpose" error={errors.purpose}>
+        <ControlField label="Purpose" htmlFor="control-purpose" error={errors.purpose} className="control-field-purpose">
           <input
             id="control-purpose"
             name="purpose"
@@ -82,69 +92,75 @@ export function ControlProposalComposer({
           />
         </ControlField>
 
-        <div className="control-form-pair">
-          <ControlField label="Category" htmlFor="control-category">
-            <select
-              id="control-category"
-              name="category"
-              className="field"
-              value={draft.category}
-              onChange={(event) => handlers.onChange({ category: event.target.value as ControlProposalDraft["category"] })}
-            >
-              {controlCategories.map((category) => (
-                <option key={category} value={category}>{controlCategoryLabels[category]}</option>
-              ))}
-            </select>
-          </ControlField>
+        <ControlField label="Category" htmlFor="control-category" className="control-field-category">
+          <select
+            id="control-category"
+            name="category"
+            className="field"
+            value={draft.category}
+            onChange={(event) => handlers.onChange({ category: event.target.value as ControlProposalDraft["category"] })}
+          >
+            {controlCategories.map((category) => (
+              <option key={category} value={category}>{controlCategoryLabels[category]}</option>
+            ))}
+          </select>
+        </ControlField>
 
-          <ControlField label="Cadence" htmlFor="control-cadence">
-            <select
-              id="control-cadence"
-              name="cadence"
-              className="field"
-              value={draft.cadence}
-              onChange={(event) => handlers.onChange({ cadence: event.target.value as ControlProposalDraft["cadence"] })}
-            >
-              {controlCadences.map((cadence) => (
-                <option key={cadence} value={cadence}>{controlCadenceLabels[cadence]}</option>
-              ))}
-            </select>
-          </ControlField>
-        </div>
+        <ControlField label="Cadence" htmlFor="control-cadence" className="control-field-cadence">
+          <select
+            id="control-cadence"
+            name="cadence"
+            className="field"
+            value={draft.cadence}
+            onChange={(event) => handlers.onChange({ cadence: event.target.value as ControlProposalDraft["cadence"] })}
+          >
+            {controlCadences.map((cadence) => (
+              <option key={cadence} value={cadence}>{controlCadenceLabels[cadence]}</option>
+            ))}
+          </select>
+        </ControlField>
 
-        <div className="control-form-money">
-          <ControlField label="Amount per charge" htmlFor="control-amount" error={errors.amountText}>
-            <input
-              id="control-amount"
-              name="amountMinor"
-              className="field font-data tnum"
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              enterKeyHint="next"
-              value={draft.amountText}
-              aria-invalid={errors.amountText ? true : undefined}
-              aria-describedby={errors.amountText ? "control-amount-error" : undefined}
-              onChange={(event) => handlers.onChange({ amountText: event.target.value })}
-            />
-          </ControlField>
+        <ControlField
+          label="Amount per charge"
+          htmlFor="control-amount"
+          error={errors.amountText}
+          className="control-field-amount"
+        >
+          <input
+            id="control-amount"
+            name="amountMinor"
+            className="field font-data tnum"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            enterKeyHint="next"
+            value={draft.amountText}
+            aria-invalid={errors.amountText ? true : undefined}
+            aria-describedby={errors.amountText ? "control-amount-error" : undefined}
+            onChange={(event) => handlers.onChange({ amountText: event.target.value })}
+          />
+        </ControlField>
 
-          <ControlField label="Currency" htmlFor="control-currency">
-            <select
-              id="control-currency"
-              name="currency"
-              className="field"
-              value={draft.currency}
-              onChange={(event) => handlers.onChange({ currency: event.target.value })}
-            >
-              {controlCurrencies.map((currency) => (
-                <option key={currency} value={currency}>{currency}</option>
-              ))}
-            </select>
-          </ControlField>
-        </div>
+        <ControlField label="Currency" htmlFor="control-currency" className="control-field-currency">
+          <select
+            id="control-currency"
+            name="currency"
+            className="field"
+            value={draft.currency}
+            onChange={(event) => handlers.onChange({ currency: event.target.value })}
+          >
+            {controlCurrencies.map((currency) => (
+              <option key={currency} value={currency}>{currency}</option>
+            ))}
+          </select>
+        </ControlField>
 
-        <ControlField label="First charge date" htmlFor="control-first-charge" error={errors.firstChargeDate}>
+        <ControlField
+          label="First charge date"
+          htmlFor="control-first-charge"
+          error={errors.firstChargeDate}
+          className="control-field-date"
+        >
           <input
             id="control-first-charge"
             name="firstChargeDate"
@@ -160,7 +176,7 @@ export function ControlProposalComposer({
         <details className="control-disclosure">
           <summary>
             Existing exposure to count with it
-            <span className="font-data text-xs text-(--muted)">
+            <span className="control-band-count">
               {selectedCount === 0 ? "None cited" : `${selectedCount} cited`}
             </span>
           </summary>
@@ -172,13 +188,14 @@ export function ControlProposalComposer({
                   <label key={commitment.id} className="control-exposure-row" htmlFor={`control-exposure-${commitment.id}`}>
                     <input
                       id={`control-exposure-${commitment.id}`}
+                      className="tick"
                       type="checkbox"
                       checked={draft.existingCommitmentIds.includes(commitment.id)}
                       onChange={() => handlers.onToggleCommitment(commitment.id)}
                     />
                     <span className="control-exposure-name">{commitment.merchant}</span>
                     <span className="font-data tnum control-exposure-amount">{commitment.amount.display}</span>
-                    <span className="font-data text-xs text-(--muted)">
+                    <span>
                       {commitment.amount.currency} · {commitment.evidenceCount} receipt{commitment.evidenceCount === 1 ? "" : "s"}
                       {commitment.nextExpectedDate ? ` · next ${formatDay(commitment.nextExpectedDate)}` : ""}
                     </span>
@@ -194,7 +211,11 @@ export function ControlProposalComposer({
         </details>
 
         <div className="control-form-actions">
-          <button type="submit" className="btn btn-primary" disabled={pending || blockedReason !== null || !online}>
+          <button
+            type="submit"
+            className={primary ? "btn btn-primary" : "btn btn-seal"}
+            disabled={pending || blockedReason !== null || !online}
+          >
             {pending ? "Evaluating…" : "Evaluate proposal"}
           </button>
           {blockedReason ? (
@@ -212,15 +233,17 @@ function ControlField({
   label,
   htmlFor,
   error,
+  className,
   children,
 }: {
   label: string;
   htmlFor: string;
   error?: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="control-field">
+    <div className={className ? `control-field ${className}` : "control-field"}>
       <label className="field-label" htmlFor={htmlFor}>{label}</label>
       {children}
       {error ? <p id={`${htmlFor}-error`} className="control-error">{error}</p> : null}

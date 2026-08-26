@@ -25,9 +25,14 @@ export const requiredAutopilotIntegrityMigrations = [
   "0055_recovery_decision_cycles",
   "0056_decision_cycle_expected_amount",
   "0057_commitment_control_v0",
+  "0058_workspace_invites",
+  "0059_control_authority_hardening",
 ];
 export const pre0057IntegrityMigrations = requiredAutopilotIntegrityMigrations.filter(
-  (migration) => migration !== "0057_commitment_control_v0",
+  (migration) =>
+    migration !== "0057_commitment_control_v0"
+    && migration !== "0058_workspace_invites"
+    && migration !== "0059_control_authority_hardening",
 );
 export const requiredAutopilotIntegrityTriggers = [
   "commitment_control_decisions_immutable",
@@ -165,7 +170,7 @@ function verificationProfile(value) {
   }
   return {
     profile,
-    migrationHead: "0057_commitment_control_v0",
+    migrationHead: "0059_control_authority_hardening",
     requiredMigrations: [requiredRecoveryMigration, ...requiredAutopilotIntegrityMigrations],
     integrityMigrations: requiredAutopilotIntegrityMigrations,
     requiredTriggers: requiredAutopilotIntegrityTriggers,

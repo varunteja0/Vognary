@@ -1,6 +1,7 @@
 import { proposalDecisionActions, type ProposalDecisionAction } from "./decision";
 import { normalizeCurrency, parsePositiveMinorUnits, requireUuid } from "./money";
 import type { CategoryPosture, PolicyReasonCode, ProposalCategory, ProposalPolicy, ProposalPolicyEvaluation } from "./policy";
+import { assertRecordableControlPolicy } from "./policy";
 import { proposalCadences, type ProposalCadence } from "./project";
 
 export type PutControlPolicyRequest = Omit<ProposalPolicy, "policyVersion">;
@@ -17,6 +18,7 @@ export type CreateControlProposalRequest = {
 export type DecideControlProposalRequest = {
   action: ProposalDecisionAction;
   approvedCapMinor?: string;
+  overrideReason?: string;
 };
 export type ReconcileControlProposalRequest = { evidenceId: string };
 
@@ -28,6 +30,7 @@ export type ControlPolicyDto = ProposalPolicy & {
 export type ControlProposalDto = {
   id: string;
   submittedByUserId: string | null;
+  submittedByDisplayName: string | null;
   merchant: string;
   purpose: string;
   category: ProposalCategory;
@@ -58,6 +61,8 @@ export type ControlDecisionDto = {
   currency: string;
   expectedAmountMinor: string;
   decidedByUserId: string | null;
+  decidedByDisplayName: string | null;
+  overrideReason: string | null;
   decidedAt: string;
 };
 
@@ -207,6 +212,7 @@ function isControlProposalDto(value: unknown): value is ControlProposalDto {
   return isRecord(value)
     && isUuid(value.id)
     && isNullableUuid(value.submittedByUserId)
+    && (value.submittedByDisplayName === null || isBoundedText(value.submittedByDisplayName, 1, 120))
     && isBoundedText(value.merchant, 1, 240)
     && isBoundedText(value.purpose, 1, 500)
     && typeof value.category === "string"
@@ -237,6 +243,7 @@ function isControlEvaluationDto(value: unknown): value is ControlEvaluationDto {
     || !value.citedEvidenceIds.every(isUuid)
     || !Array.isArray(value.reasonCodes)
     || !value.reasonCodes.every((reason) => typeof reason === "string" && policyReasonCodes.includes(reason as PolicyReasonCode))
+    || !["NONE", "PROJECTED", "OBSERVATION_ONLY"].includes(String(value.citedExposureBasis))
     || !Array.isArray(value.currencyResults)
     || !value.currencyResults.length
     || !isTimestamp(value.evaluatedAt)) return false;
@@ -279,6 +286,8 @@ function isControlDecisionDto(value: unknown): value is ControlDecisionDto {
     || !isNullableMinorUnits(value.approvedCapMinor)
     || !isCurrency(value.currency)
     || !isNullableUuid(value.decidedByUserId)
+    || !(value.decidedByDisplayName === null || isBoundedText(value.decidedByDisplayName, 1, 120))
+    || !(value.overrideReason === null || isBoundedText(value.overrideReason, 1, 500))
     || !isTimestamp(value.decidedAt)) return false;
   if (value.action === "DECLINE") return value.approvedCapMinor === null;
   if (value.approvedCapMinor === null) return false;
@@ -319,6 +328,7 @@ const policyReasonCodes: readonly PolicyReasonCode[] = [
   "PER_CHARGE_LIMIT_EXCEEDED",
   "THIRTEEN_WEEK_LIMIT_EXCEEDED",
   "ANNUAL_LIMIT_EXCEEDED",
+  "EXPOSURE_NOT_CITED",
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -389,7 +399,7 @@ export function normalizeControlPolicyRequest(value: unknown): PutControlPolicyR
   if (!Array.isArray(record.currencyLimits) || record.currencyLimits.length > 20) {
     throw new Error("Policy currencyLimits must be an array with at most 20 currencies.");
   }
-  return {
+  const normalized = {
     categoryRules: record.categoryRules.map((entry, index) => {
       const rule = requireRecord(entry, `Category rule ${index + 1}`);
       rejectUnknown(rule, ["category", "posture"], `category rule ${index + 1}`);
@@ -412,6 +422,8 @@ export function normalizeControlPolicyRequest(value: unknown): PutControlPolicyR
       };
     }),
   };
+  assertRecordableControlPolicy(normalized);
+  return normalized;
 }
 
 export function normalizeControlProposalRequest(value: unknown): CreateControlProposalRequest {
@@ -443,18 +455,22 @@ export function normalizeControlProposalRequest(value: unknown): CreateControlPr
 
 export function normalizeControlDecisionRequest(value: unknown): DecideControlProposalRequest {
   const record = requireRecord(value, "Decision request");
-  rejectUnknown(record, ["action", "approvedCapMinor"], "decision request");
+  rejectUnknown(record, ["action", "approvedCapMinor", "overrideReason"], "decision request");
   if (typeof record.action !== "string" || !proposalDecisionActions.includes(record.action as (typeof proposalDecisionActions)[number])) {
     throw new Error("Proposal decision action is not supported.");
   }
   if (record.action === "APPROVE" && record.approvedCapMinor !== undefined) throw new Error("APPROVE does not accept a cap.");
   if (record.action === "DECLINE" && record.approvedCapMinor !== undefined) throw new Error("DECLINE cannot carry a cap.");
   if (record.action === "APPROVE_WITH_CAP" && record.approvedCapMinor === undefined) throw new Error("APPROVE_WITH_CAP requires a cap.");
+  const overrideReason = record.overrideReason === undefined
+    ? undefined
+    : boundedText(record.overrideReason, "Override reason", 1, 500);
   return {
     action: record.action as (typeof proposalDecisionActions)[number],
     ...(record.approvedCapMinor === undefined
       ? {}
       : { approvedCapMinor: parsePositiveMinorUnits(record.approvedCapMinor, "Approved cap").toString() }),
+    ...(overrideReason === undefined ? {} : { overrideReason }),
   };
 }
 
