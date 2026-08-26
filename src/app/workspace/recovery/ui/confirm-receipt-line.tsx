@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { receiptLineProposalIsPartial, type ImageProposalStatus, type ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
+import { confirmLineInputLocked, receiptLineProposalIsPartial, type ImageProposalStatus, type ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
 import { confirmedReceiptText } from "@/lib/recovery/wow-first-session";
 import { customerPhrases } from "../present/customer-copy";
 
@@ -33,6 +33,7 @@ export function ConfirmReceiptLine({
 
   const reading = draft.proposalStatus === "reading";
   const unreadable = draft.proposalStatus === "unreadable";
+  const locked = confirmLineInputLocked(disabled, draft.proposalStatus);
   const guidance = reading
     ? customerPhrases.readingInvoice
     : unreadable
@@ -49,7 +50,7 @@ export function ConfirmReceiptLine({
     <article className="inset grid gap-3 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="text-sm font-semibold text-(--ink)">{draft.name}</p>
-        <button type="button" className="btn btn-sm btn-ghost" onClick={onRemove} disabled={disabled}>Remove</button>
+        <button type="button" className="btn btn-sm btn-ghost" onClick={onRemove} disabled={locked}>Remove</button>
       </div>
       {draft.previewUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -59,25 +60,25 @@ export function ConfirmReceiptLine({
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor={`${draft.clientRef}-merchant`} className="field-label">Merchant</label>
-          <input id={`${draft.clientRef}-merchant`} className="field mt-1" value={merchant} onChange={(event) => setEdited((current) => ({ ...current, merchant: event.target.value }))} disabled={disabled || reading} />
+          <input id={`${draft.clientRef}-merchant`} className="field mt-1" value={merchant} onChange={(event) => setEdited((current) => ({ ...current, merchant: event.target.value }))} disabled={locked} />
         </div>
         <div>
           <label htmlFor={`${draft.clientRef}-amount`} className="field-label">Amount</label>
-          <input id={`${draft.clientRef}-amount`} className="field mt-1" inputMode="decimal" value={amount} onChange={(event) => setEdited((current) => ({ ...current, amount: event.target.value }))} disabled={disabled || reading} />
+          <input id={`${draft.clientRef}-amount`} className="field mt-1" inputMode="decimal" value={amount} onChange={(event) => setEdited((current) => ({ ...current, amount: event.target.value }))} disabled={locked} />
         </div>
         <div>
           <label htmlFor={`${draft.clientRef}-currency`} className="field-label">Currency</label>
-          <input id={`${draft.clientRef}-currency`} className="field mt-1" value={currency} onChange={(event) => setEdited((current) => ({ ...current, currency: event.target.value }))} disabled={disabled || reading} maxLength={3} />
+          <input id={`${draft.clientRef}-currency`} className="field mt-1" value={currency} onChange={(event) => setEdited((current) => ({ ...current, currency: event.target.value }))} disabled={locked} maxLength={3} />
         </div>
         <div>
           <label htmlFor={`${draft.clientRef}-date`} className="field-label">Charge date</label>
-          <input id={`${draft.clientRef}-date`} className="field mt-1" type="date" value={date} onChange={(event) => setEdited((current) => ({ ...current, date: event.target.value }))} disabled={disabled || reading} />
+          <input id={`${draft.clientRef}-date`} className="field mt-1" type="date" value={date} onChange={(event) => setEdited((current) => ({ ...current, date: event.target.value }))} disabled={locked} />
         </div>
       </div>
       <button
         type="button"
         className="btn btn-primary justify-self-start"
-        disabled={disabled || reading || !text}
+        disabled={locked || !text}
         onClick={() => {
           if (text) onConfirm(text);
         }}

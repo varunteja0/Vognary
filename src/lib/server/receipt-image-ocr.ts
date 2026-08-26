@@ -29,11 +29,23 @@ export async function prepareReceiptImage(buffer: Buffer): Promise<{
   return { ocr, vision, visionMediaType: "image/jpeg" };
 }
 
+export const PROPOSE_READ_TIMEOUT_MS = 8_000;
+
+export function wasmOcrIsAllowed(input: {
+  vercel?: string;
+  lifecycle?: string;
+  bytes: number;
+}): boolean {
+  if (input.vercel) return false;
+  if (input.bytes < 8_000) return false;
+  return input.lifecycle !== "test";
+}
+
 export async function ocrReceiptImage(png: Buffer): Promise<string | null> {
   const native = process.env.VERCEL ? null : await ocrWithSystemTesseract(png);
   if (native && native.length >= 12) return repairOcrGlyphs(native);
   if (!wasmOcrAllowed(png)) return native ? repairOcrGlyphs(native) : null;
-  const wasm = await withTimeout(ocrWithWasmTesseract(png), 12_000, null);
+  const wasm = await withTimeout(ocrWithWasmTesseract(png), PROPOSE_READ_TIMEOUT_MS, null);
   const chosen = denserText(native, wasm);
   return chosen ? repairOcrGlyphs(chosen) : null;
 }
@@ -55,8 +67,11 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Pr
 }
 
 function wasmOcrAllowed(buffer: Buffer) {
-  if (buffer.length < 8_000) return false;
-  return process.env.npm_lifecycle_event !== "test";
+  return wasmOcrIsAllowed({
+    vercel: process.env.VERCEL,
+    lifecycle: process.env.npm_lifecycle_event,
+    bytes: buffer.length,
+  });
 }
 
 function denserText(left: string | null, right: string | null): string | null {
@@ -89,7 +104,7 @@ function runTesseract(input: string, psm: string): Promise<string | null> {
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
       resolve(null);
-    }, 8_000);
+    }, PROPOSE_READ_TIMEOUT_MS);
     child.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
     child.on("error", () => {
       clearTimeout(timer);

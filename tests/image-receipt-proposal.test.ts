@@ -1,14 +1,25 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
+  confirmLineInputLocked,
   mergeReceiptLineProposals,
   proposalFromVisionExtraction,
   proposeReceiptLineFromReadableText,
   proposeReceiptLineFromVisibleText,
+  RECEIPT_IMAGE_CLIENT_TIMEOUT_MS,
   sanitizeReceiptLineProposal,
 } from "../src/lib/recovery/image-receipt-proposal";
 import { POST } from "../src/app/api/receipt-image/propose/route";
+
+const manageSubscriptionScreenshotText = [
+  "Manage Subscription",
+  "Plan Premium",
+  "Status Active",
+  "Cost ₹427 / month",
+  "Next billing cycle starts on September 20, 2026",
+].join("\n");
 
 const chatgptBillingText = [
   "ChatGPT Plus",
@@ -213,4 +224,66 @@ test("a paid 0 beats an OCR guess of the plan price", () => {
   assert.equal(merged?.amount, "");
   assert.equal(merged?.date, "2026-07-24");
   assert.equal(merged?.zeroPaidVisible, true);
+});
+
+test("receipt-image propose prefills a subscription screenshot without a next-cycle charge date", async () => {
+  const body = new FormData();
+  body.append("file", new File(
+    [`${manageSubscriptionScreenshotText}\n`],
+    "subscription.png",
+    { type: "image/png" },
+  ));
+  const response = await POST(new Request("https://vognary.example/api/receipt-image/propose", {
+    method: "POST",
+    headers: { "x-forwarded-for": `receipt-image-subscription-${Date.now()}` },
+    body,
+  }) as never);
+  assert.equal(response.status, 200);
+  const payload = await response.json() as { proposal: { merchant: string; amount: string; currency: string; date: string } };
+  assert.equal(payload.proposal.merchant, "");
+  assert.equal(payload.proposal.amount, "427");
+  assert.equal(payload.proposal.currency, "INR");
+  assert.equal(payload.proposal.date, "");
+});
+
+test("a subscription screenshot prefills the printed rupee amount and not the next cycle date", () => {
+  const proposal = proposeReceiptLineFromReadableText(manageSubscriptionScreenshotText);
+  assert.equal(proposal?.merchant, "");
+  assert.equal(proposal?.amount, "427");
+  assert.equal(proposal?.currency, "INR");
+  assert.equal(proposal?.date, "");
+});
+
+test("vision cannot invent a vendor or turn next billing into a charge date", () => {
+  const cited = proposalFromVisionExtraction({
+    visible_text: manageSubscriptionScreenshotText,
+    merchant: "Premium",
+    amount: "427",
+    currency: "INR",
+    charge_date: "2026-09-20",
+    paid_amount_is_zero: false,
+  });
+  assert.equal(cited?.merchant, "");
+  assert.equal(cited?.amount, "427");
+  assert.equal(cited?.currency, "INR");
+  assert.equal(cited?.date, "");
+});
+
+test("photo reading never locks confirm-the-line fields and aborts in eight seconds", () => {
+  assert.equal(confirmLineInputLocked(false, "reading"), false);
+  assert.equal(confirmLineInputLocked(false, "ready"), false);
+  assert.equal(confirmLineInputLocked(true, "reading"), true);
+  assert.equal(RECEIPT_IMAGE_CLIENT_TIMEOUT_MS, 8_000);
+});
+
+test("guest start and signed-in add-a-bill share confirm-the-line", () => {
+  const start = readFileSync(new URL("../src/app/start/start-client.tsx", import.meta.url), "utf8");
+  const add = readFileSync(new URL("../src/app/workspace/recovery/recovery-add-evidence.tsx", import.meta.url), "utf8");
+  const confirm = readFileSync(new URL("../src/app/workspace/recovery/ui/confirm-receipt-line.tsx", import.meta.url), "utf8");
+  assert.match(start, /fetchReceiptLineProposal/);
+  assert.match(start, /ConfirmReceiptLine/);
+  assert.match(add, /fetchReceiptLineProposal/);
+  assert.match(add, /ConfirmReceiptLine/);
+  assert.match(confirm, /confirmLineInputLocked/);
+  assert.doesNotMatch(confirm, /disabled \|\| reading/);
 });

@@ -12,7 +12,7 @@ import {
   receiptLineProposalIsPartial,
   type ReceiptLineProposal,
 } from "@/lib/recovery/image-receipt-proposal";
-import { ocrReceiptImage, prepareReceiptImage, withTimeout } from "@/lib/server/receipt-image-ocr";
+import { ocrReceiptImage, prepareReceiptImage, PROPOSE_READ_TIMEOUT_MS, withTimeout } from "@/lib/server/receipt-image-ocr";
 
 const maxImageBytes = 8 * 1024 * 1024;
 
@@ -21,9 +21,11 @@ const visionPrompt = [
   "Return JSON only with this shape:",
   '{"visible_text":"every visible character, line by line, exact","merchant":"printed merchant or plan name or empty","amount":"printed paid or total amount digits only or empty","currency":"INR or USD or EUR or GBP or empty","charge_date":"YYYY-MM-DD of the paid/charge date or empty","paid_amount_is_zero":false}',
   "Copy. Do not infer.",
-  "Do not use a plan price, list price, or renewal price unless that exact amount is the paid or total line.",
+  "Do not use a second plan price, list price, or renewal price when a different paid or total line is printed.",
+  "If no paid line exists, copy the unique printed cost with currency. That is still not a settlement.",
   "A paid line of 0 stays 0: amount must be empty and paid_amount_is_zero true.",
-  "charge_date is the transaction or paid date, never an access-until or expiry date.",
+  "merchant is the printed vendor name, never a plan word such as Premium, Active, Plus, or Pro by itself.",
+  "charge_date is the transaction or paid date, never an access-until, expiry, or next billing cycle date.",
   "If the image is unreadable, visible_text must be empty and every other field empty.",
 ].join(" ");
 
@@ -47,14 +49,15 @@ export async function proposeReceiptLineFromImageFile(file: File): Promise<{
   try {
     const prepared = await prepareReceiptImage(buffer);
     const visionBuffer = Buffer.from(prepared.vision);
-    const ocrPromise = ocrReceiptImage(Buffer.from(prepared.ocr));
-    const visionPromise = transcribeReceiptImage(visionBuffer, prepared.visionMediaType);
-    const ocrText = await withTimeout(ocrPromise, 12_000, null);
+    const [ocrText, visionRaw] = await Promise.all([
+      withTimeout(ocrReceiptImage(Buffer.from(prepared.ocr)), PROPOSE_READ_TIMEOUT_MS, null),
+      withTimeout(transcribeReceiptImage(visionBuffer, prepared.visionMediaType), PROPOSE_READ_TIMEOUT_MS, null),
+    ]);
     const fromOcr = proposeReceiptLineFromReadableText(ocrText ?? "");
     if (fromOcr && !receiptLineProposalIsPartial(fromOcr) && (ocrText?.length ?? 0) >= 40) {
       return { proposal: fromOcr, reason: "cited" };
     }
-    const fromVision = proposalFromVisionExtraction(await withTimeout(visionPromise, 8_000, null));
+    const fromVision = proposalFromVisionExtraction(visionRaw);
     const proposal = mergeReceiptLineProposals(fromOcr, fromVision);
     if (proposal) return { proposal, reason: "cited" };
     return { proposal: null, reason: "unreadable" };

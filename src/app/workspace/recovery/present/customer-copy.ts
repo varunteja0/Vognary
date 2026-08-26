@@ -32,7 +32,7 @@ export const customerPhrases = {
   confirmPartial: "We read part of this bill from the photo. Fill any blank from the image. Confirm only if it matches. Vognary does not invent money.",
   confirmZeroPaid: "This photo shows a paid amount of 0. We did not fill a plan price. Enter the charge you can see, then confirm.",
   imageUnreadable: "This photo was not treated as money. Confirm the line, or paste the receipt text.",
-  readingInvoice: "Reading your invoice…",
+  readingInvoice: "Reading your invoice… You can fill the line now.",
   stayUpToDate: "Stay up to date",
   privateInbox: "Private billing inbox",
   forwardMatching: "Forward matching software bills automatically.",

@@ -9,12 +9,47 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## Live state — 2026-08-26 (first-session photo read unstick)
+
+**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Sell and Track F in the Control
+Operability block below still bind as the human actions. This is a
+journey-impossible repair, not a new product wave. Composite remains **1.5**.
+
+**Scoreboard row:** Product UX. **Loop:** first cited evidence → confirm the
+line → Recovery. Confirm this line still never auto-commits money.
+
+**WHAT IS TRUE in this working tree.** Dropping a bill photo no longer locks
+Merchant / Amount / Currency / Charge date while status is reading. Client and
+server photo reads abort at 8s. Vercel never runs WASM Tesseract on the
+isolate, so the event loop cannot starve those timeouts. A Manage Subscription
+screenshot that prints `Cost ₹427 / month` and `Next billing cycle starts on
+September 20, 2026` prefills **427 + INR**, leaves merchant blank (Premium is
+not a vendor), and does not treat the next cycle as the charge date. Vision
+transcription still runs only when `ANTHROPIC_API_KEY` and
+`AI_MONTHLY_BUDGET_INR` are live, still grounded to visible text, and still
+degrades to unreadable without a key. Guest `/start` and signed-in `/app` share
+the same confirm-the-line path.
+
+**WHAT IS NOT TRUE.** This SHA is not production until pushed. Dark UI photos
+on Vercel still need founder AI keys to transcribe; without them the fields
+stay editable and the photo is not treated as money. Contacted **0**,
+conversations **0**, offers **0**, payments **0**. Do not claim a 10/10 first
+session.
+
+**NEXT HUMAN ACTIONS:** unchanged — sell the five qualified drafts; founder
+executes Track F. Commit and deploy this repair when the working tree is
+accepted. Provision AI keys only if production photo transcription is required.
+
+**HARD STOP:** no auto merchant-match, Gmail OAuth, knowledge graph, workflow
+agent, or another operability/polish wave.
+
 ## Live state — 2026-08-26 (Control Operability: code-complete locally; sell + founder ops)
 
-**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Entries below are history. Do not
-open a new product wave, leap plan, design rewrite, or 10/10 polish pass.
-Composite remains **1.5**. Official scores do not rise until a conversation,
-offer, or payment is measured.
+> **SUPERSEDED as live instruction** by the photo-read unstick block at the top.
+> Sell, Track F, production `0056`, and the product hard stop below remain true.
+> Entries below this marker are history. Do not open a new product wave, leap
+> plan, design rewrite, or 10/10 polish pass. Composite remains **1.5**. Official
+> scores do not rise until a conversation, offer, or payment is measured.
 
 **Scoreboard rows:** Product UX (journey-impossible, code-closed locally),
 production activation (still blocked), business validation (still 0 contact).

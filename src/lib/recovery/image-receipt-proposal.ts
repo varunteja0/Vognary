@@ -15,13 +15,24 @@ export type ReceiptLineProposal = {
 
 export type ImageProposalStatus = "idle" | "reading" | "ready" | "unreadable";
 
+export const RECEIPT_IMAGE_CLIENT_TIMEOUT_MS = 8_000;
+
+export function confirmLineInputLocked(
+  formDisabled: boolean,
+  proposalStatus?: ImageProposalStatus,
+): boolean {
+  void proposalStatus;
+  return formDisabled;
+}
+
 const visibleBrandPattern = /(OpenAI|ChatGPT|Anthropic|Claude|Kling|Cursor|Perplexity|Midjourney|Runway|ElevenLabs|GitHub|Vercel|Render|AWS|Google Cloud|DigitalOcean|Cloudflare|GoDaddy|Namecheap|Hostinger|Apple|Google Play|Google One|Netflix|Spotify|YouTube|Amazon Prime|Prime Video|Hotstar|JioHotstar|Adobe|Canva|Figma|Notion|Slack|Zoom|Linear|Sentry|PostHog|X Premium|X\.com|Airtel|Jio|LIC|Razorpay|Stripe)/i;
 const planSuffixPattern = /^(Plus|Pro|Max|Team|Business|Premium|Enterprise|Unlimited)\b/i;
 const visibleAmountPattern = /(?:(₹|Rs\.?|INR|USD|EUR|GBP|CAD|AUD|US\$|CA\$|AU\$|€|£|\$)\s*([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)|([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*(INR|USD|EUR|GBP|CAD|AUD))/gi;
 const visibleDatePattern = /\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s+\d{4}|[A-Za-z]{3,9}\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}/g;
 const untilDatePrefix = /\b(?:until|till|through|expires?|valid(?:\s+until)?|access(?:\s+until)?)\b/i;
+const nextCycleDatePrefix = /\b(?:next\s+(?:bill(?:ing)?(?:\s+cycle)?|charge|renewal)|billing\s+cycle\s+starts|renews?\s+on)\b/i;
 const paidDatePrefix = /\b(?:paid|charged|debited|transaction|invoice|receipt|billing|charge date)\b/i;
-const genericMerchant = /^(paid|invoice|receipt|transaction|total|amount|date|history|plan|subscription|merchant|seller|vendor)$/i;
+const genericMerchant = /^(paid|invoice|receipt|transaction|total|amount|date|history|plan|subscription|merchant|seller|vendor|premium|active|inactive|manage subscription)$/i;
 
 export function proposeReceiptLineFromReadableText(text: string): ReceiptLineProposal | null {
   const observed = extractObservedReceipt(text);
@@ -134,7 +145,7 @@ export async function fetchReceiptLineProposal(file: File): Promise<ReceiptLineP
   const body = new FormData();
   body.append("file", file);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20_000);
+  const timer = setTimeout(() => controller.abort(), RECEIPT_IMAGE_CLIENT_TIMEOUT_MS);
   try {
     const response = await fetch("/api/receipt-image/propose", {
       method: "POST",
@@ -180,7 +191,7 @@ function visibleAmount(text: string): { decimal: string; currency: string } {
     const currency = detectVisibleCurrency(match[0]);
     const prefix = text.slice(Math.max(0, (match.index ?? 0) - 40), match.index ?? 0);
     const around = text.slice(match.index ?? 0, (match.index ?? 0) + match[0].length + 24);
-    const paid = /\b(?:paid|charged|debited|total|amount|invoice)\b/i.test(prefix)
+    const paid = /\b(?:paid|charged|debited|total|amount|invoice|cost|price)\b/i.test(prefix)
       || /\b(?:paid|charged|debited)\b/i.test(around);
     return { decimal: raw, currency, paid };
   }).filter((match) => match.decimal && match.currency);
@@ -233,7 +244,7 @@ function citedChargeDates(text: string): string[] {
     const iso = parseLooseCalendarDate(match[0]);
     if (!iso || match.index === undefined) continue;
     const before = text.slice(Math.max(0, match.index - 48), match.index);
-    if (untilDatePrefix.test(before)) continue;
+    if (untilDatePrefix.test(before) || nextCycleDatePrefix.test(before)) continue;
     const around = `${before} ${text.slice(match.index, match.index + match[0].length + 24)}`;
     found.push({ iso, paid: paidDatePrefix.test(around) });
   }
