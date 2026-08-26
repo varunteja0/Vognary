@@ -51,14 +51,11 @@ export function RecoveryHome({
   onAddEvidence,
   onOpenSources,
   onSeeAllCommitments,
-  onWorkspaceMutated,
   onDecide,
   onSaveContext,
   onReminderConsent,
   onPaymentAsk,
   receiptInbox,
-  onVeto: _onVeto,
-  pendingVetoId: _pendingVetoId,
   pendingDecisionId,
   onCitedPictureRendered,
 }: {
@@ -126,6 +123,7 @@ export function RecoveryHome({
     <div className="w-full max-w-4xl">
       <div className="stack-page">
         <CitedPictureActivation home={home} onCitedPictureRendered={onCitedPictureRendered} />
+        <SpendHero home={home} />
         <DecisionQueue
           home={home}
           pendingDecisionId={pendingDecisionId}

@@ -1,9 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { buildGuestAuditSnapshot, guestAuditTransferKey, type TransferStatementSource } from "@/lib/guest-audit-transfer";
-import { formatDraftInr, readGuestProposalDraft, type GuestProposalDraft } from "@/lib/guest-proposal-draft";
+import {
+  formatDraftInr,
+  getGuestProposalDraftServerSnapshot,
+  getGuestProposalDraftSnapshot,
+  subscribeGuestProposalDraft,
+} from "@/lib/guest-proposal-draft";
 import { formatCalendarDate } from "@/lib/date-only";
 import { startCardsFromRecurringItems, type RecurringItemLike, type StartCard } from "@/lib/recovery/start-cards";
 import { fetchReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
@@ -27,11 +32,11 @@ export default function StartClient() {
   const [cards, setCards] = useState<StartCard[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [draft, setDraft] = useState<GuestProposalDraft | null>(null);
-
-  useEffect(() => {
-    setDraft(readGuestProposalDraft());
-  }, []);
+  const draft = useSyncExternalStore(
+    subscribeGuestProposalDraft,
+    getGuestProposalDraftSnapshot,
+    getGuestProposalDraftServerSnapshot,
+  );
 
   function persistTab(text: string, sources: readonly TransferStatementSource[]) {
     const snapshot = buildGuestAuditSnapshot({ receiptText: text, statementSources: [...sources], manualItems: [] });

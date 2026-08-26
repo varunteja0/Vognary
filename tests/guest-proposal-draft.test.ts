@@ -3,8 +3,10 @@ import test from "node:test";
 import {
   buildGuestProposalDraft,
   controlDraftFromGuestProposal,
+  getGuestProposalDraftServerSnapshot,
   guestProposalDraftTtlMs,
   parseGuestProposalDraft,
+  subscribeGuestProposalDraft,
 } from "../src/lib/guest-proposal-draft";
 
 test("a guest draft is an assumption, not a recorded decision", () => {
@@ -71,4 +73,18 @@ test("the Control desk continues a typed guest assumption, never the Cursor exam
     action: "APPROVE_WITH_CAP",
     usingExample: false,
   })), { merchant: "OpenAI API", amountText: "1700" });
+});
+
+test("the server snapshot is empty so /start does not hydrate a fake proposal", () => {
+  assert.equal(getGuestProposalDraftServerSnapshot(), null);
+});
+
+test("guest draft subscribe returns an unsubscribe function", () => {
+  let calls = 0;
+  const stop = subscribeGuestProposalDraft(() => {
+    calls += 1;
+  });
+  assert.equal(typeof stop, "function");
+  stop();
+  assert.equal(calls, 0);
 });

@@ -68,13 +68,24 @@ export function parseGuestProposalDraft(raw: string | null, now = new Date()): G
   }
 }
 
+const draftListeners = new Set<() => void>();
+let snapshotRaw: string | null | undefined;
+let snapshotDraft: GuestProposalDraft | null = null;
+
+function notifyGuestProposalDraft() {
+  snapshotRaw = undefined;
+  for (const listener of draftListeners) listener();
+}
+
 export function writeGuestProposalDraft(input: Parameters<typeof buildGuestProposalDraft>[0]): boolean {
   const draft = buildGuestProposalDraft(input);
   if (!draft) return false;
   try {
     const serialized = JSON.stringify(draft);
     window.sessionStorage.setItem(guestProposalDraftKey, serialized);
-    return window.sessionStorage.getItem(guestProposalDraftKey) === serialized;
+    const ok = window.sessionStorage.getItem(guestProposalDraftKey) === serialized;
+    if (ok) notifyGuestProposalDraft();
+    return ok;
   } catch {
     return false;
   }
@@ -86,6 +97,31 @@ export function readGuestProposalDraft(): GuestProposalDraft | null {
   } catch {
     return null;
   }
+}
+
+/** For useSyncExternalStore. getSnapshot must be referentially stable when storage is unchanged. */
+export function subscribeGuestProposalDraft(onStoreChange: () => void) {
+  draftListeners.add(onStoreChange);
+  return () => {
+    draftListeners.delete(onStoreChange);
+  };
+}
+
+export function getGuestProposalDraftSnapshot(): GuestProposalDraft | null {
+  let raw: string | null = null;
+  try {
+    raw = window.sessionStorage.getItem(guestProposalDraftKey);
+  } catch {
+    raw = null;
+  }
+  if (raw === snapshotRaw) return snapshotDraft;
+  snapshotRaw = raw;
+  snapshotDraft = parseGuestProposalDraft(raw);
+  return snapshotDraft;
+}
+
+export function getGuestProposalDraftServerSnapshot(): GuestProposalDraft | null {
+  return null;
 }
 
 export function formatDraftInr(rupees: number): string {
