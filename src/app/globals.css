@@ -418,6 +418,59 @@ select {
   color: var(--ink-soft);
 }
 
+/* The Commitment Control loop on the public page. Numbered register, not a
+   marketing timeline. */
+.authorization-loop {
+  display: grid;
+  gap: 0;
+  margin-top: 1.25rem;
+  max-width: 28rem;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+  counter-reset: loop;
+}
+.authorization-loop > li {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-body);
+  line-height: 1.5;
+  color: var(--ink-soft);
+  counter-increment: loop;
+}
+.authorization-loop > li::before {
+  content: counter(loop);
+  font-family: var(--font-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.75rem;
+  color: var(--ochre);
+}
+.authorization-loop > li[data-complete="true"] {
+  color: var(--muted);
+}
+.authorization-loop > li[aria-current="step"] {
+  color: var(--ink);
+  box-shadow: inset 0.15rem 0 0 var(--ember);
+  padding-left: 0.6rem;
+  margin-left: -0.6rem;
+}
+.authorization-loop > li[aria-current="step"]::before {
+  color: var(--ember);
+}
+.authorization-loop-compact {
+  margin-top: 0;
+  max-width: none;
+}
+.authorization-loop-compact > li {
+  padding: 0.4rem 0;
+  font-size: var(--text-fine);
+}
+
 /* A disclosure that opens a whole working area. Word stays quiet; the target
    is a full row. */
 .disclosure-summary {

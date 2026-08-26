@@ -5,10 +5,13 @@ test("the first-value path leads into the product without a cancel promise", asy
   await page.goto("/");
 
   const primary = page.locator("section").filter({ has: page.getByRole("heading", { name: "Decide before the obligation exists." }) })
-    .getByRole("link", { name: "Add a bill", exact: true });
+    .getByRole("link", { name: "Cap the next yes", exact: true });
   await expect(primary).toBeVisible();
-  await expect(primary).toHaveAttribute("href", "/start");
-  await primary.click();
+  await expect(primary).toHaveAttribute("href", "#example-decision");
+  const evidence = page.locator("section").filter({ has: page.getByRole("heading", { name: "Decide before the obligation exists." }) })
+    .getByRole("link", { name: "Add a bill", exact: true });
+  await expect(evidence).toHaveAttribute("href", "/start");
+  await evidence.click();
   await expect(page).toHaveURL(/\/start/);
   await expect(page.getByRole("heading", { name: "See the charge. Sign in to authorize." })).toBeVisible();
   await page.goto("/");

@@ -1,4 +1,10 @@
+import { COMMITMENT_CONTROL_STEPS } from "./commitment-control-loop";
+
 export const agentLinkHeader = '</index.md>; rel="alternate"; type="text/markdown", </llms.txt>; rel="describedby"';
+
+const commitmentControlLoopMarkdown = COMMITMENT_CONTROL_STEPS
+  .map((step, index) => `${index + 1}. ${step}`)
+  .join("\n");
 
 export const agentNotFoundMarkdown = `# 404: Page not found
 
@@ -19,6 +25,10 @@ export const agentHomepageMarkdown = `# Vognary
 
 Vognary records a proposed obligation, cited existing exposure, and versioned policy, then a named human authorizes a frozen cap. Later Recovery receipts prove the observed outcome against that authorization. Proposal amounts are user-entered assumptions until evidence cites them. If the evidence does not support a financial fact, Vognary leaves it unknown.
 
+This loop is the product. Vognary is not a live bank feed, mailbox-wide scanner, budgeting suite, procurement platform, or autonomous cancellation service. An authorization is a recorded human decision. It is not a purchase, a cancellation, or a payment.
+
+${commitmentControlLoopMarkdown}
+
 ## What Vognary does
 
 - Reads billing evidence that an authorized user intentionally pastes or uploads.
@@ -33,10 +43,11 @@ Vognary is designed for finance owners at India-first, 5–100 person AI-native 
 
 ## How to use it
 
-1. Open [Add a bill](https://www.vognary.com/start) for the no-account evidence step.
-2. Add a billing record the user is authorized to share.
+1. Open [Cap the next yes](https://www.vognary.com/#example-decision) to type a proposed obligation. Typed amounts are assumptions.
+2. Open [Add a bill](https://www.vognary.com/start) to cite billing evidence the user is authorized to share.
 3. Sign in to remember the evidence and open the Control desk.
 4. Record policy, propose the spend, and have an owner or admin authorize a cap.
+5. Link a later same-workspace receipt to that frozen cap.
 
 ## Product boundaries
 
@@ -85,8 +96,9 @@ Important interpretation rules:
 ## Core
 
 - [Homepage in Markdown](https://www.vognary.com/index.md): Concise product identity, workflow, best fit, and boundaries.
-- [Add a bill](https://www.vognary.com/start): No-account first step for reviewing user-provided billing evidence.
-- [Vognary homepage](https://www.vognary.com/): Human-facing product overview and illustrative cited authorization.
+- [Cap the next yes](https://www.vognary.com/#example-decision): Guest authorization desk. Typed amounts are assumptions until a receipt is cited.
+- [Add a bill](https://www.vognary.com/start): No-account step for reviewing user-provided billing evidence.
+- [Vognary homepage](https://www.vognary.com/): Human-facing product overview and working authorization desk.
 
 ## Trust and policies
 

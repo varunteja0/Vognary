@@ -60,7 +60,7 @@ export function ControlReconciliationDialog({
   return (
     <RecoveryDialog
       title="Link observed evidence"
-      description="Pick one receipt already saved in this workspace. The frozen amount and cap are never rewritten by what it shows."
+      description="This is the last unique step: a later receipt is compared to the frozen cap. The authorization is never rewritten by what the receipt shows."
       onClose={onClose}
       returnFocusId={returnFocusId}
       footer={

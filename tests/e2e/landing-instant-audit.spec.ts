@@ -126,9 +126,11 @@ test("the landing demonstrates the decision loop and sends visitors to their own
   await expect(heading).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
 
-  const getStarted = hero.getByRole("link", { name: "Add a bill", exact: true });
+  const getStarted = hero.getByRole("link", { name: "Cap the next yes", exact: true });
+  const citeBill = hero.getByRole("link", { name: "Add a bill", exact: true });
   const signIn = page.getByRole("navigation", { name: "Public" }).getByRole("link", { name: "Sign in", exact: true });
-  await expect(getStarted).toHaveAttribute("href", "/start");
+  await expect(getStarted).toHaveAttribute("href", "#example-decision");
+  await expect(citeBill).toHaveAttribute("href", "/start");
   await expect(signIn).toHaveAttribute("href", "/login?next=/app");
 
   await expect(page.getByText("No account required", { exact: true })).toBeVisible();
@@ -139,10 +141,12 @@ test("the landing demonstrates the decision loop and sends visitors to their own
   await expect(page.getByText(/Example only\. Your review uses your receipts/)).toBeVisible();
 
   await page.getByRole("button", { name: "Approve with cap", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "A named human freezes a cap below the proposal." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "A named human freezes ₹1,350 as the cap." })).toBeVisible();
   await expect(page.getByText(/Vognary does not cancel Cursor or move money|later evidence cannot rewrite it/)).toBeVisible();
 
-  await expect(page.getByRole("textbox")).toHaveCount(0);
+  await expect(page.getByLabel("Vendor / commitment")).toBeVisible();
+  await expect(page.getByText("Review required", { exact: true }).first()).toBeVisible();
+  await expect(page.getByLabel("Paste receipts or invoices")).toHaveCount(0);
   await expect(page.getByText(/sample audit/i)).toHaveCount(0);
   await expect(page.getByText(/verified savings/i)).toHaveCount(0);
   await expect(page.getByText(/account aggregator|upi autopay|card e-mandate/i)).toHaveCount(0);
@@ -150,6 +154,13 @@ test("the landing demonstrates the decision loop and sends visitors to their own
   const axe = await new AxeBuilder({ page }).analyze();
   const serious = axe.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical");
   expect(serious).toEqual([]);
+
+  await page.getByLabel("Vendor / commitment").fill("OpenAI API");
+  await expect(page.getByRole("heading", { name: "OpenAI API: existing exposure is not cited." })).toBeVisible();
+  await expect(page.getByText(/EXPOSURE_NOT_CITED/)).toBeVisible();
+  await page.getByRole("link", { name: "Cite a bill you already have" }).click();
+  await expect(page).toHaveURL(/\/start/);
+  await expect(page.getByText(/You named OpenAI API as the next yes at ₹1,700/)).toBeVisible();
 });
 
 test("the mobile landing keeps the primary action visible without overflow", async ({ page }) => {
@@ -157,7 +168,7 @@ test("the mobile landing keeps the primary action visible without overflow", asy
   await page.goto("/");
 
   const heading = page.getByRole("heading", { level: 1, name: "Decide before the obligation exists." });
-  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Add a bill", exact: true });
+  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Cap the next yes", exact: true });
   await expect(getStarted).toBeVisible();
   const actionBottom = await getStarted.evaluate((element) => element.getBoundingClientRect().bottom);
   const metrics = await page.evaluate(() => ({

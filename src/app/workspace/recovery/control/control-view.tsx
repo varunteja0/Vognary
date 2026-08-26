@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { AuthorizationLoop } from "@/app/authorization-loop";
+import { activeCommitmentControlStep, commitmentControlStepLabel } from "@/lib/commitment-control-loop";
+import { controlDraftFromGuestProposal, readGuestProposalDraft } from "@/lib/guest-proposal-draft";
 import type { CommitmentSummaryDto, EvidenceDto } from "@/lib/recovery/contracts";
 import { currencyExponent, minorUnitsToDecimal } from "@/lib/recovery/domain";
 import { formatMoment } from "../labels";
@@ -295,6 +298,15 @@ export function ControlView({
   onAddBill?: () => void;
 }) {
   const { state, handlers } = desk;
+  const guestDraftApplied = useRef(false);
+
+  useEffect(() => {
+    if (guestDraftApplied.current || state.status.kind !== "READY" || state.draft.merchant.trim()) return;
+    const patch = controlDraftFromGuestProposal(readGuestProposalDraft());
+    if (!patch) return;
+    guestDraftApplied.current = true;
+    handlers.changeDraft(patch);
+  }, [handlers, state.draft.merchant, state.status.kind]);
 
   if (state.status.kind === "LOADING" || state.status.kind === "IDLE") {
     return <LoadingBlock label="Opening the Control desk…" />;
@@ -323,6 +335,12 @@ export function ControlView({
     : policy === null
       ? "No policy version exists yet, so no proposal can be evaluated. A workspace owner or admin has to record one first."
       : null;
+  const activeStep = activeCommitmentControlStep({
+    citedEvidence: commitments.some((commitment) => commitment.evidenceCount > 0),
+    hasPolicy: policy !== null,
+    awaitingHumanDecision: awaitingDecision.length > 0,
+    authorizedAwaitingEvidence: awaitingEvidence.length > 0,
+  });
 
   return (
     <div className="control-desk">
@@ -333,11 +351,12 @@ export function ControlView({
           version — nothing is derived, projected or estimated here. */}
       <section aria-labelledby="control-masthead-heading" className="control-masthead">
         <div className="control-masthead-top">
-          <h3 id="control-masthead-heading" className="control-masthead-title">The control desk</h3>
+          <h3 id="control-masthead-heading" className="control-masthead-title">Commitment Control</h3>
           <p className="control-masthead-stamp">
             {policy === null ? "No policy version recorded" : `Policy version ${policy.policyVersion} · recorded ${formatMoment(policy.createdAt)}`}
           </p>
         </div>
+        <AuthorizationLoop compact activeStep={activeStep} />
         <dl className="control-figures">
           <div className="control-figure truth-policy">
             <dt>Policy in force</dt>
@@ -415,7 +434,7 @@ export function ControlView({
       >
         <div className="control-band-head">
           <h3 id="control-queue-heading" className="control-heading">Needs a decision</h3>
-          <p className="control-band-count">{awaitingDecision.length === 0 ? "Nothing waiting" : `${awaitingDecision.length} waiting`}</p>
+          <p className="control-band-count">{commitmentControlStepLabel(4)}</p>
         </div>
         {awaitingDecision.length === 0 ? (
           <p className="control-note">
@@ -451,7 +470,7 @@ export function ControlView({
       >
         <div className="control-band-head">
           <h3 id="control-authorized-heading" className="control-heading">Authorized commitments</h3>
-          <p className="control-band-count">{authorized.length === 0 ? "Nothing decided" : `${authorized.length} decided`}</p>
+          <p className="control-band-count">{commitmentControlStepLabel(5)}</p>
         </div>
         {authorized.length === 0 ? (
           <p className="control-note">No proposal has been decided yet.</p>

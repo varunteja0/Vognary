@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { AuthorizationLoop } from "./authorization-loop";
 import { VognaryMark } from "./brand";
 import { LandingDecisionPreview } from "./landing-decision-preview";
 
 export default function LaunchLanding() {
-  const primaryHref = "/start";
-  const primaryLabel = "Add a bill";
+  const primaryHref = "#example-decision";
+  const primaryLabel = "Cap the next yes";
+  const evidenceHref = "/start";
+  const evidenceLabel = "Add a bill";
   return (
     <main id="ledger-main" className="relative overflow-hidden px-4 pb-12 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
@@ -26,11 +29,16 @@ export default function LaunchLanding() {
                 Decide before the obligation exists.
               </h1>
               <p className="lede mt-4 max-w-lg">
-                Vognary is Commitment Control: propose the spend, see cited exposure and policy, then a named human freezes a cap. Later receipts prove the outcome. Start with a bill you already have.
+                Vognary is Commitment Control. Propose the spend. See cited exposure and versioned policy. A named human freezes a cap — or declines. Later receipts prove the outcome against that authorization. No other live step invents money, auto-approves, or moves funds.
               </p>
-              <div className="mt-6">
-                <Link href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</Link>
+              <p className="mt-4 max-w-lg text-sm leading-6 text-(--muted)">
+                Private paid pilot: ₹40,000/month upfront. Zero paid customers. No auto-approval. No money movement.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <a href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</a>
+                <Link href={evidenceHref} className="btn btn-ghost btn-lg">{evidenceLabel}</Link>
               </div>
+              <AuthorizationLoop activeStep={4} />
             </div>
 
             <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
@@ -43,6 +51,7 @@ export default function LaunchLanding() {
                 <li>No account required</li>
                 <li>No bank passwords</li>
                 <li>No mailbox access</li>
+                <li>No auto-approve, auto-deny, or payment</li>
               </ul>
             </section>
           </div>
@@ -52,9 +61,9 @@ export default function LaunchLanding() {
           <div className="min-w-0">
             <h2 className="truth-label truth-citation">Start with what you already have</h2>
             <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">One receipt is enough to begin.</h3>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Nothing is saved until you sign in. Vognary never cancels a service or moves money.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Nothing is saved until you sign in. The unique next step is a named human authorization on the Control desk, not Keep or Plan to cancel. Vognary never cancels a service or moves money.</p>
           </div>
-          <Link href={primaryHref} className="btn btn-primary btn-lg shrink-0">{primaryLabel}</Link>
+          <Link href={evidenceHref} className="btn btn-primary btn-lg shrink-0">{evidenceLabel}</Link>
         </section>
 
         <footer className="flex flex-col items-center justify-between gap-2 border-t border-line py-6 text-center sm:flex-row sm:text-left">

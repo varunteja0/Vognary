@@ -1,5 +1,6 @@
 "use client";
 
+import { commitmentControlStepLabel } from "@/lib/commitment-control-loop";
 import type { CommitmentSummaryDto } from "@/lib/recovery/contracts";
 import { formatDay } from "../labels";
 import {
@@ -45,7 +46,7 @@ export function ControlProposalComposer({
     <section aria-labelledby="control-composer-heading" className="control-band control-band-open">
       <div className="control-band-head">
         <h3 id="control-composer-heading" className="control-heading">What are you considering committing to?</h3>
-        <p className="control-band-count">Evaluating never authorizes. A person still decides.</p>
+        <p className="control-band-count">{commitmentControlStepLabel(2)}</p>
       </div>
 
       <form

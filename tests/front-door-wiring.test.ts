@@ -16,8 +16,9 @@ test("the public page is a cacheable readiness-neutral shell", () => {
 });
 
 test("the landing selects the guest-first proven entry path without instant-audit surfaces", () => {
-  assert.match(landingSource, /const primaryHref = "\/start";/);
-  assert.match(landingSource, /const primaryLabel = "Add a bill";/);
+  assert.match(landingSource, /const primaryHref = "#example-decision";/);
+  assert.match(landingSource, /const primaryLabel = "Cap the next yes";/);
+  assert.match(landingSource, /const evidenceHref = "\/start";/);
   assert.match(landingSource, /<LandingDecisionPreview \/>/);
   assert.doesNotMatch(landingSource, /sample|demo|InstantAudit|instant audit/i);
 });
@@ -27,6 +28,8 @@ test("the landing states concise evidence and action boundaries without unsuppor
   assert.match(landingSource, /No mailbox access/);
   assert.match(landingPreviewSource, /From two example receipts/);
   assert.match(landingPreviewSource, /unsupported facts stay unknown/);
+  assert.match(landingPreviewSource, /writeGuestProposalDraft/);
+  assert.match(landingPreviewSource, /annotateLandingPolicy/);
   assert.match(landingSource, /Vognary never cancels a service or moves money/);
   assert.doesNotMatch(landingSource, /30 days/i);
   assert.doesNotMatch(landingSource, /only billing evidence you intentionally forward/i);

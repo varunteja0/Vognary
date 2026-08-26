@@ -141,6 +141,8 @@ test("landing, login, and empty Home tell one receipts-to-decision product story
   assert.match(landingSource, /No account required/);
   assert.match(landingSource, /No bank passwords/);
   assert.match(landingSource, /No mailbox access/);
+  assert.match(landingSource, /AuthorizationLoop/);
+  assert.match(landingSource, /No auto-approve, auto-deny, or payment/);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
   assert.doesNotMatch(landingSource, /Set up billing forwarding once so matching mail keeps arriving/);
 });

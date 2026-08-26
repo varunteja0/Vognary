@@ -9,7 +9,36 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## Live state — 2026-08-26 (founder: unique loop is the product)
+
+**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Composite remains **1.5**. Official
+scoreboard rows do not become 10/10 from copy. Production Control remains
+unenrolled on verified schema **0056**. Founder owns sell and Track F on their
+clock; agents implement the loop.
+
+**Scoreboard row:** Product UX. **Loop:** cite evidence → propose assumption →
+policy annotates → named human freezes cap → later receipt reconciles.
+
+**WHAT IS TRUE in this working tree.** The five-step loop is one module, now on
+`/`, `/start` (empty and after cite), `/login`, `/about`, empty Home, the Control
+desk, and agent markdown. A typed guest assumption (not the Cursor example)
+prefills the signed-in composer. Desk bands are labeled as steps 2, 4, and 5.
+Landing highlights step 4 because the public desk *is* the authorization.
+
+**WHAT IS NOT TRUE.** Market proof and production enrollment cannot become 10
+from this SHA. Schema is still **0056**.
+
+**NEXT HUMAN ACTIONS:** deploy this unique-loop surface. Persist-on-confirm
+remains SHA `d68987a`. Do not write 10/10 onto the official scoreboard.
+
+**HARD STOP:** no public redesign, stock photography, auto merchant-match, Gmail
+OAuth, Luna/OpenRouter, or another marketing lecture from agents.
+
 ## Live state — 2026-08-26 (Slice 4: monthly loop is Recovery persist)
+
+> **SUPERSEDED as live instruction** by the unique-loop surface pass at the top.
+> Persist-on-confirm on `main` (`d68987a`) remains true. Sell and Track F still
+> bind. Composite remains **1.5**.
 
 **THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Sell and Track F still bind.
 Composite remains **1.5**.

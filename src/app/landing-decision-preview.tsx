@@ -1,6 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { writeGuestProposalDraft } from "@/lib/guest-proposal-draft";
+import { annotateLandingPolicy } from "@/lib/landing-desk-policy";
+
+const EXAMPLE_MERCHANT = "Cursor Pro";
+const EXAMPLE_AMOUNT = 1700;
+const EXAMPLE_PRIOR = 1350;
 
 const actions = [
   { value: "APPROVE", label: "Approve" },
@@ -10,80 +17,194 @@ const actions = [
 
 type PreviewAction = (typeof actions)[number]["value"];
 
-const actionPresentation: Record<PreviewAction, {
-  label: string;
-  tone: "keep" | "watch" | "cancel";
-  title: string;
-  body: string;
-  nextCheck: string;
-}> = {
-  APPROVE: {
-    label: "Authorize at the proposed amount",
-    tone: "keep",
-    title: "A named human freezes ₹1,700 as the cap.",
-    body: "The proposal remains an assumption until later cited receipts are linked. Approving does not purchase, provision, or pay Cursor.",
-    nextCheck: "The next Cursor receipt is compared to the frozen ₹1,700 cap.",
-  },
-  APPROVE_WITH_CAP: {
-    label: "Authorize a lower cap",
-    tone: "watch",
-    title: "A named human freezes a cap below the proposal.",
-    body: "Policy can require review. The human still decides. A lower cap is recorded; later evidence cannot rewrite it.",
-    nextCheck: "Observed spend above that cap is marked over the frozen authorization.",
-  },
-  DECLINE: {
-    label: "Decline the obligation",
-    tone: "cancel",
-    title: "No cap is frozen. The company did not authorize this.",
-    body: "Decline is a recorded refusal. Vognary does not cancel Cursor or move money.",
-    nextCheck: "A later Cursor receipt can still be stored as evidence. It is not an authorization.",
-  },
-};
+function formatInr(rupees: number): string {
+  if (!Number.isFinite(rupees) || rupees < 0) return "unknown";
+  return `₹${Math.round(rupees).toLocaleString("en-IN")}`;
+}
+
+function parseRupees(raw: string): number | null {
+  const digits = raw.replace(/[^\d]/g, "");
+  if (!digits) return null;
+  const value = Number(digits);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
 
 export function LandingDecisionPreview() {
+  const [merchant, setMerchant] = useState(EXAMPLE_MERCHANT);
+  const [amountInput, setAmountInput] = useState(String(EXAMPLE_AMOUNT));
+  const [capInput, setCapInput] = useState(String(EXAMPLE_PRIOR));
   const [action, setAction] = useState<PreviewAction>("APPROVE_WITH_CAP");
-  const presentation = actionPresentation[action];
+
+  const usingExample = merchant.trim() === EXAMPLE_MERCHANT && parseRupees(amountInput) === EXAMPLE_AMOUNT;
+  const amount = parseRupees(amountInput);
+  const cap = parseRupees(capInput);
+  const label = merchant.trim() || "Unnamed vendor";
+  const annotation = annotateLandingPolicy({
+    usingExample,
+    proposedAmountInr: amount,
+    citedPriorInr: EXAMPLE_PRIOR,
+  });
+
+  useEffect(() => {
+    writeGuestProposalDraft({
+      merchant: label,
+      amountInr: amount,
+      capInr: cap,
+      action,
+      usingExample,
+    });
+  }, [action, amount, cap, label, usingExample]);
+
+  const presentation = useMemo(() => {
+    if (action === "DECLINE") {
+      return {
+        label: "Decline the obligation",
+        tone: "cancel" as const,
+        title: "No cap is frozen. The company did not authorize this.",
+        body: usingExample
+          ? "Decline is a recorded refusal. Vognary does not cancel Cursor or move money."
+          : "Decline is a recorded refusal. Vognary does not cancel the vendor or move money.",
+        nextCheck: usingExample
+          ? "A later Cursor receipt can still be stored as evidence. It is not an authorization."
+          : "A later receipt can still be stored as evidence. It is not an authorization.",
+      };
+    }
+    if (action === "APPROVE") {
+      const frozen = amount == null ? "unknown" : formatInr(amount);
+      return {
+        label: "Authorize at the proposed amount",
+        tone: "keep" as const,
+        title: `A named human freezes ${frozen} as the cap.`,
+        body: "The proposal remains an assumption until later cited receipts are linked. Approving does not purchase, provision, or pay the vendor.",
+        nextCheck: amount == null
+          ? "Name a proposed amount before this can be a frozen cap."
+          : `The next cited receipt for ${label} is compared to the frozen ${frozen} cap.`,
+      };
+    }
+    const frozen = cap == null ? null : formatInr(cap);
+    return {
+      label: "Authorize a lower cap",
+      tone: "watch" as const,
+      title: frozen
+        ? `A named human freezes ${frozen} as the cap.`
+        : "A named human freezes a cap below the proposal.",
+      body: "Policy can require review. The human still decides. A lower cap is recorded; later evidence cannot rewrite it.",
+      nextCheck: cap == null
+        ? "Name a cap in INR. Until then this is a click, not an authorization."
+        : amount != null && cap >= amount
+          ? "A cap at or above the proposal is the same as Approve. Lower it, or choose Approve."
+          : `Observed spend above ${frozen} is marked over the frozen authorization.`,
+    };
+  }, [action, amount, cap, label, usingExample]);
 
   return (
     <section id="example-decision" aria-labelledby="product-review-heading" className="min-w-0">
-      <h2 className="eyebrow text-ochre">A real authorization, not a dashboard</h2>
+      <h2 className="eyebrow text-ochre">A working authorization, not a dashboard</h2>
       <h3 id="product-review-heading" className="mt-2 font-display text-xl font-semibold text-(--ink) sm:text-2xl">
-        Cursor costs ₹350 more this month.
+        {usingExample ? "Cursor costs ₹350 more this month." : `${label}: existing exposure is not cited.`}
       </h3>
+      <p className={`truth-label ${annotation.truthClass} mt-3`}>{annotation.status}</p>
+      <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{annotation.reason}</p>
+
+      <form
+        className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2"
+        onSubmit={(event) => event.preventDefault()}
+      >
+        <p className="sm:col-span-2 text-sm leading-6 text-(--muted)">
+          Type the next yes. Amounts you type are assumptions. Cited money stays unknown until you add a bill.
+        </p>
+        <div>
+          <label htmlFor="landing-merchant" className="field-label">Vendor / commitment</label>
+          <input
+            id="landing-merchant"
+            className="field"
+            value={merchant}
+            onChange={(event) => setMerchant(event.target.value)}
+            autoComplete="off"
+          />
+        </div>
+        <div>
+          <label htmlFor="landing-amount" className="field-label">Proposed amount (INR)</label>
+          <input
+            id="landing-amount"
+            className="field field-mono"
+            inputMode="numeric"
+            value={amountInput}
+            onChange={(event) => setAmountInput(event.target.value)}
+            autoComplete="off"
+          />
+        </div>
+        {action === "APPROVE_WITH_CAP" ? (
+          <div className="sm:col-span-2">
+            <label htmlFor="landing-cap" className="field-label">Frozen cap (INR)</label>
+            <input
+              id="landing-cap"
+              className="field field-mono"
+              inputMode="numeric"
+              value={capInput}
+              onChange={(event) => setCapInput(event.target.value)}
+              placeholder="Lower than the proposal"
+              autoComplete="off"
+            />
+          </div>
+        ) : null}
+      </form>
 
       <div className="mt-4 grid min-w-0 gap-5">
         <article className="decision" data-lead="true">
           <div className="min-w-0">
-            <p className="decision-cue">Proposed obligation · monthly</p>
-            <h4 className="decision-sentence mt-2">Cursor Pro · ₹1,700</h4>
+            <p className="decision-cue">Proposed obligation · assumption</p>
+            <h4 className="decision-sentence mt-2">
+              {label} · {amount == null ? "amount unknown" : formatInr(amount)}
+            </h4>
           </div>
 
           <div className="decision-evidence">
-            <p className="eyebrow eyebrow-xs">From two example receipts</p>
-            <ol className="cycle-rail mt-2" aria-label="Cursor Pro across three billing periods">
-              <li className="cycle-cell">
-                <span className="cycle-period">Jul</span>
-                <span className="cycle-amount">₹1,350</span>
-                <span className="cycle-note">Receipt</span>
-              </li>
-              <li className="cycle-cell">
-                <span className="cycle-period">Aug</span>
-                <span className="cycle-amount">₹1,700</span>
-                <span className="cycle-note">Receipt</span>
-              </li>
-              <li className="cycle-cell cycle-cell-open">
-                <span className="cycle-period">Sep</span>
-                <span className="cycle-amount" aria-label="Not yet known">—</span>
-                <span className="cycle-note">Not charged yet</span>
-              </li>
-            </ol>
+            {usingExample ? (
+              <>
+                <p className="eyebrow eyebrow-xs">From two example receipts</p>
+                <ol className="cycle-rail mt-2" aria-label="Cursor Pro across three billing periods">
+                  <li className="cycle-cell">
+                    <span className="cycle-period">Jul</span>
+                    <span className="cycle-amount">{formatInr(EXAMPLE_PRIOR)}</span>
+                    <span className="cycle-note">Receipt</span>
+                  </li>
+                  <li className="cycle-cell">
+                    <span className="cycle-period">Aug</span>
+                    <span className="cycle-amount">{formatInr(EXAMPLE_AMOUNT)}</span>
+                    <span className="cycle-note">Receipt</span>
+                  </li>
+                  <li className="cycle-cell cycle-cell-open">
+                    <span className="cycle-period">Sep</span>
+                    <span className="cycle-amount" aria-label="Not yet known">—</span>
+                    <span className="cycle-note">Not charged yet</span>
+                  </li>
+                </ol>
+              </>
+            ) : (
+              <>
+                <p className="eyebrow eyebrow-xs">Cited existing exposure</p>
+                <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
+                  Unknown. Eligible existing spend was not cited, so exposure stays unknown. Policy annotates. It does not invent a merchant or an amount.
+                </p>
+              </>
+            )}
           </div>
 
           <div>
             <p className="eyebrow eyebrow-xs">Why this needs a human</p>
             <ul className="reason-list mt-2">
-              <li>The latest bill is ₹350 higher than the previous one.</li>
-              <li>Policy annotates. A named owner or admin still authorizes the cap.</li>
+              {usingExample ? (
+                <>
+                  <li>The latest bill is {formatInr(EXAMPLE_AMOUNT - EXAMPLE_PRIOR)} higher than the previous one.</li>
+                  <li>Policy annotates. A named owner or admin still authorizes the cap.</li>
+                </>
+              ) : (
+                <>
+                  <li>You typed an assumption. It is not evidence that money was spent or will be spent.</li>
+                  <li>A named owner or admin still has to freeze a cap, or decline. You are not signed in, so this click is not a recorded decision.</li>
+                </>
+              )}
             </ul>
           </div>
 
@@ -122,12 +243,15 @@ export function LandingDecisionPreview() {
           <div className="mt-4 border-t border-line pt-3">
             <p className="eyebrow eyebrow-xs">What happens next</p>
             <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{presentation.nextCheck}</p>
+            <Link href="/start" className="btn btn-primary mt-4">Cite a bill you already have</Link>
           </div>
         </aside>
       </div>
 
       <p className="mt-4 text-xs leading-5 text-(--muted)">
-        Example only. Your review uses your receipts, and unsupported facts stay unknown.
+        {usingExample
+          ? "Example only. Your review uses your receipts, and unsupported facts stay unknown."
+          : "Not saved. Not a recorded owner decision. Unsupported facts stay unknown. Cite a bill to ground exposure."}
       </p>
     </section>
   );

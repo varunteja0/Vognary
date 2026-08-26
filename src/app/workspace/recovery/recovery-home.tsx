@@ -40,6 +40,7 @@ import {
   purposeLabels,
 } from "./labels";
 import { MoneyValue } from "./recovery-states";
+import { AuthorizationLoop } from "@/app/authorization-loop";
 
 export function RecoveryHome({
   home,
@@ -174,6 +175,9 @@ function EmptyRecoveryHome({ onAddEvidence }: { onAddEvidence: () => void }) {
     <section aria-label="Get started" className="mx-auto max-w-xl py-8 text-center sm:py-14">
       <h3 className="font-display text-3xl font-semibold text-(--ink)">{customerPhrases.emptyHomeTitle}</h3>
       <p className="mt-4 text-base leading-7 text-(--muted)">{customerPhrases.emptyHomeBody}</p>
+      <div className="mt-6 text-left">
+        <AuthorizationLoop activeStep={1} />
+      </div>
       <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-8">
         {customerPhrases.addBills}
       </button>

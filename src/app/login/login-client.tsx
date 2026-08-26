@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { guestAuditTransferKey } from "@/lib/guest-audit-transfer";
+import { AuthorizationLoop } from "../authorization-loop";
 import { VognaryMark } from "../brand";
 
 type SessionPayload = {
@@ -179,6 +180,7 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
           <span className="folio" data-folio="01">Sign in</span>
           <h1 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">Decide what the company may commit to next</h1>
           <p className="mt-2 text-sm leading-6 text-(--muted)">Sign in with Google to remember cited bills, open the Control desk, and record a named human authorization before a new obligation exists.</p>
+          <AuthorizationLoop compact activeStep={guestAuditWaiting ? 1 : 4} />
 
           {session.authenticated ? (
             <div className="mt-6 rounded-xl border border-line bg-(--card-2) p-4" role="status" aria-live="polite">

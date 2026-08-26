@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AuthorizationLoop } from "../authorization-loop";
 import { VognaryMark } from "../brand";
 
 export const metadata: Metadata = {
@@ -58,6 +59,11 @@ export default function AboutPage() {
               </section>
             ))}
           </div>
+
+          <section className="mt-8 border-t border-line pt-5">
+            <h2 className="font-display text-lg font-semibold text-(--ink)">The loop no dashboard replaces</h2>
+            <AuthorizationLoop />
+          </section>
 
           <section className="mt-8 border-t border-line pt-5">
             <h2 className="font-display text-lg font-semibold text-(--ink)">What Vognary does not claim</h2>

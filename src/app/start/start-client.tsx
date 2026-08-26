@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { buildGuestAuditSnapshot, guestAuditTransferKey, type TransferStatementSource } from "@/lib/guest-audit-transfer";
+import { formatDraftInr, readGuestProposalDraft, type GuestProposalDraft } from "@/lib/guest-proposal-draft";
 import { formatCalendarDate } from "@/lib/date-only";
 import { startCardsFromRecurringItems, type RecurringItemLike, type StartCard } from "@/lib/recovery/start-cards";
 import { fetchReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
 import { knownMerchantsFromNames } from "@/lib/recovery/monthly-loop";
 import { splitReceiptTexts } from "@/lib/recovery/receipt-input";
 import { isReceiptImageFile } from "@/lib/recovery/wow-first-session";
+import { AuthorizationLoop } from "../authorization-loop";
 import { VognaryMark } from "../brand";
 import { BillDropzone } from "../workspace/recovery/ui/dropzone";
 import { ConfirmReceiptLine, type ImageDraft } from "../workspace/recovery/ui/confirm-receipt-line";
@@ -25,6 +27,11 @@ export default function StartClient() {
   const [cards, setCards] = useState<StartCard[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [draft, setDraft] = useState<GuestProposalDraft | null>(null);
+
+  useEffect(() => {
+    setDraft(readGuestProposalDraft());
+  }, []);
 
   function persistTab(text: string, sources: readonly TransferStatementSource[]) {
     const snapshot = buildGuestAuditSnapshot({ receiptText: text, statementSources: [...sources], manualItems: [] });
@@ -147,6 +154,14 @@ export default function StartClient() {
       <h1 className="page-title mt-3 max-w-2xl text-(--ink)">
         See the charge. Sign in to authorize.
       </h1>
+      {draft && !draft.usingExample ? (
+        <p className="mt-4 max-w-2xl text-sm leading-6 text-(--ink-soft)" data-testid="guest-proposal-draft">
+          {draft.amountInr == null
+            ? `You named ${draft.merchant} as the next yes.`
+            : `You named ${draft.merchant} as the next yes at ${formatDraftInr(draft.amountInr)}.`}
+          {" "}That amount is an assumption. Cite a bill to ground existing exposure. This is not a recorded owner decision.
+        </p>
+      ) : null}
       {!cards.length ? (
         <>
           <p className="lede mt-4 max-w-2xl">
@@ -155,6 +170,7 @@ export default function StartClient() {
           <p className="mt-2 text-sm leading-6 text-(--muted)">
             No account needed. Nothing is saved until you sign in.
           </p>
+          <AuthorizationLoop activeStep={1} />
         </>
       ) : null}
 
@@ -222,8 +238,9 @@ export default function StartClient() {
               ) : null}
             </article>
           ))}
+          <AuthorizationLoop completedThrough={1} activeStep={4} />
           <p className="text-sm leading-6 text-(--muted)">
-            Sign in to remember this evidence. New spend is authorized on the Control desk, not as Keep or Plan to cancel.
+            Sign in to remember this evidence. The next unique step is the Control desk: a named owner or admin freezes a cap before a new obligation exists. That is not Keep or Plan to cancel.
           </p>
           <Link href="/login?next=/app" className="btn btn-primary btn-lg justify-self-start">
             Sign in to remember this evidence

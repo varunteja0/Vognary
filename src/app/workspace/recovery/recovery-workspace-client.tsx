@@ -860,7 +860,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
 
         {controlPilotOff && workspaceId ? (
           <p role="status" className="mt-3 text-sm leading-6 text-(--muted)">
-            The private Control pilot is not on for this workspace. Workspace id:{" "}
+            This workspace is not enrolled for the Control desk, so a named owner cannot freeze a cap here yet. Cited bills still save. Workspace id:{" "}
             <span className="font-data break-all text-(--ink)">{workspaceId}</span>
           </p>
         ) : null}
