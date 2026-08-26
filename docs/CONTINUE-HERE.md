@@ -9,11 +9,39 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## Live state — 2026-08-26 (GitHub Actions restored at $0 by public visibility)
+
+**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Sell and Track F still bind.
+Composite remains **1.5**.
+
+**Scoreboard row:** production activation / backend readiness. **Loop:** hosted
+CI and Encrypted Backup Drill, which Track F needs.
+
+**WHAT IS TRUE.** `varunteja0/Vognary` is **public**. Standard GitHub-hosted
+Ubuntu runners are free on public repositories, so Actions no longer consume
+the private-minute quota and no longer require a spending limit or a card.
+The previously empty billing-blocked run
+[`32964415480`](https://github.com/varunteja0/Vognary/actions/runs/32964415480)
+was re-run and actually started `validate` (31 steps). Private CRM and `.env`
+remain gitignored. Do not treat a green check as customer proof.
+
+**WHAT IS NOT TRUE.** GitHub did not get a payment. The private-repo minute
+meter is not repaired. Making the repo private again will re-block hosted CI
+until the monthly quota resets or a card/budget exists. Exact-head CI has not
+finished this re-run yet. Production schema is still verified **0056**.
+
+**NEXT HUMAN ACTIONS:** unchanged — sell the five drafts; founder executes
+Track F when this re-run (or a later `main` run) is green. Encrypted Backup
+Drill `pre-0057` can be dispatched without paying for Actions while the repo
+stays public.
+
+**HARD STOP:** no auto merchant-match, Gmail OAuth, or a new product wave.
+
 ## Live state — 2026-08-26 (first-session photo read unstick)
 
-**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Sell and Track F in the Control
-Operability block below still bind as the human actions. This is a
-journey-impossible repair, not a new product wave. Composite remains **1.5**.
+> **SUPERSEDED as live instruction** by the public-repo Actions restore at the top.
+> The photo-read repair on `main` (`b0650e1`) remains true.
+> Sell and Track F still bind. Composite remains **1.5**.
 
 **Scoreboard row:** Product UX. **Loop:** first cited evidence → confirm the
 line → Recovery. Confirm this line still never auto-commits money.
