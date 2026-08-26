@@ -1374,6 +1374,7 @@ async function buildAccessExport(client: PoolClient, input: {
   if (!recovery) throw new Error("Recovery privacy export query returned no row.");
   const commitmentControl = commitmentControlResult.rows[0];
   if (!commitmentControl) throw new Error("Commitment Control privacy export query returned no row.");
+  const workspaceInvites = await loadWorkspaceInvitesPrivacyExport(query, input.workspaceId);
   for (const records of [
     recovery.versions,
     recovery.submissions,
@@ -1581,6 +1582,7 @@ async function buildAccessExport(client: PoolClient, input: {
       evaluationEvidence: commitmentControl.evaluation_evidence,
       decisions: commitmentControl.decisions,
       reconciliations: commitmentControl.reconciliations,
+      workspaceInvites,
     },
     productEvents: productEventResult.rows.map((row) => ({
       id: row.id,
@@ -2216,6 +2218,28 @@ export async function readCommitmentControlPrivacyExport(
   }
   if (relationCount !== 6) throw new Error("Commitment Control privacy schema is partially installed.");
   return load();
+}
+
+async function loadWorkspaceInvitesPrivacyExport(
+  query: ReturnType<typeof createSequentialQuery>,
+  workspaceId: string,
+) {
+  const availability = await query<{ present: boolean }>(
+    `select to_regclass('public.workspace_invites') is not null as present`,
+  );
+  if (!availability.rows[0]?.present) return [];
+  const result = await query<Record<string, unknown>>(
+    `select id, email, role, invited_by_user_id as "invitedByUserId",
+            expires_at as "expiresAt", accepted_at as "acceptedAt",
+            accepted_by_user_id as "acceptedByUserId", revoked_at as "revokedAt",
+            created_at as "createdAt"
+     from workspace_invites
+     where workspace_id = $1
+     order by created_at asc
+     limit $2`,
+    [workspaceId, 501],
+  );
+  return result.rows;
 }
 
 type ConsentExportRow = {

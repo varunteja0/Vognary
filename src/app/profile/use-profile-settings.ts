@@ -20,6 +20,7 @@ import type {
 const localWorkspaceStorageKey = "vognary.workspace.v1";
 const initialStatuses: ProfileStatuses = {
   account: "Loading account…",
+  people: "",
   notifications: "Loading reminder settings…",
   privacyConsent: "Loading privacy choices…",
   privacyData: "Loading export and retention controls…",
@@ -41,6 +42,13 @@ export function useProfileSettings() {
   const [privacyRequests, setPrivacyRequests] = useState<PrivacyRequest[]>([]);
   const [privacyLifecycleAvailable, setPrivacyLifecycleAvailable] = useState<boolean | null>(null);
   const [privacyBusy, setPrivacyBusy] = useState(false);
+  const [people, setPeople] = useState<{
+    members: Array<{ userId: string; email: string; displayName: string | null; role: string }>;
+    invites: Array<{ id: string; email: string; role: string; status: string; expiresAt: string }>;
+  } | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
+  const [peopleBusy, setPeopleBusy] = useState(false);
 
   function setStatus(scope: ProfileStatusScope, message: string) {
     setStatuses((current) => ({ ...current, [scope]: message }));
@@ -57,6 +65,17 @@ export function useProfileSettings() {
         }
         setProfile(payload);
         setStatus("account", "Account loaded.");
+        const role = payload.activeWorkspace?.role;
+        if (role === "owner" || role === "admin") {
+          const peopleResponse = await fetch("/api/workspaces/current/members", { cache: "no-store" });
+          const peoplePayload = await peopleResponse.json().catch(() => ({}));
+          if (cancelled) return;
+          if (!peopleResponse.ok) {
+            setStatus("people", peoplePayload.error?.message ?? peoplePayload.message ?? "People are not available for this workspace.");
+            return;
+          }
+          setPeople({ members: peoplePayload.data?.members ?? [], invites: peoplePayload.data?.invites ?? [] });
+        }
       })
       .catch(() => {
         if (!cancelled) setStatus("account", "Could not load account. Check your connection and retry.");
@@ -311,12 +330,90 @@ export function useProfileSettings() {
     }
   }
 
+  async function loadPeople() {
+    setPeopleBusy(true);
+    try {
+      const response = await fetch("/api/workspaces/current/members", { cache: "no-store" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setStatus("people", payload.error?.message ?? payload.message ?? "People are not available for this workspace.");
+        return;
+      }
+      setPeople({ members: payload.data?.members ?? [], invites: payload.data?.invites ?? [] });
+      setStatus("people", "");
+    } catch {
+      setStatus("people", "Could not load people.");
+    } finally {
+      setPeopleBusy(false);
+    }
+  }
+
+  async function invitePerson() {
+    setPeopleBusy(true);
+    try {
+      const response = await fetch("/api/workspaces/current/members/invites", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setStatus("people", payload.error?.message ?? payload.message ?? "Could not send the invite.");
+        return;
+      }
+      setInviteEmail("");
+      setStatus("people", "Invite recorded. If email is not configured, share /login with that person.");
+      await loadPeople();
+    } catch {
+      setStatus("people", "Could not send the invite.");
+    } finally {
+      setPeopleBusy(false);
+    }
+  }
+
+  async function revokeInvite(inviteId: string) {
+    setPeopleBusy(true);
+    try {
+      const response = await fetch(`/api/workspaces/current/members/invites/${inviteId}/revoke`, { method: "POST" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setStatus("people", payload.error?.message ?? payload.message ?? "Could not revoke that invite.");
+        return;
+      }
+      await loadPeople();
+    } catch {
+      setStatus("people", "Could not revoke that invite.");
+    } finally {
+      setPeopleBusy(false);
+    }
+  }
+
+  async function switchWorkspace(workspaceId: string) {
+    setStatus("account", "Switching workspace…");
+    try {
+      const response = await fetch("/api/profile/workspace", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workspaceId }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setStatus("account", payload.error ?? "Could not switch workspace.");
+        return;
+      }
+      window.location.assign("/app");
+    } catch {
+      setStatus("account", "Could not switch workspace.");
+    }
+  }
+
   return {
     profile, statuses, deleteText, deleting, deletionComplete, setDeleteText, deleteMyData, signOut,
     consentsAvailable, analyticsConsent, benchmarkConsent, consentBusy, toggleAnalyticsConsent, toggleBenchmarkConsent,
     renewalAlerts, renewalAlertBusy, setRenewalAlerts, saveRenewalAlerts,
     privacyLifecycleAvailable, retentionPolicy, privacyRequests, privacyBusy, setRetentionPolicy,
     saveRetentionPolicy, createAndDownloadPrivacyExport,
+    people, inviteEmail, inviteRole, peopleBusy, setInviteEmail, setInviteRole, loadPeople, invitePerson, revokeInvite, switchWorkspace,
   };
 }
 

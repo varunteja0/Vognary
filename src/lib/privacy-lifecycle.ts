@@ -120,6 +120,7 @@ export type PrivacyExportDocument = {
     evaluationEvidence: Array<Record<string, unknown>>;
     decisions: Array<Record<string, unknown>>;
     reconciliations: Array<Record<string, unknown>>;
+    workspaceInvites: Array<Record<string, unknown>>;
   };
   productEvents: Array<Record<string, unknown>>;
   renewalAlertPreferences: Array<Record<string, unknown>>;

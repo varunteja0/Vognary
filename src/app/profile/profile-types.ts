@@ -81,6 +81,6 @@ export type PrivacyRequest = {
   downloadCount: number;
 };
 
-export type ProfileStatusScope = "account" | "notifications" | "privacyConsent" | "privacyData" | "danger";
+export type ProfileStatusScope = "account" | "people" | "notifications" | "privacyConsent" | "privacyData" | "danger";
 
 export type ProfileStatuses = Record<ProfileStatusScope, string>;

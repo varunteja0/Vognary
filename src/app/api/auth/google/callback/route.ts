@@ -25,6 +25,7 @@ import {
   getOrCreateUserByGoogleIdentity,
   WorkspaceIdentityConflictError,
 } from "@/lib/server/workspace-store";
+import { acceptOpenWorkspaceInvitesForUser } from "@/lib/server/workspace-invite-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -96,7 +97,13 @@ export async function GET(request: NextRequest) {
     if (error instanceof WorkspaceIdentityConflictError) return redirectToLogin(request, "identity-conflict");
     throw error;
   }
-  const workspace = await getOrCreateDefaultWorkspaceForUser({ userId: user.id, workspaceName: getGoogleWorkspaceName(tokenInfo) });
+  const accepted = await acceptOpenWorkspaceInvitesForUser({
+    userId: user.id,
+    email: tokenInfo.email.toLowerCase(),
+  }).catch(() => null);
+  const workspace = accepted
+    ? { workspaceId: accepted.workspaceId, workspaceName: accepted.workspaceName, role: accepted.role }
+    : await getOrCreateDefaultWorkspaceForUser({ userId: user.id, workspaceName: getGoogleWorkspaceName(tokenInfo) });
   const cookie = await createSessionCookie({ userId: user.id, workspaceId: workspace.workspaceId });
 
   const nextPath = sanitizeOAuthReturnPath(request.cookies.get(googleAuthNextCookie)?.value);

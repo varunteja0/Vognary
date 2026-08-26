@@ -46,10 +46,30 @@ export function AccountSection({ settings }: { settings: Settings }) {
       <StatusMessage message={settings.statuses.account} />
 
       {profile?.activeWorkspace ? (
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <Info label="Workspace" value={profile.activeWorkspace.workspaceName} />
+          <Info label="Workspace id" value={profile.activeWorkspace.workspaceId} />
           <Info label="Plan" value={profile.activeWorkspace.plan} />
           <Info label="Role" value={profile.activeWorkspace.role} />
+        </div>
+      ) : null}
+
+      {profile && profile.workspaces.length > 1 ? (
+        <div className="mt-5">
+          <p className="eyebrow">Switch workspace</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {profile.workspaces.map((workspace) => (
+              <button
+                key={workspace.workspaceId}
+                type="button"
+                className={workspace.workspaceId === profile.activeWorkspace?.workspaceId ? "btn btn-ghost" : "btn btn-primary"}
+                disabled={workspace.workspaceId === profile.activeWorkspace?.workspaceId}
+                onClick={() => settings.switchWorkspace(workspace.workspaceId)}
+              >
+                {workspace.workspaceName} · {workspace.role}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
 
@@ -199,16 +219,70 @@ export function DangerZoneSection({ settings }: { settings: Settings }) {
   );
 }
 
+export function PeopleSection({ settings }: { settings: Settings }) {
+  const canManage = Boolean(settings.profile?.activeWorkspace && ["owner", "admin"].includes(settings.profile.activeWorkspace.role));
+  return (
+    <ProfileGroup name="People" description="Invite a second human so Commitment Control can be maker-checked" defaultOpen={canManage}>
+      {canManage ? (
+        <>
+          <p className="text-sm leading-6 text-(--muted)">
+            Invite a colleague as admin or member by Google email. Accepting the invite binds that person to this workspace and does not merge money from any personal workspace they already have.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+            <label className="block">
+              <span className="field-label">Email</span>
+              <input className="field mt-1" type="email" value={settings.inviteEmail} onChange={(event) => settings.setInviteEmail(event.target.value)} />
+            </label>
+            <label className="block">
+              <span className="field-label">Role</span>
+              <select className="field mt-1" value={settings.inviteRole} onChange={(event) => settings.setInviteRole(event.target.value as "member" | "admin")}>
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <button type="button" className="btn btn-primary self-end" disabled={settings.peopleBusy || !settings.inviteEmail} onClick={() => settings.invitePerson()}>
+              Invite
+            </button>
+          </div>
+          {settings.people?.members.length ? (
+            <ul className="mt-5 grid gap-2">
+              {settings.people.members.map((member) => (
+                <li key={member.userId} className="inset px-3 py-3 text-sm">
+                  <span className="font-semibold text-(--ink)">{member.displayName || member.email}</span>
+                  <span className="ml-2 text-(--muted)">{member.role}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {settings.people?.invites.filter((invite) => invite.status === "PENDING").length ? (
+            <ul className="mt-4 grid gap-2">
+              {settings.people.invites.filter((invite) => invite.status === "PENDING").map((invite) => (
+                <li key={invite.id} className="inset flex items-center justify-between gap-3 px-3 py-3 text-sm">
+                  <span>{invite.email} · {invite.role} · pending</span>
+                  <button type="button" className="btn btn-ghost" disabled={settings.peopleBusy} onClick={() => settings.revokeInvite(invite.id)}>Revoke</button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </>
+      ) : (
+        <p className="text-sm text-(--muted)">Only a workspace owner or admin can invite people.</p>
+      )}
+      <StatusMessage message={settings.statuses.people} />
+    </ProfileGroup>
+  );
+}
+
 function StatusMessage({ message }: { message: string }) {
   return <p role="status" aria-live="polite" aria-atomic="true" className="mt-4 min-h-5 text-xs leading-5 text-(--muted)">{message}</p>;
 }
 
 function Info({ label, value }: { label: string; value: string }) {
-  return <div className="inset px-3 py-3"><p className="eyebrow text-[0.56rem]">{label}</p><p className="mt-2 break-all font-semibold text-(--ink)">{value}</p></div>;
+  return <div className="inset px-3 py-3"><p className="eyebrow eyebrow-xs">{label}</p><p className="mt-2 break-all font-semibold text-(--ink)">{value}</p></div>;
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-lg border border-line px-3 py-3"><p className="eyebrow text-[0.56rem]">{label}</p><p className="font-data mt-2 text-2xl font-semibold tnum text-(--ink)">{value}</p></div>;
+  return <div className="rounded-lg border border-line px-3 py-3"><p className="eyebrow eyebrow-xs">{label}</p><p className="font-data mt-2 text-2xl font-semibold tnum text-(--ink)">{value}</p></div>;
 }
 
 function CheckBox({ label, checked, disabled, onChange }: { label: string; checked: boolean; disabled: boolean; onChange: (checked: boolean) => void }) {

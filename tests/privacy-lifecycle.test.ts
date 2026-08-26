@@ -170,6 +170,7 @@ test("privacy export builder emits an allowlisted metadata-only document", () =>
       evaluationEvidence: [],
       decisions: [],
       reconciliations: [],
+      workspaceInvites: [],
     },
     productEvents: [],
     renewalAlertPreferences: [],

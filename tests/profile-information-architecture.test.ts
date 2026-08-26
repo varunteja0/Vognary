@@ -37,7 +37,7 @@ test("profile actions preserve their established server contracts", () => {
 });
 
 test("profile settings use the required progressive-disclosure groups in task order", () => {
-  const groupOrder = ["AccountSection", "NotificationsSection", "PrivacySection", "DangerZoneSection"];
+  const groupOrder = ["AccountSection", "PeopleSection", "NotificationsSection", "PrivacySection", "DangerZoneSection"];
   let previous = -1;
   for (const group of groupOrder) {
     const position = clientEntry.indexOf(`<${group}`);
@@ -46,6 +46,7 @@ test("profile settings use the required progressive-disclosure groups in task or
   }
   assert.match(sections, /<details className="panel group overflow-hidden"/);
   assert.match(sections, /name="Account"/);
+  assert.match(sections, /name="People"/);
   assert.match(sections, /name="Notifications"/);
   assert.match(sections, /name="Privacy"/);
   assert.doesNotMatch(sections, /name="Developer"|Read-only automation access/);
@@ -53,7 +54,7 @@ test("profile settings use the required progressive-disclosure groups in task or
 });
 
 test("each profile action group renders its own live status region", () => {
-  assert.equal((sections.match(/<StatusMessage message=/g) ?? []).length, 6);
+  assert.equal((sections.match(/<StatusMessage message=/g) ?? []).length, 7);
   assert.match(sections, /role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(client, /setStatus\("danger", "Deleting server data…"\)/);
   assert.doesNotMatch(client, /setStatus\("developer"/);

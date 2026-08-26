@@ -127,6 +127,39 @@ export async function createSessionCookie(input: { userId: string; workspaceId?:
   };
 }
 
+export async function rebindSessionWorkspace(request: Request, workspaceId: string) {
+  const secret = getSessionSecret();
+  if (!secret) throw new Error("SESSION_SECRET is not configured or is too short for production.");
+  const claims = readSession(request);
+  if (!claims) throw new Error("Authentication required.");
+  const membership = await getDatabasePool().query<{ workspace_id: string }>(
+    `select workspace_id from workspace_members where user_id = $1 and workspace_id = $2`,
+    [claims.userId, workspaceId],
+  );
+  if (!membership.rows[0]) throw new Error("You are not a member of that workspace.");
+
+  const updated = await getDatabasePool().query(
+    `update auth_sessions
+     set workspace_id = $3
+     where token_hash = $1
+       and user_id = $2
+       and revoked_at is null
+       and expires_at > now()`,
+    [hashSessionToken(claims.sessionToken), claims.userId, workspaceId],
+  );
+  if (!updated.rowCount) throw new Error("Authentication required.");
+
+  const session: SessionClaims = { ...claims, workspaceId };
+  const payload = Buffer.from(JSON.stringify(session), "utf8").toString("base64url");
+  const signature = signPayload(payload, secret);
+  const maxAgeSeconds = Math.max(1, Math.floor((claims.expiresAt - Date.now()) / 1000));
+  return {
+    name: sessionCookieName,
+    value: `${payload}.${signature}`,
+    maxAgeSeconds,
+  };
+}
+
 export async function revokeCurrentSession(request: Request) {
   const session = readSession(request);
   if (!session || !isDatabaseConfigured()) return false;

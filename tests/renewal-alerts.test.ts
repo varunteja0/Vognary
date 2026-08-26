@@ -98,6 +98,7 @@ test("renewal scheduling and delivery source enforce opt-in, idempotency, bounde
   const store = source("src/lib/server/renewal-alert-store.ts");
   const ledger = source("src/lib/server/living-ledger-store.ts");
   const mailer = source("src/lib/server/renewal-alert-mailer.ts");
+  const resend = source("src/lib/server/resend-mailer.ts");
   const worker = source("src/app/api/internal/renewal-alerts/due/run/route.ts");
   const deliveryTable = migration.slice(
     migration.indexOf("create table if not exists renewal_alert_deliveries"),
@@ -114,7 +115,7 @@ test("renewal scheduling and delivery source enforce opt-in, idempotency, bounde
   assert.match(store, /attempt_count < \$2/);
   assert.match(store, /consent\.purpose = 'renewal-alerts'/);
   assert.match(ledger, /scheduleRenewalAlertsForWorkspace\(input\.workspaceId, client\)/);
-  assert.match(mailer, /AbortSignal\.timeout\(resendTimeoutMs\)/);
+  assert.match(resend, /AbortSignal\.timeout\(resendTimeoutMs\)/);
   assert.match(mailer, /`renewal-alert\/\$\{input\.deliveryId\}`/);
   assert.match(mailer, /`weekly-digest\/\$\{input\.deliveryId\}`/);
   assert.match(digestMigration, /unique \(preference_id, week_start\)/);

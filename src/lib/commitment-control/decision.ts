@@ -14,6 +14,7 @@ export type AuthorizedProposalDecision = {
   expectedAmountMinor: string;
   decidedByUserId: string | null;
   decidedAt: string;
+  overrideReason: string | null;
 };
 
 export function authorizeProposalDecision(input: {
@@ -23,11 +24,27 @@ export function authorizeProposalDecision(input: {
   action: ProposalDecisionAction;
   approvedCapMinor?: string;
   decidedAt?: string;
+  submittedByUserId?: string | null;
+  authorizingAdminCount?: number;
+  overrideReason?: string;
 }): AuthorizedProposalDecision {
   if (input.actorRole !== "admin" && input.actorRole !== "owner") {
     throw new Error("A workspace owner or admin must make the proposal decision.");
   }
   if (!proposalDecisionActions.includes(input.action)) throw new Error("Proposal decision action is not supported.");
+  if (
+    (input.authorizingAdminCount ?? 1) >= 2
+    && input.submittedByUserId
+    && input.submittedByUserId === input.actorUserId
+  ) {
+    throw new Error("A second owner or admin must record this decision.");
+  }
+  if (input.evaluation.status === "OUTSIDE_POLICY" && (input.action === "APPROVE" || input.action === "APPROVE_WITH_CAP")) {
+    const override = input.overrideReason?.trim() ?? "";
+    if (override.length < 1 || override.length > 500) {
+      throw new Error("Approving an outside-policy proposal requires a written override reason.");
+    }
+  }
   const expectedAmount = parsePositiveMinorUnits(input.evaluation.proposal.amountMinor, "Expected proposal amount");
   let approvedCapMinor: string | null = null;
   if (input.action === "APPROVE") {
@@ -51,5 +68,8 @@ export function authorizeProposalDecision(input: {
     expectedAmountMinor: expectedAmount.toString(),
     decidedByUserId: requireUuid(input.actorUserId, "Decision actor id"),
     decidedAt: decidedAt.toISOString(),
+    overrideReason: input.evaluation.status === "OUTSIDE_POLICY" && input.action !== "DECLINE"
+      ? (input.overrideReason?.trim() ?? "")
+      : null,
   };
 }

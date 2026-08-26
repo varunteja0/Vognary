@@ -6,6 +6,7 @@ import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError 
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 import { createSessionCookie, sessionCookieOptions } from "@/lib/server/session";
 import { getOrCreateDefaultWorkspaceForUser, getOrCreateUserByEmail } from "@/lib/server/workspace-store";
+import { acceptOpenWorkspaceInvitesForUser } from "@/lib/server/workspace-invite-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -66,7 +67,10 @@ export async function POST(request: NextRequest) {
   }
 
   const user = await getOrCreateUserByEmail({ email, displayName: body.name });
-  const workspace = await getOrCreateDefaultWorkspaceForUser({ userId: user.id, workspaceName: body.workspaceName });
+  const accepted = await acceptOpenWorkspaceInvitesForUser({ userId: user.id, email }).catch(() => null);
+  const workspace = accepted
+    ? { workspaceId: accepted.workspaceId, workspaceName: accepted.workspaceName, role: accepted.role, plan: "private_beta" }
+    : await getOrCreateDefaultWorkspaceForUser({ userId: user.id, workspaceName: body.workspaceName });
   const cookie = await createSessionCookie({ userId: user.id, workspaceId: workspace.workspaceId });
 
   const response = NextResponse.json({
