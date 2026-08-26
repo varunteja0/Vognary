@@ -39,21 +39,18 @@ test("exception-only home is honest about shadow mode and missing coverage", () 
   assert.ok(autopilotHomeSource.indexOf("Needs your help") < autopilotHomeSource.indexOf("Handled for you"));
 });
 
-test("active mandate still publishes the first-value spend strip when no recurring amount is cited", () => {
-  assert.ok(
-     homeSource.indexOf("<RecoveryAutopilotHome") < homeSource.indexOf("<SpendHero"),
-     "active Autopilot actions must render above cited spend metrics",
-  );
+test("active mandate stays off the customer Now surface; cited spend metrics remain honest", () => {
+  assert.doesNotMatch(homeSource, /RecoveryAutopilotHome/);
   const metricsFn = homeSource.slice(homeSource.indexOf("function SpendHero"));
   assert.match(metricsFn, /Software commitments/);
   assert.match(metricsFn, /No recurring amount yet/);
   assert.doesNotMatch(metricsFn, /if \(!hasTotals\) return null/);
 });
 
-test("landing copy stays on the commitment decision; autopilot claims do not leak onto public pages", () => {
+test("landing copy stays on Commitment Control; autopilot claims do not leak onto public pages", () => {
   assert.match(landingSource, /One receipt is enough to begin/);
   assert.doesNotMatch(landingSource, /standing mandate|Exception-only home|money stops without chores/i);
-  assert.match(homeSource, /home\.autopilot\?\.mandate\?\.status === "ACTIVE"/);
+  assert.doesNotMatch(homeSource, /home\.autopilot\?\.mandate\?\.status === "ACTIVE"/);
 });
 
 test("signed mandate text is the frozen terms, not a paraphrase", () => {

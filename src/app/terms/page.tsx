@@ -4,12 +4,12 @@ import { VognaryMark } from "../brand";
 
 export const metadata: Metadata = {
   title: "Terms",
-  description: "Terms for using Vognary's evidence-backed Commitment Intelligence workspace.",
+  description: "Terms for using Vognary's evidence-backed Commitment Control workspace.",
   alternates: { canonical: "/terms" },
   openGraph: {
     url: "/terms",
     title: "Terms - Vognary",
-    description: "Terms for using Vognary's evidence-backed Commitment Intelligence workspace.",
+    description: "Terms for using Vognary's evidence-backed Commitment Control workspace.",
   },
 };
 

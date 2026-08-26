@@ -11,7 +11,7 @@ test("manual financial evidence is not exposed before sign-in", async ({ page })
 test("landing walkthrough is explicitly illustrative and never presented as customer proof", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Know what renews. Decide what stays." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Decide before the obligation exists." })).toBeVisible();
   await expect(page.getByText("Cursor Pro · ₹1,700", { exact: true })).toBeVisible();
   await expect(page.getByText("From two example receipts", { exact: true })).toBeVisible();
   await expect(page.getByText(/Example only\. Your review uses your receipts/)).toBeVisible();

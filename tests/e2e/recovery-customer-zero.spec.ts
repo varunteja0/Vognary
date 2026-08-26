@@ -55,7 +55,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 1-3. Open landing and establish a saved identity independently of provider activation.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Know what renews. Decide what stays.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Decide before the obligation exists.");
   await tabToAndActivate(page, "Sign in");
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
@@ -64,7 +64,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
 
   // 4-7. Add bills from empty Home, not Gmail setup.
-  await openNowAfterWorkspaceLoad(page, "Start with a software bill.", initialControlProbe);
+  await openNowAfterWorkspaceLoad(page, "Start with a cited bill.", initialControlProbe);
   await page.getByRole("button", { name: "Add a bill" }).click();
   const addBills = page.getByRole("dialog", { name: "Add a bill" });
   await expect(addBills).toBeVisible();

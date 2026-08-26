@@ -120,8 +120,7 @@ test("primary navigation keeps Control and Mandate hidden until each is genuinel
   assert.deepEqual([...recoveryViews], ["CONTROL", "HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
   assert.deepEqual(Object.values(recoveryViewLabels), ["Control", "Now", "Bills", "Sources", "Automation"]);
   assert.match(clientSource, /<nav aria-label="Primary"/);
-  assert.match(clientSource, /mandateAvailable/);
-  assert.match(clientSource, /noticeReadiness\.state === "proven-ready"/);
+  assert.match(clientSource, /view !== "MANDATE"/);
   assert.match(clientSource, /view !== "CONTROL" \|\| controlAvailable/);
   assert.match(clientSource, /primaryViews\.map/);
   assert.match(clientSource, /aria-current=\{state\.view === view \? "page" : undefined\}/);
@@ -132,10 +131,10 @@ test("primary navigation keeps Control and Mandate hidden until each is genuinel
 
 test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
   assert.match(landingSource, /One receipt is enough to begin/);
-  assert.match(landingSource, /Know what renews/);
-  assert.match(loginSource, /what renews next/);
-  assert.match(allSource, /Start with a software bill/);
-  assert.match(allSource, /Add a receipt to see the charge/);
+  assert.match(landingSource, /Decide before the obligation exists/);
+  assert.match(loginSource, /Control desk/);
+  assert.match(allSource, /Start with a cited bill/);
+  assert.match(allSource, /Add a receipt. Now, Bills, and Sources hold cited evidence/);
   assert.doesNotMatch(landingSource, /Want it done for you\?/);
   assert.doesNotMatch(landingSource, /href="\/private-audit"/);
   assert.match(clientSource, />Vognary</);
@@ -178,15 +177,12 @@ test("home leads with the pre-renewal decision queue and cited spend activation"
   assert.doesNotMatch(addEvidenceSource, /recordWorkspaceActivation|onCitedPictureRendered/);
   assert.doesNotMatch(sourcesSource, /recordWorkspaceActivation|onCitedPictureRendered/);
   assert.match(homeSource, /SpendHero/);
-  assert.match(homeSource, /<RecoveryAttention/);
+  assert.doesNotMatch(homeSource, /<RecoveryAttention/);
   assert.doesNotMatch(homeSource, /FirstResultHome|showFirstResult/);
   assert.doesNotMatch(clientSource, /FIRST_RESULT_DISMISSED|onDismissFirstResult/);
   const quietHome = homeSource.slice(homeSource.indexOf("className=\"stack-page\""));
   assert.ok(quietHome.indexOf("<DecisionQueue") < quietHome.indexOf("<ComingLater"), "Decision queue must lead Coming later");
-  assert.ok(
-    homeSource.indexOf("<RecoveryAutopilotHome") < homeSource.indexOf("<SpendHero"),
-    "active Autopilot actions must render above cited spend metrics",
-  );
+  assert.doesNotMatch(homeSource, /RecoveryAutopilotHome/);
   assert.match(homeSource, /Next charges/);
   assert.match(homeSource, /comingLaterItems\(home\)/);
   assert.doesNotMatch(homeSource, /home\.next\.map/);
@@ -214,8 +210,8 @@ test("returning Home stays quiet unless a real change or attention item exists",
 test("an empty Home leads with adding bills, not Gmail setup", () => {
   assert.match(clientSource, /void loadSources\(\)/);
   assert.match(clientSource, /receiptInbox=\{state\.receiptInbox\}/);
-  assert.match(allSource, /Start with a software bill/);
-  assert.match(allSource, /Add a receipt to see the charge/);
+  assert.match(allSource, /Start with a cited bill/);
+  assert.match(allSource, /Add a receipt. Now, Bills, and Sources hold cited evidence/);
   assert.match(allSource, /No mailbox access required/);
   assert.match(clientSource, /onOpenSources=/);
   assert.doesNotMatch(homeSource, /Finish one-time billing setup/);

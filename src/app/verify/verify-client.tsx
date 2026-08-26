@@ -109,15 +109,15 @@ export default function VerifyClient() {
             {result.reasons.map((reason) => <li key={reason}>— {reason}</li>)}
           </ul>
           {result.contentHash ? (
-            <p className="mt-3 break-all font-data text-[0.68rem] text-(--muted)">Content hash: {result.contentHash}</p>
+            <p className="mt-3 break-all font-data text-xs text-(--muted)">Content hash: {result.contentHash}</p>
           ) : null}
           {result.integrity?.prevHash ? (
-            <p className="mt-1 break-all font-data text-[0.68rem] text-(--muted)">Self-declared previous export hash: {result.integrity.prevHash}</p>
+            <p className="mt-1 break-all font-data text-xs text-(--muted)">Self-declared previous export hash: {result.integrity.prevHash}</p>
           ) : result.integrity ? (
-            <p className="mt-1 font-data text-[0.68rem] text-(--muted)">Claims to be the first export in this workspace&apos;s local chain.</p>
+            <p className="mt-1 font-data text-xs text-(--muted)">Claims to be the first export in this workspace&apos;s local chain.</p>
           ) : null}
           {result.issuerSignature.keyId ? (
-            <p className="mt-1 break-all font-data text-[0.68rem] text-(--muted)">
+            <p className="mt-1 break-all font-data text-xs text-(--muted)">
               Issuer key: {result.issuerSignature.keyId} · issued {result.issuerSignature.issuedAt?.slice(0, 10) ?? "unknown"}
             </p>
           ) : null}

@@ -168,7 +168,7 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
     <main id="ledger-main" className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-2xl">
         <nav className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="inline-flex items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
+          <Link href="/" className="brandmark">
             <VognaryMark size={22} />
             Vognary
           </Link>
@@ -177,12 +177,12 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
 
         <section className="panel p-6 sm:p-8">
           <span className="folio" data-folio="01">Sign in</span>
-          <h1 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">Know what your company is committed to pay next</h1>
-          <p className="mt-2 text-sm leading-6 text-(--muted)">Sign in with Google to remember the bills you already reviewed, review what renews next, and open the receipt behind each claim.</p>
+          <h1 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">Decide what the company may commit to next</h1>
+          <p className="mt-2 text-sm leading-6 text-(--muted)">Sign in with Google to remember cited bills, open the Control desk, and record a named human authorization before a new obligation exists.</p>
 
           {session.authenticated ? (
             <div className="mt-6 rounded-xl border border-line bg-(--card-2) p-4" role="status" aria-live="polite">
-              <p className="font-data text-xs uppercase tracking-[0.16em] text-verdict">Signed in</p>
+              <p className="eyebrow text-verdict">Signed in</p>
               <p className="mt-2 font-semibold text-(--ink)">{session.session?.email}</p>
               <p className="mt-1 text-sm leading-6 text-(--muted)">Taking you to your workspace…</p>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -206,8 +206,8 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
                 <Notice banner={googleStatus} />
               </div>
 
-              {isDevEnv ? <details className="rounded-xl border border-line bg-(--card-2) p-4">
-                <summary className="cursor-pointer select-none font-display text-base font-semibold text-(--ink)">Other ways to sign in</summary>
+              {isDevEnv ? <details className="rounded-xl border border-line bg-(--card-2) px-4 py-1">
+                <summary className="disclosure-summary font-display">Other ways to sign in</summary>
                 <div className="mt-4">
                   <form onSubmit={submit} className="flex flex-col gap-3">
                       <h2 className="font-display text-base font-semibold text-(--ink)">Development login</h2>
@@ -229,8 +229,8 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
 
               <ul className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 {trustPoints.map((point) => (
-                  <li key={point} className="inline-flex items-center gap-1.5 font-data text-[0.66rem] uppercase tracking-[0.12em] text-(--muted)">
-                    <span className="live-dot" aria-hidden />
+                  <li key={point} className="inline-flex items-center gap-1.5 eyebrow">
+                    <span aria-hidden className="inline-block h-px w-3 bg-(--gold)" />
                     {point}
                   </li>
                 ))}
@@ -240,11 +240,8 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
 
           <Notice banner={status} />
 
-          <p className="mt-5 text-center text-xs leading-5 text-(--muted)">
-            By continuing you agree to our{" "}
-            <Link href="/terms" className="text-(--ink-soft) underline underline-offset-2 transition hover:text-(--ink)">Terms</Link>{" "}
-            and{" "}
-            <Link href="/privacy" className="text-(--ink-soft) underline underline-offset-2 transition hover:text-(--ink)">Privacy Policy</Link>.
+          <p className="mt-5 text-center text-sm leading-6 text-(--muted)">
+            By continuing you agree to our <Link href="/terms" className="legal-link">Terms</Link> and <Link href="/privacy" className="legal-link">Privacy Policy</Link>.
           </p>
 
         </section>

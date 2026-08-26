@@ -17,7 +17,7 @@ test("the public page is a cacheable readiness-neutral shell", () => {
 
 test("the landing selects the guest-first proven entry path without instant-audit surfaces", () => {
   assert.match(landingSource, /const primaryHref = "\/start";/);
-  assert.match(landingSource, /const primaryLabel = "Check a bill";/);
+  assert.match(landingSource, /const primaryLabel = "Add a bill";/);
   assert.match(landingSource, /<LandingDecisionPreview \/>/);
   assert.doesNotMatch(landingSource, /sample|demo|InstantAudit|instant audit/i);
 });
@@ -53,7 +53,7 @@ test("static layout metadata remains readiness-neutral", () => {
   assert.ok(metadataStart >= 0 && metadataEnd > metadataStart);
   const metadataSource = layoutSource.slice(metadataStart, metadataEnd);
 
-  assert.match(metadataSource, /Vognary - Know what your company is committed to pay next/);
-  assert.match(metadataSource, /Commitment Intelligence for founder-led 2–20 person software and AI companies/);
+  assert.match(metadataSource, /Vognary - Decide before the obligation exists/);
+  assert.match(metadataSource, /Commitment Control for India-first 5–100 person AI-native companies/);
   assert.doesNotMatch(metadataSource, /\b(?:forward(?:ed|ing)?|Gmail|bank|UPI|cancel(?:s|led|ling|lation|lations)?)\b/i);
 });

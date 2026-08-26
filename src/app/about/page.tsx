@@ -4,27 +4,27 @@ import { VognaryMark } from "../brand";
 
 export const metadata: Metadata = {
   title: "About",
-  description: "What Vognary is building, how Commitment Intelligence works, and the product boundaries that protect financial truth.",
+  description: "What Vognary is building, how Commitment Control works, and the product boundaries that protect financial truth.",
   alternates: { canonical: "/about" },
   openGraph: {
     url: "/about",
     title: "About - Vognary",
-    description: "What Vognary is building, how Commitment Intelligence works, and the product boundaries that protect financial truth.",
+    description: "What Vognary is building, how Commitment Control works, and the product boundaries that protect financial truth.",
   },
 };
 
 const principles = [
   {
     heading: "Evidence before inference",
-    body: "Important amounts, dates, changes, and expected charges remain tied to billing evidence the user intentionally provides. When the evidence cannot support a financial fact, Vognary leaves it unknown instead of filling the gap with a plausible answer.",
+    body: "Important amounts, dates, changes, and expected charges remain tied to billing evidence the user intentionally provides. When the evidence cannot support a financial fact, Vognary leaves it unknown instead of filling the gap with a plausible answer. Proposal amounts are labeled as user-entered assumptions until later receipts prove an outcome.",
   },
   {
-    heading: "A decision before the charge",
-    body: "Vognary turns receipts into a small review queue: what changed, what is expected next, why it needs attention, and whether the founder chose Keep, Review later, or Plan to cancel for that cycle.",
+    heading: "A decision before the obligation",
+    body: "Commitment Control records a proposed spend, cited existing exposure, and versioned policy, then a named owner or admin authorizes, caps, or declines. Policy annotates. It never auto-approves, auto-denies, purchases, or moves money.",
   },
   {
     heading: "Memory without pretending",
-    body: "A saved workspace can remember cited evidence and decisions and compare them with later matching evidence. Missing evidence is still unknown. A plan to cancel is a recorded intention, never proof that a vendor was cancelled.",
+    body: "A saved workspace can remember cited evidence, frozen caps, and later reconciliations. Missing evidence is still unknown. An authorization is not proof that money was spent. A declined proposal is not proof a vendor was cancelled.",
   },
 ] as const;
 
@@ -45,9 +45,9 @@ export default function AboutPage() {
 
         <article className="panel p-6 sm:p-8">
           <span className="folio" data-folio="Company">About</span>
-          <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">Commitment Intelligence, built around evidence</h1>
+          <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">Commitment Control, built around evidence</h1>
           <p className="mt-3 text-sm leading-7 text-(--muted)">
-            Vognary is built for founder-led software and AI companies that need to know what their tools are likely to charge next, what changed, and which bills deserve a decision before the card fires. It starts with receipts and invoices the company already has. The product is India-first and focused on small teams without dedicated finance or procurement operations.
+            Vognary is built for India-first, 5–100 person AI-native companies that need a named human to authorize a new obligation before it exists, then prove later spend against that frozen cap. It starts with receipts and invoices the company already has. Recovery remains the evidence foundation; Control is the authorization desk.
           </p>
 
           <div className="mt-8 grid gap-6">
@@ -67,7 +67,7 @@ export default function AboutPage() {
           </section>
 
           <div className="mt-8 flex flex-wrap gap-2.5 border-t border-line pt-5">
-            <Link href="/start" className="btn btn-primary">Check a bill</Link>
+            <Link href="/start" className="btn btn-primary">Add a bill</Link>
             <Link href="/security" className="btn btn-ghost">Security and readiness</Link>
             <Link href="/privacy" className="btn btn-ghost">Privacy</Link>
           </div>

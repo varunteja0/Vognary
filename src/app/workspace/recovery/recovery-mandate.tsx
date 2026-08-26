@@ -60,11 +60,11 @@ export function RecoveryMandate({
 
       <dl className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-line bg-card p-4">
-          <dt className="text-xs uppercase tracking-wide text-(--muted)">Notice delivery</dt>
+          <dt className="eyebrow eyebrow-xs">Notice delivery</dt>
           <dd className="mt-1 text-sm text-(--ink)">{autopilotNoticeReadinessCopy(noticeReadiness.state)}</dd>
         </div>
         <div className="rounded-2xl border border-line bg-card p-4">
-          <dt className="text-xs uppercase tracking-wide text-(--muted)">Execution</dt>
+          <dt className="eyebrow eyebrow-xs">Execution</dt>
           <dd className="mt-1 text-sm text-(--ink)">{executionEnabled ? "Enabled for proven supported cases after the veto clock" : "Off — no cancellation is executed"}</dd>
         </div>
       </dl>

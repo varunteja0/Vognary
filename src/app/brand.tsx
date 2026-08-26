@@ -82,7 +82,7 @@ export function VognaryLockup({
   return (
     <span className={`inline-flex items-center gap-2 ${className ?? ""}`}>
       <VognaryMark size={markSize} />
-      <span className={`font-display font-semibold tracking-[-0.02em] ${wordClassName ?? ""}`}>
+      <span className={`font-display font-semibold ${wordClassName ?? ""}`}>
         Vognary
       </span>
     </span>

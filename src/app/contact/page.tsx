@@ -59,7 +59,7 @@ export default function ContactPage() {
           <span className="folio" data-folio="Company">Contact</span>
           <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">Reach a person, not a queue</h1>
           <p className="mt-3 text-sm leading-7 text-(--muted)">
-            Vognary is a small team building Commitment Intelligence for founder-led software and AI companies. Mail is read by
+            Vognary is a small team building Commitment Control for India-first AI-native companies. Mail is read by
             the people who build the product. Response time is not guaranteed and no support hours are published, because
             promising a window Vognary cannot yet keep would be the same kind of unproven claim the product refuses to make.
           </p>

@@ -50,7 +50,7 @@ function LegacyContinuityBlock({ counts }: { counts: RecoveryCutoverStatus["coun
 function ExperienceLoading({ label }: { label: string }) {
   return (
     <main className="grid min-h-[50vh] place-items-center px-4" aria-busy="true">
-      <p className="font-data text-xs uppercase tracking-[0.14em] text-(--muted)" role="status">{label}</p>
+      <p className="eyebrow" role="status">{label}</p>
     </main>
   );
 }

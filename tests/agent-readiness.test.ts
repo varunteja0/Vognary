@@ -132,7 +132,7 @@ test("homepage Markdown is useful, cache-safe, and linked to its agent guide", a
   assert.match(response.headers.get("link") ?? "", /<\/index\.md>; rel="alternate"; type="text\/markdown"/);
   assert.match(response.headers.get("link") ?? "", /<\/llms\.txt>; rel="describedby"/);
   assert.match(body, /^# Vognary/m);
-  assert.match(body, /Commitment Intelligence/);
+  assert.match(body, /Commitment Control/);
   assert.match(body, /## What Vognary does/);
   assert.match(body, /## Product boundaries/);
   assert.match(body, /\[About Vognary\]\(https:\/\/www\.vognary\.com\/about\)/);
@@ -170,7 +170,7 @@ test("homepage identity and 404 recovery are machine-readable without changing t
   assert.match(page, /contactPoint:/);
   assert.match(page, /"@type": "PostalAddress"/);
   assert.match(page, /addressCountry: "IN"/);
-  assert.match(about, /Commitment Intelligence, built around evidence/);
+  assert.match(about, /Commitment Control, built around evidence/);
   assert.ok(about.length >= 2_000, `expected a substantive About source, received ${about.length} characters`);
   assert.match(notFound, /href="\/llms\.txt"/);
   assert.match(notFound, /href="\/sitemap\.xml"/);

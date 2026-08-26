@@ -29,17 +29,16 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.vognary.com"),
   applicationName: "Vognary",
   title: {
-    default: "Vognary - Know what your company is committed to pay next",
+    default: "Vognary - Decide before the obligation exists",
     template: "%s - Vognary",
   },
   description:
-    "Vognary is Commitment Intelligence for founder-led 2–20 person software and AI companies: know what you are committed to pay next, and what deserves attention before the card fires.",
+    "Vognary is Commitment Control for India-first 5–100 person AI-native companies: propose the spend, see cited exposure and policy, then a named human freezes a cap.",
   keywords: [
-    "Software Decision Intelligence",
-    "Commitment Intelligence",
-    "software renewals",
+    "Commitment Control",
+    "software authorizations",
     "recurring vendor commitments",
-    "renewal reminders",
+    "human-approved spend",
     "Vognary",
   ],
   authors: [{ name: "Vognary" }],
@@ -61,15 +60,15 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "Vognary",
     url: "/",
-    title: "Vognary - Know what your company is committed to pay next",
+    title: "Vognary - Decide before the obligation exists",
     description:
-      "Vognary is Commitment Intelligence for founder-led 2–20 person software and AI companies: know what you are committed to pay next, and what deserves attention before the card fires.",
+      "Vognary is Commitment Control for India-first 5–100 person AI-native companies: propose the spend, see cited exposure and policy, then a named human freezes a cap.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vognary - Know what your company is committed to pay next",
+    title: "Vognary - Decide before the obligation exists",
     description:
-      "Vognary is Commitment Intelligence for founder-led 2–20 person software and AI companies: know what you are committed to pay next, and what deserves attention before the card fires.",
+      "Vognary is Commitment Control for India-first 5–100 person AI-native companies: propose the spend, see cited exposure and policy, then a named human freezes a cap.",
   },
 };
 
@@ -91,10 +90,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <PwaRegister />
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-(--glow) focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-(--ink-on-gold)"
-        >
+        <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
         <div id="main-content" tabIndex={-1} className="relative z-10 flex min-h-full flex-col outline-none">{children}</div>

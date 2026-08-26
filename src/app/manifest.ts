@@ -6,10 +6,10 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Vognary - Commitment Intelligence",
+    name: "Vognary - Commitment Control",
     short_name: "Vognary",
     description:
-      "Know what your company is committed to pay next — from evidence you choose.",
+      "Decide what the company may commit to before the obligation exists — from evidence you choose.",
     id: "/app",
     start_url: "/app",
     scope: "/",

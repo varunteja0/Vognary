@@ -1,6 +1,6 @@
 export const customerPhrases = {
-  emptyHomeTitle: "Start with a software bill.",
-  emptyHomeBody: "Add a receipt to see the charge, the evidence behind it, and the decision it needs.",
+  emptyHomeTitle: "Start with a cited bill.",
+  emptyHomeBody: "Add a receipt. Now, Bills, and Sources hold cited evidence so Control can later prove a frozen cap against observed spend.",
   addBills: "Add a bill",
   noMailbox: "No mailbox access required.",
   caughtUp: "No decisions due right now.",

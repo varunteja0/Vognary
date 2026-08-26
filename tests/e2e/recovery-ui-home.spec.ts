@@ -523,15 +523,10 @@ test("exception-only Autopilot home is honest on desktop and mobile and has no s
   );
   await page.goto("/app");
 
-  for (const name of ["Watching", "Delivery pending", "48-hour veto window", "Handled for you", "Needs your help", "Proof and savings", "Fees and refunds", "Mandate"]) {
-    await expect(page.getByRole("heading", { name })).toBeVisible();
-  }
-  await expect(page.getByText("Exception-only home")).toBeVisible();
-  await expect(page.getByText("Software commitments")).toBeVisible();
-  await expect(page.getByText("No recurring amount yet")).toHaveCount(0);
-  await expect(page.getByText("missing USD coverage is not a zero saving", { exact: false })).toBeVisible();
-  await expect(page.getByText("Fee collection stays fail-closed")).toBeVisible();
-  await expect(page.getByText("This is not a connected, cancelled, saved, or paid state.")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Mandate" })).toHaveCount(0);
+  await expect(page.getByText("Exception-only home")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Now" })).toBeVisible();
   await page.emulateMedia({ reducedMotion: "reduce" });
 
   const desktopAxe = await new AxeBuilder({ page }).analyze();
@@ -596,8 +591,8 @@ test("an active mandate still shows the spend strip when no recurring amount is 
   );
   await page.goto("/app");
 
-  await expect(page.getByText("Exception-only home")).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toBeVisible();
+  await expect(page.getByText("Exception-only home")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toHaveCount(0);
   await expect(page.getByText("Software commitments")).toBeVisible();
   await expect(page.getByText("No recurring amount yet")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Next charges" })).toBeVisible();

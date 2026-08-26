@@ -15,32 +15,32 @@ The requested Vognary path does not exist.
 
 export const agentHomepageMarkdown = `# Vognary
 
-> Commitment Intelligence for founder-led software and AI companies with 2–20 people.
+> Commitment Control for India-first 5–100 person AI-native companies.
 
-Vognary turns software bills and receipts a company already has into an evidence-backed view of what renews, what changed, what is likely to charge next, and which decision the founder recorded for the current cycle. Important amounts stay linked to the submitted evidence. If the evidence does not support a financial fact, Vognary leaves it unknown.
+Vognary records a proposed obligation, cited existing exposure, and versioned policy, then a named human authorizes a frozen cap. Later Recovery receipts prove the observed outcome against that authorization. Proposal amounts are user-entered assumptions until evidence cites them. If the evidence does not support a financial fact, Vognary leaves it unknown.
 
 ## What Vognary does
 
 - Reads billing evidence that an authorized user intentionally pastes or uploads.
-- Groups cited observations into recurring vendor commitments.
-- Surfaces upcoming charges, price changes, and overlapping software that may deserve review.
-- Records one of three conservative decisions: Keep, Review later, or Plan to cancel.
-- Checks later matching evidence against the amount and decision recorded for that cycle.
+- Groups cited observations into recurring vendor commitments used as exposure context.
+- Evaluates a new proposal against versioned policy without auto-approving or auto-denying.
+- Records an owner or admin authorization, cap, or decline.
+- Reconciles later same-workspace receipts to the frozen cap.
 
 ## Best fit
 
-Vognary is designed for founders and operators at small software or AI companies who manage recurring software, cloud, and AI-tool bills without dedicated finance or procurement staff. It is most useful before a renewal or card charge, when the user needs the amount, timing, reason, and cited receipt in one place.
+Vognary is designed for finance owners at India-first, 5–100 person AI-native companies that need a human decision before a new software, cloud, contractor, or campaign obligation exists.
 
 ## How to use it
 
-1. Open [Check a bill](https://www.vognary.com/start) for the no-account first step.
+1. Open [Add a bill](https://www.vognary.com/start) for the no-account evidence step.
 2. Add a billing record the user is authorized to share.
-3. Review the cited charge and choose Keep, Review later, or Plan to cancel.
-4. Sign in only when the user wants Vognary to remember the evidence and decision.
+3. Sign in to remember the evidence and open the Control desk.
+4. Record policy, propose the spend, and have an owner or admin authorize a cap.
 
 ## Product boundaries
 
-Vognary does not cancel a service, move money, ask for bank passwords, or require mailbox access for the first review. A plan to cancel is a remembered user decision, not proof that cancellation happened. Missing evidence is reported as unknown, not as a stopped charge or saving.
+Vognary does not cancel a service, move money, ask for bank passwords, or require mailbox access for the first review. An authorization is not proof that money was spent. Missing evidence is reported as unknown, not as a stopped charge or saving.
 
 ## Public resources
 
@@ -55,25 +55,26 @@ Vognary does not cancel a service, move money, ask for bank passwords, or requir
 
 export const llmsTxt = `# Vognary
 
-> Vognary is Commitment Intelligence for founder-led 2–20 person software and AI companies: cited commitments, changes, upcoming charges, and conservative renewal decisions from billing evidence the user provides.
+> Vognary is Commitment Control for India-first 5–100 person AI-native companies: proposed obligation, cited exposure, versioned policy, named human authorization, frozen cap, later Recovery evidence, exact reconciliation.
 
 Important interpretation rules:
 
 - Treat only cited amounts and dates as financial facts.
+- Treat proposal amounts as user-entered assumptions until later evidence is linked.
 - Treat missing evidence as unknown, never as proof that a charge stopped.
-- A Plan to cancel decision records the user's intent; Vognary does not cancel services or move money.
+- An authorization records a human decision; Vognary does not cancel services or move money.
 - The first review requires no bank password, mailbox access, or account.
 
 **When to use Vognary**
 
-- Use Vognary when a founder or operator wants to review a software, AI, or cloud bill before the next charge.
-- Use it to identify cited price changes, upcoming recurring charges, or overlapping software that deserves a human decision.
+- Use Vognary when a finance owner wants to authorize a software, AI, or cloud obligation before it exists.
+- Use it to compare a frozen cap with later cited receipts.
 - Use it when the user needs evidence-backed answers rather than an inferred inventory or an autonomous cancellation agent.
 
 **How to use Vognary**
 
 - For one no-account review, direct the user to https://www.vognary.com/start and ask them to provide only billing evidence they are authorized to share.
-- For a maintained workspace, let the user sign in after first value so Vognary can remember evidence and Keep, Review later, or Plan to cancel decisions.
+- For a maintained workspace, let the user sign in so Vognary can remember evidence and open Commitment Control.
 - Do not submit private financial evidence on a user's behalf without their explicit authorization.
 
 **When not to use Vognary**
@@ -84,8 +85,8 @@ Important interpretation rules:
 ## Core
 
 - [Homepage in Markdown](https://www.vognary.com/index.md): Concise product identity, workflow, best fit, and boundaries.
-- [Check a bill](https://www.vognary.com/start): No-account first step for reviewing user-provided billing evidence.
-- [Vognary homepage](https://www.vognary.com/): Human-facing product overview and illustrative cited decision.
+- [Add a bill](https://www.vognary.com/start): No-account first step for reviewing user-provided billing evidence.
+- [Vognary homepage](https://www.vognary.com/): Human-facing product overview and illustrative cited authorization.
 
 ## Trust and policies
 

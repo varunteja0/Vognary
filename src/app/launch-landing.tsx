@@ -4,12 +4,12 @@ import { LandingDecisionPreview } from "./landing-decision-preview";
 
 export default function LaunchLanding() {
   const primaryHref = "/start";
-  const primaryLabel = "Check a bill";
+  const primaryLabel = "Add a bill";
   return (
     <main id="ledger-main" className="relative overflow-hidden px-4 pb-12 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
         <nav aria-label="Public" className="flex min-h-16 items-center justify-between gap-3 border-b border-line py-3">
-          <Link href="/" className="inline-flex items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
+          <Link href="/" className="brandmark">
             <VognaryMark size={26} />
             Vognary
           </Link>
@@ -21,12 +21,12 @@ export default function LaunchLanding() {
         <section className="border-b border-line py-8 sm:py-10">
           <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:grid-rows-[auto_1fr] lg:gap-x-14 lg:gap-y-6">
             <div className="min-w-0 lg:col-start-1 lg:row-start-1">
-              <p className="eyebrow text-ochre">For small software teams</p>
-              <h1 className="mt-3 font-display text-[2.125rem] font-semibold leading-[1.08] tracking-tight text-(--ink) sm:text-5xl">
-                Know what renews. Decide what stays.
+              <p className="truth-label truth-policy">For India-first AI companies</p>
+              <h1 className="page-title mt-3 text-(--ink)">
+                Decide before the obligation exists.
               </h1>
-              <p className="mt-4 max-w-lg text-base leading-7 text-(--ink-soft)">
-                Vognary turns the software bills you already have into upcoming charges you can act on. Every amount opens to its receipt.
+              <p className="lede mt-4 max-w-lg">
+                Vognary is Commitment Control: propose the spend, see cited exposure and policy, then a named human freezes a cap. Later receipts prove the outcome. Start with a bill you already have.
               </p>
               <div className="mt-6">
                 <Link href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</Link>
@@ -38,8 +38,8 @@ export default function LaunchLanding() {
             </div>
 
             <section className="lg:col-start-1 lg:row-start-2 lg:self-start" aria-labelledby="product-boundaries-heading">
-              <h2 id="product-boundaries-heading" className="eyebrow text-(--muted)">What you do not need</h2>
-              <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm text-(--muted)">
+              <h2 id="product-boundaries-heading" className="truth-label truth-frozen">What you do not need</h2>
+              <ul className="boundary-list mt-3">
                 <li>No account required</li>
                 <li>No bank passwords</li>
                 <li>No mailbox access</li>
@@ -48,25 +48,26 @@ export default function LaunchLanding() {
           </div>
         </section>
 
-        <section className="my-4 flex flex-col justify-between gap-5 border-y border-line py-8 sm:flex-row sm:items-center">          <div>
-            <h2 className="eyebrow text-ochre">Start with what you already have</h2>
-            <h3 className="mt-2 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">One receipt is enough to begin.</h3>
+        <section className="my-4 flex flex-col justify-between gap-5 border-y border-line py-8 sm:flex-row sm:items-center">
+          <div className="min-w-0">
+            <h2 className="truth-label truth-citation">Start with what you already have</h2>
+            <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">One receipt is enough to begin.</h3>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Nothing is saved until you sign in. Vognary never cancels a service or moves money.</p>
           </div>
           <Link href={primaryHref} className="btn btn-primary btn-lg shrink-0">{primaryLabel}</Link>
         </section>
 
-        <footer className="flex flex-col items-center justify-between gap-4 border-t border-line py-7 text-center sm:flex-row sm:text-left">
+        <footer className="flex flex-col items-center justify-between gap-2 border-t border-line py-6 text-center sm:flex-row sm:text-left">
           <div className="inline-flex items-center gap-2.5">
             <VognaryMark size={22} />
             <span className="font-display font-semibold text-(--ink)">Vognary</span>
           </div>
-          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-(--muted)">
-            <Link href="/about" className="transition hover:text-(--ink)">About</Link>
-            <Link href="/privacy" className="transition hover:text-(--ink)">Privacy</Link>
-            <Link href="/security" className="transition hover:text-(--ink)">Security</Link>
-            <Link href="/contact" className="transition hover:text-(--ink)">Contact</Link>
-            <Link href="/terms" className="transition hover:text-(--ink)">Terms</Link>
+          <div className="flex flex-wrap justify-center gap-x-1 gap-y-0">
+            <Link href="/about" className="footer-link">About</Link>
+            <Link href="/privacy" className="footer-link">Privacy</Link>
+            <Link href="/security" className="footer-link">Security</Link>
+            <Link href="/contact" className="footer-link">Contact</Link>
+            <Link href="/terms" className="footer-link">Terms</Link>
           </div>
         </footer>
       </div>

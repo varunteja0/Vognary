@@ -39,7 +39,7 @@ export function BillDropzone({
       onDragOver={onDragOver}
       onDragLeave={() => setOver(false)}
       onDrop={onDrop}
-      className={`grid min-h-40 cursor-pointer place-items-center rounded-(--radius) border border-dashed px-(--space-4) py-(--space-6) text-center ${
+      className={`relative grid min-h-40 cursor-pointer place-items-center rounded-(--radius) border border-dashed px-(--space-4) py-(--space-6) text-center ${
         over ? "border-(--gold) bg-(--card-3)" : "border-line bg-(--card-2)"
       } ${disabled ? "pointer-events-none opacity-60" : ""}`}
     >
@@ -48,7 +48,7 @@ export function BillDropzone({
         type="file"
         multiple
         accept={acceptedExtensions}
-        className="sr-only"
+        className="file-target"
         disabled={disabled}
         aria-label="Upload invoices or receipts"
         onChange={(event) => {

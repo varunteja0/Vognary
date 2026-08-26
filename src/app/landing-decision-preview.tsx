@@ -1,57 +1,60 @@
 "use client";
 
 import { useState } from "react";
-import type { DecisionCycleAction } from "@/lib/recovery/contracts";
-import { decisionHookCopy } from "@/lib/recovery/wow-first-session";
 
 const actions = [
-  { value: "KEEP", label: "Keep" },
-  { value: "REVIEW_LATER", label: "Review later" },
-  { value: "PLAN_TO_CANCEL", label: "Plan to cancel" },
-] as const satisfies readonly { value: DecisionCycleAction; label: string }[];
+  { value: "APPROVE", label: "Approve" },
+  { value: "APPROVE_WITH_CAP", label: "Approve with cap" },
+  { value: "DECLINE", label: "Decline" },
+] as const;
 
-const actionPresentation: Record<DecisionCycleAction, {
+type PreviewAction = (typeof actions)[number]["value"];
+
+const actionPresentation: Record<PreviewAction, {
   label: string;
   tone: "keep" | "watch" | "cancel";
+  title: string;
+  body: string;
   nextCheck: string;
 }> = {
-  KEEP: {
-    label: "Keep this cycle",
+  APPROVE: {
+    label: "Authorize at the proposed amount",
     tone: "keep",
-    nextCheck: "The next Cursor receipt is checked against ₹1,700 and this Keep decision.",
+    title: "A named human freezes ₹1,700 as the cap.",
+    body: "The proposal remains an assumption until later cited receipts are linked. Approving does not purchase, provision, or pay Cursor.",
+    nextCheck: "The next Cursor receipt is compared to the frozen ₹1,700 cap.",
   },
-  REVIEW_LATER: {
-    label: "Review before charge",
+  APPROVE_WITH_CAP: {
+    label: "Authorize a lower cap",
     tone: "watch",
-    nextCheck: "Vognary brings this back before 28 September. It records no cancellation.",
+    title: "A named human freezes a cap below the proposal.",
+    body: "Policy can require review. The human still decides. A lower cap is recorded; later evidence cannot rewrite it.",
+    nextCheck: "Observed spend above that cap is marked over the frozen authorization.",
   },
-  PLAN_TO_CANCEL: {
-    label: "Plan to cancel",
+  DECLINE: {
+    label: "Decline the obligation",
     tone: "cancel",
-    nextCheck: "If another Cursor receipt arrives, Vognary surfaces it. No receipt means Unknown, not cancelled.",
+    title: "No cap is frozen. The company did not authorize this.",
+    body: "Decline is a recorded refusal. Vognary does not cancel Cursor or move money.",
+    nextCheck: "A later Cursor receipt can still be stored as evidence. It is not an authorization.",
   },
 };
 
 export function LandingDecisionPreview() {
-  const [action, setAction] = useState<DecisionCycleAction>("PLAN_TO_CANCEL");
+  const [action, setAction] = useState<PreviewAction>("APPROVE_WITH_CAP");
   const presentation = actionPresentation[action];
-  const hook = decisionHookCopy({
-    merchant: "Cursor Pro",
-    action,
-    watchDate: "28 Sept 2026",
-  });
 
   return (
     <section id="example-decision" aria-labelledby="product-review-heading" className="min-w-0">
-      <h2 className="eyebrow text-ochre">A real decision, not a dashboard</h2>
-      <h3 id="product-review-heading" className="mt-2 font-display text-xl font-semibold tracking-tight text-(--ink) sm:text-2xl">
+      <h2 className="eyebrow text-ochre">A real authorization, not a dashboard</h2>
+      <h3 id="product-review-heading" className="mt-2 font-display text-xl font-semibold text-(--ink) sm:text-2xl">
         Cursor costs ₹350 more this month.
       </h3>
 
       <div className="mt-4 grid min-w-0 gap-5">
         <article className="decision" data-lead="true">
           <div className="min-w-0">
-            <p className="decision-cue">Next charge · 28 Aug</p>
+            <p className="decision-cue">Proposed obligation · monthly</p>
             <h4 className="decision-sentence mt-2">Cursor Pro · ₹1,700</h4>
           </div>
 
@@ -77,19 +80,19 @@ export function LandingDecisionPreview() {
           </div>
 
           <div>
-            <p className="eyebrow eyebrow-xs">Why this needs you</p>
+            <p className="eyebrow eyebrow-xs">Why this needs a human</p>
             <ul className="reason-list mt-2">
               <li>The latest bill is ₹350 higher than the previous one.</li>
-              <li>You have not decided what should happen this cycle.</li>
+              <li>Policy annotates. A named owner or admin still authorizes the cap.</li>
             </ul>
           </div>
 
           <div className="decision-actions">
-            <div role="group" aria-label="Choose the example decision" className="flex flex-wrap items-center gap-2">
+            <div role="group" aria-label="Choose the example authorization" className="flex flex-wrap items-center gap-2">
               {actions.map((item) => {
                 const selected = action === item.value;
-                const selectedClass = item.value === "PLAN_TO_CANCEL" ? "btn-ember" : "btn-primary";
-                const idleClass = item.value === "PLAN_TO_CANCEL" ? "btn-quiet-danger" : "btn-ghost";
+                const selectedClass = item.value === "DECLINE" ? "btn-ember" : "btn-primary";
+                const idleClass = item.value === "DECLINE" ? "btn-quiet-danger" : "btn-ghost";
                 return (
                   <button
                     key={item.value}
@@ -111,10 +114,10 @@ export function LandingDecisionPreview() {
           aria-live="polite"
         >
           <div>
-            <p className="eyebrow eyebrow-xs">Your decision</p>
+            <p className="eyebrow eyebrow-xs">The authorization</p>
             <p className={`stamp stamp-${presentation.tone} mt-3`}>{presentation.label}</p>
-            <h4 className="mt-4 font-display text-lg font-semibold leading-snug text-(--ink)">{hook.title}</h4>
-            <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{hook.body}</p>
+            <h4 className="mt-4 font-display text-lg font-semibold leading-snug text-(--ink)">{presentation.title}</h4>
+            <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{presentation.body}</p>
           </div>
           <div className="mt-4 border-t border-line pt-3">
             <p className="eyebrow eyebrow-xs">What happens next</p>

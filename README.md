@@ -4,18 +4,18 @@
 > category-defining, falsifiable outcomes with bounded downside; it does not
 > confuse incremental polish with progress. See [THE-LAW](docs/THE-LAW.md).
 
-Vognary is Commitment Intelligence for 2–20 person software and AI companies: an evidence-backed picture of what the company is committed to pay, what changed, what comes next, and why.
+Vognary is Commitment Control for India-first 5–100 person AI-native companies: propose an obligation, see cited exposure and policy, then a named human freezes a cap. Recovery remains the evidence foundation that later proves the outcome.
 
-The product is public but not yet operationally proven. No first ICP company has completed the production receipt-to-decision-to-next-receipt loop, so this repository must not be read as customer, distribution, or automatic-receipt proof.
+The product is public but not yet operationally proven. No paid Control pilot has completed the production proposal-to-authorization-to-reconciliation loop, so this repository must not be read as customer, distribution, or automatic-receipt proof.
 
 ## Current product loop
 
 1. Sign in.
-2. Add 2–5 billing receipts or invoices by paste or file.
-3. Review cited commitments, recent changes, expected upcoming money, and supporting evidence.
-4. Choose **Keep** or **Review**; decisions are stored transactionally.
-5. After first value, optionally configure one-time billing-only forwarding when Sources shows that a private receipt alias is available.
-6. Let the next real matching receipt prove what changed and whether the source remains healthy.
+2. Add billing receipts the company already has (paste, file, or photo).
+3. Record a complete workspace policy.
+4. Propose a new obligation. Cited exposure and policy annotate; they do not decide.
+5. An owner or admin authorizes, caps, or declines. The cap is frozen.
+6. Link a later cited receipt and reconcile the observed amount to that authorization.
 
 AI follows **cite or shut up**: unsupported amounts, merchants, dates, and source-liveness claims must be refused or marked unknown.
 

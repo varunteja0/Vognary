@@ -184,7 +184,7 @@ function CommitmentDetailPanel({
         <div className="lg:hidden">
           <button type="button" onClick={() => handlers.onSelect(null)} className="btn btn-sm btn-ghost">← Back</button>
         </div>
-        <h3 id="recovery-commitment-heading" className="mt-3 font-display text-3xl font-semibold tracking-tight text-(--ink) lg:mt-0">
+        <h3 id="recovery-commitment-heading" className="mt-3 font-display text-3xl font-semibold text-(--ink) lg:mt-0">
           {detail.merchant}
         </h3>
         <p className="mt-2 font-data text-xl text-(--ink)">

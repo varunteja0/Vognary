@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("an unauthenticated first session can paste a bill and see a spoken decision before Google", async ({ page }) => {
+test("an unauthenticated first session can paste a bill and see cited evidence before Google", async ({ page }) => {
   await page.goto("/start");
-  await expect(page.getByRole("heading", { name: "See the charge. Make the decision." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "See the charge. Sign in to authorize." })).toBeVisible();
   await expect(page.getByText(/Nothing is saved until you sign in/)).toBeVisible();
   await page.getByLabel("Or paste the receipt").fill([
     "Cursor",
@@ -10,21 +10,12 @@ test("an unauthenticated first session can paste a bill and see a spoken decisio
     "Payment date: 28 August 2026",
     "Cursor Pro renews monthly on 28 September 2026.",
   ].join("\n"));
-  await page.getByRole("button", { name: "Check this bill" }).click();
-  // The result leads with merchant and amount; timing and proof are their own lines.
+  await page.getByRole("button", { name: "Cite this bill" }).click();
   await expect(page.getByRole("heading", { name: /^Cursor · \$20\.00$/ })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/Cursor charges \$20\.00\. Charges in/i)).toHaveCount(0);
   await expect(page.getByText("From your receipt", { exact: true })).toBeVisible();
-  await expect(page.getByText("Why now", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Keep", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Plan to cancel" })).toBeVisible();
-  await page.getByRole("button", { name: "Plan to cancel" }).click();
-  await expect(page.getByRole("heading", { name: "Cursor — plan to cancel" })).toBeVisible();
-  await expect(page.getByText(/Sign in to remember this plan/)).toBeVisible();
-  await expect(page.getByText(/Sign in to save this decision and have Vognary check the next bill/)).toBeVisible();
-  // The hook names the calendar date from the bill, not a spoken relative phrase.
-  await expect(page.getByText(/will then watch around 28 Sept 2026/)).toBeVisible();
-  await expect(page.getByText(/watch around Charges in/)).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Sign in to remember this decision" })).toHaveAttribute("href", "/login?next=/app");
+  await expect(page.getByRole("button", { name: "Keep", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Plan to cancel" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Sign in to remember this evidence" })).toHaveAttribute("href", "/login?next=/app");
   await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0);
 });

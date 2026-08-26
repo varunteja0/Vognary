@@ -92,7 +92,7 @@ export default function BrandPage() {
                   <Nakul pose={pose} size={104} className="text-(--ink)" title={label} />
                 </div>
                 <div className="border-t border-line bg-(--card-2) px-3 py-2">
-                  <p className="font-data text-[0.58rem] uppercase tracking-[0.16em] text-(--muted)">{label}</p>
+                  <p className="eyebrow eyebrow-xs">{label}</p>
                 </div>
               </div>
             ))}
@@ -112,11 +112,11 @@ export default function BrandPage() {
           <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_15rem]">
             <div className="overflow-hidden rounded-xl border border-line bg-(--card-2)">
               <Image src="/brand/vognary-x-header.png" alt="Vognary X profile header" width={1500} height={500} className="h-auto w-full" priority />
-              <p className="border-t border-line px-3 py-2 font-data text-[0.58rem] uppercase tracking-[0.16em] text-(--muted)">X header · 1500×500 · crop safe</p>
+              <p className="eyebrow eyebrow-xs border-t border-line px-3 py-2">X header · 1500×500 · crop safe</p>
             </div>
             <div className="overflow-hidden rounded-xl border border-line bg-(--card-2)">
               <Image src="/brand/vognary-x-avatar.png" alt="Vognary X profile avatar" width={800} height={800} className="h-auto w-full" />
-              <p className="border-t border-line px-3 py-2 font-data text-[0.58rem] uppercase tracking-[0.16em] text-(--muted)">X avatar · 800×800 · circle safe</p>
+              <p className="eyebrow eyebrow-xs border-t border-line px-3 py-2">X avatar · 800×800 · circle safe</p>
             </div>
           </div>
           <div className="mt-4 overflow-hidden rounded-xl border border-line bg-(--card-2)">
@@ -128,7 +128,7 @@ export default function BrandPage() {
               loading="eager"
               className="h-auto w-full"
             />
-            <p className="border-t border-line px-3 py-2 font-data text-[0.58rem] uppercase tracking-[0.16em] text-(--muted)">Open Graph / X link card · 1200×630</p>
+            <p className="eyebrow eyebrow-xs border-t border-line px-3 py-2">Open Graph / X link card · 1200×630</p>
           </div>
         </section>
 
@@ -209,7 +209,7 @@ function MarkTile({ label, bg, markClass, mono }: { label: string; bg: string; m
         <VognaryMark size={46} className={markClass} mono={mono} />
       </div>
       <div className="border-t border-line bg-(--card-2) px-3 py-2">
-        <p className="font-data text-[0.58rem] uppercase tracking-[0.16em] text-(--muted)">{label}</p>
+        <p className="eyebrow eyebrow-xs">{label}</p>
       </div>
     </div>
   );
@@ -229,7 +229,7 @@ function Swatch({ name, hex, ring }: { name: string; hex: string; ring?: boolean
       />
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-(--ink)">{name}</p>
-        <p className="font-data text-xs uppercase text-(--muted)">{hex}</p>
+        <p className="font-data text-xs text-(--muted)">{hex}</p>
       </div>
     </div>
   );
