@@ -16,6 +16,7 @@ import type {
 import { decisionLabels } from "./labels";
 import type { FailureOrigin, ResponseMeta, TransportFailure } from "./transport";
 import type { ImageProposalStatus, ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
+import { keepAddBillsOpenAfterPersist, persistTextFromConfirmedLine } from "@/lib/recovery/monthly-loop";
 import { decimalToMinorUnits, minorUnitsToDecimal } from "@/lib/recovery/domain";
 
 // Pure state for the Recovery workspace. It holds exactly two things: server
@@ -533,7 +534,7 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
       };
 
     case "IMAGE_LINE_CONFIRMED": {
-      const nextText = [state.evidenceDraft.receiptText.trim(), action.text.trim()].filter(Boolean).join("\n\n");
+      const nextText = persistTextFromConfirmedLine(state.evidenceDraft.receiptText, action.text);
       return {
         ...state,
         evidenceDraft: {
@@ -542,7 +543,7 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
           receiptText: nextText,
           imageDrafts: state.evidenceDraft.imageDrafts.filter((draft) => draft.clientRef !== action.clientRef),
         },
-        announcement: "Line confirmed. It will be added as receipt text, not as a guessed scan.",
+        announcement: "Line confirmed. Saving it as receipt evidence.",
       };
     }
 
@@ -567,6 +568,8 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
       const everyResultAccepted = action.submission.results.every((result) => result.status === "ACCEPTED");
       const refreshSelectedDetail = state.selectedCommitmentId !== null;
       const accepted = everyResultAccepted && action.submission.acceptedEvidenceCount > 0;
+      const remainingImages = state.evidenceDraft.imageDrafts;
+      const keepOpen = accepted && keepAddBillsOpenAfterPersist(remainingImages.length);
       return {
         ...state,
         pending: null,
@@ -581,9 +584,11 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         requestId: action.meta.requestId,
         status: { kind: "READY" },
         refreshRequired: false,
-        evidenceDraft: everyResultAccepted ? emptyEvidenceDraft : { ...state.evidenceDraft, preparing: false },
-        view: accepted ? "HOME" : state.view,
-        addBillsOpen: accepted ? false : state.addBillsOpen,
+        evidenceDraft: everyResultAccepted
+          ? (keepOpen ? { ...emptyEvidenceDraft, imageDrafts: remainingImages } : emptyEvidenceDraft)
+          : { ...state.evidenceDraft, preparing: false },
+        view: accepted && !keepOpen ? "HOME" : state.view,
+        addBillsOpen: accepted ? keepOpen : state.addBillsOpen,
         announcement: evidenceSubmissionAnnouncement(action.submission),
       };
     }

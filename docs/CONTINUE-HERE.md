@@ -9,10 +9,46 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## Live state — 2026-08-26 (GitHub Actions restored at $0 by public visibility)
+## Live state — 2026-08-26 (Slice 4: monthly loop is Recovery persist)
 
 **THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Sell and Track F still bind.
 Composite remains **1.5**.
+
+**Scoreboard row:** Product UX. **Loop step this task raises:** CONFIRM →
+REMEMBER (confirmed photo line persisted as `RECEIPT_PASTE` evidence). KEEP,
+watch, and later exact-name verify already exist; they cannot start if Confirm
+never saves.
+
+**WHAT IS TRUE in this working tree.** Monthly compounding is the Recovery
+loop, not a knowledge graph. Architecture lives in
+`src/lib/recovery/monthly-loop.ts`: confirm a cited line → persist it → human
+decision → watch the window → later cited receipt on the same exact merchant +
+currency. Signed-in **Confirm this line** now submits that line as receipt
+evidence immediately. Leftover photos stay in the overlay. A previously
+confirmed merchant may prefill only when that exact name is already printed on
+this photo. Guest `/start` still analyzes locally until sign-in. Confirm this
+line still never auto-commits money, never fuzzy-matches, and never invents
+cadence.
+
+**WHAT IS NOT TRUE.** This SHA is not production until deployed. Production
+schema is still verified **0056**. Contacted **0**, conversations **0**,
+offers **0**, payments **0**. Inbox forwarding and Control reconcile are
+separate enrolled loops and were not rebuilt. Do not claim a 10/10 monthly
+intelligence product.
+
+**NEXT HUMAN ACTIONS:** unchanged — sell the five qualified drafts; founder
+executes Track F. Deploy this persist wiring. Provision
+`ANTHROPIC_API_KEY` + `AI_MONTHLY_BUDGET_INR` only if production photo
+transcription is required. Do not route receipts through free public models.
+
+**HARD STOP:** no knowledge graph, RAG, embeddings, auto merchant-match, Gmail
+OAuth, workflow agent, or another product wave.
+
+## Live state — 2026-08-26 (GitHub Actions restored at $0 by public visibility)
+
+> **SUPERSEDED as live instruction** by Slice 4 monthly-loop persist at the top.
+> The public-repo Actions restore remains true. Sell and Track F still bind.
+> Composite remains **1.5**.
 
 **Scoreboard row:** production activation / backend readiness. **Loop:** hosted
 CI and Encrypted Backup Drill, which Track F needs.

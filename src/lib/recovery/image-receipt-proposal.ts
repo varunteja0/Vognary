@@ -4,6 +4,7 @@
  */
 import { parseLooseCalendarDate } from "@/lib/loose-date";
 import { extractObservedReceipt } from "@/lib/receipt-parser";
+import { sanitizeKnownMerchants, workspaceMerchantCitedInText } from "@/lib/recovery/monthly-loop";
 
 export type ReceiptLineProposal = {
   merchant: string;
@@ -14,6 +15,10 @@ export type ReceiptLineProposal = {
 };
 
 export type ImageProposalStatus = "idle" | "reading" | "ready" | "unreadable";
+
+export type ReceiptLineProposalOptions = {
+  knownMerchants?: readonly string[];
+};
 
 export const RECEIPT_IMAGE_CLIENT_TIMEOUT_MS = 8_000;
 
@@ -34,20 +39,26 @@ const nextCycleDatePrefix = /\b(?:next\s+(?:bill(?:ing)?(?:\s+cycle)?|charge|ren
 const paidDatePrefix = /\b(?:paid|charged|debited|transaction|invoice|receipt|billing|charge date)\b/i;
 const genericMerchant = /^(paid|invoice|receipt|transaction|total|amount|date|history|plan|subscription|merchant|seller|vendor|premium|active|inactive|manage subscription)$/i;
 
-export function proposeReceiptLineFromReadableText(text: string): ReceiptLineProposal | null {
+export function proposeReceiptLineFromReadableText(
+  text: string,
+  options?: ReceiptLineProposalOptions,
+): ReceiptLineProposal | null {
   const observed = extractObservedReceipt(text);
   if (observed) {
-    return {
+    return applyCitedWorkspaceMerchant({
       merchant: observed.merchant,
       amount: observed.amountDecimal,
       currency: observed.currency,
       date: observed.observedDate,
-    };
+    }, text, options?.knownMerchants);
   }
-  return proposeReceiptLineFromVisibleText(text);
+  return proposeReceiptLineFromVisibleText(text, options);
 }
 
-export function proposeReceiptLineFromVisibleText(text: string): ReceiptLineProposal | null {
+export function proposeReceiptLineFromVisibleText(
+  text: string,
+  options?: ReceiptLineProposalOptions,
+): ReceiptLineProposal | null {
   const normalized = normalizeVisibleText(text);
   if (!normalized) return null;
 
@@ -57,20 +68,32 @@ export function proposeReceiptLineFromVisibleText(text: string): ReceiptLineProp
   const currency = amount.currency || visibleCurrency(normalized);
   if (!merchant && !amount.decimal && !date) return null;
   if (amount.decimal && Number(amount.decimal) === 0) {
-    return {
+    return applyCitedWorkspaceMerchant({
       merchant: merchant ?? "",
       amount: "",
       currency: currency || "INR",
       date: date ?? "",
       zeroPaidVisible: true,
-    };
+    }, normalized, options?.knownMerchants);
   }
-  return {
+  return applyCitedWorkspaceMerchant({
     merchant: merchant ?? "",
     amount: amount.decimal,
     currency: currency || (amount.decimal ? "INR" : ""),
     date: date ?? "",
-  };
+  }, normalized, options?.knownMerchants);
+}
+
+export function applyCitedWorkspaceMerchant(
+  proposal: ReceiptLineProposal | null,
+  text: string,
+  knownMerchants?: readonly string[],
+): ReceiptLineProposal | null {
+  if (!proposal) return null;
+  if (proposal.merchant) return proposal;
+  const merchant = workspaceMerchantCitedInText(text, knownMerchants ?? []);
+  if (!merchant) return proposal;
+  return { ...proposal, merchant };
 }
 
 export function sanitizeReceiptLineProposal(input: Partial<ReceiptLineProposal> | null | undefined): ReceiptLineProposal | null {
@@ -125,25 +148,37 @@ export function mergeReceiptLineProposals(
  * Turn a vision response into a proposal. Fields are kept only when they
  * already appear in the visible transcript. A paid 0 stays blank.
  */
-export function proposalFromVisionExtraction(input: unknown): ReceiptLineProposal | null {
+export function proposalFromVisionExtraction(
+  input: unknown,
+  options?: ReceiptLineProposalOptions,
+): ReceiptLineProposal | null {
   if (input == null) return null;
   if (typeof input === "string") {
     const parsed = parseVisionJson(input);
-    if (parsed) return proposalFromVisionExtraction(parsed);
-    return proposeReceiptLineFromReadableText(input);
+    if (parsed) return proposalFromVisionExtraction(parsed, options);
+    return proposeReceiptLineFromReadableText(input, options);
   }
   if (typeof input !== "object") return null;
   const record = input as Record<string, unknown>;
   const transcript = typeof record.visible_text === "string" ? record.visible_text : "";
   if (!transcript.trim() || /^empty$/i.test(transcript.trim())) return null;
-  const fromText = proposeReceiptLineFromReadableText(transcript);
+  const fromText = proposeReceiptLineFromReadableText(transcript, options);
   const grounded = groundVisionFields(record, transcript);
-  return mergeReceiptLineProposals(fromText, grounded);
+  return applyCitedWorkspaceMerchant(
+    mergeReceiptLineProposals(fromText, grounded),
+    transcript,
+    options?.knownMerchants,
+  );
 }
 
-export async function fetchReceiptLineProposal(file: File): Promise<ReceiptLineProposal | null> {
+export async function fetchReceiptLineProposal(
+  file: File,
+  options?: ReceiptLineProposalOptions,
+): Promise<ReceiptLineProposal | null> {
   const body = new FormData();
   body.append("file", file);
+  const knownMerchants = sanitizeKnownMerchants(options?.knownMerchants ?? []);
+  if (knownMerchants.length) body.append("known_merchants", JSON.stringify(knownMerchants));
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), RECEIPT_IMAGE_CLIENT_TIMEOUT_MS);
   try {

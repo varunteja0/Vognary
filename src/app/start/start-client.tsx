@@ -6,6 +6,7 @@ import { buildGuestAuditSnapshot, guestAuditTransferKey, type TransferStatementS
 import { formatCalendarDate } from "@/lib/date-only";
 import { startCardsFromRecurringItems, type RecurringItemLike, type StartCard } from "@/lib/recovery/start-cards";
 import { fetchReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
+import { knownMerchantsFromNames } from "@/lib/recovery/monthly-loop";
 import { splitReceiptTexts } from "@/lib/recovery/receipt-input";
 import { isReceiptImageFile } from "@/lib/recovery/wow-first-session";
 import { VognaryMark } from "../brand";
@@ -90,7 +91,9 @@ export default function StartClient() {
       void Promise.all(images.map(async (file, index) => {
         const draft = drafts[index];
         if (!draft) return;
-        const proposal = await fetchReceiptLineProposal(file);
+        const proposal = await fetchReceiptLineProposal(file, {
+          knownMerchants: knownMerchantsFromNames(cards.map((card) => card.merchant)),
+        });
         setImageDrafts((current) => current.map((item) => (
           item.clientRef === draft.clientRef
             ? { ...item, proposal, proposalStatus: proposal ? "ready" : "unreadable" }

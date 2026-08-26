@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
+  applyCitedWorkspaceMerchant,
   confirmLineInputLocked,
   mergeReceiptLineProposals,
   proposalFromVisionExtraction,
@@ -279,11 +280,41 @@ test("photo reading never locks confirm-the-line fields and aborts in eight seco
 test("guest start and signed-in add-a-bill share confirm-the-line", () => {
   const start = readFileSync(new URL("../src/app/start/start-client.tsx", import.meta.url), "utf8");
   const add = readFileSync(new URL("../src/app/workspace/recovery/recovery-add-evidence.tsx", import.meta.url), "utf8");
+  const workspace = readFileSync(new URL("../src/app/workspace/recovery/recovery-workspace-client.tsx", import.meta.url), "utf8");
   const confirm = readFileSync(new URL("../src/app/workspace/recovery/ui/confirm-receipt-line.tsx", import.meta.url), "utf8");
   assert.match(start, /fetchReceiptLineProposal/);
   assert.match(start, /ConfirmReceiptLine/);
+  assert.match(start, /knownMerchantsFromNames/);
   assert.match(add, /fetchReceiptLineProposal/);
   assert.match(add, /ConfirmReceiptLine/);
+  assert.match(add, /knownMerchants/);
+  assert.match(workspace, /persistConfirmedLine/);
   assert.match(confirm, /confirmLineInputLocked/);
   assert.doesNotMatch(confirm, /disabled \|\| reading/);
+});
+
+test("a remembered merchant fills only when that exact name is printed", () => {
+  const withoutPrint = proposeReceiptLineFromVisibleText(manageSubscriptionScreenshotText, {
+    knownMerchants: ["Acme Cloud"],
+  });
+  assert.equal(withoutPrint?.merchant, "");
+  assert.equal(withoutPrint?.amount, "427");
+  assert.equal(withoutPrint?.currency, "INR");
+
+  const withPrint = proposeReceiptLineFromVisibleText(
+    ["Acme Cloud", "Plan Premium", "Cost ₹427 / month"].join("\n"),
+    { knownMerchants: ["Acme Cloud", "OpenAI"] },
+  );
+  assert.equal(withPrint?.merchant, "Acme Cloud");
+  assert.equal(withPrint?.amount, "427");
+  assert.equal(withPrint?.currency, "INR");
+
+  assert.equal(
+    applyCitedWorkspaceMerchant(
+      { merchant: "", amount: "427", currency: "INR", date: "" },
+      "Acme Cloud invoice. That other vendor is not printed.",
+      ["OpenAI"],
+    )?.merchant,
+    "",
+  );
 });

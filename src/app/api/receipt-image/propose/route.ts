@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
+import { sanitizeKnownMerchants } from "@/lib/recovery/monthly-loop";
 import { assertContentType, readLimitedBytes, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 import { proposeReceiptLineFromImageFile } from "@/lib/server/receipt-image-propose";
@@ -42,7 +43,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Attach one photo as file." }, { status: 400 });
   }
 
-  const result = await proposeReceiptLineFromImageFile(file);
+  const result = await proposeReceiptLineFromImageFile(file, {
+    knownMerchants: readKnownMerchants(formData),
+  });
   if (result.reason === "too-large") {
     return NextResponse.json({ error: "That photo is too large. Keep files below 8 MB." }, { status: 413 });
   }
@@ -53,4 +56,14 @@ export async function POST(request: NextRequest) {
     proposal: result.proposal,
     reason: result.proposal ? "cited" : "unreadable",
   });
+}
+
+function readKnownMerchants(formData: FormData): string[] {
+  const raw = formData.get("known_merchants");
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  try {
+    return sanitizeKnownMerchants(JSON.parse(raw) as unknown);
+  } catch {
+    return [];
+  }
 }

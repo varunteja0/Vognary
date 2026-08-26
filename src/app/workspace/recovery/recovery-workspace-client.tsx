@@ -17,6 +17,7 @@ import {
 } from "@/lib/recovery/start-session";
 import { stampForCycleAction } from "@/lib/recovery/decision-cycle";
 import { isReceiptImageFile } from "@/lib/recovery/wow-first-session";
+import { knownMerchantsFromNames, persistTextFromConfirmedLine } from "@/lib/recovery/monthly-loop";
 import {
   recoveryLimits,
   type CommitmentSummaryDto,
@@ -586,6 +587,32 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     else dispatch({ type: "MUTATION_FAILED", failure: result });
   }
 
+  async function persistConfirmedLine(clientRef: string, text: string) {
+    if (state.workspaceVersion === null || state.pending) return;
+    const request = evidenceRequestFromDraft({
+      ...state.evidenceDraft,
+      mode: "RECEIPT_PASTE",
+      receiptText: persistTextFromConfirmedLine(state.evidenceDraft.receiptText, text),
+    }, "RECEIPT_PASTE");
+    if (!request) return;
+    const idempotencyKey = newIdempotencyKey();
+    dispatch({ type: "EVIDENCE_SUBMIT_STARTED", idempotencyKey });
+    const result = await transport.submitEvidence(request, { workspaceVersion: state.workspaceVersion, idempotencyKey });
+    if (result.ok) {
+      dispatch({ type: "IMAGE_LINE_CONFIRMED", clientRef, text });
+      dispatch({
+        type: "EVIDENCE_SUBMITTED",
+        submission: result.data.submission,
+        home: result.data.home,
+        commitments: result.data.commitments,
+        total: result.data.commitmentTotal,
+        meta: result.meta,
+      });
+    } else {
+      dispatch({ type: "EVIDENCE_SUBMIT_FAILED", failure: result });
+    }
+  }
+
   async function submitEvidence(mode: SourceType) {
     if (state.workspaceVersion === null) return;
     const request = evidenceRequestFromDraft(state.evidenceDraft, mode);
@@ -923,6 +950,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         >
           <RecoveryAddEvidence
             draft={state.evidenceDraft}
+            knownMerchants={knownMerchantsFromNames(state.commitments.map((item) => item.merchant))}
             submission={state.submission}
             failure={state.evidenceFailure}
             pending={state.pending?.kind === "EVIDENCE"}
@@ -934,7 +962,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
               onImageDrafts: (drafts) => dispatch({ type: "IMAGE_DRAFTS_ADDED", drafts }),
               onImageProposal: (clientRef, proposal) => dispatch({ type: "IMAGE_DRAFT_PROPOSAL", clientRef, proposal }),
               onRemoveSource: (clientRef) => dispatch({ type: "CSV_SOURCE_REMOVED", clientRef }),
-              onConfirmImageLine: (clientRef, text) => dispatch({ type: "IMAGE_LINE_CONFIRMED", clientRef, text }),
+              onConfirmImageLine: (clientRef, text) => void persistConfirmedLine(clientRef, text),
               onRemoveImageDraft: (clientRef) => dispatch({ type: "IMAGE_DRAFT_REMOVED", clientRef }),
               onSubmit: (mode) => void submitEvidence(mode),
             }}

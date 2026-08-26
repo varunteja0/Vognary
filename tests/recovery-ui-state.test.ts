@@ -570,6 +570,69 @@ test("evidence requests are built from the chosen mode, not from stale draft sta
   assert.equal(evidenceRequestFromDraft({ ...draft, csvSources: [] }, "CSV_IMPORT"), null);
 });
 
+test("confirming a photo line persists as receipt evidence and keeps leftover photos in the overlay", () => {
+  const opened = recoveryReducer(loaded(), { type: "ADD_BILLS_OPENED" });
+  const withPhotos = recoveryReducer(opened, {
+    type: "IMAGE_DRAFTS_ADDED",
+    drafts: [
+      { clientRef: "image-1", name: "one.png", previewUrl: null, proposalStatus: "ready" },
+      { clientRef: "image-2", name: "two.png", previewUrl: null, proposalStatus: "ready" },
+    ],
+  });
+  const confirmed = recoveryReducer(withPhotos, {
+    type: "IMAGE_LINE_CONFIRMED",
+    clientRef: "image-1",
+    text: "Acme Cloud invoice paid INR 427 on 2026-08-20.",
+  });
+  assert.equal(confirmed.evidenceDraft.mode, "RECEIPT_PASTE");
+  assert.equal(confirmed.evidenceDraft.receiptText, "Acme Cloud invoice paid INR 427 on 2026-08-20.");
+  assert.deepEqual(confirmed.evidenceDraft.imageDrafts.map((draft) => draft.clientRef), ["image-2"]);
+  assert.match(confirmed.announcement, /Saving it as receipt evidence/);
+
+  const firstSaved = recoveryReducer(confirmed, {
+    type: "EVIDENCE_SUBMITTED",
+    submission: {
+      id: "submission-photo-1",
+      type: "RECEIPT_PASTE",
+      ingestedAt: "2026-08-09T10:00:00.000Z",
+      acceptedEvidenceCount: 1,
+      results: [{ clientRef: "receipt-paste-1", status: "ACCEPTED", code: null, message: null }],
+    },
+    home,
+    commitments: [commitment],
+    total: 2,
+    meta,
+  });
+  assert.equal(firstSaved.evidenceDraft.receiptText, "");
+  assert.deepEqual(firstSaved.evidenceDraft.imageDrafts.map((draft) => draft.clientRef), ["image-2"]);
+  assert.equal(firstSaved.addBillsOpen, true);
+  assert.equal(firstSaved.pending, null);
+
+  const secondConfirmed = recoveryReducer(firstSaved, {
+    type: "IMAGE_LINE_CONFIRMED",
+    clientRef: "image-2",
+    text: "OpenAI invoice paid INR 1999.00 on 2026-08-21.",
+  });
+  const lastSaved = recoveryReducer(secondConfirmed, {
+    type: "EVIDENCE_SUBMITTED",
+    submission: {
+      id: "submission-photo-2",
+      type: "RECEIPT_PASTE",
+      ingestedAt: "2026-08-09T10:00:00.000Z",
+      acceptedEvidenceCount: 1,
+      results: [{ clientRef: "receipt-paste-1", status: "ACCEPTED", code: null, message: null }],
+    },
+    home,
+    commitments: [commitment],
+    total: 2,
+    meta,
+  });
+  assert.equal(lastSaved.addBillsOpen, false);
+  assert.equal(lastSaved.view, "HOME");
+  assert.equal(lastSaved.evidenceDraft.imageDrafts.length, 0);
+  assert.equal(lastSaved.evidenceDraft.receiptText, "");
+});
+
 test("going offline is announced once and never invents a reason for the gap", () => {
   const offline = recoveryReducer(loaded(), { type: "NETWORK_CHANGED", online: false });
   assert.equal(offline.online, false);

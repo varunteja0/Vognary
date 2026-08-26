@@ -26,6 +26,7 @@ export type AddEvidenceHandlers = {
 
 export function RecoveryAddEvidence({
   draft,
+  knownMerchants = [],
   submission,
   failure,
   pending,
@@ -33,6 +34,7 @@ export function RecoveryAddEvidence({
   handlers,
 }: {
   draft: EvidenceDraft;
+  knownMerchants?: readonly string[];
   submission: EvidenceSubmissionDto | null;
   failure: RecoveryFailure | null;
   pending: boolean;
@@ -76,7 +78,7 @@ export function RecoveryAddEvidence({
                 void Promise.all(images.map(async (file, index) => {
                   const draft = drafts[index];
                   if (!draft) return;
-                  const proposal = await fetchReceiptLineProposal(file);
+                  const proposal = await fetchReceiptLineProposal(file, { knownMerchants });
                   handlers.onImageProposal(draft.clientRef, proposal);
                 }));
               }
