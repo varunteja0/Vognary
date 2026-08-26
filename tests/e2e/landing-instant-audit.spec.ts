@@ -138,9 +138,9 @@ test("the landing demonstrates the decision loop and sends visitors to their own
   await expect(page.getByText("From two example receipts", { exact: true })).toBeVisible();
   await expect(page.getByText(/Example only\. Your review uses your receipts/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Review later", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Cursor Pro — review later" })).toBeVisible();
-  await expect(page.getByText(/Nothing is cancelled/)).toBeVisible();
+  await page.getByRole("button", { name: "Approve with cap", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "A named human freezes a cap below the proposal." })).toBeVisible();
+  await expect(page.getByText(/Vognary does not cancel Cursor or move money|later evidence cannot rewrite it/)).toBeVisible();
 
   await expect(page.getByRole("textbox")).toHaveCount(0);
   await expect(page.getByText(/sample audit/i)).toHaveCount(0);
@@ -171,8 +171,8 @@ test("the mobile landing keeps the primary action visible without overflow", asy
 test("login presents one Google identity path without product detours", async ({ page }) => {
   await page.goto("/login?next=/app");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Know what your company is committed to pay next" })).toBeVisible();
-  await expect(page.getByText(/remember the bills you already reviewed/)).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Decide what the company may commit to next" })).toBeVisible();
+  await expect(page.getByText(/named human authorization before a new obligation exists/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await expect(page.getByText("Google is only for sign-in. Vognary does not access Gmail.")).toBeVisible();
 
@@ -186,7 +186,7 @@ test("signed-out app entry returns to the canonical sign-in path", async ({ page
   await page.goto("/app");
 
   await expect(page).toHaveURL(/\/login\?next=(?:%2F|\/)app$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Know what your company is committed to pay next" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Decide what the company may commit to next" })).toBeVisible();
   await expect(page.getByLabel("Paste receipts or invoices")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "See a sample audit" })).toHaveCount(0);
 });
