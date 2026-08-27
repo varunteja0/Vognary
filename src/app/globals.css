@@ -993,6 +993,10 @@ select.field option {
     var(--card);
   box-shadow: var(--shadow-2), inset 2px 0 0 var(--gold);
 }
+.decision[data-decision-focus="true"] {
+  border-color: var(--ember);
+  box-shadow: var(--shadow-2), inset 2px 0 0 var(--ember);
+}
 
 .decision-head {
   display: grid;

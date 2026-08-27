@@ -1,5 +1,14 @@
 export { customerPhrases, cadenceShortLabels } from "./customer-copy";
 export {
+  commitmentGroupKey,
+  findGroupForCommitment,
+  groupCommitments,
+  groupDecisionState,
+  groupNeedsAttention,
+  representativeCommitment,
+  type CommitmentGroup,
+} from "./commitment-groups";
+export {
   customerStatuses,
   customerStatusLabels,
   toCustomerStatus,

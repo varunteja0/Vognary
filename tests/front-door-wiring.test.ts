@@ -19,7 +19,8 @@ test("the landing selects the guest-first proven entry path without instant-audi
   assert.match(landingSource, /const primaryHref = "#example-decision";/);
   assert.match(landingSource, /const primaryLabel = "Cap the next yes";/);
   assert.match(landingSource, /const evidenceHref = "\/start";/);
-  assert.match(landingSource, /<LandingDecisionPreview \/>/);
+  assert.match(landingSource, /href="\/pay" prefetch=\{false\}/);
+  assert.match(landingSource, /<AuthorizationLoop activeStep=\{4\} compact \/>/);
   assert.doesNotMatch(landingSource, /sample|demo|InstantAudit|instant audit/i);
 });
 

@@ -23,13 +23,13 @@ import {
   type CommitmentSummaryDto,
   type CorrectionDto,
   type CorrectionField,
-  type Decision,
   type EvidenceDto,
   type PutCommitmentContextRequest,
   type PutDecisionRequest,
   type SourceType,
 } from "@/lib/recovery/contracts";
 import { VognaryMark } from "../../brand";
+import { AuthorizationLoop } from "../../authorization-loop";
 import { correctionFieldLabels, decisionLabels } from "./labels";
 import { ControlView, useCommitmentControl } from "./control/control-view";
 import { RecoveryAddEvidence } from "./recovery-add-evidence";
@@ -38,6 +38,7 @@ import { RecoveryOverlay } from "./ui/overlay";
 import { CorrectionForm, EvidenceInspector } from "./recovery-evidence-panels";
 import { RecoveryHome } from "./recovery-home";
 import { RecoverySources } from "./recovery-sources";
+import { groupCommitments, representativeCommitment, customerPhrases } from "./present";
 import { AuthRequiredBlock, FailureBlock, LoadingBlock, OfflineBlock, StateBlock } from "./recovery-states";
 import {
   correctionPatchFromDraft,
@@ -129,6 +130,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   });
   const controlAvailable = controlDesk.available;
   const pendingDecisionCount = controlDesk.state.brief?.proposals.filter((entry) => entry.evaluation && !entry.decision).length ?? 0;
+  const nowDecisionCount = state.home?.decisionQueue.length ?? 0;
   const awaitingControlEvidence = Boolean(
     controlDesk.state.brief?.proposals.some((entry) =>
       entry.decision
@@ -542,10 +544,6 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     else dispatch({ type: "MUTATION_FAILED", failure: result });
   }
 
-  async function decideFromDetail(commitment: CommitmentSummaryDto, decision: Decision) {
-    await decide({ commitmentId: commitment.id, decision });
-  }
-
   async function saveContext(commitmentId: string, request: PutCommitmentContextRequest) {
     if (state.workspaceVersion === null) return;
     const idempotencyKey = newIdempotencyKey();
@@ -785,7 +783,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
 
   const commitmentsHandlers: CommitmentsHandlers = {
     onSelect: (commitmentId) => dispatch({ type: "COMMITMENT_SELECTED", commitmentId }),
-    onDecide: (commitment, decision) => void decideFromDetail(commitment, decision),
+    onDecideOnNow: (commitmentId) => dispatch({ type: "DECIDE_ON_NOW_REQUESTED", commitmentId }),
     onSaveContext: (commitmentId, request) => void saveContext(commitmentId, request),
     onInspectEvidence: (evidence: EvidenceDto, buttonId: string) =>
       inspectEvidence(state.selectedCommitmentId ?? "", evidence.id, buttonId),
@@ -813,13 +811,19 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     && !hasGuidedAddStep
     && (state.view !== "CONTROL" || awaitingControlEvidence);
   const controlPilotOff = controlDesk.unavailable;
-  const workspaceId = state.home?.workspace.id ?? null;
   // Autopilot engines stay fail-closed. The customer nav never offers Mandate.
   const primaryViews = recoveryViews.filter((view) =>
     view !== "MANDATE" && (view !== "CONTROL" || controlAvailable));
   const navColumnsClass = primaryViews.length >= 5
     ? "grid-cols-5"
     : primaryViews.length === 4 ? "grid-cols-4" : "grid-cols-3";
+
+  useEffect(() => {
+    if (state.view !== "COMMITMENTS" || state.selectedCommitmentId || !state.commitments.length) return;
+    const groups = groupCommitments(state.commitments);
+    if (!groups.length) return;
+    dispatch({ type: "COMMITMENT_SELECTED", commitmentId: representativeCommitment(groups[0]!).id });
+  }, [state.commitments, state.selectedCommitmentId, state.view]);
   return (
     <main id="recovery-workspace" className="relative px-4 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] pt-4 text-foreground sm:px-6 sm:pb-12 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
@@ -858,11 +862,14 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           </div>
         </header>
 
-        {controlPilotOff && workspaceId ? (
-          <p role="status" className="mt-3 text-sm leading-6 text-(--muted)">
-            This workspace is not enrolled for the Control desk, so a named owner cannot freeze a cap here yet. Cited bills still save. Workspace id:{" "}
-            <span className="font-data break-all text-(--ink)">{workspaceId}</span>
-          </p>
+        {controlPilotOff ? (
+          <div className="mt-3 grid gap-3">
+            <AuthorizationLoop activeStep={4} completedThrough={3} compact label="Commitment Control loop" />
+            <p className="text-sm leading-6 text-(--muted)">
+              Commitment Control unlocks after pilot enrollment. Cited bills still save here.{" "}
+              <Link href="/pay" className="link-quiet">See the pilot offer</Link>
+            </p>
+          </div>
         ) : null}
 
         <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 pb-[env(safe-area-inset-bottom,0px)] pt-1 sm:static sm:border-0 sm:border-b sm:border-b-line sm:bg-transparent sm:p-0">
@@ -878,6 +885,9 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
                   {recoveryViewLabels[view]}
                   {view === "CONTROL" && pendingDecisionCount > 0 ? (
                     <span className="ml-1 font-data text-[11px] text-ember">({pendingDecisionCount})</span>
+                  ) : null}
+                  {view === "HOME" && nowDecisionCount > 0 ? (
+                    <span className="ml-1 font-data text-[11px] text-ember">({nowDecisionCount})</span>
                   ) : null}
                 </button>
               </li>
@@ -926,6 +936,9 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         >
           {recoveryViewLabels[state.view]}
         </h2>
+        {state.view === "COMMITMENTS" ? (
+          <p className="mt-1 text-xs leading-5 text-(--muted)">{customerPhrases.billsLedgerHint}</p>
+        ) : null}
 
         <div className="mt-4">
           {state.status.kind === "AUTH_REQUIRED" ? (
@@ -1053,7 +1066,13 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     }
 
     if (state.view === "COMMITMENTS") {
-      return <RecoveryCommitments state={state} handlers={commitmentsHandlers} />;
+      return (
+        <RecoveryCommitments
+          state={state}
+          handlers={commitmentsHandlers}
+          queueEmpty={nowDecisionCount === 0}
+        />
+      );
     }
 
     if (state.view === "MANDATE") {
@@ -1081,13 +1100,15 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           receiptInbox={state.receiptInbox}
           onVeto={(candidateId) => void vetoCandidate(candidateId)}
           pendingVetoId={state.pending?.kind === "CANDIDATE_VETO" ? state.pending.candidateId : null}
-          pendingDecisionId={state.pending?.kind === "DECISION" ? state.pending.commitmentId : null}
-          onCitedPictureRendered={recordCitedPictureActivation}
-        />
-      ) : null;
-    }
+        pendingDecisionId={state.pending?.kind === "DECISION" ? state.pending.commitmentId : null}
+        focusDecisionCommitmentId={state.focusDecisionCommitmentId}
+        onDecisionFocusHandled={() => dispatch({ type: "DECISION_FOCUS_CLEARED" })}
+        onCitedPictureRendered={recordCitedPictureActivation}
+      />
+    ) : null;
+  }
 
-    return state.home ? (
+  return state.home ? (
       <RecoveryHome
         home={state.home}
         commitmentTotal={state.commitmentTotal}
@@ -1112,6 +1133,8 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         onVeto={(candidateId) => void vetoCandidate(candidateId)}
         pendingVetoId={state.pending?.kind === "CANDIDATE_VETO" ? state.pending.candidateId : null}
         pendingDecisionId={state.pending?.kind === "DECISION" ? state.pending.commitmentId : null}
+        focusDecisionCommitmentId={state.focusDecisionCommitmentId}
+        onDecisionFocusHandled={() => dispatch({ type: "DECISION_FOCUS_CLEARED" })}
         onCitedPictureRendered={recordCitedPictureActivation}
       />
     ) : (

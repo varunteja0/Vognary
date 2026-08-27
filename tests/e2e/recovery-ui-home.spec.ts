@@ -363,11 +363,9 @@ test("a commitment exposes its exact evidence and returns focus after inspection
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   await expect(page.getByRole("heading", { name: "OpenAI" })).toBeVisible();
-  await page.getByRole("tab", { name: "Why" }).click();
-  await expect(page.getByText("Not enough history yet.")).toBeVisible();
   await expect(page.getByText("OpenAI invoice paid INR 1,999. Renews monthly.", { exact: false })).toBeVisible();
 
-  const inspect = page.getByRole("button", { name: "See the receipt" });
+  const inspect = page.getByRole("button", { name: "See the receipt" }).first();
   await inspect.click();
 
   const dialog = page.getByRole("dialog", { name: "The receipt" });
@@ -388,23 +386,26 @@ test("a commitment exposes its exact evidence and returns focus after inspection
   await expect(inspect).toBeFocused();
 });
 
-test("three primary choices and two secondary choices preserve the server decision row", async ({ page }) => {
+test("Now keeps the three primary choices; Bills routes decisions back to Now", async ({ page }) => {
   await signIn(page);
   await mockRecoveryApi(page);
   await page.goto("/app");
 
+  const nowChoices = page.getByRole("group", { name: "Your choice" });
+  for (const label of ["Keep", "Plan to cancel", "Review later"]) {
+    await expect(nowChoices.getByRole("button", { name: new RegExp(`^${label}`) })).toBeVisible();
+  }
+
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
+  await expect(page.getByRole("group", { name: "Your choice" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Decide on Now" })).toBeVisible();
 
-  const group = page.getByRole("group", { name: "Your choice" });
-  for (const label of ["Keep", "Plan to cancel", "Review later"]) {
-    await expect(group.getByRole("button", { name: new RegExp(`^${label}`) })).toBeVisible();
-  }
-  await page.getByText("More", { exact: true }).click();
-  await expect(page.getByRole("button", { name: "Consider a cheaper plan" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "I don’t recognize this" })).toBeVisible();
+  await page.getByRole("button", { name: "Decide on Now" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Now" })).toBeVisible();
+  await expect(nowChoices.getByRole("button", { name: /^Plan to cancel/ })).toBeVisible();
 
-  await group.getByRole("button", { name: /^Plan to cancel/ }).click();
+  await nowChoices.getByRole("button", { name: /^Plan to cancel/ }).click();
   await expect(page.getByText(/Saved Plan to cancel on/)).toBeVisible();
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 });
@@ -420,8 +421,6 @@ test("a rejected decision rolls back visibly and states what the workspace still
   });
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
-  await page.getByRole("button", { name: /OpenAI/ }).first().click();
   await page.getByRole("group", { name: "Your choice" }).getByRole("button", { name: /^Plan to cancel/ }).click();
 
   const alert = page.getByRole("alert").filter({ hasText: "Rolled back" });

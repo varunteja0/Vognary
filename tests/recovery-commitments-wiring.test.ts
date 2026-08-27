@@ -3,37 +3,37 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const commitmentsSource = readFileSync("src/app/workspace/recovery/recovery-commitments.tsx", "utf8");
+const homeSource = readFileSync("src/app/workspace/recovery/recovery-home.tsx", "utf8");
 
-test("commitment choices use the same three choices, in the same order, as the Now queue", () => {
-  const primaryDecisionSource = commitmentsSource.match(/const primaryDecisions = \[([^\]]+)\] as const/);
-
-  assert.ok(primaryDecisionSource, "primary decisions must be declared explicitly");
-  assert.deepEqual(primaryDecisionSource[1].match(/[A-Z]+/g), ["KEEP", "MONITOR", "CANCEL"]);
-  assert.match(commitmentsSource, /\{primaryDecisions\.map\(\(decision\) =>/);
-  assert.match(commitmentsSource, /aria-label="Your choice"/);
+test("Bills ledger routes decisions to Now instead of duplicating the choice block", () => {
+  assert.match(commitmentsSource, /handlers\.onDecideOnNow/);
+  assert.match(commitmentsSource, /decideOnNow/);
+  assert.doesNotMatch(commitmentsSource, /aria-label="Your choice"/);
+  assert.doesNotMatch(commitmentsSource, /handlers\.onDecide\(/);
+  assert.match(homeSource, /aria-label="Your choice"/);
 });
 
 test("planning a cancellation records intent without claiming provider action", () => {
   assert.match(
-    commitmentsSource,
-    /Planning to cancel records your intent. Vognary does not cancel the service./,
+    homeSource,
+    /customerPhrases\.decisionBoundary/,
   );
 });
 
 test("commitment detail keeps evidence inspection and correction controls", () => {
-  assert.match(commitmentsSource, /label: "Why"/);
   assert.match(commitmentsSource, /<EvidenceRow[\s\S]*?onInspect=\{\(\) => handlers\.onInspectEvidence/);
   assert.match(commitmentsSource, /handlers\.onEvidencePage/);
   assert.match(commitmentsSource, /handlers\.onCorrect/);
   assert.match(commitmentsSource, /<CorrectionHistory/);
-  assert.match(commitmentsSource, /<details className="mt-3">[\s\S]*?>More<\/summary>/);
+  assert.match(commitmentsSource, /More about this bill/);
+  assert.match(commitmentsSource, /groupCommitments/);
 });
 
-test("commitment decisions delegate to handlers without calling provider APIs", () => {
-  const decisionHandlers = commitmentsSource.match(/onClick=\{\(\) => handlers\.onDecide\(detail, decision\)\}/g) ?? [];
+test("ledger actions delegate to handlers without calling provider APIs", () => {
+  const decideOnNowHandlers = commitmentsSource.match(/onClick=\{\(\) => handlers\.onDecideOnNow\(detail\.id\)\}/g) ?? [];
   const imports = [...commitmentsSource.matchAll(/from "([^"]+)";/g)].map((match) => match[1]);
 
-  assert.equal(decisionHandlers.length, 2, "primary and secondary choices must use handlers.onDecide");
+  assert.equal(decideOnNowHandlers.length, 1, "Bills must route pending decisions through onDecideOnNow");
   assert.deepEqual(imports, [
     "react",
     "@/lib/recovery/contracts",
@@ -42,7 +42,6 @@ test("commitment decisions delegate to handlers without calling provider APIs", 
     "./recovery-evidence-panels",
     "./recovery-states",
     "./state",
-    "./ui/disclosure-tabs",
   ]);
   assert.doesNotMatch(commitmentsSource, /\b(?:fetch|XMLHttpRequest|EventSource|WebSocket)\b/);
   assert.doesNotMatch(commitmentsSource, /["'`]\/api\//);

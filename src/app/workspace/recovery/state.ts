@@ -128,6 +128,7 @@ export type RecoveryState = {
   evidenceFailure: RecoveryFailure | null;
   refreshRequired: boolean;
   announcement: string;
+  focusDecisionCommitmentId: string | null;
 };
 
 const emptyEvidenceDraft: EvidenceDraft = {
@@ -179,6 +180,7 @@ export const initialRecoveryState: RecoveryState = {
   evidenceFailure: null,
   refreshRequired: false,
   announcement: "",
+  focusDecisionCommitmentId: null,
 };
 
 export type RecoveryAction =
@@ -192,6 +194,8 @@ export type RecoveryAction =
   | { type: "ADD_BILLS_OPENED" }
   | { type: "ADD_BILLS_CLOSED" }
   | { type: "COMMITMENT_SELECTED"; commitmentId: string | null }
+  | { type: "DECIDE_ON_NOW_REQUESTED"; commitmentId: string }
+  | { type: "DECISION_FOCUS_CLEARED" }
   | { type: "DETAIL_EVIDENCE_PAGE_REQUESTED"; cursor: string | null }
   | { type: "DETAIL_LOADED"; detail: CommitmentDetailDto; meta: ResponseMeta }
   | { type: "DETAIL_FAILED"; failure: TransportFailure }
@@ -366,7 +370,12 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
       }
 
     case "VIEW_SELECTED":
-      return { ...state, view: action.view, announcement: `${recoveryViewLabels[action.view]} view.` };
+      return {
+        ...state,
+        view: action.view,
+        focusDecisionCommitmentId: action.view === "HOME" ? state.focusDecisionCommitmentId : null,
+        announcement: `${recoveryViewLabels[action.view]} view.`,
+      };
 
     case "ADD_BILLS_OPENED":
       return { ...state, addBillsOpen: true, evidenceFailure: null, announcement: "Add a bill." };
@@ -382,6 +391,21 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         detailEvidenceCursor: null,
         detailStatus: action.commitmentId ? { kind: "LOADING" } : { kind: "IDLE" },
       };
+
+    case "DECIDE_ON_NOW_REQUESTED":
+      return {
+        ...state,
+        view: "HOME",
+        selectedCommitmentId: null,
+        detail: null,
+        detailEvidenceCursor: null,
+        detailStatus: { kind: "IDLE" },
+        focusDecisionCommitmentId: action.commitmentId,
+        announcement: "Decide on Now.",
+      };
+
+    case "DECISION_FOCUS_CLEARED":
+      return { ...state, focusDecisionCommitmentId: null };
 
     case "DETAIL_EVIDENCE_PAGE_REQUESTED":
       return { ...state, detailEvidenceCursor: action.cursor, detailStatus: { kind: "LOADING" } };

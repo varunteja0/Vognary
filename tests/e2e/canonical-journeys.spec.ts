@@ -85,13 +85,21 @@ function collectRuntimeFailures(page: Page) {
   const failures: string[] = [];
   page.on("pageerror", (error) => failures.push(`page: ${error.message}`));
   page.on("console", (message) => {
-    if (message.type() === "error") failures.push(`console: ${message.text()}`);
+    if (message.type() !== "error") return;
+    if (message.text().startsWith("Failed to load resource:")) return;
+    failures.push(`console: ${message.text()}`);
   });
   page.on("requestfailed", (request) => {
     const error = request.failure()?.errorText ?? "failed";
     const url = new URL(request.url());
     if (error === "net::ERR_ABORTED" && request.method() === "GET" && url.searchParams.has("_rsc")) return;
     failures.push(`request: ${request.url()} ${error}`);
+  });
+  page.on("response", (response) => {
+    if (response.status() !== 404) return;
+    const url = new URL(response.url());
+    if (url.pathname === "/favicon.ico") return;
+    failures.push(`404: ${url.pathname}${url.search}`);
   });
   return failures;
 }

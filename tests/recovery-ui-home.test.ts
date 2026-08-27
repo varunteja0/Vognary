@@ -252,7 +252,7 @@ test("one observation is coached toward a second matching receipt instead of ren
   assert.match(addEvidenceSource, /Paste text/);
 });
 
-test("commitments use ordinary language and three primary choices", () => {
+test("commitments ledger keeps decisions on Now and groups duplicate merchants", () => {
   assert.deepEqual(decisionLabels, {
     KEEP: "Keep",
     MONITOR: "Review later",
@@ -260,14 +260,27 @@ test("commitments use ordinary language and three primary choices", () => {
     CANCEL: "Plan to cancel",
     INVESTIGATE: "I don’t recognize this",
   });
-  assert.match(commitmentsSource, /const primaryDecisions = \["KEEP", "MONITOR", "CANCEL"\]/);
-  assert.match(commitmentsSource, /Planning to cancel records your intent/);
-  assert.match(commitmentsSource, /label: "Why"/);
+  assert.match(commitmentsSource, /groupCommitments/);
+  assert.match(commitmentsSource, /decideOnNow/);
   assert.match(commitmentsSource, /presentExpectedObservation/);
   assert.match(commitmentsSource, /detail\.memory/);
+  assert.doesNotMatch(commitmentsSource, /aria-label="Your choice"/);
   assert.doesNotMatch(commitmentsSource, />Your decision</);
   assert.doesNotMatch(commitmentsSource, />Evidence behind this</);
   assert.doesNotMatch(commitmentsSource, /Suggested:/);
+});
+
+test("Now leads decisions; Bills is cited evidence with orientation copy", () => {
+  assert.match(homeSource, /customerPhrases\.decideNowIntro/);
+  assert.match(homeSource, /data-decision-focus/);
+  assert.match(homeSource, /aria-label="Your choice"/);
+  assert.match(clientSource, /nowDecisionCount/);
+  assert.match(clientSource, /view === "HOME" && nowDecisionCount > 0/);
+  assert.match(clientSource, /customerPhrases\.billsLedgerHint/);
+  assert.match(clientSource, /AuthorizationLoop/);
+  assert.match(clientSource, /DECIDE_ON_NOW_REQUESTED/);
+  assert.match(clientSource, /focusDecisionCommitmentId/);
+  assert.doesNotMatch(clientSource, /Workspace id:/);
 });
 
 test("Sources keeps forwarding as stay-current infrastructure and paste as a manual action", () => {

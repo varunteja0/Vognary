@@ -58,6 +58,8 @@ export function RecoveryHome({
   onPaymentAsk,
   receiptInbox,
   pendingDecisionId,
+  focusDecisionCommitmentId,
+  onDecisionFocusHandled,
   onCitedPictureRendered,
 }: {
   home: HomeProjectionDto;
@@ -77,6 +79,8 @@ export function RecoveryHome({
   onVeto?: (candidateId: string) => void;
   pendingVetoId?: string | null;
   pendingDecisionId?: string | null;
+  focusDecisionCommitmentId?: string | null;
+  onDecisionFocusHandled?: () => void;
   onCitedPictureRendered?: (workspaceId: string) => void;
 }) {
   const [lastHook, setLastHook] = useState<{ title: string; body: string; artefact: string } | null>(null);
@@ -128,6 +132,8 @@ export function RecoveryHome({
         <DecisionQueue
           home={home}
           pendingDecisionId={pendingDecisionId}
+          focusDecisionCommitmentId={focusDecisionCommitmentId}
+          onDecisionFocusHandled={onDecisionFocusHandled}
           lastHook={lastHook}
           onDecide={rememberDecision}
           onSaveContext={onSaveContext}
@@ -294,6 +300,8 @@ function NextChargeLine({ next, className = "" }: { next: QuietNextChargeDto; cl
 function DecisionQueue({
   home,
   pendingDecisionId,
+  focusDecisionCommitmentId,
+  onDecisionFocusHandled,
   lastHook,
   onDecide,
   onSaveContext,
@@ -303,6 +311,8 @@ function DecisionQueue({
 }: {
   home: HomeProjectionDto;
   pendingDecisionId?: string | null;
+  focusDecisionCommitmentId?: string | null;
+  onDecisionFocusHandled?: () => void;
   lastHook: { title: string; body: string; artefact: string } | null;
   onDecide: (request: PutDecisionRequest) => void;
   onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
@@ -314,6 +324,11 @@ function DecisionQueue({
   const next = home.nextQuietCharge;
   const comingUp = shouldShowComingUp(home);
   const watching = home.decisionOutcomes.some((outcome) => outcome.kind === "WATCHING") || lastHook !== null;
+
+  useEffect(() => {
+    if (!focusDecisionCommitmentId || !queue.some((card) => card.commitmentId === focusDecisionCommitmentId)) return;
+    onDecisionFocusHandled?.();
+  }, [focusDecisionCommitmentId, onDecisionFocusHandled, queue]);
   if (!queue.length) {
     return (
       <section aria-labelledby="recovery-decisions">
@@ -339,6 +354,7 @@ function DecisionQueue({
           <p className="font-data text-xs text-(--muted)">{`${queue.length.toLocaleString("en-IN")} charges need you`}</p>
         ) : null}
       </div>
+      <p className="text-sm leading-6 text-(--muted)">{customerPhrases.decideNowIntro}</p>
       <div className="grid gap-3">
         {queue.map((card, index) => (
           <DecisionCard
@@ -346,6 +362,7 @@ function DecisionQueue({
             card={card}
             prominent={index === 0}
             pending={pendingDecisionId === card.commitmentId}
+            focused={focusDecisionCommitmentId === card.commitmentId}
             onDecide={onDecide}
             onSaveContext={onSaveContext}
             onOpenCommitment={onOpenCommitment}
@@ -364,6 +381,7 @@ function DecisionCard({
   card,
   prominent,
   pending,
+  focused = false,
   onDecide,
   onSaveContext,
   onOpenCommitment,
@@ -372,6 +390,7 @@ function DecisionCard({
   card: DecisionCardDto;
   prominent: boolean;
   pending: boolean;
+  focused?: boolean;
   onDecide: (request: PutDecisionRequest) => void;
   onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
   onOpenCommitment: (commitmentId: string) => void;
@@ -390,7 +409,7 @@ function DecisionCard({
   const inWindow = card.daysAway !== null && card.daysAway >= 0 && card.daysAway <= 7;
   const dueLine = chargeDueDisplay(card.dueDate ? formatDay(card.dueDate) : null, card.daysAway);
   return (
-    <article className="decision" data-lead={prominent}>
+    <article className="decision" data-lead={prominent} data-decision-focus={focused ? "true" : undefined}>
       <div className="min-w-0">
         {inWindow ? <p className="decision-cue">{card.headline}</p> : null}
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">

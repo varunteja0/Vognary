@@ -107,10 +107,10 @@ export function LandingDecisionPreview() {
       <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{annotation.reason}</p>
 
       <form
-        className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2"
+        className="mt-4 grid min-w-0 grid-cols-2 gap-3"
         onSubmit={(event) => event.preventDefault()}
       >
-        <p className="sm:col-span-2 text-sm leading-6 text-(--muted)">
+        <p className="col-span-2 text-sm leading-6 text-(--muted)">
           Type the next yes. Amounts you type are assumptions. Cited money stays unknown until you add a bill.
         </p>
         <div>
@@ -135,7 +135,7 @@ export function LandingDecisionPreview() {
           />
         </div>
         {action === "APPROVE_WITH_CAP" ? (
-          <div className="sm:col-span-2">
+          <div className="col-span-2">
             <label htmlFor="landing-cap" className="field-label">Frozen cap (INR)</label>
             <input
               id="landing-cap"
@@ -163,7 +163,7 @@ export function LandingDecisionPreview() {
             {usingExample ? (
               <>
                 <p className="eyebrow eyebrow-xs">From two example receipts</p>
-                <ol className="cycle-rail mt-2" aria-label="Cursor Pro across three billing periods">
+                <ol className="cycle-rail mt-2 hidden sm:flex" aria-label="Cursor Pro across three billing periods">
                   <li className="cycle-cell">
                     <span className="cycle-period">Jul</span>
                     <span className="cycle-amount">{formatInr(EXAMPLE_PRIOR)}</span>

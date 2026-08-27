@@ -12,7 +12,7 @@ export default function LaunchLanding() {
   const evidenceLabel = "Add a bill";
   const price = formatMoney(pilotOfferMajorUnits(), commitmentControlPilotOffer.currency);
   return (
-    <main id="ledger-main" className="relative overflow-hidden px-4 pb-12 text-foreground sm:px-6 lg:px-8">
+    <main id="ledger-main" className="relative overflow-hidden px-4 pb-8 text-foreground sm:px-6 sm:pb-12 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
         <nav aria-label="Public" className="flex min-h-16 items-center justify-between gap-3 border-b border-line py-3">
           <Link href="/" className="brandmark">
@@ -20,13 +20,13 @@ export default function LaunchLanding() {
             Vognary
           </Link>
           <div className="flex items-center gap-2">
-            <Link href="/pay" className="btn btn-sm btn-ghost">Subscribe</Link>
+            <Link href="/pay" prefetch={false} className="btn btn-sm btn-ghost">Subscribe</Link>
             <Link href="/login?next=/app" className="btn btn-sm btn-ghost">Sign in</Link>
           </div>
         </nav>
 
-        <section className="border-b border-line py-8 sm:py-10">
-          <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:grid-rows-[auto_1fr] lg:gap-x-14 lg:gap-y-6">
+        <section className="border-b border-line py-6 sm:py-10">
+          <div className="grid min-w-0 gap-6 sm:gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:grid-rows-[auto_1fr] lg:gap-x-14 lg:gap-y-6">
             <div className="min-w-0 lg:col-start-1 lg:row-start-1">
               <p className="truth-label truth-policy">For India-first AI companies</p>
               <h1 className="page-title mt-3 text-(--ink)">
@@ -35,15 +35,16 @@ export default function LaunchLanding() {
               <p className="lede mt-4 max-w-lg">
                 Vognary is Commitment Control. Propose the spend. See cited exposure and versioned policy. A named human freezes a cap — or declines. Later receipts prove the outcome against that authorization. No other live step invents money, auto-approves, or moves funds.
               </p>
-              <p className="mt-4 max-w-lg text-sm leading-6 text-(--muted)">
-                Private paid pilot: {price}/month auto-renewing Razorpay subscription. Zero paid customers. No auto-approval. Authorizations never move vendor money.
+              <p className="mt-3 max-w-lg text-sm leading-6 text-(--muted)">
+                One receipt is enough to begin. Private pilot {price}/month. Zero paid customers. No auto-approval.
               </p>
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <a href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</a>
                 <Link href={evidenceHref} className="btn btn-ghost btn-lg">{evidenceLabel}</Link>
-                <Link href="/pay" className="btn btn-ghost btn-lg">Subscribe at {price}/mo</Link>
               </div>
-              <AuthorizationLoop activeStep={4} />
+              <div className="hidden sm:block">
+                <AuthorizationLoop activeStep={4} compact />
+              </div>
             </div>
 
             <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
@@ -62,16 +63,13 @@ export default function LaunchLanding() {
           </div>
         </section>
 
-        <section className="my-4 flex flex-col justify-between gap-5 border-y border-line py-8 sm:flex-row sm:items-center">
-          <div className="min-w-0">
-            <h2 className="truth-label truth-citation">Start with what you already have</h2>
-            <h3 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">One receipt is enough to begin.</h3>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Nothing is saved until you sign in. The unique next step is a named human authorization on the Control desk, not Keep or Plan to cancel. Vognary never cancels a service or moves money.</p>
-          </div>
-          <Link href={evidenceHref} className="btn btn-primary btn-lg shrink-0">{evidenceLabel}</Link>
+        <section className="my-3 hidden border-y border-line py-4 sm:my-4 sm:block sm:py-5">
+          <p className="max-w-2xl text-sm leading-6 text-(--muted)">
+            Nothing is saved until you sign in. The unique next step is a named human authorization on the Control desk, not Keep or Plan to cancel. Vognary never cancels a service or moves money.
+          </p>
         </section>
 
-        <footer className="flex flex-col items-center justify-between gap-2 border-t border-line py-6 text-center sm:flex-row sm:text-left">
+        <footer className="flex flex-col items-center justify-between gap-2 border-t border-line py-4 text-center sm:flex-row sm:py-6 sm:text-left">
           <div className="inline-flex items-center gap-2.5">
             <VognaryMark size={22} />
             <span className="font-display font-semibold text-(--ink)">Vognary</span>
@@ -81,7 +79,7 @@ export default function LaunchLanding() {
             <Link href="/privacy" className="footer-link">Privacy</Link>
             <Link href="/security" className="footer-link">Security</Link>
             <Link href="/contact" className="footer-link">Contact</Link>
-            <Link href="/pay" className="footer-link">Pay</Link>
+            <Link href="/pay" prefetch={false} className="footer-link">Pay</Link>
             <Link href="/terms" className="footer-link">Terms</Link>
           </div>
         </footer>
