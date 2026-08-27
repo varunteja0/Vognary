@@ -11,10 +11,18 @@ export type ReceiptLineProposal = {
   amount: string;
   currency: string;
   date: string;
+  nextBillingDate?: string;
   zeroPaidVisible?: boolean;
 };
 
 export type ImageProposalStatus = "idle" | "reading" | "ready" | "unreadable";
+
+export type ReceiptImageProposeReason = "cited" | "unreadable" | "not-image" | "too-large" | "timeout" | "error";
+
+export type ReceiptImageProposeResult = {
+  proposal: ReceiptLineProposal | null;
+  reason: ReceiptImageProposeReason;
+};
 
 export type ReceiptLineProposalOptions = {
   knownMerchants?: readonly string[];
@@ -45,12 +53,12 @@ export function proposeReceiptLineFromReadableText(
 ): ReceiptLineProposal | null {
   const observed = extractObservedReceipt(text);
   if (observed) {
-    return applyCitedWorkspaceMerchant({
+    return applyCitedWorkspaceMerchant(withNextBilling({
       merchant: observed.merchant,
       amount: observed.amountDecimal,
       currency: observed.currency,
       date: observed.observedDate,
-    }, text, options?.knownMerchants);
+    }, text), text, options?.knownMerchants);
   }
   return proposeReceiptLineFromVisibleText(text, options);
 }
@@ -65,23 +73,24 @@ export function proposeReceiptLineFromVisibleText(
   const merchant = visibleMerchant(normalized);
   const amount = visibleAmount(normalized);
   const date = visibleChargeDate(normalized);
+  const nextBillingDate = visibleNextBillingDate(normalized);
   const currency = amount.currency || visibleCurrency(normalized);
-  if (!merchant && !amount.decimal && !date) return null;
+  if (!merchant && !amount.decimal && !date && !nextBillingDate) return null;
   if (amount.decimal && Number(amount.decimal) === 0) {
-    return applyCitedWorkspaceMerchant({
+    return applyCitedWorkspaceMerchant(withNextBilling({
       merchant: merchant ?? "",
       amount: "",
       currency: currency || "INR",
       date: date ?? "",
       zeroPaidVisible: true,
-    }, normalized, options?.knownMerchants);
+    }, normalized), normalized, options?.knownMerchants);
   }
-  return applyCitedWorkspaceMerchant({
+  return applyCitedWorkspaceMerchant(withNextBilling({
     merchant: merchant ?? "",
     amount: amount.decimal,
     currency: currency || (amount.decimal ? "INR" : ""),
     date: date ?? "",
-  }, normalized, options?.knownMerchants);
+  }, normalized), normalized, options?.knownMerchants);
 }
 
 export function applyCitedWorkspaceMerchant(
@@ -102,22 +111,25 @@ export function sanitizeReceiptLineProposal(input: Partial<ReceiptLineProposal> 
   const currency = (input.currency ?? "").trim().toUpperCase();
   const amount = (input.amount ?? "").replace(/,/g, "").trim();
   const date = (input.date ?? "").trim();
+  const nextBillingDate = (input.nextBillingDate ?? "").trim();
   const safeCurrency = /^[A-Z]{3}$/.test(currency) ? currency : "";
   const safeAmount = /^\d+(\.\d{1,2})?$/.test(amount) && Number(amount) > 0 ? amount : "";
   const safeDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "";
-  if (!merchant && !safeAmount && !safeDate) return null;
+  const safeNext = /^\d{4}-\d{2}-\d{2}$/.test(nextBillingDate) && nextBillingDate !== safeDate ? nextBillingDate : "";
+  if (!merchant && !safeAmount && !safeDate && !safeNext) return null;
   const zeroPaidVisible = Boolean(input.zeroPaidVisible) && !safeAmount;
   return {
     merchant,
     amount: safeAmount,
     currency: safeCurrency || (safeAmount ? "INR" : ""),
     date: safeDate,
+    ...(safeNext ? { nextBillingDate: safeNext } : {}),
     ...(zeroPaidVisible ? { zeroPaidVisible: true } : {}),
   };
 }
 
 export function receiptLineProposalIsPartial(proposal: ReceiptLineProposal): boolean {
-  return !proposal.merchant || !proposal.amount || !proposal.currency || !proposal.date;
+  return !proposal.merchant || !proposal.amount || !proposal.currency || !(proposal.date || proposal.nextBillingDate);
 }
 
 export function mergeReceiptLineProposals(
@@ -140,6 +152,7 @@ export function mergeReceiptLineProposals(
     amount,
     currency: left.currency || right.currency,
     date: left.date || right.date,
+    nextBillingDate: left.nextBillingDate || right.nextBillingDate,
     zeroPaidVisible: zeroPaid && !amount,
   });
 }
@@ -174,7 +187,7 @@ export function proposalFromVisionExtraction(
 export async function fetchReceiptLineProposal(
   file: File,
   options?: ReceiptLineProposalOptions,
-): Promise<ReceiptLineProposal | null> {
+): Promise<ReceiptImageProposeResult> {
   const body = new FormData();
   body.append("file", file);
   const knownMerchants = sanitizeKnownMerchants(options?.knownMerchants ?? []);
@@ -188,11 +201,21 @@ export async function fetchReceiptLineProposal(
       body,
       signal: controller.signal,
     });
-    if (!response.ok) return null;
-    const payload = await response.json() as { proposal?: ReceiptLineProposal | null };
-    return sanitizeReceiptLineProposal(payload.proposal);
-  } catch {
-    return null;
+    if (!response.ok) return { proposal: null, reason: "error" };
+    const payload = await response.json() as {
+      proposal?: ReceiptLineProposal | null;
+      reason?: ReceiptImageProposeReason;
+    };
+    const proposal = sanitizeReceiptLineProposal(payload.proposal);
+    return {
+      proposal,
+      reason: proposal ? "cited" : payload.reason === "not-image" ? "not-image" : "unreadable",
+    };
+  } catch (error) {
+    const timedOut = error instanceof DOMException
+      ? error.name === "AbortError"
+      : error instanceof Error && error.name === "AbortError";
+    return { proposal: null, reason: timedOut ? "timeout" : "error" };
   } finally {
     clearTimeout(timer);
   }
@@ -273,6 +296,25 @@ function visibleChargeDate(text: string): string | null {
   return unique.length === 1 ? unique[0] : null;
 }
 
+function visibleNextBillingDate(text: string): string | undefined {
+  const found: string[] = [];
+  for (const match of text.matchAll(new RegExp(visibleDatePattern.source, "g"))) {
+    const iso = parseLooseCalendarDate(match[0]);
+    if (!iso || match.index === undefined) continue;
+    const before = text.slice(Math.max(0, match.index - 48), match.index);
+    if (untilDatePrefix.test(before)) continue;
+    if (nextCycleDatePrefix.test(before)) found.push(iso);
+  }
+  const unique = [...new Set(found)];
+  return unique.length === 1 ? unique[0] : undefined;
+}
+
+function withNextBilling(proposal: ReceiptLineProposal, text: string): ReceiptLineProposal {
+  const nextBillingDate = visibleNextBillingDate(text);
+  if (!nextBillingDate || nextBillingDate === proposal.date) return proposal;
+  return { ...proposal, nextBillingDate };
+}
+
 function citedChargeDates(text: string): string[] {
   const found: { iso: string; paid: boolean }[] = [];
   for (const match of text.matchAll(new RegExp(visibleDatePattern.source, "g"))) {
@@ -308,13 +350,13 @@ function groundVisionFields(record: Record<string, unknown>, transcript: string)
   const currency = citedCurrency(record.currency, transcript);
   const date = citedDate(record.charge_date ?? record.date, transcript);
   const zeroPaid = Boolean(record.paid_amount_is_zero) && amount === "";
-  return sanitizeReceiptLineProposal({
+  return sanitizeReceiptLineProposal(withNextBilling({
     merchant,
     amount,
     currency,
     date,
     zeroPaidVisible: zeroPaid,
-  });
+  }, transcript));
 }
 
 function citedMerchant(value: unknown, transcript: string): string {

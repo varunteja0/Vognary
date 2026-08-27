@@ -75,6 +75,7 @@ test("the public endpoints expose complete agent-readable contracts without Java
   expect(sitemap.headers()["content-type"]).toContain("application/xml");
   expect(await sitemap.text()).toContain("<loc>https://www.vognary.com/</loc>");
   expect(await (await request.get("/sitemap.xml")).text()).toContain("<loc>https://www.vognary.com/about</loc>");
+  expect(await (await request.get("/sitemap.xml")).text()).toContain("<loc>https://www.vognary.com/pay</loc>");
 
   const about = await request.get("/about");
   expect(about.status()).toBe(200);

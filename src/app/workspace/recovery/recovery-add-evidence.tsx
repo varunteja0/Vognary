@@ -6,7 +6,7 @@ import { rejectedSubmissionCopy } from "./present";
 import { errorCopy } from "./labels";
 import { FailureBlock } from "./recovery-states";
 import type { EvidenceDraft, RecoveryFailure } from "./state";
-import { fetchReceiptLineProposal, type ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
+import { fetchReceiptLineProposal, type ReceiptImageProposeReason, type ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
 import { isReceiptImageFile } from "@/lib/recovery/wow-first-session";
 import type { ImageDraft } from "./state";
 import { BillDropzone } from "./ui/dropzone";
@@ -17,7 +17,7 @@ export type AddEvidenceHandlers = {
   onReceiptChange: (text: string) => void;
   onFilesChosen: (files: readonly File[]) => void;
   onImageDrafts: (drafts: readonly ImageDraft[]) => void;
-  onImageProposal: (clientRef: string, proposal: ReceiptLineProposal | null) => void;
+  onImageProposal: (clientRef: string, proposal: ReceiptLineProposal | null, reason?: ReceiptImageProposeReason) => void;
   onRemoveSource: (clientRef: string) => void;
   onConfirmImageLine: (clientRef: string, text: string) => void;
   onRemoveImageDraft: (clientRef: string) => void;
@@ -78,8 +78,8 @@ export function RecoveryAddEvidence({
                 void Promise.all(images.map(async (file, index) => {
                   const draft = drafts[index];
                   if (!draft) return;
-                  const proposal = await fetchReceiptLineProposal(file, { knownMerchants });
-                  handlers.onImageProposal(draft.clientRef, proposal);
+                  const result = await fetchReceiptLineProposal(file, { knownMerchants });
+                  handlers.onImageProposal(draft.clientRef, result.proposal, result.reason);
                 }));
               }
               if (documents.length) {

@@ -22,3 +22,11 @@ export function chargeWhenLine(
   }
   return `Charges ${formattedDay}`;
 }
+
+export function chargeDueDisplay(formattedDay: string | null, daysAway: number | null): string | null {
+  if (!formattedDay) return null;
+  if (daysAway === 0) return `${formattedDay} · today`;
+  if (daysAway === 1) return `${formattedDay} · tomorrow`;
+  if (daysAway !== null && daysAway > 1) return `${formattedDay} · in ${daysAway.toLocaleString("en-IN")} days`;
+  return formattedDay;
+}

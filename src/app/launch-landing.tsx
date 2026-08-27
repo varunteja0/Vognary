@@ -2,12 +2,15 @@ import Link from "next/link";
 import { AuthorizationLoop } from "./authorization-loop";
 import { VognaryMark } from "./brand";
 import { LandingDecisionPreview } from "./landing-decision-preview";
+import { formatMoney } from "@/lib/format";
+import { commitmentControlPilotOffer, pilotOfferMajorUnits } from "@/lib/pilot-offer";
 
 export default function LaunchLanding() {
   const primaryHref = "#example-decision";
   const primaryLabel = "Cap the next yes";
   const evidenceHref = "/start";
   const evidenceLabel = "Add a bill";
+  const price = formatMoney(pilotOfferMajorUnits(), commitmentControlPilotOffer.currency);
   return (
     <main id="ledger-main" className="relative overflow-hidden px-4 pb-12 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
@@ -17,6 +20,7 @@ export default function LaunchLanding() {
             Vognary
           </Link>
           <div className="flex items-center gap-2">
+            <Link href="/pay" className="btn btn-sm btn-ghost">Subscribe</Link>
             <Link href="/login?next=/app" className="btn btn-sm btn-ghost">Sign in</Link>
           </div>
         </nav>
@@ -32,11 +36,12 @@ export default function LaunchLanding() {
                 Vognary is Commitment Control. Propose the spend. See cited exposure and versioned policy. A named human freezes a cap — or declines. Later receipts prove the outcome against that authorization. No other live step invents money, auto-approves, or moves funds.
               </p>
               <p className="mt-4 max-w-lg text-sm leading-6 text-(--muted)">
-                Private paid pilot: ₹40,000/month upfront. Zero paid customers. No auto-approval. No money movement.
+                Private paid pilot: {price}/month auto-renewing Razorpay subscription. Zero paid customers. No auto-approval. Authorizations never move vendor money.
               </p>
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <a href={primaryHref} className="btn btn-primary btn-lg">{primaryLabel}</a>
                 <Link href={evidenceHref} className="btn btn-ghost btn-lg">{evidenceLabel}</Link>
+                <Link href="/pay" className="btn btn-ghost btn-lg">Subscribe at {price}/mo</Link>
               </div>
               <AuthorizationLoop activeStep={4} />
             </div>
@@ -51,7 +56,7 @@ export default function LaunchLanding() {
                 <li>No account required</li>
                 <li>No bank passwords</li>
                 <li>No mailbox access</li>
-                <li>No auto-approve, auto-deny, or payment</li>
+                <li>No auto-approve, auto-deny, or vendor payment</li>
               </ul>
             </section>
           </div>
@@ -76,6 +81,7 @@ export default function LaunchLanding() {
             <Link href="/privacy" className="footer-link">Privacy</Link>
             <Link href="/security" className="footer-link">Security</Link>
             <Link href="/contact" className="footer-link">Contact</Link>
+            <Link href="/pay" className="footer-link">Pay</Link>
             <Link href="/terms" className="footer-link">Terms</Link>
           </div>
         </footer>

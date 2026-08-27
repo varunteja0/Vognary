@@ -18,6 +18,7 @@ jobs:
       POSTGRES_SSL: "false"
       SESSION_SECRET: ci-only-session-secret-0123456789abcdef0123456789abcdef01234567
       TOKEN_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      RESEND_INBOUND_WEBHOOK_SECRET: whsec_receiving_test
     services:
       postgres:
         image: postgres:16.14@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
@@ -57,7 +58,6 @@ jobs:
         env:
           ENABLE_RECEIPT_INBOX: "true"
           RESEND_RECEIVING_API_KEY: ci-receiving-api-key
-          RESEND_INBOUND_WEBHOOK_SECRET: whsec_Y2ktcmVjZWlwdC13ZWJob29rLXNlY3JldA==
           RESEND_RECEIVING_DOMAIN: receipts.vognary.test
           RECEIPT_INBOX_ALIAS_HMAC_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           RECEIPT_INBOX_ALIAS_HMAC_KEY_ID: receipt-alias-v1
@@ -109,7 +109,6 @@ jobs:
         run: |
           ALLOW_IN_MEMORY_RATE_LIMITS=true INTERNAL_SYNC_SECRET=ci-internal-sync-secret-at-least-32-bytes PORT=3000 \
             ENABLE_RECEIPT_INBOX=true RESEND_RECEIVING_API_KEY=ci-receiving-api-key \
-            RESEND_INBOUND_WEBHOOK_SECRET=whsec_Y2ktcmVjZWlwdC13ZWJob29rLXNlY3JldA== \
             RESEND_RECEIVING_DOMAIN=receipts.vognary.test \
             RECEIPT_INBOX_ALIAS_HMAC_SECRET=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
             RECEIPT_INBOX_ALIAS_HMAC_KEY_ID=receipt-alias-v1 \

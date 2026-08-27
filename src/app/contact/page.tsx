@@ -33,6 +33,12 @@ const channels = [
       "Suspected vulnerabilities, exposed data, or anything that looks like a security defect. Report responsibly rather than testing against real workspaces or other people's data. The machine-readable contact is published at /.well-known/security.txt.",
   },
   {
+    heading: "Pilot payment",
+    address: "support@vognary.com",
+    body:
+      "Pay the ₹14,999/month Commitment Control private pilot as a Razorpay subscription from /pay when online collection is configured. For an invoice or a unique Subscription Link, email this address with the company legal name and GSTIN if any. Do not send card numbers, OTPs, or bank passwords — those stay on Razorpay.",
+  },
+  {
     heading: "Legal",
     address: "legal@vognary.com",
     body:

@@ -21,7 +21,7 @@
 
 Current loop: user-entered proposal → cited existing exposure → deterministic policy → owner/admin decision → frozen cap → later Recovery evidence → reconciliation.
 
-Build only the thin ten-day V0 needed for paid pilots at ₹40,000/month. V0 never auto-approves, auto-denies, purchases, provisions, cancels, or moves money. Do **not** build cards, wallets, payments, autonomous agents, Slack, Gmail OAuth, bank connectors, automatic merchant matching, procurement suites, contract negotiation, or a public redesign. Existing billing evidence may reconcile an approved proposal.
+Build only the thin ten-day V0 needed for paid pilots at ₹14,999/month. V0 never auto-approves, auto-denies, purchases, provisions, cancels, or moves money. Do **not** build cards, wallets, payments, autonomous agents, Slack, Gmail OAuth, bank connectors, automatic merchant matching, procurement suites, contract negotiation, or a public redesign. Existing billing evidence may reconcile an approved proposal.
 
 AI must **cite or shut up**. Never invent amounts, merchants, or connector liveness.
 

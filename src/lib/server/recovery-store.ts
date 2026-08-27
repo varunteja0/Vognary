@@ -76,6 +76,7 @@ import {
   type StatementSource,
 } from "@/lib/recurring-audit";
 import { recoveryEvidenceFingerprint } from "@/lib/recovery/evidence-fingerprint";
+import { indiaCalendarDate } from "@/lib/date-only";
 import {
   provisionalManualsFromOrphans,
   type OrphanReceiptObservation,
@@ -86,6 +87,7 @@ import {
   decisionHistoryItems,
   freezeDecisionExpectedAmountMinor,
   persistableCycleReasonKeys,
+  resolveDecisionDueDate,
   resolveDecisionWrite,
   verificationExpectedAmountMinor,
   verificationFromEvaluation,
@@ -961,8 +963,12 @@ export async function putRecoveryDecision(input: {
     assertWorkspaceVersion(state, input.expectedVersion);
     const commitment = await getCommitmentRow(client, input.workspaceId, input.request.commitmentId);
     if (!commitment) throw new RecoveryServiceError("NOT_FOUND");
-    const today = now.toISOString().slice(0, 10);
-    const dueDate = toDateOnly(commitment.effective_next_expected_date);
+    const today = indiaCalendarDate(now);
+    const records = await loadCommitmentRecords(client, input.workspaceId);
+    const fact = toDecisionFacts(records).find((item) => item.commitmentId === commitment.id);
+    const dueDate = fact
+      ? resolveDecisionDueDate(fact, today)
+      : toDateOnly(commitment.effective_next_expected_date);
     const write = resolveDecisionWrite(input.request, today, dueDate);
     const decision = await client.query<{ decision: Decision; decided_at: Date; updated_at: Date }>(
       `insert into recovery_decisions (workspace_id, commitment_id, decided_by_user_id, decision, decided_at, updated_at)
@@ -975,8 +981,6 @@ export async function putRecoveryDecision(input: {
       [input.workspaceId, input.request.commitmentId, input.actorUserId, write.stamp, now],
     );
     if (write.action && dueDate) {
-      const records = await loadCommitmentRecords(client, input.workspaceId);
-      const fact = toDecisionFacts(records).find((item) => item.commitmentId === commitment.id);
       const reasonKeys = fact ? collectReasonKeys(fact, today) : [];
       const stake = annualizedStake(
         BigInt(normalizeMinorUnits(commitment.effective_amount_minor)),
@@ -2586,6 +2590,7 @@ async function loadCommitmentRecords(client: PoolClient, workspaceId: string): P
         const latest = signal?.latestByCurrency?.[row.base_currency];
         return latest ? BigInt(normalizeMinorUnits(latest)) : null;
       })(),
+      latestObservedOn: excerpts.get(row.id)?.evidenceDate ?? null,
       cycles: cyclesByCommitment.get(row.id) ?? [],
       excerpt: excerpts.get(row.id)?.excerpt ?? null,
       latestEvidenceId: excerpts.get(row.id)?.evidenceId ?? null,
@@ -2594,9 +2599,9 @@ async function loadCommitmentRecords(client: PoolClient, workspaceId: string): P
   });
 }
 
-async function loadLatestExcerpts(client: PoolClient, workspaceId: string): Promise<Map<string, { excerpt: string; evidenceId: string }>> {
-  const result = await client.query<{ commitment_id: string; excerpt: string; id: string }>(
-    `select distinct on (link.commitment_id) link.commitment_id, evidence.excerpt, evidence.id
+async function loadLatestExcerpts(client: PoolClient, workspaceId: string): Promise<Map<string, { excerpt: string; evidenceId: string; evidenceDate: string | null }>> {
+  const result = await client.query<{ commitment_id: string; excerpt: string; id: string; evidence_date: Date | string | null }>(
+    `select distinct on (link.commitment_id) link.commitment_id, evidence.excerpt, evidence.id, evidence.evidence_date
      from recovery_commitment_evidence link
      join recovery_evidence evidence
        on evidence.workspace_id = link.workspace_id and evidence.id = link.evidence_id
@@ -2604,7 +2609,11 @@ async function loadLatestExcerpts(client: PoolClient, workspaceId: string): Prom
      order by link.commitment_id, link.linked_at desc, link.evidence_id desc`,
     [workspaceId],
   );
-  return new Map(result.rows.map((row) => [row.commitment_id, { excerpt: row.excerpt, evidenceId: row.id }]));
+  return new Map(result.rows.map((row) => [row.commitment_id, {
+    excerpt: row.excerpt,
+    evidenceId: row.id,
+    evidenceDate: toDateOnly(row.evidence_date),
+  }]));
 }
 
 async function loadCommitmentRows(client: PoolClient, workspaceId: string) {

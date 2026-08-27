@@ -15,7 +15,7 @@ import type {
 } from "@/lib/recovery/contracts";
 import { decisionLabels } from "./labels";
 import type { FailureOrigin, ResponseMeta, TransportFailure } from "./transport";
-import type { ImageProposalStatus, ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
+import type { ImageProposalStatus, ReceiptImageProposeReason, ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
 import { keepAddBillsOpenAfterPersist, persistTextFromConfirmedLine } from "@/lib/recovery/monthly-loop";
 import { decimalToMinorUnits, minorUnitsToDecimal } from "@/lib/recovery/domain";
 
@@ -58,6 +58,7 @@ export type ImageDraft = {
   previewUrl: string | null;
   proposal?: ReceiptLineProposal | null;
   proposalStatus?: ImageProposalStatus;
+  proposalReason?: ReceiptImageProposeReason;
 };
 
 export type EvidenceDraft = {
@@ -208,7 +209,7 @@ export type RecoveryAction =
   | { type: "CSV_SOURCES_PREPARED"; sources: readonly PreparedCsvSource[] }
   | { type: "CSV_SOURCE_REMOVED"; clientRef: string }
   | { type: "IMAGE_DRAFTS_ADDED"; drafts: readonly ImageDraft[] }
-  | { type: "IMAGE_DRAFT_PROPOSAL"; clientRef: string; proposal: ReceiptLineProposal | null }
+  | { type: "IMAGE_DRAFT_PROPOSAL"; clientRef: string; proposal: ReceiptLineProposal | null; reason?: ReceiptImageProposeReason }
   | { type: "IMAGE_DRAFT_REMOVED"; clientRef: string }
   | { type: "IMAGE_LINE_CONFIRMED"; clientRef: string; text: string }
   | { type: "CSV_PREPARE_FAILED"; failure: TransportFailure }
@@ -518,7 +519,12 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
           ...state.evidenceDraft,
           imageDrafts: state.evidenceDraft.imageDrafts.map((draft) => (
             draft.clientRef === action.clientRef
-              ? { ...draft, proposal: action.proposal, proposalStatus: action.proposal ? "ready" : "unreadable" }
+              ? {
+                ...draft,
+                proposal: action.proposal,
+                proposalStatus: action.proposal ? "ready" : "unreadable",
+                proposalReason: action.reason,
+              }
               : draft
           )),
         },

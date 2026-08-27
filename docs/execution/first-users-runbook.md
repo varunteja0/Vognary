@@ -24,7 +24,7 @@ Recovery/Autopilot sessions, old CRM replies, product praise, or a demo proposal
 | **First value** | An owner/admin records APPROVE, APPROVE_WITH_CAP, or DECLINE on that proposal; approval/cap remains human authority | `commitment_control_decisions` |
 | **Observed outcome** | Later same-workspace Recovery evidence is appended against the frozen decision | `commitment_control_reconciliations` |
 | **Continuation** | The company submits a second real proposal before spend without the founder prompting that specific request | Second product proposal plus CRM `pre_spend_status=YES` |
-| **Paid pilot** | Cleared ₹40,000 upfront payment | CRM `payment_received_at`; intent/invoice do not count |
+| **Paid pilot** | Cleared ₹14,999 subscription payment | CRM `payment_received_at`; intent/invoice do not count |
 
 ## 2. Before the 20-minute working session
 
@@ -158,7 +158,7 @@ Only `PAYMENT` satisfies the paid gate.
 ```text
 Publicly qualified targets: <n>  Contacted: <n>  Conversations: <n>
 Pre-spend pain: <n>  Post-spend-only pain: <n>  Working sessions: <n>
-Explicit ₹40,000 offers: <n>  Invoices: <n>  Cleared payments: <n>
+Explicit ₹14,999 offers: <n>  Invoices: <n>  Cleared payments: <n>
 Real proposals: <n>  Pre-spend YES / NO / UNKNOWN: <n>/<n>/<n>
 Decisions recorded: <n>  Capped/declined/materially changed: <n>
 T0/T1/T2/T3/T4 PASS counts: <n>/<n>/<n>/<n>/<n>

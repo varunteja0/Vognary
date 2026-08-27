@@ -137,6 +137,7 @@ test("canonical metadata and transactional decision audit are explicit", () => {
     ["src/app/security/page.tsx", 'canonical: "/security"'],
     ["src/app/privacy/page.tsx", 'canonical: "/privacy"'],
     ["src/app/terms/page.tsx", 'canonical: "/terms"'],
+    ["src/app/pay/page.tsx", 'canonical: "/pay"'],
   ]) {
     assert.match(source(path), new RegExp(canonical.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), path);
   }

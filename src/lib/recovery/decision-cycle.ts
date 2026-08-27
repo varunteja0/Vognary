@@ -23,6 +23,7 @@ import type {
   MoneyDto,
   QuietNextChargeDto,
 } from "./contracts";
+import { formatCalendarDayShort } from "@/lib/date-only";
 import { annualizedStake, toMoneyDto } from "./domain";
 import { spokenDecisionSentence, receiptQuote, decisionHookCopy } from "./wow-first-session";
 import { hypothesizedMonthlyNextDate } from "./provisional-receipt";
@@ -71,6 +72,8 @@ export type DecisionCycleFact = {
   amountMinor: bigint;
   /** Amount of the most recent cited bill in this commitment's currency, when known. */
   latestObservedMinor: bigint | null;
+  /** Calendar date of the most recent cited evidence row, when known. */
+  latestObservedOn: string | null;
   nextExpectedDate: string | null;
   firstDetectedOn: string | null;
   observationCount: number;
@@ -164,7 +167,7 @@ export function verificationFromEvaluation(
 
 export function collectReasonKeys(fact: DecisionCycleFact, today: string): DecisionReasonKey[] {
   const keys: DecisionReasonKey[] = [];
-  const dueDate = fact.nextExpectedDate;
+  const dueDate = resolveDecisionDueDate(fact, today);
   if (isInDecisionWindow(today, dueDate, fact.cadence)) keys.push("RENEWS_SOON");
   if (fact.priceChange && fact.priceChange.currentMinor > fact.priceChange.previousMinor) keys.push("PRICE_INCREASE");
   if (fact.overlapPeers.length > 0 && !fact.purpose) keys.push("OVERLAP_NO_PURPOSE");
@@ -263,10 +266,7 @@ export function outcomeCopyNeverClaimsCancellation(text: string): boolean {
 function toQueueCard(fact: DecisionCycleFact, today: string): DecisionCardDto | null {
   if (isSilenced(fact, today)) return null;
   const keys = collectReasonKeys(fact, today);
-  const dueDate = fact.nextExpectedDate
-    ?? (fact.observationCount < 2 && fact.cadence === "MONTHLY" && fact.firstDetectedOn
-      ? hypothesizedMonthlyNextDate(fact.firstDetectedOn, today)
-      : null);
+  const dueDate = resolveDecisionDueDate(fact, today);
   const inWindow = isInDecisionWindow(today, dueDate, fact.cadence === "IRREGULAR" && fact.observationCount < 2 ? "MONTHLY" : fact.cadence);
   const material = keys.some((key) => materialReasonKeys.has(key));
   if (!inWindow && !material) return null;
@@ -309,8 +309,17 @@ function toQueueCard(fact: DecisionCycleFact, today: string): DecisionCardDto | 
   };
 }
 
+export function resolveDecisionDueDate(fact: Pick<DecisionCycleFact, "nextExpectedDate" | "latestObservedOn" | "firstDetectedOn" | "observationCount" | "cadence">, today: string): string | null {
+  if (fact.latestObservedOn && fact.latestObservedOn > today) return fact.latestObservedOn;
+  if (fact.nextExpectedDate) return fact.nextExpectedDate;
+  if (fact.observationCount < 2 && fact.cadence === "MONTHLY" && (fact.latestObservedOn || fact.firstDetectedOn)) {
+    return hypothesizedMonthlyNextDate(fact.latestObservedOn ?? fact.firstDetectedOn!, today);
+  }
+  return null;
+}
+
 function isSilenced(fact: DecisionCycleFact, today: string): boolean {
-  const dueDate = fact.nextExpectedDate;
+  const dueDate = resolveDecisionDueDate(fact, today);
   const cycle = cycleForDueDate(fact, dueDate);
   if (cycle?.userAction === "KEEP") return true;
   if (cycle?.userAction === "PLAN_TO_CANCEL") return true;
@@ -428,18 +437,24 @@ function nextQuietCharge(
 ): QuietNextChargeDto | null {
   const queued = new Set(queue.map((card) => card.commitmentId));
   const upcoming = facts
-    .filter((fact) => fact.nextExpectedDate && !queued.has(fact.commitmentId))
-    .map((fact) => ({ fact, daysAway: daysBetween(today, fact.nextExpectedDate!) }))
-    .filter((entry): entry is { fact: DecisionCycleFact; daysAway: number } => entry.daysAway !== null && entry.daysAway >= 0)
+    .map((fact) => {
+      const dueDate = resolveDecisionDueDate(fact, today);
+      return dueDate && !queued.has(fact.commitmentId)
+        ? { fact, dueDate, daysAway: daysBetween(today, dueDate) }
+        : null;
+    })
+    .filter((entry): entry is { fact: DecisionCycleFact; dueDate: string; daysAway: number } => (
+      entry !== null && entry.daysAway !== null && entry.daysAway >= 0
+    ))
     .sort((left, right) => left.daysAway - right.daysAway || left.fact.merchant.localeCompare(right.fact.merchant));
   const next = upcoming[0];
-  if (!next?.fact.nextExpectedDate) return null;
+  if (!next) return null;
   return {
     commitmentId: next.fact.commitmentId,
     merchant: next.fact.merchant,
     // Same receipt-cited rule as decision cards and upcoming rows.
     amount: toMoneyDto(next.fact.latestObservedMinor ?? next.fact.amountMinor, next.fact.currency),
-    date: next.fact.nextExpectedDate,
+    date: next.dueDate,
   };
 }
 
@@ -482,10 +497,12 @@ function outcomeRank(kind: DecisionOutcomeKind): number {
 function decideHeadline(dueDate: string | null, daysAway: number | null): string {
   if (daysAway === 0) return "Decide today";
   if (daysAway === 1) return "Decide tomorrow";
-  if (dueDate) {
+  const monthlyLead = decisionWindowLeadDays.MONTHLY ?? 7;
+  if (dueDate && daysAway !== null && daysAway > 1 && daysAway <= monthlyLead) {
     const weekday = weekdayNames[utcWeekday(dueDate)];
-    return weekday ? `Decide before ${weekday}` : `Decide before ${dueDate}`;
+    return weekday ? `Decide before ${weekday}` : `Decide before ${formatCalendarDayShort(dueDate)}`;
   }
+  if (dueDate) return `Decide before ${formatCalendarDayShort(dueDate)}`;
   return "Decision needed";
 }
 

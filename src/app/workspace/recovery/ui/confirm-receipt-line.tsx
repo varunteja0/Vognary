@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { confirmLineInputLocked, receiptLineProposalIsPartial, type ImageProposalStatus, type ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
+import { indiaCalendarDate } from "@/lib/date-only";
+import {
+  confirmLineInputLocked,
+  receiptLineProposalIsPartial,
+  type ImageProposalStatus,
+  type ReceiptImageProposeReason,
+  type ReceiptLineProposal,
+} from "@/lib/recovery/image-receipt-proposal";
 import { confirmedReceiptText } from "@/lib/recovery/wow-first-session";
 import { customerPhrases } from "../present/customer-copy";
 
@@ -11,6 +18,7 @@ export type ImageDraft = {
   previewUrl: string | null;
   proposal?: ReceiptLineProposal | null;
   proposalStatus?: ImageProposalStatus;
+  proposalReason?: ReceiptImageProposeReason;
 };
 
 export function ConfirmReceiptLine({
@@ -24,27 +32,33 @@ export function ConfirmReceiptLine({
   onConfirm: (text: string) => void;
   onRemove: () => void;
 }) {
-  const [edited, setEdited] = useState<{ merchant?: string; amount?: string; currency?: string; date?: string }>({});
+  const [edited, setEdited] = useState<{ merchant?: string; amount?: string; currency?: string; date?: string; nextBillingDate?: string }>({});
   const merchant = edited.merchant ?? draft.proposal?.merchant ?? "";
   const amount = edited.amount ?? draft.proposal?.amount ?? "";
   const currency = edited.currency ?? draft.proposal?.currency ?? (draft.proposalStatus === "reading" ? "" : "INR");
   const date = edited.date ?? draft.proposal?.date ?? "";
-  const text = confirmedReceiptText({ merchant, amount, currency, date });
+  const nextBillingDate = edited.nextBillingDate ?? draft.proposal?.nextBillingDate ?? "";
+  const today = indiaCalendarDate();
+  const text = confirmedReceiptText({ merchant, amount, currency, date, nextBillingDate, today });
 
   const reading = draft.proposalStatus === "reading";
   const unreadable = draft.proposalStatus === "unreadable";
   const locked = confirmLineInputLocked(disabled, draft.proposalStatus);
   const guidance = reading
     ? customerPhrases.readingInvoice
-    : unreadable
-      ? customerPhrases.imageUnreadable
-      : draft.proposal?.zeroPaidVisible
-        ? customerPhrases.confirmZeroPaid
-        : draft.proposal && receiptLineProposalIsPartial(draft.proposal)
-          ? customerPhrases.confirmPartial
-          : draft.proposal
-            ? customerPhrases.confirmPrefill
-            : customerPhrases.confirmTheLine;
+    : draft.proposalReason === "timeout"
+      ? customerPhrases.imageTimedOut
+      : unreadable
+        ? customerPhrases.imageUnreadable
+        : draft.proposal?.zeroPaidVisible
+          ? customerPhrases.confirmZeroPaid
+          : draft.proposal?.nextBillingDate && !draft.proposal.date
+            ? customerPhrases.confirmNextBilling
+            : draft.proposal && receiptLineProposalIsPartial(draft.proposal)
+              ? customerPhrases.confirmPartial
+              : draft.proposal
+                ? customerPhrases.confirmPrefill
+                : customerPhrases.confirmTheLine;
 
   return (
     <article className="inset grid gap-3 p-4">
@@ -54,7 +68,7 @@ export function ConfirmReceiptLine({
       </div>
       {draft.previewUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={draft.previewUrl} alt={`Preview of ${draft.name}`} className="max-h-48 w-auto rounded-(--radius) border border-line" />
+        <img src={draft.previewUrl} alt={`Preview of ${draft.name}`} className="max-h-56 w-auto rounded-(--radius) border border-line" />
       ) : null}
       <p className="text-sm leading-6 text-(--muted)">{guidance}</p>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -71,8 +85,12 @@ export function ConfirmReceiptLine({
           <input id={`${draft.clientRef}-currency`} className="field mt-1" value={currency} onChange={(event) => setEdited((current) => ({ ...current, currency: event.target.value }))} disabled={locked} maxLength={3} />
         </div>
         <div>
-          <label htmlFor={`${draft.clientRef}-date`} className="field-label">Charge date</label>
+          <label htmlFor={`${draft.clientRef}-date`} className="field-label">Last paid</label>
           <input id={`${draft.clientRef}-date`} className="field mt-1" type="date" value={date} onChange={(event) => setEdited((current) => ({ ...current, date: event.target.value }))} disabled={locked} />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor={`${draft.clientRef}-next-billing`} className="field-label">Next billing</label>
+          <input id={`${draft.clientRef}-next-billing`} className="field mt-1" type="date" value={nextBillingDate} onChange={(event) => setEdited((current) => ({ ...current, nextBillingDate: event.target.value }))} disabled={locked} />
         </div>
       </div>
       <button

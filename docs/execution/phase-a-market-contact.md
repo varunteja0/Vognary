@@ -5,7 +5,7 @@
 > deadline and kill metric. Full doctrine: [`THE-LAW.md`](../THE-LAW.md).
 
 > **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md)
-> **Goal:** Prove companies will put Vognary before a real obligation and pay ₹40,000/month for a human-approved control workflow.
+> **Goal:** Prove companies will put Vognary before a real obligation and pay ₹14,999/month for a human-approved control workflow.
 > **Owner:** Founder owns targeting, conversations, offers, contracts, and payment evidence. Agents support CRM structure, proposal intake, and evidence-safe artifacts.
 > **Day 10 gate:** 20 qualified targets contacted, 10 conversations, five explicit offers, and two upfront payments.
 > **Day 30 gate:** three paid pilots, 30 pre-spend proposals, three materially changed/capped/declined decisions, at least 80% pre-spend arrival, and two paid renewals.
@@ -18,7 +18,7 @@
 
 - 20 companies match the ICP using public evidence only.
 - 10 founder-confirmed conversations happen.
-- Five explicit ₹40,000/month offers are made.
+- Five explicit ₹14,999/month offers are made.
 - Two pilots pay upfront. Written intent, invoice sent, and payment received remain separate fields.
 
 ### Day 30 success
@@ -42,7 +42,7 @@
 ```text
 20 qualified targets
   → 10 conversations
-  → 5 explicit ₹40,000/month offers
+  → 5 explicit ₹14,999/month offers
   → 2 upfront payments by Day 10
 ```
 
@@ -82,7 +82,7 @@ Agents never infer `qualified`, `offered`, `paid`, `renewed`, or `decision_chang
 | `monthly_controllable_spend_minor` | integer string | Buyer-stated/cited amount only |
 | `monthly_controllable_spend_currency` | char(3) | Usually INR; never convert FX |
 | `working_session_at` | datetime | One real upcoming commitment was brought to the desk |
-| `offer_at` | datetime | Explicit ₹40,000/month offer made |
+| `offer_at` | datetime | Explicit ₹14,999/month offer made |
 | `invoice_sent_at` | datetime | Invoice delivery; does not count as payment |
 | `payment_received_at` | datetime | Cleared upfront payment; the paid gate |
 | `payment_amount_inr` | integer | Cleared gross INR amount |
@@ -140,7 +140,7 @@ Hi {Name} — I’m running a founder-delivered Commitment Control pilot for rec
 
 Before the next AI, cloud, software, contractor, or campaign obligation is created, the desk shows cited existing exposure, checks your stated policy, and records a named human decision and frozen cap. Later bills are reconciled against that approval.
 
-The pilot is ₹40,000/month, paid upfront, including setup and weekly reconciliation. Vognary never auto-approves or moves money. Do you have one real upcoming commitment we could put through a 20-minute working session this week?
+The pilot is ₹14,999/month as a Razorpay subscription, including setup and weekly reconciliation. Vognary never auto-approves or moves money. Do you have one real upcoming commitment we could put through a 20-minute working session this week?
 ```
 
 Do not discount, add a menu, or offer free implementation before the offer-ten gate. Record price-specific rejection separately from rejection of the underlying job.
@@ -168,7 +168,7 @@ Classify the conversation the same day. If most buyers describe only post-hoc bi
 | 1–2 | Source and qualify 20 beachhead companies from public evidence; create no assumed spend facts | 20 CRM rows with source URLs |
 | 3–4 | Send 20 first touches in two batches | `contacted_at`, never drafts |
 | 5–8 | Run 10 behavioral conversations; book working sessions only for pre-spend pain | `conversation_at`, pain class, exact notes |
-| 6–9 | Make five explicit ₹40,000/month offers; invoice same day on yes | `offer_at`, `invoice_sent_at` |
+| 6–9 | Make five explicit ₹14,999/month offers; invoice same day on yes | `offer_at`, `invoice_sent_at` |
 | 8–10 | Run paid working sessions with a real upcoming commitment | product rows plus CRM timing fields |
 | 10 | Apply the two-payment gate with cleared funds only | GO / REWORK / KILL worksheet in CONTINUE-HERE |
 

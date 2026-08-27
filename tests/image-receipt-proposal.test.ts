@@ -240,11 +240,12 @@ test("receipt-image propose prefills a subscription screenshot without a next-cy
     body,
   }) as never);
   assert.equal(response.status, 200);
-  const payload = await response.json() as { proposal: { merchant: string; amount: string; currency: string; date: string } };
+  const payload = await response.json() as { proposal: { merchant: string; amount: string; currency: string; date: string; nextBillingDate?: string } };
   assert.equal(payload.proposal.merchant, "");
   assert.equal(payload.proposal.amount, "427");
   assert.equal(payload.proposal.currency, "INR");
   assert.equal(payload.proposal.date, "");
+  assert.equal(payload.proposal.nextBillingDate, "2026-09-20");
 });
 
 test("a subscription screenshot prefills the printed rupee amount and not the next cycle date", () => {
@@ -253,6 +254,7 @@ test("a subscription screenshot prefills the printed rupee amount and not the ne
   assert.equal(proposal?.amount, "427");
   assert.equal(proposal?.currency, "INR");
   assert.equal(proposal?.date, "");
+  assert.equal(proposal?.nextBillingDate, "2026-09-20");
 });
 
 test("vision cannot invent a vendor or turn next billing into a charge date", () => {
@@ -268,6 +270,7 @@ test("vision cannot invent a vendor or turn next billing into a charge date", ()
   assert.equal(cited?.amount, "427");
   assert.equal(cited?.currency, "INR");
   assert.equal(cited?.date, "");
+  assert.equal(cited?.nextBillingDate, "2026-09-20");
 });
 
 test("photo reading never locks confirm-the-line fields and aborts in eight seconds", () => {
@@ -284,11 +287,14 @@ test("guest start and signed-in add-a-bill share confirm-the-line", () => {
   const confirm = readFileSync(new URL("../src/app/workspace/recovery/ui/confirm-receipt-line.tsx", import.meta.url), "utf8");
   assert.match(start, /fetchReceiptLineProposal/);
   assert.match(start, /ConfirmReceiptLine/);
+  assert.match(start, /chargeDueDisplay/);
   assert.match(start, /knownMerchantsFromNames/);
   assert.match(add, /fetchReceiptLineProposal/);
   assert.match(add, /ConfirmReceiptLine/);
   assert.match(add, /knownMerchants/);
   assert.match(workspace, /persistConfirmedLine/);
+  assert.match(confirm, /Last paid/);
+  assert.match(confirm, /Next billing/);
   assert.match(confirm, /confirmLineInputLocked/);
   assert.doesNotMatch(confirm, /disabled \|\| reading/);
 });

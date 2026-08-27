@@ -4,6 +4,7 @@ import { checkGoogleAuthConfiguration } from "./google-auth";
 import { checkSessionConfiguration } from "./session";
 import { checkTokenVaultConfiguration } from "./token-vault";
 import { getReceiptInboxLaunchReadiness } from "./recovery-inbound-store";
+import { getPilotPaymentLink } from "../pilot-payment-link";
 
 export type TrustSignalState = "proven" | "configured" | "not-yet-proven";
 
@@ -14,7 +15,8 @@ export type TrustSignalId =
   | "identity-provider"
   | "receipt-inbox"
   | "retention-scheduler"
-  | "renewal-alert-delivery";
+  | "renewal-alert-delivery"
+  | "pilot-payment-collection";
 
 export type PublicTrustSignal = {
   id: TrustSignalId;
@@ -51,6 +53,7 @@ export function getPublicTrustSignals(): PublicTrustSignal[] {
       "An operator recorded production renewal-alert delivery after observing a real send.",
       "Production renewal-alert delivery has not been attested yet.",
     ),
+    pilotPaymentSignal(),
   ];
 }
 
@@ -155,6 +158,18 @@ function identitySignal(): PublicTrustSignal {
     label: "Identity provider",
     state: "not-yet-proven",
     detail: "No identity provider is active in this deployment, so sign-in is unavailable.",
+  };
+}
+
+function pilotPaymentSignal(): PublicTrustSignal {
+  const ready = getPilotPaymentLink().status === "ready";
+  return {
+    id: "pilot-payment-collection",
+    label: "Private-pilot collection",
+    state: ready ? "configured" : "not-yet-proven",
+    detail: ready
+      ? "A Razorpay Subscription Link is configured for the ₹14,999 Commitment Control private pilot. Card and UPI details stay on Razorpay. A configured link is not a paid customer."
+      : "Online collection for the private pilot is not configured on this deployment.",
   };
 }
 

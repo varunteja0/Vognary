@@ -17,6 +17,7 @@ const primaryRoutes: PrimaryRoute[] = [
   { label: "privacy", path: "/privacy", public: true },
   { label: "security", path: "/security", public: true },
   { label: "terms", path: "/terms", public: true },
+  { label: "pay", path: "/pay", public: true },
 ];
 
 const publicRoutes = primaryRoutes.filter((route) => route.public);

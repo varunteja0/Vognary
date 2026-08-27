@@ -100,6 +100,25 @@ test("start cards keep the effective amount when evidence carries no amounts", (
   assert.equal(github?.amountDisplay, "₹400.00");
 });
 
+test("a future cited evidence date is the start-card due date, not stored next plus one month", () => {
+  const cards = startCardsFromRecurringItems([
+    {
+      id: "x-com",
+      merchant: "X.com",
+      category: "AI tools",
+      currency: "INR",
+      averageAmount: 427,
+      amountDecimal: "427.00",
+      nextExpectedDate: "2026-10-20",
+      evidence: [{ description: "X.com next billing INR 427 on 2026-09-20.", amountDecimal: "427.00", date: "2026-09-20" }],
+    },
+  ], "2026-08-27");
+  const card = cards.find((item) => item.id === "x-com");
+  assert.ok(card);
+  assert.equal(card?.dueDate, "2026-09-20");
+  assert.doesNotMatch(card?.excerpt ?? "", /invoice paid/);
+});
+
 test("start-session replay matches Cursor Pro to Cursor and reports unmatched merchants", () => {
   const matched = matchStartDecision("Cursor", [{ merchant: "Cursor Pro", action: "PLAN_TO_CANCEL" }]);
   assert.equal(matched?.action, "PLAN_TO_CANCEL");

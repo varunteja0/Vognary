@@ -3,6 +3,7 @@ import test from "node:test";
 import type { AttentionItemDto, ExpectedVsObservedDto, HomeProjectionDto } from "../src/lib/recovery/contracts";
 import { errorCopy } from "../src/app/workspace/recovery/labels";
 import {
+  chargeDueDisplay,
   chargeWhenLine,
   citedEvidenceLine,
   customerInboxStatus,
@@ -133,6 +134,8 @@ test("decision-moment copy cites receipt count and charge timing without inventi
   assert.equal(chargeWhenLine("2026-08-23", 1, "23 Aug 2026"), "Charges tomorrow · 23 Aug 2026");
   assert.equal(chargeWhenLine("2026-08-25", 3, "25 Aug 2026"), "Charges in 3 days · 25 Aug 2026");
   assert.equal(chargeWhenLine("2026-09-06", null, "6 Sept 2026"), "Charges 6 Sept 2026");
+  assert.equal(chargeDueDisplay("20 Sep 2026", 24), "20 Sep 2026 · in 24 days");
+  assert.equal(chargeDueDisplay("22 Aug 2026", 0), "22 Aug 2026 · today");
 });
 
 test("inbox failures never print PARSE_FAILED", () => {

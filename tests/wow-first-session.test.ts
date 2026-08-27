@@ -85,6 +85,36 @@ test("confirm-the-line never invents a cadence and rejects blank money", () => {
     "Claude Max invoice paid INR 24000 on 2026-08-19.",
   );
   assert.equal(confirmedReceiptText({ merchant: "Claude", amount: "", currency: "INR", date: "2026-08-19" }), null);
+  assert.equal(
+    confirmedReceiptText({
+      merchant: "X.com",
+      amount: "427",
+      currency: "INR",
+      nextBillingDate: "2026-09-20",
+      today: "2026-08-27",
+    }),
+    "X.com next billing INR 427 on 2026-09-20.",
+  );
+  assert.equal(
+    confirmedReceiptText({
+      merchant: "X.com",
+      amount: "427",
+      currency: "INR",
+      date: "2026-09-20",
+      today: "2026-08-27",
+    }),
+    "X.com next billing INR 427 on 2026-09-20.",
+  );
+  assert.doesNotMatch(
+    confirmedReceiptText({
+      merchant: "X.com",
+      amount: "427",
+      currency: "INR",
+      date: "2026-09-20",
+      today: "2026-08-27",
+    }) ?? "",
+    /\bpaid\b/i,
+  );
   assert.equal(isReceiptImageFile({ name: "gmail.jpeg", type: "image/jpeg" }), true);
   assert.equal(isReceiptImageFile({ name: "invoice.pdf", type: "application/pdf" }), false);
 });

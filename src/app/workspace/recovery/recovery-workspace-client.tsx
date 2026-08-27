@@ -960,7 +960,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
               onReceiptChange: (text) => dispatch({ type: "RECEIPT_DRAFT_CHANGED", text }),
               onFilesChosen: (files) => void prepareFiles(files),
               onImageDrafts: (drafts) => dispatch({ type: "IMAGE_DRAFTS_ADDED", drafts }),
-              onImageProposal: (clientRef, proposal) => dispatch({ type: "IMAGE_DRAFT_PROPOSAL", clientRef, proposal }),
+              onImageProposal: (clientRef, proposal, reason) => dispatch({ type: "IMAGE_DRAFT_PROPOSAL", clientRef, proposal, reason }),
               onRemoveSource: (clientRef) => dispatch({ type: "CSV_SOURCE_REMOVED", clientRef }),
               onConfirmImageLine: (clientRef, text) => void persistConfirmedLine(clientRef, text),
               onRemoveImageDraft: (clientRef) => dispatch({ type: "IMAGE_DRAFT_REMOVED", clientRef }),

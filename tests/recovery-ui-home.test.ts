@@ -142,13 +142,16 @@ test("landing, login, and empty Home tell one receipts-to-decision product story
   assert.match(landingSource, /No bank passwords/);
   assert.match(landingSource, /No mailbox access/);
   assert.match(landingSource, /AuthorizationLoop/);
-  assert.match(landingSource, /No auto-approve, auto-deny, or payment/);
+  assert.match(landingSource, /No auto-approve, auto-deny, or vendor payment/);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
   assert.doesNotMatch(landingSource, /Set up billing forwarding once so matching mail keeps arriving/);
 });
 
 test("the decision card puts cited evidence and cycle memory on the same object as Keep / Review later / Plan to cancel", () => {
-  assert.match(homeSource, /card\.sentence/);
+  assert.match(homeSource, /decision-merchant/);
+  assert.match(homeSource, /decision-amount/);
+  assert.match(homeSource, /chargeDueDisplay/);
+  assert.match(homeSource, /inWindow \? <p className="decision-cue">/);
   assert.match(homeSource, /card\.excerpt/);
   assert.match(homeSource, /keepIsPrimary\(card\.reasonKeys\)/);
   assert.match(homeSource, /decisionHookCopy/);

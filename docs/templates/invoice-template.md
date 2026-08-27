@@ -1,10 +1,11 @@
 # Manual Invoice — usage notes + email version
 
 Companion to [`invoice-template.html`](./invoice-template.html) (open in a browser →
-fill placeholders → Print → Save as PDF). The live commercial pack is **₹40,000/month
+fill placeholders → Print → Save as PDF). The live commercial pack is **₹14,999/month
 Commitment Control private pilot**. The retired one-time ₹999 / ₹4,999 audit checkout
-must stay off; `/api/checkout` remains `410`. Never wire payment links into the product
-UI. Historical settlement handling lives in `docs/billing-activation-runbook.md`.
+must stay off; `/api/checkout` remains `410`. The live pay page is `/pay`, which opens
+the founder-configured Razorpay Payment Link. Historical settlement handling lives in
+`docs/billing-activation-runbook.md`.
 
 ## Before the first invoice (one-time)
 
@@ -15,18 +16,18 @@ UI. Historical settlement handling lives in `docs/billing-activation-runbook.md`
 - GSTIN: placeholder on the template. Charge GST only after a real GSTIN is written on
   the founder-local copy. Never commit PAN, UPI, or GSTIN.
 - TDS: startup clients may deduct 10% under §194J. That's normal — the invoice tells
-  them how; you reconcile via Form 26AS at tax time. ₹40,000 net of 10% TDS = ₹36,000.
+  them how; you reconcile via Form 26AS at tax time. ₹14,999 net of 10% TDS = ₹13,499.
 
 ## Per-invoice checklist
 
 1. Duplicate your personal HTML copy → update number, date, client block, pilot month.
-2. Line item stays **Commitment Control private pilot (monthly)** at ₹40,000. Do not
+2. Line item stays **Commitment Control private pilot (monthly)** at ₹14,999. Do not
    revive the retired spend-audit SKU or invent a success-fee line unless a later
    paid contract says so in writing.
 3. Do not invoice the retired one-time assisted-audit SKU.
 4. Print → Save as PDF → filename `VOG-2026-001.pdf`.
-5. Send with the email below; mark Paid in the tracker when UPI settles.
-6. Issue this pack only when someone actually pays. Checkout stays 410.
+5. Send with the email below; mark Paid in the tracker when Razorpay or UPI settles.
+6. Issue this pack only when someone actually pays. `/api/checkout` stays 410; `/pay` is the live collection page.
 
 ## Email that carries the invoice
 
@@ -35,7 +36,8 @@ UI. Historical settlement handling lives in `docs/billing-activation-runbook.md`
 > Hi [Name],
 >
 > Attached is the invoice for one month of the Commitment Control private pilot
-> (₹40,000, due on receipt). Fastest way to pay: UPI to **[yourid@upi]** with
+> (₹14,999, due on receipt). Fastest way to pay: https://www.vognary.com/pay when
+> that page shows the Razorpay button, or UPI to **[yourid@upi]** with
 > **VOG-2026-001** in the remark.
 >
 > The desk is proposal → policy → named human authorization → frozen cap →

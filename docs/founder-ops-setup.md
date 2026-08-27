@@ -161,11 +161,23 @@ This gate also needs a real Postgres (`DATABASE_URL`), a token key, and a sessio
 
 ---
 
-## 5. Razorpay + legal terms — deferred; retired checkout must stay off
+## 5. Razorpay Subscription Link for `/pay` — one-time Payment Links do not renew
 
-The one-time ₹999 assisted-audit checkout was retired on 2026-08-21. `/private-audit`, `/api/audit-intake`, and `/api/checkout` cannot be reactivated by setting environment variables. Do not provision Razorpay merely to make readiness look complete.
+The one-time ₹999 assisted-audit checkout was retired on 2026-08-21. `/private-audit`, `/api/audit-intake`, and `/api/checkout` cannot be reactivated by setting environment variables. Do not put `RAZORPAY_KEY_ID` or `RAZORPAY_KEY_SECRET` in Vercel to “turn payments on.” A Razorpay **Payment Link** is a single charge. Monthly autopay is **Subscriptions**.
 
-Razorpay, tax, privacy, refund, and legal approval become founder work only after first-10 proof supports a current paid offer. Historical settlement/refund handling is documented in `docs/billing-activation-runbook.md`.
+**Live commercial path (dashboard, no code):** on the **Vognary** merchant, **Live** mode:
+
+1. **Payment Products → Subscriptions → Plans → New Plan.** Name `Commitment Control private pilot`. Billing frequency **monthly**. Amount **14999 INR**. Plans cannot be edited after create.
+2. **Create New Subscription.** Select that plan. Start immediately (no trial unless you intend one). **Total count** = how many months (use `12` for a year, or up to `1200` for the 30-year Razorpay maximum). Skip customer notify if `/pay` will open the link.
+3. Copy the **short URL** (`https://rzp.io/i/...` or `https://rzp.io/l/...`).
+
+Then set:
+
+```
+COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL=https://rzp.io/i/your-live-subscription
+```
+
+in `.env.local` and in Vercel Production. One Subscription Link binds **one** subscriber. The next company needs a new subscription created from the same Plan. Blank or invalid URL → honest “not configured.” ₹14,999 stays under the ₹15,000 UPI Autopay PIN-free cap only if GST is not added. Historical settlement for old rows: `docs/billing-activation-runbook.md`.
 
 ---
 

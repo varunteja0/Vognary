@@ -9,8 +9,10 @@ import {
   getGuestProposalDraftSnapshot,
   subscribeGuestProposalDraft,
 } from "@/lib/guest-proposal-draft";
-import { formatCalendarDate } from "@/lib/date-only";
+import { indiaCalendarDate, parseIsoDateOnly } from "@/lib/date-only";
 import { startCardsFromRecurringItems, type RecurringItemLike, type StartCard } from "@/lib/recovery/start-cards";
+import { formatDay } from "../workspace/recovery/labels";
+import { chargeDueDisplay } from "../workspace/recovery/present/decision-copy";
 import { fetchReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
 import { knownMerchantsFromNames } from "@/lib/recovery/monthly-loop";
 import { splitReceiptTexts } from "@/lib/recovery/receipt-input";
@@ -24,6 +26,14 @@ type IngestResponse = {
   sources?: Array<{ name: string; text: string; kind?: TransferStatementSource["kind"]; rowCount: number; warnings?: string[] }>;
   error?: string;
 };
+
+function startCardDaysAway(today: string, dueDate: string | null): number | null {
+  if (!dueDate) return null;
+  const start = parseIsoDateOnly(today);
+  const end = parseIsoDateOnly(dueDate);
+  if (!start || !end) return null;
+  return Math.round((end.getTime() - start.getTime()) / 86_400_000);
+}
 
 export default function StartClient() {
   const [receiptText, setReceiptText] = useState("");
@@ -74,7 +84,7 @@ export default function StartClient() {
       }
       const nextCards = payload.cards?.length
         ? payload.cards
-        : startCardsFromRecurringItems(payload.audit?.recurringItems ?? [], formatCalendarDate(new Date()));
+        : startCardsFromRecurringItems(payload.audit?.recurringItems ?? [], indiaCalendarDate());
       if (!nextCards.length) {
         setStatus("We couldn't verify a merchant, amount, and date from that text. Put each bill on its own line, or separate them with a blank line.");
         setCards([]);
@@ -103,12 +113,17 @@ export default function StartClient() {
       void Promise.all(images.map(async (file, index) => {
         const draft = drafts[index];
         if (!draft) return;
-        const proposal = await fetchReceiptLineProposal(file, {
+        const result = await fetchReceiptLineProposal(file, {
           knownMerchants: knownMerchantsFromNames(cards.map((card) => card.merchant)),
         });
         setImageDrafts((current) => current.map((item) => (
           item.clientRef === draft.clientRef
-            ? { ...item, proposal, proposalStatus: proposal ? "ready" : "unreadable" }
+            ? {
+              ...item,
+              proposal: result.proposal,
+              proposalStatus: result.proposal ? "ready" : "unreadable",
+              proposalReason: result.reason,
+            }
             : item
         )));
       }));
@@ -223,14 +238,19 @@ export default function StartClient() {
 
       {cards.length ? (
         <section className="mt-8 grid gap-6" aria-label="Cited bills">
-          {cards.map((card) => (
+          {cards.map((card) => {
+            const dueLine = chargeDueDisplay(
+              card.dueDate ? formatDay(card.dueDate) : null,
+              startCardDaysAway(indiaCalendarDate(), card.dueDate),
+            );
+            return (
             <article key={card.id} className="decision" data-lead="true">
               <div className="min-w-0">
-                <p className="decision-cue">Cited from your receipt</p>
-                <h2 className="decision-sentence mt-2">{card.merchant} · {card.amountDisplay}</h2>
-                {card.whenLine && card.whenLine !== "Date not established" ? (
-                  <p className="decision-due mt-1">{card.whenLine}</p>
-                ) : null}
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <h2 className="decision-merchant">{card.merchant}</h2>
+                  <span className="decision-amount">{card.amountDisplay}</span>
+                </div>
+                {dueLine ? <p className="decision-due mt-1">{dueLine}</p> : null}
               </div>
               {card.excerpt ? (
                 <div className="decision-evidence">
@@ -242,7 +262,8 @@ export default function StartClient() {
                 <p className="mt-2 text-sm leading-6 text-(--muted)">This is one cited charge. Its recurring cadence is not proven yet.</p>
               ) : null}
             </article>
-          ))}
+            );
+          })}
           <AuthorizationLoop completedThrough={1} activeStep={4} />
           <p className="text-sm leading-6 text-(--muted)">
             Sign in to remember this evidence. The next unique step is the Control desk: a named owner or admin freezes a cap before a new obligation exists. That is not Keep or Plan to cancel.

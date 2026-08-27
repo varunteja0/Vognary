@@ -9,7 +9,78 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## Live state — 2026-08-27 (founder: Home dates, photo confirm, signed-in cards)
+
+**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Composite remains **1.5**. Production
+Control remains unenrolled on verified schema **0056**. Sell and Track F still
+bind. `/pay` remains the public collection page.
+
+**Scoreboard row:** Trust / Product UX. **Loop step:** cite the photo → confirm
+the line honestly → show the real next charge.
+
+**WHAT IS TRUE in this working tree.** Founder authorized a signed-in `/app`
+presentation pass plus a date/photo truth fix. A future cited date is the next
+charge, not a paid invoice plus one month. Confirm this line splits Last paid
+and Next billing. A Manage Subscription screenshot that prints `Cost ₹427 /
+month` and `Next billing cycle starts on September 20, 2026` prefills 427 + INR
+and next billing 2026-09-20, leaves merchant blank (Premium is not a vendor),
+and never stores that cycle as “invoice paid”. Home cards scan merchant, amount,
+and a calendar due date. Weekday cues stay inside the monthly decision window.
+Home “today” is Asia/Kolkata. Existing stored +1-month next dates correct on
+read when the latest evidence date is still in the future.
+
+**WHAT IS NOT TRUE.** This is not a public redesign, a new design system, or
+auto merchant-match. Official UX/trust scores do not rise from this SHA. A live
+photo still needs production vision (`ANTHROPIC_API_KEY` +
+`AI_MONTHLY_BUDGET_INR`); Vercel does not run Tesseract.
+
+**NEXT HUMAN ACTIONS:** deploy this SHA. Confirm the X.com card shows 20 Sep
+2026, not 20 Oct / 54 days. Drop a Manage Subscription screenshot and confirm
+next billing prefills. Continue the five first-touch sends and Track F.
+
+**HARD STOP:** no public `/` restyle, no token rewrite, no invented X.com, no
+Gmail OAuth, no Standard Checkout.
+
+## Live state — 2026-08-27 (founder: public /pay is the Razorpay Payment Link)
+
+> **SUPERSEDED as live instruction** by the Home date/photo block at the top.
+> `/pay` collection remains true. Sell and Track F still bind.
+> Composite remains **1.5**.
+
+**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Composite remains **1.5**. Production
+Control remains unenrolled on verified schema **0056**. Sell and Track F still bind.
+
+**Scoreboard row:** business validation. **Loop step:** explicit offer → cleared
+₹14,999 subscription payment.
+
+**WHAT IS TRUE in this working tree.** Founder authorized a public pay page at
+`/pay` for the Commitment Control private pilot. The price is server-owned
+₹14,999/month INR as a **Razorpay Subscription** (plan + per-customer mandate),
+not a one-time Payment Link. Collection is a founder-created Subscription
+`short_url` in `COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL` (`https` `rzp.io` or
+`pages.razorpay.com` only). One link binds one subscriber. Blank env keeps `/pay`
+honest and unconfigured. `/api/checkout` remains `410`. Standard Checkout, test
+keys, and the retired ₹999 audit SKU are not used. Vognary still never
+auto-approves or moves vendor money.
+
+**WHAT IS NOT TRUE.** A Subscription Link is not a paid customer. GST on top of
+₹14,999 would break the ₹15,000 UPI Autopay PIN-free cap. Contacted /
+conversations / offers / payments remain unmeasured until the CRM records them.
+Do not claim enterprise scale or live Control enrollment from this page.
+
+**NEXT HUMAN ACTIONS:** in Razorpay **Live** create a monthly ₹14,999 **Plan**,
+then a **Subscription** (not a Payment Link). Paste the `rzp.io` short URL into
+`COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL` on Vercel Production and `.env.local`,
+redeploy, open `/pay`. Continue the five first-touch sends and Track F.
+
+**HARD STOP:** no Standard Checkout modal, no `RAZORPAY_KEY_SECRET` on the
+client, no reopening `/api/checkout`, no fake paid-customer claims.
+
 ## Live state — 2026-08-26 (founder: unique loop is the product)
+
+> **SUPERSEDED as live instruction** by the `/pay` Payment Link block at the top.
+> Unique-loop copy on `/` remains true. Sell and Track F still bind.
+> Composite remains **1.5**.
 
 **THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Composite remains **1.5**. Official
 scoreboard rows do not become 10/10 from copy. Production Control remains

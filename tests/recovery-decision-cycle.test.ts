@@ -31,6 +31,7 @@ function fact(overrides: Partial<DecisionCycleFact> & Pick<DecisionCycleFact, "c
     currency: "INR",
     amountMinor: BigInt(170_000),
     latestObservedMinor: null,
+    latestObservedOn: null,
     nextExpectedDate: "2026-08-22",
     firstDetectedOn: "2026-06-01",
     observationCount: 4,
@@ -662,4 +663,30 @@ test("outcome detail never prints a raw ISO date or repeats the card's own amoun
   assert.match(outcome.detail, /did not cancel/i);
   assert.equal(outcome.amount?.display, "₹830.00");
   assert.equal(outcome.date, "2026-08-01");
+});
+
+test("a future cited evidence date is the next charge, not stored next plus one month", () => {
+  const home = buildDecisionHome([
+    fact({
+      commitmentId: "x-com",
+      merchant: "X.com",
+      amountMinor: BigInt(42_700),
+      latestObservedMinor: BigInt(42_700),
+      latestObservedOn: "2026-09-20",
+      nextExpectedDate: "2026-10-20",
+      firstDetectedOn: "2026-08-27",
+      observationCount: 1,
+      evidenceIds: ["evidence-x"],
+      excerpt: "X.com invoice paid INR 427 on 2026-09-20.",
+      latestEvidenceId: "evidence-x",
+    }),
+  ], "2026-08-27");
+  const card = home.decisionQueue.find((item) => item.commitmentId === "x-com");
+  assert.ok(card);
+  assert.equal(card.dueDate, "2026-09-20");
+  assert.equal(card.daysAway, 24);
+  assert.match(card.headline, /Decide before 20 Sep/);
+  assert.doesNotMatch(card.headline, /Tuesday/);
+  assert.match(card.sentence, /Charges in 24 days/);
+  assert.match(card.reasons.join(" "), /next is 2026-09-20/);
 });

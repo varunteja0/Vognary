@@ -16,6 +16,7 @@ import {
 } from "@/lib/recovery/contracts";
 import { hasCitedRecurringSpendPicture } from "@/lib/recovery/domain";
 import {
+  chargeDueDisplay,
   chargeWhenLine,
   customerPhrases,
   decisionOutcomeTone,
@@ -385,13 +386,21 @@ function DecisionCard({
   const reviewPanelId = useId();
   const purposeId = useId();
   const keepPrimary = keepIsPrimary(card.reasonKeys);
-  const sentence = card.sentence?.trim() || `${card.merchant} charges ${card.charge.display}.`;
   const quote = card.excerpt?.trim() || null;
+  const inWindow = card.daysAway !== null && card.daysAway >= 0 && card.daysAway <= 7;
+  const dueLine = chargeDueDisplay(card.dueDate ? formatDay(card.dueDate) : null, card.daysAway);
   return (
     <article className="decision" data-lead={prominent}>
       <div className="min-w-0">
-        <p className="decision-cue">{card.headline}</p>
-        <h4 className="decision-sentence">{sentence}</h4>
+        {inWindow ? <p className="decision-cue">{card.headline}</p> : null}
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h4 className="decision-merchant">{card.merchant}</h4>
+          <span className="decision-amount">{card.charge.display}</span>
+        </div>
+        {dueLine ? <p className="decision-due">{dueLine}</p> : null}
+        {card.provisional ? (
+          <p className="decision-stake">Seen once. Cadence is not proven.</p>
+        ) : null}
       </div>
 
       {quote ? (

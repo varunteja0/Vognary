@@ -74,6 +74,7 @@ export default function AboutPage() {
 
           <div className="mt-8 flex flex-wrap gap-2.5 border-t border-line pt-5">
             <Link href="/start" className="btn btn-primary">Add a bill</Link>
+            <Link href="/pay" className="btn btn-ghost">Subscribe at the pilot rate</Link>
             <Link href="/security" className="btn btn-ghost">Security and readiness</Link>
             <Link href="/privacy" className="btn btn-ghost">Privacy</Link>
           </div>

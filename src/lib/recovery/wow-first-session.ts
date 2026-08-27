@@ -137,19 +137,32 @@ export function confirmedReceiptText(input: {
   merchant: string;
   amount: string;
   currency: string;
-  date: string;
+  date?: string;
+  nextBillingDate?: string;
+  today?: string;
 }): string | null {
   const merchant = input.merchant.replace(/\s+/g, " ").trim();
   const amount = input.amount.replace(/,/g, "").trim();
   const currency = input.currency.trim().toUpperCase();
-  const date = input.date.trim();
+  const paidDate = (input.date ?? "").trim();
+  const nextBillingDate = (input.nextBillingDate ?? "").trim();
+  const today = (input.today ?? "").trim();
   if (merchant.length < 2 || merchant.length > 80) return null;
   if (!/^[A-Z]{3}$/.test(currency)) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   if (!/^\d+(\.\d{1,2})?$/.test(amount)) return null;
   const numeric = Number(amount);
   if (!Number.isFinite(numeric) || numeric <= 0) return null;
-  return `${merchant} invoice paid ${currency} ${amount} on ${date}.`;
+  const paid = /^\d{4}-\d{2}-\d{2}$/.test(paidDate) ? paidDate : "";
+  const next = /^\d{4}-\d{2}-\d{2}$/.test(nextBillingDate) ? nextBillingDate : "";
+  const paidIsUpcoming = Boolean(paid && today && paid > today);
+  if (paid && next && !paidIsUpcoming) {
+    return `${merchant} invoice paid ${currency} ${amount} on ${paid}. Next billing ${next}.`;
+  }
+  if (next && !paid) return `${merchant} next billing ${currency} ${amount} on ${next}.`;
+  if (paidIsUpcoming) return `${merchant} next billing ${currency} ${amount} on ${paid}.`;
+  if (paid) return `${merchant} invoice paid ${currency} ${amount} on ${paid}.`;
+  if (next) return `${merchant} next billing ${currency} ${amount} on ${next}.`;
+  return null;
 }
 
 export function isReceiptImageFile(file: Pick<File, "name" | "type">): boolean {

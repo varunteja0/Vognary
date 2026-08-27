@@ -58,7 +58,7 @@ Prior-generation material lives only in `docs/archive/`. Treat it as history, no
 > **Vognary is the human-authorized commitment firewall for AI-native companies: proposed obligation → policy context → human authorization → approved cap → observed outcome.**
 
 - First ICP: India-first, 5–100-person AI-native companies with at least ₹5 lakh/month in AI, cloud, software, contractor, or campaign exposure.
-- V0 offer: a private paid pilot at **₹40,000/month**, delivered with a thin product build in 10 days.
+- V0 offer: a private paid pilot at **₹14,999/month**, delivered with a thin product build in 10 days.
 - V0 loop: proposal → deterministic exposure → stated policy → authorized human decision → frozen cap → later Recovery evidence → reconciliation.
 - Recovery remains the sole evidence authority. Existing commitment graph facts may inform exposure, but a proposal is not evidence that money was spent.
 - Every amount is an exact minor-unit value with an explicit currency. Existing evidence is cited; user-entered proposal values are labeled assumptions.
@@ -157,7 +157,7 @@ npm run build && npm run perf:budget
 | Metric | Day 30 | Day 90 | Kill / pivot if |
 | --- | ---: | ---: | --- |
 | Qualified conversations | **10** | **30** | <10 by day 10 |
-| Explicit ₹40,000/month offers | **10** | **30** | <10 by day 10 |
+| Explicit ₹14,999/month offers | **10** | **30** | <10 by day 10 |
 | Upfront paid pilots | **3** | **10** | <2 of 10 offers pay by day 10 |
 | Pre-spend proposals evaluated | **30** | **150** | <50% arrive before spend |
 | Decisions materially changed / capped / declined | **3** | **15** | 0 after 30 proposals |
@@ -170,7 +170,7 @@ npm run build && npm run perf:budget
 | Phase | Name | Goal | Gate to exit |
 | --- | --- | --- | --- |
 | **0** | Hygiene | One repo, one doc chain | **DONE** 2026-07-21 |
-| **A** | Paid proof | Sell ten explicit ₹40,000/month offers | Two upfront payments by Day 10 |
+| **A** | Paid proof | Sell ten explicit ₹14,999/month offers | Two upfront payments by Day 10 |
 | **B** | Control V0 | Proposal, policy, human decision, reconciliation | Private V0 in 10 days |
 | **C** | Production min | Identity, monitor, backup, pay, email | activation rows READY |
 | **D** | Intelligence moat | Corpus 100, formats, first verified saving | corpus:strict green |
@@ -289,7 +289,7 @@ Consumer audit alone is not $100B. **Commitment truth as infrastructure** might 
 | 3 | Resend domain + key | Magic link + renewal email |
 | 4 | Monitoring (Sentry or Better Stack) | Safe production |
 | 5 | Backup storage + restore drill | Financial data trust |
-| 6 | Pilot agreement, invoice, and founder-controlled payment collection | Upfront ₹40,000 pilot payment |
+| 6 | Pilot agreement, invoice, and founder-controlled payment collection | ₹14,999/month subscription |
 | 7 | 10–20 redacted real statements → corpus | Intelligence truth |
 | 8 | Setu AA onboarding | Deferred until paid control usage earns a rail |
 
@@ -301,7 +301,7 @@ Agents may draft configs, checklists, and verification commands. Agents must **n
 
 | Day | Who | Work |
 | --- | --- | --- |
-| 1 | Founder | Contact qualified ICPs and make the first explicit ₹40,000/month offers |
+| 1 | Founder | Contact qualified ICPs and make the first explicit ₹14,999/month offers |
 | 1–3 | Agent | Exact multi-currency exposure and policy domain, red tests first |
 | 3–5 | Agent | Proposal, evaluation, evidence-link, and append-only decision persistence |
 | 5–7 | Both | Run proposals through the same human-approved pilot workflow |

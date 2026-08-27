@@ -113,7 +113,7 @@ That command applies only unrecorded files in sorted order. After a successful
 Stop if either checksum drifts. Verify the resulting head is
 `0059_control_authority_hardening`. Then copy the finance-owner workspace UUID
 from Profile, set `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS` to that exact UUID,
-redeploy, and invite the engineering lead as `member`. Issue the ₹40,000 invoice
+redeploy, and invite the engineering lead as `member`. Issue the ₹14,999 invoice
 only when someone actually pays.
 
 ## Phase 0: Stop Conditions

@@ -29,3 +29,31 @@ export function formatCalendarDate(date: Date): string {
 export function startOfLocalDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
+
+export const INDIA_CALENDAR_TIME_ZONE = "Asia/Kolkata";
+
+export function calendarDateInTimeZone(date: Date, timeZone: string): string {
+  if (Number.isNaN(date.getTime())) throw new Error("Calendar date formatting requires a valid instant.");
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+  const year = values.get("year");
+  const month = values.get("month");
+  const day = values.get("day");
+  if (!year || !month || !day) throw new Error("Calendar date formatting did not return a complete date.");
+  return `${year}-${month}-${day}`;
+}
+
+export function indiaCalendarDate(date: Date = new Date()): string {
+  return calendarDateInTimeZone(date, INDIA_CALENDAR_TIME_ZONE);
+}
+
+export function formatCalendarDayShort(value: string): string {
+  const parsed = parseIsoDateOnly(value);
+  if (!parsed) return value;
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(parsed);
+}

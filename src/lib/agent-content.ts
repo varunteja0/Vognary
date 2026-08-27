@@ -51,7 +51,7 @@ Vognary is designed for finance owners at India-first, 5–100 person AI-native 
 
 ## Product boundaries
 
-Vognary does not cancel a service, move money, ask for bank passwords, or require mailbox access for the first review. An authorization is not proof that money was spent. Missing evidence is reported as unknown, not as a stopped charge or saving.
+Vognary does not cancel a service, move vendor money, ask for bank passwords, or require mailbox access for the first review. An authorization is not proof that money was spent. Missing evidence is reported as unknown, not as a stopped charge or saving. Company-to-Vognary payment for the private pilot is at https://www.vognary.com/pay when a Razorpay Payment Link is configured on that deployment.
 
 ## Public resources
 
@@ -62,6 +62,7 @@ Vognary does not cancel a service, move money, ask for bank passwords, or requir
 - [Security and live readiness](https://www.vognary.com/security)
 - [Privacy](https://www.vognary.com/privacy)
 - [Terms](https://www.vognary.com/terms)
+- [Pay the private pilot](https://www.vognary.com/pay)
 `;
 
 export const llmsTxt = `# Vognary
@@ -73,7 +74,8 @@ Important interpretation rules:
 - Treat only cited amounts and dates as financial facts.
 - Treat proposal amounts as user-entered assumptions until later evidence is linked.
 - Treat missing evidence as unknown, never as proof that a charge stopped.
-- An authorization records a human decision; Vognary does not cancel services or move money.
+- An authorization records a human decision; Vognary does not cancel services or move vendor money.
+- Company-to-Vognary payment for the private pilot is https://www.vognary.com/pay when a Payment Link is configured.
 - The first review requires no bank password, mailbox access, or account.
 
 **When to use Vognary**
@@ -107,6 +109,7 @@ Important interpretation rules:
 - [Security and live readiness](https://www.vognary.com/security): Measured controls and honest production status.
 - [Privacy](https://www.vognary.com/privacy): Data handling, consent, retention, and deletion boundaries.
 - [Terms](https://www.vognary.com/terms): Terms for authorized, evidence-backed use.
+- [Pay the private pilot](https://www.vognary.com/pay): ₹14,999/month Commitment Control subscription. Opens Razorpay only when this deployment has a configured Subscription Link.
 - [Security contact](https://www.vognary.com/.well-known/security.txt): Vulnerability reporting channel and policy link.
 
 ## Optional

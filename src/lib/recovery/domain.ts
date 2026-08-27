@@ -18,6 +18,7 @@ import type {
   CorrectionField,
   CorrectionStatus,
 } from "./contracts";
+import { indiaCalendarDate } from "@/lib/date-only";
 import { groupStackOverlaps } from "./stack-overlap";
 import {
   buildDecisionHome,
@@ -61,6 +62,8 @@ export type CanonicalCommitmentRecord = {
   amountConflict?: boolean;
   /** Amount of the most recent cited bill in this commitment's currency, when known. */
   latestObservedMinor?: bigint | null;
+  /** Calendar date of the most recent cited evidence row, when known. */
+  latestObservedOn?: string | null;
   cycles?: readonly SavedDecisionCycle[];
   excerpt?: string | null;
   /** The evidence row the excerpt was quoted from, when known. */
@@ -133,7 +136,7 @@ export function isRecoveryReminderEligible(commitment: Pick<CanonicalCommitmentR
 export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionDto {
   assertReconstructibleChanges(input.changed.items);
   const generatedAt = input.generatedAt ?? new Date();
-  const today = dateOnly(generatedAt);
+  const today = indiaCalendarDate(generatedAt);
   const active = input.commitments.filter((commitment) => commitment.status === "ACTIVE");
   const excludedFromHeadline = commitmentIdsExcludedFromHeadlineTotals(input.duplicateState);
   const inHeadline = (commitment: CanonicalCommitmentRecord) => !excludedFromHeadline.has(commitment.id);
@@ -146,21 +149,27 @@ export function buildHomeProjection(input: HomeProjectionInput): HomeProjectionD
   const next30DayCommitments = active.filter((commitment) => {
     if (!inHeadline(commitment)) return false;
     if (commitment.riskTags.includes(PROVISIONAL_RISK_TAG)) return false;
-    const days = commitment.nextExpectedDate ? daysBetween(today, commitment.nextExpectedDate) : null;
+    const dueDate = dueDateForCommitment(commitment, today);
+    const days = dueDate ? daysBetween(today, dueDate) : null;
     return days !== null && days >= 0 && days <= 30;
   });
   const next30DayTotals = buildTotals(next30DayCommitments, (commitment) => commitment.amountMinor, next30DayTotalCorrectionFields);
 
   const next = active
-    .filter((commitment) => commitment.nextExpectedDate && daysBetween(today, commitment.nextExpectedDate) !== null)
-    .map((commitment) => ({ commitment, daysAway: daysBetween(today, commitment.nextExpectedDate!)! }))
-    .filter(({ daysAway }) => daysAway >= 0)
+    .map((commitment) => {
+      const dueDate = dueDateForCommitment(commitment, today);
+      const daysAway = dueDate ? daysBetween(today, dueDate) : null;
+      return dueDate && daysAway !== null ? { commitment, dueDate, daysAway } : null;
+    })
+    .filter((entry): entry is { commitment: CanonicalCommitmentRecord; dueDate: string; daysAway: number } => (
+      entry !== null && entry.daysAway >= 0
+    ))
     .sort((left, right) => left.daysAway - right.daysAway || left.commitment.merchant.localeCompare(right.commitment.merchant))
     .slice(0, 12)
-    .map(({ commitment, daysAway }) => ({
+    .map(({ commitment, dueDate, daysAway }) => ({
       commitmentId: commitment.id,
       merchant: commitment.merchant,
-      date: commitment.nextExpectedDate!,
+      date: dueDate,
       daysAway,
       // Per-merchant upcoming rows name a charge a receipt actually contains
       // (same rule as decision cards); the blended effective amount is only a
@@ -379,7 +388,8 @@ function buildTotals(
 
 function buildAttention(commitment: CanonicalCommitmentRecord, today: string): HomeProjectionDto["needsMe"] {
   const confidence = toConfidence(commitment);
-  const daysAway = commitment.nextExpectedDate ? daysBetween(today, commitment.nextExpectedDate) : null;
+  const dueDate = dueDateForCommitment(commitment, today);
+  const daysAway = dueDate ? daysBetween(today, dueDate) : null;
   const needsDecision = !commitment.decision && commitment.recommendedDecision !== "KEEP";
   if (needsDecision) {
     return [{
@@ -390,7 +400,7 @@ function buildAttention(commitment: CanonicalCommitmentRecord, today: string): H
       title: `Review ${commitment.merchant}`,
       detail: commitment.recommendationReason,
       amount: toMoneyDto(commitment.amountMinor, commitment.currency),
-      dueDate: commitment.nextExpectedDate,
+      dueDate,
       evidenceIds: commitment.evidenceIds,
     }];
   }
@@ -403,7 +413,7 @@ function buildAttention(commitment: CanonicalCommitmentRecord, today: string): H
       title: `Confirm ${commitment.merchant}`,
       detail: confidence.reasons[0] ?? "The persisted evidence is not yet sufficient for high confidence.",
       amount: toMoneyDto(commitment.amountMinor, commitment.currency),
-      dueDate: commitment.nextExpectedDate,
+      dueDate,
       evidenceIds: commitment.evidenceIds,
     }];
   }
@@ -416,7 +426,7 @@ function buildAttention(commitment: CanonicalCommitmentRecord, today: string): H
       title: `${commitment.merchant} is due soon`,
       detail: `Expected in ${daysAway} day${daysAway === 1 ? "" : "s"}.`,
       amount: toMoneyDto(commitment.amountMinor, commitment.currency),
-      dueDate: commitment.nextExpectedDate,
+      dueDate,
       evidenceIds: commitment.evidenceIds,
     }];
   }
@@ -509,15 +519,16 @@ function daysBetween(left: string, right: string) {
   return Math.round((rightDate.getTime() - leftDate.getTime()) / dayMs);
 }
 
+function dueDateForCommitment(commitment: CanonicalCommitmentRecord, today: string): string | null {
+  if (commitment.latestObservedOn && commitment.latestObservedOn > today) return commitment.latestObservedOn;
+  return commitment.nextExpectedDate;
+}
+
 function parseDateOnly(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;
   const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
   return date.toISOString().slice(0, 10) === value ? date : null;
-}
-
-function dateOnly(value: Date) {
-  return value.toISOString().slice(0, 10);
 }
 
 export function overlapForCommitment(
@@ -563,6 +574,7 @@ export function toDecisionFacts(commitments: readonly CanonicalCommitmentRecord[
       currency: commitment.currency,
       amountMinor: commitment.amountMinor,
       latestObservedMinor: commitment.latestObservedMinor ?? null,
+      latestObservedOn: commitment.latestObservedOn ?? null,
       nextExpectedDate: commitment.nextExpectedDate,
       firstDetectedOn: commitment.firstDetectedAt ?? null,
       observationCount: commitment.evidenceIds.length,

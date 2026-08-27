@@ -60,7 +60,7 @@ test("the live authority set locks the human-approved Commitment Control pilot",
   assert.ok(/Commitment Control replaces Commitment Intelligence/.test(authority), "Commitment Control must replace the prior direction");
   assert.ok(/proposal.*policy.*human (?:decision|authorization).*reconciliation/i.test(normalizedAuthority), "the complete control loop must be canonical");
   assert.ok(/never auto-approves, auto-denies, purchases, provisions, cancels, or moves money/.test(authority), "V0 must preserve the human-only boundary");
-  assert.ok(/₹40,000\/month/.test(authority), "the paid-pilot price must be explicit");
+  assert.ok(/₹14,999\/month/.test(authority), "the paid-pilot price must be explicit");
   assert.ok(/two upfront payments by Day 10/.test(authority), "the Day 10 success gate must be explicit");
   assert.ok(/fewer than two of ten offers pay/.test(authority), "the Day 10 kill gate must be explicit");
 });

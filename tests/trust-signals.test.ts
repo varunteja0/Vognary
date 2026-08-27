@@ -34,6 +34,7 @@ const names = [
   "RESEND_FROM_EMAIL",
   "NEXT_PUBLIC_APP_URL",
   "APP_URL",
+  "COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL",
 ] as const;
 
 function withEnvironment(overrides: Partial<Record<(typeof names)[number], string>>, run: () => void) {
@@ -55,7 +56,7 @@ function withEnvironment(overrides: Partial<Record<(typeof names)[number], strin
 test("a blank environment proves nothing", () => {
   withEnvironment({}, () => {
     const signals = getPublicTrustSignals();
-    assert.equal(signals.length, 7);
+    assert.equal(signals.length, 8);
     for (const signal of signals) {
       assert.equal(signal.state, "not-yet-proven", `${signal.id} must not claim readiness on blank env`);
     }
@@ -93,6 +94,7 @@ test("configuration and operator attestations flip the matching signals", () => 
     assert.equal(byId.get("receipt-inbox")?.state, "configured");
     assert.equal(byId.get("retention-scheduler")?.state, "proven");
     assert.equal(byId.get("renewal-alert-delivery")?.state, "proven");
+    assert.equal(byId.get("pilot-payment-collection")?.state, "not-yet-proven");
   });
 });
 
@@ -142,6 +144,17 @@ test("a malformed restore-drill date is ignored, never rendered", () => {
     const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
     assert.equal(byId.get("backups")?.state, "configured");
     assert.ok(!(byId.get("backups")?.detail ?? "").includes("not-a-date"));
+  });
+});
+
+test("a valid Razorpay Payment Link configures private-pilot collection without proving a paid customer", () => {
+  withEnvironment({
+    COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL: "https://rzp.io/l/vognary-pilot",
+  }, () => {
+    const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
+    assert.equal(byId.get("pilot-payment-collection")?.state, "configured");
+    assert.match(byId.get("pilot-payment-collection")?.detail ?? "", /not a paid customer/i);
+    assert.doesNotMatch(byId.get("pilot-payment-collection")?.detail ?? "", /rzp\.io|COMMITMENT_CONTROL/i);
   });
 });
 

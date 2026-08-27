@@ -32,6 +32,7 @@ export function isProvisionalSingleReason(reason: string): boolean {
 export function hypothesizedMonthlyNextDate(observedDate: string, today: string): string | null {
   const observed = parseIsoDateOnly(observedDate);
   if (!observed) return null;
+  if (today && observedDate > today) return formatCalendarDate(observed);
   const next = new Date(observed.getFullYear(), observed.getMonth() + 1, observed.getDate());
   if (next.getDate() !== observed.getDate()) {
     next.setDate(0);

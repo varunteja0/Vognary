@@ -300,7 +300,10 @@ test("home renders attention, upcoming charges, and receipt freshness without in
 
   await expect.poll(() => activationResponses.length).toBe(1);
   expect(activationResponses).toEqual([201]);
-  await expect(page.getByText("OpenAI charges ₹1,999.00").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "OpenAI" })).toBeVisible();
+  await expect(page.getByText("₹1,999.00").first()).toBeVisible();
+  await expect(page.getByText("6 Aug 2026 · in 3 days")).toBeVisible();
+  await expect(page.getByText("Decide before Thursday")).toBeVisible();
   await expect(page.getByText("OpenAI invoice paid INR 1,999. Renews monthly.")).toBeVisible();
   await expect(page.getByRole("button", { name: "See the cited receipt" })).toBeVisible();
   await expect(page.getByText("Why now")).toBeVisible();
