@@ -1,0 +1,39 @@
+{
+  // Both harnesses read workspace customization. Register the .github/* and
+  // .claude/* paths so Copilot, Claude, and Codex sessions resolve the same
+  // six lanes, five skills, and five instruction files.
+  "chat.useAgentsMdFile": true,
+  "chat.useClaudeMdFile": true,
+  "chat.useNestedAgentsMdFiles": true,
+  "chat.agentFilesLocations": {
+    ".github/agents": true,
+    ".claude/agents": true
+  },
+  "chat.agentSkillsLocations": {
+    ".github/skills": true,
+    ".claude/skills": true
+  },
+  "chat.instructionsFilesLocations": {
+    ".github/instructions": true,
+    ".claude/rules": true
+  },
+
+  // Codex does not appear in the Agents window picker unless it is registered
+  // with the Agent Host. The OpenAI extension alone only enables Chat view.
+  // Requires an Agent Host restart (or window reload) to take effect.
+  "chat.agentHost.codexAgent.enabled": true,
+  "chat.editor.codex.preferAgentHost": true,
+
+  // Surface Claude Code / Codex CLI sessions started outside VS Code.
+  "chat.agentSessions.showExternal": "last7Days",
+
+  // Worktrees start from committed state, so gitignored files do not travel.
+  // .env.local is required for signed-in, DB-backed, and test:postgres work.
+  // ONLY .env.local — never .env.production.local. Worktree sessions run at
+  // Bypass Approvals, so an agent there must not hold production credentials.
+  // .env.local points at localhost:5432, which is why it is safe to copy.
+  "git.worktreeIncludeFiles": [".env.local"],
+
+  "chat.mcp.discovery.enabled": true,
+  "chat.mcp.autostart": "newAndOutdated"
+}
