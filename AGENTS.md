@@ -39,6 +39,7 @@ AI must **cite or shut up**. Never invent amounts, merchants, or connector liven
 ## 2. Working rules
 
 - **Live checkout (founder override, 2026-08-18):** stay in `"/Users/varunteja/Desktop/CVT Group/Vognary"` on `main`. Do **not** `git worktree add ../vognary-*`, do not clone a sibling folder, and do not redo merged WP-A / PR #34. Parked copies belong in `.fallow/` (gitignored). Isolated-worktree-per-WP resumes only after CONTINUE-HERE names it again.
+- **Harness worktrees (founder authorization, 2026-08-31):** worktrees created by the VS Code agent harness under `Vognary.worktrees/<slug>` on `agents/<slug>` branches **are** authorized. Hand-rolled `../vognary-*` siblings and clones remain banned. One Git owner merges to `main`. A fresh worktree has **no `node_modules`** and **no `.env.local`** (`.gitignore` line 49 matches `.env*`) — run `nvm use 22.23.2 && npm ci` and supply `.env.local` before any gate, or §4's Next.js docs rule silently resolves to an empty path. Copy `.env.local` only, never `.env.production.local`: worktree sessions run at Bypass Approvals.
 - Path with spaces: quote `"/Users/varunteja/Desktop/CVT Group/Vognary"`
 - Before merge: `lint` · `typecheck` · `claims:check` · `tokens:check` · `test` · disposable `test:postgres` when the WP touches migrations/stores · then `build` · `perf:budget`
 - Engine changes: **failing test first**
@@ -48,7 +49,7 @@ AI must **cite or shut up**. Never invent amounts, merchants, or connector liven
 
 ### Commitment Control loop — same-repo sequential branch
 
-Commitment Control V0 continues on `main` in this folder. One Git owner. No sibling worktrees. Do not invent payments, usage, readiness, or reviewer approvals.
+Commitment Control V0 continues on `main` in this folder. One Git owner. No hand-rolled sibling folders; harness worktrees under `Vognary.worktrees/` on `agents/*` branches are authorized and merge back to `main`. Do not invent payments, usage, readiness, or reviewer approvals.
 
 ## 3. Hard stops
 

@@ -1,0 +1,21 @@
+{
+  // Workspace MCP servers. This file is committed — no secrets belong here.
+  //
+  // Neon is deliberately ABSENT. Its entry carries a live write-scoped
+  // production API key and lives in VS Code user config
+  // (Command Palette -> "MCP: Open User Configuration"), which is the correct
+  // scope for a personal credential and keeps it out of git history.
+  //
+  // Do not use ${input:...} here: MCP servers that require input prompts are
+  // not forwarded to the Agent Host, so harness sessions would silently lose
+  // the server. Use ${env:...} if a value must be injected.
+  //
+  // Note: the Copilot harness supports only local MCP servers that need no
+  // authentication. Playwright (stdio, no auth) qualifies.
+  "servers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@microsoft/mcp-server-playwright"]
+    }
+  }
+}
