@@ -9,7 +9,7 @@ const routes = [
   { route: "/app", key: "/app/page", manifest: "server/app/app/page_client-reference-manifest.js", jsGzipLimit: 220_000 },
   { route: "/verify", key: "/verify/page", manifest: "server/app/verify/page_client-reference-manifest.js", jsGzipLimit: 220_000 },
 ];
-const cssGzipLimit = 16_000;
+const cssGzipLimit = 15_000;
 const chunkGzipLimit = 80_000;
 
 if (!existsSync(rootManifestUrl)) {

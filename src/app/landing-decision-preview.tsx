@@ -124,7 +124,17 @@ export function LandingDecisionPreview() {
         <article className="decision" data-lead="true">
           <div className="min-w-0">
             <p className="decision-cue">Proposed obligation · assumption</p>
-            <h4 className="decision-sentence mt-2">{label} · {amount === null ? "amount unknown" : formatInr(amount)}</h4>
+            <h4 className="decision-sentence mt-2">
+              {label}
+              {amount === null ? (
+                <> · <span className="text-(--muted)">amount unknown</span></>
+              ) : (
+                <>
+                  {" · "}
+                  <MoneyValue minor={amount * 100} provenance={{ kind: "assumed" }} size="record" />
+                </>
+              )}
+            </h4>
           </div>
 
           <div className="decision-evidence">
@@ -199,11 +209,17 @@ export function LandingDecisionPreview() {
         >
           <div>
             <p className="eyebrow eyebrow-xs">The authorization</p>
-            <p className={`stamp stamp-${presentation.tone} mt-3`}>{presentation.label}</p>
+            <p key={`stamp-${presentation.tone}`} className={`stamp stamp-land stamp-${presentation.tone} mt-3`}>{presentation.label}</p>
             <h4 className="mt-4 font-display text-lg font-semibold leading-snug text-(--ink)">{presentation.title}</h4>
             {presentation.capInr === null ? null : (
               <p className="mt-3">
-                <MoneyValue minor={presentation.capInr * 100} provenance={{ kind: "frozen" }} size="lead" />
+                <MoneyValue
+                  key={`cap-${presentation.capInr}`}
+                  minor={presentation.capInr * 100}
+                  provenance={{ kind: "frozen" }}
+                  size="lead"
+                  proving
+                />
               </p>
             )}
             <p className="mt-2 text-sm leading-6 text-(--ink-soft)">{presentation.body}</p>

@@ -9,55 +9,58 @@
 */
 
 :root {
-  /* ---- PRIVATE LEDGER / Graphite & Gold ----------------------------
-     A premium financial instrument: cool graphite, hairline structure,
-     and a single champagne-gold accent for money and action. Legacy
-     token names are re-pointed so the whole product re-skins here. --- */
+  /* ---- THE EVIDENCE FILE -------------------------------------------
+     Every number is an exhibit until proven. The surface is uncoated
+     paper, the text is ink, and authority comes from rules, weight and
+     position — not from elevation or gloss. One accent carries
+     attention (evidence red) and one carries authorization (seal).
+     Blue is refused outright: it is the fintech default and says
+     nothing about proof. Legacy token names are re-pointed so the whole
+     product re-skins from here. ------------------------------------ */
 
-  /* Cool paper base; graphite is the ink, not a wall of black. */
-  --paper: #f3f5f7;
-  --paper-2: #e9edf1;
-  --card: #ffffff;
-  --card-2: #f7f8fa;
-  --card-3: #edf0f3;
+  /* Warm uncoated stock. Paper is never pure white. */
+  --paper: #f2efe7;
+  --paper-2: #eae6dc;
+  --card: #fbfaf6;
+  --card-2: #f5f2ea;
+  --card-3: #eae6dc;
 
-  /* Text */
-  --ink: #171a1f;
-  --ink-soft: #4f5864;
-  --muted: #626b76;
+  /* Ink, never pure black — printed carbon sits warm. */
+  --ink: #16140f;
+  --ink-soft: #3c382f;
+  --muted: #6b6558;
 
-  /* Structure — exact graphite hairlines on paper */
-  --line: rgba(23, 26, 31, 0.10);
-  --line-strong: rgba(23, 26, 31, 0.18);
+  /* Structure — ruling on paper, not shadow */
+  --line: rgba(22, 20, 15, 0.14);
+  --line-strong: rgba(22, 20, 15, 0.26);
 
-  /* Accent — champagne gold (money / primary / focus) */
-  --gold: #c99a45;
-  --gold-soft: #d8b267;
-  --gold-deep: #9b6d22;
-  --gold-line: rgba(155, 109, 34, 0.34);
-  --ink-on-gold: #17130a;
-  --dossier-fill: rgba(155, 109, 34, 0.06);
+  /* Authorization seal — the only thing permitted to look like foil */
+  --gold: #8a6a1f;
+  --gold-soft: #a8862f;
+  --gold-deep: #6d5316;
+  --gold-line: rgba(138, 106, 31, 0.38);
+  --ink-on-gold: #fbfaf6;
+  --dossier-fill: rgba(138, 106, 31, 0.07);
   --glow: var(--gold);
   --glow-soft: var(--gold-soft);
   --glow-deep: var(--gold-deep);
 
-  /* Verdict spectrum — desaturated, refined.
-     Ink values are darkened against their own 10% tint so stamp/pill text
-     clears 4.5:1; the tints stay on the original hue. */
-  --ember: #a63a2f;
-  --ember-tint: rgba(189, 73, 61, 0.10);
-  --verdict: #15614c;
-  --verdict-tint: rgba(25, 116, 91, 0.10);
-  --ochre: #845515;
-  --ochre-tint: rgba(149, 99, 28, 0.10);
-  --indigo: #515aa6;
-  --indigo-tint: rgba(81, 90, 166, 0.10);
+  /* Verdict spectrum. Evidence red is reserved for stamps and
+     attention; it is never used decoratively. */
+  --ember: #a8321f;
+  --ember-tint: rgba(168, 50, 31, 0.09);
+  --verdict: #2f5d3f;
+  --verdict-tint: rgba(47, 93, 63, 0.10);
+  --ochre: #7d5410;
+  --ochre-tint: rgba(125, 84, 16, 0.10);
+  --indigo: #2f5d3f;
+  --indigo-tint: rgba(47, 93, 63, 0.10);
 
   /* Featured dark surfaces (hero / exhibit) */
-  --dossier: #0c0e12;
-  --dossier-2: #14171d;
-  --dossier-ink: #edeef1;
-  --dossier-muted: #9a9ea8;
+  --dossier: #14120d;
+  --dossier-2: #1e1b14;
+  --dossier-ink: #f2efe7;
+  --dossier-muted: #a09884;
   --dossier-line: rgba(255, 255, 255, 0.10);
 
   /* Legacy aliases */
@@ -132,13 +135,18 @@ body {
 }
 
 /* A quiet edge wash keeps the paper from reading as an empty white canvas. */
+/* Document ruling. Faint horizontal rules establish the page as stock rather
+   than as a canvas; a vignette would imply glass, which this world does not
+   have. Fixed so it does not repaint on scroll. */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(130% 100% at 50% 20%, transparent 66%, rgba(23, 26, 31, 0.035));
+  background-image: linear-gradient(rgba(22, 20, 15, 0.022) 1px, transparent 1px);
+  background-size: 100% 2rem;
+  opacity: 1;
 }
 
 button,
@@ -291,15 +299,17 @@ select {
 .btn:active {
   transform: translateY(1px);
 }
+/* The primary action is ink on paper — a stamped block. Gold is reserved
+   for authorization seals, so spending it on buttons would make a frozen cap
+   mean less. No inner highlight: this world has no gloss. */
 .btn-primary {
-  background: var(--gold);
-  color: var(--ink-on-gold);
-  border-color: color-mix(in srgb, var(--gold-deep) 60%, var(--gold));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 10px 24px -14px rgba(216, 184, 122, 0.55);
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
 }
 .btn-primary:hover {
-  background: var(--gold-soft);
-  border-color: var(--gold-soft);
+  background: var(--ink-soft);
+  border-color: var(--ink-soft);
 }
 .btn-ghost {
   background: var(--card-3);
@@ -1022,10 +1032,10 @@ select.field option {
   --text-micro: 0.6875rem;
   --text-page: 1.625rem;
   --text-record: 1.125rem;
-  --truth-assumption: #7c8494;
+  --truth-assumption: #6b6558;
   --truth-authority: var(--gold-deep);
-  --truth-citation: var(--indigo);
-  --truth-frozen: #3f4855;
+  --truth-citation: var(--verdict);
+  --truth-frozen: #14120d;
   --truth-observed: var(--verdict);
   --truth-policy: var(--ochre);
 }
@@ -1195,6 +1205,52 @@ details[open] > .disclosure-summary::after {
 .money-assumed .money-amount {
   color: var(--truth-assumption);
   border-bottom: 1px dotted var(--truth-assumption);
+}
+
+/* ---- THE PROVING ----------------------------------------------------------
+   The signature moment: an amount stops being a claim and becomes evidence.
+   A solid rule is drawn left-to-right over the provisional dotted one and the
+   figure resolves from graphite to full ink — a print developing rather than a
+   colour change. Compositor-only: transform and opacity. */
+.money-proving .money-amount {
+  position: relative;
+  animation: prove-ink var(--motion-enter) var(--ease-enter) both;
+}
+.money-proving .money-amount::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: var(--truth-citation);
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: prove-rule var(--motion-enter) var(--ease-enter) forwards;
+}
+.money-proving .money-provenance {
+  animation: prove-tag var(--motion-move) var(--ease-emphasis) var(--motion-fast) both;
+}
+@keyframes prove-rule {
+  to { transform: scaleX(1); }
+}
+@keyframes prove-ink {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
+@keyframes prove-tag {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* A stamp is placed by a hand: it arrives oversized, lands, and settles
+   slightly off-axis. One settle, never a bounce. */
+.stamp-land {
+  animation: stamp-land var(--motion-move) var(--ease-emphasis) both;
+}
+@keyframes stamp-land {
+  from { opacity: 0; transform: scale(1.3) rotate(-5deg); }
+  to { opacity: 1; transform: scale(1) rotate(-1.2deg); }
 }
 
 /* Brackets are drawn, not typed, so they scale with the number they hold. */

@@ -1,23 +1,28 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from "next/font/google";
 import PwaRegister from "./pwa-register";
 import "./globals.css";
 
-const grotesk = Geist({
+// The Evidence File: a documentary voice, not a product voice. Plex was drawn
+// for technical documentation and Newsreader for long-form record, which is
+// what this product actually is.
+const grotesk = IBM_Plex_Sans({
   variable: "--font-grotesk",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
   display: "optional",
   preload: false,
 });
 
-const monoData = Geist_Mono({
+const monoData = IBM_Plex_Mono({
   variable: "--font-mono-data",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
   display: "optional",
   preload: false,
 });
 
-const display = Fraunces({
+const display = Newsreader({
   variable: "--font-display-serif",
   subsets: ["latin"],
   display: "optional",

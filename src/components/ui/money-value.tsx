@@ -23,6 +23,7 @@ export function MoneyValue({
   provenance,
   size = "record",
   layout = "inline",
+  proving = false,
   className = "",
 }: {
   /** Minor units (paise for INR). Never a pre-divided major-unit float. */
@@ -32,9 +33,13 @@ export function MoneyValue({
   size?: "data" | "record" | "lead";
   /** "stacked" puts provenance under the amount, for column layouts. */
   layout?: "inline" | "stacked";
+  /** Plays the proving transition when a claim becomes evidence. */
+  proving?: boolean;
   className?: string;
 }) {
-  const base = `money money-${size} money-${layout} ${className}`.trim();
+  const base = `money money-${size} money-${layout} ${proving ? "money-proving" : ""} ${className}`
+    .replace(/\s+/g, " ")
+    .trim();
 
   // An unknown amount must never be coerced into a number.
   if (provenance.kind === "unknown" || minor === null) {
