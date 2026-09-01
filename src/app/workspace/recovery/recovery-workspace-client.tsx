@@ -28,7 +28,6 @@ import {
   type SourceType,
 } from "@/lib/recovery/contracts";
 import { VognaryMark } from "../../brand";
-import { AuthorizationLoop } from "../../authorization-loop";
 import { correctionFieldLabels, decisionLabels } from "./labels";
 import { ControlView, useCommitmentControl } from "./control/control-view";
 import { RecoveryAddEvidence } from "./recovery-add-evidence";
@@ -804,14 +803,15 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     : primaryViews.length === 4 ? "grid-cols-4" : "grid-cols-3";
   return (
     <main id="recovery-workspace" className="relative px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-5 text-foreground sm:px-6 sm:pb-10 lg:px-8">
-      <div className="mx-auto w-full max-w-6xl">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-2.5">
+      <div className="mx-auto w-full max-w-7xl lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-10">
+        <div className="workspace-rail">
+        <header className="flex flex-wrap items-center justify-between gap-3 lg:block">
+          <div className="rail-brand inline-flex items-center gap-2.5">
             <VognaryMark size={24} />
             <h1 className="font-display text-lg font-semibold text-(--ink)">Vognary</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <p className="hidden font-data text-xs text-(--muted) sm:block">
+          <div className="rail-actions flex items-center gap-2 lg:flex-col lg:items-stretch">
+            <p className="hidden font-data text-xs text-(--muted) sm:block lg:order-3">
               {state.workspaceVersion === null ? "Loading your workspace…" : "Saved to Vognary"}
             </p>
             {showPersistentAdd ? (
@@ -819,7 +819,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
                 id="workspace-add-bill"
                 type="button"
                 aria-label="Add a bill"
-                className="btn btn-sm btn-primary"
+                className="btn btn-sm btn-primary lg:order-1 lg:w-full"
                 onClick={() => dispatch({ type: "ADD_BILLS_OPENED" })}
               >
                 <span aria-hidden>+</span>
@@ -829,7 +829,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
             <Link
               href="/profile"
               aria-label={accountEmail ? `Account for ${accountEmail}` : "Account"}
-              className="btn btn-sm btn-ghost"
+              className="btn btn-sm btn-ghost lg:order-2 lg:justify-start"
             >
               <span aria-hidden className="grid size-6 place-items-center rounded-full bg-(--card-2) font-data text-xs text-(--ink)">
                 {accountEmail?.charAt(0).toUpperCase() ?? "A"}
@@ -838,16 +838,6 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
             </Link>
           </div>
         </header>
-
-        {controlPilotOff ? (
-          <div className="mt-3 grid gap-3">
-            <AuthorizationLoop activeStep={4} completedThrough={3} compact label="Commitment Control loop" />
-            <p className="text-sm leading-6 text-(--muted)">
-              Commitment Control unlocks after pilot enrollment. Cited bills still save here.{" "}
-              <Link href="/pay" className="link-quiet">See the pilot offer</Link>
-            </p>
-          </div>
-        ) : null}
 
         <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 py-2 sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
           <ul className={`viewnav ${navColumnsClass}`}>
@@ -871,6 +861,17 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
             ))}
           </ul>
         </nav>
+        </div>
+
+        <div className="min-w-0">
+        {controlPilotOff ? (
+          <div className="mt-3 grid gap-3 lg:mt-0">
+            <p className="text-sm leading-6 text-(--muted)">
+              Commitment Control unlocks after pilot enrollment. Cited bills still save here.{" "}
+              <Link href="/pay" className="link-quiet">See the pilot offer</Link>
+            </p>
+          </div>
+        ) : null}
 
         <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{state.announcement}</p>
 
@@ -921,6 +922,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           ) : (
             renderView()
           )}
+        </div>
         </div>
       </div>
 

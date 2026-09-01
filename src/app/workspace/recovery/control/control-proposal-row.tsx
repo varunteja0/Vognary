@@ -11,7 +11,6 @@ import {
   controlVerdictLabels,
   controlVerdictMeanings,
   controlVerdictToneClass,
-  formatControlMoney,
   type ControlReconciliationVerdict,
 } from "./control-format";
 
@@ -105,12 +104,12 @@ export function ControlProposalRow({
           {reconciliations.length === 0 ? (
             <div className="control-settled">
               <dl className="proof">
-                <ControlFact label="Frozen expected" value={formatControlMoney(decision.expectedAmountMinor, decision.currency)} engraved />
-                <ControlFact
-                  label="Approved cap"
-                  value={decision.approvedCapMinor === null ? "No cap — declined" : formatControlMoney(decision.approvedCapMinor, decision.currency)}
-                  engraved
-                />
+                <ControlFact label="Frozen expected" money={{ minor: decision.expectedAmountMinor, currency: decision.currency, provenance: { kind: "frozen" } }} />
+                {decision.approvedCapMinor === null ? (
+                  <ControlFact label="Approved cap" value="No cap — declined" engraved />
+                ) : (
+                  <ControlFact label="Approved cap" money={{ minor: decision.approvedCapMinor, currency: decision.currency, provenance: { kind: "frozen" } }} />
+                )}
                 <ControlFact label="Observed" value="Awaiting evidence" observed />
               </dl>
               <div className="control-settled-side">
@@ -135,21 +134,24 @@ export function ControlProposalRow({
                 <dl className={proofToneClass[reconciliation.verdict]}>
                   <ControlFact
                     label="Frozen expected"
-                    value={formatControlMoney(reconciliation.expectedAmountMinor, reconciliation.authorizationCurrency)}
-                    engraved
+                    money={{ minor: reconciliation.expectedAmountMinor, currency: reconciliation.authorizationCurrency, provenance: { kind: "frozen" } }}
                   />
-                  <ControlFact
-                    label="Frozen cap"
-                    value={reconciliation.approvedCapMinor === null
-                      ? "No cap — declined"
-                      : formatControlMoney(reconciliation.approvedCapMinor, reconciliation.authorizationCurrency)}
-                    engraved
-                  />
-                  <ControlFact
-                    label="Observed"
-                    value={formatControlMoney(reconciliation.observedAmountMinor, reconciliation.observedCurrency)}
-                    observed
-                  />
+                  {reconciliation.approvedCapMinor === null ? (
+                    <ControlFact label="Frozen cap" value="No cap — declined" engraved />
+                  ) : (
+                    <ControlFact
+                      label="Frozen cap"
+                      money={{ minor: reconciliation.approvedCapMinor, currency: reconciliation.authorizationCurrency, provenance: { kind: "frozen" } }}
+                    />
+                  )}
+                  {reconciliation.observedAmountMinor === null || reconciliation.observedCurrency === null ? (
+                    <ControlFact label="Observed" value="Awaiting evidence" observed />
+                  ) : (
+                    <ControlFact
+                      label="Observed"
+                      money={{ minor: reconciliation.observedAmountMinor, currency: reconciliation.observedCurrency, provenance: { kind: "observed" } }}
+                    />
+                  )}
                 </dl>
                 <div className="control-settled-side">
                   <p className="proof-head">

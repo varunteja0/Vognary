@@ -174,10 +174,10 @@ function SectionHeading({ id, children }: { id: string; children: string }) {
 
 function EmptyRecoveryHome({ onAddEvidence }: { onAddEvidence: () => void }) {
   return (
-    <section aria-label="Get started" className="mx-auto max-w-xl py-8 text-center sm:py-14">
-      <h3 className="font-display text-3xl font-semibold tracking-tight text-(--ink)">{customerPhrases.emptyHomeTitle}</h3>
-      <p className="mt-4 text-base leading-7 text-(--muted)">{customerPhrases.emptyHomeBody}</p>
-      <div className="mt-6 text-left"><AuthorizationLoop activeStep={1} /></div>
+    <section aria-label="Get started" className="max-w-2xl py-6 sm:py-10">
+      <h3 className="font-display text-3xl font-semibold tracking-tight text-(--ink) sm:text-4xl">{customerPhrases.emptyHomeTitle}</h3>
+      <p className="mt-4 max-w-prose text-base leading-7 text-(--muted)">{customerPhrases.emptyHomeBody}</p>
+      <div className="mt-7"><AuthorizationLoop activeStep={1} /></div>
       <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-8">
         {customerPhrases.addBills}
       </button>
@@ -209,7 +209,7 @@ function FirstObservationHome({
                 <span className="ledger-name">{observation.merchant ?? "Merchant not published"}</span>
                 {observation.amount ? (
                   <span className="ledger-meta">
-                    <MoneyValue amount={observation.amount} className="text-(--ink)" />
+                    <MoneyValue amount={observation.amount} provenance={{ kind: "cited", source: "Receipt" }} size="data" />
                   </span>
                 ) : null}
               </p>
@@ -242,7 +242,7 @@ function NextChargeLine({ next, className = "" }: { next: QuietNextChargeDto; cl
     <p className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 ${className}`}>
       <span className="font-data text-xs text-(--muted)">Next</span>
       <span className="font-display text-base font-semibold text-(--ink)">{next.merchant}</span>
-      <MoneyValue amount={next.amount} className="text-sm text-(--ink-soft)" />
+      <MoneyValue amount={next.amount} provenance={{ kind: "projected" }} size="data" />
       <span className="font-data text-xs text-(--muted)">{formatDay(next.date)}</span>
     </p>
   );
@@ -524,7 +524,7 @@ function OutcomeCard({
       <p className="outcome-title">{outcome.headline}</p>
       <p className="text-sm leading-6 text-(--muted)">{outcome.detail}</p>
       <p className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        {outcome.amount ? <MoneyValue amount={outcome.amount} className="text-sm text-(--ink)" /> : null}
+        {outcome.amount ? <MoneyValue amount={outcome.amount} provenance={{ kind: "observed" }} size="data" /> : null}
         {outcome.date ? <span className="font-data text-xs text-(--muted)">{formatDay(outcome.date)}</span> : null}
         <button type="button" onClick={() => onOpenCommitment(outcome.commitmentId)} className="link-quiet">
           {customerPhrases.seeWhy}
@@ -624,7 +624,7 @@ function UpcomingRow({ item, onOpenCommitment }: { item: UpcomingItemDto; onOpen
       <button type="button" onClick={() => onOpenCommitment(item.commitmentId)} className="ledger-line ledger-row px-2">
         <span className="ledger-name">{item.merchant}</span>
         <span className="ledger-meta">
-          <MoneyValue amount={item.amount} className="text-(--ink-soft)" />
+          <MoneyValue amount={item.amount} provenance={{ kind: "projected" }} size="data" />
           <span className="ledger-date font-data text-xs">{formatDay(item.date)}</span>
         </span>
       </button>

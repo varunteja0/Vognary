@@ -1,6 +1,7 @@
 "use client";
 
 import type { ControlEvaluationDto, ControlProposalDto } from "@/lib/commitment-control/contracts";
+import { MoneyValue, type MoneyProvenance } from "@/components/ui/money-value";
 import { formatDay } from "../labels";
 import {
   controlCadenceLabels,
@@ -33,9 +34,9 @@ export function ControlEvaluation({
       <section className="control-section" aria-labelledby={`assumption-${evaluation.id}`}>
         <p id={`assumption-${evaluation.id}`} className="truth-label truth-assumption">User-entered assumption</p>
         <dl className="control-facts">
-          <ControlFact label="Per charge" value={formatControlMoney(proposal.amountMinor, proposal.currency)} engraved />
-          <ControlFact label="13 weeks" value={formatControlMoney(proposal.projectedThirteenWeekMinor, proposal.currency)} engraved />
-          <ControlFact label="12 months" value={formatControlMoney(proposal.projectedAnnualMinor, proposal.currency)} engraved />
+          <ControlFact label="Per charge" money={{ minor: proposal.amountMinor, currency: proposal.currency, provenance: { kind: "assumed" } }} />
+          <ControlFact label="13 weeks" money={{ minor: proposal.projectedThirteenWeekMinor, currency: proposal.currency, provenance: { kind: "assumed" } }} />
+          <ControlFact label="12 months" money={{ minor: proposal.projectedAnnualMinor, currency: proposal.currency, provenance: { kind: "assumed" } }} />
         </dl>
         <p className="control-card-meta">
           {controlCategoryLabels[proposal.category]} · {controlCadenceLabels[proposal.cadence]} · first charge {formatDay(proposal.firstChargeDate)} · projected from {formatDay(proposal.asOfDate)}
@@ -134,18 +135,33 @@ export function ControlEvaluation({
 export function ControlFact({
   label,
   value,
+  money,
   engraved = false,
   observed = false,
 }: {
   label: string;
-  value: string;
+  value?: string;
+  /** Preferred for currency: carries provenance instead of a bare string. */
+  money?: { minor: string; currency: string; provenance: MoneyProvenance };
   engraved?: boolean;
   observed?: boolean;
 }) {
   return (
     <div className="control-fact" data-observed={observed ? "true" : undefined}>
       <dt>{label}</dt>
-      <dd className={engraved || observed ? "font-data tnum" : undefined}>{value}</dd>
+      <dd className={!money && (engraved || observed) ? "font-data tnum" : undefined}>
+        {money ? (
+          <MoneyValue
+            minor={money.minor}
+            currency={money.currency}
+            provenance={money.provenance}
+            size="data"
+            layout="stacked"
+          />
+        ) : (
+          value
+        )}
+      </dd>
     </div>
   );
 }

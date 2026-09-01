@@ -1,34 +1,31 @@
+import type { MoneyDto, ProjectionAmountProvenance } from "@/lib/recovery/contracts";
 import { currencyExponent } from "@/lib/recovery/domain";
 
 /**
  * Where a number came from. Required, so a money value cannot render without
  * declaring its provenance — the distinction this product sells.
  *
- * cited    — backed by a receipt or bill the user supplied
- * assumed  — typed by a human; a claim, not proof
- * frozen   — a human-authorized cap; immovable once recorded
- * observed — later evidence, measured against a cap
- * unknown  — not yet known; renders as an em dash, never as zero
+ * cited     — backed by a receipt or bill the user supplied
+ * assumed   — typed by a human; a claim, not proof
+ * projected — expected from cited history, but not yet charged
+ * frozen    — a human-authorized cap; immovable once recorded
+ * observed  — later evidence, measured against a cap
+ * unknown   — not yet known; renders as an em dash, never as zero
  */
 export type MoneyProvenance =
   | { kind: "cited"; source: string }
   | { kind: "assumed" }
+  | { kind: "projected" }
   | { kind: "frozen" }
   | { kind: "observed" }
   | { kind: "unknown"; reason?: string };
 
-export function MoneyValue({
-  minor,
-  currency = "INR",
-  provenance,
-  size = "record",
-  layout = "inline",
-  proving = false,
-  className = "",
-}: {
-  /** Minor units (paise for INR). Never a pre-divided major-unit float. */
-  minor: number | null;
-  currency?: string;
+/** Maps the projection's own provenance so call sites do not restate it. */
+export function citedFrom(provenance: ProjectionAmountProvenance): MoneyProvenance {
+  return { kind: "cited", source: provenance === "USER_CORRECTED" ? "Corrected" : "Receipt" };
+}
+
+type MoneyValueOwnProps = {
   provenance: MoneyProvenance;
   size?: "data" | "record" | "lead";
   /** "stacked" puts provenance under the amount, for column layouts. */
@@ -36,13 +33,42 @@ export function MoneyValue({
   /** Plays the proving transition when a claim becomes evidence. */
   proving?: boolean;
   className?: string;
-}) {
+};
+
+/**
+ * Three input shapes, one renderer:
+ *   display — the server's own formatted string, rendered verbatim (preferred;
+ *             the client must never reformat a server amount)
+ *   amount  — a MoneyDto, whose `display` is likewise used verbatim
+ *   minor   — raw minor units, formatted client-side for surfaces the server
+ *             does not pre-format (Commitment Control)
+ */
+type MoneyValueProps = MoneyValueOwnProps &
+  (
+    | { display: string; amount?: never; minor?: never; currency?: never }
+    | { display?: never; amount: MoneyDto; minor?: never; currency?: never }
+    | { display?: never; amount?: never; minor: string | number | null; currency?: string }
+  );
+
+export function MoneyValue({
+  display,
+  amount,
+  minor,
+  currency = "INR",
+  provenance,
+  size = "record",
+  layout = "inline",
+  proving = false,
+  className = "",
+}: MoneyValueProps) {
   const base = `money money-${size} money-${layout} ${proving ? "money-proving" : ""} ${className}`
     .replace(/\s+/g, " ")
     .trim();
 
+  const missing = display === undefined && !amount && minor === null;
+
   // An unknown amount must never be coerced into a number.
-  if (provenance.kind === "unknown" || minor === null) {
+  if (provenance.kind === "unknown" || missing) {
     const reason = provenance.kind === "unknown" ? provenance.reason : undefined;
     return (
       <span className={`money-unknown ${base}`}>
@@ -54,33 +80,45 @@ export function MoneyValue({
     );
   }
 
+  const text =
+    display ??
+    amount?.display ??
+    formatExactMinor(minor as string | number, currencyExponent(currency), currency);
+
   return (
     <span className={`money-${provenance.kind} ${base}`}>
-      <span className="money-amount">{formatExactMinor(minor, currency)}</span>
+      <span className="money-amount">{text}</span>
       <span className="money-provenance">{provenanceLabel(provenance)}</span>
     </span>
   );
 }
 
+function formatExactMinor(minor: string | number, exponent: number, currency: string): string {
+  const value = typeof minor === "string" ? BigInt(minor) : BigInt(Math.round(minor));
+  const zero = BigInt(0);
+  const negative = value < zero;
+  const absolute = negative ? -value : value;
+  const divisor = BigInt(10) ** BigInt(exponent);
+  return compose(negative, absolute / divisor, absolute % divisor, exponent, currency);
+}
+
 /**
- * Formats exact minor units without floating-point division: the whole and
- * fractional parts are split with integer math, so a value never drifts.
  * Fraction digits appear only when they carry information — "INR 1,350" rather
  * than "INR 1,350.00" — and the ISO code is always shown, never a bare symbol.
  * INR uses Indian (lakh/crore) grouping.
  */
-function formatExactMinor(minor: number, currency: string): string {
-  const exponent = currencyExponent(currency);
-  const divisor = 10 ** exponent;
-  const rounded = Math.round(minor);
-  const negative = rounded < 0;
-  const absolute = Math.abs(rounded);
-  const whole = Math.trunc(absolute / divisor);
-  const fraction = absolute - whole * divisor;
+function compose(
+  negative: boolean,
+  whole: bigint,
+  fraction: bigint,
+  exponent: number,
+  currency: string,
+): string {
   const grouped = new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", {
     maximumFractionDigits: 0,
   }).format(whole);
-  const fractionText = fraction === 0 ? "" : `.${String(fraction).padStart(exponent, "0")}`;
+  const fractionText =
+    fraction === BigInt(0) ? "" : `.${String(fraction).padStart(exponent, "0")}`;
   return `${negative ? "−" : ""}${currency} ${grouped}${fractionText}`;
 }
 
@@ -90,6 +128,8 @@ function provenanceLabel(provenance: MoneyProvenance): string {
       return provenance.source;
     case "assumed":
       return "Assumption";
+    case "projected":
+      return "Not charged yet";
     case "frozen":
       return "Frozen cap";
     case "observed":

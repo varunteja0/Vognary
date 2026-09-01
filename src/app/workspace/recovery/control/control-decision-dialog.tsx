@@ -57,7 +57,7 @@ export function ControlDecisionDialog({
       <dl className="control-facts">
         <ControlFact label="Merchant" value={proposal.merchant} />
         <ControlFact label="Purpose" value={proposal.purpose} />
-        <ControlFact label="Assumption per charge" value={formatControlMoney(proposal.amountMinor, proposal.currency)} engraved />
+        <ControlFact label="Assumption per charge" money={{ minor: proposal.amountMinor, currency: proposal.currency, provenance: { kind: "assumed" } }} />
       </dl>
 
       {evaluation ? (

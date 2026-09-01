@@ -62,7 +62,7 @@ export function RecoveryAutopilotHome({
                 {window.status === "MISSING_COVERAGE" || window.status === "PENDING"
                   ? ` — missing ${window.currency} coverage is not a zero saving.`
                   : window.saving
-                    ? <> · recorded saving <MoneyValue amount={window.saving} /></>
+                    ? <> · recorded saving <MoneyValue amount={window.saving} provenance={{ kind: "observed" }} size="data" /></>
                     : ""}
               </li>
             ))}
@@ -78,8 +78,8 @@ export function RecoveryAutopilotHome({
           <ul className="mt-3 grid gap-3">
             {autopilot.fees.map((fee) => (
               <li key={fee.currency} className="grid gap-1 text-sm">
-                <div>Monitoring <MoneyValue amount={fee.monitoring} /> · covered window <MoneyValue amount={fee.verifiedSaving} /></div>
-                <div>Retained <MoneyValue amount={fee.retained} /> · refund credit <MoneyValue amount={fee.refundCredit} /></div>
+                <div>Monitoring <MoneyValue amount={fee.monitoring} provenance={{ kind: "observed" }} size="data" /> · covered window <MoneyValue amount={fee.verifiedSaving} provenance={{ kind: "observed" }} size="data" /></div>
+                <div>Retained <MoneyValue amount={fee.retained} provenance={{ kind: "observed" }} size="data" /> · refund credit <MoneyValue amount={fee.refundCredit} provenance={{ kind: "observed" }} size="data" /></div>
                 <div>Fee collection: {fee.chargeStatus === "FAIL_CLOSED" ? "not charging — fail-closed" : fee.chargeStatus}</div>
               </li>
             ))}
@@ -141,7 +141,7 @@ function CandidateSection({
                   {noticeCopy ? <p className="text-sm leading-6 text-(--muted)">{noticeCopy}</p> : null}
                 </div>
                 <div className="flex items-center gap-2">
-                  <MoneyValue amount={item.amount} />
+                  <MoneyValue amount={item.amount} provenance={{ kind: "projected" }} size="data" />
                   {vetoAllowed ? (
                     <button
                       type="button"

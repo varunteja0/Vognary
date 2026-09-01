@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { ConfidenceDto, MoneyDto } from "@/lib/recovery/contracts";
+import { MoneyValue as SharedMoneyValue, type MoneyProvenance } from "@/components/ui/money-value";
 import { confidenceLabels, confidenceUncertainty, errorCopy } from "./labels";
 import type { RecoveryFailure } from "./state";
 
@@ -94,12 +95,16 @@ export function OfflineBlock() {
   );
 }
 
-export function MoneyValue({ amount, className }: { amount: MoneyDto; className?: string }) {
-  return (
-    <span className={`font-data tnum ${className ?? ""}`} aria-label={`${amount.display} ${amount.currency}`}>
-      {amount.display}
-    </span>
-  );
+/**
+ * The workspace's money adapter. The server's `display` string is authoritative
+ * and is passed straight through; this only attaches provenance presentation.
+ */
+export function MoneyValue({ amount, provenance, size = "data" }: {
+  amount: MoneyDto;
+  provenance: MoneyProvenance;
+  size?: "data" | "record" | "lead";
+}) {
+  return <SharedMoneyValue display={amount.display} provenance={provenance} size={size} />;
 }
 
 export function ConfidenceBadge({ confidence }: { confidence: ConfidenceDto }) {

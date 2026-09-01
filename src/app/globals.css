@@ -426,6 +426,60 @@ select {
     height: 2.1rem;
   }
 }
+/* Width is not a proxy for pointer: a tablet clears 40rem and is still a thumb.
+   Coarse pointers keep the full --tap box, the same rule .btn already follows. */
+@media (min-width: 40rem) and (pointer: coarse) {
+  .viewnav > li > button {
+    height: var(--tap);
+  }
+}
+
+/* The desk earns a rail once there is room for one. The view switcher stops
+   being a pill group and becomes a vertical index: left-aligned, full width,
+   the current view marked by a rule rather than a filled chip. */
+@media (min-width: 64rem) {
+  .workspace-rail {
+    position: sticky;
+    top: 1.5rem;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  /* The header's box is dropped so the rail can order brand, index, then
+     account independently. Its children stay in the accessibility tree. */
+  .workspace-rail > header {
+    display: contents;
+  }
+  .workspace-rail .rail-brand { order: 1; }
+  .workspace-rail nav { order: 2; }
+  .workspace-rail .rail-actions { order: 3; }
+  .viewnav {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-top: 1px solid var(--line);
+  }
+  .viewnav > li > button {
+    height: auto;
+    min-height: var(--tap);
+    justify-content: flex-start;
+    padding: 0 0 0 0.7rem;
+    border-radius: 0;
+    border-bottom: 1px solid var(--line);
+    box-shadow: none;
+    font-size: 0.85rem;
+  }
+  .viewnav > li > button[aria-current="page"] {
+    background: transparent;
+    box-shadow: inset 2px 0 0 var(--gold-deep);
+    color: var(--ink);
+    font-weight: 600;
+  }
+}
 
 /* Numbered step rail — the guided, easy-to-remember path */
 
@@ -671,29 +725,10 @@ select.field option {
   text-transform: uppercase;
   color: var(--muted);
 }
-.cycle-amount {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--ink);
-  white-space: nowrap;
-}
-.cycle-cell-open .cycle-amount {
-  color: var(--muted);
-}
-.cycle-note {
-  font-size: 0.68rem;
-  line-height: 1.35;
-  color: var(--muted);
-}
 
 @media (min-width: 34rem) {
   .cycle-rail {
     gap: 0.65rem;
-  }
-  .cycle-amount {
-    font-size: 1.15rem;
   }
 }
 
@@ -1207,6 +1242,14 @@ details[open] > .disclosure-summary::after {
   border-bottom: 1px dotted var(--truth-assumption);
 }
 
+/* Expected from cited history but not yet charged. The rule is dashed — the
+   step between a typed claim (dotted) and proof (solid). */
+.money-projected .money-amount {
+  color: var(--ink-soft);
+  border-bottom: 1px dashed var(--truth-assumption);
+}
+.money-projected .money-provenance { color: var(--muted); }
+
 /* ---- THE PROVING ----------------------------------------------------------
    The signature moment: an amount stops being a claim and becomes evidence.
    A solid rule is drawn left-to-right over the provisional dotted one and the
@@ -1278,66 +1321,4 @@ details[open] > .disclosure-summary::after {
 .money-unknown {
   color: var(--muted);
   font-family: var(--font-mono-data), ui-monospace, monospace;
-}
-
-/* ---- Evidence chip ---------------------------------------------------------
-   A citation is a control, not a badge: it carries a real 44px target and a
-   focus ring. The mark is a filled square for present evidence and a hollow
-   one for absent, so presence reads without colour. */
-.evidence-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-height: var(--tap);
-  padding: 0 0.6rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background: var(--card);
-  font-size: var(--text-fine);
-  color: var(--ink-soft);
-  text-align: left;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard);
-}
-.evidence-chip-mark {
-  width: 0.5rem;
-  height: 0.5rem;
-  flex: none;
-  background: var(--truth-citation);
-}
-.evidence-chip-detail {
-  color: var(--muted);
-}
-.evidence-chip-detail::before {
-  content: "·";
-  margin-right: 0.35rem;
-}
-a.evidence-chip:hover,
-button.evidence-chip:hover {
-  border-color: var(--truth-citation);
-  color: var(--ink);
-}
-.evidence-chip-static {
-  min-height: 0;
-  padding-block: 0.2rem;
-}
-/* Absent evidence keeps its place in the layout and says why. */
-.evidence-chip-absent {
-  border-style: dashed;
-  color: var(--muted);
-}
-.evidence-chip-absent .evidence-chip-mark {
-  background: transparent;
-  border: 1px solid var(--muted);
-}
-
-/* Inline links inside prose (email addresses, cross-references) carry a real
-   44px target without changing the line height around them: the box grows and
-   the margin pulls the layout back. */
-.inline-tap {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap);
-  margin-block: calc((var(--tap) - 1.25rem) / -2);
 }

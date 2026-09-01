@@ -35,7 +35,7 @@ export function EvidenceRow({ evidence, buttonId, onInspect }: { evidence: Evide
         <p className="font-data text-xs text-(--muted)">
           {kind}{label ? ` · ${label}` : ""}
         </p>
-        {evidence.amount ? <MoneyValue amount={evidence.amount} className="text-sm font-semibold text-(--ink)" /> : <span className="font-data text-xs text-(--muted)">No amount published</span>}
+        {evidence.amount ? <MoneyValue amount={evidence.amount} provenance={{ kind: "cited", source: "Receipt" }} size="data" /> : <span className="font-data text-xs text-(--muted)">No amount published</span>}
       </div>
       <p className="mt-2 text-sm leading-6 text-(--ink-soft)">
         “{evidence.excerpt}”{evidence.excerptTruncated ? <span className="text-(--muted)"> (excerpt truncated by the workspace)</span> : null}
@@ -79,7 +79,7 @@ export function EvidenceInspector({ evidence }: { evidence: EvidenceDto }) {
         <Fact label="Amount and currency">
           {evidence.amount ? (
             <>
-              <MoneyValue amount={evidence.amount} className="text-lg font-semibold text-(--ink)" />
+              <MoneyValue amount={evidence.amount} provenance={{ kind: "cited", source: "Receipt" }} size="record" />
               <p className="mt-1 font-data text-xs text-(--muted)">{evidence.amount.currency}</p>
             </>
           ) : (

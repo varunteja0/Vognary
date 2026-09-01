@@ -7,7 +7,6 @@ import { RecoveryDialog } from "../recovery-dialog";
 import { FailureBlock, LoadingBlock } from "../recovery-states";
 import type { RecoveryFailure } from "../state";
 import { ControlFact } from "./control-evaluation";
-import { formatControlMoney } from "./control-format";
 import type { ControlReconciliationDraft } from "./control-state";
 
 export type ControlEvidenceState =
@@ -79,12 +78,12 @@ export function ControlReconciliationDialog({
     >
       <p className="truth-label truth-frozen">Frozen authorization · never rewritten</p>
       <dl className="proof mt-2">
-        <ControlFact label="Frozen expected" value={formatControlMoney(decision.expectedAmountMinor, decision.currency)} engraved />
-        <ControlFact
-          label="Frozen cap"
-          value={decision.approvedCapMinor === null ? "No cap — declined" : formatControlMoney(decision.approvedCapMinor, decision.currency)}
-          engraved
-        />
+        <ControlFact label="Frozen expected" money={{ minor: decision.expectedAmountMinor, currency: decision.currency, provenance: { kind: "frozen" } }} />
+        {decision.approvedCapMinor === null ? (
+          <ControlFact label="Approved cap" value="No cap — declined" engraved />
+        ) : (
+          <ControlFact label="Approved cap" money={{ minor: decision.approvedCapMinor, currency: decision.currency, provenance: { kind: "frozen" } }} />
+        )}
       </dl>
       <p className="control-card-meta mt-2">{proposal.merchant} · authorized in {decision.currency}</p>
 

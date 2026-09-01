@@ -367,7 +367,7 @@ function CommitmentDetailPanel({
                     <p className="ledger-line">
                       <span className="font-data text-sm text-(--ink-soft)">{formatDay(point.date)}</span>
                       <span className="ledger-meta">
-                        <MoneyValue amount={point.amount} className="text-(--ink)" />
+                        <MoneyValue amount={point.amount} provenance={{ kind: "cited", source: "Receipt" }} size="data" />
                         <span className="ledger-date font-data text-xs">{sourceLabels[point.sourceType]}</span>
                       </span>
                     </p>
