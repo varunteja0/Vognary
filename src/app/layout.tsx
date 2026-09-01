@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     template: "%s - Vognary",
   },
   description:
-    "Vognary is Commitment Control for India-first 5–100 person AI-native companies: propose the spend, see cited exposure and policy, then a named human freezes a cap.",
+    "Vognary is Commitment Control for India-first 20–100 person AI-native companies: propose the spend, see cited exposure and policy, then a named human freezes a cap.",
   keywords: [
     "Commitment Control",
     "software authorizations",
@@ -62,13 +62,13 @@ export const metadata: Metadata = {
     url: "/",
     title: "Vognary - Decide before the obligation exists",
     description:
-      "Vognary is Commitment Control for India-first 5–100 person AI-native companies: propose the spend, see cited exposure and policy, then a named human freezes a cap.",
+      "Vognary is Commitment Control for India-first 20–100 person AI-native companies: propose the spend, see cited exposure and policy, then a named human freezes a cap.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Vognary - Decide before the obligation exists",
     description:
-      "Vognary is Commitment Control for India-first 5–100 person AI-native companies: propose the spend, see cited exposure and policy, then a named human freezes a cap.",
+      "Vognary is Commitment Control for India-first 20–100 person AI-native companies: propose the spend, see cited exposure and policy, then a named human freezes a cap.",
   },
 };
 

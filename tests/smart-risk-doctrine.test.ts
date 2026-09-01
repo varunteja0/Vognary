@@ -55,12 +55,16 @@ test("the live authority set locks the human-approved Commitment Control pilot",
     "docs/execution/scoreboard.md",
   ];
   const authority = authorityPaths.map((path) => readFileSync(path, "utf8")).join("\n");
+  const law = readFileSync("docs/THE-LAW.md", "utf8");
   const normalizedAuthority = authority.replace(/\s+/g, " ");
 
   assert.ok(/Commitment Control replaces Commitment Intelligence/.test(authority), "Commitment Control must replace the prior direction");
   assert.ok(/proposal.*policy.*human (?:decision|authorization).*reconciliation/i.test(normalizedAuthority), "the complete control loop must be canonical");
   assert.ok(/never auto-approves, auto-denies, purchases, provisions, cancels, or moves money/.test(authority), "V0 must preserve the human-only boundary");
-  assert.ok(/₹14,999\/month/.test(authority), "the paid-pilot price must be explicit");
-  assert.ok(/two upfront payments by Day 10/.test(authority), "the Day 10 success gate must be explicit");
-  assert.ok(/fewer than two of ten offers pay/.test(authority), "the Day 10 kill gate must be explicit");
+  assert.ok(/one-time ₹14,999/.test(authority), "the paid-pilot price and billing mode must be explicit");
+  assert.ok(/five qualified plus fifteen (?:explicitly )?exploratory/i.test(normalizedAuthority), "the two outreach cohorts must stay separate");
+  assert.ok(/two upfront payments by Day 7/.test(authority), "the Day 7 success gate must be explicit");
+  assert.ok(/zero of ten offers pay/.test(authority), "the offer-failure gate must be explicit");
+  assert.ok(/independent security (?:assessment|review).*before any real customer (?:financial )?data/i.test(normalizedAuthority), "real customer data must wait for independent assurance");
+  assert.doesNotMatch(law, /human-authorized commitment firewall/i, "V0 must not claim enforcement it does not provide");
 });

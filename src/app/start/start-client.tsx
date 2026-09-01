@@ -9,10 +9,8 @@ import {
   getGuestProposalDraftSnapshot,
   subscribeGuestProposalDraft,
 } from "@/lib/guest-proposal-draft";
-import { indiaCalendarDate, parseIsoDateOnly } from "@/lib/date-only";
+import { formatCalendarDate } from "@/lib/date-only";
 import { startCardsFromRecurringItems, type RecurringItemLike, type StartCard } from "@/lib/recovery/start-cards";
-import { formatDay } from "../workspace/recovery/labels";
-import { chargeDueDisplay } from "../workspace/recovery/present/decision-copy";
 import { fetchReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
 import { knownMerchantsFromNames } from "@/lib/recovery/monthly-loop";
 import { splitReceiptTexts } from "@/lib/recovery/receipt-input";
@@ -27,14 +25,6 @@ type IngestResponse = {
   error?: string;
 };
 
-function startCardDaysAway(today: string, dueDate: string | null): number | null {
-  if (!dueDate) return null;
-  const start = parseIsoDateOnly(today);
-  const end = parseIsoDateOnly(dueDate);
-  if (!start || !end) return null;
-  return Math.round((end.getTime() - start.getTime()) / 86_400_000);
-}
-
 export default function StartClient() {
   const [receiptText, setReceiptText] = useState("");
   const [statementSources, setStatementSources] = useState<TransferStatementSource[]>([]);
@@ -47,15 +37,6 @@ export default function StartClient() {
     getGuestProposalDraftSnapshot,
     getGuestProposalDraftServerSnapshot,
   );
-
-  function persistTab(text: string, sources: readonly TransferStatementSource[]) {
-    const snapshot = buildGuestAuditSnapshot({ receiptText: text, statementSources: [...sources], manualItems: [] });
-    try {
-      window.sessionStorage.setItem(guestAuditTransferKey, JSON.stringify(snapshot));
-    } catch {
-      // Sign-in can still proceed; the workspace will ask for the bills again.
-    }
-  }
 
   async function analyzeWith(text: string, sources: readonly TransferStatementSource[]) {
     const trimmed = text.trim();
@@ -84,7 +65,7 @@ export default function StartClient() {
       }
       const nextCards = payload.cards?.length
         ? payload.cards
-        : startCardsFromRecurringItems(payload.audit?.recurringItems ?? [], indiaCalendarDate());
+        : startCardsFromRecurringItems(payload.audit?.recurringItems ?? [], formatCalendarDate(new Date()));
       if (!nextCards.length) {
         setStatus("We couldn't verify a merchant, amount, and date from that text. Put each bill on its own line, or separate them with a blank line.");
         setCards([]);
@@ -96,6 +77,18 @@ export default function StartClient() {
       setStatus("The review could not run. Check your connection and try again.");
     } finally {
       setPending(false);
+    }
+  }
+
+  function persistTab(
+    text: string,
+    sources: readonly TransferStatementSource[],
+  ) {
+    const snapshot = buildGuestAuditSnapshot({ receiptText: text, statementSources: [...sources], manualItems: [] });
+    try {
+      window.sessionStorage.setItem(guestAuditTransferKey, JSON.stringify(snapshot));
+    } catch {
+      // Sign-in can still proceed; the workspace will ask for the bills again.
     }
   }
 
@@ -119,11 +112,11 @@ export default function StartClient() {
         setImageDrafts((current) => current.map((item) => (
           item.clientRef === draft.clientRef
             ? {
-              ...item,
-              proposal: result.proposal,
-              proposalStatus: result.proposal ? "ready" : "unreadable",
-              proposalReason: result.reason,
-            }
+                ...item,
+                proposal: result.proposal,
+                proposalReason: result.reason,
+                proposalStatus: result.proposal ? "ready" : "unreadable",
+              }
             : item
         )));
       }));
@@ -163,7 +156,7 @@ export default function StartClient() {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
       <nav className="flex items-center justify-between gap-3">
-        <Link href="/" className="brandmark">
+        <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-display text-lg font-semibold text-(--ink)">
           <VognaryMark size={24} />
           Vognary
         </Link>
@@ -171,12 +164,12 @@ export default function StartClient() {
       </nav>
 
       <p className="truth-label truth-policy mt-10">Add cited evidence</p>
-      <h1 className="page-title mt-3 max-w-2xl text-(--ink)">
+      <h1 className="mt-3 max-w-2xl font-display text-3xl font-semibold leading-tight text-(--ink) sm:text-4xl">
         See the charge. Sign in to authorize.
       </h1>
       {draft && !draft.usingExample ? (
         <p className="mt-4 max-w-2xl text-sm leading-6 text-(--ink-soft)" data-testid="guest-proposal-draft">
-          {draft.amountInr == null
+          {draft.amountInr === null
             ? `You named ${draft.merchant} as the next yes.`
             : `You named ${draft.merchant} as the next yes at ${formatDraftInr(draft.amountInr)}.`}
           {" "}That amount is an assumption. Cite a bill to ground existing exposure. This is not a recorded owner decision.
@@ -184,7 +177,7 @@ export default function StartClient() {
       ) : null}
       {!cards.length ? (
         <>
-          <p className="lede mt-4 max-w-2xl">
+          <p className="mt-3 max-w-2xl text-base leading-7 text-(--muted)">
             Upload or paste a receipt. Vognary cites the merchant, amount, and date. Sign in to remember the evidence and open the Control desk.
           </p>
           <p className="mt-2 text-sm leading-6 text-(--muted)">
@@ -194,8 +187,9 @@ export default function StartClient() {
         </>
       ) : null}
 
-      <details open={!cards.length} className="mt-7 border-y border-line py-2">
-        <summary className="disclosure-summary">
+      {/* Once a bill is cited the decision is the page; the form steps aside. */}
+      <details open={!cards.length} className="mt-7 border-y border-line py-6">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center font-medium text-(--ink)">
           {cards.length ? "Add another bill" : "Upload or paste a bill"}
         </summary>
         <div className="mt-5 grid gap-5 lg:grid-cols-2">
@@ -215,7 +209,7 @@ export default function StartClient() {
               disabled={pending || (!receiptText.trim() && statementSources.length === 0)}
               onClick={() => void analyzeWith(receiptText, statementSources)}
             >
-              {pending ? "Reading the bill…" : "Cite this bill"}
+              {pending ? "Reading the bill…" : "Check this bill"}
             </button>
           </div>
         </div>
@@ -237,33 +231,25 @@ export default function StartClient() {
       </details>
 
       {cards.length ? (
-        <section className="mt-8 grid gap-6" aria-label="Cited bills">
-          {cards.map((card) => {
-            const dueLine = chargeDueDisplay(
-              card.dueDate ? formatDay(card.dueDate) : null,
-              startCardDaysAway(indiaCalendarDate(), card.dueDate),
-            );
-            return (
-            <article key={card.id} className="decision" data-lead="true">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  <h2 className="decision-merchant">{card.merchant}</h2>
-                  <span className="decision-amount">{card.amountDisplay}</span>
-                </div>
-                {dueLine ? <p className="decision-due mt-1">{dueLine}</p> : null}
+        <section className="mt-10 grid gap-5" aria-live="polite">
+          {cards.map((card) => (
+          <article key={card.id} className="decision" data-lead="true">
+            <div className="min-w-0">
+              <p className="decision-cue">Cited evidence</p>
+              <h2 className="decision-sentence mt-2">{card.merchant} · {card.amountDisplay}</h2>
+              {card.whenLine && card.whenLine !== "Date not established" ? (
+                <p className="decision-due mt-1">{card.whenLine}</p>
+              ) : null}
+            </div>
+            {card.excerpt ? (
+              <div className="decision-evidence">
+                <p className="eyebrow eyebrow-xs">From your receipt</p>
+                <blockquote className="decision-quote">“{card.excerpt}”</blockquote>
               </div>
-              {card.excerpt ? (
-                <div className="decision-evidence">
-                  <p className="eyebrow eyebrow-xs">From your receipt</p>
-                  <blockquote className="decision-quote">“{card.excerpt}”</blockquote>
-                </div>
-              ) : null}
-              {card.provisional ? (
-                <p className="mt-2 text-sm leading-6 text-(--muted)">This is one cited charge. Its recurring cadence is not proven yet.</p>
-              ) : null}
-            </article>
-            );
-          })}
+            ) : null}
+            {card.provisional ? <p className="text-sm leading-6 text-(--muted)">This is one cited charge. Its recurring cadence is not proven yet.</p> : null}
+          </article>
+          ))}
           <AuthorizationLoop completedThrough={1} activeStep={4} />
           <p className="text-sm leading-6 text-(--muted)">
             Sign in to remember this evidence. The next unique step is the Control desk: a named owner or admin freezes a cap before a new obligation exists. That is not Keep or Plan to cancel.

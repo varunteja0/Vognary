@@ -587,7 +587,7 @@ test("confirming a photo line persists as receipt evidence and keeps leftover ph
   assert.equal(confirmed.evidenceDraft.mode, "RECEIPT_PASTE");
   assert.equal(confirmed.evidenceDraft.receiptText, "Acme Cloud invoice paid INR 427 on 2026-08-20.");
   assert.deepEqual(confirmed.evidenceDraft.imageDrafts.map((draft) => draft.clientRef), ["image-2"]);
-  assert.match(confirmed.announcement, /Saving it as receipt evidence/);
+  assert.match(confirmed.announcement, /Line confirmed.*added as receipt text.*not as a guessed scan/);
 
   const firstSaved = recoveryReducer(confirmed, {
     type: "EVIDENCE_SUBMITTED",

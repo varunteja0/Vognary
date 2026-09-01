@@ -5,6 +5,10 @@ import { checkSessionConfiguration } from "./session";
 import { checkTokenVaultConfiguration } from "./token-vault";
 import { getReceiptInboxLaunchReadiness } from "./recovery-inbound-store";
 import { getPilotPaymentLink } from "../pilot-payment-link";
+import {
+  independentSecurityAssessmentEvidenceFromEnvironment,
+  isIndependentSecurityAssessmentCleared,
+} from "../commitment-control/security-assessment";
 
 export type TrustSignalState = "proven" | "configured" | "not-yet-proven";
 
@@ -16,6 +20,7 @@ export type TrustSignalId =
   | "receipt-inbox"
   | "retention-scheduler"
   | "renewal-alert-delivery"
+  | "independent-security-assessment"
   | "pilot-payment-collection";
 
 export type PublicTrustSignal = {
@@ -53,8 +58,31 @@ export function getPublicTrustSignals(): PublicTrustSignal[] {
       "An operator recorded production renewal-alert delivery after observing a real send.",
       "Production renewal-alert delivery has not been attested yet.",
     ),
+    independentSecurityAssessmentSignal(),
     pilotPaymentSignal(),
   ];
+}
+
+function independentSecurityAssessmentSignal(): PublicTrustSignal {
+  const evidence = independentSecurityAssessmentEvidenceFromEnvironment();
+  const cleared = isIndependentSecurityAssessmentCleared(evidence);
+  const publicDisclosureApproved = evidence.publicDisclosureStatus?.trim() === "approved";
+  if (cleared && publicDisclosureApproved) {
+    return {
+      id: "independent-security-assessment",
+      label: "Independent security assessment",
+      state: "proven",
+      detail: `An independent assessment (${evidence.assessedAt}) and remediation retest (${evidence.retestedAt}) are recorded for this exact release. No unresolved Critical, High, or data-impacting Medium finding remains.`,
+    };
+  }
+  return {
+    id: "independent-security-assessment",
+    label: "Independent security assessment",
+    state: "not-yet-proven",
+    detail: cleared
+      ? "Release-bound independent assessment and retest evidence is recorded, but a public scope statement is not approved."
+      : "No dated independent assessment and remediation retest is recorded for this release. Real customer financial data remains blocked until that evidence exists.",
+  };
 }
 
 function receiptInboxSignal(): PublicTrustSignal {
@@ -168,7 +196,7 @@ function pilotPaymentSignal(): PublicTrustSignal {
     label: "Private-pilot collection",
     state: ready ? "configured" : "not-yet-proven",
     detail: ready
-      ? "A Razorpay Subscription Link is configured for the ₹14,999 Commitment Control private pilot. Card and UPI details stay on Razorpay. A configured link is not a paid customer."
+      ? "A one-time hosted payment page is configured for the ₹14,999 Commitment Control private pilot. Card and UPI details stay with the payment provider. A configured link is not a paid customer."
       : "Online collection for the private pilot is not configured on this deployment.",
   };
 }

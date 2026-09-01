@@ -1,4 +1,5 @@
 import { getRateLimitBackendStatus } from "@/lib/rate-limit";
+import { getCommitmentControlEnrollmentReadiness } from "@/lib/commitment-control/enrollment";
 import { checkBackupConfiguration } from "@/lib/server/backup-readiness";
 import { checkDatabaseConnection } from "@/lib/server/database";
 import { checkFeatureReadiness, getUnconfiguredFeatureReadiness } from "@/lib/server/feature-readiness";
@@ -32,6 +33,7 @@ export async function GET(request: Request) {
   const schemaDegraded = database.status === "ready" && features.schema.status !== "ready";
   const receiptInboxLaunch = getReceiptInboxLaunchReadiness();
   const receiptInboxMigrationsReady = features.schema.applied?.includes("0053_phase_a_receipt_activation") === true;
+  const commitmentControlEnrollment = getCommitmentControlEnrollmentReadiness();
 
   return Response.json({
     service: "vognary-web",
@@ -80,6 +82,7 @@ export async function GET(request: Request) {
       renewalAlerts: getRenewalAlertStatus(features.renewalAlerts, renewalAlertEmail),
       renewalAlertEmail: renewalAlertEmail.status === "ready" ? "configured" : `missing-${renewalAlertEmail.missing.join("-")}`,
       commitmentDecisions: features.commitmentDecisions.status,
+      commitmentControlEnrollment,
       platformApi: getPlatformApiStatus(features.platformApi, rateLimitBackend),
       recoveryV1: features.recoveryV1.status,
     },

@@ -167,10 +167,13 @@ test("runtime and PostgreSQL tooling are pinned to one reproducible foundation",
   const packageJson = JSON.parse(read("package.json")) as {
     engines?: { node?: string; npm?: string };
     packageManager?: string;
+    scripts?: Record<string, string>;
   };
   assert.equal(packageJson.engines?.node, nodeEngine);
   assert.equal(packageJson.engines?.npm, npmEngine);
   assert.equal(packageJson.packageManager, `npm@${npmVersion}`);
+  assert.match(packageJson.scripts?.test ?? "", /^NODE_ENV=test /);
+  assert.match(packageJson.scripts?.["test:postgres"] ?? "", /^NODE_ENV=test /);
   assert.equal(read(".nvmrc").trim(), nodeVersion);
   assert.match(read(".npmrc"), /^engine-strict=true$/m);
 
@@ -327,6 +330,8 @@ test("internal readiness distinguishes schema, observed evidence, and operator a
   assert.match(source, /schema-ready-shared-rate-limit-required/);
   assert.match(source, /sharedRateLimiting/);
   assert.match(source, /configured-postgres/);
+  assert.match(source, /getCommitmentControlEnrollmentReadiness/);
+  assert.match(source, /commitmentControlEnrollment/);
   assert.match(source, /payments: "retired-public-checkout"/);
   assert.match(source, /leadPersistence: "retired-public-intake"/);
   assert.match(read("src/lib/server/feature-readiness.ts"), /checkout\.plan = \$1[\s\S]*checkout\.offer_id = \$2[\s\S]*orders\.status in \('pending', 'in_progress', 'delivered'\)/);
@@ -350,6 +355,7 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
     "renewal-alerts",
     "receipt-inbox",
     "platform-api",
+    "control-brief-auth-guard",
     "workspace-decisions-auth-guard",
     "workspace-proof-graph-auth-guard",
     "workspace-current-auth-guard",
@@ -386,6 +392,10 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.match(source, /applied\?\.includes\("0056_decision_cycle_expected_amount"\)/);
   assert.match(source, /required\?\.includes\("0057_commitment_control_v0"\)/);
   assert.match(source, /applied\?\.includes\("0057_commitment_control_v0"\)/);
+  assert.match(source, /required\?\.includes\("0058_workspace_invites"\)/);
+  assert.match(source, /applied\?\.includes\("0058_workspace_invites"\)/);
+  assert.match(source, /required\?\.includes\("0059_control_authority_hardening"\)/);
+  assert.match(source, /applied\?\.includes\("0059_control_authority_hardening"\)/);
   assert.match(source, /betaReady: endpointReport\.every\(\(item\) => item\.ok\)/);
   assert.match(source, /envReport\.filter\(\(item\) => item\.launchBlocking\)/);
   assert.match(source, /activationProfile = "receipt-forwarding"/);
@@ -397,6 +407,7 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.doesNotMatch(source, /status === "magic-link-ready" \|\| status === "google-ready"/);
   assert.match(source, /id: "audit-intake-retired"[\s\S]*?expected: \[410\]/);
   assert.match(source, /id: "checkout-assisted-audit-retired"[\s\S]*?expected: \[410\]/);
+  assert.match(source, /id: "control-brief-auth-guard"[\s\S]*?expected: \[401\]/);
   assert.doesNotMatch(source, /name: "Activation Check"/);
   assert.doesNotMatch(source, /id: "monitoring-delivery-test"/);
 });
@@ -417,6 +428,25 @@ test("operator evidence flags default blank and the runbook forbids secret-only 
     assert.match(env, new RegExp(`^${name}=$`, "m"));
     assert.match(runbook, new RegExp(`${name}=${expected}`));
   }
+  for (const name of [
+    "COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS",
+    "COMMITMENT_CONTROL_PAID_WORKSPACE_IDS",
+    "COMMITMENT_CONTROL_SECURITY_ASSESSMENT_STATUS",
+    "COMMITMENT_CONTROL_SECURITY_RETEST_STATUS",
+    "COMMITMENT_CONTROL_SECURITY_ASSESSMENT_AT",
+    "COMMITMENT_CONTROL_SECURITY_RETEST_AT",
+    "COMMITMENT_CONTROL_SECURITY_ASSESSED_COMMIT_SHA",
+    "COMMITMENT_CONTROL_DEPLOYED_COMMIT_SHA",
+    "COMMITMENT_CONTROL_SECURITY_REPORT_SHA256",
+    "COMMITMENT_CONTROL_SECURITY_RETEST_SHA256",
+    "COMMITMENT_CONTROL_SECURITY_OPEN_CRITICAL_HIGH",
+    "COMMITMENT_CONTROL_SECURITY_OPEN_DATA_IMPACTING_MEDIUM",
+    "COMMITMENT_CONTROL_SECURITY_PUBLIC_DISCLOSURE_STATUS",
+  ]) {
+    assert.match(env, new RegExp(`^${name}=$`, "m"));
+  }
+  assert.match(runbook, /COMMITMENT_CONTROL_PAID_WORKSPACE_IDS/);
+  assert.match(runbook, /private report\/retest SHA-256 hashes/);
   assert.match(runbook, /CRON_SECRET[\s\S]*does not prove the schedule is deployed or firing/);
   assert.match(runbook, /operator attestation rather than independent scheduler telemetry/);
   assert.match(runbook, /does not label the API as adopted by a partner/);

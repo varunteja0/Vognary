@@ -32,6 +32,8 @@ const publicSurfaces = [
   "src/app/manifest.ts",
   "public/brand/vognary-social-card.svg",
   "src/lib/server/trust-signals.ts",
+  "docs/templates/invoice-template.md",
+  "docs/templates/invoice-template.html",
   "docs/platform-api.md",
 ];
 
@@ -39,6 +41,11 @@ const prohibitedClaims = [
   { pattern: /see every rupee/i, reason: "universal spend coverage is not proven" },
   { pattern: /one live recurring-money ledger/i, reason: "background synchronization is source-specific" },
   { pattern: /bank-grade encryption/i, reason: "the control must be named instead of using an undefined superlative" },
+  { pattern: /highest security/i, reason: "security superlatives require impossible universal comparison" },
+  { pattern: /Apple[- ]secure/i, reason: "competitor security comparisons are not substantiated" },
+  { pattern: /certified secure/i, reason: "no current certification proves this claim" },
+  { pattern: /passed penetration test/i, reason: "publish only dated assessment scope and retest evidence" },
+  { pattern: /commitment firewall/i, reason: "V0 records authority but does not enforce or block obligations" },
   { pattern: /never paste an api key/i, reason: "some workspace-owned provider integrations use scoped API keys" },
   { pattern: /no api\. no pasting/i, reason: "fallback and administrator-credential paths still exist" },
   { pattern: /connect once, see everything/i, reason: "partner-gated rails make this claim false" },

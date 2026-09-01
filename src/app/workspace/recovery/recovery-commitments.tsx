@@ -264,10 +264,13 @@ function CommitmentDetailPanel({
           {statusLabel}.
         </p>
         {observation ? (
-          <p className="mt-2 max-w-prose text-sm leading-6 text-(--muted)">
-            {observation.sentence}
-            {observation.detail ? ` ${observation.detail}` : ""}
-          </p>
+          <div className="mt-2 max-w-prose">
+            <p className="eyebrow eyebrow-xs">Why</p>
+            <p className="mt-1 text-sm leading-6 text-(--muted)">
+              {observation.sentence}
+              {observation.detail ? ` ${observation.detail}` : ""}
+            </p>
+          </div>
         ) : null}
       </header>
 
@@ -276,13 +279,16 @@ function CommitmentDetailPanel({
         <div className="flex flex-wrap items-center gap-3">
           <span className="font-data text-xs uppercase tracking-wide text-(--muted)">{statusLabel}</span>
           {inQueue ? (
-            <button
-              type="button"
-              onClick={() => handlers.onDecideOnNow(detail.id)}
-              className="btn btn-sm btn-primary"
-            >
-              {customerPhrases.decideOnNow}
-            </button>
+            <div>
+              <button
+                type="button"
+                onClick={() => handlers.onDecideOnNow(detail.id)}
+                className="btn btn-sm btn-primary"
+              >
+                {customerPhrases.decideOnNow}
+              </button>
+              <p className="mt-2 text-xs leading-5 text-(--muted)">Planning to cancel records your intent. Vognary does not cancel the service.</p>
+            </div>
           ) : (
             <p className="text-sm leading-6 text-(--muted)">{customerPhrases.noActionNeeded}</p>
           )}
@@ -297,11 +303,13 @@ function CommitmentDetailPanel({
       {detail.evidence.items[0] ? (
         <div className="grid gap-2">
           <p className="eyebrow eyebrow-xs">{customerPhrases.citedEvidence}</p>
-          <EvidenceRow
-            evidence={detail.evidence.items[0]}
-            buttonId={`recovery-evidence-${detail.evidence.items[0].id}`}
-            onInspect={() => handlers.onInspectEvidence(detail.evidence.items[0]!, `recovery-evidence-${detail.evidence.items[0]!.id}`)}
-          />
+          <ul>
+            <EvidenceRow
+              evidence={detail.evidence.items[0]}
+              buttonId={`recovery-evidence-${detail.evidence.items[0].id}`}
+              onInspect={() => handlers.onInspectEvidence(detail.evidence.items[0]!, `recovery-evidence-${detail.evidence.items[0]!.id}`)}
+            />
+          </ul>
           {detail.evidence.items.length > 1 || detail.evidence.nextCursor ? (
             <details className="mt-1">
               <summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">{customerPhrases.seeTheReceipt}</summary>

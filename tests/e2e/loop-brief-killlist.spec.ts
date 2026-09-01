@@ -12,7 +12,7 @@ test("landing walkthrough is explicitly illustrative and never presented as cust
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "Decide before the obligation exists." })).toBeVisible();
-  await expect(page.getByText("Cursor Pro · ₹1,700", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cursor Pro · INR 1,700", { exact: true })).toBeVisible();
   await expect(page.getByText("From two example receipts", { exact: true })).toBeVisible();
   await expect(page.getByText(/Example only\. Your review uses your receipts/)).toBeVisible();
   await expect(page.getByText(/sample audit|customer result|verified saving/i)).toHaveCount(0);

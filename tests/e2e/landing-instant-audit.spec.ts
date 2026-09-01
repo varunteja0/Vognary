@@ -20,7 +20,7 @@ test("the public endpoints expose complete agent-readable contracts without Java
   expect(html.match(/<h1\b/gi)?.length).toBe(1);
   expect(html.match(/<h2\b/gi)?.length ?? 0).toBeGreaterThanOrEqual(2);
   const headingLevels = [...html.matchAll(/<h([1-6])\b[^>]*>/gi)].map((match) => Number(match[1]));
-  expect(headingLevels).toEqual([1, 2, 3, 4, 4, 2]);
+  expect(headingLevels).toEqual([1, 2, 3, 4, 4, 2, 2, 3]);
   expect(headingLevels.every((level, index) => index === 0 || level <= (headingLevels[index - 1] ?? level) + 1)).toBe(true);
   expect(visibleText).toMatch(/What you do not need/i);
 
@@ -137,12 +137,12 @@ test("the landing demonstrates the decision loop and sends visitors to their own
   await expect(page.getByText("No account required", { exact: true })).toBeVisible();
   await expect(page.getByText("No bank passwords", { exact: true })).toBeVisible();
   await expect(page.getByText("No mailbox access", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Cursor costs ₹350 more this month." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cursor costs INR 350 more this month." })).toBeVisible();
   await expect(page.getByText("From two example receipts", { exact: true })).toBeVisible();
   await expect(page.getByText(/Example only\. Your review uses your receipts/)).toBeVisible();
 
   await page.getByRole("button", { name: "Approve with cap", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "A named human freezes ₹1,350 as the cap." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "A named human freezes INR 1,350 as the cap." })).toBeVisible();
   await expect(page.getByText(/Vognary does not cancel Cursor or move money|later evidence cannot rewrite it/)).toBeVisible();
 
   await expect(page.getByLabel("Vendor / commitment")).toBeVisible();

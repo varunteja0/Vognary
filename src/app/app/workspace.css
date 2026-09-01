@@ -1,0 +1,1044 @@
+/*
+  Workspace (Recovery + Control) styling.
+
+  Loaded from src/app/app/layout.tsx so Next.js ships it only for the /app
+  route segment. Because next.config.ts enables experimental.inlineCss, every
+  byte in globals.css is inlined into the HTML of *every* route — keeping
+  surface-specific rules here is what stops public pages paying for the
+  signed-in desk.
+
+  Rules here are global (not CSS-module scoped) so existing class names in
+  src/app/workspace/** keep working unchanged.
+*/
+
+.stack-page {
+  display: grid;
+  gap: var(--space-6);
+}
+.stack-section {
+  display: grid;
+  gap: var(--space-4);
+}
+/* ------------------------------------------------------------------ *
+ * Segmented control / tabbed navigation
+ * ------------------------------------------------------------------ */
+
+.segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+.segmented > button,
+.segmented > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.1rem;
+  padding: 0 0.85rem;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.segmented > button:hover,
+.segmented > a:hover {
+  color: var(--ink);
+}
+.segmented > [data-active="true"] {
+  background: var(--card-3);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+.field-hint {
+  margin-top: 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.decision-hook {
+  display: grid;
+  gap: 0.35rem;
+}
+.decision-hook-title {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--ink);
+}
+/* Outcome — what happened to the decision the customer already made */
+.outcome {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.85rem 0 0.9rem 0.9rem;
+  border-left: 2px solid var(--line-strong);
+}
+.outcome-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.outcome-alert .outcome-title {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1.12rem;
+  font-weight: 600;
+}
+/* Ledger rows — vendor, money, date. Two lines narrow, one line wide.
+   Separators live on the list so a single-child row never draws a stray rule. */
+.ledger-list > li + li {
+  border-top: 1px solid var(--line);
+}
+.ledger-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 1rem;
+  row-gap: 0.15rem;
+  width: 100%;
+  padding: 0.65rem 0;
+  text-align: left;
+}
+.ledger-name {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ledger-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 0.15rem 0.7rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.ledger-meta .ledger-date {
+  color: var(--muted);
+}
+/* ------------------------------------------------------------------ *
+ * Instrument ticker
+ * ------------------------------------------------------------------ */
+
+/* Ledger table interactions */
+.ledger-row {
+  transition: background var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard);
+}
+.ledger-row:hover {
+  background: rgba(255, 255, 255, 0.024);
+}
+.ledger-row[data-active="true"] {
+  background: color-mix(in srgb, var(--gold) 8%, transparent);
+  box-shadow: inset 2px 0 0 var(--gold);
+}
+/* Commitment inventory row — two lines, so a long vendor name can never
+   collide with the amount the way fixed side-by-side columns allowed. */
+.ledger-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 0.9rem;
+  row-gap: 0.2rem;
+  width: 100%;
+  padding: 0.7rem 0.75rem;
+  border-radius: var(--radius-xs);
+  text-align: left;
+}
+.ledger-item-name {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ledger-item-cost {
+  font-size: 0.83rem;
+  color: var(--ink-soft);
+}
+.ledger-item-when {
+  justify-self: end;
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ledger-item-state {
+  justify-self: end;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ledger-item-state[data-tone="due"] { color: var(--ochre); }
+.ledger-item-state[data-tone="cancel"] { color: var(--ember); }
+.ledger-item-state[data-tone="keep"] { color: var(--verdict); }
+/* Decision memory — dated timeline, not an audit log */
+.timeline {
+  display: grid;
+  gap: 0;
+  margin-left: 0.28rem;
+  border-left: 1px solid var(--line);
+}
+.timeline > li {
+  position: relative;
+  padding: 0.5rem 0 0.5rem 1.15rem;
+}
+.timeline > li::before {
+  content: "";
+  position: absolute;
+  left: -3.5px;
+  top: 0.98rem;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+}
+.timeline > li[data-current="true"]::before {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+.timeline-when {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.timeline-what {
+  margin-top: 0.1rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.timeline-note {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+/* A short settle for a disclosure that opens under the pointer */
+.settle {
+  animation: settle-in var(--motion-fast) var(--ease-enter) both;
+}
+.truth-assumption { --truth-rule: var(--truth-assumption); }
+.truth-citation { --truth-rule: var(--truth-citation); }
+.truth-authority { --truth-rule: var(--truth-authority); }
+.truth-frozen { --truth-rule: var(--truth-frozen); }
+.truth-observed { --truth-rule: var(--truth-observed); }
+/* The seal — a deliberate, weighty ink action. Used where the command is
+   consequential but is NOT the single gold act of the context. */
+.btn-seal {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 10px 24px -18px rgba(23, 26, 31, 0.9);
+}
+.btn-seal:hover {
+  background: color-mix(in srgb, var(--ink) 88%, var(--paper));
+  border-color: color-mix(in srgb, var(--ink) 88%, var(--paper));
+}
+/* ------------------------------------------------------------------ *
+ * Tick — the one checkbox/radio in the product.
+ *
+ * The control paints a 20px mark but occupies a 44px square, so a thumb
+ * target never shrinks to match an optical detail.
+ * ------------------------------------------------------------------ */
+
+.tick {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-content: center;
+  inline-size: var(--tap);
+  block-size: var(--tap);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+.tick::before {
+  content: "";
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--card);
+  box-shadow: inset 0 1px 1px rgba(23, 26, 31, 0.05);
+  transition: background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.tick[type="radio"]::before {
+  border-radius: 999px;
+}
+.tick:hover::before {
+  border-color: var(--ink-soft);
+}
+.tick:checked::before {
+  background: var(--ink);
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 3px var(--card);
+}
+.tick:disabled {
+  cursor: not-allowed;
+}
+.tick:disabled::before {
+  opacity: 0.45;
+}
+
+@media (forced-colors: active) {
+  .tick::before {
+      border-color: CanvasText;
+    }
+  .tick:checked::before {
+      background: Highlight;
+      box-shadow: inset 0 0 0 3px Canvas;
+    }}
+/* ------------------------------------------------------------------ *
+ * Commitment Control desk
+ *
+ * A ledger page, not a dashboard. An operating masthead states what the
+ * desk already knows; unframed bands separated by hairlines carry the work;
+ * a frame is drawn only around one real repeated object, the proposal
+ * record. Money, dates, versions and verdicts are engraved in tabular mono
+ * and aligned on one right-hand column, so a frozen cap and a later
+ * observation compare in a single eye movement.
+ * ------------------------------------------------------------------ */
+
+.control-desk {
+  display: grid;
+  gap: var(--space-5);
+}
+/* --- Operating masthead: what is already true, before any new work ---- */
+
+.control-masthead {
+  display: grid;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line-strong);
+}
+.control-masthead-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem var(--space-4);
+}
+.control-masthead-title {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-optical-sizing: auto;
+  font-size: var(--text-page);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.control-masthead-stamp {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  color: var(--muted);
+}
+.control-figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-5);
+}
+
+@media (min-width: 48rem) {
+  .control-figures {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }}
+.control-figure {
+  display: grid;
+  align-content: start;
+  gap: 0.15rem;
+  min-width: 0;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--truth-rule, var(--line-strong));
+}
+.control-figure > dt {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-micro);
+  line-height: 1.4;
+  color: var(--muted);
+}
+.control-figure > dd {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-record);
+  line-height: 1.25;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.control-figure > dd > small {
+  display: block;
+  font-size: var(--text-fine);
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+/* --- Bands ------------------------------------------------------------ */
+
+.control-band {
+  display: grid;
+  gap: var(--space-4);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+.control-band:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+/* The band that opens the working area sits directly under the masthead rule. */
+.control-band-open {
+  padding-top: 0;
+  border-top: 0;
+}
+/* An empty band states its absence and gets out of the way. */
+.control-band[data-empty="true"] {
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+}
+.control-band-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem var(--space-4);
+}
+.control-heading {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-optical-sizing: auto;
+  font-size: var(--text-band);
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.control-band-count {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-fine);
+  color: var(--muted);
+}
+.control-note {
+  font-size: var(--text-body);
+  line-height: 1.5;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.control-error {
+  margin-top: 0.35rem;
+  font-size: var(--text-fine);
+  line-height: 1.5;
+  color: var(--ember);
+}
+/* --- Composer: one instrument rail, never a narrow column in a wide page - */
+
+.control-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  width: 100%;
+}
+.control-field {
+  display: block;
+  min-width: 0;
+}
+
+@media (min-width: 60rem) {
+  .control-form {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: var(--space-4);
+      row-gap: var(--space-4);
+      align-items: start;
+    }
+  .control-field-merchant { grid-column: span 5; }
+  .control-field-purpose { grid-column: span 7; }
+  .control-field-category { grid-column: span 3; }
+  .control-field-cadence { grid-column: span 3; }
+  .control-field-amount { grid-column: span 3; }
+  .control-field-currency { grid-column: span 3; }
+  .control-field-date { grid-column: span 4; }
+  .control-disclosure { grid-column: span 8; }
+  .control-form-actions { grid-column: span 12; }}
+
+@media (min-width: 40rem) and (max-width: 59.999rem) {
+  .control-form {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: var(--space-4);
+    }
+  .control-field-merchant,
+  .control-field-purpose,
+  .control-disclosure,
+  .control-form-actions {
+      grid-column: span 2;
+    }}
+.control-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.control-form-actions > .control-note {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.control-disclosure {
+  align-self: end;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--card-2);
+}
+.control-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap);
+  padding: 0.35rem 0.85rem;
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+}
+.control-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.control-disclosure-body {
+  padding: 0 0.85rem 0.6rem;
+}
+.control-exposure-set {
+  display: grid;
+  gap: 0;
+  border: 0;
+}
+.control-exposure-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 0.5rem;
+  border-top: 1px solid var(--line);
+  font-size: var(--text-body);
+  color: var(--ink);
+  cursor: pointer;
+}
+.control-exposure-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.control-exposure-amount {
+  font-size: var(--text-body);
+  white-space: nowrap;
+}
+.control-exposure-row > span:last-child {
+  grid-column: 2 / -1;
+  padding-bottom: 0.5rem;
+  font-size: var(--text-fine);
+  color: var(--muted);
+}
+/* --- The proposal record: the one framed repeated object --------------- */
+
+.control-card-list {
+  display: grid;
+  gap: var(--space-4);
+}
+.control-card {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-4) calc(var(--space-4) - 2px);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+}
+/* One lead record per queue: a single gold edge, never three competing alarms. */
+.control-card[data-lead="true"] {
+  border-left-color: var(--gold);
+}
+.control-card[data-settled="true"] {
+  border-left-color: var(--truth-authority);
+}
+.control-card-head {
+  display: grid;
+  gap: 0.3rem;
+}
+.control-card-topline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem var(--space-3);
+}
+.control-card-title {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: var(--text-record);
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.control-card-purpose {
+  font-size: var(--text-body);
+  line-height: 1.5;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.control-card-meta {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  line-height: 1.5;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.control-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.control-card-actions > .control-note {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+/* --- Sections inside a record ----------------------------------------- */
+
+.control-evaluation {
+  display: grid;
+  gap: var(--space-4);
+}
+.control-section {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.control-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.control-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem var(--space-5);
+  /* Money groups so three figures compare at a glance instead of spreading
+     across the whole desk width. */
+  max-width: 34rem;
+}
+
+@media (min-width: 34rem) {
+  .control-facts {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }}
+.control-fact {
+  min-width: 0;
+}
+.control-fact > dt {
+  font-size: var(--text-fine);
+  line-height: 1.4;
+  color: var(--muted);
+}
+.control-fact > dd {
+  font-size: var(--text-body);
+  line-height: 1.45;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+/* --- The proof ledger -------------------------------------------------- *
+ *
+ * The most important object in the product. Frozen expected, approved cap
+ * and the later observation sit in one block, on adjacent rows, sharing a
+ * single right-hand money column: identical left edge, identical width,
+ * decimal points aligned. Zero horizontal separation, so the comparison is
+ * a glance and never an act of memory. Nothing here is computed on the
+ * client; every figure is the server's, rendered as published.
+ * --------------------------------------------------------------------- */
+
+.proof {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: var(--space-4);
+  padding: 0.15rem 0.75rem 0.15rem 0.7rem;
+  border-left: 2px solid var(--truth-frozen);
+  border-radius: 0 6px 6px 0;
+  background: var(--card-2);
+}
+/* The row wrapper is transparent to the grid so both columns line up
+   across every row, whatever the label length. */
+.proof > .control-fact {
+  display: contents;
+}
+.proof > .control-fact > dt {
+  grid-column: 1;
+  align-self: baseline;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line);
+  font-size: var(--text-body);
+  line-height: 1.35;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.proof > .control-fact > dd {
+  grid-column: 2;
+  align-self: baseline;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-lead);
+  line-height: 1.35;
+  color: var(--ink);
+  text-align: right;
+  white-space: nowrap;
+}
+.proof > .control-fact:first-child > dt,
+.proof > .control-fact:first-child > dd {
+  border-top: 0;
+}
+/* The observation is the one row that carries weight. */
+.proof > .control-fact[data-observed="true"] > dt {
+  color: var(--ink);
+  font-weight: 500;
+}
+.proof > .control-fact[data-observed="true"] > dd {
+  font-weight: 600;
+  border-top-color: var(--line-strong);
+}
+.proof-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem var(--space-3);
+}
+.control-evidence-list {
+  display: grid;
+  gap: 0;
+}
+/* Secondary projection detail, opened on demand. Authority, cap, observation,
+   verdict and evidence are never behind this. */
+.control-more {
+  border-top: 1px solid var(--line);
+}
+.control-more > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem var(--space-3);
+  min-height: var(--tap);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+}
+.control-more > summary::-webkit-details-marker {
+  display: none;
+}
+.control-more > summary::after {
+  content: "Show";
+  margin-left: auto;
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  color: var(--muted);
+}
+.control-more[open] > summary::after {
+  content: "Hide";
+}
+.control-more-body {
+  display: grid;
+  gap: var(--space-4);
+  padding-bottom: var(--space-3);
+}
+.control-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-fine);
+  table-layout: fixed;
+}
+.control-table-caption {
+  text-align: left;
+  padding-bottom: 0.35rem;
+  font-size: var(--text-micro);
+  color: var(--muted);
+}
+.control-table th,
+.control-table td {
+  padding: 0.45rem 0.3rem;
+  border-top: 1px solid var(--line);
+  text-align: right;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.control-table thead th {
+  border-top: 0;
+  color: var(--muted);
+  font-weight: 500;
+}
+.control-table th[scope="row"],
+.control-table thead th:first-child {
+  text-align: left;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.control-verdict {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem 0.75rem 0.75rem 0.7rem;
+  border-left: 2px solid var(--truth-policy);
+  border-radius: 0 6px 6px 0;
+  background: var(--ochre-tint);
+}
+.control-reasons {
+  display: grid;
+  gap: 0.2rem;
+  font-size: var(--text-body);
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.control-reasons > li {
+  position: relative;
+  padding-left: 0.9rem;
+}
+.control-reasons > li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.6rem;
+  width: 5px;
+  height: 1px;
+  background: var(--line-strong);
+}
+.control-decision-required {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  font-weight: 600;
+  color: var(--ink);
+}
+/* --- Authority, observation and policy -------------------------------- */
+
+.control-authority,
+.control-outcomes {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.control-authority:first-of-type,
+.control-outcomes:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+.control-outcome-list {
+  display: grid;
+  gap: var(--space-4);
+}
+.control-outcome {
+  display: grid;
+  gap: 0.5rem;
+}
+/* A settled record reads across, not down: the frozen ledger on the left, the
+   verdict that judges it on the right, both inside one eye span. */
+.control-settled {
+  display: grid;
+  gap: var(--space-3);
+}
+.control-settled-side {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+@media (min-width: 45rem) {
+  .control-settled {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: var(--space-4);
+      align-items: start;
+    }}
+.control-choice-set {
+  display: grid;
+  gap: 0;
+  border: 0;
+}
+.control-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0 0.35rem;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+.control-choice > input {
+  grid-row: 1 / span 2;
+}
+.control-choice > span {
+  grid-column: 2;
+  min-width: 0;
+}
+.control-choice-title {
+  align-self: end;
+  font-size: var(--text-lead);
+  font-weight: 500;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.control-choice > .control-note {
+  align-self: start;
+  padding-bottom: 0.6rem;
+}
+.control-choice:has(> input:checked) {
+  background: var(--dossier-fill);
+}
+.control-policy-summary {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  width: 100%;
+}
+.control-policy-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 40rem) {
+  .control-policy-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }}
+.control-policy-limit {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+/* Posture board — four postures, told apart by rule, weight and word. */
+.control-posture-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0;
+  width: 100%;
+  border-top: 1px solid var(--line);
+}
+.control-posture {
+  display: grid;
+  align-content: start;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.6rem 0 0.7rem 0.7rem;
+  border-left: 2px solid var(--posture-rule, var(--line-strong));
+  border-bottom: 1px solid var(--line);
+}
+.control-posture > dt {
+  font-size: var(--text-body);
+  line-height: 1.4;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.control-posture > dd {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+.control-posture[data-posture="ALLOW"] { --posture-rule: var(--verdict); }
+.control-posture[data-posture="REVIEW"] { --posture-rule: var(--ochre); }
+.control-posture[data-posture="OUTSIDE_POLICY"] { --posture-rule: var(--ember); }
+.control-posture[data-posture="UNSET"] { --posture-rule: var(--line-strong); }
+.control-posture[data-posture="UNSET"] > dd { color: var(--muted); }
+.control-review-list {
+  display: grid;
+  gap: 0;
+  width: 100%;
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.control-review-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.control-review-list > li:first-child {
+  border-top: 0;
+}
+
+@keyframes settle-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---- Authorization cap -----------------------------------------------------
+   The cap is the one number later evidence cannot rewrite, so it is drawn as a
+   bounded object with its authorizer and date attached. The left edge carries
+   the outcome: neutral while awaiting evidence, verdict green within the cap,
+   ember when observed spend has passed it. */
+.auth-cap {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--truth-frozen);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+}
+.auth-cap[data-state="within"] { border-left-color: var(--verdict); }
+.auth-cap[data-state="over"] { border-left-color: var(--ember); }
+
+.auth-cap-head {
+  display: grid;
+  gap: var(--space-2);
+}
+.auth-cap-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.auth-cap-meta dt {
+  font-size: var(--text-micro);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.auth-cap-meta dd {
+  margin: 0;
+  font-size: var(--text-fine);
+  color: var(--ink);
+}
+.auth-cap-observed {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.auth-cap-delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: var(--text-fine);
+  color: var(--ink-soft);
+}
+.auth-cap[data-state="over"] .auth-cap-delta { color: var(--ember); }

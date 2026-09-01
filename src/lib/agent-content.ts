@@ -109,7 +109,7 @@ Important interpretation rules:
 - [Security and live readiness](https://www.vognary.com/security): Measured controls and honest production status.
 - [Privacy](https://www.vognary.com/privacy): Data handling, consent, retention, and deletion boundaries.
 - [Terms](https://www.vognary.com/terms): Terms for authorized, evidence-backed use.
-- [Pay the private pilot](https://www.vognary.com/pay): ₹14,999/month Commitment Control subscription. Opens Razorpay only when this deployment has a configured Subscription Link.
+- [Reserve the private pilot](https://www.vognary.com/pay): One-time ₹14,999 Commitment Control pilot for one month. Opens a hosted payment page only when this deployment has one configured; access begins after the written activation conditions are met.
 - [Security contact](https://www.vognary.com/.well-known/security.txt): Vulnerability reporting channel and policy link.
 
 ## Optional

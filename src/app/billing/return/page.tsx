@@ -17,7 +17,7 @@ export default async function BillingReturnPage({ searchParams }: { searchParams
     <main className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="inline-flex items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
             <VognaryMark size={22} />
             Vognary
           </Link>

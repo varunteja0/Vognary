@@ -116,42 +116,40 @@ test("every contract enum has presentation copy, so a contract change cannot ren
   }
 });
 
-test("primary navigation keeps Control and Mandate hidden until each is genuinely available", () => {
+test("primary navigation gates Control by enrollment and Automation by proven delivery or existing authority", () => {
   assert.deepEqual([...recoveryViews], ["CONTROL", "HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
   assert.deepEqual(Object.values(recoveryViewLabels), ["Control", "Now", "Bills", "Sources", "Automation"]);
   assert.match(clientSource, /<nav aria-label="Primary"/);
-  assert.match(clientSource, /view !== "MANDATE"/);
   assert.match(clientSource, /view !== "CONTROL" \|\| controlAvailable/);
+  assert.match(clientSource, /mandateAvailable/);
+  assert.match(clientSource, /noticeReadiness\.state === "proven-ready"/);
   assert.match(clientSource, /primaryViews\.map/);
   assert.match(clientSource, /aria-current=\{state\.view === view \? "page" : undefined\}/);
   assert.match(clientSource, /href="\/profile"/);
   assert.doesNotMatch(clientSource, /state\.view === "PROFILE"/);
-  assert.match(clientSource, /primaryViews\.length === 4 \? "grid-cols-4" : "grid-cols-3"/);
+  assert.match(clientSource, /const navColumnsClass = primaryViews\.length >= 5/);
+  assert.match(clientSource, /viewnav \$\{navColumnsClass\}/);
 });
 
 test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
   assert.match(landingSource, /One receipt is enough to begin/);
   assert.match(landingSource, /Decide before the obligation exists/);
-  assert.match(loginSource, /Control desk/);
-  assert.match(allSource, /Start with a cited bill/);
-  assert.match(allSource, /Add a receipt. Now, Bills, and Sources hold cited evidence/);
+  assert.match(landingSource, /Cap the next yes/);
+  assert.match(loginSource, /named human authorization before a new obligation exists/);
+  assert.match(allSource, /Start with a software bill/);
+  assert.match(allSource, /Add a receipt to see the charge/);
   assert.doesNotMatch(landingSource, /Want it done for you\?/);
   assert.doesNotMatch(landingSource, /href="\/private-audit"/);
   assert.match(clientSource, />Vognary</);
   assert.match(landingSource, /No account required/);
   assert.match(landingSource, /No bank passwords/);
   assert.match(landingSource, /No mailbox access/);
-  assert.match(landingSource, /AuthorizationLoop/);
-  assert.match(landingSource, /No auto-approve, auto-deny, or vendor payment/);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
   assert.doesNotMatch(landingSource, /Set up billing forwarding once so matching mail keeps arriving/);
 });
 
 test("the decision card puts cited evidence and cycle memory on the same object as Keep / Review later / Plan to cancel", () => {
-  assert.match(homeSource, /decision-merchant/);
-  assert.match(homeSource, /decision-amount/);
-  assert.match(homeSource, /chargeDueDisplay/);
-  assert.match(homeSource, /inWindow \? <p className="decision-cue">/);
+  assert.match(homeSource, /card\.sentence/);
   assert.match(homeSource, /card\.excerpt/);
   assert.match(homeSource, /keepIsPrimary\(card\.reasonKeys\)/);
   assert.match(homeSource, /decisionHookCopy/);
@@ -181,17 +179,21 @@ test("home leads with the pre-renewal decision queue and cited spend activation"
   assert.match(clientSource, /onCitedPictureRendered=/);
   assert.doesNotMatch(addEvidenceSource, /recordWorkspaceActivation|onCitedPictureRendered/);
   assert.doesNotMatch(sourcesSource, /recordWorkspaceActivation|onCitedPictureRendered/);
-  assert.match(homeSource, /SpendHero/);
-  assert.doesNotMatch(homeSource, /<RecoveryAttention/);
+  assert.match(homeSource, /CitedPictureActivation/);
+  assert.match(homeSource, /<RecoveryAttention/);
   assert.doesNotMatch(homeSource, /FirstResultHome|showFirstResult/);
   assert.doesNotMatch(clientSource, /FIRST_RESULT_DISMISSED|onDismissFirstResult/);
   const quietHome = homeSource.slice(homeSource.indexOf("className=\"stack-page\""));
   assert.ok(quietHome.indexOf("<DecisionQueue") < quietHome.indexOf("<ComingLater"), "Decision queue must lead Coming later");
-  assert.doesNotMatch(homeSource, /RecoveryAutopilotHome/);
+  assert.ok(
+    quietHome.indexOf("<DecisionOutcomes") < quietHome.indexOf("<RecoveryAttention")
+      && quietHome.indexOf("<RecoveryAttention") < quietHome.indexOf("<ComingLater"),
+    "decision outcomes and evidence attention must render before upcoming charges",
+  );
   assert.match(homeSource, /Next charges/);
   assert.match(homeSource, /comingLaterItems\(home\)/);
   assert.doesNotMatch(homeSource, /home\.next\.map/);
-  assert.match(homeSource, /No recurring amount yet/);
+  assert.match(homeSource, /<DecisionOutcomes/);
   assert.match(homeSource, /shouldShowRecentChange/);
   assert.doesNotMatch(homeSource, /WHAT NEEDS ME\?|WHAT CHANGED\?|WHAT HAPPENS NEXT\?|COVERAGE/);
   assert.doesNotMatch(homeSource, /TotalsStrip|Server totals|Compared version|No prior baseline/);
@@ -215,8 +217,8 @@ test("returning Home stays quiet unless a real change or attention item exists",
 test("an empty Home leads with adding bills, not Gmail setup", () => {
   assert.match(clientSource, /void loadSources\(\)/);
   assert.match(clientSource, /receiptInbox=\{state\.receiptInbox\}/);
-  assert.match(allSource, /Start with a cited bill/);
-  assert.match(allSource, /Add a receipt. Now, Bills, and Sources hold cited evidence/);
+  assert.match(allSource, /Start with a software bill/);
+  assert.match(allSource, /Add a receipt to see the charge/);
   assert.match(allSource, /No mailbox access required/);
   assert.match(clientSource, /onOpenSources=/);
   assert.doesNotMatch(homeSource, /Finish one-time billing setup/);
@@ -252,7 +254,7 @@ test("one observation is coached toward a second matching receipt instead of ren
   assert.match(addEvidenceSource, /Paste text/);
 });
 
-test("commitments ledger keeps decisions on Now and groups duplicate merchants", () => {
+test("commitments use ordinary language and three primary choices", () => {
   assert.deepEqual(decisionLabels, {
     KEEP: "Keep",
     MONITOR: "Review later",
@@ -260,27 +262,15 @@ test("commitments ledger keeps decisions on Now and groups duplicate merchants",
     CANCEL: "Plan to cancel",
     INVESTIGATE: "I don’t recognize this",
   });
-  assert.match(commitmentsSource, /groupCommitments/);
-  assert.match(commitmentsSource, /decideOnNow/);
+  assert.match(homeSource, /const primaryDecisions = \["KEEP", "MONITOR", "CANCEL"\]/);
+  assert.match(commitmentsSource, /handlers\.onDecideOnNow/);
+  assert.match(commitmentsSource, /Planning to cancel records your intent/);
+  assert.match(commitmentsSource, />Why</);
   assert.match(commitmentsSource, /presentExpectedObservation/);
   assert.match(commitmentsSource, /detail\.memory/);
-  assert.doesNotMatch(commitmentsSource, /aria-label="Your choice"/);
   assert.doesNotMatch(commitmentsSource, />Your decision</);
   assert.doesNotMatch(commitmentsSource, />Evidence behind this</);
   assert.doesNotMatch(commitmentsSource, /Suggested:/);
-});
-
-test("Now leads decisions; Bills is cited evidence with orientation copy", () => {
-  assert.match(homeSource, /customerPhrases\.decideNowIntro/);
-  assert.match(homeSource, /data-decision-focus/);
-  assert.match(homeSource, /aria-label="Your choice"/);
-  assert.match(clientSource, /nowDecisionCount/);
-  assert.match(clientSource, /view === "HOME" && nowDecisionCount > 0/);
-  assert.match(clientSource, /customerPhrases\.billsLedgerHint/);
-  assert.match(clientSource, /AuthorizationLoop/);
-  assert.match(clientSource, /DECIDE_ON_NOW_REQUESTED/);
-  assert.match(clientSource, /focusDecisionCommitmentId/);
-  assert.doesNotMatch(clientSource, /Workspace id:/);
 });
 
 test("Sources keeps forwarding as stay-current infrastructure and paste as a manual action", () => {

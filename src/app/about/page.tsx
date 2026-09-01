@@ -34,7 +34,7 @@ export default function AboutPage() {
     <main id="ledger-main" className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="inline-flex items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
             <VognaryMark size={22} />
             Vognary
           </Link>
@@ -48,7 +48,7 @@ export default function AboutPage() {
           <span className="folio" data-folio="Company">About</span>
           <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">Commitment Control, built around evidence</h1>
           <p className="mt-3 text-sm leading-7 text-(--muted)">
-            Vognary is built for India-first, 5–100 person AI-native companies that need a named human to authorize a new obligation before it exists, then prove later spend against that frozen cap. It starts with receipts and invoices the company already has. Recovery remains the evidence foundation; Control is the authorization desk.
+            Vognary is built for India-first, 20–100 person AI-native companies that need a named human to authorize a new obligation before it exists, then prove later spend against that frozen cap. It starts with receipts and invoices the company already has. Recovery remains the evidence foundation; Control is the authorization desk.
           </p>
 
           <div className="mt-8 grid gap-6">
@@ -74,7 +74,7 @@ export default function AboutPage() {
 
           <div className="mt-8 flex flex-wrap gap-2.5 border-t border-line pt-5">
             <Link href="/start" className="btn btn-primary">Add a bill</Link>
-            <Link href="/pay" prefetch={false} className="btn btn-ghost">Subscribe at the pilot rate</Link>
+            <Link href="/pay" prefetch={false} className="btn btn-ghost">Reserve the private pilot</Link>
             <Link href="/security" className="btn btn-ghost">Security and readiness</Link>
             <Link href="/privacy" className="btn btn-ghost">Privacy</Link>
           </div>

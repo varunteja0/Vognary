@@ -408,8 +408,9 @@ test("a workspace outside the private pilot sees no Control surface at all", asy
   await expect(nav.getByRole("button", { name: "Now" })).toBeVisible();
   await expect(nav.getByRole("button", { name: "Control" })).toHaveCount(0);
   await expect(page.getByText(composerHeading)).toHaveCount(0);
-  await expect(page.getByText("The private Control pilot is not on for this workspace.")).toBeVisible();
-  await expect(page.getByText("workspace-1")).toBeVisible();
+  await expect(page.getByText(/Commitment Control unlocks after pilot enrollment/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "See the pilot offer" })).toHaveAttribute("href", "/pay");
+  await expect(page.getByText("workspace-1")).toHaveCount(0);
   await expect(page.getByText(/waitlist|coming soon/i)).toHaveCount(0);
 
   await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();

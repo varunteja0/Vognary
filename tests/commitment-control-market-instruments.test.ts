@@ -14,6 +14,11 @@ test("Phase A targets one funded finance-owned Commitment Control beachhead", ()
   assert.match(phaseA, /founder-delivered control desk/i);
   assert.match(phaseA, /last real (?:financial )?(?:obligation|commitment)/i);
   assert.match(phaseA, /pre-spend/i);
+  assert.match(phaseA, /up to ten (?:real )?proposals/i);
+  assert.match(phaseA, /one 30-minute reconciliation review per week/i);
+  assert.match(phaseA, /two additional founder-support hours/i);
+  assert.match(phaseA, /one-time/i);
+  assert.doesNotMatch(phaseA, /up to 50 commitment evaluations|one-business-day response SLA|monthly Razorpay subscription/i);
 });
 
 test("the private Commitment Control CRM has a committed schema and stays gitignored", () => {
@@ -21,6 +26,7 @@ test("the private Commitment Control CRM has a committed schema and stays gitign
   assert.match(gitignore, /^docs\/execution\/private-commitment-control-pilot-crm\.csv$/m);
   for (const column of [
     "company_name",
+    "contact_cohort",
     "contacted_at",
     "conversation_at",
     "pain_class",
@@ -33,6 +39,8 @@ test("the private Commitment Control CRM has a committed schema and stays gitign
   ]) {
     assert.match(crm.split("\n", 1)[0], new RegExp(`(?:^|,)${column}(?:,|$)`));
   }
+  assert.match(phaseA, /QUALIFIED\s*\|\s*EXPLORATORY/);
+  assert.match(phaseA, /exploratory[\s\S]*qualified_at[\s\S]*blank/i);
 });
 
 test("the live first-user ladder measures proposal to frozen cap and second-proposal behavior", () => {

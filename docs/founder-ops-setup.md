@@ -39,16 +39,37 @@ attestations, not evidence, and the honesty gate treats a blank as "not proven."
 
 ### Commitment Control private-pilot enrollment
 
-Control is fail-closed until the founder sets exact enrolled workspace UUIDs:
+Control is fail-closed until the founder records three independent conditions:
+explicit enrollment, cleared payment for that exact workspace, and a clean
+independent assessment/retest bound to the deployed commit.
 
 ```bash
-COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS=uuid-one,uuid-two
+COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS=paid-workspace-uuid
+COMMITMENT_CONTROL_PAID_WORKSPACE_IDS=paid-workspace-uuid
+COMMITMENT_CONTROL_SECURITY_ASSESSMENT_STATUS=passed
+COMMITMENT_CONTROL_SECURITY_RETEST_STATUS=passed
+COMMITMENT_CONTROL_SECURITY_ASSESSMENT_AT=YYYY-MM-DD
+COMMITMENT_CONTROL_SECURITY_RETEST_AT=YYYY-MM-DD
+COMMITMENT_CONTROL_SECURITY_ASSESSED_COMMIT_SHA=40-character-deployed-commit-sha
+# Required only when the host does not supply VERCEL_GIT_COMMIT_SHA:
+COMMITMENT_CONTROL_DEPLOYED_COMMIT_SHA=40-character-deployed-commit-sha
+COMMITMENT_CONTROL_SECURITY_REPORT_SHA256=64-character-private-report-hash
+COMMITMENT_CONTROL_SECURITY_RETEST_SHA256=64-character-private-retest-hash
+COMMITMENT_CONTROL_SECURITY_OPEN_CRITICAL_HIGH=0
+COMMITMENT_CONTROL_SECURITY_OPEN_DATA_IMPACTING_MEDIUM=0
 ```
 
 Blank means no workspace sees or can call Control. `*` is accepted only outside
-`NODE_ENV=production`; production rejects it. Add a workspace only after the
-pilot agreement and access decision are real. This flag does not prove a
-conversation, offer, payment, proposal, decision, renewal, or production schema.
+`NODE_ENV=production`; production rejects it. The assessed commit must equal the
+host-provided deployed commit. An invalid date, artifact hash, status, finding
+count, paid list, or commit match closes access. These are operator attestations
+to private evidence; never set them from intent or configuration alone.
+
+Public disclosure is separate. Set
+`COMMITMENT_CONTROL_SECURITY_PUBLIC_DISCLOSURE_STATUS=approved` only when the
+assessor contract permits the exact bounded statement on `/security`. Without
+that approval, a cleared private assessment may unlock an otherwise eligible
+paid workspace but stays below a public proven claim.
 
 ---
 
@@ -161,23 +182,40 @@ This gate also needs a real Postgres (`DATABASE_URL`), a token key, and a sessio
 
 ---
 
-## 5. Razorpay Subscription Link for `/pay` — one-time Payment Links do not renew
+## 5. Razorpay one-time Payment Link for `/pay`
 
-The one-time ₹999 assisted-audit checkout was retired on 2026-08-21. `/private-audit`, `/api/audit-intake`, and `/api/checkout` cannot be reactivated by setting environment variables. Do not put `RAZORPAY_KEY_ID` or `RAZORPAY_KEY_SECRET` in Vercel to “turn payments on.” A Razorpay **Payment Link** is a single charge. Monthly autopay is **Subscriptions**.
+The one-time ₹999 assisted-audit checkout was retired on 2026-08-21. `/private-audit`, `/api/audit-intake`, and `/api/checkout` cannot be reactivated by setting environment variables. Do not put `RAZORPAY_KEY_ID` or `RAZORPAY_KEY_SECRET` in Vercel to “turn payments on.” Use a hosted single-charge Payment Link for this experiment; do not use any recurring payment product.
 
-**Live commercial path (dashboard, no code):** on the **Vognary** merchant, **Live** mode:
+The live Commitment Control experiment also uses a one-time Payment Link.
+Do not create or configure a Plan or Subscription for the first ten offers. A voluntary
+second month requires a separate purchase.
 
-1. **Payment Products → Subscriptions → Plans → New Plan.** Name `Commitment Control private pilot`. Billing frequency **monthly**. Amount **14999 INR**. Plans cannot be edited after create.
-2. **Create New Subscription.** Select that plan. Start immediately (no trial unless you intend one). **Total count** = how many months (use `12` for a year, or up to `1200` for the 30-year Razorpay maximum). Skip customer notify if `/pay` will open the link.
-3. Copy the **short URL** (`https://rzp.io/i/...` or `https://rzp.io/l/...`).
+**Live commercial path (dashboard, no code):** on the **Vognary** merchant in
+**Live** mode:
+
+1. Create a new one-time **Payment Link** for exactly **₹14,999 INR**. Name it
+   `Commitment Control private pilot — one month`. Disable partial payment and do
+   not attach a recurring mandate.
+2. Create a unique link only after a prospect accepts the explicit offer. Keep
+   customer notifications and expiry consistent with the signed pilot terms.
+3. Copy the hosted HTTPS URL (`https://rzp.io/i/...`, `https://rzp.io/l/...`, or
+   the supported Razorpay Pages host).
 
 Then set:
 
 ```
-COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL=https://rzp.io/i/your-live-subscription
+COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL=https://rzp.io/i/your-one-time-payment
+COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE=one-time
 ```
 
-in `.env.local` and in Vercel Production. One Subscription Link binds **one** subscriber. The next company needs a new subscription created from the same Plan. Blank or invalid URL → honest “not configured.” ₹14,999 stays under the ₹15,000 UPI Autopay PIN-free cap only if GST is not added. Historical settlement for old rows: `docs/billing-activation-runbook.md`.
+in `.env.local` and in Vercel Production. The exact lowercase `one-time` mode is
+an operator attestation that the URL was reviewed and creates no recurring
+mandate; any other value keeps `/pay` unavailable. Use one unique link per accepted
+prospect. Blank or invalid URL → honest “not configured.” A configured link is
+not an offer, payment, customer, security clearance, or enrollment. Mark payment
+only after settlement, and keep real customer financial data out of Vognary
+until the independent assessment and activation gates close. Historical
+settlement handling lives in `docs/billing-activation-runbook.md`.
 
 ---
 

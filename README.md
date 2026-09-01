@@ -26,7 +26,7 @@ AI follows **cite or shut up**: unsupported amounts, merchants, dates, and sourc
 - Direct Gmail OAuth remains fail-closed until Google restricted-scope verification and the required security assessment are complete.
 - The retired `/app?demo=1` and `/app?guest=1` modes return `410 Gone`; no fictional financial records are shown.
 - The retired one-time assisted audit and public checkout cannot collect leads or create payments. Historical billing code remains only for settlement integrity, reconciliation, and refunds.
-- The live commercial path is `/pay`: the ₹14,999/month Commitment Control private pilot. It opens a founder-configured Razorpay Subscription Link when that deployment has one. `/api/checkout` remains `410`.
+- The live commercial path is `/pay`: the one-time ₹14,999 Commitment Control private pilot for one month. It opens a founder-configured hosted payment page when that deployment has one. Payment reserves a pilot but does not grant customer-data access before the assurance and activation gates. `/api/checkout` remains `410`.
 - Vognary does not cancel or downgrade anything autonomously and does not claim universal financial coverage.
 
 The product freeze and live evidence state are authoritative in [THE-LAW](docs/THE-LAW.md) and [CONTINUE-HERE](docs/CONTINUE-HERE.md).

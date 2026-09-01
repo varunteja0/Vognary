@@ -35,6 +35,21 @@ const names = [
   "NEXT_PUBLIC_APP_URL",
   "APP_URL",
   "COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL",
+  "COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE",
+  "COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS",
+  "COMMITMENT_CONTROL_PAID_WORKSPACE_IDS",
+  "COMMITMENT_CONTROL_SECURITY_ASSESSMENT_STATUS",
+  "COMMITMENT_CONTROL_SECURITY_RETEST_STATUS",
+  "COMMITMENT_CONTROL_SECURITY_ASSESSMENT_AT",
+  "COMMITMENT_CONTROL_SECURITY_RETEST_AT",
+  "COMMITMENT_CONTROL_SECURITY_ASSESSED_COMMIT_SHA",
+  "COMMITMENT_CONTROL_DEPLOYED_COMMIT_SHA",
+  "COMMITMENT_CONTROL_SECURITY_REPORT_SHA256",
+  "COMMITMENT_CONTROL_SECURITY_RETEST_SHA256",
+  "COMMITMENT_CONTROL_SECURITY_OPEN_CRITICAL_HIGH",
+  "COMMITMENT_CONTROL_SECURITY_OPEN_DATA_IMPACTING_MEDIUM",
+  "COMMITMENT_CONTROL_SECURITY_PUBLIC_DISCLOSURE_STATUS",
+  "VERCEL_GIT_COMMIT_SHA",
 ] as const;
 
 function withEnvironment(overrides: Partial<Record<(typeof names)[number], string>>, run: () => void) {
@@ -56,10 +71,11 @@ function withEnvironment(overrides: Partial<Record<(typeof names)[number], strin
 test("a blank environment proves nothing", () => {
   withEnvironment({}, () => {
     const signals = getPublicTrustSignals();
-    assert.equal(signals.length, 8);
+    assert.equal(signals.length, 9);
     for (const signal of signals) {
       assert.equal(signal.state, "not-yet-proven", `${signal.id} must not claim readiness on blank env`);
     }
+    assert.match(new Map(signals.map((signal) => [signal.id, signal])).get("independent-security-assessment")?.detail ?? "", /no dated independent assessment.*retest/i);
   });
 });
 
@@ -150,11 +166,34 @@ test("a malformed restore-drill date is ignored, never rendered", () => {
 test("a valid Razorpay Payment Link configures private-pilot collection without proving a paid customer", () => {
   withEnvironment({
     COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL: "https://rzp.io/l/vognary-pilot",
+    COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE: "one-time",
   }, () => {
     const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
     assert.equal(byId.get("pilot-payment-collection")?.state, "configured");
     assert.match(byId.get("pilot-payment-collection")?.detail ?? "", /not a paid customer/i);
     assert.doesNotMatch(byId.get("pilot-payment-collection")?.detail ?? "", /rzp\.io|COMMITMENT_CONTROL/i);
+  });
+});
+
+test("only exact-release assessment, retest, clean findings, and disclosure approval prove independent review", () => {
+  const releaseSha = "a".repeat(40);
+  withEnvironment({
+    COMMITMENT_CONTROL_SECURITY_ASSESSMENT_STATUS: "passed",
+    COMMITMENT_CONTROL_SECURITY_RETEST_STATUS: "passed",
+    COMMITMENT_CONTROL_SECURITY_ASSESSMENT_AT: "2020-01-01",
+    COMMITMENT_CONTROL_SECURITY_RETEST_AT: "2020-01-02",
+    COMMITMENT_CONTROL_SECURITY_ASSESSED_COMMIT_SHA: releaseSha,
+    COMMITMENT_CONTROL_SECURITY_REPORT_SHA256: "b".repeat(64),
+    COMMITMENT_CONTROL_SECURITY_RETEST_SHA256: "c".repeat(64),
+    COMMITMENT_CONTROL_SECURITY_OPEN_CRITICAL_HIGH: "0",
+    COMMITMENT_CONTROL_SECURITY_OPEN_DATA_IMPACTING_MEDIUM: "0",
+    COMMITMENT_CONTROL_SECURITY_PUBLIC_DISCLOSURE_STATUS: "approved",
+    VERCEL_GIT_COMMIT_SHA: releaseSha,
+  }, () => {
+    const signal = new Map(getPublicTrustSignals().map((entry) => [entry.id, entry])).get("independent-security-assessment");
+    assert.equal(signal?.state, "proven");
+    assert.match(signal?.detail ?? "", /assessment \(2020-01-01\).*retest \(2020-01-02\).*exact release/i);
+    assert.match(signal?.detail ?? "", /No unresolved Critical, High, or data-impacting Medium/i);
   });
 });
 

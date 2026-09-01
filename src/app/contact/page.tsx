@@ -36,7 +36,7 @@ const channels = [
     heading: "Pilot payment",
     address: "support@vognary.com",
     body:
-      "Pay the ₹14,999/month Commitment Control private pilot as a Razorpay subscription from /pay when online collection is configured. For an invoice or a unique Subscription Link, email this address with the company legal name and GSTIN if any. Do not send card numbers, OTPs, or bank passwords — those stay on Razorpay.",
+      "Reserve the one-time ₹14,999 Commitment Control private pilot from /pay when online collection is configured. For an invoice and unique one-time payment link, email this address with the company legal name and GSTIN if any. Service starts only after the written activation conditions are met. Do not send card numbers, OTPs, or bank passwords — those stay with the payment provider.",
   },
   {
     heading: "Legal",
@@ -51,7 +51,7 @@ export default function ContactPage() {
     <main id="ledger-main" className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="inline-flex items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
             <VognaryMark size={22} />
             Vognary
           </Link>

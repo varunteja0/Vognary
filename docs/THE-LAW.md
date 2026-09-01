@@ -51,21 +51,22 @@ constraints because violating them destroys the upside.
 
 Prior-generation material lives only in `docs/archive/`. Treat it as history, not instructions.
 
-### 0.1 Founder scope freeze — 2026-08-25 (Commitment Control)
+### 0.1 Founder scope freeze — amended 2026-09-01 (Commitment Control)
 
 **Commitment Control replaces Commitment Intelligence as the company direction.** Recovery remains the evidence and reconciliation foundation; the product moves one step earlier, before a new obligation is created.
 
-> **Vognary is the human-authorized commitment firewall for AI-native companies: proposed obligation → policy context → human authorization → approved cap → observed outcome.**
+> **Vognary records a proposed obligation, shows cited existing exposure, records who approved what limit, and later checks observed evidence against that decision.**
 
-- First ICP: India-first, 5–100-person AI-native companies with at least ₹5 lakh/month in AI, cloud, software, contractor, or campaign exposure.
-- V0 offer: a private paid pilot at **₹14,999/month**, delivered with a thin product build in 10 days.
+- First strict ICP: India-first, 20–100-person AI-native companies with a named finance owner and buyer-confirmed controllable exposure. Exploratory outreach may test plausible adjacent buyers but never counts as qualification.
+- V0 offer: a **one-time ₹14,999 payment for one pilot month**: one policy setup, up to ten proposals, up to four weekly 30-minute reconciliation reviews, and up to two additional founder-support hours.
 - V0 loop: proposal → deterministic exposure → stated policy → authorized human decision → frozen cap → later Recovery evidence → reconciliation.
 - Recovery remains the sole evidence authority. Existing commitment graph facts may inform exposure, but a proposal is not evidence that money was spent.
 - Every amount is an exact minor-unit value with an explicit currency. Existing evidence is cited; user-entered proposal values are labeled assumptions.
 - Only workspace owners/admins may approve, approve with a cap, or decline. V0 **never auto-approves, auto-denies, purchases, provisions, cancels, or moves money**.
 - Direct Gmail OAuth, banks, cards, wallets, Slack, agent execution, procurement workflows, and autonomous action remain deferred. The existing private billing inbox may supply later reconciliation evidence; it is not a prerequisite for proposing or deciding.
-- The first irreversible bet is paid behavior, not payment infrastructure: 20 qualified contacts, 10 conversations, five explicit offers, and two upfront payments by Day 10. If the first five are inconclusive, the kill decision is mandatory no later than offer ten.
-- Kill or rework if fewer than two of ten offers pay, fewer than half of requests arrive before spending, or 30 proposals change zero decisions.
+- The first irreversible bet is paid behavior, not payment infrastructure: five qualified plus fifteen exploratory contacts, at least 10 substantive conversations, ten identical offers, and two upfront payments by Day 7.
+- Two cleared payments are `GO`; one is `REWORK`; zero of ten offers pay means the offer or economic value failed. Also kill or rework if fewer than half of requests arrive before spending or 30 proposals change zero decisions.
+- An independent security assessment and retest must close before any real customer financial data enters Vognary, with no unresolved Critical/High finding and no unresolved data-impacting Medium finding. Payment does not grant data access. Production enrollment requires both cleared payment and that assurance exit.
 
 ---
 
@@ -156,9 +157,9 @@ npm run build && npm run perf:budget
 
 | Metric | Day 30 | Day 90 | Kill / pivot if |
 | --- | ---: | ---: | --- |
-| Qualified conversations | **10** | **30** | <10 by day 10 |
-| Explicit ₹14,999/month offers | **10** | **30** | <10 by day 10 |
-| Upfront paid pilots | **3** | **10** | <2 of 10 offers pay by day 10 |
+| Qualified conversations | **10** | **30** | <10 in the seven-day test |
+| Explicit one-time ₹14,999 offers | **10** | **30** | <10 in the seven-day test |
+| Upfront paid pilots | **3** | **10** | 0 of 10 offers pay; one payment requires rework |
 | Pre-spend proposals evaluated | **30** | **150** | <50% arrive before spend |
 | Decisions materially changed / capped / declined | **3** | **15** | 0 after 30 proposals |
 | Paid pilot renewals | **2** | **7** | <2 by day 30 |
@@ -170,7 +171,7 @@ npm run build && npm run perf:budget
 | Phase | Name | Goal | Gate to exit |
 | --- | --- | --- | --- |
 | **0** | Hygiene | One repo, one doc chain | **DONE** 2026-07-21 |
-| **A** | Paid proof | Sell ten explicit ₹14,999/month offers | Two upfront payments by Day 10 |
+| **A** | Paid proof | Sell ten identical one-time ₹14,999 pilot offers | Two upfront payments by Day 7 |
 | **B** | Control V0 | Proposal, policy, human decision, reconciliation | Private V0 in 10 days |
 | **C** | Production min | Identity, monitor, backup, pay, email | activation rows READY |
 | **D** | Intelligence moat | Corpus 100, formats, first verified saving | corpus:strict green |
@@ -289,7 +290,7 @@ Consumer audit alone is not $100B. **Commitment truth as infrastructure** might 
 | 3 | Resend domain + key | Magic link + renewal email |
 | 4 | Monitoring (Sentry or Better Stack) | Safe production |
 | 5 | Backup storage + restore drill | Financial data trust |
-| 6 | Pilot agreement, invoice, and founder-controlled payment collection | ₹14,999/month subscription |
+| 6 | Pilot agreement, invoice, and founder-controlled one-time payment collection | ₹14,999 pilot reservation; active purchase required for month two |
 | 7 | 10–20 redacted real statements → corpus | Intelligence truth |
 | 8 | Setu AA onboarding | Deferred until paid control usage earns a rail |
 
@@ -301,13 +302,13 @@ Agents may draft configs, checklists, and verification commands. Agents must **n
 
 | Day | Who | Work |
 | --- | --- | --- |
-| 1 | Founder | Contact qualified ICPs and make the first explicit ₹14,999/month offers |
-| 1–3 | Agent | Exact multi-currency exposure and policy domain, red tests first |
-| 3–5 | Agent | Proposal, evaluation, evidence-link, and append-only decision persistence |
-| 5–7 | Both | Run proposals through the same human-approved pilot workflow |
-| 6–8 | Agent | Private Control-first UI and owner/admin decision boundary |
-| 8–9 | Agent | Recovery-linked reconciliation without rewriting authorization |
-| 10 | Founder | Two-payment gate; GO / REWORK using measured evidence only |
+| 1 | Founder | Send the five founder-qualified first touches; record actual sends only |
+| 2 | Founder | Send fifteen plausible buyers labeled exploratory; never infer qualification or spend |
+| 2–4 | Founder | Run behavioral conversations without collecting real customer financial data in Vognary |
+| 1–5 | Agent + founder ops | Prepare exact-head CI, encrypted restore proof, incident readiness, and synthetic assessment environment |
+| 3–6 | Founder | Make the identical one-time ₹14,999 offer until ten explicit offers are recorded |
+| 1–7 | Independent assessor + agent | Assess and remediate the synthetic staging target; real customer data stays blocked |
+| 7 | Founder | Apply the two-payment gate; payment still does not bypass the assurance gate |
 
 Full 21-day grid: Phase A doc. Full engineering WPs: Phase B doc.
 

@@ -136,6 +136,7 @@ const endpointChecks = [
   },
   { id: "connectors", path: "/api/connectors", expected: [410] },
   { id: "auth-session", path: "/api/auth/session", expected: [200] },
+  { id: "control-brief-auth-guard", path: "/api/workspaces/current/control/brief", expected: [401] },
   { id: "auth-google-start", path: "/api/auth/google/start?mode=json", expected: [200, 501], captureJson: true },
   {
     id: "auth-magic-link-request",
@@ -388,6 +389,10 @@ function isFeatureMigrationsReady({ endpointPayloads }) {
     && capabilities.schema.applied?.includes("0056_decision_cycle_expected_amount") === true
     && capabilities.schema.required?.includes("0057_commitment_control_v0") === true
     && capabilities.schema.applied?.includes("0057_commitment_control_v0") === true
+    && capabilities.schema.required?.includes("0058_workspace_invites") === true
+    && capabilities.schema.applied?.includes("0058_workspace_invites") === true
+    && capabilities.schema.required?.includes("0059_control_authority_hardening") === true
+    && capabilities.schema.applied?.includes("0059_control_authority_hardening") === true
     && capabilities.privacyLifecycle?.status !== "schema-query-failed"
     && capabilities.renewalAlerts?.status !== "schema-query-failed"
     && capabilities.commitmentDecisions?.status !== "schema-query-failed"

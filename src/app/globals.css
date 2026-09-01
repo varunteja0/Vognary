@@ -1,21 +1,11 @@
 @import "tailwindcss";
 
 /*
-  VOGNARY — "THE AUTHORIZATION DESK" (v2.0)
-
-  Vognary is read as a working ledger page, not a dashboard. Cool paper,
-  graphite ink, hairline rule structure, and one champagne-gold seal that is
-  spent only on the human act. Sections are unframed and separated by rule and
-  rhythm; a frame is drawn only around a real repeated object (a proposal
-  record) or a bounded tool (a dialog).
-
-  Six truth classes must never be confusable, so each one carries a fixed
-  label voice and a fixed rule colour:
-    1 assumption   2 citation   3 policy   4 authority   5 frozen   6 observed
-
-  Money is engraved: tabular mono, aligned on one right-hand column so a
-  frozen cap and a later observation compare in a single eye movement.
-  Legacy token names are re-pointed so the whole product re-skins here.
+  VOGNARY — "PRIVATE LEDGER"  (graphite & gold, v1.2 — Convergence mark)
+  A premium financial instrument: cool graphite, hairline structure, and a
+  single champagne-gold accent for money and action. Desaturated verdict
+  colours, exact edges, quiet motion. Legacy token names are re-pointed so
+  the whole product re-skins from this one file.
 */
 
 :root {
@@ -81,30 +71,6 @@
   --danger: var(--ember);
   --blue: var(--indigo);
 
-  /* Truth-class rules. Colour is never the only carrier — each class also
-     carries its own label voice and position — but the rule makes the class
-     scannable once the reader has learned the page. */
-  --truth-assumption: #7c8494;
-  --truth-citation: var(--indigo);
-  --truth-policy: var(--ochre);
-  --truth-authority: var(--gold-deep);
-  --truth-frozen: #3f4855;
-  --truth-observed: var(--verdict);
-
-  /* Control metrics. 44px is the floor for anything a thumb can hit. */
-  --tap: 2.75rem;
-  --tap-px: 44px;
-
-  /* Type scale — fixed steps, never viewport-scaled. */
-  --text-micro: 0.6875rem;  /* 11px — truth-class labels, the floor */
-  --text-fine: 0.75rem;     /* 12px — verdicts, engraved metadata */
-  --text-data: 0.8125rem;   /* 13px — ledger data */
-  --text-body: 0.875rem;    /* 14px — operational prose */
-  --text-lead: 1rem;
-  --text-record: 1.125rem;
-  --text-band: 1.25rem;
-  --text-page: 1.625rem;
-
   --radius: 16px;
   --radius-sm: 12px;
   --radius-xs: 10px;
@@ -119,11 +85,21 @@
   --shadow-1: 0 1px 2px rgba(23, 26, 31, 0.08);
   --shadow-2: 0 1px 2px rgba(23, 26, 31, 0.05), 0 18px 42px -28px rgba(23, 26, 31, 0.28);
   --shadow-ink: var(--shadow-2);
+
+  /* Motion. Durations are graded by how much area moves: press feedback must
+     land inside the 100ms perception window, element changes read at 200ms,
+     and only whole-region entrances earn 400ms+.
+     Easing carries meaning: entrances decelerate (fast in, settle out), exits
+     accelerate away, and moves use an emphasis curve with a slight overshoot.
+     `ease` is never used — its symmetric curve reads as mechanical. */
+  --motion-press: 90ms;
   --motion-fast: 160ms;
-  --motion-enter: 450ms;
+  --motion-move: 220ms;
+  --motion-enter: 420ms;
   --motion-emphasis: 500ms;
-  --ease-standard: ease;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-enter: cubic-bezier(0.22, 0.7, 0.25, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
   --ease-emphasis: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -186,29 +162,6 @@ select {
   outline-offset: 2px;
 }
 
-/* The skip link is a real control, so it keeps a real 44px box. It waits
-   just above the viewport instead of collapsing to a clipped pixel. */
-.skip-link {
-  position: fixed;
-  left: 1rem;
-  top: -5rem;
-  z-index: 60;
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap);
-  padding: 0 1.05rem;
-  border-radius: var(--radius-xs);
-  background: var(--ink);
-  color: var(--paper);
-  font-size: var(--text-body);
-  font-weight: 600;
-  box-shadow: var(--shadow-2);
-  transition: top 0.16s ease;
-}
-.skip-link:focus {
-  top: 1rem;
-}
-
 ::-webkit-scrollbar {
   width: 11px;
   height: 11px;
@@ -252,45 +205,16 @@ select {
 
 .eyebrow {
   font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-size: var(--text-fine);
+  font-size: 0.72rem;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
   color: var(--muted);
 }
 
-/* Never the smallest text on the page: 11px is the hard floor. */
 .eyebrow-xs {
-  font-size: var(--text-micro);
+  font-size: 0.58rem;
 }
-
-/* Truth-class label. The reader must be able to tell, without reading a single
-   number, which of the six classes a block belongs to. */
-.truth-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-size: var(--text-micro);
-  font-weight: 500;
-  letter-spacing: 0;
-  line-height: 1.4;
-  color: var(--ink-soft);
-}
-.truth-label::before {
-  content: "";
-  flex: none;
-  width: 0.85rem;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--truth-rule, var(--line-strong));
-}
-.truth-assumption { --truth-rule: var(--truth-assumption); }
-.truth-citation { --truth-rule: var(--truth-citation); }
-.truth-policy { --truth-rule: var(--truth-policy); }
-.truth-authority { --truth-rule: var(--truth-authority); }
-.truth-frozen { --truth-rule: var(--truth-frozen); }
-.truth-observed { --truth-rule: var(--truth-observed); }
 
 /* § folio index eyebrow */
 .folio {
@@ -316,201 +240,6 @@ select {
   letter-spacing: 0;
 }
 
-.hairline {
-  height: 1px;
-  width: 100%;
-  background: repeating-linear-gradient(
-    to right,
-    var(--line) 0,
-    var(--line) 6px,
-    transparent 6px,
-    transparent 11px
-  );
-}
-
-/* Page-level display voice. Fixed steps, never viewport-scaled, so a long
-   Indian-formatted amount or merchant name can never resize the page. */
-.page-title {
-  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-optical-sizing: auto;
-  font-size: 2.125rem;
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: 0;
-}
-@media (min-width: 40rem) {
-  .page-title {
-    font-size: 2.75rem;
-  }
-}
-@media (min-width: 64rem) {
-  .page-title {
-    font-size: 3rem;
-  }
-}
-.lede {
-  font-size: var(--text-lead);
-  line-height: 1.65;
-  color: var(--ink-soft);
-}
-
-/* The wordmark is a link, so it carries a real 44px box. */
-.brandmark {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  min-height: var(--tap);
-  padding-right: 0.25rem;
-  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-size: 1.125rem;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: var(--ink);
-}
-
-/* Footer and secondary navigation links. The visible word stays quiet; the
-   target underneath is always 44px tall. */
-.footer-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap);
-  padding: 0 0.7rem;
-  border-radius: 8px;
-  font-size: var(--text-body);
-  color: var(--muted);
-  transition: color 0.16s ease, background 0.16s ease;
-}
-.footer-link:hover {
-  color: var(--ink);
-  background: var(--card-2);
-}
-
-/* Links inside a sentence keep the sentence's spacing — WCAG 2.2 SC 2.5.8
-   exempts inline prose targets from the 44px minimum — but still carry a full
-   44px block target so a thumb has something to land on. */
-.legal-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap);
-  margin-block: -0.85rem;
-  color: var(--ink-soft);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  transition: color 0.16s ease;
-}
-.legal-link:hover {
-  color: var(--ink);
-}
-
-/* Boundary list — what the product deliberately does not ask for. Read as a
-   ruled register, not a row of pills. */
-.boundary-list {
-  display: grid;
-  gap: 0;
-  max-width: 26rem;
-  border-top: 1px solid var(--line);
-}
-.boundary-list > li {
-  padding: 0.55rem 0;
-  border-bottom: 1px solid var(--line);
-  font-size: var(--text-body);
-  line-height: 1.5;
-  color: var(--ink-soft);
-}
-
-/* The Commitment Control loop on the public page. Numbered register, not a
-   marketing timeline. */
-.authorization-loop {
-  display: grid;
-  gap: 0;
-  margin-top: 1.25rem;
-  max-width: 28rem;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--line);
-  counter-reset: loop;
-}
-.authorization-loop > li {
-  display: grid;
-  grid-template-columns: 1.75rem minmax(0, 1fr);
-  gap: 0.75rem;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid var(--line);
-  font-size: var(--text-body);
-  line-height: 1.5;
-  color: var(--ink-soft);
-  counter-increment: loop;
-}
-.authorization-loop > li::before {
-  content: counter(loop);
-  font-family: var(--font-data), ui-monospace, monospace;
-  font-size: var(--text-fine);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.75rem;
-  color: var(--ochre);
-}
-.authorization-loop > li[data-complete="true"] {
-  color: var(--muted);
-}
-.authorization-loop > li[aria-current="step"] {
-  color: var(--ink);
-  box-shadow: inset 0.15rem 0 0 var(--ember);
-  padding-left: 0.6rem;
-  margin-left: -0.6rem;
-}
-.authorization-loop > li[aria-current="step"]::before {
-  color: var(--ember);
-}
-.authorization-loop-compact {
-  margin-top: 0;
-  max-width: none;
-}
-.authorization-loop-compact > li {
-  padding: 0.4rem 0;
-  font-size: var(--text-fine);
-}
-
-/* A disclosure that opens a whole working area. Word stays quiet; the target
-   is a full row. */
-.disclosure-summary {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  min-height: var(--tap);
-  font-size: var(--text-lead);
-  font-weight: 600;
-  color: var(--ink);
-  cursor: pointer;
-  user-select: none;
-  list-style: none;
-}
-.disclosure-summary::-webkit-details-marker {
-  display: none;
-}
-.disclosure-summary::after {
-  content: "Show";
-  margin-left: auto;
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-size: var(--text-fine);
-  font-weight: 500;
-  color: var(--muted);
-}
-details[open] > .disclosure-summary::after {
-  content: "Hide";
-}
-
-/* The file control IS the drop area, so it carries the drop area's box
-   instead of collapsing to a clipped pixel behind its label. */
-.file-target {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-
 /* ------------------------------------------------------------------ *
  * Surfaces
  * ------------------------------------------------------------------ */
@@ -524,25 +253,15 @@ details[open] > .disclosure-summary::after {
   border-radius: var(--radius);
   box-shadow: var(--shadow-2);
 }
-.panel-flat {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-
-.stack-page {
-  display: grid;
-  gap: var(--space-6);
-}
-.stack-section {
-  display: grid;
-  gap: var(--space-4);
-}
 .inset {
   background: var(--card-2);
   border: 1px solid var(--line);
   border-radius: 12px;
 }
+
+/* Featured panel — the deep spectral chamber (hero / exhibit) */
+
+/* Perforated receipt edge */
 
 /* ------------------------------------------------------------------ *
  * Buttons
@@ -553,15 +272,20 @@ details[open] > .disclosure-summary::after {
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  min-height: var(--tap);
-  padding: 0 1.05rem;
+  height: var(--tap);
+  padding: 0 1rem;
   border-radius: var(--radius-xs);
   border: 1px solid transparent;
-  font-size: var(--text-body);
+  font-size: 0.83rem;
   font-weight: 500;
-  letter-spacing: 0;
+  letter-spacing: -0.005em;
   cursor: pointer;
-  transition: transform 0.14s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+  transition:
+    transform var(--motion-press) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
   user-select: none;
 }
 .btn:active {
@@ -577,27 +301,6 @@ details[open] > .disclosure-summary::after {
   background: var(--gold-soft);
   border-color: var(--gold-soft);
 }
-.btn-ember {
-  background: color-mix(in srgb, var(--ember) 14%, transparent);
-  color: var(--ember);
-  border-color: color-mix(in srgb, var(--ember) 42%, transparent);
-}
-.btn-ember:hover {
-  background: color-mix(in srgb, var(--ember) 22%, transparent);
-  border-color: color-mix(in srgb, var(--ember) 60%, transparent);
-}
-/* The seal — a deliberate, weighty ink action. Used where the command is
-   consequential but is NOT the single gold act of the context. */
-.btn-seal {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 10px 24px -18px rgba(23, 26, 31, 0.9);
-}
-.btn-seal:hover {
-  background: color-mix(in srgb, var(--ink) 88%, var(--paper));
-  border-color: color-mix(in srgb, var(--ink) 88%, var(--paper));
-}
 .btn-ghost {
   background: var(--card-3);
   color: var(--ink);
@@ -607,14 +310,24 @@ details[open] > .disclosure-summary::after {
   border-color: var(--line-strong);
   background: var(--paper-2);
 }
-.btn-ondark {
-  background: transparent;
-  color: var(--dossier-ink);
-  border-color: var(--dossier-line);
+.btn-ember {
+  background: color-mix(in srgb, var(--ember) 14%, transparent);
+  color: var(--ember);
+  border-color: color-mix(in srgb, var(--ember) 42%, transparent);
 }
-.btn-ondark:hover {
-  border-color: var(--dossier-ink);
-  background: rgba(243, 234, 214, 0.08);
+.btn-ember:hover {
+  background: color-mix(in srgb, var(--ember) 22%, transparent);
+  border-color: color-mix(in srgb, var(--ember) 60%, transparent);
+}
+.btn-quiet-danger {
+  background: transparent;
+  color: var(--ink-soft);
+  border-color: color-mix(in srgb, var(--ember) 30%, var(--line));
+}
+.btn-quiet-danger:hover {
+  color: var(--ember);
+  border-color: color-mix(in srgb, var(--ember) 55%, transparent);
+  background: color-mix(in srgb, var(--ember) 9%, transparent);
 }
 .btn:disabled,
 .btn[aria-disabled="true"] {
@@ -625,16 +338,25 @@ details[open] > .disclosure-summary::after {
 .btn svg {
   flex: none;
 }
-/* .btn-sm keeps a smaller optical weight, never a smaller hit area. */
 .btn-sm {
-  min-height: var(--tap);
-  padding: 0 0.85rem;
-  font-size: var(--text-data);
+  height: 2.15rem;
+  padding: 0 0.7rem;
+  font-size: 0.76rem;
 }
 .btn-lg {
-  min-height: 3.1rem;
-  padding: 0 1.5rem;
-  font-size: 1rem;
+  height: 2.95rem;
+  padding: 0 1.4rem;
+  font-size: 0.92rem;
+}
+
+/* Touch pointers get a full 44px box on every control, at every width — a
+   tablet is not a phone but it is still a thumb. Fine pointers keep the denser
+   .btn-sm sizing, which a mouse can hit accurately. */
+@media (pointer: coarse) {
+  .btn,
+  .btn-sm {
+    min-height: var(--tap);
+  }
 }
 .btn-block {
   width: 100%;
@@ -651,67 +373,24 @@ details[open] > .disclosure-summary::after {
   border-color: rgba(0, 0, 0, 0.16);
 }
 
-/* ------------------------------------------------------------------ *
- * Segmented control / tabbed navigation
- * ------------------------------------------------------------------ */
-
-.segmented {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  background: var(--card-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-}
-.segmented > button,
-.segmented > a {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-height: var(--tap);
-  padding: 0 0.95rem;
-  border-radius: 8px;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--text-data);
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.16s ease, color 0.16s ease;
-}
-.segmented > button:hover,
-.segmented > a:hover {
-  color: var(--ink);
-}
-.segmented > [data-active="true"] {
-  background: var(--card-3);
-  color: var(--ink);
-  box-shadow: var(--shadow-1);
-}
-
-/* Workspace view switcher. Deliberately not gold: gold marks the single human
-   act available in a context, never the page the reader is already on. On a
-   phone this is a bottom rail with a live rule under the current desk; on a
-   desk it is a hairline tab row anchored to the page rule. */
+/* Workspace view switcher. Deliberately not gold: gold marks the action a
+   founder can take, never the page they are already on. */
 .viewnav {
   display: grid;
   gap: 2px;
 }
 .viewnav > li > button {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: var(--tap);
-  padding: 0 0.75rem;
+  height: 2.75rem;
+  padding: 0 0.85rem;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--muted);
-  font-size: var(--text-data);
+  font-size: 0.8rem;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
@@ -723,63 +402,49 @@ details[open] > .disclosure-summary::after {
 .viewnav > li > button[aria-current="page"] {
   background: var(--card-3);
   color: var(--ink);
-  font-weight: 600;
   box-shadow: var(--shadow-1);
 }
 @media (min-width: 40rem) {
   .viewnav {
     display: inline-flex;
-    gap: 0.35rem;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    border-radius: 0;
+    padding: 3px;
+    background: var(--card-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-xs);
   }
   .viewnav > li > button {
-    min-height: var(--tap);
-    padding: 0 0.15rem;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-    margin-right: 1.35rem;
-    font-size: var(--text-body);
-  }
-  .viewnav > li:last-child > button {
-    margin-right: 0;
-  }
-  .viewnav > li > button[aria-current="page"] {
-    background: transparent;
-    box-shadow: none;
-    color: var(--ink);
-  }
-  .viewnav > li > button[aria-current="page"]::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -1px;
-    height: 2px;
-    background: var(--ink);
-  }
-  .viewnav > li > button:hover {
-    background: transparent;
+    height: 2.1rem;
   }
 }
+
+/* Numbered step rail — the guided, easy-to-remember path */
 
 /* ------------------------------------------------------------------ *
  * Form fields
  * ------------------------------------------------------------------ */
 
-/* 44px is the floor for a single-line control. Textareas reset the height so a
-   `min-h-*` utility still owns their size. */
+.file-target {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-target:disabled {
+  cursor: not-allowed;
+}
+
 .field {
   height: var(--tap);
   width: 100%;
   padding: 0 0.85rem;
-  background: var(--card);
-  border: 1px solid var(--line-strong);
+  background: var(--card-2);
+  border: 1px solid var(--line);
   border-radius: var(--radius-xs);
-  font-size: var(--text-lead);
+  font-size: 0.9rem;
   color: var(--ink);
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
   outline: none;
@@ -810,7 +475,7 @@ select.field {
   -moz-appearance: none;
   appearance: none;
   padding-right: 2.5rem;
-  background-color: var(--card);
+  background-color: var(--card-2);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a8e98' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.8rem center;
@@ -832,74 +497,9 @@ select.field option {
 .field-label {
   display: block;
   margin-bottom: 0.4rem;
-  font-size: var(--text-data);
+  font-size: 0.78rem;
   font-weight: 500;
   color: var(--ink-soft);
-}
-.field-hint {
-  margin-top: 0.4rem;
-  font-size: var(--text-fine);
-  line-height: 1.5;
-  color: var(--muted);
-}
-
-/* ------------------------------------------------------------------ *
- * Tick — the one checkbox/radio in the product.
- *
- * The control paints a 20px mark but occupies a 44px square, so a thumb
- * target never shrinks to match an optical detail.
- * ------------------------------------------------------------------ */
-
-.tick {
-  -webkit-appearance: none;
-  appearance: none;
-  flex: none;
-  display: grid;
-  place-content: center;
-  inline-size: var(--tap);
-  block-size: var(--tap);
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  cursor: pointer;
-}
-.tick::before {
-  content: "";
-  inline-size: 1.25rem;
-  block-size: 1.25rem;
-  border: 1px solid var(--line-strong);
-  border-radius: 5px;
-  background: var(--card);
-  box-shadow: inset 0 1px 1px rgba(23, 26, 31, 0.05);
-  transition: background 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
-}
-.tick[type="radio"]::before {
-  border-radius: 999px;
-}
-.tick:hover::before {
-  border-color: var(--ink-soft);
-}
-.tick:checked::before {
-  background: var(--ink);
-  border-color: var(--ink);
-  box-shadow: inset 0 0 0 3px var(--card);
-}
-.tick:disabled {
-  cursor: not-allowed;
-}
-.tick:disabled::before {
-  opacity: 0.45;
-}
-@media (forced-colors: active) {
-  .tick::before {
-    border-color: CanvasText;
-  }
-  .tick:checked::before {
-    background: Highlight;
-    box-shadow: inset 0 0 0 3px Canvas;
-  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -910,15 +510,15 @@ select.field option {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.3rem 0.65rem;
+  padding: 0.24rem 0.6rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
   font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-size: var(--text-data);
+  font-size: 0.66rem;
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
-  line-height: 1.25;
+  line-height: 1;
   transition: box-shadow 0.18s ease, border-color 0.18s ease;
 }
 .stamp::before {
@@ -949,24 +549,22 @@ select.field option {
   background: rgba(23, 26, 31, 0.05);
 }
 
-/* Status pills (readiness / coverage / verdict). Never below 12px: a verdict
-   the reader cannot read is not a verdict. */
+/* Status pills (readiness / coverage) */
 .pill {
   display: inline-flex;
   align-items: center;
-  padding: 0.28rem 0.6rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, currentColor 34%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
   font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-size: var(--text-data);
+  font-size: 0.66rem;
   font-weight: 600;
-  line-height: 1.25;
   letter-spacing: 0;
   text-transform: none;
 }
 .pill-ready { color: var(--verdict); background: var(--verdict-tint); }
-.pill-partial { color: var(--indigo); background: var(--indigo-tint); }
 .pill-blocked { color: var(--ember); background: var(--ember-tint); }
+.pill-partial { color: var(--indigo); background: var(--indigo-tint); }
 .pill-planned { color: var(--ink-soft); background: rgba(23, 26, 31, 0.05); }
 
 /* ------------------------------------------------------------------ *
@@ -993,15 +591,6 @@ select.field option {
     var(--card);
   box-shadow: var(--shadow-2), inset 2px 0 0 var(--gold);
 }
-.decision[data-decision-focus="true"] {
-  border-color: var(--ember);
-  box-shadow: var(--shadow-2), inset 2px 0 0 var(--ember);
-}
-
-.decision-head {
-  display: grid;
-  gap: 0.7rem;
-}
 .decision-cue {
   font-family: var(--font-mono-data), ui-monospace, monospace;
   font-size: 0.72rem;
@@ -1023,58 +612,15 @@ select.field option {
   line-height: 1.55;
   color: var(--ink-soft);
 }
-.decision-hook {
-  display: grid;
-  gap: 0.35rem;
-}
-.decision-hook-title {
-  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-size: 1.35rem;
-  font-weight: 600;
-  line-height: 1.25;
-  color: var(--ink);
-}
-.decision-merchant {
-  margin-top: 0.3rem;
-  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-size: 1.3rem;
-  font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.005em;
-  color: var(--ink);
-}
-.decision-amount {
-  display: block;
-  font-size: 1.45rem;
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
 .decision-due {
   margin-top: 0.25rem;
   font-size: 0.82rem;
   line-height: 1.4;
   color: var(--ink-soft);
 }
-.decision-stake {
-  margin-top: 0.15rem;
-  font-size: 0.76rem;
-  line-height: 1.4;
-  color: var(--muted);
-}
 .decision-evidence {
   display: grid;
   gap: 0.35rem;
-}
-.decision-evidence-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 0.85rem;
-  font-size: 0.86rem;
-  line-height: 1.5;
-  color: var(--ink-soft);
 }
 
 /* ------------------------------------------------------------------ *
@@ -1109,10 +655,10 @@ select.field option {
 }
 .cycle-period {
   font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-size: var(--text-micro);
+  font-size: 0.62rem;
   font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--muted);
 }
 .cycle-amount {
@@ -1127,8 +673,8 @@ select.field option {
   color: var(--muted);
 }
 .cycle-note {
-  font-size: var(--text-micro);
-  line-height: 1.4;
+  font-size: 0.68rem;
+  line-height: 1.35;
   color: var(--muted);
 }
 
@@ -1145,20 +691,6 @@ select.field option {
   .decision {
     gap: 1.25rem;
     padding: 1.35rem 1.5rem 1.4rem;
-  }
-  .decision-head {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    column-gap: 1.75rem;
-  }
-  .decision-money {
-    text-align: right;
-  }
-  .decision-merchant {
-    font-size: 1.5rem;
-  }
-  .decision-amount {
-    font-size: 1.75rem;
   }
 }
 
@@ -1193,24 +725,10 @@ select.field option {
   padding-top: 1rem;
   border-top: 1px solid var(--line);
 }
-.btn-quiet-danger {
-  background: transparent;
-  color: var(--ink-soft);
-  border-color: color-mix(in srgb, var(--ember) 30%, var(--line));
-}
-.btn-quiet-danger:hover {
-  color: var(--ember);
-  border-color: color-mix(in srgb, var(--ember) 55%, transparent);
-  background: color-mix(in srgb, var(--ember) 9%, transparent);
-}
 .link-quiet {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap);
   border-radius: 6px;
-  font-size: var(--text-body);
-  color: var(--ink-soft);
-  text-align: left;
+  font-size: 0.8rem;
+  color: var(--muted);
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
@@ -1221,174 +739,12 @@ select.field option {
   color: var(--ink);
 }
 
-/* Outcome — what happened to the decision the customer already made */
-.outcome {
-  display: grid;
-  gap: 0.3rem;
-  padding: 0.85rem 0 0.9rem 0.9rem;
-  border-left: 2px solid var(--line-strong);
-}
-.outcome-title {
-  font-size: 0.95rem;
-  font-weight: 500;
-  line-height: 1.45;
-  color: var(--ink);
-}
-.outcome-settled { border-left-color: color-mix(in srgb, var(--verdict) 55%, transparent); }
-.outcome-open { border-left-color: color-mix(in srgb, var(--ochre) 55%, transparent); }
-.outcome-unknown { border-left-color: var(--line-strong); }
-
-/* Ledger rows — vendor, money, date. Two lines narrow, one line wide.
-   Separators live on the list so a single-child row never draws a stray rule. */
-.ledger-list > li + li {
-  border-top: 1px solid var(--line);
-}
-.ledger-line {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline;
-  column-gap: 1rem;
-  row-gap: 0.15rem;
-  width: 100%;
-  padding: 0.65rem 0;
-  text-align: left;
-}
-.ledger-name {
-  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-size: 0.98rem;
-  font-weight: 600;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-.ledger-meta {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-items: baseline;
-  gap: 0.15rem 0.7rem;
-  font-size: 0.82rem;
-  color: var(--ink-soft);
-}
-.ledger-meta .ledger-date {
-  color: var(--muted);
-}
-
-/* ------------------------------------------------------------------ *
- * Ledger rows
- * ------------------------------------------------------------------ */
-
-/* Ledger table interactions */
-.ledger-row {
-  transition: background var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard);
-}
-.ledger-row:hover {
-  background: rgba(255, 255, 255, 0.024);
-}
-.ledger-row[data-active="true"] {
-  background: color-mix(in srgb, var(--gold) 8%, transparent);
-  box-shadow: inset 2px 0 0 var(--gold);
-}
-
-/* Commitment inventory row — two lines, so a long vendor name can never
-   collide with the amount the way fixed side-by-side columns allowed. */
-.ledger-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline;
-  column-gap: 0.9rem;
-  row-gap: 0.2rem;
-  width: 100%;
-  padding: 0.7rem 0.75rem;
-  border-radius: var(--radius-xs);
-  text-align: left;
-}
-.ledger-item-name {
-  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-.ledger-item-cost {
-  font-size: 0.83rem;
-  color: var(--ink-soft);
-}
-.ledger-item-when {
-  justify-self: end;
-  font-size: 0.78rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.ledger-item-state {
-  justify-self: end;
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.ledger-item-state[data-tone="due"] { color: var(--ochre); }
-.ledger-item-state[data-tone="cancel"] { color: var(--ember); }
-.ledger-item-state[data-tone="keep"] { color: var(--verdict); }
-
-/* Decision memory — dated timeline, not an audit log */
-.timeline {
-  display: grid;
-  gap: 0;
-  margin-left: 0.28rem;
-  border-left: 1px solid var(--line);
-}
-.timeline > li {
-  position: relative;
-  padding: 0.5rem 0 0.5rem 1.15rem;
-}
-.timeline > li::before {
-  content: "";
-  position: absolute;
-  left: -3.5px;
-  top: 0.98rem;
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--card);
-  border: 1px solid var(--line-strong);
-}
-.timeline > li[data-current="true"]::before {
-  background: var(--gold);
-  border-color: var(--gold);
-}
-.timeline-when {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 0.72rem;
-  color: var(--muted);
-}
-.timeline-what {
-  margin-top: 0.1rem;
-  font-size: 0.88rem;
-  line-height: 1.5;
-  color: var(--ink);
-}
-.timeline-note {
-  font-size: 0.8rem;
-  color: var(--ink-soft);
-}
-
 /* ------------------------------------------------------------------ *
  * Motion
  * ------------------------------------------------------------------ */
 
 .rise {
   animation: rise-in var(--motion-emphasis) var(--ease-emphasis) both;
-}
-
-/* A short settle for a disclosure that opens under the pointer */
-.settle {
-  animation: settle-in var(--motion-fast) var(--ease-enter) both;
-}
-
-@keyframes settle-in {
-  from { opacity: 0; transform: translateY(-3px); }
-  to { opacity: 1; transform: none; }
 }
 
 @keyframes rise-in {
@@ -1430,7 +786,11 @@ select.field option {
   }
   .nakul-pulse,
   .rise,
-  .settle {
+  .settle,
+  .stamp-animate,
+  .live-dot,
+  .tape::after,
+  .scan::after {
     animation: none;
   }
   .rise,
@@ -1441,9 +801,49 @@ select.field option {
 }
 
 /* ------------------------------------------------------------------ *
- * Logo resolve — evidence rows arrive first, then the gold verdict locks in.
+ * Spectral signatures
  * ------------------------------------------------------------------ */
 
+/* Glowing numerals for detected money */
+
+/* A refined hairline accent divider */
+
+/* Hero pointer spotlight — a soft light that follows attention */
+
+/* A thin sweeping scan line for reveal moments */
+.scan {
+  position: relative;
+  overflow: hidden;
+}
+.scan::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(216, 184, 122, 0.05), transparent);
+  background-size: 42% 100%;
+  background-repeat: no-repeat;
+  animation: scan-run 6s ease-in-out infinite;
+}
+
+@keyframes scan-run {
+  0% { background-position: -50% 0; }
+  60%, 100% { background-position: 160% 0; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Depth, glass, reveal & data-viz
+ * ------------------------------------------------------------------ */
+
+/* Frosted glass (sticky instrument bar) */
+
+/* Interactive lift */
+
+/* Fluid type */
+
+/* Spend spectrum — a glowing heat bar of recurring money */
+
+/* Logo resolve — evidence rows arrive first, then the gold verdict locks in. */
 .mark-draw .mark-source {
   --mark-source-x: 0;
   opacity: 0;
@@ -1469,6 +869,124 @@ select.field option {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* ---- The Commitment Control loop -----------------------------------------
+   The product is these five steps, so the list is built as a sequential
+   register rather than a marketing timeline: tabular numerals in a fixed
+   gutter, hairline rules between rows, and a continuous spine so the eye
+   reads it as one ordered run instead of five detached bullets.
+   Three states carry meaning — settled work recedes, the current step is the
+   only thing at full ink, and steps not yet reached stay quiet. */
+.authorization-loop {
+  display: grid;
+  gap: 0;
+  margin-top: 1.25rem;
+  max-width: 30rem;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+  counter-reset: loop;
+}
+.authorization-loop > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.6rem 0 0.6rem 0.7rem;
+  margin-left: -0.7rem;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-body);
+  line-height: 1.5;
+  color: var(--ink-soft);
+  counter-increment: loop;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+/* Tabular numerals keep the gutter optically straight at every step. */
+.authorization-loop > li::before {
+  content: counter(loop);
+  grid-column: 1;
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5rem;
+  color: var(--muted);
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+/* The spine runs between numerals, stopping short of the last row. */
+.authorization-loop > li::after {
+  content: "";
+  position: absolute;
+  left: calc(0.7rem + 0.8rem);
+  top: 2.1rem;
+  bottom: -0.1rem;
+  width: 1px;
+  background: var(--line);
+}
+.authorization-loop > li:last-child::after {
+  display: none;
+}
+
+.authorization-loop > li[data-complete="true"] {
+  color: var(--muted);
+}
+.authorization-loop > li[data-complete="true"]::before {
+  color: var(--verdict);
+}
+.authorization-loop > li[data-complete="true"]::after {
+  background: color-mix(in srgb, var(--verdict) 38%, transparent);
+}
+
+/* Exactly one row is the present tense; it is the only full-ink line. */
+.authorization-loop > li[aria-current="step"] {
+  color: var(--ink);
+  font-weight: 500;
+  box-shadow: inset 0.15rem 0 0 var(--gold-deep);
+}
+.authorization-loop > li[aria-current="step"]::before {
+  color: var(--gold-deep);
+}
+
+.authorization-loop-compact {
+  margin-top: 0;
+  max-width: none;
+}
+.authorization-loop-compact > li {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  font-size: var(--text-fine);
+}
+.authorization-loop-compact > li::after {
+  top: 1.8rem;
+}
+
+/* ---- Product boundaries --------------------------------------------------
+   "What you do not need" is a trust claim, so each item is struck through a
+   quiet rule mark rather than a checkmark: the point is absence, not a
+   feature list. */
+.boundary-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.boundary-list > li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: var(--text-fine);
+  color: var(--muted);
+}
+.boundary-list > li::before {
+  content: "";
+  align-self: center;
+  width: 0.6rem;
+  height: 1px;
+  flex: none;
+  background: var(--line-strong);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -1482,713 +1000,288 @@ select.field option {
   }
 }
 
-/* ------------------------------------------------------------------ *
- * Commitment Control desk
- *
- * A ledger page, not a dashboard. An operating masthead states what the
- * desk already knows; unframed bands separated by hairlines carry the work;
- * a frame is drawn only around one real repeated object, the proposal
- * record. Money, dates, versions and verdicts are engraved in tabular mono
- * and aligned on one right-hand column, so a frozen cap and a later
- * observation compare in a single eye movement.
- * ------------------------------------------------------------------ */
+/* =========================================================================
+   RECOVERED RULES — restored from HEAD (commit eca6904).
 
-.control-desk {
-  display: grid;
-  gap: var(--space-5);
+   The in-flight globals.css rewrite deleted 80 class definitions that 12
+   still-unconverted components reference, leaving them unstyled. The whole
+   Control surface (src/app/workspace/recovery/control/**, untouched since
+   HEAD) and the .skip-link accessibility control were affected.
+
+   These rules are a bridge, not a destination: delete each block as its
+   component is converted to Tailwind v4 utilities.
+   To revert this block wholesale: git diff src/app/globals.css
+   ========================================================================= */
+
+:root {
+  --tap: 2.75rem;
+  --text-band: 1.25rem;
+  --text-body: 0.875rem;
+  --text-fine: 0.75rem;
+  --text-lead: 1rem;
+  --text-micro: 0.6875rem;
+  --text-page: 1.625rem;
+  --text-record: 1.125rem;
+  --truth-assumption: #7c8494;
+  --truth-authority: var(--gold-deep);
+  --truth-citation: var(--indigo);
+  --truth-frozen: #3f4855;
+  --truth-observed: var(--verdict);
+  --truth-policy: var(--ochre);
 }
 
-/* --- Operating masthead: what is already true, before any new work ---- */
-
-.control-masthead {
-  display: grid;
-  gap: var(--space-3);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--line-strong);
+/* The skip link is a real control, so it keeps a real 44px box. It waits
+   just above the viewport instead of collapsing to a clipped pixel. */
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: -5rem;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 1.05rem;
+  border-radius: var(--radius-xs);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: var(--text-body);
+  font-weight: 600;
+  box-shadow: var(--shadow-2);
+  transition: top 0.16s ease;
 }
-.control-masthead-top {
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+/* Truth-class label. The reader must be able to tell, without reading a single
+   number, which of the six classes a block belongs to. */
+.truth-label {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.35rem var(--space-4);
-}
-.control-masthead-title {
-  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-optical-sizing: auto;
-  font-size: var(--text-page);
-  font-weight: 500;
-  line-height: 1.15;
-  letter-spacing: 0;
-  color: var(--ink);
-}
-.control-masthead-stamp {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-size: var(--text-fine);
-  color: var(--muted);
-}
-.control-figures {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3) var(--space-5);
-}
-@media (min-width: 48rem) {
-  .control-figures {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-.control-figure {
-  display: grid;
-  align-content: start;
-  gap: 0.15rem;
-  min-width: 0;
-  padding-left: 0.7rem;
-  border-left: 2px solid var(--truth-rule, var(--line-strong));
-}
-.control-figure > dt {
+  align-items: center;
+  gap: 0.5rem;
   font-family: var(--font-mono-data), ui-monospace, monospace;
   font-size: var(--text-micro);
+  font-weight: 500;
+  letter-spacing: 0;
   line-height: 1.4;
-  color: var(--muted);
-}
-.control-figure > dd {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-record);
-  line-height: 1.25;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-.control-figure > dd > small {
-  display: block;
-  font-size: var(--text-fine);
-  line-height: 1.45;
   color: var(--ink-soft);
 }
 
-/* --- Bands ------------------------------------------------------------ */
-
-.control-band {
-  display: grid;
-  gap: var(--space-4);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--line);
-}
-.control-band:first-of-type {
-  padding-top: 0;
-  border-top: 0;
-}
-/* The band that opens the working area sits directly under the masthead rule. */
-.control-band-open {
-  padding-top: 0;
-  border-top: 0;
-}
-/* An empty band states its absence and gets out of the way. */
-.control-band[data-empty="true"] {
-  gap: var(--space-2);
-  padding-top: var(--space-4);
-}
-.control-band-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.25rem var(--space-4);
+.truth-label::before {
+  content: "";
+  flex: none;
+  width: 0.85rem;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--truth-rule, var(--line-strong));
 }
 
-.control-heading {
+.truth-policy { --truth-rule: var(--truth-policy); }
+
+/* The wordmark is a link, so it carries a real 44px box. */
+.brandmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: var(--tap);
+  padding-right: 0.25rem;
   font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-optical-sizing: auto;
-  font-size: var(--text-band);
-  font-weight: 500;
-  line-height: 1.2;
+  font-size: 1.125rem;
+  font-weight: 600;
   letter-spacing: 0;
   color: var(--ink);
 }
-.control-band-count {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-fine);
-  color: var(--muted);
-}
 
-.control-note {
-  font-size: var(--text-body);
-  line-height: 1.5;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-
-.control-error {
-  margin-top: 0.35rem;
-  font-size: var(--text-fine);
-  line-height: 1.5;
-  color: var(--ember);
-}
-
-/* --- Composer: one instrument rail, never a narrow column in a wide page - */
-
-.control-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
-  width: 100%;
-}
-.control-field {
-  display: block;
-  min-width: 0;
-}
-@media (min-width: 60rem) {
-  .control-form {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    column-gap: var(--space-4);
-    row-gap: var(--space-4);
-    align-items: start;
-  }
-  .control-field-merchant { grid-column: span 5; }
-  .control-field-purpose { grid-column: span 7; }
-  .control-field-category { grid-column: span 3; }
-  .control-field-cadence { grid-column: span 3; }
-  .control-field-amount { grid-column: span 3; }
-  .control-field-currency { grid-column: span 3; }
-  .control-field-date { grid-column: span 4; }
-  .control-disclosure { grid-column: span 8; }
-  .control-form-actions { grid-column: span 12; }
-}
-@media (min-width: 40rem) and (max-width: 59.999rem) {
-  .control-form {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: var(--space-4);
-  }
-  .control-field-merchant,
-  .control-field-purpose,
-  .control-disclosure,
-  .control-form-actions {
-    grid-column: span 2;
-  }
-}
-.control-form-actions {
-  display: flex;
-  flex-wrap: wrap;
+/* Links inside a sentence keep the sentence's spacing — WCAG 2.2 SC 2.5.8
+   exempts inline prose targets from the 44px minimum — but still carry a full
+   44px block target so a thumb has something to land on. */
+.legal-link {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--line);
-}
-.control-form-actions > .control-note {
-  flex: 1 1 16rem;
-  min-width: 0;
-}
-
-.control-disclosure {
-  align-self: end;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background: var(--card-2);
-}
-.control-disclosure > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
   min-height: var(--tap);
-  padding: 0.35rem 0.85rem;
-  font-size: var(--text-body);
+  margin-block: -0.85rem;
   color: var(--ink-soft);
-  cursor: pointer;
-  list-style: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.16s ease;
 }
-.control-disclosure > summary::-webkit-details-marker {
-  display: none;
-}
-.control-disclosure-body {
-  padding: 0 0.85rem 0.6rem;
-}
-.control-exposure-set {
-  display: grid;
-  gap: 0;
-  border: 0;
-}
-.control-exposure-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0 0.5rem;
-  border-top: 1px solid var(--line);
-  font-size: var(--text-body);
+
+.legal-link:hover {
   color: var(--ink);
-  cursor: pointer;
-}
-.control-exposure-name {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.control-exposure-amount {
-  font-size: var(--text-body);
-  white-space: nowrap;
-}
-.control-exposure-row > span:last-child {
-  grid-column: 2 / -1;
-  padding-bottom: 0.5rem;
-  font-size: var(--text-fine);
-  color: var(--muted);
 }
 
-/* --- The proposal record: the one framed repeated object --------------- */
-
-.control-card-list {
-  display: grid;
-  gap: var(--space-4);
-}
-.control-card {
-  display: grid;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-4) var(--space-4) calc(var(--space-4) - 2px);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--line-strong);
-  border-radius: 10px;
-  background: var(--card);
-  box-shadow: var(--shadow-1);
-}
-/* One lead record per queue: a single gold edge, never three competing alarms. */
-.control-card[data-lead="true"] {
-  border-left-color: var(--gold);
-}
-.control-card[data-settled="true"] {
-  border-left-color: var(--truth-authority);
-}
-.control-card-head {
-  display: grid;
-  gap: 0.3rem;
-}
-.control-card-topline {
+/* A disclosure that opens a whole working area. Word stays quiet; the target
+   is a full row. */
+.disclosure-summary {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem var(--space-3);
-}
-.control-card-title {
-  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-size: var(--text-record);
-  font-weight: 500;
-  line-height: 1.25;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-.control-card-purpose {
-  font-size: var(--text-body);
-  line-height: 1.5;
-  color: var(--ink-soft);
-  overflow-wrap: anywhere;
-}
-.control-card-meta {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-size: var(--text-fine);
-  line-height: 1.5;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-.control-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-}
-.control-card-actions > .control-note {
-  flex: 1 1 14rem;
-  min-width: 0;
-}
-
-/* --- Sections inside a record ----------------------------------------- */
-
-.control-evaluation {
-  display: grid;
-  gap: var(--space-4);
-}
-.control-section {
-  display: grid;
-  gap: 0.5rem;
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--line);
-}
-.control-section:first-child {
-  padding-top: 0;
-  border-top: 0;
-}
-
-.control-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem var(--space-5);
-  /* Money groups so three figures compare at a glance instead of spreading
-     across the whole desk width. */
-  max-width: 34rem;
-}
-@media (min-width: 34rem) {
-  .control-facts {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-.control-fact {
-  min-width: 0;
-}
-.control-fact > dt {
-  font-size: var(--text-fine);
-  line-height: 1.4;
-  color: var(--muted);
-}
-.control-fact > dd {
-  font-size: var(--text-body);
-  line-height: 1.45;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-
-/* --- The proof ledger -------------------------------------------------- *
- *
- * The most important object in the product. Frozen expected, approved cap
- * and the later observation sit in one block, on adjacent rows, sharing a
- * single right-hand money column: identical left edge, identical width,
- * decimal points aligned. Zero horizontal separation, so the comparison is
- * a glance and never an act of memory. Nothing here is computed on the
- * client; every figure is the server's, rendered as published.
- * --------------------------------------------------------------------- */
-
-.proof {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline;
-  column-gap: var(--space-4);
-  padding: 0.15rem 0.75rem 0.15rem 0.7rem;
-  border-left: 2px solid var(--truth-frozen);
-  border-radius: 0 6px 6px 0;
-  background: var(--card-2);
-}
-/* The row wrapper is transparent to the grid so both columns line up
-   across every row, whatever the label length. */
-.proof > .control-fact {
-  display: contents;
-}
-.proof > .control-fact > dt {
-  grid-column: 1;
-  align-self: baseline;
-  padding: 0.45rem 0;
-  border-top: 1px solid var(--line);
-  font-size: var(--text-body);
-  line-height: 1.35;
-  color: var(--ink-soft);
-  overflow-wrap: anywhere;
-}
-.proof > .control-fact > dd {
-  grid-column: 2;
-  align-self: baseline;
-  padding: 0.45rem 0;
-  border-top: 1px solid var(--line);
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
+  gap: 0.75rem;
+  min-height: var(--tap);
   font-size: var(--text-lead);
-  line-height: 1.35;
-  color: var(--ink);
-  text-align: right;
-  white-space: nowrap;
-}
-.proof > .control-fact:first-child > dt,
-.proof > .control-fact:first-child > dd {
-  border-top: 0;
-}
-/* The observation is the one row that carries weight. */
-.proof > .control-fact[data-observed="true"] > dt {
-  color: var(--ink);
-  font-weight: 500;
-}
-.proof > .control-fact[data-observed="true"] > dd {
   font-weight: 600;
-  border-top-color: var(--line-strong);
-}
-.proof-observed {
-  border-left-color: var(--truth-observed);
-}
-.proof-exceeded {
-  border-left-color: var(--ember);
-}
-.proof-unknown {
-  border-left-color: var(--line-strong);
-}
-.proof-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem var(--space-3);
-}
-
-.control-evidence-list {
-  display: grid;
-  gap: 0;
-}
-
-/* Secondary projection detail, opened on demand. Authority, cap, observation,
-   verdict and evidence are never behind this. */
-.control-more {
-  border-top: 1px solid var(--line);
-}
-.control-more > summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem var(--space-3);
-  min-height: var(--tap);
-  font-size: var(--text-body);
-  color: var(--ink-soft);
+  color: var(--ink);
   cursor: pointer;
+  user-select: none;
   list-style: none;
 }
-.control-more > summary::-webkit-details-marker {
+
+.disclosure-summary::-webkit-details-marker {
   display: none;
 }
-.control-more > summary::after {
+
+.disclosure-summary::after {
   content: "Show";
   margin-left: auto;
   font-family: var(--font-mono-data), ui-monospace, monospace;
   font-size: var(--text-fine);
+  font-weight: 500;
   color: var(--muted);
 }
-.control-more[open] > summary::after {
+
+details[open] > .disclosure-summary::after {
   content: "Hide";
 }
-.control-more-body {
-  display: grid;
-  gap: var(--space-4);
-  padding-bottom: var(--space-3);
-}
 
-.control-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-fine);
-  table-layout: fixed;
-}
-.control-table-caption {
-  text-align: left;
-  padding-bottom: 0.35rem;
-  font-size: var(--text-micro);
-  color: var(--muted);
-}
-.control-table th,
-.control-table td {
-  padding: 0.45rem 0.3rem;
-  border-top: 1px solid var(--line);
-  text-align: right;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-.control-table thead th {
-  border-top: 0;
-  color: var(--muted);
-  font-weight: 500;
-}
-.control-table th[scope="row"],
-.control-table thead th:first-child {
-  text-align: left;
-  color: var(--ink-soft);
-  font-weight: 500;
-}
-
-.control-verdict {
-  display: grid;
-  gap: 0.5rem;
-  padding: 0.7rem 0.75rem 0.75rem 0.7rem;
-  border-left: 2px solid var(--truth-policy);
-  border-radius: 0 6px 6px 0;
-  background: var(--ochre-tint);
-}
-.control-reasons {
-  display: grid;
-  gap: 0.2rem;
-  font-size: var(--text-body);
-  line-height: 1.5;
-  color: var(--ink-soft);
-}
-.control-reasons > li {
-  position: relative;
-  padding-left: 0.9rem;
-}
-.control-reasons > li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.6rem;
-  width: 5px;
-  height: 1px;
-  background: var(--line-strong);
-}
-.control-decision-required {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-size: var(--text-fine);
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.control-pill-review {
-  color: var(--ochre);
-  background: var(--ochre-tint);
-}
-
-/* --- Authority, observation and policy -------------------------------- */
-
-.control-authority,
-.control-outcomes {
-  display: grid;
-  gap: 0.6rem;
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--line);
-}
-.control-authority:first-of-type,
-.control-outcomes:first-of-type {
-  padding-top: 0;
-  border-top: 0;
-}
-.control-outcome-list {
-  display: grid;
-  gap: var(--space-4);
-}
-.control-outcome {
-  display: grid;
-  gap: 0.5rem;
-}
-/* A settled record reads across, not down: the frozen ledger on the left, the
-   verdict that judges it on the right, both inside one eye span. */
-.control-settled {
-  display: grid;
-  gap: var(--space-3);
-}
-.control-settled-side {
-  display: grid;
-  align-content: start;
+/* ---- Money -----------------------------------------------------------------
+   A number's provenance is carried by structure, not colour alone, so the
+   distinction survives greyscale, colour-blindness, and a photocopier:
+     cited    solid underline — proof exists
+     assumed  dotted underline — a claim someone typed
+     frozen   enclosed in brackets — an authorized cap is a container, and
+              containers do not move
+     unknown  an em dash — never a zero
+   Amounts are tabular so digits stack in a column and a changing value does
+   not shift the ones beside it. */
+.money {
+  display: inline-flex;
+  align-items: baseline;
   gap: 0.4rem;
   min-width: 0;
 }
-@media (min-width: 45rem) {
-  .control-settled {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--space-4);
-    align-items: start;
-  }
-}
-
-.control-choice-set {
-  display: grid;
-  gap: 0;
-  border: 0;
-}
-.control-choice {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 0 0.35rem;
-  border-top: 1px solid var(--line);
-  cursor: pointer;
-}
-.control-choice > input {
-  grid-row: 1 / span 2;
-}
-.control-choice > span {
-  grid-column: 2;
-  min-width: 0;
-}
-.control-choice-title {
-  align-self: end;
-  font-size: var(--text-lead);
-  font-weight: 500;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-.control-choice > .control-note {
-  align-self: start;
-  padding-bottom: 0.6rem;
-}
-.control-choice:has(> input:checked) {
-  background: var(--dossier-fill);
-}
-
-.control-policy-summary {
-  display: grid;
-  gap: var(--space-3);
-  justify-items: start;
-  width: 100%;
-}
-.control-policy-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-3);
-}
-@media (min-width: 40rem) {
-  .control-policy-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-.control-policy-limit {
-  display: grid;
-  gap: var(--space-3);
-  justify-items: start;
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--line);
-}
-/* Posture board — four postures, told apart by rule, weight and word. */
-.control-posture-board {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: 0;
-  width: 100%;
-  border-top: 1px solid var(--line);
-}
-.control-posture {
+/* Column contexts (period rails, tables) stack the provenance under the
+   amount so the numerals stay in one vertical line. */
+.money-stacked {
   display: grid;
   align-content: start;
-  gap: 0.2rem;
-  min-width: 0;
-  padding: 0.6rem 0 0.7rem 0.7rem;
-  border-left: 2px solid var(--posture-rule, var(--line-strong));
-  border-bottom: 1px solid var(--line);
+  justify-items: start;
+  gap: 0.15rem;
 }
-.control-posture > dt {
-  font-size: var(--text-body);
-  line-height: 1.4;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-.control-posture > dd {
+.money-amount {
   font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-size: var(--text-fine);
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
-.control-posture[data-posture="ALLOW"] { --posture-rule: var(--verdict); }
-.control-posture[data-posture="REVIEW"] { --posture-rule: var(--ochre); }
-.control-posture[data-posture="OUTSIDE_POLICY"] { --posture-rule: var(--ember); }
-.control-posture[data-posture="UNSET"] { --posture-rule: var(--line-strong); }
-.control-posture[data-posture="UNSET"] > dd { color: var(--muted); }
+.money-provenance,
+.money-note {
+  font-size: var(--text-micro);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.money-data .money-amount { font-size: var(--text-fine); }
+.money-record .money-amount { font-size: var(--text-record); font-weight: 600; }
+.money-lead .money-amount { font-size: var(--text-page); font-weight: 600; }
 
-.control-review-list {
-  display: grid;
-  gap: 0;
-  width: 100%;
-  font-size: var(--text-body);
+.money-cited .money-amount {
+  color: var(--ink);
+  border-bottom: 1px solid var(--truth-citation);
+}
+.money-cited .money-provenance { color: var(--truth-citation); }
+
+.money-assumed .money-amount {
+  color: var(--truth-assumption);
+  border-bottom: 1px dotted var(--truth-assumption);
+}
+
+/* Brackets are drawn, not typed, so they scale with the number they hold. */
+.money-frozen .money-amount {
+  position: relative;
+  color: var(--truth-frozen);
+  padding-inline: 0.4rem;
+}
+.money-frozen .money-amount::before,
+.money-frozen .money-amount::after {
+  content: "";
+  position: absolute;
+  top: -0.1em;
+  bottom: -0.1em;
+  width: 0.22rem;
+  border: 1px solid var(--truth-frozen);
+}
+.money-frozen .money-amount::before { left: 0; border-right: 0; }
+.money-frozen .money-amount::after { right: 0; border-left: 0; }
+.money-frozen .money-provenance { color: var(--truth-frozen); }
+
+.money-observed .money-amount { color: var(--truth-observed); }
+.money-observed .money-provenance { color: var(--truth-observed); }
+
+.money-unknown {
+  color: var(--muted);
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+}
+
+/* ---- Evidence chip ---------------------------------------------------------
+   A citation is a control, not a badge: it carries a real 44px target and a
+   focus ring. The mark is a filled square for present evidence and a hollow
+   one for absent, so presence reads without colour. */
+.evidence-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: var(--tap);
+  padding: 0 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--card);
+  font-size: var(--text-fine);
   color: var(--ink-soft);
+  text-align: left;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
 }
-.control-review-list > li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.35rem 0.75rem;
-  padding: 0.45rem 0;
-  border-top: 1px solid var(--line);
-  overflow-wrap: anywhere;
+.evidence-chip-mark {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  background: var(--truth-citation);
 }
-.control-review-list > li:first-child {
-  border-top: 0;
+.evidence-chip-detail {
+  color: var(--muted);
+}
+.evidence-chip-detail::before {
+  content: "·";
+  margin-right: 0.35rem;
+}
+a.evidence-chip:hover,
+button.evidence-chip:hover {
+  border-color: var(--truth-citation);
+  color: var(--ink);
+}
+.evidence-chip-static {
+  min-height: 0;
+  padding-block: 0.2rem;
+}
+/* Absent evidence keeps its place in the layout and says why. */
+.evidence-chip-absent {
+  border-style: dashed;
+  color: var(--muted);
+}
+.evidence-chip-absent .evidence-chip-mark {
+  background: transparent;
+  border: 1px solid var(--muted);
+}
+
+/* Inline links inside prose (email addresses, cross-references) carry a real
+   44px target without changing the line height around them: the box grows and
+   the margin pulls the layout back. */
+.inline-tap {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  margin-block: calc((var(--tap) - 1.25rem) / -2);
 }

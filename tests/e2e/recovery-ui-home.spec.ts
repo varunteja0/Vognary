@@ -302,7 +302,7 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   expect(activationResponses).toEqual([201]);
   await expect(page.getByRole("heading", { name: "OpenAI" })).toBeVisible();
   await expect(page.getByText("₹1,999.00").first()).toBeVisible();
-  await expect(page.getByText("6 Aug 2026 · in 3 days")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Charges in 3 days/ })).toBeVisible();
   await expect(page.getByText("Decide before Thursday")).toBeVisible();
   await expect(page.getByText("OpenAI invoice paid INR 1,999. Renews monthly.")).toBeVisible();
   await expect(page.getByRole("button", { name: "See the cited receipt" })).toBeVisible();
@@ -406,7 +406,8 @@ test("Now keeps the three primary choices; Bills routes decisions back to Now", 
   await expect(nowChoices.getByRole("button", { name: /^Plan to cancel/ })).toBeVisible();
 
   await nowChoices.getByRole("button", { name: /^Plan to cancel/ }).click();
-  await expect(page.getByText(/Saved Plan to cancel on/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "OpenAI — plan to cancel is recorded" })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("Saved. OpenAI is now Plan to cancel.");
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 });
 
@@ -480,7 +481,7 @@ test("Mandate stays hidden until notice delivery is proven", async ({ page }) =>
   await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toHaveCount(0);
 });
 
-test("exception-only Autopilot home is honest on desktop and mobile and has no serious axe issues", async ({ page }) => {
+test("existing authority is isolated to Automation while Now stays decision-led", async ({ page }) => {
   const autopilotHome = {
     ...home,
     autopilot: {
@@ -525,10 +526,15 @@ test("exception-only Autopilot home is honest on desktop and mobile and has no s
   );
   await page.goto("/app");
 
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Mandate" })).toHaveCount(0);
+  const automation = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" });
+  await expect(automation).toBeVisible();
+  await expect(page.getByRole("heading", { name: "This workspace has an active standing mandate" })).toHaveCount(0);
   await expect(page.getByText("Exception-only home")).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Now" })).toBeVisible();
+  await automation.click();
+  await expect(page.getByText("This workspace has an active standing mandate", { exact: true })).toBeVisible();
+  await expect(page.getByText("Off — no cancellation is executed")).toBeVisible();
+  await expect(page.getByText("Standing mandate terms for the e2e fixture.")).toBeVisible();
   await page.emulateMedia({ reducedMotion: "reduce" });
 
   const desktopAxe = await new AxeBuilder({ page }).analyze();
@@ -541,7 +547,7 @@ test("exception-only Autopilot home is honest on desktop and mobile and has no s
   expect(mobileAxe.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical")).toEqual([]);
 });
 
-test("an active mandate still shows the spend strip when no recurring amount is cited", async ({ page }) => {
+test("an active mandate does not restore the retired spend strip on Now", async ({ page }) => {
   const autopilotHome = {
     ...home,
     monthlyTotals: [],
@@ -594,9 +600,9 @@ test("an active mandate still shows the spend strip when no recurring amount is 
   await page.goto("/app");
 
   await expect(page.getByText("Exception-only home")).toHaveCount(0);
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toHaveCount(0);
-  await expect(page.getByText("Software commitments")).toBeVisible();
-  await expect(page.getByText("No recurring amount yet")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toBeVisible();
+  await expect(page.getByText("Software commitments")).toHaveCount(0);
+  await expect(page.getByText("No recurring amount yet")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Next charges" })).toBeVisible();
 });
 
@@ -801,7 +807,7 @@ const bouncedCandidate = {
   noticePresentation: { kind: "bounced" as const },
 };
 
-test("notice states distinguish delivery pending from a delivered 48-hour clock", async ({ page }) => {
+test("unproven notice delivery stays off Now and fails closed in Automation", async ({ page }) => {
   const usdSaving = { currency: "USD", minor: "1000", exponent: 2, display: "$10.00" };
   const inrSaving = { currency: "INR", minor: "199900", exponent: 2, display: "₹1,999.00" };
   const noticeHome = {
@@ -859,26 +865,17 @@ test("notice states distinguish delivery pending from a delivered 48-hour clock"
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: noticeHome, meta }) }),
   );
   await page.goto("/app");
-  await expect(page.getByRole("heading", { name: "Delivery pending" })).toBeVisible();
-  await expect(page.getByText("Delivery is pending.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "48-hour veto window" })).toBeVisible();
-  const vetoWindowBox = await page.getByRole("heading", { name: "48-hour veto window" }).boundingBox();
-  const recurringAmountBox = await page.getByText("Software commitments").boundingBox();
-  expect(vetoWindowBox?.y).toBeLessThan(recurringAmountBox?.y ?? 0);
-  const watchingBox = await page.getByRole("heading", { name: "Watching" }).boundingBox();
-  const helpBox = await page.getByRole("heading", { name: "Needs your help" }).boundingBox();
-  const handledBox = await page.getByRole("heading", { name: "Handled for you" }).boundingBox();
-  expect(vetoWindowBox?.y).toBeLessThan(watchingBox?.y ?? 0);
-  expect(helpBox?.y).toBeLessThan(handledBox?.y ?? 0);
-  await expect(page.getByText(/Delivered 2026-08-24T00:05:00.000Z/)).toBeVisible();
-  await expect(page.getByText(/Veto by 2026-08-26T00:05:00.000Z/)).toBeVisible();
-  await expect(page.getByText("Notice bounced. There is no active veto countdown.")).toBeVisible();
-  await expect(page.getByLabel("₹1,999.00 INR").first()).toBeVisible();
-  await expect(page.getByLabel("$10.00 USD")).toBeVisible();
-  await expect(page.getByText(/minor units/i)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Veto", exact: true })).toHaveCount(2);
+  await expect(page.getByRole("heading", { name: "Delivery pending" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "48-hour veto window" })).toHaveCount(0);
+  const automation = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" });
+  await expect(automation).toBeVisible();
+  await automation.click();
+  await expect(page.getByText("Configured, but live delivery is not proven")).toBeVisible();
+  await expect(page.getByText("Off — no cancellation is executed")).toBeVisible();
+  await expect(page.getByText(/Figma: EXCEPTION/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Veto", exact: true })).toHaveCount(0);
   await page.setViewportSize({ width: 375, height: 812 });
-  await expect(page.getByText("Delivery is pending.")).toBeVisible();
+  await expect(page.getByText("Configured, but live delivery is not proven")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   expect(overflow).toBe(false);
 });

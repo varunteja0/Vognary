@@ -111,10 +111,22 @@ That command applies only unrecorded files in sorted order. After a successful
 | `0059_control_authority_hardening` | `c9c873a20353690e14263a982a18cc95108f4887d76de777518e7a186375eaba` |
 
 Stop if either checksum drifts. Verify the resulting head is
-`0059_control_authority_hardening`. Then copy the finance-owner workspace UUID
-from Profile, set `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS` to that exact UUID,
-redeploy, and invite the engineering lead as `member`. Issue the ₹14,999 invoice
-only when someone actually pays.
+`0059_control_authority_hardening`. Then keep `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS` unset. Schema readiness does not
+authorize customer-data access or enrollment.
+
+Cleared payment and an independent security assessment with the current retest
+exit are both required before enrollment. After both exist, copy the paid
+finance-owner workspace UUID from Profile, put that same exact UUID in both
+`COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS` and
+`COMMITMENT_CONTROL_PAID_WORKSPACE_IDS`, and record the assessment and retest dates, exact
+deployed commit SHA, private report/retest SHA-256 hashes, passed statuses, and
+zero open Critical/High or data-impacting Medium findings using the fields in
+`.env.example`. On a non-Vercel host, also set
+`COMMITMENT_CONTROL_DEPLOYED_COMMIT_SHA` to the immutable deployed Git commit;
+Vercel's system commit SHA wins when present. Redeploy, verify internal readiness reports
+`commitmentControlEnrollment.status = ready`, run a synthetic smoke, and invite
+the engineering lead as `member`. Issue the ₹14,999 invoice after the explicit
+offer is accepted; mark it paid only after settlement.
 
 ## Phase 0: Stop Conditions
 

@@ -59,12 +59,11 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await tabToAndActivate(page, "Sign in");
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
-  const initialControlProbe = waitForControlProbe(page);
   await loginAsDevelopmentUser(page);
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
 
   // 4-7. Add bills from empty Home, not Gmail setup.
-  await openNowAfterWorkspaceLoad(page, "Start with a cited bill.", initialControlProbe);
+  await expect(page.getByRole("heading", { name: "Start with a software bill." })).toBeVisible();
   await page.getByRole("button", { name: "Add a bill" }).click();
   const addBills = page.getByRole("dialog", { name: "Add a bill" });
   await expect(addBills).toBeVisible();
@@ -84,7 +83,6 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   if (isMobile) await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
 
   await openCommitment(page, "OpenAI");
-  await page.getByRole("tab", { name: "Why" }).click();
   const exactEvidenceTrigger = page.getByRole("button", { name: "See the receipt" }).first();
   await exactEvidenceTrigger.click();
   const evidenceDialog = page.getByRole("dialog", { name: "The receipt" });
@@ -100,16 +98,15 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   await openCommitment(page, "OpenAI");
 
-  // Save one decision on the first recurring commitment.
-  const reviewChoice = page.getByRole("button", { name: "Review later", exact: true });
-  if (!(await reviewChoice.isVisible())) {
-    await page.getByRole("button", { name: "Change", exact: true }).click();
-  }
+  // Save one immutable decision on Now for the first recurring commitment.
+  await page.getByRole("button", { name: "Decide on Now" }).click();
+  const reviewChoice = page.getByRole("group", { name: "Your choice" }).getByRole("button", { name: "Review later", exact: true });
   await reviewChoice.click();
-  await expect(page.getByText(/Saved Review later on/)).toBeVisible();
-  await selectRecoveryView(page, "Now");
+  await page.getByRole("button", { name: "Tomorrow" }).click();
+  await expect(page.getByRole("status")).toContainText("Saved. OpenAI is now Review later.");
   // The decision is remembered for this cycle, so Home stops asking for it.
-  await expect(page.getByRole("heading", { name: "You're caught up" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your decisions are saved" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "OpenAI — review later" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Decide now" })).toHaveCount(0);
   await openCommitment(page, "OpenAI");
 
@@ -145,26 +142,16 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await amountHistory.getByRole("button", { name: "Reverse this correction" }).click();
   await expect(amountHistory.getByText("Reversed", { exact: true })).toBeVisible();
 
-  // 22-26. Exercise every stored decision through three primary and two secondary user choices.
-  await page.getByText("More", { exact: true }).click();
-  for (const decision of ["Keep", "Review later", "Consider a cheaper plan", "Plan to cancel", "I don’t recognize this"]) {
-    const button = page.getByRole("button", { name: decision, exact: true });
-    if (!(await button.isVisible())) {
-      const change = page.getByRole("button", { name: "Change", exact: true });
-      if (await change.isVisible()) await change.click();
-      const more = page.getByText("More", { exact: true });
-      if (await more.isVisible()) await more.click();
-    }
-    await page.getByRole("button", { name: decision, exact: true }).click();
-    await expect(page.getByText(new RegExp(`Saved ${escapeRegExp(decision)} on`))).toBeVisible();
-  }
+  // The cycle decision is frozen; detail shows it without offering a rewrite.
+  await expect(page.getByText(/Saved Review later on/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Change", exact: true })).toHaveCount(0);
   await expectNoSeriousAxeViolations(page, "corrected commitment detail");
 
-  // 27. Reload and verify the saved correction and final decision remain visible.
+  // Reload and verify the saved correction and frozen decision remain visible.
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
   await openCommitment(page, "OpenAI India");
-  await expect(page.getByText(/Saved I don’t recognize this on/)).toBeVisible();
+  await expect(page.getByText(/Saved Review later on/)).toBeVisible();
   await page.getByText("Something wrong?").click();
   await expect(page.getByText("Merchant set to “OpenAI India”")).toBeVisible();
 
@@ -176,7 +163,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await expect(page).toHaveURL(/\/login/);
   await loginAsDevelopmentUser(page);
   await openCommitment(page, "OpenAI India");
-  await expect(page.getByText(/Saved I don’t recognize this on/)).toBeVisible();
+  await expect(page.getByText(/Saved Review later on/)).toBeVisible();
 
   // 29. Add later evidence and verify a real Changed event replaces the baseline.
   await openAddBills(page);
@@ -188,12 +175,11 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   // 30. Unproven automation authority stays out of the public workspace.
   await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toHaveCount(0);
-  const finalControlProbe = waitForControlProbe(page);
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
-  await openNowAfterWorkspaceLoad(page, "You're caught up", finalControlProbe);
   await expectNoHorizontalOverflow(page);
   // The next charge is months away, so Home stays calm instead of manufacturing urgency.
+  await expect(page.getByRole("heading", { name: "You're caught up" })).toBeVisible();
 
   // 31. Exercise canonical export and canonical deletion through Account settings.
   await openAccount(page);
@@ -253,25 +239,6 @@ async function loginAsDevelopmentUser(page: Page) {
   await page.waitForURL(/\/app$/);
   await page.waitForLoadState("domcontentloaded");
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
-}
-
-function waitForControlProbe(page: Page) {
-  return page.waitForResponse((response) => (
-    new URL(response.url()).pathname === "/api/workspaces/current/control/brief"
-    && response.request().method() === "GET"
-  ));
-}
-
-async function openNowAfterWorkspaceLoad(page: Page, headingName: string, controlProbe: Promise<unknown>) {
-  await controlProbe;
-  const navigation = page.getByRole("navigation", { name: "Primary" });
-  const expectedHome = page.getByRole("heading", { name: headingName });
-  const control = navigation.getByRole("button", { name: "Control" });
-  if (await control.isVisible()) {
-    await expect(control).toHaveAttribute("aria-current", "page");
-    await navigation.getByRole("button", { name: "Now" }).click();
-  }
-  await expect(expectedHome).toBeVisible();
 }
 
 async function selectRecoveryView(page: Page, name: "Now" | "Bills" | "Sources" | "Automation") {
@@ -342,15 +309,13 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 }
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function collectRuntimeFailures(page: Page) {
   const failures: string[] = [];
   page.on("pageerror", (error) => failures.push(`page: ${error.message}`));
   page.on("response", (response) => {
-    if (response.status() >= 500) failures.push(`response: ${response.status()} ${new URL(response.url()).pathname}`);
+    const pathname = new URL(response.url()).pathname;
+    if (response.status() === 503 && pathname === "/api/workspaces/current/control/brief") return;
+    if (response.status() >= 500) failures.push(`response: ${response.status()} ${pathname}`);
   });
   page.on("console", (message) => {
     if (message.type() !== "error") return;

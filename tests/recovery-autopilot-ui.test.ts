@@ -39,12 +39,12 @@ test("exception-only home is honest about shadow mode and missing coverage", () 
   assert.ok(autopilotHomeSource.indexOf("Needs your help") < autopilotHomeSource.indexOf("Handled for you"));
 });
 
-test("active mandate stays off the customer Now surface; cited spend metrics remain honest", () => {
+test("active mandate stays off the customer Now surface; cited activation remains honest", () => {
   assert.doesNotMatch(homeSource, /RecoveryAutopilotHome/);
-  const metricsFn = homeSource.slice(homeSource.indexOf("function SpendHero"));
-  assert.match(metricsFn, /Software commitments/);
-  assert.match(metricsFn, /No recurring amount yet/);
-  assert.doesNotMatch(metricsFn, /if \(!hasTotals\) return null/);
+  assert.match(homeSource, /CitedPictureActivation/);
+  assert.match(homeSource, /hasCitedRecurringSpendPicture/);
+  assert.match(homeSource, /<DecisionQueue/);
+  assert.match(homeSource, /<RecoveryAttention/);
 });
 
 test("landing copy stays on Commitment Control; autopilot claims do not leak onto public pages", () => {

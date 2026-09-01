@@ -1,4 +1,4 @@
-# CONTINUE HERE — live handoff (2026-08-22)
+# CONTINUE HERE — live handoff (2026-09-01)
 
 > **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
 > falsifiable upside and bound irreversible downside. Full doctrine:
@@ -9,266 +9,114 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## Live state — 2026-08-27 (founder: Home dates, photo confirm, signed-in cards)
+## Live state — 2026-09-01 (founder-authorized paid-proof and assurance gate)
 
-**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Composite remains **1.5**. Production
-Control remains unenrolled on verified schema **0056**. Sell and Track F still
-bind. `/pay` remains the public collection page.
+**Scoreboard rows:** business validation / distribution first; trust and
+production activation as a customer-data prerequisite. **Loop step:** contact →
+paid reservation → real pre-spend proposal → cited exposure → deterministic
+policy → owner/admin frozen decision → reconciliation → active renewal.
 
-**Scoreboard row:** Trust / Product UX. **Loop step:** cite the photo → confirm
-the line honestly → show the real next charge.
+**DECISION — REWORK AND TEST.** Commitment Control is neither validated nor
+killed. Discretionary product, design, infrastructure, and strategy work is
+frozen except the commercial-truth corrections and money, trust, security,
+privacy, or journey-impossible defects needed to run this test. Earlier
+₹40,000/month entries below are historical evidence, not the live offer.
 
-**WHAT IS TRUE in this working tree.** Founder authorized a signed-in `/app`
-presentation pass plus a date/photo truth fix. A future cited date is the next
-charge, not a paid invoice plus one month. Confirm this line splits Last paid
-and Next billing. A Manage Subscription screenshot that prints `Cost ₹427 /
-month` and `Next billing cycle starts on September 20, 2026` prefills 427 + INR
-and next billing 2026-09-20, leaves merchant blank (Premium is not a vendor),
-and never stores that cycle as “invoice paid”. Home cards scan merchant, amount,
-and a calendar due date. Weekday cues stay inside the monthly decision window.
-Home “today” is Asia/Kolkata. Existing stored +1-month next dates correct on
-read when the latest evidence date is still in the future.
+**ONE LIVE OFFER.** The first ten prospects receive the same offer: a one-time
+₹14,999 payment for one pilot month, covering one policy setup, up to ten real
+proposals, up to four weekly 30-minute reconciliation reviews, and up to two
+additional founder-support hours. There is no decision-response SLA and no
+automatic renewal. A second month requires a separate purchase. If Vognary
+cannot activate within ten business days after payment, the buyer may request a
+full refund.
 
-**WHAT IS NOT TRUE.** This is not a public redesign, a new design system, or
-auto merchant-match. Official UX/trust scores do not rise from this SHA. A live
-photo still needs production vision (`ANTHROPIC_API_KEY` +
-`AI_MONTHLY_BUDGET_INR`); Vercel does not run Tesseract.
+**SEVEN-DAY TEST.** Contact the five founder-qualified prospects, then fifteen
+plausible buyers labeled `EXPLORATORY`; exploratory rows keep `qualified_at`
+blank and spend `UNMEASURED`. Run at least ten substantive behavioral
+conversations and make ten identical offers to credible buyers. Two upfront
+payments by Day 7 are `GO`; one is `REWORK`; zero of ten offers pay means the
+offer or economic value failed. Fewer than three genuine pre-spend examples in
+ten conversations sends the next test back to post-spend Recovery.
 
-**NEXT HUMAN ACTIONS:** deploy this SHA. Confirm the X.com card shows 20 Sep
-2026, not 20 Oct / 54 days. Drop a Manage Subscription screenshot and confirm
-next billing prefills. Continue the five first-touch sends and Track F.
+**CUSTOMER-DATA HARD STOP.** Before an independent security assessment closes,
+use behavioral interviews and synthetic demonstrations only. Do not put a
+prospect's real merchant, amount, proposal, receipt, contract, credential, or
+financial evidence into Vognary. Exit requires zero open Critical/High findings
+and zero open Medium findings that can affect authentication, authorization,
+tenant isolation, money, evidence, privacy, or durability. Do not claim
+“highest security,” “Apple-secure,” “bank-grade,” certification, or a passed
+assessment before dated scope and retest evidence exist.
 
-**HARD STOP:** no public `/` restyle, no token rewrite, no invented X.com, no
-Gmail OAuth, no Standard Checkout.
+**PRODUCTION PREPARATION MAY PROCEED FAIL-CLOSED.** Freshly verify the current
+exact HEAD, repair any CI/account blocker, prove an encrypted `pre-0057` object
+download and disposable restore, apply bounded `0057`, then canonical `0058`
+and `0059`. Keep `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS` unset. Enroll one exact
+workspace UUID only after both cleared payment and the assurance exit.
 
-## Live state — 2026-08-27 (founder: public /pay is the Razorpay Payment Link)
+**IMPLEMENTATION CHECKPOINT — RECONCILED LOCAL CANDIDATE, NOT RELEASED.** The canonical
+offer is version 3: one-time ₹14,999 for one month, ten proposals, four weekly
+30-minute reconciliation reviews, two additional founder-support hours, and a
+ten-business-day activation/refund boundary. `/pay`, Terms, Contact, About,
+agent content, trust signals, invoice templates, founder operations, and the
+private CRM schema agree. Hosted collection stays unavailable unless an operator
+records exact `one-time` mode. The gitignored CRM now has 35 unique rows: the
+original 20 are preserved, five are `QUALIFIED`, fifteen newly researched rows
+are explicitly `EXPLORATORY`, and fifteen older sourced rows remain unselected.
+Exploratory rows keep qualification, spend, and all funnel events unmeasured.
 
-> **SUPERSEDED as live instruction** by the Home date/photo block at the top.
-> `/pay` collection remains true. Sell and Track F still bind.
-> Composite remains **1.5**.
+Production Control enrollment now fails closed unless the exact workspace UUID
+appears in both enrollment and cleared-payment lists and an independent
+assessment plus remediation retest has valid dates, private artifact hashes,
+zero open Critical/High or data-impacting Medium findings, and an assessed
+commit matching the deployed commit. Unknown runtime environments, malformed
+UUID lists, missing evidence, and SHA drift close access. Internal readiness
+reports only a safe status, blocker reason, and count; public proof additionally
+requires separate disclosure approval. Threat model, incident runbook, and
+synthetic independent-assessment brief live under `docs/security/`. Incident
+commander and backup remain **UNASSIGNED**, so customer data stays blocked.
 
-**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Composite remains **1.5**. Production
-Control remains unenrolled on verified schema **0056**. Sell and Track F still bind.
+The parallel Recovery/front-door work is now reconciled into this same local
+candidate. `/start` preserves PDF/CSV/photo ingestion, cites evidence, and stops
+before an unsigned guest decision; signed-in Control is restored as the default
+desk only after its fail-closed enrollment brief clears. Now remains the
+Recovery decision/evidence surface. Existing mandate authority is inspectable
+and revocable only in the separate Automation view; the retired Autopilot Home
+and spend strip do not return. Cited due dates prefer future source evidence,
+confirmed photo drafts survive partial acceptance, the 320–390px file input no
+longer overflows, and cited evidence rows retain semantic list structure.
+The frontend foundation now renders the landing cap through an exact minor-unit
+money value with explicit frozen provenance and route-scopes workspace-only CSS.
+`EvidenceChip` and `AuthorizationCap` exist as unconsumed atoms; they do not add
+or imply a product capability until a bounded call site adopts them.
 
-**Scoreboard row:** business validation. **Loop step:** explicit offer → cleared
-₹14,999 subscription payment.
+Exact-tree validation on Node 22.23.2: ESLint PASS with zero errors and one
+longstanding profile-navigation warning · typecheck PASS · public claims **32
+surfaces** PASS · design tokens **67 components** PASS · research pack and brand
+assets PASS · unit **1125/1125** PASS · disposable PostgreSQL **176/176** PASS ·
+production and full dependency audits **0 vulnerabilities** · standalone build
+PASS · performance budget PASS (`/` 183.0 KB JS, `/app` 183.4 KB, `/verify`
+181.1 KB; public/verify CSS 11.8 KB, `/app` CSS 15.3 KB) · Lighthouse PASS
+(landing median LCP **1.773s**, performance **97**; login **100**; verify **100**;
+accessibility and best practices **100**) · exact standalone public browser
+matrix **60/60** PASS · staged
+signed-in browser matrix **68/68** PASS with four receipt-inbox environment
+skips · desktop/mobile Customer #0 real-handler PostgreSQL journey **2/2** PASS ·
+14-route desktop/mobile visual/runtime sweep returns 200 with zero horizontal
+overflow, console errors, or page errors · 60-capture public audit across
+390/768/1440 widths and light/dark preferences reports no layout or touch-target
+findings · `git diff --check` PASS. This is
+code-proven local evidence, not a release, assessment, customer-data approval,
+or paid-pilot result.
 
-**WHAT IS TRUE in this working tree.** Founder authorized a public pay page at
-`/pay` for the Commitment Control private pilot. The price is server-owned
-₹14,999/month INR as a **Razorpay Subscription** (plan + per-customer mandate),
-not a one-time Payment Link. Collection is a founder-created Subscription
-`short_url` in `COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL` (`https` `rzp.io` or
-`pages.razorpay.com` only). One link binds one subscriber. Blank env keeps `/pay`
-honest and unconfigured. `/api/checkout` remains `410`. Standard Checkout, test
-keys, and the retired ₹999 audit SKU are not used. Vognary still never
-auto-approves or moves vendor money.
-
-**WHAT IS NOT TRUE.** A Subscription Link is not a paid customer. GST on top of
-₹14,999 would break the ₹15,000 UPI Autopay PIN-free cap. Contacted /
-conversations / offers / payments remain unmeasured until the CRM records them.
-Do not claim enterprise scale or live Control enrollment from this page.
-
-**NEXT HUMAN ACTIONS:** in Razorpay **Live** create a monthly ₹14,999 **Plan**,
-then a **Subscription** (not a Payment Link). Paste the `rzp.io` short URL into
-`COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL` on Vercel Production and `.env.local`,
-redeploy, open `/pay`. Continue the five first-touch sends and Track F.
-
-**HARD STOP:** no Standard Checkout modal, no `RAZORPAY_KEY_SECRET` on the
-client, no reopening `/api/checkout`, no fake paid-customer claims.
-
-## Live state — 2026-08-26 (founder: unique loop is the product)
-
-> **SUPERSEDED as live instruction** by the `/pay` Payment Link block at the top.
-> Unique-loop copy on `/` remains true. Sell and Track F still bind.
-> Composite remains **1.5**.
-
-**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Composite remains **1.5**. Official
-scoreboard rows do not become 10/10 from copy. Production Control remains
-unenrolled on verified schema **0056**. Founder owns sell and Track F on their
-clock; agents implement the loop.
-
-**Scoreboard row:** Product UX. **Loop:** cite evidence → propose assumption →
-policy annotates → named human freezes cap → later receipt reconciles.
-
-**WHAT IS TRUE in this working tree.** The five-step loop is one module, now on
-`/`, `/start` (empty and after cite), `/login`, `/about`, empty Home, the Control
-desk, and agent markdown. A typed guest assumption (not the Cursor example)
-prefills the signed-in composer. Desk bands are labeled as steps 2, 4, and 5.
-Landing highlights step 4 because the public desk *is* the authorization.
-
-**WHAT IS NOT TRUE.** Market proof and production enrollment cannot become 10
-from this SHA. Schema is still **0056**.
-
-**NEXT HUMAN ACTIONS:** deploy this unique-loop surface. Persist-on-confirm
-remains SHA `d68987a`. Do not write 10/10 onto the official scoreboard.
-
-**HARD STOP:** no public redesign, stock photography, auto merchant-match, Gmail
-OAuth, Luna/OpenRouter, or another marketing lecture from agents.
-
-## Live state — 2026-08-26 (Slice 4: monthly loop is Recovery persist)
-
-> **SUPERSEDED as live instruction** by the unique-loop surface pass at the top.
-> Persist-on-confirm on `main` (`d68987a`) remains true. Sell and Track F still
-> bind. Composite remains **1.5**.
-
-**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.** Sell and Track F still bind.
-Composite remains **1.5**.
-
-**Scoreboard row:** Product UX. **Loop step this task raises:** CONFIRM →
-REMEMBER (confirmed photo line persisted as `RECEIPT_PASTE` evidence). KEEP,
-watch, and later exact-name verify already exist; they cannot start if Confirm
-never saves.
-
-**WHAT IS TRUE in this working tree.** Monthly compounding is the Recovery
-loop, not a knowledge graph. Architecture lives in
-`src/lib/recovery/monthly-loop.ts`: confirm a cited line → persist it → human
-decision → watch the window → later cited receipt on the same exact merchant +
-currency. Signed-in **Confirm this line** now submits that line as receipt
-evidence immediately. Leftover photos stay in the overlay. A previously
-confirmed merchant may prefill only when that exact name is already printed on
-this photo. Guest `/start` still analyzes locally until sign-in. Confirm this
-line still never auto-commits money, never fuzzy-matches, and never invents
-cadence.
-
-**WHAT IS NOT TRUE.** This SHA is not production until deployed. Production
-schema is still verified **0056**. Contacted **0**, conversations **0**,
-offers **0**, payments **0**. Inbox forwarding and Control reconcile are
-separate enrolled loops and were not rebuilt. Do not claim a 10/10 monthly
-intelligence product.
-
-**NEXT HUMAN ACTIONS:** unchanged — sell the five qualified drafts; founder
-executes Track F. Deploy this persist wiring. Provision
-`ANTHROPIC_API_KEY` + `AI_MONTHLY_BUDGET_INR` only if production photo
-transcription is required. Do not route receipts through free public models.
-
-**HARD STOP:** no knowledge graph, RAG, embeddings, auto merchant-match, Gmail
-OAuth, workflow agent, or another product wave.
-
-## Live state — 2026-08-26 (GitHub Actions restored at $0 by public visibility)
-
-> **SUPERSEDED as live instruction** by Slice 4 monthly-loop persist at the top.
-> The public-repo Actions restore remains true. Sell and Track F still bind.
-> Composite remains **1.5**.
-
-**Scoreboard row:** production activation / backend readiness. **Loop:** hosted
-CI and Encrypted Backup Drill, which Track F needs.
-
-**WHAT IS TRUE.** `varunteja0/Vognary` is **public**. Standard GitHub-hosted
-Ubuntu runners are free on public repositories, so Actions no longer consume
-the private-minute quota and no longer require a spending limit or a card.
-The previously empty billing-blocked run
-[`32964415480`](https://github.com/varunteja0/Vognary/actions/runs/32964415480)
-was re-run and actually started `validate` (31 steps). Private CRM and `.env`
-remain gitignored. Do not treat a green check as customer proof.
-
-**WHAT IS NOT TRUE.** GitHub did not get a payment. The private-repo minute
-meter is not repaired. Making the repo private again will re-block hosted CI
-until the monthly quota resets or a card/budget exists. Exact-head CI has not
-finished this re-run yet. Production schema is still verified **0056**.
-
-**NEXT HUMAN ACTIONS:** unchanged — sell the five drafts; founder executes
-Track F when this re-run (or a later `main` run) is green. Encrypted Backup
-Drill `pre-0057` can be dispatched without paying for Actions while the repo
-stays public.
-
-**HARD STOP:** no auto merchant-match, Gmail OAuth, or a new product wave.
-
-## Live state — 2026-08-26 (first-session photo read unstick)
-
-> **SUPERSEDED as live instruction** by the public-repo Actions restore at the top.
-> The photo-read repair on `main` (`b0650e1`) remains true.
-> Sell and Track F still bind. Composite remains **1.5**.
-
-**Scoreboard row:** Product UX. **Loop:** first cited evidence → confirm the
-line → Recovery. Confirm this line still never auto-commits money.
-
-**WHAT IS TRUE in this working tree.** Dropping a bill photo no longer locks
-Merchant / Amount / Currency / Charge date while status is reading. Client and
-server photo reads abort at 8s. Vercel never runs WASM Tesseract on the
-isolate, so the event loop cannot starve those timeouts. A Manage Subscription
-screenshot that prints `Cost ₹427 / month` and `Next billing cycle starts on
-September 20, 2026` prefills **427 + INR**, leaves merchant blank (Premium is
-not a vendor), and does not treat the next cycle as the charge date. Vision
-transcription still runs only when `ANTHROPIC_API_KEY` and
-`AI_MONTHLY_BUDGET_INR` are live, still grounded to visible text, and still
-degrades to unreadable without a key. Guest `/start` and signed-in `/app` share
-the same confirm-the-line path.
-
-**WHAT IS NOT TRUE.** This SHA is not production until pushed. Dark UI photos
-on Vercel still need founder AI keys to transcribe; without them the fields
-stay editable and the photo is not treated as money. Contacted **0**,
-conversations **0**, offers **0**, payments **0**. Do not claim a 10/10 first
-session.
-
-**NEXT HUMAN ACTIONS:** unchanged — sell the five qualified drafts; founder
-executes Track F. Commit and deploy this repair when the working tree is
-accepted. Provision AI keys only if production photo transcription is required.
-
-**HARD STOP:** no auto merchant-match, Gmail OAuth, knowledge graph, workflow
-agent, or another operability/polish wave.
-
-## Live state — 2026-08-26 (Control Operability: code-complete locally; sell + founder ops)
-
-> **SUPERSEDED as live instruction** by the photo-read unstick block at the top.
-> Sell, Track F, production `0056`, and the product hard stop below remain true.
-> Entries below this marker are history. Do not open a new product wave, leap
-> plan, design rewrite, or 10/10 polish pass. Composite remains **1.5**. Official
-> scores do not rise until a conversation, offer, or payment is measured.
-
-**Scoreboard rows:** Product UX (journey-impossible, code-closed locally),
-production activation (still blocked), business validation (still 0 contact).
-**Loop:** proposal → policy → named human decision → frozen cap → Recovery
-evidence → reconciliation.
-
-**WHAT IS TRUE.** Waves 0–4 of the Control Operability Program are in `main` as
-sequential commits in this folder. Public and signed-in identity is Commitment
-Control (India-first 5–100). Mandate is omitted from customer nav. Guest `/start`
-is evidence intake, not Keep/Cancel. Unenrolled desks show workspace UUID.
-Additive `0058` invites plus Profile People and maker-checker when two authorizing
-admins exist. Additive `0059` binds complete policy, `EXPOSURE_NOT_CITED`, override
-reason, observation-only irregular cite, actor name snapshots, 42P01/42703 →
-`FEATURE_UNAVAILABLE`, Control desk evidence last-mile, pending-decision badge,
-and fail-closed Resend notify. Invoice pack is ₹40,000/month. `/api/checkout`
-stays 410. Local Control e2e **20/20**. Local code is 0056-safe via enrollment
-short-circuit; Control brief needs `0059` columns after enrollment. Autopilot
-engines (0031–0047) are retained and fail-closed; customers cannot reach them.
-
-**WHAT IS NOT TRUE.** Production Neon is still verified **0056**. No production
-pilot UUID is enrolled. Track F has not been executed. Contacted **0**,
-conversations **0**, offers **0**, payments **0**. The eight-item company test
-(two humans on production completing one proposal → named decision → linked
-receipt → verdict) is unrun. Do not claim READY.
-
-**NEXT HUMAN ACTIONS (parallel; do not wait for one to start the other):**
-
-1. **Sell.** Founder sends the five qualified first-touch drafts this week.
-   Frame a founder-delivered desk that runs after track F, not a live production
-   Control desk today. Do not send the remaining 15. A ready draft is not a sent
-   contact; update `contacted_at` only after send. P05 Smallest is rejected;
-   P11 iTuring stays unsendable until the finance-owner role is independently
-   proved.
-2. **Track F (founder executes; agents do not fake READY). Do not set a UUID
-   before `0057`.** Repair GitHub Actions billing → Encrypted Backup Drill
-   `pre-0057` from `main` → `apply-control-0057` with exact confirmation token
-   (head `0057_commitment_control_v0`, checksum
-   `eb1145d8248f5044c38472870525209560122fad5b4aa3175fb26f6edc9afc4f`) → apply
-   `0058_workspace_invites` then `0059_control_authority_hardening` with the
-   canonical schema applier (do **not** re-run `apply-control-0057`; do **not**
-   use `apply-latest`) → first finance-owner Google login → copy workspace UUID
-   from Profile → `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS` → redeploy → invite
-   the engineering lead as `member` → issue the Wave 4 invoice only when someone
-   pays.
-3. **After F, run the company test once** on production with those two people.
-
-**HARD STOP ON PRODUCT.** No SSO, RLS, vendor catalogs, Gmail OAuth, Slack,
-auto merchant-match, seats/GSTIN engine, design-system rewrite, in-app Razorpay,
-deleting Autopilot engines, or another operability/polish wave. Next product
-slice only from a live T0–T4 session, or money-wrong / trust-broken defects.
-Day-10 / Day-30 paid-pilot kills in THE-LAW still bind.
-
-**KILL / REVERT** if money meaning, DTO honesty, permissions, evidence links, or
-release gates regress. Do not auto-approve, auto-deny, purchase, provision,
-cancel, or move money.
+**MEASURED STATE — 2026-09-01 12:29 IST:** founder-qualified **5**; newly
+prepared exploratory contacts **15**; qualified contacts **3** (P10, P12, and
+stress-test P02, each verified `Pending` on LinkedIn); exploratory contacts
+**0**; current-thesis conversations **0**; offers **0**; invoices **0**;
+payments **0**; real proposals **0**; changed decisions **0**; renewals **0**.
+P01 exposed only Premium-gated Message plus Follow. Before P03 could be
+verified, LinkedIn logged the authenticated browser out after an anti-scraping
+protection request, so the channel is paused rather than routed around. These
+contacts raise activity, not the business-validation score.
 
 ## Live governance — 2026-08-25 (smart-risk doctrine)
 
@@ -323,12 +171,6 @@ override does not raise business validation and does not authorize a second
 polish pass before customer evidence.
 
 ## Live state — 2026-08-26 (independent review: REWORK the market test, freeze product scope)
-
-> **SUPERSEDED as live instruction** by the Control Operability block at the top.
-> Market facts below remain true (5 qualified / 0 contacted). The product-code
-> freeze was later unfrozen for Waves 0–4 only; that unfreeze is now closed.
-> Do not read this section as permission to wait for production before sending
-> the five drafts, or as permission to start another product wave.
 
 **Scoreboard rows:** business validation / distribution. **Loop step:** qualified
 contact → behavioral discovery → explicit offer → paid working session. Composite

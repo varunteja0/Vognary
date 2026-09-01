@@ -5,6 +5,9 @@ export type PilotPaymentLink =
 const allowedHosts = new Set(["rzp.io", "pages.razorpay.com"]);
 
 export function getPilotPaymentLink(): PilotPaymentLink {
+  if (process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE?.trim() !== "one-time") {
+    return { status: "unavailable" };
+  }
   const href = parsePilotPaymentLink(process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL);
   return href ? { status: "ready", href } : { status: "unavailable" };
 }

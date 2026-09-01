@@ -1,8 +1,8 @@
 # Manual Invoice — usage notes + email version
 
 Companion to [`invoice-template.html`](./invoice-template.html) (open in a browser →
-fill placeholders → Print → Save as PDF). The live commercial pack is **₹14,999/month
-Commitment Control private pilot**. The retired one-time ₹999 / ₹4,999 audit checkout
+fill placeholders → Print → Save as PDF). The live commercial pack is a **one-time
+₹14,999 Commitment Control private pilot for one month**. The retired one-time ₹999 / ₹4,999 audit checkout
 must stay off; `/api/checkout` remains `410`. The live pay page is `/pay`, which opens
 the founder-configured Razorpay Payment Link. Historical settlement handling lives in
 `docs/billing-activation-runbook.md`.
@@ -21,13 +21,16 @@ the founder-configured Razorpay Payment Link. Historical settlement handling liv
 ## Per-invoice checklist
 
 1. Duplicate your personal HTML copy → update number, date, client block, pilot month.
-2. Line item stays **Commitment Control private pilot (monthly)** at ₹14,999. Do not
+2. Line item stays **Commitment Control private pilot (one month)** at ₹14,999. It includes
+  one policy setup, up to ten proposals, up to four weekly 30-minute reconciliation
+  reviews, and up to two additional founder-support hours. Do not
    revive the retired spend-audit SKU or invent a success-fee line unless a later
    paid contract says so in writing.
 3. Do not invoice the retired one-time assisted-audit SKU.
 4. Print → Save as PDF → filename `VOG-2026-001.pdf`.
 5. Send with the email below; mark Paid in the tracker when Razorpay or UPI settles.
-6. Issue this pack only when someone actually pays. `/api/checkout` stays 410; `/pay` is the live collection page.
+6. Issue this pack only after an explicit offer is accepted. Mark it paid only after
+  settlement. `/api/checkout` stays 410; `/pay` is the live collection page.
 
 ## Email that carries the invoice
 
@@ -43,6 +46,11 @@ the founder-configured Razorpay Payment Link. Historical settlement handling liv
 > The desk is proposal → policy → named human authorization → frozen cap →
 > cited Recovery evidence → reconciliation. Vognary never purchases, provisions,
 > cancels, or moves money.
+>
+> This is a one-time pilot payment. Service and customer-data access begin after
+> the written activation conditions are complete. If Vognary cannot activate the
+> pilot within ten business days after payment, you may request a full refund. A
+> second month requires a separate purchase.
 >
 > [Your name]
 

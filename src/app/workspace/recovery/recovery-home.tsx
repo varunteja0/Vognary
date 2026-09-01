@@ -7,7 +7,6 @@ import {
   type DecisionOutcomeDto,
   type DecisionReviewSnooze,
   type HomeProjectionDto,
-  type ProjectionTotalDto,
   type PutCommitmentContextRequest,
   type PutDecisionRequest,
   type QuietNextChargeDto,
@@ -16,7 +15,6 @@ import {
 } from "@/lib/recovery/contracts";
 import { hasCitedRecurringSpendPicture } from "@/lib/recovery/domain";
 import {
-  chargeDueDisplay,
   chargeWhenLine,
   customerPhrases,
   decisionOutcomeTone,
@@ -34,6 +32,7 @@ import {
   reminderOffer,
   shouldOfferPaymentAsk,
 } from "@/lib/recovery/wow-first-session";
+import { RecoveryAttention } from "./recovery-attention";
 import {
   changeKindLabels,
   decisionReviewSnoozeLabels,
@@ -52,14 +51,13 @@ export function RecoveryHome({
   onAddEvidence,
   onOpenSources,
   onSeeAllCommitments,
+  onWorkspaceMutated,
   onDecide,
   onSaveContext,
   onReminderConsent,
   onPaymentAsk,
   receiptInbox,
   pendingDecisionId,
-  focusDecisionCommitmentId,
-  onDecisionFocusHandled,
   onCitedPictureRendered,
 }: {
   home: HomeProjectionDto;
@@ -76,11 +74,7 @@ export function RecoveryHome({
   onReminderConsent?: () => void;
   onPaymentAsk?: (answer: "yes" | "no") => void;
   receiptInbox: ReceiptInboxStatusDto | null;
-  onVeto?: (candidateId: string) => void;
-  pendingVetoId?: string | null;
   pendingDecisionId?: string | null;
-  focusDecisionCommitmentId?: string | null;
-  onDecisionFocusHandled?: () => void;
   onCitedPictureRendered?: (workspaceId: string) => void;
 }) {
   const [lastHook, setLastHook] = useState<{ title: string; body: string; artefact: string } | null>(null);
@@ -128,12 +122,9 @@ export function RecoveryHome({
     <div className="w-full max-w-4xl">
       <div className="stack-page">
         <CitedPictureActivation home={home} onCitedPictureRendered={onCitedPictureRendered} />
-        <SpendHero home={home} />
         <DecisionQueue
           home={home}
           pendingDecisionId={pendingDecisionId}
-          focusDecisionCommitmentId={focusDecisionCommitmentId}
-          onDecisionFocusHandled={onDecisionFocusHandled}
           lastHook={lastHook}
           onDecide={rememberDecision}
           onSaveContext={onSaveContext}
@@ -142,6 +133,12 @@ export function RecoveryHome({
           onReminderConsent={onReminderConsent}
         />
         <DecisionOutcomes home={home} onOpenCommitment={onOpenCommitment} />
+        <RecoveryAttention
+          embedded
+          onOpenCommitment={onOpenCommitment}
+          onOpenSources={onOpenSources}
+          onWorkspaceMutated={onWorkspaceMutated}
+        />
         <ComingLater home={home} onOpenCommitment={onOpenCommitment} onSeeAllCommitments={onSeeAllCommitments} />
         {shouldShowRecentChange(home) ? (
           <RecentChange items={home.changed.state === "COMPARED" ? home.changed.items : []} onOpenCommitment={onOpenCommitment} />
@@ -178,11 +175,9 @@ function SectionHeading({ id, children }: { id: string; children: string }) {
 function EmptyRecoveryHome({ onAddEvidence }: { onAddEvidence: () => void }) {
   return (
     <section aria-label="Get started" className="mx-auto max-w-xl py-8 text-center sm:py-14">
-      <h3 className="font-display text-3xl font-semibold text-(--ink)">{customerPhrases.emptyHomeTitle}</h3>
+      <h3 className="font-display text-3xl font-semibold tracking-tight text-(--ink)">{customerPhrases.emptyHomeTitle}</h3>
       <p className="mt-4 text-base leading-7 text-(--muted)">{customerPhrases.emptyHomeBody}</p>
-      <div className="mt-6 text-left">
-        <AuthorizationLoop activeStep={1} />
-      </div>
+      <div className="mt-6 text-left"><AuthorizationLoop activeStep={1} /></div>
       <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-8">
         {customerPhrases.addBills}
       </button>
@@ -242,50 +237,6 @@ function CitedPictureActivation({
   return null;
 }
 
-function SpendHero({
-  home,
-  onCitedPictureRendered,
-}: {
-  home: HomeProjectionDto;
-  onCitedPictureRendered?: (workspaceId: string) => void;
-}) {
-  const hasPicture = hasCitedRecurringSpendPicture(home);
-
-  useEffect(() => {
-    if (!hasPicture) return;
-    onCitedPictureRendered?.(home.workspace.id);
-  }, [hasPicture, home.workspace.id, onCitedPictureRendered]);
-
-  return (
-    <section aria-labelledby="home-spend">
-      <p className="text-sm text-(--muted)">Software commitments</p>
-      <h3 id="home-spend" className="mt-1 font-display text-3xl font-semibold text-(--ink)">
-        <MonthlyLine totals={home.monthlyTotals} />
-      </h3>
-      <p className="mt-2 text-sm text-(--muted)">
-        {home.activeCommitmentCount === 1
-          ? "1 active tool"
-          : `${home.activeCommitmentCount.toLocaleString("en-IN")} active tools`}
-      </p>
-    </section>
-  );
-}
-
-function MonthlyLine({ totals }: { totals: readonly ProjectionTotalDto[] }) {
-  if (!totals.length) return <span>No recurring amount yet</span>;
-  return (
-    <span>
-      {totals.map((total, index) => (
-        <span key={total.amount.currency}>
-          {index > 0 ? " · " : null}
-          <MoneyValue amount={total.amount} className="text-3xl font-semibold text-(--ink)" />
-          <span className="text-xl font-normal text-(--ink-soft)"> / month</span>
-        </span>
-      ))}
-    </span>
-  );
-}
-
 function NextChargeLine({ next, className = "" }: { next: QuietNextChargeDto; className?: string }) {
   return (
     <p className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 ${className}`}>
@@ -300,8 +251,6 @@ function NextChargeLine({ next, className = "" }: { next: QuietNextChargeDto; cl
 function DecisionQueue({
   home,
   pendingDecisionId,
-  focusDecisionCommitmentId,
-  onDecisionFocusHandled,
   lastHook,
   onDecide,
   onSaveContext,
@@ -311,8 +260,6 @@ function DecisionQueue({
 }: {
   home: HomeProjectionDto;
   pendingDecisionId?: string | null;
-  focusDecisionCommitmentId?: string | null;
-  onDecisionFocusHandled?: () => void;
   lastHook: { title: string; body: string; artefact: string } | null;
   onDecide: (request: PutDecisionRequest) => void;
   onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
@@ -324,16 +271,11 @@ function DecisionQueue({
   const next = home.nextQuietCharge;
   const comingUp = shouldShowComingUp(home);
   const watching = home.decisionOutcomes.some((outcome) => outcome.kind === "WATCHING") || lastHook !== null;
-
-  useEffect(() => {
-    if (!focusDecisionCommitmentId || !queue.some((card) => card.commitmentId === focusDecisionCommitmentId)) return;
-    onDecisionFocusHandled?.();
-  }, [focusDecisionCommitmentId, onDecisionFocusHandled, queue]);
   if (!queue.length) {
     return (
       <section aria-labelledby="recovery-decisions">
         {lastHook ? <DecisionHook hook={lastHook} onReminderConsent={onReminderConsent} /> : null}
-        <h3 id="recovery-decisions" className="font-display text-2xl font-semibold text-(--ink)">
+        <h3 id="recovery-decisions" className="font-display text-2xl font-semibold tracking-tight text-(--ink)">
           {watching ? customerPhrases.watchingHomeTitle : customerPhrases.quietHomeTitle}
         </h3>
         <p className="mt-2 text-sm leading-6 text-(--muted)">
@@ -354,7 +296,6 @@ function DecisionQueue({
           <p className="font-data text-xs text-(--muted)">{`${queue.length.toLocaleString("en-IN")} charges need you`}</p>
         ) : null}
       </div>
-      <p className="text-sm leading-6 text-(--muted)">{customerPhrases.decideNowIntro}</p>
       <div className="grid gap-3">
         {queue.map((card, index) => (
           <DecisionCard
@@ -362,7 +303,6 @@ function DecisionQueue({
             card={card}
             prominent={index === 0}
             pending={pendingDecisionId === card.commitmentId}
-            focused={focusDecisionCommitmentId === card.commitmentId}
             onDecide={onDecide}
             onSaveContext={onSaveContext}
             onOpenCommitment={onOpenCommitment}
@@ -375,13 +315,13 @@ function DecisionQueue({
   );
 }
 
+const primaryDecisions = ["KEEP", "MONITOR", "CANCEL"] as const;
 const reviewSnoozes = ["TOMORROW", "THREE_DAYS_BEFORE", "ONE_DAY_BEFORE"] as const satisfies readonly DecisionReviewSnooze[];
 
 function DecisionCard({
   card,
   prominent,
   pending,
-  focused = false,
   onDecide,
   onSaveContext,
   onOpenCommitment,
@@ -390,7 +330,6 @@ function DecisionCard({
   card: DecisionCardDto;
   prominent: boolean;
   pending: boolean;
-  focused?: boolean;
   onDecide: (request: PutDecisionRequest) => void;
   onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
   onOpenCommitment: (commitmentId: string) => void;
@@ -405,21 +344,13 @@ function DecisionCard({
   const reviewPanelId = useId();
   const purposeId = useId();
   const keepPrimary = keepIsPrimary(card.reasonKeys);
+  const sentence = card.sentence?.trim() || `${card.merchant} charges ${card.charge.display}.`;
   const quote = card.excerpt?.trim() || null;
-  const inWindow = card.daysAway !== null && card.daysAway >= 0 && card.daysAway <= 7;
-  const dueLine = chargeDueDisplay(card.dueDate ? formatDay(card.dueDate) : null, card.daysAway);
   return (
-    <article className="decision" data-lead={prominent} data-decision-focus={focused ? "true" : undefined}>
+    <article className="decision" data-lead={prominent}>
       <div className="min-w-0">
-        {inWindow ? <p className="decision-cue">{card.headline}</p> : null}
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h4 className="decision-merchant">{card.merchant}</h4>
-          <span className="decision-amount">{card.charge.display}</span>
-        </div>
-        {dueLine ? <p className="decision-due">{dueLine}</p> : null}
-        {card.provisional ? (
-          <p className="decision-stake">Seen once. Cadence is not proven.</p>
-        ) : null}
+        <p className="decision-cue">{card.headline}</p>
+        <h4 className="decision-sentence">{sentence}</h4>
       </div>
 
       {quote ? (
@@ -483,32 +414,47 @@ function DecisionCard({
       <div>
         <div className="decision-actions">
           <div role="group" aria-label="Your choice" className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => onDecide({ commitmentId: card.commitmentId, decision: "KEEP", action: "KEEP" })}
-              className={`btn btn-sm ${keepPrimary ? "btn-primary" : "btn-ghost"}`}
-            >
-              Keep
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              aria-expanded={reviewOpen}
-              aria-controls={reviewPanelId}
-              onClick={() => setReviewOpen((open) => !open)}
-              className={`btn btn-sm ${keepPrimary ? "btn-ghost" : "btn-primary"}`}
-            >
-              Review later
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => onDecide({ commitmentId: card.commitmentId, decision: "CANCEL", action: "PLAN_TO_CANCEL" })}
-              className="btn btn-sm btn-quiet-danger"
-            >
-              Plan to cancel
-            </button>
+            {primaryDecisions.map((decision) => {
+              if (decision === "KEEP") {
+                return (
+                  <button
+                    key={decision}
+                    type="button"
+                    disabled={pending}
+                    onClick={() => onDecide({ commitmentId: card.commitmentId, decision, action: "KEEP" })}
+                    className={`btn btn-sm ${keepPrimary ? "btn-primary" : "btn-ghost"}`}
+                  >
+                    Keep
+                  </button>
+                );
+              }
+              if (decision === "MONITOR") {
+                return (
+                  <button
+                    key={decision}
+                    type="button"
+                    disabled={pending}
+                    aria-expanded={reviewOpen}
+                    aria-controls={reviewPanelId}
+                    onClick={() => setReviewOpen((open) => !open)}
+                    className={`btn btn-sm ${keepPrimary ? "btn-ghost" : "btn-primary"}`}
+                  >
+                    Review later
+                  </button>
+                );
+              }
+              return (
+                <button
+                  key={decision}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => onDecide({ commitmentId: card.commitmentId, decision, action: "PLAN_TO_CANCEL" })}
+                  className="btn btn-sm btn-quiet-danger"
+                >
+                  Plan to cancel
+                </button>
+              );
+            })}
           </div>
         </div>
         <div id={reviewPanelId} hidden={!reviewOpen}>
@@ -661,7 +607,7 @@ function DecisionHook({
 function PaymentAsk({ onAnswer }: { onAnswer: (answer: "yes" | "no") => void }) {
   return (
     <section className="stack-section" aria-labelledby="payment-ask">
-      <h3 id="payment-ask" className="font-display text-lg font-semibold text-(--ink)">
+      <h3 id="payment-ask" className="font-display text-lg font-semibold tracking-tight text-(--ink)">
         {paymentAskQuestion}
       </h3>
       <div className="mt-3 flex flex-wrap gap-2">

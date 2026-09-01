@@ -34,7 +34,7 @@ export default function SecurityPage() {
     <main className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="inline-flex items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
             <VognaryMark size={22} />
             Vognary
           </Link>
@@ -44,6 +44,7 @@ export default function SecurityPage() {
           <span className="folio" data-folio="Trust">Security</span>
           <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">How Vognary handles data</h1>
           <p className="mt-3 text-sm leading-7 text-(--muted)">Google is used for sign-in only. Receipt mail enters through a signed provider webhook, is bounded before parsing, and is saved only through the canonical Recovery workspace.</p>
+          <p className="mt-3 text-sm leading-7 text-(--muted)">Independent security assessment and remediation retest are not yet proven for this release. Real customer financial data remains blocked until that gate closes.</p>
           <div className="mt-8 grid gap-3">
             {trustAnswers.map((item) => (
               <div key={item.title} className="inset p-4">

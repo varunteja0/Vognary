@@ -287,7 +287,9 @@ test("guest start and signed-in add-a-bill share confirm-the-line", () => {
   const confirm = readFileSync(new URL("../src/app/workspace/recovery/ui/confirm-receipt-line.tsx", import.meta.url), "utf8");
   assert.match(start, /fetchReceiptLineProposal/);
   assert.match(start, /ConfirmReceiptLine/);
-  assert.match(start, /chargeDueDisplay/);
+  assert.match(start, /getGuestProposalDraftSnapshot/);
+  assert.match(start, /AuthorizationLoop/);
+  assert.doesNotMatch(start, /guestDecisionHookCopy|keepIsPrimary|PLAN_TO_CANCEL/);
   assert.match(start, /knownMerchantsFromNames/);
   assert.match(add, /fetchReceiptLineProposal/);
   assert.match(add, /ConfirmReceiptLine/);

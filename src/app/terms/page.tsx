@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   },
 };
 
-const effectiveDate = "27 August 2026";
+const effectiveDate = "1 September 2026";
 
 const terms = [
   ["1. The service", "Vognary is software for discovering, organizing, forecasting, reviewing, and documenting recurring financial commitments from available evidence. Vognary is not a bank, payment institution, account aggregator, broker, investment adviser, insurance adviser, accountant, law firm, or cancellation service."],
@@ -26,7 +26,7 @@ const terms = [
   ["8. Your content and permissions", "You retain rights in data and evidence you submit. You grant Vognary the limited permission needed to process it for the product functions you request, secure the service, and meet legal obligations. Vognary does not acquire ownership of your financial evidence."],
   ["9. Privacy and deletion", "Processing is described in the Privacy Notice. Deleting a workspace or account revokes its receipt address and removes Vognary-held active product data through the deletion workflow. Provider-held email copies, limited security or legal records, and encrypted backup copies can remain under their separate retention or recovery periods."],
   ["10. Availability", "Vognary can change, pause, lose provider access, contain errors, or require migration. Vognary may suspend a connection or account to protect users, investigate abuse, comply with law, or address a security risk. Material product claims follow the status displayed for each source."],
-  ["11. Payments", "The Commitment Control private pilot is a monthly Razorpay subscription of ₹14,999. When online collection is configured, /pay opens a Razorpay Subscription Link. The first successful payment authorizes the mandate; later cycles are invoiced and charged by Razorpay until the subscription is cancelled, completed, or halted. Vognary does not store card, UPI, or bank credentials and does not itself debit accounts. One Subscription Link binds one subscriber. The retired public checkout route remains unavailable. Keep Razorpay's confirmations; email support@vognary.com for a letterhead receipt. GST is charged only when a GSTIN is stated on the invoice; the listed price does not include GST. Request a full refund before the first paid month starts; after work begins, eligibility follows applicable law."],
+  ["11. Payments", "The Commitment Control private pilot costs ₹14,999 as a one-time payment for one month. It includes one policy setup, up to ten proposals, up to four weekly 30-minute reconciliation reviews, and up to two additional founder-support hours. Service and customer-data access begin only after the written activation conditions, including the required independent security review, are complete. If Vognary cannot activate the pilot within ten business days after payment, you may request a full refund. A second month requires a separate purchase and does not renew automatically. Vognary does not store card, UPI, or bank credentials and does not itself debit accounts. The retired public checkout route remains unavailable. Keep the payment provider's confirmation; email support@vognary.com for a letterhead receipt. GST is charged only when a GSTIN is stated on the invoice; the listed price does not include GST. After pilot work begins, further refund eligibility follows applicable law."],
   ["12. Warranty disclaimer", "To the extent permitted by law, Vognary is provided on an as-available basis. Vognary does not warrant uninterrupted provider access, universal discovery, exact forecasts, merchant cooperation, or that a suggested action is suitable for your legal or financial situation. Mandatory consumer rights are not excluded."],
   ["13. Liability", "To the extent permitted by law, Vognary is not responsible for losses caused by decisions taken without verifying source evidence, provider outages, unauthorized account access outside Vognary's reasonable control, or obligations that continue after a payment method is stopped. Liability that cannot legally be excluded remains unaffected."],
   ["14. Governing rules", "These terms are governed by applicable laws of India, subject to mandatory consumer protections and the jurisdiction of a competent court. This page does not claim legal or regulatory approval."],
@@ -38,7 +38,7 @@ export default function TermsPage() {
     <main id="ledger-main" className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="inline-flex items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
             <VognaryMark size={22} />
             Vognary
           </Link>

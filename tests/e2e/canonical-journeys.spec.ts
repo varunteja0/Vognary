@@ -23,7 +23,7 @@ test("legacy mode URLs are crawlable tombstones without demo records", async ({ 
   }
 });
 
-test("mobile production entry keeps the forwarding action focused and bounded", async ({ page }) => {
+test("mobile production entry keeps the authorization action focused and bounded", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
   const initial = await pageMetrics(page);

@@ -13,8 +13,9 @@ test("the workspace wires Sources and delegates account settings to the profile 
   assert.match(workspaceSource, /import \{ RecoverySources \} from "\.\/recovery-sources"/);
   assert.match(workspaceSource, /<RecoverySources/);
   assert.match(workspaceSource, /href="\/profile"/);
-  assert.match(workspaceSource, /primaryViews\.length >= 5\s*\n?\s*\? "grid-cols-5"/);
+  assert.match(workspaceSource, /const navColumnsClass = primaryViews\.length >= 5\s*\n?\s*\? "grid-cols-5"/);
   assert.match(workspaceSource, /primaryViews\.length === 4 \? "grid-cols-4" : "grid-cols-3"/);
+  assert.match(workspaceSource, /viewnav \$\{navColumnsClass\}/);
   assert.doesNotMatch(workspaceSource, /grid-cols-6/);
   assert.doesNotMatch(workspaceSource, /RecoveryProfile/);
   assert.doesNotMatch(workspaceSource, /\bPROFILE\b/);
@@ -74,8 +75,8 @@ test("the canonical Home keeps server-published action and coverage fields", () 
   assert.match(homeSource, /home\.coverage/);
 });
 
-test("the canonical Home renders server totals without doing money math itself", () => {
-  assert.match(homeSource, /home\.monthlyTotals/);
+test("the canonical Home renders server money values without doing money math itself", () => {
+  assert.match(homeSource, /<MoneyValue amount=/);
   assert.doesNotMatch(homeSource, /\.reduce\(|BigInt\(|parseFloat\(|Number\(/);
 });
 

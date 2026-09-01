@@ -17,7 +17,6 @@ import {
 } from "@/lib/recovery/start-session";
 import { stampForCycleAction } from "@/lib/recovery/decision-cycle";
 import { isReceiptImageFile } from "@/lib/recovery/wow-first-session";
-import { knownMerchantsFromNames, persistTextFromConfirmedLine } from "@/lib/recovery/monthly-loop";
 import {
   recoveryLimits,
   type CommitmentSummaryDto,
@@ -37,9 +36,10 @@ import { RecoveryCommitments, type CommitmentsHandlers } from "./recovery-commit
 import { RecoveryOverlay } from "./ui/overlay";
 import { CorrectionForm, EvidenceInspector } from "./recovery-evidence-panels";
 import { RecoveryHome } from "./recovery-home";
+import { RecoveryMandate } from "./recovery-mandate";
 import { RecoverySources } from "./recovery-sources";
-import { groupCommitments, representativeCommitment, customerPhrases } from "./present";
 import { AuthRequiredBlock, FailureBlock, LoadingBlock, OfflineBlock, StateBlock } from "./recovery-states";
+import { offAutopilotNoticeReadiness } from "@/lib/recovery/notice-readiness";
 import {
   correctionPatchFromDraft,
   evidenceRequestFromDraft,
@@ -502,8 +502,6 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     if (controlDefaultRef.current || !controlAvailable) return;
     controlDefaultRef.current = true;
     if (viewChosenByReaderRef.current || state.view !== "HOME") return;
-    // Opening on Control is not a view change the reader made, so the heading
-    // focus that follows a deliberate switch is suppressed for this one hop.
     viewChangedRef.current = false;
     dispatch({ type: "VIEW_SELECTED", view: "CONTROL" });
   }, [controlAvailable, state.view]);
@@ -585,32 +583,6 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     else dispatch({ type: "MUTATION_FAILED", failure: result });
   }
 
-  async function persistConfirmedLine(clientRef: string, text: string) {
-    if (state.workspaceVersion === null || state.pending) return;
-    const request = evidenceRequestFromDraft({
-      ...state.evidenceDraft,
-      mode: "RECEIPT_PASTE",
-      receiptText: persistTextFromConfirmedLine(state.evidenceDraft.receiptText, text),
-    }, "RECEIPT_PASTE");
-    if (!request) return;
-    const idempotencyKey = newIdempotencyKey();
-    dispatch({ type: "EVIDENCE_SUBMIT_STARTED", idempotencyKey });
-    const result = await transport.submitEvidence(request, { workspaceVersion: state.workspaceVersion, idempotencyKey });
-    if (result.ok) {
-      dispatch({ type: "IMAGE_LINE_CONFIRMED", clientRef, text });
-      dispatch({
-        type: "EVIDENCE_SUBMITTED",
-        submission: result.data.submission,
-        home: result.data.home,
-        commitments: result.data.commitments,
-        total: result.data.commitmentTotal,
-        meta: result.meta,
-      });
-    } else {
-      dispatch({ type: "EVIDENCE_SUBMIT_FAILED", failure: result });
-    }
-  }
-
   async function submitEvidence(mode: SourceType) {
     if (state.workspaceVersion === null) return;
     const request = evidenceRequestFromDraft(state.evidenceDraft, mode);
@@ -631,6 +603,10 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     } else {
       dispatch({ type: "EVIDENCE_SUBMIT_FAILED", failure: result });
     }
+  }
+
+  function persistConfirmedLine(clientRef: string, text: string) {
+    dispatch({ type: "IMAGE_LINE_CONFIRMED", clientRef, text });
   }
 
   async function prepareFiles(files: readonly File[]) {
@@ -685,11 +661,6 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     if (state.status.kind !== "READY" || !state.home) return;
     const record = readStartSessionRecord();
     if (!record?.decisions.length) return;
-    if (controlAvailable) {
-      startReplayRef.current = true;
-      clearStartSessionRecord();
-      return;
-    }
     if (!state.home.decisionQueue.length) return;
     startReplayRef.current = true;
     const home = state.home;
@@ -717,9 +688,9 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         );
       }
     })();
-    // One-shot replay of leftover /start Keep-Cancel records; Control enrolled workspaces discard them.
+    // One-shot replay of /start decisions; decide is the current snapshot writer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.home, state.status.kind, controlAvailable]);
+  }, [state.home, state.status.kind]);
 
   async function updateReceiptInbox(action: "PROVISION" | "ROTATE" | "REVOKE") {
     const activeAliasId = state.receiptInbox?.alias?.id ?? null;
@@ -734,11 +705,23 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     else dispatch({ type: "SOURCE_ACTION_FAILED", failure: result });
   }
 
-  async function vetoCandidate(candidateId: string) {
+  async function signMandate() {
     if (state.workspaceVersion === null) return;
     const idempotencyKey = newIdempotencyKey();
-    dispatch({ type: "VETO_STARTED", candidateId, idempotencyKey });
-    const result = await transport.vetoAutopilotCandidate(candidateId, { workspaceVersion: state.workspaceVersion, idempotencyKey });
+    dispatch({ type: "MANDATE_STARTED", action: "SIGN", idempotencyKey });
+    const result = await transport.signStandingMandate({ workspaceVersion: state.workspaceVersion, idempotencyKey });
+    if (!result.ok) {
+      dispatch({ type: "MUTATION_FAILED", failure: result });
+      return;
+    }
+    await loadSnapshot();
+  }
+
+  async function revokeMandate() {
+    if (state.workspaceVersion === null) return;
+    const idempotencyKey = newIdempotencyKey();
+    dispatch({ type: "MANDATE_STARTED", action: "REVOKE", idempotencyKey });
+    const result = await transport.revokeStandingMandate({ workspaceVersion: state.workspaceVersion, idempotencyKey });
     if (!result.ok) {
       dispatch({ type: "MUTATION_FAILED", failure: result });
       return;
@@ -810,33 +793,27 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     && state.home !== null
     && !hasGuidedAddStep
     && (state.view !== "CONTROL" || awaitingControlEvidence);
+  const mandateAvailable = Boolean(state.home?.autopilot?.mandate)
+    || state.home?.autopilot?.noticeReadiness.state === "proven-ready";
   const controlPilotOff = controlDesk.unavailable;
-  // Autopilot engines stay fail-closed. The customer nav never offers Mandate.
   const primaryViews = recoveryViews.filter((view) =>
-    view !== "MANDATE" && (view !== "CONTROL" || controlAvailable));
+    (view !== "CONTROL" || controlAvailable)
+    && (view !== "MANDATE" || mandateAvailable));
   const navColumnsClass = primaryViews.length >= 5
     ? "grid-cols-5"
     : primaryViews.length === 4 ? "grid-cols-4" : "grid-cols-3";
-
-  useEffect(() => {
-    if (state.view !== "COMMITMENTS" || state.selectedCommitmentId || !state.commitments.length) return;
-    const groups = groupCommitments(state.commitments);
-    if (!groups.length) return;
-    dispatch({ type: "COMMITMENT_SELECTED", commitmentId: representativeCommitment(groups[0]!).id });
-  }, [state.commitments, state.selectedCommitmentId, state.view]);
   return (
-    <main id="recovery-workspace" className="relative px-4 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] pt-4 text-foreground sm:px-6 sm:pb-12 lg:px-8">
+    <main id="recovery-workspace" className="relative px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-5 text-foreground sm:px-6 sm:pb-10 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
-        <header className="flex flex-wrap items-center justify-between gap-3 pb-3">
-          <div className="inline-flex min-w-0 items-center gap-2.5">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex items-center gap-2.5">
             <VognaryMark size={24} />
             <h1 className="font-display text-lg font-semibold text-(--ink)">Vognary</h1>
-            <span aria-hidden className="hidden h-4 w-px bg-(--line-strong) sm:block" />
+          </div>
+          <div className="flex items-center gap-2">
             <p className="hidden font-data text-xs text-(--muted) sm:block">
               {state.workspaceVersion === null ? "Loading your workspace…" : "Saved to Vognary"}
             </p>
-          </div>
-          <div className="flex items-center gap-2">
             {showPersistentAdd ? (
               <button
                 id="workspace-add-bill"
@@ -872,7 +849,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           </div>
         ) : null}
 
-        <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 pb-[env(safe-area-inset-bottom,0px)] pt-1 sm:static sm:border-0 sm:border-b sm:border-b-line sm:bg-transparent sm:p-0">
+        <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 py-2 sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
           <ul className={`viewnav ${navColumnsClass}`}>
             {primaryViews.map((view) => (
               <li key={view} className="min-w-0">
@@ -894,11 +871,6 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
             ))}
           </ul>
         </nav>
-        {controlAvailable ? (
-          <p className="mt-2 hidden text-xs leading-5 text-(--muted) sm:block">
-            Control authorizes new spend. Now, Bills, and Sources hold cited evidence.
-          </p>
-        ) : null}
 
         <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{state.announcement}</p>
 
@@ -931,14 +903,11 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           className={
             state.view === "HOME" || state.view === "CONTROL"
               ? "sr-only"
-              : "mt-6 w-fit font-display text-2xl font-semibold text-(--ink) outline-none"
+              : "mt-6 w-fit font-display text-2xl font-semibold tracking-tight text-(--ink) outline-none"
           }
         >
           {recoveryViewLabels[state.view]}
         </h2>
-        {state.view === "COMMITMENTS" ? (
-          <p className="mt-1 text-xs leading-5 text-(--muted)">{customerPhrases.billsLedgerHint}</p>
-        ) : null}
 
         <div className="mt-4">
           {state.status.kind === "AUTH_REQUIRED" ? (
@@ -963,7 +932,6 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         >
           <RecoveryAddEvidence
             draft={state.evidenceDraft}
-            knownMerchants={knownMerchantsFromNames(state.commitments.map((item) => item.merchant))}
             submission={state.submission}
             failure={state.evidenceFailure}
             pending={state.pending?.kind === "EVIDENCE"}
@@ -975,7 +943,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
               onImageDrafts: (drafts) => dispatch({ type: "IMAGE_DRAFTS_ADDED", drafts }),
               onImageProposal: (clientRef, proposal, reason) => dispatch({ type: "IMAGE_DRAFT_PROPOSAL", clientRef, proposal, reason }),
               onRemoveSource: (clientRef) => dispatch({ type: "CSV_SOURCE_REMOVED", clientRef }),
-              onConfirmImageLine: (clientRef, text) => void persistConfirmedLine(clientRef, text),
+              onConfirmImageLine: persistConfirmedLine,
               onRemoveImageDraft: (clientRef) => dispatch({ type: "IMAGE_DRAFT_REMOVED", clientRef }),
               onSubmit: (mode) => void submitEvidence(mode),
             }}
@@ -1066,49 +1034,29 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     }
 
     if (state.view === "COMMITMENTS") {
+      return <RecoveryCommitments state={state} handlers={commitmentsHandlers} />;
+    }
+
+    if (state.view === "MANDATE") {
       return (
-        <RecoveryCommitments
-          state={state}
-          handlers={commitmentsHandlers}
-          queueEmpty={nowDecisionCount === 0}
+        <RecoveryMandate
+          mandate={state.home?.autopilot?.mandate ?? null}
+          executionEnabled={state.home?.autopilot?.executionEnabled ?? false}
+          noticeReadiness={state.home?.autopilot?.noticeReadiness ?? offAutopilotNoticeReadiness}
+          pendingKind={state.pending?.kind === "MANDATE_SIGN" ? "SIGN" : state.pending?.kind === "MANDATE_REVOKE" ? "REVOKE" : null}
+          online={state.online}
+          canSign={state.home?.workspace.role === "owner"}
+          canOperate={state.home?.workspace.role === "owner" || state.home?.workspace.role === "admin"}
+          handled={state.home?.autopilot?.handled ?? []}
+          needsHelp={state.home?.autopilot?.needsHelp ?? []}
+          attempts={state.home?.autopilot?.attempts ?? []}
+          onSign={() => void signMandate()}
+          onRevoke={() => void revokeMandate()}
         />
       );
     }
 
-    if (state.view === "MANDATE") {
-      return state.home ? (
-        <RecoveryHome
-          home={state.home}
-          commitmentTotal={state.commitmentTotal}
-          receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable}
-          onOpenCommitment={openCommitment}
-          onInspectCitedReceipt={(commitmentId, evidenceId) => inspectEvidence(commitmentId, evidenceId, "see-cited-receipt")}
-          onAddEvidence={() => dispatch({ type: "ADD_BILLS_OPENED" })}
-          onOpenSources={() => selectView("ADD_EVIDENCE")}
-          onSeeAllCommitments={() => selectView("COMMITMENTS")}
-          onDecide={(request) => void decide(request)}
-          onReminderConsent={() => void consentReminder()}
-          onPaymentAsk={(answer) => {
-            try {
-              window.sessionStorage.setItem("vognary.payment-ask", answer);
-            } catch {
-              // Written intent is research-only; missing storage does not change money.
-            }
-          }}
-          onSaveContext={(commitmentId, request) => void saveContext(commitmentId, request)}
-          onWorkspaceMutated={() => void loadSnapshot()}
-          receiptInbox={state.receiptInbox}
-          onVeto={(candidateId) => void vetoCandidate(candidateId)}
-          pendingVetoId={state.pending?.kind === "CANDIDATE_VETO" ? state.pending.candidateId : null}
-        pendingDecisionId={state.pending?.kind === "DECISION" ? state.pending.commitmentId : null}
-        focusDecisionCommitmentId={state.focusDecisionCommitmentId}
-        onDecisionFocusHandled={() => dispatch({ type: "DECISION_FOCUS_CLEARED" })}
-        onCitedPictureRendered={recordCitedPictureActivation}
-      />
-    ) : null;
-  }
-
-  return state.home ? (
+    return state.home ? (
       <RecoveryHome
         home={state.home}
         commitmentTotal={state.commitmentTotal}
@@ -1130,11 +1078,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         onSaveContext={(commitmentId, request) => void saveContext(commitmentId, request)}
         onWorkspaceMutated={() => void loadSnapshot()}
         receiptInbox={state.receiptInbox}
-        onVeto={(candidateId) => void vetoCandidate(candidateId)}
-        pendingVetoId={state.pending?.kind === "CANDIDATE_VETO" ? state.pending.candidateId : null}
         pendingDecisionId={state.pending?.kind === "DECISION" ? state.pending.commitmentId : null}
-        focusDecisionCommitmentId={state.focusDecisionCommitmentId}
-        onDecisionFocusHandled={() => dispatch({ type: "DECISION_FOCUS_CLEARED" })}
         onCitedPictureRendered={recordCitedPictureActivation}
       />
     ) : (

@@ -68,6 +68,23 @@ test("Commitment Control HTTP routes preserve auth, RBAC, ETags, and the complet
     assert.equal((await notEnrolled.json() as ApiFailure).error.code, "FEATURE_UNAVAILABLE");
     process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "*";
 
+    const previousNodeEnv = process.env.NODE_ENV;
+    Reflect.set(process.env, "NODE_ENV", "production");
+    process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = workspaceId;
+    process.env.COMMITMENT_CONTROL_PAID_WORKSPACE_IDS = workspaceId;
+    try {
+      const assessmentBlocked = await getControlBrief(new Request(`${baseUrl}/api/workspaces/current/control/brief`, {
+        headers: { cookie: ownerCookieHeader },
+      }));
+      assert.equal(assessmentBlocked.status, 503);
+      assert.equal((await assessmentBlocked.json() as ApiFailure).error.code, "FEATURE_UNAVAILABLE");
+    } finally {
+      if (previousNodeEnv === undefined) Reflect.deleteProperty(process.env, "NODE_ENV");
+      else Reflect.set(process.env, "NODE_ENV", previousNodeEnv);
+      process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "*";
+      delete process.env.COMMITMENT_CONTROL_PAID_WORKSPACE_IDS;
+    }
+
     const crossSite = await putControlPolicy(new Request(`${baseUrl}/api/workspaces/current/control/policy`, {
       method: "PUT",
       headers: {
@@ -194,6 +211,16 @@ test("Commitment Control HTTP routes preserve auth, RBAC, ETags, and the complet
     assert.equal(briefPayload.data.capabilities.canDecide, false);
     assert.equal(briefPayload.data.proposals[0]?.decision?.approvedCapMinor, "180000");
     assert.equal(briefPayload.data.proposals[0]?.reconciliations[0]?.verdict, "OVER_CAP");
+
+    await pool.query(
+      `delete from workspace_members where workspace_id = $1 and user_id = $2`,
+      [workspaceId, memberUserId],
+    );
+    const removedMember = await getControlBrief(new Request(`${baseUrl}/api/workspaces/current/control/brief`, {
+      headers: { cookie: memberCookieHeader },
+    }));
+    assert.equal(removedMember.status, 401);
+    assert.equal((await removedMember.json() as ApiFailure).error.code, "AUTH_REQUIRED");
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]).catch(() => undefined);
     await pool.query(`delete from users where id = any($1::uuid[])`, [[ownerUserId, memberUserId]]).catch(() => undefined);

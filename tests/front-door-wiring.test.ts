@@ -30,6 +30,8 @@ test("the landing states concise evidence and action boundaries without unsuppor
   assert.match(landingPreviewSource, /From two example receipts/);
   assert.match(landingPreviewSource, /unsupported facts stay unknown/);
   assert.match(landingPreviewSource, /writeGuestProposalDraft/);
+  assert.match(landingPreviewSource, /onClick=\{saveDraft\}/);
+  assert.doesNotMatch(landingPreviewSource, /useEffect/);
   assert.match(landingPreviewSource, /annotateLandingPolicy/);
   assert.match(landingSource, /Vognary never cancels a service or moves money/);
   assert.doesNotMatch(landingSource, /30 days/i);
@@ -58,6 +60,6 @@ test("static layout metadata remains readiness-neutral", () => {
   const metadataSource = layoutSource.slice(metadataStart, metadataEnd);
 
   assert.match(metadataSource, /Vognary - Decide before the obligation exists/);
-  assert.match(metadataSource, /Commitment Control for India-first 5–100 person AI-native companies/);
+  assert.match(metadataSource, /Commitment Control for India-first 20–100 person AI-native companies/);
   assert.doesNotMatch(metadataSource, /\b(?:forward(?:ed|ing)?|Gmail|bank|UPI|cancel(?:s|led|ling|lation|lations)?)\b/i);
 });

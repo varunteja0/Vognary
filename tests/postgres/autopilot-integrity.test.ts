@@ -24,6 +24,7 @@ import { drainAutopilotTestNoticeSends } from "../../src/lib/server/autopilot-ma
 import { currentlyConnectedSourceSql, queryAutopilotFunnel, standingMandateConsentExistsSql } from "../../scripts/lib/autopilot-funnel.mjs";
 import { createRecoveryCorrection, submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
 import { lookupCatalogProviderById } from "../../src/lib/recovery/provider-registry";
+import { addUtcMonths } from "../../src/lib/recovery/billing-year";
 import { withdrawConsentGrant } from "../../src/lib/server/consent-store";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
@@ -1381,11 +1382,13 @@ test("cited amount changes invalidate the shadow hash while ids stay the same; d
     );
     assert.equal(year.rows[0]?.year_start, year.rows[0]?.anchor);
     assert.notEqual(year.rows[0]?.year_start, "2027-01-01");
+    const anchor = year.rows[0]?.anchor;
+    assert.ok(anchor);
     await assert.rejects(
       invoiceWorkspacePeriod({
         workspaceId,
-        periodStart: "2027-08-01",
-        periodEnd: "2027-08-31",
+        periodStart: addUtcMonths(anchor, 11),
+        periodEnd: addUtcMonths(anchor, 12),
         currency: "INR",
       }),
       /billing anniversary/i,

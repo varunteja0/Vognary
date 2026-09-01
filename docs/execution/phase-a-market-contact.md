@@ -5,20 +5,20 @@
 > deadline and kill metric. Full doctrine: [`THE-LAW.md`](../THE-LAW.md).
 
 > **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md)
-> **Goal:** Prove companies will put Vognary before a real obligation and pay ₹14,999/month for a human-approved control workflow.
+> **Goal:** Prove companies will put Vognary before a real obligation and make a one-time ₹14,999 payment for a one-month human-approved control pilot.
 > **Owner:** Founder owns targeting, conversations, offers, contracts, and payment evidence. Agents support CRM structure, proposal intake, and evidence-safe artifacts.
-> **Day 10 gate:** 20 qualified targets contacted, 10 conversations, five explicit offers, and two upfront payments.
+> **Day 7 gate:** five qualified plus fifteen explicitly exploratory contacts reached, 10 substantive conversations, ten identical explicit offers, and two upfront payments.
 > **Day 30 gate:** three paid pilots, 30 pre-spend proposals, three materially changed/capped/declined decisions, at least 80% pre-spend arrival, and two paid renewals.
 
 ---
 
 ## 0. Success / stop criteria
 
-### Day 10 success
+### Day 7 success
 
-- 20 companies match the ICP using public evidence only.
+- Five companies match the strict ICP using public evidence; fifteen additional plausible buyers are contacted as `EXPLORATORY`, never counted as qualified.
 - 10 founder-confirmed conversations happen.
-- Five explicit ₹14,999/month offers are made.
+- Ten identical one-time ₹14,999 pilot offers are made.
 - Two pilots pay upfront. Written intent, invoice sent, and payment received remain separate fields.
 
 ### Day 30 success
@@ -40,13 +40,13 @@
 ### Measurable funnel
 
 ```text
-20 qualified targets
+5 qualified + 15 exploratory contacts
   → 10 conversations
-  → 5 explicit ₹14,999/month offers
-  → 2 upfront payments by Day 10
+  → 10 identical one-time ₹14,999 offers
+  → 2 upfront payments by Day 7
 ```
 
-Current Commitment Control counts (private CRM, 2026-08-26): sourced rows **20**, founder-qualified **5**, contacted **0**, conversations **0**, offers **0**, payments **0**. Historical Autopilot conversations do not count toward the new thesis. Drafts are not contacts.
+Current Commitment Control counts (private CRM, 2026-09-01): rows **35**; founder-qualified **5**; exploratory selected **15**; older sourced/unselected **15**; qualified contacted **3**; exploratory contacted **0**; conversations **0**; offers **0**; invoices **0**; payments **0**. P10, P12, and stress-test P02 have verified pending LinkedIn invitations. LinkedIn is paused after the authenticated browser logged out following an anti-scraping protection request. Historical Autopilot conversations do not count toward the new thesis. Drafts and opened profiles are not contacts.
 
 ---
 
@@ -59,9 +59,13 @@ Agents never infer `qualified`, `offered`, `paid`, `renewed`, or `decision_chang
 
 ### Required columns
 
+The closed `contact_cohort` vocabulary is `QUALIFIED | EXPLORATORY`. Exploratory
+rows keep `qualified_at` blank and never count toward the qualified cohort.
+
 | Column | Type | Values / notes |
 | --- | --- | --- |
 | `id` | string | `P01`, `P02`, … stable |
+| `contact_cohort` | enum | `QUALIFIED` \| `EXPLORATORY`. Exploratory rows keep `qualified_at` blank and never count as qualified. |
 | `company_name` | string | Private working identity; never commit the populated row |
 | `company_public_url` | URL | Canonical company source |
 | `india_entity_evidence_url` | URL | Public evidence of an India-registered operating entity |
@@ -82,7 +86,7 @@ Agents never infer `qualified`, `offered`, `paid`, `renewed`, or `decision_chang
 | `monthly_controllable_spend_minor` | integer string | Buyer-stated/cited amount only |
 | `monthly_controllable_spend_currency` | char(3) | Usually INR; never convert FX |
 | `working_session_at` | datetime | One real upcoming commitment was brought to the desk |
-| `offer_at` | datetime | Explicit ₹14,999/month offer made |
+| `offer_at` | datetime | Explicit one-time ₹14,999 pilot offer made |
 | `invoice_sent_at` | datetime | Invoice delivery; does not count as payment |
 | `payment_received_at` | datetime | Cleared upfront payment; the paid gate |
 | `payment_amount_inr` | integer | Cleared gross INR amount |
@@ -131,7 +135,7 @@ Agents never infer `qualified`, `offered`, `paid`, `renewed`, or `decision_chang
 
 ## 3. Offer and delivery contract
 
-Position this as a **founder-delivered control desk**, not naked SaaS. The paid pilot includes a policy workshop, up to 50 commitment evaluations, a 13-week obligation register, weekly reconciliation, and a one-business-day response SLA. It records decisions; it does not purchase, provision, cancel, or move money. Compare the job with adding fractional finance/procurement capacity; do not quote third-party market prices without a source in the private notes.
+Position this as a **founder-delivered control desk**, not naked SaaS. The one-time ₹14,999 pilot covers one month: one policy setup, up to ten real proposals, one 30-minute reconciliation review per week (maximum four), and up to two additional founder-support hours. It records decisions; it does not purchase, provision, cancel, or move money. Service and customer-data access begin only after the written activation conditions, including the required independent security review, are complete. If Vognary cannot activate within ten business days after payment, the buyer may request a full refund. A second month requires a separate purchase.
 
 ### First-touch frame
 
@@ -140,7 +144,7 @@ Hi {Name} — I’m running a founder-delivered Commitment Control pilot for rec
 
 Before the next AI, cloud, software, contractor, or campaign obligation is created, the desk shows cited existing exposure, checks your stated policy, and records a named human decision and frozen cap. Later bills are reconciled against that approval.
 
-The pilot is ₹14,999/month as a Razorpay subscription, including setup and weekly reconciliation. Vognary never auto-approves or moves money. Do you have one real upcoming commitment we could put through a 20-minute working session this week?
+The pilot is a one-time ₹14,999 payment for one month, including one policy setup, up to ten proposals, weekly reconciliation reviews, and bounded founder support. Vognary never auto-approves or moves money. Do you have one real upcoming commitment we could put through a 20-minute working session after the independent security review is complete?
 ```
 
 Do not discount, add a menu, or offer free implementation before the offer-ten gate. Record price-specific rejection separately from rejection of the underlying job.
@@ -165,12 +169,11 @@ Classify the conversation the same day. If most buyers describe only post-hoc bi
 
 | Day | Founder action | Evidence |
 | ---: | --- | --- |
-| 1–2 | Source and qualify 20 beachhead companies from public evidence; create no assumed spend facts | 20 CRM rows with source URLs |
-| 3–4 | Send 20 first touches in two batches | `contacted_at`, never drafts |
-| 5–8 | Run 10 behavioral conversations; book working sessions only for pre-spend pain | `conversation_at`, pain class, exact notes |
-| 6–9 | Make five explicit ₹14,999/month offers; invoice same day on yes | `offer_at`, `invoice_sent_at` |
-| 8–10 | Run paid working sessions with a real upcoming commitment | product rows plus CRM timing fields |
-| 10 | Apply the two-payment gate with cleared funds only | GO / REWORK / KILL worksheet in CONTINUE-HERE |
+| 1 | Send the five founder-qualified first touches | `contacted_at`, never drafts |
+| 2 | Source and send fifteen plausible buyers labeled `EXPLORATORY`; do not infer qualification or spend | `contact_cohort`, public URL, `contacted_at`; `qualified_at` stays blank |
+| 2–4 | Run at least 10 behavioral conversations; collect no real customer financial data in Vognary before independent security clearance | `conversation_at`, pain class, minimum necessary notes |
+| 3–6 | Make the identical one-time ₹14,999 offer to credible buyers until ten offers are recorded | `offer_at`, `invoice_sent_at` |
+| 7 | Apply the two-payment demand gate with cleared funds only; payment grants no data access before assurance clearance | GO / REWORK / KILL worksheet in CONTINUE-HERE |
 
 Agents may prepare sources, copy, redaction, and aggregate reports. Only the founder sends messages, confirms identities, records private notes, invoices, and marks payment.
 

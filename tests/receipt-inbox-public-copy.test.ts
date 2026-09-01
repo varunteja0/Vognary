@@ -19,7 +19,7 @@ test("public trust copy states the verified inbound and identity boundaries", ()
 
 test("the displayed notice date and consent version move together", () => {
   assert.match(privacy, /21 August 2026/);
-  assert.match(terms, /27 August 2026/);
+  assert.match(terms, /1 September 2026/);
   assert.match(readFileSync("src/lib/privacy-notice.ts", "utf8"), /privacy-2026-08-21/);
-  assert.match(readFileSync("src/lib/pilot-offer.ts", "utf8"), /terms-2026-08-27/);
+  assert.match(readFileSync("src/lib/pilot-offer.ts", "utf8"), /terms-2026-09-01/);
 });

@@ -6,6 +6,7 @@
  * expected-vs-observed. No LLM. No opaque score. Absence is never cancellation.
  */
 import type { ExpectedChargeEvaluation } from "./absence";
+import { formatCalendarDayShort } from "@/lib/date-only";
 import { newCommitmentNoticeDays } from "./change-intelligence";
 import { DUPLICATE_AMBIGUITY_REASON, IDENTITY_UNCERTAIN_REASON } from "./commitment-relationship";
 import type {
@@ -23,7 +24,6 @@ import type {
   MoneyDto,
   QuietNextChargeDto,
 } from "./contracts";
-import { formatCalendarDayShort } from "@/lib/date-only";
 import { annualizedStake, toMoneyDto } from "./domain";
 import { spokenDecisionSentence, receiptQuote, decisionHookCopy } from "./wow-first-session";
 import { hypothesizedMonthlyNextDate } from "./provisional-receipt";
@@ -39,7 +39,6 @@ export const decisionWindowLeadDays: Record<Cadence, number | null> = {
   IRREGULAR: null,
 };
 
-const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 const dayMs = 24 * 60 * 60 * 1_000;
 const materialReasonKeys = new Set<DecisionReasonKey>([
   "PRICE_INCREASE",
@@ -72,7 +71,6 @@ export type DecisionCycleFact = {
   amountMinor: bigint;
   /** Amount of the most recent cited bill in this commitment's currency, when known. */
   latestObservedMinor: bigint | null;
-  /** Calendar date of the most recent cited evidence row, when known. */
   latestObservedOn: string | null;
   nextExpectedDate: string | null;
   firstDetectedOn: string | null;
@@ -226,6 +224,14 @@ export function verificationExpectedAmountMinor(
   return frozenExpectedMinor ?? currentEffectiveMinor;
 }
 
+export function resolveDecisionDueDate(fact: DecisionCycleFact, today: string): string | null {
+  if (fact.latestObservedOn && fact.latestObservedOn > today) return fact.latestObservedOn;
+  return fact.nextExpectedDate
+    ?? (fact.observationCount < 2 && fact.cadence === "MONTHLY" && fact.firstDetectedOn
+      ? hypothesizedMonthlyNextDate(fact.firstDetectedOn, today)
+      : null);
+}
+
 export function buildDecisionHome(facts: readonly DecisionCycleFact[], today: string): DecisionHomeProjection {
   const active = facts.filter((fact) => fact.status === "ACTIVE");
   const queue = active
@@ -309,17 +315,8 @@ function toQueueCard(fact: DecisionCycleFact, today: string): DecisionCardDto | 
   };
 }
 
-export function resolveDecisionDueDate(fact: Pick<DecisionCycleFact, "nextExpectedDate" | "latestObservedOn" | "firstDetectedOn" | "observationCount" | "cadence">, today: string): string | null {
-  if (fact.latestObservedOn && fact.latestObservedOn > today) return fact.latestObservedOn;
-  if (fact.nextExpectedDate) return fact.nextExpectedDate;
-  if (fact.observationCount < 2 && fact.cadence === "MONTHLY" && (fact.latestObservedOn || fact.firstDetectedOn)) {
-    return hypothesizedMonthlyNextDate(fact.latestObservedOn ?? fact.firstDetectedOn!, today);
-  }
-  return null;
-}
-
 function isSilenced(fact: DecisionCycleFact, today: string): boolean {
-  const dueDate = resolveDecisionDueDate(fact, today);
+  const dueDate = fact.nextExpectedDate;
   const cycle = cycleForDueDate(fact, dueDate);
   if (cycle?.userAction === "KEEP") return true;
   if (cycle?.userAction === "PLAN_TO_CANCEL") return true;
@@ -437,24 +434,18 @@ function nextQuietCharge(
 ): QuietNextChargeDto | null {
   const queued = new Set(queue.map((card) => card.commitmentId));
   const upcoming = facts
-    .map((fact) => {
-      const dueDate = resolveDecisionDueDate(fact, today);
-      return dueDate && !queued.has(fact.commitmentId)
-        ? { fact, dueDate, daysAway: daysBetween(today, dueDate) }
-        : null;
-    })
-    .filter((entry): entry is { fact: DecisionCycleFact; dueDate: string; daysAway: number } => (
-      entry !== null && entry.daysAway !== null && entry.daysAway >= 0
-    ))
+    .filter((fact) => fact.nextExpectedDate && !queued.has(fact.commitmentId))
+    .map((fact) => ({ fact, daysAway: daysBetween(today, fact.nextExpectedDate!) }))
+    .filter((entry): entry is { fact: DecisionCycleFact; daysAway: number } => entry.daysAway !== null && entry.daysAway >= 0)
     .sort((left, right) => left.daysAway - right.daysAway || left.fact.merchant.localeCompare(right.fact.merchant));
   const next = upcoming[0];
-  if (!next) return null;
+  if (!next?.fact.nextExpectedDate) return null;
   return {
     commitmentId: next.fact.commitmentId,
     merchant: next.fact.merchant,
     // Same receipt-cited rule as decision cards and upcoming rows.
     amount: toMoneyDto(next.fact.latestObservedMinor ?? next.fact.amountMinor, next.fact.currency),
-    date: next.dueDate,
+    date: next.fact.nextExpectedDate,
   };
 }
 
@@ -497,11 +488,6 @@ function outcomeRank(kind: DecisionOutcomeKind): number {
 function decideHeadline(dueDate: string | null, daysAway: number | null): string {
   if (daysAway === 0) return "Decide today";
   if (daysAway === 1) return "Decide tomorrow";
-  const monthlyLead = decisionWindowLeadDays.MONTHLY ?? 7;
-  if (dueDate && daysAway !== null && daysAway > 1 && daysAway <= monthlyLead) {
-    const weekday = weekdayNames[utcWeekday(dueDate)];
-    return weekday ? `Decide before ${weekday}` : `Decide before ${formatCalendarDayShort(dueDate)}`;
-  }
   if (dueDate) return `Decide before ${formatCalendarDayShort(dueDate)}`;
   return "Decision needed";
 }
@@ -581,9 +567,4 @@ function daysBetween(from: string, to: string): number | null {
   const end = parseDate(to);
   if (start === null || end === null) return null;
   return Math.round((end - start) / dayMs);
-}
-
-function utcWeekday(value: string): number {
-  const parsed = parseDate(value);
-  return parsed === null ? 0 : new Date(parsed).getUTCDay();
 }

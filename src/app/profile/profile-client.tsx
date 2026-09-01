@@ -37,7 +37,7 @@ export default function ProfileClient() {
     <main id="ledger-main" className="relative px-4 py-6 text-foreground sm:px-6 sm:py-8 lg:px-8">
       <div className="mx-auto w-full max-w-4xl">
         <header className="flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="inline-flex items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
             <VognaryMark size={22} />
             Vognary
           </Link>

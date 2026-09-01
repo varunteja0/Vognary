@@ -16,7 +16,6 @@ import type {
 import { decisionLabels } from "./labels";
 import type { FailureOrigin, ResponseMeta, TransportFailure } from "./transport";
 import type { ImageProposalStatus, ReceiptImageProposeReason, ReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal";
-import { keepAddBillsOpenAfterPersist, persistTextFromConfirmedLine } from "@/lib/recovery/monthly-loop";
 import { decimalToMinorUnits, minorUnitsToDecimal } from "@/lib/recovery/domain";
 
 // Pure state for the Recovery workspace. It holds exactly two things: server
@@ -128,7 +127,6 @@ export type RecoveryState = {
   evidenceFailure: RecoveryFailure | null;
   refreshRequired: boolean;
   announcement: string;
-  focusDecisionCommitmentId: string | null;
 };
 
 const emptyEvidenceDraft: EvidenceDraft = {
@@ -180,7 +178,6 @@ export const initialRecoveryState: RecoveryState = {
   evidenceFailure: null,
   refreshRequired: false,
   announcement: "",
-  focusDecisionCommitmentId: null,
 };
 
 export type RecoveryAction =
@@ -195,7 +192,6 @@ export type RecoveryAction =
   | { type: "ADD_BILLS_CLOSED" }
   | { type: "COMMITMENT_SELECTED"; commitmentId: string | null }
   | { type: "DECIDE_ON_NOW_REQUESTED"; commitmentId: string }
-  | { type: "DECISION_FOCUS_CLEARED" }
   | { type: "DETAIL_EVIDENCE_PAGE_REQUESTED"; cursor: string | null }
   | { type: "DETAIL_LOADED"; detail: CommitmentDetailDto; meta: ResponseMeta }
   | { type: "DETAIL_FAILED"; failure: TransportFailure }
@@ -370,12 +366,7 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
       }
 
     case "VIEW_SELECTED":
-      return {
-        ...state,
-        view: action.view,
-        focusDecisionCommitmentId: action.view === "HOME" ? state.focusDecisionCommitmentId : null,
-        announcement: `${recoveryViewLabels[action.view]} view.`,
-      };
+      return { ...state, view: action.view, announcement: `${recoveryViewLabels[action.view]} view.` };
 
     case "ADD_BILLS_OPENED":
       return { ...state, addBillsOpen: true, evidenceFailure: null, announcement: "Add a bill." };
@@ -400,12 +391,8 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         detail: null,
         detailEvidenceCursor: null,
         detailStatus: { kind: "IDLE" },
-        focusDecisionCommitmentId: action.commitmentId,
-        announcement: "Decide on Now.",
+        announcement: "Decision opened on Now.",
       };
-
-    case "DECISION_FOCUS_CLEARED":
-      return { ...state, focusDecisionCommitmentId: null };
 
     case "DETAIL_EVIDENCE_PAGE_REQUESTED":
       return { ...state, detailEvidenceCursor: action.cursor, detailStatus: { kind: "LOADING" } };
@@ -543,12 +530,7 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
           ...state.evidenceDraft,
           imageDrafts: state.evidenceDraft.imageDrafts.map((draft) => (
             draft.clientRef === action.clientRef
-              ? {
-                ...draft,
-                proposal: action.proposal,
-                proposalStatus: action.proposal ? "ready" : "unreadable",
-                proposalReason: action.reason,
-              }
+              ? { ...draft, proposal: action.proposal, proposalStatus: action.proposal ? "ready" : "unreadable", proposalReason: action.reason }
               : draft
           )),
         },
@@ -564,7 +546,7 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
       };
 
     case "IMAGE_LINE_CONFIRMED": {
-      const nextText = persistTextFromConfirmedLine(state.evidenceDraft.receiptText, action.text);
+      const nextText = [state.evidenceDraft.receiptText.trim(), action.text.trim()].filter(Boolean).join("\n\n");
       return {
         ...state,
         evidenceDraft: {
@@ -573,7 +555,7 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
           receiptText: nextText,
           imageDrafts: state.evidenceDraft.imageDrafts.filter((draft) => draft.clientRef !== action.clientRef),
         },
-        announcement: "Line confirmed. Saving it as receipt evidence.",
+        announcement: "Line confirmed. It will be added as receipt text, not as a guessed scan.",
       };
     }
 
@@ -598,8 +580,8 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
       const everyResultAccepted = action.submission.results.every((result) => result.status === "ACCEPTED");
       const refreshSelectedDetail = state.selectedCommitmentId !== null;
       const accepted = everyResultAccepted && action.submission.acceptedEvidenceCount > 0;
-      const remainingImages = state.evidenceDraft.imageDrafts;
-      const keepOpen = accepted && keepAddBillsOpenAfterPersist(remainingImages.length);
+      const remainingImageDrafts = state.evidenceDraft.imageDrafts;
+      const hasRemainingImages = remainingImageDrafts.length > 0;
       return {
         ...state,
         pending: null,
@@ -615,10 +597,10 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         status: { kind: "READY" },
         refreshRequired: false,
         evidenceDraft: everyResultAccepted
-          ? (keepOpen ? { ...emptyEvidenceDraft, imageDrafts: remainingImages } : emptyEvidenceDraft)
+          ? { ...emptyEvidenceDraft, imageDrafts: remainingImageDrafts }
           : { ...state.evidenceDraft, preparing: false },
-        view: accepted && !keepOpen ? "HOME" : state.view,
-        addBillsOpen: accepted ? keepOpen : state.addBillsOpen,
+        view: accepted && !hasRemainingImages ? "HOME" : state.view,
+        addBillsOpen: accepted ? hasRemainingImages : state.addBillsOpen,
         announcement: evidenceSubmissionAnnouncement(action.submission),
       };
     }

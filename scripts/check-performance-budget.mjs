@@ -40,14 +40,16 @@ for (const config of routes) {
   const routeJs = Object.values(manifest.clientModules)
     .flatMap((entry) => entry.chunks ?? [])
     .map(normalizeAssetPath);
-  const css = Object.values(manifest.entryCSSFiles)
+  // Next 16 marks every CSS entry `inlined: true` and carries the bytes in
+  // `content`. Inlined CSS still ships on the critical path, so it is measured
+  // from `content` when the chunk is not emitted to disk. Filtering inlined
+  // entries out silently zeroed this budget.
+  const cssEntries = Object.values(manifest.entryCSSFiles)
     .flatMap((entries) => entries)
-    .filter((entry) => !entry.inlined)
-    .map((entry) => normalizeAssetPath(entry.path));
+    .filter((entry) => normalizeAssetPath(entry.path).endsWith(".css"));
   const jsAssets = unique([...sharedJs, ...routeJs]).filter((asset) => asset.endsWith(".js"));
-  const cssAssets = unique(css).filter((asset) => asset.endsWith(".css"));
   const jsSizes = jsAssets.map(measureAsset);
-  const cssSizes = cssAssets.map(measureAsset);
+  const cssSizes = measureCssEntries(cssEntries);
   const jsGzip = total(jsSizes, "gzip");
   const cssGzip = total(cssSizes, "gzip");
 
@@ -93,6 +95,23 @@ function measureAsset(path) {
   if (!existsSync(assetUrl)) throw new Error(`Manifest references missing asset: ${path}`);
   const buffer = readFileSync(assetUrl);
   return { path, raw: buffer.length, gzip: gzipSync(buffer, { level: 9 }).length };
+}
+
+function measureCssEntries(entries) {
+  const seen = new Set();
+  const sizes = [];
+  for (const entry of entries) {
+    const path = normalizeAssetPath(entry.path);
+    if (seen.has(path)) continue;
+    seen.add(path);
+    const assetUrl = new URL(path, nextRoot);
+    const buffer = existsSync(assetUrl)
+      ? readFileSync(assetUrl)
+      : Buffer.from(entry.content ?? "", "utf8");
+    if (!buffer.length) throw new Error(`CSS entry has no measurable bytes: ${path}`);
+    sizes.push({ path, raw: buffer.length, gzip: gzipSync(buffer, { level: 9 }).length });
+  }
+  return sizes;
 }
 
 function total(values, key) {
