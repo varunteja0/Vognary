@@ -5,6 +5,7 @@ import test from "node:test";
 const threatModel = source("docs/security/commitment-control-threat-model.md");
 const incidentRunbook = source("docs/security/incident-response-runbook.md");
 const assessmentBrief = source("docs/security/independent-assessment-brief.md");
+const operatorEvidenceTemplate = source("docs/templates/control-pilot-operator-evidence-template.md");
 const disclosurePolicy = source("docs/vulnerability-disclosure-policy.md");
 const securityPage = source("src/app/security/page.tsx");
 
@@ -67,6 +68,31 @@ test("the independent assessment handoff is synthetic, multi-tenant, and retest-
     /retest/i,
   ]) {
     assert.match(normalizedBrief, requirement);
+  }
+});
+
+test("the first-pilot operator record keeps external proof restricted and hash-addressable", () => {
+  const normalized = operatorEvidenceTemplate.replace(/\s+/g, " ");
+  for (const requirement of [
+    /do not complete.*in Git/i,
+    /incident commander/i,
+    /backup incident commander/i,
+    /tabletop/i,
+    /actual log sources/i,
+    /retention/i,
+    /jurisdiction/i,
+    /CERT-In applicability/i,
+    /Point of Contact/i,
+    /clock synchronization/i,
+    /proposal-review procedure/i,
+    /restore drill/i,
+    /monitoring delivery/i,
+    /assessment report/i,
+    /cleared payment/i,
+    /exact workspace/i,
+    /shasum -a 256/i,
+  ]) {
+    assert.match(normalized, requirement);
   }
 });
 

@@ -20,10 +20,11 @@ import {
   listWorkspacePeople,
   revokeWorkspaceInvite,
 } from "../../src/lib/server/workspace-invite-store";
-import { completeControlPolicyRequest } from "../commitment-control-policy-fixture";
+import { completeControlPolicyRequest, futureControlTestDate } from "../commitment-control-policy-fixture";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
 const baseUrl = "https://vognary.test";
+const futureFirstChargeDate = futureControlTestDate();
 process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "*";
 
 async function seedDesk(label: string) {
@@ -182,7 +183,7 @@ test("a second owner or admin must record the decision when the desk is not solo
         category: "AI_MODEL",
         amountMinor: "199900",
         currency: "INR",
-        firstChargeDate: "2026-09-01",
+        firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
       },

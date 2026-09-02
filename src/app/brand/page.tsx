@@ -1,3 +1,4 @@
+import "../public.css";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -11,18 +12,18 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const grays: Array<[string, string]> = [
-  ["Base", "#0b0c0f"],
-  ["Panel", "#131519"],
-  ["Inset", "#0f1114"],
-  ["Elevated", "#1a1d23"],
+const foundations: Array<[string, string]> = [
+  ["Paper", "#f2efe7"],
+  ["Card", "#fbfaf6"],
+  ["Ink", "#16140f"],
+  ["Ink soft", "#3c382f"],
 ];
 
-const verdicts: Array<[string, string]> = [
-  ["Keep", "#43c6a0"],
-  ["Watch", "#e0a54e"],
-  ["Downgrade", "#8891e8"],
-  ["Cancel", "#f0705e"],
+const signals: Array<[string, string]> = [
+  ["Authorization", "#8a6a1f"],
+  ["Cited evidence", "#2f5d3f"],
+  ["Review", "#7d5410"],
+  ["Exceeded", "#a8321f"],
 ];
 
 export default function BrandPage() {
@@ -48,7 +49,7 @@ export default function BrandPage() {
                 Vognary brand basics
               </h1>
               <p className="mt-4 text-sm leading-7 text-(--muted)">
-                The Ledger-to-Verdict mark turns scattered evidence rows into one clear action. Platinum carries the proof; champagne gold carries the verdict.
+                The Ledger-to-Authorization mark turns scattered evidence into one human-controlled commitment record. Ink carries the proof; restrained gold carries the frozen authorization.
               </p>
               <p className="mt-3 text-sm leading-7 text-(--muted)">
                 Use this page for the mark, colors, type, spacing rules, and downloadable assets.
@@ -60,7 +61,7 @@ export default function BrandPage() {
         <section className="panel mt-6 p-5 sm:p-6">
           <span className="folio" data-folio="Use">The mark in use</span>
           <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">One mark for every surface</h2>
-          <p className="mt-1 text-sm leading-6 text-(--muted)">Two evidence tiers resolve into the gold V. The silhouette stays recognizable on dark, gold, light, and one-color production.</p>
+          <p className="mt-1 text-sm leading-6 text-(--muted)">Two evidence tiers resolve into the authorization V. The silhouette stays recognizable on graphite, gold, paper, and one-color production.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <MarkTile label="On graphite" bg="var(--card-2)" markClass="text-(--ink)" />
             <MarkTile label="On gold" bg="var(--gold)" markClass="text-[#14161b]" mono />
@@ -74,16 +75,16 @@ export default function BrandPage() {
           <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Nakul, the ledger mongoose</h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-(--muted)">
             In Indian iconography, Kubera&rsquo;s mongoose guards treasure — and the mongoose is the one animal a snake fears.
-            Recurring charges are the snakes in the grass. Nakul watches the ledger and guards the gold verdict token between
-            his paws. His eye and the token stay gold on every surface, forever.
+            Unseen obligations are the snakes in the grass. Nakul watches the evidence ledger and guards the gold authorization
+            seal between his paws. His eye and the seal stay gold on every surface.
           </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {(
               [
-                ["sentinel", "Sentinel — watching the ledger"],
-                ["guide", "Guide — onboarding and help"],
-                ["found", "Found — a charge spotted"],
-                ["celebrate", "Celebrate — a verified saving"],
+                ["sentinel", "Sentinel — watching commitments"],
+                ["guide", "Guide — proposing the next yes"],
+                ["found", "Found — evidence cited"],
+                ["celebrate", "Reconciled — outcome proven"],
                 ["rest", "Rest — empty states"],
               ] as Array<[NakulPose, string]>
             ).map(([pose, label]) => (
@@ -111,11 +112,11 @@ export default function BrandPage() {
           </p>
           <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_15rem]">
             <div className="overflow-hidden rounded-xl border border-line bg-(--card-2)">
-              <Image src="/brand/vognary-x-header.png" alt="Vognary X profile header" width={1500} height={500} className="h-auto w-full" priority />
+              <Image src="/brand/vognary-x-header.png" alt="Vognary X profile header" width={1500} height={500} className="h-auto w-full" priority unoptimized />
               <p className="eyebrow eyebrow-xs border-t border-line px-3 py-2">X header · 1500×500 · crop safe</p>
             </div>
             <div className="overflow-hidden rounded-xl border border-line bg-(--card-2)">
-              <Image src="/brand/vognary-x-avatar.png" alt="Vognary X profile avatar" width={800} height={800} className="h-auto w-full" />
+              <Image src="/brand/vognary-x-avatar.png" alt="Vognary X profile avatar" width={800} height={800} className="h-auto w-full" loading="eager" unoptimized />
               <p className="eyebrow eyebrow-xs border-t border-line px-3 py-2">X avatar · 800×800 · circle safe</p>
             </div>
           </div>
@@ -127,6 +128,7 @@ export default function BrandPage() {
               height={630}
               loading="eager"
               className="h-auto w-full"
+              unoptimized
             />
             <p className="eyebrow eyebrow-xs border-t border-line px-3 py-2">Open Graph / X link card · 1200×630</p>
           </div>
@@ -134,16 +136,15 @@ export default function BrandPage() {
 
         <section className="panel mt-6 p-5 sm:p-6">
           <span className="folio" data-folio="01">Palette</span>
-          <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Graphite and gold</h2>
-          <p className="mt-1 text-sm leading-6 text-(--muted)">Gold is for money, primary actions, and focus states. The other colors label review actions.</p>
+          <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Paper, graphite, and authorization gold</h2>
+          <p className="mt-1 text-sm leading-6 text-(--muted)">Gold marks human authority and frozen decisions, never general decoration. Evidence, review, and exceeded states each keep a separate semantic color and structural label.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Swatch name="Champagne gold" hex="#d8b87a" ring />
-            {grays.map(([name, hex]) => (
+            {foundations.map(([name, hex]) => (
               <Swatch key={hex} name={name} hex={hex} />
             ))}
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {verdicts.map(([name, hex]) => (
+            {signals.map(([name, hex]) => (
               <Swatch key={hex} name={name} hex={hex} />
             ))}
           </div>
@@ -153,16 +154,16 @@ export default function BrandPage() {
           <span className="folio" data-folio="02">Typography</span>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="inset p-5">
-              <p className="eyebrow">Display &middot; Fraunces / UI &middot; Geist</p>
-              <p className="mt-3 font-display text-3xl font-semibold text-(--ink)">Recurring payments, reviewed</p>
-              <p className="mt-2 text-sm text-(--muted)">Fraunces carries headlines and the wordmark; Geist carries the interface.</p>
+              <p className="eyebrow">Display &middot; Fraunces / UI &middot; IBM Plex Sans</p>
+              <p className="mt-3 font-display text-3xl font-semibold text-(--ink)">Commitment Control</p>
+              <p className="mt-2 text-sm text-(--muted)">Fraunces carries true headings and the wordmark; IBM Plex Sans carries the interface.</p>
             </div>
             <div className="inset p-5">
-              <p className="eyebrow">Data &middot; Geist Mono</p>
+              <p className="eyebrow">Data &middot; IBM Plex Mono</p>
               <p className="font-data mt-3 text-3xl font-medium tnum text-(--ink)">
-                &#8377;1,24,900<span className="text-(--muted)">/yr</span>
+                INR 1,350
               </p>
-              <p className="font-data mt-2 text-sm tnum text-(--muted)">0 1 2 3 4 5 6 7 8 9 &middot; tabular</p>
+              <p className="font-data mt-2 text-sm tnum text-(--muted)">FROZEN CAP &middot; 0 1 2 3 4 5 6 7 8 9</p>
             </div>
           </div>
         </section>
@@ -175,7 +176,7 @@ export default function BrandPage() {
               <ul className="mt-2 grid gap-1.5 text-sm leading-6 text-(--muted)">
                 <li>- Keep clear space equal to one quarter of the mark&rsquo;s width on every side.</li>
                 <li>- Minimum size: 20&nbsp;px full color; 16&nbsp;px with the one-color master.</li>
-                <li>- Evidence rows stay platinum or ink; the verdict V stays champagne gold.</li>
+                <li>- Evidence rows stay platinum or ink; the authorization V stays champagne gold.</li>
                 <li>- Never rotate, stretch, outline, add shadows to, or place copy inside the mark.</li>
               </ul>
             </div>
@@ -215,16 +216,14 @@ function MarkTile({ label, bg, markClass, mono }: { label: string; bg: string; m
   );
 }
 
-function Swatch({ name, hex, ring }: { name: string; hex: string; ring?: boolean }) {
+function Swatch({ name, hex }: { name: string; hex: string }) {
   return (
     <div className="inset flex items-center gap-3 p-3">
       <span
         className="size-10 shrink-0 rounded-lg"
         style={{
           background: hex,
-          boxShadow: ring
-            ? "0 0 0 1px rgba(255,255,255,0.12), 0 8px 20px -10px rgba(216,184,122,0.6)"
-            : "0 0 0 1px rgba(255,255,255,0.06)",
+          boxShadow: "0 0 0 1px rgba(22,20,15,0.14)",
         }}
       />
       <div className="min-w-0">

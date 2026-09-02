@@ -1,12 +1,12 @@
 <!-- Vognary horizontal lockup for dark backgrounds. Mark geometry is canonical; wordmark uses the Fraunces brand face with a serif fallback. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="320" height="80" viewBox="0 0 320 80" fill="none" role="img" aria-labelledby="title desc">
   <title id="title">Vognary</title>
-  <desc id="desc">Vognary wordmark with the Ledger to Verdict symbol</desc>
+  <desc id="desc">Vognary wordmark with the Ledger to Authorization symbol</desc>
   <g transform="translate(7 7) scale(1.02)">
     <path d="M7 11h17l5 7H12l-5-7ZM13 23h15l5 7H18l-5-7Z" fill="#F0F1F5"/>
     <path d="M57 11H40l-5 7h17l5-7ZM51 23H36l-5 7h15l5-7Z" fill="#F0F1F5"/>
     <path d="m20.5 35 11.5 14L43.5 35" stroke="#D8B87A" stroke-width="8" stroke-linecap="square" stroke-linejoin="miter"/>
     <path d="m23 35 9 11 9-11" stroke="#F1DCA6" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" opacity=".72"/>
   </g>
-  <text x="86" y="54" font-family="Fraunces, Georgia, serif" font-size="43" font-weight="600" letter-spacing="-.8" fill="#F0F1F5">Vognary</text>
+  <text x="86" y="54" font-family="Fraunces, Georgia, serif" font-size="43" font-weight="600" letter-spacing="0" fill="#F0F1F5">Vognary</text>
 </svg>

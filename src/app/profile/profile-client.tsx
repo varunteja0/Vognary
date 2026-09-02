@@ -1,5 +1,7 @@
 "use client";
 
+import "../ledger.css";
+
 import Link from "next/link";
 import { VognaryMark } from "../brand";
 import {

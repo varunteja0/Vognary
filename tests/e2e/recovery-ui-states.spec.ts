@@ -234,7 +234,7 @@ test("receipt onboarding shows proven forwarding, backfill, and sender trust", a
   }));
 
   await page.goto("/app");
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Evidence" }).click();
   await expect(page.getByRole("heading", { name: "Stay up to date" })).toBeVisible();
   await expect(page.getByText("Status: On")).toBeVisible();
   await page.getByText("Older bills", { exact: true }).click();
@@ -243,7 +243,7 @@ test("receipt onboarding shows proven forwarding, backfill, and sender trust", a
   await expect(page.getByRole("link", { name: "Google's attachment instructions" })).toHaveAttribute("href", /answer\/9261412/);
   await expectNoSeriousAxeViolations(page, "receipt onboarding");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Now" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Today" }).click();
   await expect(page.getByRole("heading", { name: "Not enough history yet" })).toBeVisible();
 });
 
@@ -408,7 +408,7 @@ test("Gmail wizard step 1 fits a 390px phone", async ({ page }) => {
     }),
   }));
   await page.goto("/app");
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Evidence" }).click();
   await expect(page.getByRole("heading", { name: "Stay up to date" })).toBeVisible();
   await page.getByRole("button", { name: "Continue setup" }).click();
   await expect(page.getByRole("heading", { name: "Verify your private Vognary address" })).toBeVisible();

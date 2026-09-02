@@ -169,14 +169,14 @@ This gate also needs a real Postgres (`DATABASE_URL`), a token key, and a sessio
 - **Sentry:** https://sentry.io → **Create Project** → platform **Next.js** → **Settings → Client Keys (DSN)** → copy DSN → set `SENTRY_DSN=https://…`.
 - **Better Stack:** https://betterstack.com → **Logs → Connect source** → copy the source token → set `BETTER_STACK_SOURCE_TOKEN=…`.
 - (optional) Axiom → `AXIOM_TOKEN=…`.
-- **Verify:** `npm run monitoring:test` (needs `INTERNAL_SYNC_SECRET`) sends a synthetic event via `/api/internal/monitoring/test`. Only **after** you see it land, set `MONITORING_DELIVERY_TEST_STATUS` per the runbook.
+- **Verify:** `npm run monitoring:test` (needs `INTERNAL_SYNC_SECRET`) sends a synthetic event via `/api/internal/monitoring/test`. Only **after** you see it land, retain and hash the restricted provider/command record, then set `MONITORING_DELIVERY_TEST_STATUS`, `MONITORING_DELIVERY_TEST_AT`, and `MONITORING_DELIVERY_TEST_RECORD_SHA256` together.
 
 **C. Backup + restore drill**
 1. `npm run secrets:generate-backup-key` → set `BACKUP_ENCRYPTION_KEY` and the `BACKUP_KEY_FINGERPRINT` it prints.
 2. (optional offsite) create an S3/R2 bucket → set `BACKUP_STORAGE_BUCKET`, `BACKUP_STORAGE_ENDPOINT`, `BACKUP_STORAGE_REGION`, `BACKUP_STORAGE_ACCESS_KEY_ID`, `BACKUP_STORAGE_SECRET_ACCESS_KEY`.
 3. Run a backup: `npm run backup:postgres`.
 4. Run a **restore drill** into a throwaway DB: set `RESTORE_DATABASE_URL=<disposable pg>` and `RESTORE_CONFIRM_DISPOSABLE=true`, then `npm run backup:restore-drill`.
-5. Only **after an observed successful drill**: set `BACKUP_RESTORE_DRILL_STATUS` + `BACKUP_RESTORE_DRILL_AT=<ISO date>` (these show on the trust pages).
+5. Only **after an observed durable-storage restore drill**: retain and hash the restricted result, then set `BACKUP_RESTORE_DRILL_STATUS`, `BACKUP_RESTORE_DRILL_AT=<ISO date>`, and `BACKUP_RESTORE_DRILL_RECORD_SHA256` together (status and date show on the trust pages).
 
 **Verify the whole stage:** `npm run production:check -- https://www.vognary.com` (add `--strict` once everything is set). Deep detail: `docs/production-activation-runbook.md`.
 

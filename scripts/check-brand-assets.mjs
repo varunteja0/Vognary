@@ -54,7 +54,9 @@ for (const altFile of ["opengraph-image.alt.txt", "twitter-image.alt.txt"]) {
 await access(path.join(brand, "vognary-lockup.svg"));
 await access(path.join(brand, "vognary-lockup-ink.svg"));
 const manifest = JSON.parse(await readFile(path.join(brand, "manifest.json"), "utf8"));
-assert.equal(manifest.identity, "Ledger to Verdict", "Brand manifest identity");
+assert.equal(manifest.identity, "Ledger to Authorization", "Brand manifest identity");
+assert.equal(manifest.version, 3, "Brand manifest version");
+assert.match(manifest.meaning.goldV, /human authorization/i, "Gold V must mean human authorization");
 const expectedExports = [
   "vognary-mark.svg",
   "vognary-mark-ink.svg",

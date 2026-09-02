@@ -95,7 +95,7 @@ export function RecoveryCommitments({
           <button type="button" data-active={filter === "ATTENTION"} aria-pressed={filter === "ATTENTION"} onClick={() => setFilter("ATTENTION")}>Needs attention</button>
         </div>
         {visibleGroups.length ? (
-          <ul className="ledger-list mt-4 grid">
+          <ul className="ledger-list enter-list mt-4 grid">
             {visibleGroups.map((group) => {
               const decisionState = groupDecisionState(group, state.home);
               const representative = representativeCommitment(group);
@@ -347,12 +347,12 @@ function CommitmentDetailPanel({
           {detail.decisionHistory.length ? (
             <div>
               <p className="eyebrow eyebrow-xs">What you decided</p>
-              <ol className="timeline mt-3">
-                {detail.decisionHistory.map((item, index) => (
-                  <li key={`${item.dueDate}-${item.decidedAt}`} data-current={index === detail.decisionHistory.length - 1}>
-                    <p className="timeline-when">{formatDay(item.dueDate)}</p>
-                    <p className="timeline-what">{decisionCycleActionLabels[item.action]}</p>
-                    {item.verificationHeadline ? <p className="timeline-note">{item.verificationHeadline}</p> : null}
+              <ol className="mt-3 grid gap-3 border-l border-line pl-4">
+                {detail.decisionHistory.map((item) => (
+                  <li key={`${item.dueDate}-${item.decidedAt}`} className="grid gap-1">
+                    <p className="font-data text-xs text-(--muted)">{formatDay(item.dueDate)}</p>
+                    <p className="text-sm leading-6 text-(--ink)">{decisionCycleActionLabels[item.action]}</p>
+                    {item.verificationHeadline ? <p className="text-xs leading-5 text-(--ink-soft)">{item.verificationHeadline}</p> : null}
                   </li>
                 ))}
               </ol>

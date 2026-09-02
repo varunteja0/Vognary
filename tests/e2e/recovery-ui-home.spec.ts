@@ -280,7 +280,7 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 
   const nav = page.getByRole("navigation", { name: "Primary" });
-  for (const label of ["Now", "Bills", "Sources"]) {
+  for (const label of ["Today", "Control", "Commitments", "Evidence"]) {
     await expect(nav.getByRole("button", { name: label })).toBeVisible();
   }
   await expect(nav.getByRole("button", { name: "Automation" })).toHaveCount(0);
@@ -359,7 +359,7 @@ test("a commitment exposes its exact evidence and returns focus after inspection
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   await expect(page.getByRole("heading", { name: "OpenAI" })).toBeVisible();
@@ -396,13 +396,13 @@ test("Now keeps the three primary choices; Bills routes decisions back to Now", 
     await expect(nowChoices.getByRole("button", { name: new RegExp(`^${label}`) })).toBeVisible();
   }
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
   await expect(page.getByRole("group", { name: "Your choice" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Decide on Now" })).toBeVisible();
 
   await page.getByRole("button", { name: "Decide on Now" }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "Now" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Today" })).toBeVisible();
   await expect(nowChoices.getByRole("button", { name: /^Plan to cancel/ })).toBeVisible();
 
   await nowChoices.getByRole("button", { name: /^Plan to cancel/ }).click();
@@ -436,7 +436,7 @@ test("correcting a commitment offers every contract field and shows reversible h
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   await page.getByText("Something wrong?").click();
@@ -466,10 +466,10 @@ test("the workspace stays usable and keyboard-reachable on a 390px phone", async
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   expect(overflow).toBe(false);
 
-  const commitmentsTab = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" });
+  const commitmentsTab = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" });
   await commitmentsTab.focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 2, name: "Bills" })).toBeFocused();
+  await expect(page.getByRole("heading", { level: 2, name: "Commitments" })).toBeFocused();
 });
 
 test("Mandate stays hidden until notice delivery is proven", async ({ page }) => {
@@ -526,11 +526,10 @@ test("existing authority is isolated to Automation while Now stays decision-led"
   );
   await page.goto("/app");
 
-  const automation = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" });
-  await expect(automation).toBeVisible();
+  const automation = await openOverflowDestination(page, "Automation");
   await expect(page.getByRole("heading", { name: "This workspace has an active standing mandate" })).toHaveCount(0);
   await expect(page.getByText("Exception-only home")).toHaveCount(0);
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Now" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Today" })).toBeVisible();
   await automation.click();
   await expect(page.getByText("This workspace has an active standing mandate", { exact: true })).toBeVisible();
   await expect(page.getByText("Off — no cancellation is executed")).toBeVisible();
@@ -600,7 +599,7 @@ test("an active mandate does not restore the retired spend strip on Now", async 
   await page.goto("/app");
 
   await expect(page.getByText("Exception-only home")).toHaveCount(0);
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toBeVisible();
+  await openOverflowDestination(page, "Automation");
   await expect(page.getByText("Software commitments")).toHaveCount(0);
   await expect(page.getByText("No recurring amount yet")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Next charges" })).toBeVisible();
@@ -646,7 +645,7 @@ test("Home posts activation only after a cited recurring-spend picture actually 
   );
 
   await signIn(page);
-  await expect(page.getByRole("heading", { level: 2, name: "Now" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Today" })).toBeVisible();
   await expect(page.getByText("Software commitments")).toHaveCount(0);
   expect(activationCalls).toEqual([]);
 
@@ -867,8 +866,7 @@ test("unproven notice delivery stays off Now and fails closed in Automation", as
   await page.goto("/app");
   await expect(page.getByRole("heading", { name: "Delivery pending" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "48-hour veto window" })).toHaveCount(0);
-  const automation = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" });
-  await expect(automation).toBeVisible();
+  const automation = await openOverflowDestination(page, "Automation");
   await automation.click();
   await expect(page.getByText("Configured, but live delivery is not proven")).toBeVisible();
   await expect(page.getByText("Off — no cancellation is executed")).toBeVisible();
@@ -933,7 +931,7 @@ test("Sources tab disconnects cited Recovery sources without rotating the receip
     });
   });
   await page.goto("/app");
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Evidence" }).click();
   await page.getByText("Advanced").click();
   await expect(page.getByText("Pasted OpenAI receipt")).toBeVisible();
   await expect(page.getByText("Pasted bill · Connected")).toBeVisible();
@@ -959,9 +957,18 @@ test("Sources tab disconnects cited Recovery sources without rotating the receip
     }),
   );
   await page.reload();
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Sources" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Evidence" }).click();
   await page.getByText("Advanced").click();
   await expect(page.getByText("Pasted bill · Disconnected")).toBeVisible();
   await page.getByRole("button", { name: "Reconnect source" }).click();
   await expect.poll(() => reconnectCalls).toEqual(["POST"]);
 });
+
+/** Automation is the fifth destination, so the phone bar keeps it behind More. */
+async function openOverflowDestination(page: Page, label: string) {
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  await nav.getByRole("group").filter({ hasText: "More" }).first().click();
+  const destination = nav.getByRole("button", { name: label });
+  await expect(destination).toBeVisible();
+  return destination;
+}

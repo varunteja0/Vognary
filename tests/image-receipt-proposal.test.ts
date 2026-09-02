@@ -288,7 +288,9 @@ test("guest start and signed-in add-a-bill share confirm-the-line", () => {
   assert.match(start, /fetchReceiptLineProposal/);
   assert.match(start, /ConfirmReceiptLine/);
   assert.match(start, /getGuestProposalDraftSnapshot/);
-  assert.match(start, /AuthorizationLoop/);
+  // Start derives first value; it does not restart the whole product lesson.
+  assert.doesNotMatch(start, /AuthorizationLoop/);
+  assert.match(start, /Sign in to remember this evidence/);
   assert.doesNotMatch(start, /guestDecisionHookCopy|keepIsPrimary|PLAN_TO_CANCEL/);
   assert.match(start, /knownMerchantsFromNames/);
   assert.match(add, /fetchReceiptLineProposal/);

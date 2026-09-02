@@ -10,18 +10,25 @@ type PrimaryRoute = {
 
 const primaryRoutes: PrimaryRoute[] = [
   { label: "landing", path: "/", public: true },
+  { label: "demo", path: "/demo", public: true },
   { label: "start", path: "/start", public: true },
   { label: "signed app", path: "/app", resolvedPath: /\/login\?next=(?:%2F|\/)app$/, public: false },
   { label: "login", path: "/login", public: true },
   { label: "profile", path: "/profile", resolvedPath: /\/login(?:\?.*)?$/, public: false },
+  { label: "about", path: "/about", public: true },
+  { label: "contact", path: "/contact", public: true },
   { label: "privacy", path: "/privacy", public: true },
   { label: "security", path: "/security", public: true },
   { label: "terms", path: "/terms", public: true },
   { label: "pay", path: "/pay", public: true },
+  { label: "verify", path: "/verify", public: true },
+  { label: "brand", path: "/brand", public: true },
+  { label: "offline", path: "/offline", public: true },
+  { label: "billing return", path: "/billing/return", public: true },
 ];
 
 const publicRoutes = primaryRoutes.filter((route) => route.public);
-const viewportWidths = [320, 375, 768, 1440] as const;
+const viewportWidths = [320, 360, 390, 768, 1024, 1440] as const;
 
 test("primary routes expose a unique title, one h1, and a working global skip link", async ({ page }) => {
   test.setTimeout(90_000);
@@ -71,6 +78,18 @@ for (const width of viewportWidths) {
   });
 }
 
+test("public primary routes reflow at a 1440x900 desktop's 200% zoom equivalent", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 720, height: 450 });
+
+  for (const route of publicRoutes) {
+    await page.goto(route.path);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const metrics = await horizontalMetrics(page);
+    expect.soft(metrics.scrollWidth, `${route.label} overflows at the 200% zoom equivalent`).toBeLessThanOrEqual(721);
+  }
+});
+
 test("public primary routes have no serious or critical axe violations", async ({ page }) => {
   test.setTimeout(120_000);
 
@@ -89,23 +108,41 @@ test("public primary routes have no serious or critical axe violations", async (
 
 test("reduced-motion preference suppresses decorative motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
+  // /demo is where the field's unsettled region — now the only looping motion in
+  // the product — is reachable, so the probe measures the real thing.
+  await page.goto("/demo");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: "See the request" }).click();
 
   const motion = await page.evaluate(() => {
     const button = document.querySelector<HTMLElement>(".btn");
+    const band = document.querySelector<HTMLElement>(".afield-band");
     if (!button) throw new Error("Reduced-motion button probe is missing");
+    if (!band) throw new Error("Reduced-motion unsettled-region probe is missing");
     const buttonStyle = getComputedStyle(button);
+    const bandStyle = getComputedStyle(band);
     return {
       matches: matchMedia("(prefers-reduced-motion: reduce)").matches,
       scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
       transitionDurations: buttonStyle.transitionDuration.split(",").map((value) => value.trim()),
+      bandAnimationName: bandStyle.animationName,
+      // Meaning is not hidden: the region is still drawn, it simply does not move.
+      bandOpacity: bandStyle.opacity,
     };
   });
 
   expect(motion.matches).toBe(true);
   expect(motion.scrollBehavior).toBe("auto");
   expect(motion.transitionDurations.every((duration) => durationInMilliseconds(duration) <= 0.01)).toBe(true);
+  expect(motion.bandAnimationName).toBe("none");
+  expect(Number(motion.bandOpacity)).toBeGreaterThan(0);
+});
+
+test("brand previews render the exact downloadable raster exports", async ({ page }) => {
+  await page.goto("/brand");
+
+  await expect(page.getByAltText("Vognary X profile header")).toHaveAttribute("src", "/brand/vognary-x-header.png");
+  await expect(page.getByAltText("Vognary social link card")).toHaveAttribute("src", "/brand/vognary-social-card.png");
 });
 
 async function horizontalMetrics(page: Page) {

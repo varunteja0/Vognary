@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import type { CommitmentControlBriefDto } from "@/lib/commitment-control/contracts";
 import { formatMoment } from "../labels";
 import { ControlEvaluation, ControlFact } from "./control-evaluation";
@@ -11,25 +11,25 @@ import {
   controlVerdictLabels,
   controlVerdictMeanings,
   controlVerdictToneClass,
-  type ControlReconciliationVerdict,
 } from "./control-format";
 
 export type ControlProposalEntry = CommitmentControlBriefDto["proposals"][number];
 
-// One proposal, one record. The frozen expected amount, the authorized cap and
-// every later observation live in a single proof ledger, on adjacent rows,
-// sharing one right-hand money column so the comparison is a glance rather
-// than an act of memory. Nothing here is recomputed: every figure is the
-// server's, rendered as published, and a later observation never rewrites the
-// authorization it is compared against.
-
-const proofToneClass: Record<ControlReconciliationVerdict, string> = {
-  MATCHED: "proof proof-observed",
-  WITHIN_CAP: "proof proof-observed",
-  OVER_CAP: "proof proof-exceeded",
-  CURRENCY_MISMATCH: "proof proof-unknown",
-  CANNOT_EVALUATE: "proof proof-unknown",
-};
+// One proposal, one record, one ledger.
+//
+// The frozen figures a person authorized are rendered ONCE, at the top, and
+// never again — a cap that appears twice on a screen is a cap the reader has to
+// reconcile by memory. A single ruled cap line divides what was frozen before
+// the spend from what arrived after it, and every later observation is appended
+// below that line in the same money column, so the comparison is a glance.
+//
+// The contract validator already refuses any brief whose reconciliation carries
+// different frozen figures from its decision (isCommitmentControlBriefDto), so
+// rendering the authorization once is exact, not an assumption.
+//
+// Nothing here is recomputed. Every figure is the server's, rendered as
+// published, and a later observation never rewrites the authorization it is
+// compared against.
 
 export function ControlProposalRow({
   entry,
@@ -49,10 +49,12 @@ export function ControlProposalRow({
   focused: boolean;
   lead: boolean;
   online: boolean;
-  onDecide: (proposalId: string, buttonId: string) => void;
-  onReconcile: (proposalId: string, buttonId: string) => void;
+  // Null on a read-only render. The row then omits the control entirely rather
+  // than mounting a button bound to nothing.
+  onDecide: ((proposalId: string, buttonId: string) => void) | null;
+  onReconcile: ((proposalId: string, buttonId: string) => void) | null;
   onInspectEvidence: ((evidenceId: string, buttonId: string) => void) | null;
-  onFocused: () => void;
+  onFocused: (() => void) | null;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { proposal, evaluation, decision, reconciliations } = entry;
@@ -60,17 +62,20 @@ export function ControlProposalRow({
   useEffect(() => {
     if (!focused) return;
     headingRef.current?.focus();
-    onFocused();
+    onFocused?.();
   }, [focused, onFocused]);
 
   const decideButtonId = `control-decide-${proposal.id}`;
   const reconcileButtonId = `control-reconcile-${proposal.id}`;
+  // The record's tone follows the most recent observation, never an average.
+  const settledVerdict = reconciliations.length ? reconciliations[reconciliations.length - 1].verdict : null;
 
   return (
     <article
       className="control-card"
       data-lead={lead && !decision ? "true" : undefined}
       data-settled={decision ? "true" : undefined}
+      data-verdict={settledVerdict ?? undefined}
       aria-labelledby={`control-proposal-${proposal.id}`}
     >
       <header className="control-card-head">
@@ -95,88 +100,106 @@ export function ControlProposalRow({
       </header>
 
       {decision ? (
-        <section aria-label={`Authorization for ${proposal.merchant}`} className="control-authority">
+        <section aria-label={`Authorization record for ${proposal.merchant}`} className="control-authority">
           <p className="truth-label truth-authority">Human authorization · frozen</p>
           <p className="control-card-meta">
-            Decided {formatMoment(decision.decidedAt)} on policy version {decision.evaluationPolicyVersion}
-            {decision.decidedByDisplayName ? ` · by ${decision.decidedByDisplayName}` : ""}
+            {decision.decidedByDisplayName ?? "Deciding account not on record"} · {formatMoment(decision.decidedAt)} · policy version {decision.evaluationPolicyVersion}
           </p>
-          {reconciliations.length === 0 ? (
-            <div className="control-settled">
-              <dl className="proof">
-                <ControlFact label="Frozen expected" money={{ minor: decision.expectedAmountMinor, currency: decision.currency, provenance: { kind: "frozen" } }} />
-                {decision.approvedCapMinor === null ? (
-                  <ControlFact label="Approved cap" value="No cap — declined" engraved />
-                ) : (
-                  <ControlFact label="Approved cap" money={{ minor: decision.approvedCapMinor, currency: decision.currency, provenance: { kind: "frozen" } }} />
-                )}
-                <ControlFact label="Observed" value="Awaiting evidence" observed />
-              </dl>
-              <div className="control-settled-side">
-                <p className="proof-head">
-                  <span className="pill pill-planned">Awaiting evidence</span>
-                </p>
-                <p className="control-note">
+
+          <div className="ledger">
+            <dl className="ledger-rows">
+              {decision.approvedCapMinor === null ? (
+                // Only a decline reaches here: the contract requires every
+                // approval to carry a cap.
+                <ControlFact
+                  label="Refused amount"
+                  money={{ minor: decision.expectedAmountMinor, currency: decision.currency, provenance: { kind: "frozen", label: "At decision" } }}
+                />
+              ) : decision.approvedCapMinor === decision.expectedAmountMinor ? (
+                // APPROVE freezes the cap at the proposed amount. One number,
+                // rendered once — never the same figure on two adjacent rows.
+                <ControlFact
+                  label="Frozen cap"
+                  money={{ minor: decision.expectedAmountMinor, currency: decision.currency, provenance: { kind: "frozen", label: "Authorized in full" } }}
+                />
+              ) : (
+                <>
+                  <ControlFact
+                    label="Proposed"
+                    money={{ minor: decision.expectedAmountMinor, currency: decision.currency, provenance: { kind: "frozen", label: "At decision" } }}
+                  />
+                  <ControlFact
+                    label="Authorized cap"
+                    money={{ minor: decision.approvedCapMinor, currency: decision.currency, provenance: { kind: "frozen", label: "Frozen" } }}
+                  />
+                </>
+              )}
+            </dl>
+
+            {/* The cap line. Everything above it a named person froze before the
+                obligation existed; everything below arrived afterwards. */}
+            <p className="ledger-line">
+              <span>Frozen before</span>
+              <span>Observed after</span>
+            </p>
+
+            {decision.action === "DECLINE" ? (
+              <p className="ledger-closed">
+                Declined, so no cap was frozen and nothing can be reconciled against this record. Vognary did not cancel
+                the vendor or move money.
+              </p>
+            ) : reconciliations.length === 0 ? (
+              <>
+                <dl className="ledger-rows">
+                  <ControlFact label="Observed" value="Awaiting evidence" observed />
+                </dl>
+                <p className="ledger-closed">
                   No receipt has been linked to this authorization yet, so nothing has been observed against the frozen cap.
                 </p>
-              </div>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
-      {reconciliations.length ? (
-        <section aria-label={`Observed outcomes for ${proposal.merchant}`} className="control-outcomes">
-          <p className="truth-label truth-observed">Observed outcome</p>
-          <ul className="control-outcome-list">
-            {reconciliations.map((reconciliation, index) => (
-              <li key={reconciliation.id} className="control-outcome control-settled">
-                <dl className={proofToneClass[reconciliation.verdict]}>
-                  <ControlFact
-                    label="Frozen expected"
-                    money={{ minor: reconciliation.expectedAmountMinor, currency: reconciliation.authorizationCurrency, provenance: { kind: "frozen" } }}
-                  />
-                  {reconciliation.approvedCapMinor === null ? (
-                    <ControlFact label="Frozen cap" value="No cap — declined" engraved />
-                  ) : (
+              </>
+            ) : (
+              reconciliations.map((reconciliation, index) => (
+                <Fragment key={reconciliation.id}>
+                  <dl className="ledger-rows" data-verdict={reconciliation.verdict}>
                     <ControlFact
-                      label="Frozen cap"
-                      money={{ minor: reconciliation.approvedCapMinor, currency: reconciliation.authorizationCurrency, provenance: { kind: "frozen" } }}
+                      label={reconciliations.length > 1 ? `Observed ${index + 1}` : "Observed"}
+                      {...(reconciliation.observedAmountMinor === null || reconciliation.observedCurrency === null
+                        ? { value: "No comparable amount published" }
+                        : {
+                          money: {
+                            minor: reconciliation.observedAmountMinor,
+                            currency: reconciliation.observedCurrency,
+                            provenance: { kind: "observed" as const },
+                          },
+                        })}
+                      observed
                     />
-                  )}
-                  {reconciliation.observedAmountMinor === null || reconciliation.observedCurrency === null ? (
-                    <ControlFact label="Observed" value="Awaiting evidence" observed />
-                  ) : (
-                    <ControlFact
-                      label="Observed"
-                      money={{ minor: reconciliation.observedAmountMinor, currency: reconciliation.observedCurrency, provenance: { kind: "observed" } }}
-                    />
-                  )}
-                </dl>
-                <div className="control-settled-side">
-                  <p className="proof-head">
-                    <span className={controlVerdictToneClass[reconciliation.verdict]}>{controlVerdictLabels[reconciliation.verdict]}</span>
-                  </p>
-                  <p className="control-note">{controlVerdictMeanings[reconciliation.verdict]}</p>
-                  <p className="control-card-meta">
-                    {formatMoment(reconciliation.reconciledAt)} · authorized in {reconciliation.authorizationCurrency} · observed in {reconciliation.observedCurrency ?? "no published currency"}
-                  </p>
-                  {onInspectEvidence ? (
-                    <button
-                      id={`control-outcome-evidence-${reconciliation.id}`}
-                      type="button"
-                      className="link-quiet"
-                      onClick={() => onInspectEvidence(reconciliation.evidenceId, `control-outcome-evidence-${reconciliation.id}`)}
-                    >
-                      Open the observed receipt
-                    </button>
-                  ) : (
-                    <span className="control-card-meta">Observation {index + 1}</span>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
+                  </dl>
+                  <div className="ledger-verdict" data-verdict={reconciliation.verdict}>
+                    <p className="proof-head">
+                      <span className={controlVerdictToneClass[reconciliation.verdict]}>{controlVerdictLabels[reconciliation.verdict]}</span>
+                    </p>
+                    <p className="control-note">{controlVerdictMeanings[reconciliation.verdict]}</p>
+                    <p className="control-card-meta">
+                      {formatMoment(reconciliation.reconciledAt)} · authorized in {reconciliation.authorizationCurrency} · observed in {reconciliation.observedCurrency ?? "no published currency"}
+                    </p>
+                    {onInspectEvidence ? (
+                      <button
+                        id={`control-outcome-evidence-${reconciliation.id}`}
+                        type="button"
+                        className="link-quiet"
+                        onClick={() => onInspectEvidence(reconciliation.evidenceId, `control-outcome-evidence-${reconciliation.id}`)}
+                      >
+                        Open the observed receipt
+                      </button>
+                    ) : (
+                      <span className="control-card-meta control-observation-index">Observation {index + 1}</span>
+                    )}
+                  </div>
+                </Fragment>
+              ))
+            )}
+          </div>
         </section>
       ) : null}
 
@@ -203,11 +226,11 @@ export function ControlProposalRow({
 
       {!decision && evaluation ? (
         <div className="control-card-actions">
-          {canDecide ? (
+          {canDecide && onDecide ? (
             <button
               id={decideButtonId}
               type="button"
-              className={lead ? "btn btn-primary" : "btn btn-seal"}
+              className={lead ? "btn btn-primary" : "btn btn-ghost"}
               disabled={pendingKind !== null || !online}
               onClick={() => onDecide(proposal.id, decideButtonId)}
             >
@@ -223,7 +246,7 @@ export function ControlProposalRow({
 
       {decision && decision.action !== "DECLINE" ? (
         <div className="control-card-actions">
-          {canDecide ? (
+          {canDecide && onReconcile ? (
             <button
               id={reconcileButtonId}
               type="button"
@@ -235,7 +258,7 @@ export function ControlProposalRow({
             </button>
           ) : null}
           <p className="control-note">
-            The frozen cap never changes. A later observation is appended beside it, whatever it shows.
+            The frozen cap never changes. A later observation is appended below it, whatever it shows.
           </p>
         </div>
       ) : null}

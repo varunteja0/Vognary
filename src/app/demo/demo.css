@@ -1,0 +1,368 @@
+/*
+  Demonstration — route-scoped.
+
+  A demonstration is not a document. The field owns the screen, one command bar
+  owns the bottom, and the reader's only job at any moment is the single thing
+  in front of them.
+*/
+
+.demo {
+  --demo-bar: 5.5rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--field);
+  color: var(--field-ink);
+  /* The command bar is fixed on a phone, so the page reserves its height plus
+     the home indicator. Nothing is ever behind it. */
+  padding-bottom: calc(var(--demo-bar) + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 64rem) {
+  .demo {
+    --demo-bar: 0rem;
+    padding-bottom: 0;
+  }
+}
+
+/* ---- Masthead ----------------------------------------------------------- */
+
+.demo-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: min(100% - 2rem, 84rem);
+  margin-inline: auto;
+  min-height: 3.75rem;
+}
+@media (min-width: 48rem) {
+  .demo-top { width: min(100% - 4rem, 84rem); min-height: 4.25rem; }
+}
+.demo-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: var(--tap);
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--field-ink);
+}
+
+/* Persistently visible, programmatically findable, and never styled as
+   decoration. It is the most important label on the page. */
+.demo-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--gold-soft) 45%, transparent);
+  border-radius: var(--radius-xs);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--gold-soft);
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+}
+.demo-stamp::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/* ---- Body --------------------------------------------------------------- */
+
+.demo-body {
+  flex: 1;
+  display: grid;
+  align-content: start;
+}
+@media (min-width: 64rem) {
+  .demo-body {
+    grid-template-columns: minmax(0, 1.25fr) minmax(21rem, 0.72fr);
+    align-content: stretch;
+  }
+}
+
+.demo-panel {
+  display: grid;
+  align-content: start;
+  border-top: 1px solid var(--field-line);
+}
+@media (min-width: 64rem) {
+  .demo-panel {
+    border-left: 1px solid var(--field-line);
+    border-top: 0;
+    padding-bottom: 1.5rem;
+  }
+}
+
+.demo-say {
+  padding: 1.5rem 1.15rem 0.25rem;
+}
+@media (min-width: 64rem) {
+  .demo-say { padding: 2.25rem 2rem 0.5rem; }
+}
+.demo-say h1 {
+  margin: 0;
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: clamp(1.5rem, 4.5vw, 1.95rem);
+  font-weight: 600;
+  line-height: 1.16;
+  text-wrap: balance;
+}
+.demo-say p {
+  margin: 0.7rem 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--field-soft);
+  text-wrap: pretty;
+}
+
+/* ---- Step index --------------------------------------------------------- *
+   A real navigation instrument: every step already reached is reachable again,
+   and a step that does not exist on this branch is not rendered as if it does. */
+.demo-steps {
+  margin: 0;
+  padding: 1.15rem 1.15rem;
+  list-style: none;
+  display: grid;
+  gap: 1px;
+}
+@media (min-width: 64rem) {
+  .demo-steps { padding: 1.15rem 2rem; }
+}
+.demo-steps > li > button {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0.35rem 0.5rem 0.35rem 0;
+  border: 0;
+  background: none;
+  color: var(--field-muted);
+  font-size: 0.9375rem;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+.demo-steps > li > button:hover:not(:disabled) { color: var(--field-ink); }
+.demo-steps > li > button:disabled { cursor: not-allowed; opacity: 0.45; }
+.demo-steps > li > button[aria-current="step"] {
+  color: var(--field-ink);
+  font-weight: 600;
+}
+.demo-step-dot {
+  justify-self: center;
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1px solid var(--field-line-strong);
+  border-radius: 999px;
+}
+.demo-steps > li > button[aria-current="step"] .demo-step-dot {
+  background: var(--gold-soft);
+  border-color: var(--gold-soft);
+}
+.demo-steps > li[data-done="true"] .demo-step-dot {
+  background: var(--field-muted);
+  border-color: var(--field-muted);
+}
+
+/* ---- The human line ----------------------------------------------------- */
+
+.demo-decision,
+.demo-outcome {
+  padding: 0 1.15rem 1.35rem;
+}
+@media (min-width: 64rem) {
+  .demo-decision,
+  .demo-outcome { padding: 0 2rem 1.35rem; }
+}
+.demo-decision h2 {
+  margin: 0 0 0.3rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--gold-soft);
+}
+.demo-decision > p {
+  margin: 0 0 0.85rem;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--field-soft);
+}
+.demo-choices {
+  display: grid;
+  gap: 0.5rem;
+}
+.demo-choice {
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--field-line-strong);
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--field-ink) 5%, transparent);
+  color: var(--field-ink);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard);
+}
+.demo-choice:hover {
+  border-color: var(--gold-soft);
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+}
+.demo-choice[data-action="DECLINE"]:hover {
+  border-color: color-mix(in srgb, var(--ember) 60%, white 40%);
+  background: color-mix(in srgb, var(--ember) 16%, transparent);
+}
+.demo-choice-label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+.demo-choice-note {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--field-muted);
+}
+
+/* ---- Outcome ------------------------------------------------------------ */
+
+.demo-outcome:focus-visible {
+  outline: 2px solid var(--gold-soft);
+  outline-offset: 6px;
+}
+.demo-outcome h2 {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1.3125rem;
+  font-weight: 600;
+}
+.demo-outcome[data-branch="DECLINE"] h2 {
+  color: color-mix(in srgb, var(--ember) 38%, white 62%);
+}
+.demo-outcome > p {
+  margin: 0 0 0.75rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--field-soft);
+  text-wrap: pretty;
+}
+.demo-figures {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--field-line);
+}
+.demo-figures > div { display: grid; gap: 0.15rem; }
+.demo-figures dt {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--field-muted);
+}
+.demo-figures dd { margin: 0; }
+.demo-reasons {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.demo-reasons > li {
+  position: relative;
+  padding-left: 0.9rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.demo-reasons > li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.7em;
+  width: 5px;
+  height: 1px;
+  background: var(--field-muted);
+}
+.demo-outcome .money-amount { color: var(--field-ink); }
+.demo-outcome .money-provenance { color: var(--field-muted); }
+.demo-outcome .money-frozen .money-amount,
+.demo-outcome .money-frozen .money-provenance { color: var(--gold-soft); }
+.demo-outcome .money-frozen .money-amount::before,
+.demo-outcome .money-frozen .money-amount::after { border-color: var(--gold-soft); }
+.demo-outcome .money-observed .money-amount,
+.demo-outcome .money-observed .money-provenance {
+  color: color-mix(in srgb, var(--evidence) 38%, white 62%);
+}
+.demo-outcome .money-assumed .money-amount,
+.demo-outcome .money-assumed .money-provenance {
+  color: var(--field-soft);
+  border-bottom-color: var(--field-soft);
+}
+
+.demo-next-action {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+}
+.demo-next-action .home-quiet,
+.demo-next-action a:not(.btn) {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-size: 0.9375rem;
+  color: var(--field-soft);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.demo-next-action a:not(.btn):hover { color: var(--field-ink); }
+
+/* ---- Command bar --------------------------------------------------------- *
+   Fixed on a phone so the only control that matters is always under a thumb;
+   inline on a desktop, where the rail already has room for it. */
+.demo-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.15rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--field-line);
+  background: color-mix(in srgb, var(--field-2) 97%, transparent);
+  backdrop-filter: blur(8px);
+}
+.demo-bar .btn-primary {
+  flex: 1;
+  background: var(--field-ink);
+  color: var(--field);
+  border-color: var(--field-ink);
+}
+.demo-bar .btn-primary:hover { background: #ffffff; border-color: #ffffff; }
+.demo-bar .btn-ghost {
+  background: transparent;
+  color: var(--field-soft);
+  border-color: var(--field-line-strong);
+}
+.demo-bar .btn-ghost:hover {
+  color: var(--field-ink);
+  background: color-mix(in srgb, var(--field-ink) 8%, transparent);
+}
+@media (min-width: 64rem) {
+  .demo-bar {
+    position: static;
+    padding: 0 2rem;
+    border-top: 0;
+    background: none;
+    backdrop-filter: none;
+  }
+  .demo-bar .btn-primary { flex: 0 0 auto; }
+}

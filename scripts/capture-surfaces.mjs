@@ -5,6 +5,10 @@
 //   node scripts/capture-surfaces.mjs [--out docs/evidence/<slug>] [--base URL]
 //   node scripts/capture-surfaces.mjs --signed-in            # adds /app surfaces
 //   node scripts/capture-surfaces.mjs --signed-in --fresh-auth
+//
+// --signed-in-only skips the public routes. The code-login disclosure on /login
+// is compiled out of a production build, so signed-in surfaces must come from a
+// dev server while public surfaces come from the standalone artifact.
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname } from "node:path";
@@ -20,20 +24,24 @@ for (let i = 2; i < process.argv.length; i += 1) {
 }
 const base = args.get("--base") ?? "http://127.0.0.1:3100";
 const outDir = args.get("--out") ?? "/tmp/vognary-shots";
-const wantSignedIn = args.get("--signed-in") === true;
+const signedInOnly = args.get("--signed-in-only") === true;
+const wantSignedIn = signedInOnly || args.get("--signed-in") === true;
 const freshAuth = args.get("--fresh-auth") === true;
 const navTimeout = Number(args.get("--timeout") ?? 90_000);
 // Session cache lives under node_modules (gitignored) so a cookie never reaches a commit.
 const authFile = typeof args.get("--auth") === "string" ? args.get("--auth") : "node_modules/.cache/vognary-auth.json";
 
 const VIEWPORTS = [
+  { name: "360", width: 360, height: 800 },
   { name: "390", width: 390, height: 844 },
   { name: "768", width: 768, height: 1024 },
+  { name: "1024", width: 1024, height: 768 },
   { name: "1440", width: 1440, height: 900 },
 ];
 
 const ROUTES = [
   ["landing", "/"],
+  ["demo", "/demo"],
   ["start", "/start"],
   ["pay", "/pay"],
   ["login", "/login"],
@@ -43,10 +51,20 @@ const ROUTES = [
   ["privacy", "/privacy"],
   ["terms", "/terms"],
   ["offline", "/offline"],
+  ["verify", "/verify"],
+  ["brand", "/brand"],
+  ["billing-return", "/billing/return"],
 ];
 
-// Signed-in surfaces. Reached with a cached session so the login is paid once, not once per run.
-const SIGNED_IN_ROUTES = [["workspace", "/app"]];
+// Signed-in surfaces. Reached with a cached session so the login is paid once,
+// not once per run. Workspace views are real in-page destinations, not routes.
+const SIGNED_IN_ROUTES = [
+  { slug: "workspace-today", route: "/app", view: "Today" },
+  { slug: "workspace-control", route: "/app", view: "Control" },
+  { slug: "workspace-bills", route: "/app", view: "Commitments" },
+  { slug: "workspace-sources", route: "/app", view: "Evidence" },
+  { slug: "profile", route: "/profile" },
+];
 
 await mkdir(outDir, { recursive: true });
 const browser = await chromium.launch();
@@ -95,7 +113,16 @@ async function resolveSession() {
 
 const sessionPath = wantSignedIn ? await resolveSession() : null;
 
-async function captureRoute(page, slug, route, vp, scheme) {
+async function captureRoute(page, slug, route, vp, scheme, view) {
+  const runtimeProblems = [];
+  const onPageError = (error) => runtimeProblems.push(`pageerror: ${error.message}`);
+  const onConsole = (message) => {
+    if (message.type() === "error" && !message.text().startsWith("Failed to load resource")) {
+      runtimeProblems.push(`console: ${message.text()}`);
+    }
+  };
+  page.on("pageerror", onPageError);
+  page.on("console", onConsole);
   // A dev server compiles each route on first hit, which can outlast the 30s default.
   // The real error is reported rather than swallowed, so a timeout is never mistaken for a broken page.
   let navError = null;
@@ -104,12 +131,34 @@ async function captureRoute(page, slug, route, vp, scheme) {
     .catch((error) => { navError = error instanceof Error ? error.message.split("\n")[0] : String(error); return null; });
   if (!res || res.status() >= 400) {
     findings.push({ route, viewport: vp.name, scheme, issue: navError ?? `HTTP ${res?.status()}` });
+    page.off("pageerror", onPageError);
+    page.off("console", onConsole);
     return;
   }
   // The signed-in workspace polls, so networkidle never fires there. Wait for quiet when it
   // comes and move on when it does not, rather than failing a page that rendered fine.
   await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
   await page.evaluate(() => document.fonts.ready);
+  if (view) {
+    const button = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: view, exact: true });
+    if (await button.count() === 0) {
+      findings.push({ route, viewport: vp.name, scheme, issue: `${view} workspace view is unavailable` });
+      page.off("pageerror", onPageError);
+      page.off("console", onConsole);
+      return;
+    }
+    await button.click();
+    await page.waitForFunction((label) => {
+      return [...document.querySelectorAll('nav[aria-label="Primary"] button')]
+        .some((candidate) => candidate.textContent?.trim() === label && candidate.getAttribute("aria-current") === "page");
+    }, view);
+  }
+  await page.evaluate(async () => {
+    const animations = [...document.querySelectorAll(".enter, .enter-list > *, .rise")]
+      .flatMap((element) => element.getAnimations())
+      .filter((animation) => animation.playState !== "finished");
+    await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
+  });
   await page.screenshot({ path: `${outDir}/${slug}-${vp.name}-${scheme}.png`, fullPage: true });
 
   // Layout and touch-target audit at the same moment the capture is taken.
@@ -135,6 +184,9 @@ async function captureRoute(page, slug, route, vp, scheme) {
   });
   if (audit.overflow) findings.push({ route, viewport: vp.name, scheme, issue: `horizontal overflow ${audit.scrollWidth}>${audit.clientWidth}`, wide: audit.wide });
   if (audit.small.length) findings.push({ route, viewport: vp.name, scheme, issue: `${audit.small.length} targets under 44px`, targets: audit.small.slice(0, 8) });
+  if (runtimeProblems.length) findings.push({ route, viewport: vp.name, scheme, issue: "runtime errors", errors: runtimeProblems });
+  page.off("pageerror", onPageError);
+  page.off("console", onConsole);
 }
 
 let captured = 0;
@@ -143,24 +195,26 @@ for (const scheme of ["light", "dark"]) {
     const contextOptions = {
       viewport: { width: vp.width, height: vp.height },
       deviceScaleFactor: 1,
-      hasTouch: vp.width <= 768,
+      hasTouch: vp.width <= 1024,
       colorScheme: scheme,
       reducedMotion: "no-preference",
     };
 
-    const context = await browser.newContext(contextOptions);
-    const page = await context.newPage();
-    for (const [slug, route] of ROUTES) {
-      await captureRoute(page, slug, route, vp, scheme);
-      captured += 1;
+    if (!signedInOnly) {
+      const context = await browser.newContext(contextOptions);
+      const page = await context.newPage();
+      for (const [slug, route] of ROUTES) {
+        await captureRoute(page, slug, route, vp, scheme);
+        captured += 1;
+      }
+      await context.close();
     }
-    await context.close();
 
     if (!sessionPath) continue;
     const signedIn = await browser.newContext({ ...contextOptions, storageState: sessionPath });
     const signedInPage = await signedIn.newPage();
-    for (const [slug, route] of SIGNED_IN_ROUTES) {
-      await captureRoute(signedInPage, slug, route, vp, scheme);
+    for (const { slug, route, view } of SIGNED_IN_ROUTES) {
+      await captureRoute(signedInPage, slug, route, vp, scheme, view);
       captured += 1;
     }
     await signedIn.close();

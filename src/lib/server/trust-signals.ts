@@ -153,6 +153,16 @@ function backupSignal(): PublicTrustSignal {
       detail: "Backup storage and a restore-drill attestation are present. Public proof waits for a recorded restore of the stored object.",
     };
   }
+  if (backups.status === "restore-drill-record-hash-required") {
+    return {
+      id: "backups",
+      label: "Encrypted backups and restore drill",
+      state: backups.storage === "configured" ? "configured" : "not-yet-proven",
+      detail: backups.storage === "configured"
+        ? "Backup storage is configured, but the restore status has no valid restricted record hash."
+        : "A restore status has no valid restricted record hash, and durable backup storage is not configured.",
+    };
+  }
   if (backups.storage === "configured") {
     return {
       id: "backups",

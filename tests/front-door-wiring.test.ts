@@ -4,36 +4,53 @@ import test from "node:test";
 
 const pageSource = readFileSync("src/app/page.tsx", "utf8");
 const landingSource = readFileSync("src/app/launch-landing.tsx", "utf8");
-const landingPreviewSource = readFileSync("src/app/landing-decision-preview.tsx", "utf8");
+const narrativeSource = readFileSync("src/app/home-field-narrative.tsx", "utf8");
+const shellSource = readFileSync("src/app/public-shell.tsx", "utf8");
+const workSource = readFileSync("src/app/home-operating-record.tsx", "utf8");
 const appPageSource = readFileSync("src/app/app/page.tsx", "utf8");
 const experienceSource = readFileSync("src/app/app/experience-client.tsx", "utf8");
 const loginSource = readFileSync("src/app/login/login-client.tsx", "utf8");
 const layoutSource = readFileSync("src/app/layout.tsx", "utf8");
+const publicFront = [landingSource, narrativeSource, shellSource, workSource].join("\n");
 
 test("the public page is a cacheable readiness-neutral shell", () => {
   assert.match(pageSource, /export const revalidate = 3600/);
   assert.doesNotMatch(pageSource, /force-dynamic|isReceiptInboxPubliclyAvailable/);
 });
 
-test("the landing selects the guest-first proven entry path without instant-audit surfaces", () => {
-  assert.match(landingSource, /const primaryHref = "#example-decision";/);
-  assert.match(landingSource, /const primaryLabel = "Cap the next yes";/);
-  assert.match(landingSource, /const evidenceHref = "\/start";/);
+test("the landing leads with the demonstration and keeps the guest evidence path second", () => {
+  // One primary command to the demonstration, one quiet secondary to the
+  // visitor's own evidence. The rejected hero form is gone for good.
+  assert.match(landingSource, /href="\/demo" className="btn btn-primary btn-lg"/);
+  assert.match(landingSource, /href="\/start" className="home-quiet"/);
   assert.match(landingSource, /href="\/pay" prefetch=\{false\}/);
-  assert.match(landingSource, /<AuthorizationLoop activeStep=\{4\} compact \/>/);
-  assert.doesNotMatch(landingSource, /sample|demo|InstantAudit|instant audit/i);
+  assert.doesNotMatch(landingSource, /LandingDecisionPreview|LandingSignalRail|control-index/);
+  assert.doesNotMatch(landingSource, /<form|<input|<textarea/);
+  // The public shell offers exactly one primary command plus one menu, so a
+  // phone header can never crowd three text buttons beside the brand.
+  assert.match(shellSource, /pshell-primary/);
+  assert.match(shellSource, /pshell-menu-button/);
+  assert.match(shellSource, /aria-haspopup="dialog"/);
+  // The retired sample/instant-audit surfaces stay gone, and the landing never
+  // calls anything a "demo" in visible copy — the route it links to labels
+  // itself a synthetic demonstration on every frame.
+  assert.doesNotMatch(landingSource, /sample|InstantAudit|instant audit/i);
+  assert.doesNotMatch(landingSource, />[^<]*\bdemos?\b[^<]*</i);
 });
 
 test("the landing states concise evidence and action boundaries without unsupported claims", () => {
-  assert.match(landingSource, /No bank passwords/);
-  assert.match(landingSource, /No mailbox access/);
-  assert.match(landingPreviewSource, /From two example receipts/);
-  assert.match(landingPreviewSource, /unsupported facts stay unknown/);
-  assert.match(landingPreviewSource, /writeGuestProposalDraft/);
-  assert.match(landingPreviewSource, /onClick=\{saveDraft\}/);
-  assert.doesNotMatch(landingPreviewSource, /useEffect/);
-  assert.match(landingPreviewSource, /annotateLandingPolicy/);
-  assert.match(landingSource, /Vognary never cancels a service or moves money/);
+  // Every boundary survives the redesign. They are now stated where they answer
+  // a live concern rather than as a column of limitations in the first viewport.
+  assert.match(publicFront, /No bank\s*\n?\s*password and no mailbox access/);
+  assert.match(publicFront, /never auto-approves, never purchases or provisions, and never moves money/);
+  assert.match(publicFront, /never auto-approves, purchases, provisions or moves money/);
+  assert.match(publicFront, /Payment is not activation/);
+  // The operating-record section is labelled synthetic and cannot be mistaken
+  // for customer activity.
+  assert.match(workSource, /SYNTHETIC_DEMO_LABEL/);
+  assert.match(workSource, /placeholders in a fixed example, not customer activity/);
+  // Nothing on the public front derives money; it renders canonical components.
+  assert.match(workSource, /MoneyValue/);
   assert.doesNotMatch(landingSource, /30 days/i);
   assert.doesNotMatch(landingSource, /only billing evidence you intentionally forward/i);
   assert.doesNotMatch(landingSource, /Gmail/i);
@@ -59,7 +76,7 @@ test("static layout metadata remains readiness-neutral", () => {
   assert.ok(metadataStart >= 0 && metadataEnd > metadataStart);
   const metadataSource = layoutSource.slice(metadataStart, metadataEnd);
 
-  assert.match(metadataSource, /Vognary - Decide before the obligation exists/);
+  assert.match(metadataSource, /Vognary - Commitment Control for India-first AI companies/);
   assert.match(metadataSource, /Commitment Control for India-first 20–100 person AI-native companies/);
   assert.doesNotMatch(metadataSource, /\b(?:forward(?:ed|ing)?|Gmail|bank|UPI|cancel(?:s|led|ling|lation|lations)?)\b/i);
 });

@@ -11,6 +11,7 @@ const names = [
   "R2_BUCKET",
   "BACKUP_RESTORE_DRILL_STATUS",
   "BACKUP_RESTORE_DRILL_AT",
+  "BACKUP_RESTORE_DRILL_RECORD_SHA256",
   "BACKUP_KEY_FINGERPRINT",
   "BACKUP_ENCRYPTION_KEY",
   "ENABLE_RECEIPT_INBOX",
@@ -85,6 +86,7 @@ test("configuration and operator attestations flip the matching signals", () => 
     TOKEN_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     BACKUP_STORAGE_BUCKET: "vognary-backups",
     BACKUP_RESTORE_DRILL_STATUS: "passed",
+    BACKUP_RESTORE_DRILL_RECORD_SHA256: "a".repeat(64),
     BACKUP_KEY_FINGERPRINT: "test-fingerprint",
     DATABASE_URL: "postgresql://vognary.test/vognary",
     GOOGLE_AUTH_CLIENT_ID: "trust-signal-google-client-id",
@@ -129,6 +131,7 @@ test("a restore-drill attestation without stored-object evidence stays configure
     BACKUP_STORAGE_BUCKET: "vognary-backups",
     BACKUP_RESTORE_DRILL_STATUS: "passed",
     BACKUP_RESTORE_DRILL_AT: "2026-07-19",
+    BACKUP_RESTORE_DRILL_RECORD_SHA256: "a".repeat(64),
     BACKUP_KEY_FINGERPRINT: "test-fingerprint",
   }, () => {
     const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
@@ -141,6 +144,7 @@ test("a matching stored-object restore record can prove backups", () => {
   withEnvironment({
     R2_BUCKET: "vognary-postgres-backups",
     BACKUP_RESTORE_DRILL_STATUS: "passed",
+    BACKUP_RESTORE_DRILL_RECORD_SHA256: "a".repeat(64),
     BACKUP_KEY_FINGERPRINT: "8it2LaCH1w__ilS1",
   }, () => {
     const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
@@ -155,11 +159,25 @@ test("a malformed restore-drill date is ignored, never rendered", () => {
     BACKUP_STORAGE_BUCKET: "vognary-backups",
     BACKUP_RESTORE_DRILL_STATUS: "passed",
     BACKUP_RESTORE_DRILL_AT: "not-a-date",
+    BACKUP_RESTORE_DRILL_RECORD_SHA256: "a".repeat(64),
     BACKUP_KEY_FINGERPRINT: "test-fingerprint",
   }, () => {
     const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
     assert.equal(byId.get("backups")?.state, "configured");
     assert.ok(!(byId.get("backups")?.detail ?? "").includes("not-a-date"));
+  });
+});
+
+test("backup readiness refuses a bare passed status without a restricted record hash", () => {
+  withEnvironment({
+    BACKUP_STORAGE_BUCKET: "vognary-backups",
+    BACKUP_RESTORE_DRILL_STATUS: "passed",
+    BACKUP_KEY_FINGERPRINT: "test-fingerprint",
+  }, () => {
+    const signal = new Map(getPublicTrustSignals().map((entry) => [entry.id, entry])).get("backups");
+    assert.equal(signal?.state, "configured");
+    assert.match(signal?.detail ?? "", /record hash/i);
+    assert.doesNotMatch(signal?.detail ?? "", /attestation.*present/i);
   });
 });
 

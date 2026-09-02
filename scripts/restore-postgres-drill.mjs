@@ -138,8 +138,8 @@ try {
     storageRestore: storageRestore ?? { source: "local-runner-copy" },
     verification,
     next: restoreFromStorage
-      ? "Record this durable-storage restore drill externally. Set BACKUP_RESTORE_DRILL_STATUS=passed in production only after this log shows source=durable-object-get."
-      : "Record this drill externally, upload the encrypted dump to durable storage, then set BACKUP_RESTORE_DRILL_STATUS=passed in production only after the storage copy is confirmed.",
+      ? "Retain this durable-storage restore result in a restricted record, hash it, then set BACKUP_RESTORE_DRILL_STATUS, BACKUP_RESTORE_DRILL_AT, and BACKUP_RESTORE_DRILL_RECORD_SHA256 together."
+      : "Record this drill externally, upload the encrypted dump to durable storage, restore that stored object, and leave all backup readiness evidence blank until the restricted durable-restore record is hashed.",
   }, null, 2));
 } finally {
   await rm(tempDir, { recursive: true, force: true });

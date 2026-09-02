@@ -13,7 +13,7 @@ export function ErrorState({ eyebrow, title, description, children }: ErrorState
     <main className="relative flex min-h-[78vh] items-center justify-center px-4 py-16 text-foreground">
       <div className="panel mx-auto w-full max-w-md p-8 text-center rise">
         <div className="mx-auto flex w-fit items-center gap-2.5">
-          <VognaryMark size={30} className="text-(--ink)" animated />
+          <VognaryMark size={30} className="text-(--ink)" />
           <span className="font-display text-lg font-semibold text-(--ink)">Vognary</span>
         </div>
         <p className="eyebrow mt-7">{eyebrow}</p>

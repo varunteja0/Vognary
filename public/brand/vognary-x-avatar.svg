@@ -1,7 +1,7 @@
 <!-- X profile avatar master. 800 × 800; all critical artwork stays inside the circular crop-safe area. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" fill="none" role="img" aria-labelledby="title desc">
   <title id="title">Vognary X avatar</title>
-  <desc id="desc">The Vognary Ledger to Verdict mark on a graphite field</desc>
+  <desc id="desc">The Vognary Ledger to Authorization mark on a graphite field</desc>
   <defs>
     <radialGradient id="bg" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(400 470) rotate(90) scale(470)">
       <stop stop-color="#171B22"/>

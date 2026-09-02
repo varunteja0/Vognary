@@ -43,7 +43,7 @@ Vognary is designed for finance owners at India-first, 5–100 person AI-native 
 
 ## How to use it
 
-1. Open [Cap the next yes](https://www.vognary.com/#example-decision) to type a proposed obligation. Typed amounts are assumptions.
+1. Open [Walk a synthetic decision](https://www.vognary.com/demo) to inspect the complete read-only loop. Every figure and identity there is a placeholder.
 2. Open [Add a bill](https://www.vognary.com/start) to cite billing evidence the user is authorized to share.
 3. Sign in to remember the evidence and open the Control desk.
 4. Record policy, propose the spend, and have an owner or admin authorize a cap.
@@ -98,9 +98,9 @@ Important interpretation rules:
 ## Core
 
 - [Homepage in Markdown](https://www.vognary.com/index.md): Concise product identity, workflow, best fit, and boundaries.
-- [Cap the next yes](https://www.vognary.com/#example-decision): Guest authorization desk. Typed amounts are assumptions until a receipt is cited.
+- [Walk a synthetic decision](https://www.vognary.com/demo): Read-only placeholder example of evidence, proposal, policy, human authorization, and later reconciliation.
 - [Add a bill](https://www.vognary.com/start): No-account step for reviewing user-provided billing evidence.
-- [Vognary homepage](https://www.vognary.com/): Human-facing product overview and working authorization desk.
+- [Vognary homepage](https://www.vognary.com/): Human-facing product overview and route into the synthetic demonstration or a user-provided bill.
 
 ## Trust and policies
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { commitmentControlPilotOffer } from "@/lib/pilot-offer";
 
 type CheckoutStatusPayload = {
   status: "created" | "pending" | "paid" | "partially_refunded" | "failed" | "reconciliation_required" | "cancelled" | "expired" | "refunded";
@@ -83,22 +84,23 @@ export default function BillingReturnClient({ checkoutId }: { checkoutId: string
 
   const { payload } = view;
   const amount = `${payload.currency === "INR" ? "INR " : `${payload.currency} `}${(payload.amountMinor / 100).toLocaleString("en-IN")}`;
-  const assistedAudit = payload.plan === "assisted-audit" || payload.plan === "annual";
-  const label = assistedAudit ? "one-time assisted audit" : `${payload.plan} legacy monitoring`;
+  // The only offer Vognary sells today is the one-time pilot. Anything else on
+  // file is a retired checkout: it is reported accurately and never re-sold.
+  const isCurrentOffer = payload.plan === commitmentControlPilotOffer.id;
+  const label = isCurrentOffer ? commitmentControlPilotOffer.title : "retired Vognary checkout";
 
   if (payload.status === "paid") {
     return (
       <StatusPanel tone="good" heading={`Payment settled — ${amount}`}>
-        Your {label} payment is confirmed by Razorpay&apos;s signed webhook.
-        {assistedAudit
-          ? " Next step: we reply to your audit-request email with the safest minimum source to share. Nothing else to do right now."
-          : " Your workspace entitlement is active; open the app to continue."}
-        {!assistedAudit ? <span className="mt-3 block"><Link href="/app" className="btn btn-primary">Open the app</Link></span> : null}
+        This {label} payment is confirmed by Razorpay&apos;s signed webhook.
+        {isCurrentOffer
+          ? ` Activation is a founder step, not an automatic one: Vognary replies to the email used at checkout and enables Commitment Control within ${commitmentControlPilotOffer.activationDeadlineBusinessDays} business days. Nothing is enabled until that reply.`
+          : " This checkout belongs to an offer Vognary no longer sells. Email support@vognary.com with the checkout reference for its exact service status."}
       </StatusPanel>
     );
   }
   if (payload.status === "partially_refunded") {
-    return <StatusPanel tone="neutral" heading={`Partially refunded — ${amount}`}>Razorpay confirmed a partial refund. The audit request remains on file; email support@vognary.com with the checkout reference for the exact remaining balance and service status.</StatusPanel>;
+    return <StatusPanel tone="neutral" heading={`Partially refunded — ${amount}`}>Razorpay confirmed a partial refund. Email support@vognary.com with the checkout reference for the exact remaining balance and service status.</StatusPanel>;
   }
   if (payload.status === "refunded") {
     return (

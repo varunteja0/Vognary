@@ -55,7 +55,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 1-3. Open landing and establish a saved identity independently of provider activation.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Decide before the obligation exists.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Commitment Control: freeze the cap before the obligation exists.");
   await tabToAndActivate(page, "Sign in");
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
@@ -241,7 +241,7 @@ async function loginAsDevelopmentUser(page: Page) {
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
 }
 
-async function selectRecoveryView(page: Page, name: "Now" | "Bills" | "Sources" | "Automation") {
+async function selectRecoveryView(page: Page, name: "Today" | "Commitments" | "Evidence" | "Automation") {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name }).click();
 }
 
@@ -255,7 +255,7 @@ async function openAddBills(page: Page) {
   if (await addBills.first().isVisible()) {
     await addBills.first().click();
   } else {
-    await selectRecoveryView(page, "Sources");
+    await selectRecoveryView(page, "Evidence");
     await page.getByRole("button", { name: "Add a bill" }).click();
   }
   await expect(overlay).toBeVisible();
@@ -263,7 +263,7 @@ async function openAddBills(page: Page) {
 }
 
 async function openCommitment(page: Page, merchant: string) {
-  await selectRecoveryView(page, "Bills");
+  await selectRecoveryView(page, "Commitments");
   const heading = page.getByRole("heading", { name: merchant, exact: true });
   if (await heading.isVisible()) return;
   const commitment = page.getByRole("button", { name: new RegExp(merchant) }).first();

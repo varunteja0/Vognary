@@ -22,7 +22,7 @@ export function annotateLandingPolicy(input: {
       truthClass: "truth-policy",
       status: delta > 0 ? "Review required" : "Within last cited amount",
       reason: delta > 0
-        ? `The latest cited bill is ₹${delta.toLocaleString("en-IN")} higher than the previous one. Policy annotates. A named human still decides.`
+        ? `The latest cited bill is INR ${delta.toLocaleString("en-IN")} higher than the previous one. Policy annotates. A named human still decides.`
         : "Cited amounts did not increase. A named human still freezes the cap.",
     };
   }

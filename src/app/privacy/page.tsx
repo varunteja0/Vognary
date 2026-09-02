@@ -1,6 +1,9 @@
+import "../public.css";
+import "../ledger.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { VognaryMark } from "../brand";
+import { PublicDocument } from "../public-document";
 
 export const metadata: Metadata = {
   title: "Privacy notice",
@@ -179,22 +182,17 @@ const sections = [
 
 export default function PrivacyPage() {
   return (
-    <main id="ledger-main" className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-3xl">
+    <main id="ledger-main" className="relative px-4 pb-12 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-6xl">
         <TrustNav />
-        <article className="panel p-6 sm:p-8 rise">
-          <span className="folio" data-folio="Trust">Privacy notice</span>
-          <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">Privacy, without hidden coverage claims</h1>
-          <p className="mt-3 text-sm leading-7 text-(--muted)">Effective {effectiveDate}. This notice explains Vognary 1.0 and the boundaries users should understand before connecting financial evidence.</p>
-          <div className="mt-8 grid gap-6">
-            {sections.map((section) => (
-              <section key={section.title}>
-                <h2 className="font-display text-lg font-semibold text-(--ink)">{section.title}</h2>
-                <div className="mt-2 text-sm leading-7 text-(--muted)">{section.body}</div>
-              </section>
-            ))}
-          </div>
-        </article>
+        <PublicDocument
+          folio="Privacy notice"
+          title="Privacy, without hidden coverage claims"
+          effectiveDate={effectiveDate}
+          summary="This notice explains Vognary 1.0 and the boundaries users should understand before connecting financial evidence."
+          idPrefix="privacy"
+          sections={sections}
+        />
       </div>
     </main>
   );
@@ -202,7 +200,7 @@ export default function PrivacyPage() {
 
 function TrustNav() {
   return (
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-line py-3">
       <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
         <VognaryMark size={22} />
         Vognary

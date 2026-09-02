@@ -1,5 +1,7 @@
 "use client";
 
+import "../public.css";
+import "../ledger.css";
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
 import { buildGuestAuditSnapshot, guestAuditTransferKey, type TransferStatementSource } from "@/lib/guest-audit-transfer";
@@ -15,7 +17,6 @@ import { fetchReceiptLineProposal } from "@/lib/recovery/image-receipt-proposal"
 import { knownMerchantsFromNames } from "@/lib/recovery/monthly-loop";
 import { splitReceiptTexts } from "@/lib/recovery/receipt-input";
 import { isReceiptImageFile } from "@/lib/recovery/wow-first-session";
-import { AuthorizationLoop } from "../authorization-loop";
 import { VognaryMark } from "../brand";
 import { BillDropzone } from "../workspace/recovery/ui/dropzone";
 import { ConfirmReceiptLine, type ImageDraft } from "../workspace/recovery/ui/confirm-receipt-line";
@@ -154,8 +155,8 @@ export default function StartClient() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
-      <nav className="flex items-center justify-between gap-3">
+    <main className="mx-auto w-full max-w-6xl px-4 pb-12 sm:px-6">
+      <nav className="flex min-h-16 items-center justify-between gap-3 border-b border-line py-3">
         <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-display text-lg font-semibold text-(--ink)">
           <VognaryMark size={24} />
           Vognary
@@ -163,8 +164,10 @@ export default function StartClient() {
         <Link href="/login?next=/app" className="btn btn-sm btn-ghost">Sign in</Link>
       </nav>
 
-      <p className="truth-label truth-policy mt-10">Add cited evidence</p>
-      <h1 className="mt-3 max-w-2xl font-display text-3xl font-semibold leading-tight text-(--ink) sm:text-4xl">
+      <div className="public-ledger">
+      <header className="public-ledger-rail">
+      <p className="truth-label truth-policy">Add cited evidence</p>
+      <h1 className="mt-3 max-w-2xl font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-5xl">
         See the charge. Sign in to authorize.
       </h1>
       {draft && !draft.usingExample ? (
@@ -183,12 +186,14 @@ export default function StartClient() {
           <p className="mt-2 text-sm leading-6 text-(--muted)">
             No account needed. Nothing is saved until you sign in.
           </p>
-          <AuthorizationLoop activeStep={1} />
         </>
       ) : null}
+      </header>
+
+      <div className="public-ledger-body">
 
       {/* Once a bill is cited the decision is the page; the form steps aside. */}
-      <details open={!cards.length} className="mt-7 border-y border-line py-6">
+      <details open={!cards.length} className="public-band public-band-lead">
         <summary className="flex min-h-11 cursor-pointer list-none items-center font-medium text-(--ink)">
           {cards.length ? "Add another bill" : "Upload or paste a bill"}
         </summary>
@@ -231,7 +236,7 @@ export default function StartClient() {
       </details>
 
       {cards.length ? (
-        <section className="mt-10 grid gap-5" aria-live="polite">
+        <section className="public-band grid gap-5" aria-live="polite">
           {cards.map((card) => (
           <article key={card.id} className="decision" data-lead="true">
             <div className="min-w-0">
@@ -250,7 +255,6 @@ export default function StartClient() {
             {card.provisional ? <p className="text-sm leading-6 text-(--muted)">This is one cited charge. Its recurring cadence is not proven yet.</p> : null}
           </article>
           ))}
-          <AuthorizationLoop completedThrough={1} activeStep={4} />
           <p className="text-sm leading-6 text-(--muted)">
             Sign in to remember this evidence. The next unique step is the Control desk: a named owner or admin freezes a cap before a new obligation exists. That is not Keep or Plan to cancel.
           </p>
@@ -259,6 +263,8 @@ export default function StartClient() {
           </Link>
         </section>
       ) : null}
+      </div>
+      </div>
     </main>
   );
 }

@@ -58,7 +58,7 @@ import {
   purposeLabels,
   sourceLabels,
 } from "../src/app/workspace/recovery/labels";
-import { recoveryViewLabels, recoveryViews } from "../src/app/workspace/recovery/state";
+import { recoveryPrimaryViewLimit, recoveryViewLabels, recoveryViews } from "../src/app/workspace/recovery/state";
 
 const recoveryDir = "src/app/workspace/recovery";
 const recoveryFiles = readdirSync(recoveryDir, { recursive: true }).filter((file): file is string => typeof file === "string" && (file.endsWith(".ts") || file.endsWith(".tsx")));
@@ -116,34 +116,54 @@ test("every contract enum has presentation copy, so a contract change cannot ren
   }
 });
 
-test("primary navigation gates Control by enrollment and Automation by proven delivery or existing authority", () => {
-  assert.deepEqual([...recoveryViews], ["CONTROL", "HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
-  assert.deepEqual(Object.values(recoveryViewLabels), ["Control", "Now", "Bills", "Sources", "Automation"]);
+test("Control stays a primary destination at the enrollment boundary, and the phone bar never carries more than four direct labels", () => {
+  assert.deepEqual([...recoveryViews], ["HOME", "CONTROL", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
+  assert.deepEqual(Object.values(recoveryViewLabels), ["Control", "Today", "Commitments", "Evidence", "Automation"]);
+  assert.equal(recoveryPrimaryViewLimit, 4);
   assert.match(clientSource, /<nav aria-label="Primary"/);
-  assert.match(clientSource, /view !== "CONTROL" \|\| controlAvailable/);
+  // The product the public site sells is never removed from navigation. Only
+  // the desk behind it is gated.
+  assert.doesNotMatch(clientSource, /view !== "CONTROL" \|\| controlAvailable/);
+  assert.match(clientSource, /availableViews = recoveryViews\.filter\(\(view\) => view !== "MANDATE" \|\| mandateAvailable\)/);
+  assert.match(clientSource, /primaryViews = availableViews\.slice\(0, recoveryPrimaryViewLimit\)/);
+  assert.match(clientSource, /overflowViews = availableViews\.slice\(recoveryPrimaryViewLimit\)/);
   assert.match(clientSource, /mandateAvailable/);
   assert.match(clientSource, /noticeReadiness\.state === "proven-ready"/);
   assert.match(clientSource, /primaryViews\.map/);
+  assert.match(clientSource, /viewnav-more/);
   assert.match(clientSource, /aria-current=\{state\.view === view \? "page" : undefined\}/);
   assert.match(clientSource, /href="\/profile"/);
   assert.doesNotMatch(clientSource, /state\.view === "PROFILE"/);
-  assert.match(clientSource, /const navColumnsClass = primaryViews\.length >= 5/);
   assert.match(clientSource, /viewnav \$\{navColumnsClass\}/);
 });
 
+test("a workspace without the pilot sees the whole loop rendered by the product's own components", () => {
+  const locked = readFileSync("src/app/workspace/recovery/control-locked-panel.tsx", "utf8");
+  assert.match(clientSource, /if \(controlPilotOff\) \{\s*return <ControlLockedPanel \/>;/);
+  assert.match(locked, /SYNTHETIC_DEMO_LABEL/);
+  assert.match(locked, /Live decisions unlock with pilot enrollment/);
+  // Same record component as the live desk, so the demonstration cannot drift.
+  assert.match(locked, /<ControlProposalRow/);
+  // Read-only: no writable capability and no handler that could reach the network.
+  assert.match(locked, /canDecide=\{false\}/);
+  assert.match(locked, /onDecide=\{null\}/);
+  assert.match(locked, /onReconcile=\{null\}/);
+  assert.doesNotMatch(locked, /fetch\(|useCommitmentControl/);
+});
+
 test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
-  assert.match(landingSource, /One receipt is enough to begin/);
-  assert.match(landingSource, /Decide before the obligation exists/);
-  assert.match(landingSource, /Cap the next yes/);
+  assert.match(landingSource, /Commitment Control for India-first AI companies/);
+  assert.match(landingSource, /Your next expensive yes should leave a line behind it/);
+  assert.match(landingSource, /Only a named human\s*\n?\s*freezes the boundary/);
+  assert.match(landingSource, /Walk a decision/);
   assert.match(loginSource, /named human authorization before a new obligation exists/);
   assert.match(allSource, /Start with a software bill/);
   assert.match(allSource, /Add a receipt to see the charge/);
   assert.doesNotMatch(landingSource, /Want it done for you\?/);
   assert.doesNotMatch(landingSource, /href="\/private-audit"/);
   assert.match(clientSource, />Vognary</);
-  assert.match(landingSource, /No account required/);
-  assert.match(landingSource, /No bank passwords/);
-  assert.match(landingSource, /No mailbox access/);
+  assert.match(landingSource, /No bank\s*\n?\s*password and no mailbox access are involved/);
+  assert.match(landingSource, /Enrollment is deliberate and manual today/);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
   assert.doesNotMatch(landingSource, /Set up billing forwarding once so matching mail keeps arriving/);
 });

@@ -1,3 +1,5 @@
+import "../public.css";
+import "../ledger.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { VognaryMark } from "../brand";
@@ -53,9 +55,9 @@ export default function PayPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
-      <main id="ledger-main" className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <main id="ledger-main" className="relative px-4 pb-12 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-line py-3">
           <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
             <VognaryMark size={22} />
             Vognary
@@ -66,48 +68,75 @@ export default function PayPage() {
           </div>
         </div>
 
-        <article className="panel p-6 sm:p-8">
-          <span className="folio" data-folio="Commercial">Private pilot</span>
-          <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">
-            {commitmentControlPilotOffer.title}
-          </h1>
-          <p className="mt-3 font-data text-3xl font-semibold text-(--ink)">{price}<span className="ml-2 text-base font-normal text-(--muted)">one-time for one month</span></p>
-          <p className="mt-3 text-sm leading-7 text-(--muted)">
-            This is a one-month, founder-delivered Commitment Control pilot: Vognary records a proposed obligation, shows cited existing exposure, records who approved what limit, and later checks observed evidence against that decision. Payment reserves the pilot; service and customer-data access begin only after the written activation conditions are met. Vognary never auto-approves, auto-denies, purchases, provisions, cancels, or moves your vendor money. Card, UPI, and bank details stay with the payment provider.
-          </p>
+        <article className="public-ledger">
+          <header className="public-ledger-rail">
+            <span className="folio" data-folio="Commercial">Private pilot</span>
+            <h1 className="mt-5 font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-5xl">
+              {commitmentControlPilotOffer.title}
+            </h1>
+            <p className="public-price mt-6">{price}</p>
+            <p className="mt-1 font-data text-xs text-(--muted)">ONE PAYMENT · ONE PILOT MONTH</p>
+            <p className="mt-5 text-sm leading-7 text-(--ink-soft)">
+              Reserve a founder-delivered control desk for proposed obligations, named human decisions, frozen caps, and later reconciliation.
+            </p>
+            {payment.status === "ready" ? (
+              <a className="btn btn-primary btn-lg mt-6 w-full" href={payment.href} rel="noopener noreferrer">
+                Reserve for {price}
+              </a>
+            ) : (
+              <a className="btn btn-primary btn-lg mt-6 w-full" href="mailto:support@vognary.com?subject=Commitment%20Control%20pilot%20invoice">
+                Request the one-time invoice
+              </a>
+            )}
+            <p className="mt-4 text-xs leading-5 text-(--muted)">
+              No automatic renewal. Payment does not bypass activation or security gates.
+            </p>
+          </header>
 
-          <section className="mt-8 border-t border-line pt-5">
-            <h2 className="font-display text-lg font-semibold text-(--ink)">Included in the pilot month</h2>
+          <div className="public-ledger-body">
+          <section className="public-band public-band-lead">
+            <p className="truth-label truth-authority">What the payment reserves</p>
+            <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink)">One bounded month, with a human in control.</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-(--muted)">
+              Vognary records a proposed obligation, shows cited existing exposure, records who approved what limit, and later checks observed evidence against that decision. It never auto-approves, auto-denies, purchases, provisions, cancels, or moves vendor money.
+            </p>
             <ul className="reason-list mt-3">
               {included.map((item) => <li key={item}>{item}</li>)}
             </ul>
           </section>
 
-          <section className="mt-8 border-t border-line pt-5">
-            <h2 className="font-display text-lg font-semibold text-(--ink)">Reserve the pilot</h2>
+          <section className="public-band">
+            <p className="truth-label truth-policy">Activation boundary</p>
+            <h2 className="mt-3 font-display text-xl font-semibold text-(--ink)">Payment reserves the work. It does not open customer data.</h2>
             {payment.status === "ready" ? (
               <>
                 <p className="mt-2 text-sm leading-7 text-(--muted)">
-                  The button opens a founder-configured hosted payment page for exactly {price}. It must request one payment only. Keep the provider&apos;s confirmation and email{" "}
+                  The payment command opens a founder-configured hosted page for exactly {price}. It must request one payment only. Card, UPI, and bank details stay with the payment provider. Keep the provider&apos;s confirmation and email{" "}
                   <a className="link-quiet" href="mailto:support@vognary.com">support@vognary.com</a> if you need a Vognary letterhead receipt.
                 </p>
                 <p className="mt-2 text-sm leading-7 text-(--muted)">
                   Service starts only after the independent security review and written activation conditions are complete. If Vognary cannot activate the pilot within {commitmentControlPilotOffer.activationDeadlineBusinessDays} business days after payment, request a full refund. A second month requires a new, active purchase; this payment does not create an automatic renewal.
                 </p>
-                <a className="btn btn-primary btn-lg mt-5" href={payment.href} rel="noopener noreferrer">
-                  Reserve the pilot for {price}
-                </a>
               </>
             ) : (
-              <p className="mt-2 text-sm leading-7 text-(--muted)">
-                Online one-time collection is not configured on this deployment. Email{" "}
+              <div className="mt-4 border-l-2 border-ochre pl-4">
+                <p className="font-data text-xs font-semibold text-ochre">ONLINE COLLECTION NOT CONFIGURED</p>
+                <p className="mt-2 text-sm leading-7 text-(--muted)">
+                  Email{" "}
                   <a className="link-quiet" href="mailto:support@vognary.com">support@vognary.com</a> for a one-time invoice and payment link. Do not send card numbers, OTPs, or bank passwords.
-              </p>
+                </p>
+              </div>
             )}
+            <dl className="public-facts mt-6">
+              <div><dt>Customer data</dt><dd>Blocked until assurance exit</dd></div>
+              <div><dt>Activation</dt><dd>Within {commitmentControlPilotOffer.activationDeadlineBusinessDays} business days or full-refund request</dd></div>
+              <div><dt>Month two</dt><dd>Requires a separate active purchase</dd></div>
+            </dl>
           </section>
 
-          <section className="mt-8 border-t border-line pt-5">
-            <h2 className="font-display text-lg font-semibold text-(--ink)">Tax, refunds, and retired checkout</h2>
+          <section className="public-band">
+            <p className="truth-label truth-citation">Invoice and legal record</p>
+            <h2 className="mt-3 font-display text-xl font-semibold text-(--ink)">Tax, refunds, and terms</h2>
             <p className="mt-2 text-sm leading-7 text-(--muted)">
               GST is charged only when a GSTIN is written on the invoice. Startups may deduct TDS under §194J; share Form 16A. Request a full refund from support@vognary.com before the pilot starts or if Vognary misses the ten business days activation deadline. After work begins, eligibility follows applicable law. The retired public checkout route is not used for this offer.
             </p>
@@ -118,6 +147,7 @@ export default function PayPage() {
               <Link href="/privacy" className="link-quiet">Privacy Notice</Link>.
             </p>
           </section>
+          </div>
         </article>
       </div>
       </main>

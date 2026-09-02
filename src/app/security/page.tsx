@@ -1,3 +1,5 @@
+import "../public.css";
+import "../ledger.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { VognaryMark } from "../brand";
@@ -31,50 +33,69 @@ const statePills: Record<TrustSignalState, string> = {
 export default function SecurityPage() {
   const signals = getPublicTrustSignals();
   return (
-    <main className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <main className="relative px-4 pb-12 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-line py-3">
           <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
             <VognaryMark size={22} />
             Vognary
           </Link>
           <Link href="/app" className="btn btn-ghost">Back to app</Link>
         </div>
-        <article className="panel p-6 sm:p-8 rise">
-          <span className="folio" data-folio="Trust">Security</span>
-          <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">How Vognary handles data</h1>
-          <p className="mt-3 text-sm leading-7 text-(--muted)">Google is used for sign-in only. Receipt mail enters through a signed provider webhook, is bounded before parsing, and is saved only through the canonical Recovery workspace.</p>
-          <p className="mt-3 text-sm leading-7 text-(--muted)">Independent security assessment and remediation retest are not yet proven for this release. Real customer financial data remains blocked until that gate closes.</p>
-          <div className="mt-8 grid gap-3">
-            {trustAnswers.map((item) => (
-              <div key={item.title} className="inset p-4">
-                <h2 className="font-display text-base font-semibold text-(--ink)">{item.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-(--muted)">{item.body}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-8 grid gap-3">
-            {items.map((item) => (
-              <div key={item.title} className="inset p-4">
-                <h2 className="font-display text-base font-semibold text-(--ink)">{item.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-(--muted)">{item.body}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-10">
-            <h2 className="font-display text-xl font-semibold text-(--ink)">Live status - measured, not promised</h2>
+        <article className="public-ledger">
+          <header className="public-ledger-rail">
+            <span className="folio" data-folio="Trust">Security</span>
+            <h1 className="mt-5 font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-5xl">How Vognary handles data</h1>
+            <p className="mt-5 text-sm leading-7 text-(--ink-soft)">Google is used for sign-in only. Receipt mail enters through a signed provider webhook, is bounded before parsing, and is saved only through the canonical Recovery workspace.</p>
+            <div className="mt-6 border-l-2 border-ochre pl-4">
+              <p className="font-data text-xs font-semibold text-ochre">ASSESSMENT NOT YET PROVEN</p>
+              <p className="mt-2 text-sm leading-7 text-(--muted)">Real customer financial data remains blocked until the independent assessment and remediation retest gate closes.</p>
+            </div>
+          </header>
+
+          <div className="public-ledger-body">
+          <section className="public-band public-band-lead">
+            <p className="truth-label truth-observed">Deployment truth</p>
+            <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Live status, measured rather than promised</h2>
             <p className="mt-2 text-sm leading-6 text-(--muted)">These states are read from this deployment&apos;s configuration each time the page loads. Backup Proven requires a recorded restore of a stored encrypted dump, not only a storage setting. Anything unproven is labeled that way.</p>
-            <div className="mt-4 grid gap-3">
+            <ul className="public-status-list mt-5">
               {signals.map((signal) => (
-                <div key={signal.id} className="inset p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                <li key={signal.id}>
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                     <h3 className="font-display text-base font-semibold text-(--ink)">{signal.label}</h3>
                     <span className={`pill ${statePills[signal.state]}`}>{stateLabels[signal.state]}</span>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-(--muted)">{signal.detail}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="public-band">
+            <p className="truth-label truth-citation">Operating boundaries</p>
+            <h2 className="mt-3 font-display text-xl font-semibold text-(--ink)">What the system does and does not hold</h2>
+            <dl className="public-record-list mt-5">
+              {items.map((item) => (
+                <div key={item.title}>
+                  <dt>{item.title}</dt>
+                  <dd>{item.body}</dd>
                 </div>
               ))}
+            </dl>
+          </section>
+
+          <section className="public-band">
+            <p className="truth-label truth-policy">Inspect the boundary</p>
+            <h2 className="mt-3 font-display text-xl font-semibold text-(--ink)">Questions the evidence policy must answer</h2>
+            <div className="public-disclosure-list mt-5">
+              {trustAnswers.map((item) => (
+                <details key={item.title} className="public-disclosure">
+                  <summary>{item.title}</summary>
+                  <p>{item.body}</p>
+                </details>
+              ))}
             </div>
+          </section>
           </div>
         </article>
       </div>

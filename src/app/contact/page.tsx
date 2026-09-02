@@ -1,3 +1,5 @@
+import "../public.css";
+import "../ledger.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { VognaryMark } from "../brand";
@@ -48,9 +50,9 @@ const channels = [
 
 export default function ContactPage() {
   return (
-    <main id="ledger-main" className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <main id="ledger-main" className="relative px-4 pb-12 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-line py-3">
           <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
             <VognaryMark size={22} />
             Vognary
@@ -61,32 +63,41 @@ export default function ContactPage() {
           </div>
         </div>
 
-        <article className="panel p-6 sm:p-8">
+        <article className="public-ledger">
+          <header className="public-ledger-rail">
           <span className="folio" data-folio="Company">Contact</span>
-          <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">Reach a person, not a queue</h1>
-          <p className="mt-3 text-sm leading-7 text-(--muted)">
+          <h1 className="mt-5 font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-5xl">Reach a person, not a queue</h1>
+          <p className="mt-5 text-sm leading-7 text-(--ink-soft)">
             Vognary is a small team building Commitment Control for India-first AI-native companies. Mail is read by
             the people who build the product. Response time is not guaranteed and no support hours are published, because
             promising a window Vognary cannot yet keep would be the same kind of unproven claim the product refuses to make.
           </p>
+          <a className="btn btn-primary btn-lg mt-6 w-full" href="mailto:support@vognary.com">Email support@vognary.com</a>
+          </header>
 
-          <div className="mt-8 grid gap-6">
-            {channels.map((channel) => (
-              <section key={channel.heading} className="border-t border-line pt-5">
-                <h2 className="font-display text-lg font-semibold text-(--ink)">{channel.heading}</h2>
-                <p className="mt-1">
+          <div className="public-ledger-body">
+          <section className="public-band public-band-lead">
+            <p className="truth-label truth-citation">Route the message</p>
+            <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink)">Choose the address by purpose</h2>
+            <dl className="public-record-list mt-5">
+              {channels.map((channel) => (
+                <div key={channel.heading}>
+                  <dt>{channel.heading}</dt>
+                  <dd>
                   <a className="link-quiet font-data text-sm text-(--ink)" href={`mailto:${channel.address}`}>
                     {channel.address}
                   </a>
-                </p>
-                <p className="mt-2 text-sm leading-7 text-(--muted)">{channel.body}</p>
-              </section>
-            ))}
-          </div>
+                  <p className="mt-2">{channel.body}</p>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
 
-          <section className="mt-8 border-t border-line pt-5">
-            <h2 className="font-display text-lg font-semibold text-(--ink)">What Vognary will never ask you for</h2>
-            <ul className="reason-list mt-3">
+          <section className="public-band">
+            <p className="truth-label truth-frozen">Identity check</p>
+            <h2 className="mt-3 font-display text-xl font-semibold text-(--ink)">What Vognary will never ask you for</h2>
+            <ul className="reason-list mt-4">
               <li>Bank, card, or UPI credentials, or a one-time passcode.</li>
               <li>Mailbox access. Vognary does not read your inbox.</li>
               <li>Permission to cancel a service or move money. It does neither.</li>
@@ -97,6 +108,7 @@ export default function ContactPage() {
               ones that are still marked unproven.
             </p>
           </section>
+          </div>
         </article>
       </div>
     </main>

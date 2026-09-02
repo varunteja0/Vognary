@@ -192,3 +192,48 @@ test("the first-10 report covers the frozen receipt experiment without PII", () 
   assert.doesNotMatch(report, /\bfirstAutomaticReceipt\b|\bsecondAutomaticReceipt\b|\bpaymentsCompleted\b/);
   assert.doesNotMatch(report, /select[\s\S]{0,120}\b(?:email|subject|excerpt|raw_evidence|encrypted_display|alias_hmac)\b/i);
 });
+
+test("the funnel report measures the current Commitment Control loop without inventing market proof", () => {
+  const report = readFileSync(new URL("../scripts/report-funnel.mjs", import.meta.url), "utf8");
+  assert.match(report, /Account rows:/);
+  assert.match(report, /do not prove real users, contact consent, or customer validation/i);
+  assert.doesNotMatch(report, /console\.log\(`Signups:/);
+  for (const metric of [
+    "controlSchemaState",
+    "policyWorkspaces",
+    "proposalWorkspaces",
+    "proposalsSubmitted",
+    "proposalsLast7Days",
+    "proposalsLast30Days",
+    "evaluationsCompleted",
+    "withinPolicy",
+    "reviewRequired",
+    "outsidePolicy",
+    "humanDecisions",
+    "approved",
+    "approvedWithCap",
+    "declined",
+    "cappedOrDeclined",
+    "reconciliations",
+    "matched",
+    "withinCap",
+    "overCap",
+    "currencyMismatch",
+    "cannotEvaluate",
+  ]) {
+    assert.match(report, new RegExp(`\\b${metric}\\b`), `Commitment Control report must include ${metric}`);
+  }
+  for (const table of [
+    "commitment_control_policies",
+    "commitment_control_proposals",
+    "commitment_control_evaluations",
+    "commitment_control_decisions",
+    "commitment_control_reconciliations",
+  ]) {
+    assert.match(report, new RegExp(`\\b${table}\\b`));
+  }
+  assert.match(report, /unavailable-schema-not-applied/);
+  assert.match(report, /Commitment Control schema:/);
+  assert.match(report, /do not prove pre-spend status, offers, payments, or customer validation/i);
+  assert.doesNotMatch(report, /select[\s\S]{0,160}commitment_control_[\s\S]{0,160}\b(?:merchant|purpose|amount_minor|approved_cap_minor|observed_amount_minor|evidence_id)\b/i);
+});

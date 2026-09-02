@@ -48,7 +48,7 @@ test("active mandate stays off the customer Now surface; cited activation remain
 });
 
 test("landing copy stays on Commitment Control; autopilot claims do not leak onto public pages", () => {
-  assert.match(landingSource, /One receipt is enough to begin/);
+  assert.match(landingSource, /Commitment Control for India-first AI companies/);
   assert.doesNotMatch(landingSource, /standing mandate|Exception-only home|money stops without chores/i);
   assert.doesNotMatch(homeSource, /home\.autopilot\?\.mandate\?\.status === "ACTIVE"/);
 });

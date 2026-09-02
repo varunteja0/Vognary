@@ -23,7 +23,7 @@ The first-ten offer is one-time ₹14,999 for one month: one policy setup, up to
 ten proposals, up to four weekly 30-minute reconciliation reviews, and up to two
 additional founder-support hours. A second month requires a separate purchase.
 
-### T0–T4 behavior ladder
+### T0–T5 behavior ladder
 
 Score each step `PASS`, `RESCUED`, `FAIL`, or `NOT_YET_ELIGIBLE`. A founder rescue
 never counts as a pass.
@@ -35,6 +35,7 @@ never counts as a pass.
 | **T2 — cited existing exposure** | After clearance, the requester opens the cited existing exposure and can distinguish evidence from the new user-entered assumption. |
 | **T3 — frozen cap** | An owner or admin approves, caps, or declines the proposal; the actor, policy version, and frozen cap remain unchanged. |
 | **T4 — second proposal** | The company submits a second real pre-spend proposal without founder rescue during the pilot month. |
+| **T5 — reconciled outcome** | Later cited Recovery evidence is linked to the frozen authorization and produces a reconciliation verdict without rewriting the original decision or cap. |
 
 ### Session record
 
@@ -44,13 +45,23 @@ CRM. Keep qualified and exploratory cohorts separate.
 ```text
 Date:
 Contact cohort: QUALIFIED / EXPLORATORY
+Test cell: DIRECT_FINANCE / FRACTIONAL_FINANCE / FINOPS_AI_OPERATIONS
+Operator scope count: integer / unmeasured
+Technology spend responsibility: YES / NO / UNMEASURED
+Buying role: BUYER / SPONSOR / USER / UNKNOWN
+Reply received: yes / no
 Behavioral conversation: yes / no
 Pain class: PRE_SPEND / POST_SPEND / BOTH / NONE / UNMEASURED
+Repeated job: YES / NO / UNMEASURED
+Job selected by committed event: PRE_SPEND / RECOVERY / DECISION_TO_OUTCOME / NONE / UNMEASURED
+Enforcement requirement: ADVISORY_ACCEPTED / NEEDS_ENFORCEMENT / UNMEASURED
 Real upcoming commitment exists: yes / no / unmeasured
+Qualifying next or recent event committed: yes / no / unmeasured
 Offer made: yes / no
+Specific invoice commitment: yes / no
 Payment cleared: yes / no
 Independent security review cleared: yes / no
-T0 / T1 / T2 / T3 / T4: PASS / RESCUED / FAIL / NOT_YET_ELIGIBLE
+T0 / T1 / T2 / T3 / T4 / T5: PASS / RESCUED / FAIL / NOT_YET_ELIGIBLE
 Seconds from proposal start to T3: unmeasured until T3
 Founder rescues:
 Trust questions, verbatim and redacted:
@@ -59,8 +70,9 @@ Second-month payment: yes / no / not yet offered
 ```
 
 Payments, invoices, synthetic demonstrations, compliments, and automatic debits
-do not prove product value or renewal. T2–T4 remain `NOT_YET_ELIGIBLE` until the
-security gate permits real customer data.
+do not prove product value or renewal. T2–T5 remain `NOT_YET_ELIGIBLE` until the
+security gate permits real customer data. T3 proves the authorization moment,
+T4 proves repeat behavior, and T5 proves the complete decision-to-outcome loop.
 
 ## Historical Recovery instrument
 

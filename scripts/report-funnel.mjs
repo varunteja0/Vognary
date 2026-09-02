@@ -54,6 +54,43 @@ try {
       decisionCycles: await count(client, "select count(*)::text as n from recovery_decision_cycles"),
     };
 
+    const controlSchemaInstalled = Boolean((await client.query(
+      `select
+         to_regclass('public.commitment_control_policies') is not null
+         and to_regclass('public.commitment_control_proposals') is not null
+         and to_regclass('public.commitment_control_evaluations') is not null
+         and to_regclass('public.commitment_control_decisions') is not null
+         and to_regclass('public.commitment_control_reconciliations') is not null
+         as installed`,
+    )).rows[0]?.installed);
+    const commitmentControl = controlSchemaInstalled
+      ? controlMetricsFromRow((await client.query(
+        `select
+           (select count(distinct workspace_id)::text from commitment_control_policies) as policy_workspaces,
+           (select count(distinct workspace_id)::text from commitment_control_proposals) as proposal_workspaces,
+           (select count(*)::text from commitment_control_proposals) as proposals_submitted,
+           (select count(*)::text from commitment_control_proposals where created_at >= now() - interval '7 days') as proposals_last_7_days,
+           (select count(*)::text from commitment_control_proposals where created_at >= now() - interval '30 days') as proposals_last_30_days,
+           (select count(*)::text from commitment_control_evaluations) as evaluations_completed,
+           (select count(*)::text from commitment_control_evaluations where status = 'WITHIN_POLICY') as within_policy,
+           (select count(*)::text from commitment_control_evaluations where status = 'REVIEW_REQUIRED') as review_required,
+           (select count(*)::text from commitment_control_evaluations where status = 'OUTSIDE_POLICY') as outside_policy,
+           (select count(distinct workspace_id)::text from commitment_control_decisions) as decision_workspaces,
+           (select count(*)::text from commitment_control_decisions) as human_decisions,
+           (select count(*)::text from commitment_control_decisions where action = 'APPROVE') as approved,
+           (select count(*)::text from commitment_control_decisions where action = 'APPROVE_WITH_CAP') as approved_with_cap,
+           (select count(*)::text from commitment_control_decisions where action = 'DECLINE') as declined,
+           (select count(*)::text from commitment_control_decisions where action in ('APPROVE_WITH_CAP', 'DECLINE')) as capped_or_declined,
+           (select count(distinct workspace_id)::text from commitment_control_reconciliations) as reconciliation_workspaces,
+           (select count(*)::text from commitment_control_reconciliations) as reconciliations,
+           (select count(*)::text from commitment_control_reconciliations where verdict = 'MATCHED') as matched,
+           (select count(*)::text from commitment_control_reconciliations where verdict = 'WITHIN_CAP') as within_cap,
+           (select count(*)::text from commitment_control_reconciliations where verdict = 'OVER_CAP') as over_cap,
+           (select count(*)::text from commitment_control_reconciliations where verdict = 'CURRENCY_MISMATCH') as currency_mismatch,
+           (select count(*)::text from commitment_control_reconciliations where verdict = 'CANNOT_EVALUATE') as cannot_evaluate`,
+      )).rows[0] ?? {})
+      : unavailableControlMetrics();
+
     const first10Row = (await client.query(
       `select
          (select count(distinct workspace_id)::text from recovery_inbound_aliases) as setup_started,
@@ -227,6 +264,7 @@ try {
       signups,
       dailySignups,
       activation,
+      commitmentControl,
       first10Experiment,
       returnVisits: {
         dailyActiveUsers,
@@ -242,8 +280,19 @@ try {
 
     console.log(JSON.stringify(report, null, 2));
     console.log("");
-    console.log(`Signups: ${signups.total} total (${signups.last7Days} in 7d, ${signups.last30Days} in 30d)`);
+    console.log(`Account rows: ${signups.total} total (${signups.last7Days} in 7d, ${signups.last30Days} in 30d)`);
+    console.log("Account rows do not prove real users, contact consent, or customer validation.");
     console.log(`Workspaces with submitted evidence: ${activation.workspacesWithSubmittedEvidence}`);
+    console.log(`Commitment Control schema: ${commitmentControl.controlSchemaState}`);
+    if (commitmentControl.controlSchemaState === "available") {
+      console.log(`Commitment Control proposals: ${commitmentControl.proposalsSubmitted} across ${commitmentControl.proposalWorkspaces} workspaces (${commitmentControl.proposalsLast7Days} in 7d, ${commitmentControl.proposalsLast30Days} in 30d)`);
+      console.log(`Policy evaluations: ${commitmentControl.evaluationsCompleted} total; ${commitmentControl.withinPolicy} within policy; ${commitmentControl.reviewRequired} review required; ${commitmentControl.outsidePolicy} outside policy`);
+      console.log(`Human decisions: ${commitmentControl.humanDecisions} total; ${commitmentControl.approved} approved; ${commitmentControl.approvedWithCap} capped; ${commitmentControl.declined} declined; ${commitmentControl.cappedOrDeclined} capped or declined`);
+      console.log(`Control reconciliations: ${commitmentControl.reconciliations} total; ${commitmentControl.matched} matched; ${commitmentControl.withinCap} within cap; ${commitmentControl.overCap} over cap; ${commitmentControl.currencyMismatch} currency mismatch; ${commitmentControl.cannotEvaluate} cannot evaluate`);
+    } else {
+      console.log("Commitment Control funnel: unavailable (schema not applied in this database)");
+    }
+    console.log("Commitment Control product rows do not prove pre-spend status, offers, payments, or customer validation; reconcile those only from founder-confirmed CRM evidence.");
     console.log(`First value (submitted evidence → decision): ${first10Experiment.firstValueWorkspaces} workspaces; ${first10Experiment.decisionsOnSubmittedEvidence} decisions`);
     console.log(`Strict recurring picture: ${first10Experiment.recurringPictureWorkspaces} workspaces`);
     console.log(`Longitudinal outcomes: ${first10Experiment.decisionCyclesAwaitingOutcome} awaiting; ${first10Experiment.continuedAsPlanned} continued as planned; ${first10Experiment.chargeAfterCancelPlan} charged after cancel plan; ${first10Experiment.noChargeInWindow} no charge in window; ${first10Experiment.cannotEvaluate} cannot evaluate`);
@@ -265,4 +314,70 @@ try {
   }
 } finally {
   await pool.end();
+}
+
+function controlMetricsFromRow(row) {
+  const proposalsSubmitted = Number(row.proposals_submitted ?? 0);
+  const humanDecisions = Number(row.human_decisions ?? 0);
+  const reconciliations = Number(row.reconciliations ?? 0);
+  return {
+    controlSchemaState: "available",
+    policyWorkspaces: Number(row.policy_workspaces ?? 0),
+    proposalWorkspaces: Number(row.proposal_workspaces ?? 0),
+    proposalsSubmitted,
+    proposalsLast7Days: Number(row.proposals_last_7_days ?? 0),
+    proposalsLast30Days: Number(row.proposals_last_30_days ?? 0),
+    evaluationsCompleted: Number(row.evaluations_completed ?? 0),
+    withinPolicy: Number(row.within_policy ?? 0),
+    reviewRequired: Number(row.review_required ?? 0),
+    outsidePolicy: Number(row.outside_policy ?? 0),
+    decisionWorkspaces: Number(row.decision_workspaces ?? 0),
+    humanDecisions,
+    approved: Number(row.approved ?? 0),
+    approvedWithCap: Number(row.approved_with_cap ?? 0),
+    declined: Number(row.declined ?? 0),
+    cappedOrDeclined: Number(row.capped_or_declined ?? 0),
+    reconciliationWorkspaces: Number(row.reconciliation_workspaces ?? 0),
+    reconciliations,
+    matched: Number(row.matched ?? 0),
+    withinCap: Number(row.within_cap ?? 0),
+    overCap: Number(row.over_cap ?? 0),
+    currencyMismatch: Number(row.currency_mismatch ?? 0),
+    cannotEvaluate: Number(row.cannot_evaluate ?? 0),
+    proposalToDecisionRate: proposalsSubmitted ? Number((humanDecisions / proposalsSubmitted).toFixed(3)) : null,
+    decisionToReconciliationRate: humanDecisions ? Number((reconciliations / humanDecisions).toFixed(3)) : null,
+  };
+}
+
+function unavailableControlMetrics() {
+  const unavailableMetrics = [
+    "policyWorkspaces",
+    "proposalWorkspaces",
+    "proposalsSubmitted",
+    "proposalsLast7Days",
+    "proposalsLast30Days",
+    "evaluationsCompleted",
+    "withinPolicy",
+    "reviewRequired",
+    "outsidePolicy",
+    "decisionWorkspaces",
+    "humanDecisions",
+    "approved",
+    "approvedWithCap",
+    "declined",
+    "cappedOrDeclined",
+    "reconciliationWorkspaces",
+    "reconciliations",
+    "matched",
+    "withinCap",
+    "overCap",
+    "currencyMismatch",
+    "cannotEvaluate",
+    "proposalToDecisionRate",
+    "decisionToReconciliationRate",
+  ];
+  return {
+    controlSchemaState: "unavailable-schema-not-applied",
+    ...Object.fromEntries(unavailableMetrics.map((metric) => [metric, null])),
+  };
 }

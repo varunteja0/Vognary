@@ -1,9 +1,10 @@
 "use client";
 
+import "../public.css";
+import "../ledger.css";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { guestAuditTransferKey } from "@/lib/guest-audit-transfer";
-import { AuthorizationLoop } from "../authorization-loop";
 import { VognaryMark } from "../brand";
 
 type SessionPayload = {
@@ -166,9 +167,9 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
   );
 
   return (
-    <main id="ledger-main" className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-2xl">
-        <nav className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <main id="ledger-main" className="relative px-4 pb-12 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-6xl">
+        <nav className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-line py-3">
           <Link href="/" className="brandmark">
             <VognaryMark size={22} />
             Vognary
@@ -176,14 +177,27 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
           <Link href="/" className="btn btn-sm btn-ghost">Home</Link>
         </nav>
 
-        <section className="panel p-6 sm:p-8">
+        <section className="public-ledger">
+          <header className="public-ledger-rail">
           <span className="folio" data-folio="01">Sign in</span>
-          <h1 className="mt-3 font-display text-2xl font-semibold text-(--ink) sm:text-3xl">Decide what the company may commit to next</h1>
-          <p className="mt-2 text-sm leading-6 text-(--muted)">Sign in with Google to remember cited bills, open the Control desk, and record a named human authorization before a new obligation exists.</p>
-          <AuthorizationLoop compact activeStep={guestAuditWaiting ? 1 : 4} />
+          <h1 className="mt-5 font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-5xl">Decide what the company may commit to next</h1>
+          <p className="mt-5 text-sm leading-7 text-(--ink-soft)">Sign in with Google to remember cited bills, open the Control desk, and record a named human authorization before a new obligation exists.</p>
+          <ul className="mt-6 grid gap-2">
+            {trustPoints.map((point) => (
+              <li key={point} className="inline-flex items-center gap-2 font-data text-xs text-(--muted)">
+                <span aria-hidden className="inline-block h-px w-3 bg-(--gold)" />
+                {point}
+              </li>
+            ))}
+          </ul>
+          </header>
+
+          <div className="public-ledger-body">
+          <div className="public-band public-band-lead">
+          <p className="truth-label truth-authority">Identity and workspace memory</p>
 
           {session.authenticated ? (
-            <div className="mt-6 rounded-xl border border-line bg-(--card-2) p-4" role="status" aria-live="polite">
+            <div className="mt-5 border-y border-line py-5" role="status" aria-live="polite">
               <p className="eyebrow text-verdict">Signed in</p>
               <p className="mt-2 font-semibold text-(--ink)">{session.session?.email}</p>
               <p className="mt-1 text-sm leading-6 text-(--muted)">Taking you to your workspace…</p>
@@ -194,7 +208,7 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
             </div>
           ) : (
             <div className="mt-5 grid gap-5">
-              <div className="rounded-xl border border-line bg-(--card-2) p-5">
+              <div className="border-y border-line py-5">
                 {guestAuditWaiting ? (
                   <div className="mb-4 border-b border-line pb-4">
                     <p className="eyebrow eyebrow-xs">Your receipts are waiting</p>
@@ -208,9 +222,9 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
                 <Notice banner={googleStatus} />
               </div>
 
-              {isDevEnv ? <details className="rounded-xl border border-line bg-(--card-2) px-4 py-1">
-                <summary className="disclosure-summary font-display">Other ways to sign in</summary>
-                <div className="mt-4">
+              {isDevEnv ? <details className="public-disclosure">
+                <summary>Other ways to sign in</summary>
+                <div className="pb-5 pt-3">
                   <form onSubmit={submit} className="flex flex-col gap-3">
                       <h2 className="font-display text-base font-semibold text-(--ink)">Development login</h2>
                       <div>
@@ -229,14 +243,6 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
                 </div>
               </details> : null}
 
-              <ul className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                {trustPoints.map((point) => (
-                  <li key={point} className="inline-flex items-center gap-1.5 eyebrow">
-                    <span aria-hidden className="inline-block h-px w-3 bg-(--gold)" />
-                    {point}
-                  </li>
-                ))}
-              </ul>
             </div>
           )}
 
@@ -245,7 +251,8 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
           <p className="mt-5 text-center text-sm leading-6 text-(--muted)">
             By continuing you agree to our <Link href="/terms" className="legal-link">Terms</Link> and <Link href="/privacy" className="legal-link">Privacy Policy</Link>.
           </p>
-
+          </div>
+          </div>
         </section>
       </div>
     </main>

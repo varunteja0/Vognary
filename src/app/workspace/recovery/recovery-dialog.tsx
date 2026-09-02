@@ -86,7 +86,7 @@ export function RecoveryDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto p-0 sm:items-center sm:p-6">
-      <div className="fixed inset-0 bg-(--paper)/80 backdrop-blur-sm" aria-hidden />
+      <div className="enter-fade fixed inset-0 bg-(--paper)/80 backdrop-blur-sm" aria-hidden />
       <div
         ref={panelRef}
         role="dialog"
@@ -94,7 +94,7 @@ export function RecoveryDialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className={`panel relative z-10 max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-b-none p-5 outline-none sm:rounded-(--radius) sm:p-6 ${tone === "destructive" ? "border-ember" : ""}`}
+        className={`panel enter-origin relative z-10 max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-b-none p-5 outline-none sm:rounded-(--radius) sm:p-6 ${tone === "destructive" ? "border-ember" : ""}`}
       >
         <div className="flex items-start justify-between gap-4">
           <div>

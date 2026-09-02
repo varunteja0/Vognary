@@ -19,10 +19,7 @@ test("the public endpoints expose complete agent-readable contracts without Java
   expect(visibleText.length).toBeGreaterThanOrEqual(500);
   expect(html.match(/<h1\b/gi)?.length).toBe(1);
   expect(html.match(/<h2\b/gi)?.length ?? 0).toBeGreaterThanOrEqual(2);
-  const headingLevels = [...html.matchAll(/<h([1-6])\b[^>]*>/gi)].map((match) => Number(match[1]));
-  expect(headingLevels).toEqual([1, 2, 3, 4, 4, 2, 2, 3]);
-  expect(headingLevels.every((level, index) => index === 0 || level <= (headingLevels[index - 1] ?? level) + 1)).toBe(true);
-  expect(visibleText).toMatch(/What you do not need/i);
+  expect(visibleText).toMatch(/Commitment Control/i);
 
   const jsonLdMatch = html.match(/<script type="application\/ld\+json">([^<]+)<\/script>/);
   expect(jsonLdMatch).not.toBeNull();
@@ -47,14 +44,13 @@ test("the public endpoints expose complete agent-readable contracts without Java
 
   const markdownResponse = await request.get("/", { headers: { accept: "text/markdown" } });
   expect(markdownResponse.status()).toBe(200);
-  expect(markdownResponse.headers()["content-type"]).toBe("text/markdown; charset=utf-8");
-  expect(markdownResponse.headers()["cache-control"]).toContain("no-store");
-  expect(markdownResponse.headers().vary).toMatch(/(?:^|,\s*)Accept(?:,|$)/i);
-  expect(await markdownResponse.text()).toContain("## Product boundaries");
+  expect(markdownResponse.headers()["content-type"]).toContain("text/html");
+  expect(markdownResponse.headers().vary ?? "").not.toMatch(/(?:^|,\s*)Accept(?:,|$)/i);
+  expect(markdownResponse.headers().link).toContain('</index.md>; rel="alternate"; type="text/markdown"');
 
   const unsupported = await request.get("/", { headers: { accept: "application/pdf" } });
-  expect(unsupported.status()).toBe(406);
-  expect(unsupported.headers()["content-type"]).toBe("text/plain; charset=utf-8");
+  expect(unsupported.status()).toBe(200);
+  expect(unsupported.headers()["content-type"]).toContain("text/html");
 
   const explicitMarkdown = await request.get("/index.md");
   expect(explicitMarkdown.status()).toBe(200);
@@ -119,24 +115,35 @@ test("the public endpoints expose complete agent-readable contracts without Java
 
 });
 
+test("the server-rendered landing has no skipped heading levels", async ({ request }) => {
+  const response = await request.get("/", { headers: { accept: "text/html" } });
+  expect(response.status()).toBe(200);
+  const html = await response.text();
+  const headingLevels = [...html.matchAll(/<h([1-6])\b[^>]*>/gi)].map((match) => Number(match[1]));
+  expect(headingLevels.every((level, index) => index === 0 || level <= (headingLevels[index - 1] ?? level) + 1)).toBe(true);
+});
+
 test("the landing demonstrates the decision loop and sends visitors to their own bill", async ({ page }) => {
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Decide before the obligation exists." });
+  const heading = page.getByRole("heading", { level: 1, name: "Commitment Control: freeze the cap before the obligation exists." });
   const hero = page.locator("section").filter({ has: heading });
   await expect(heading).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
 
-  const getStarted = hero.getByRole("link", { name: "Cap the next yes", exact: true });
-  const citeBill = hero.getByRole("link", { name: "Add a bill", exact: true });
+  const getStarted = hero.getByRole("link", { name: "See a decision made", exact: true });
+  const citeBill = hero.getByRole("link", { name: "Cite your own bill", exact: true });
   const signIn = page.getByRole("navigation", { name: "Public" }).getByRole("link", { name: "Sign in", exact: true });
-  await expect(getStarted).toHaveAttribute("href", "#example-decision");
+  await expect(getStarted).toHaveAttribute("href", "/demo");
   await expect(citeBill).toHaveAttribute("href", "/start");
   await expect(signIn).toHaveAttribute("href", "/login?next=/app");
 
   await expect(page.getByText("No account required", { exact: true })).toBeVisible();
   await expect(page.getByText("No bank passwords", { exact: true })).toBeVisible();
   await expect(page.getByText("No mailbox access", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Every yes has a state." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Freeze the line" })).toBeVisible();
+  await expect(page.getByText("Human only", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Cursor costs INR 350 more this month." })).toBeVisible();
   await expect(page.getByText("From two example receipts", { exact: true })).toBeVisible();
   await expect(page.getByText(/Example only\. Your review uses your receipts/)).toBeVisible();
@@ -168,8 +175,8 @@ test("the mobile landing keeps the primary action visible without overflow", asy
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Decide before the obligation exists." });
-  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "Cap the next yes", exact: true });
+  const heading = page.getByRole("heading", { level: 1, name: "Commitment Control: freeze the cap before the obligation exists." });
+  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "See a decision made", exact: true });
   await expect(getStarted).toBeVisible();
   const actionBottom = await getStarted.evaluate((element) => element.getBoundingClientRect().bottom);
   const metrics = await page.evaluate(() => ({

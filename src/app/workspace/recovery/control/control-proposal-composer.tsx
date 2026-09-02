@@ -214,7 +214,7 @@ export function ControlProposalComposer({
         <div className="control-form-actions">
           <button
             type="submit"
-            className={primary ? "btn btn-primary" : "btn btn-seal"}
+            className={primary ? "btn btn-primary" : "btn btn-ghost"}
             disabled={pending || blockedReason !== null || !online}
           >
             {pending ? "Evaluating…" : "Evaluate proposal"}

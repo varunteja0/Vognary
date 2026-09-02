@@ -30,3 +30,13 @@ export function completeControlPolicyRequest(input?: {
     currencyLimits: input?.currencyLimits ?? defaultControlCurrencyLimits,
   };
 }
+
+export function futureControlTestDate(daysAhead = 2, now = new Date()) {
+  const future = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(future);
+}

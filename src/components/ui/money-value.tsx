@@ -8,7 +8,8 @@ import { currencyExponent } from "@/lib/recovery/domain";
  * cited     — backed by a receipt or bill the user supplied
  * assumed   — typed by a human; a claim, not proof
  * projected — expected from cited history, but not yet charged
- * frozen    — a human-authorized cap; immovable once recorded
+ * frozen    — recorded by a human decision; immovable afterwards. `label`
+ *             separates the amount frozen at decision from the cap itself.
  * observed  — later evidence, measured against a cap
  * unknown   — not yet known; renders as an em dash, never as zero
  */
@@ -16,7 +17,7 @@ export type MoneyProvenance =
   | { kind: "cited"; source: string }
   | { kind: "assumed" }
   | { kind: "projected" }
-  | { kind: "frozen" }
+  | { kind: "frozen"; label?: string }
   | { kind: "observed" }
   | { kind: "unknown"; reason?: string };
 
@@ -47,7 +48,7 @@ type MoneyValueProps = MoneyValueOwnProps &
   (
     | { display: string; amount?: never; minor?: never; currency?: never }
     | { display?: never; amount: MoneyDto; minor?: never; currency?: never }
-    | { display?: never; amount?: never; minor: string | number | null; currency?: string }
+    | { display?: never; amount?: never; minor: string | null; currency?: string }
   );
 
 export function MoneyValue({
@@ -83,7 +84,7 @@ export function MoneyValue({
   const text =
     display ??
     amount?.display ??
-    formatExactMinor(minor as string | number, currencyExponent(currency), currency);
+    formatExactMinor(minor as string, currencyExponent(currency), currency);
 
   return (
     <span className={`money-${provenance.kind} ${base}`}>
@@ -93,8 +94,18 @@ export function MoneyValue({
   );
 }
 
-function formatExactMinor(minor: string | number, exponent: number, currency: string): string {
-  const value = typeof minor === "string" ? BigInt(minor) : BigInt(Math.round(minor));
+/**
+ * The one exact renderer for minor units the server does not pre-format
+ * (Commitment Control). Exported so no surface invents a second notation for
+ * the same figure — a cap shown as "INR 1,350" in the ledger and "₹1,350.00" in
+ * the dialog beside it is two representations of one number.
+ */
+export function formatExactMinorUnits(minor: string, currency: string): string {
+  return formatExactMinor(minor, currencyExponent(currency), currency);
+}
+
+function formatExactMinor(minor: string, exponent: number, currency: string): string {
+  const value = BigInt(minor);
   const zero = BigInt(0);
   const negative = value < zero;
   const absolute = negative ? -value : value;
@@ -131,7 +142,7 @@ function provenanceLabel(provenance: MoneyProvenance): string {
     case "projected":
       return "Not charged yet";
     case "frozen":
-      return "Frozen cap";
+      return provenance.label ?? "Frozen";
     case "observed":
       return "Observed";
     default:

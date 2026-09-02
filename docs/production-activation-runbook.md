@@ -128,6 +128,42 @@ Vercel's system commit SHA wins when present. Redeploy, verify internal readines
 the engineering lead as `member`. Issue the ₹14,999 invoice after the explicit
 offer is accepted; mark it paid only after settlement.
 
+## First Commitment Control pilot preflight
+
+Before putting real customer financial data into the first workspace, run:
+
+```bash
+npm run control:preflight -- --report-only https://www.vognary.com
+```
+
+Remove `--report-only` for the blocking gate. `READY` requires all of the
+following at the target release:
+
+- authenticated internal readiness with migrations `0057`, `0058`, and `0059`;
+- exactly one enrolled workspace with cleared-payment and release-bound
+	independent-assessment evidence accepted by the existing enrollment guard;
+- assigned incident commander and independent backup, referenced only by a
+	SHA-256 restricted staffing record;
+- a passed tabletop no older than 90 days and its restricted record hash;
+- written legal/security logging review marked `cleared-for-pilot`, with date
+	and restricted evidence hash;
+- a successful restore drill no older than 30 days, with a restricted record
+	hash;
+- a passed monitoring delivery test, with observation date and restricted
+	record hash; and
+- an approved proposal-review procedure and record hash.
+
+The legal/logging flag records a written founder/counsel decision about the
+actual deployment. It **does not prove legal applicability or compliance** and
+does not replace counsel. Keep it blank when scope, log location, retention,
+incident-reporting duty, Point-of-Contact filing, or clock evidence is unknown.
+
+Proposal email after a committed write is currently best-effort. The first
+pilot procedure must therefore name who reviews the Control desk and how often.
+`COMMITMENT_CONTROL_PROPOSAL_REVIEW_PROCEDURE_STATUS=approved` proves only that
+the manual procedure was accepted; it never claims provider delivery. Do not
+add a second customer until observed notification/review evidence justifies it.
+
 ## Phase 0: Stop Conditions
 
 Do not show the forwarding-first landing or set any receipt-inbox operator flag unless all earlier phases pass.
@@ -284,6 +320,9 @@ The read-only platform API remains separately authenticated and does not label t
 Before public activation:
 
 - Prove monitoring delivery with the protected monitoring test route.
+- Retain the observed provider receipt and command result outside Git; set
+	`MONITORING_DELIVERY_TEST_STATUS`, `MONITORING_DELIVERY_TEST_AT`, and
+	`MONITORING_DELIVERY_TEST_RECORD_SHA256` only from that hashed record.
 - Complete and record an encrypted backup restore drill.
 - Run `pg_dump`/`pg_restore` with a client at least as new as the production
 	server. The repository Docker fallback is pinned to PostgreSQL 18.4 because
@@ -293,7 +332,8 @@ Before public activation:
 - A successful local/disposable restore does **not** make backups READY by
 	itself. Keep `BACKUP_RESTORE_DRILL_STATUS` blank until the encrypted dump and
 	manifest use a persistent founder-held key, are uploaded to configured durable
-	object storage, and that stored object is the artifact restored in the drill.
+	object storage, that stored object is the artifact restored in the drill, and
+	the restricted result is recorded in `BACKUP_RESTORE_DRILL_RECORD_SHA256`.
 - Keep assisted-audit checkout hidden unless Razorpay KYC, signed webhook, replay, refund, reconciliation, and legal terms gates all pass.
 - Verify deletion follow-up for provider credentials created before connector retirement.
 

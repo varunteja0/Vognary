@@ -10,9 +10,10 @@ import {
 import { getDatabasePool } from "../../src/lib/server/database";
 import { RecoveryServiceError } from "../../src/lib/server/recovery-api";
 import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
-import { completeControlPolicyRequest } from "../commitment-control-policy-fixture";
+import { completeControlPolicyRequest, futureControlTestDate } from "../commitment-control-policy-fixture";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
+const futureFirstChargeDate = futureControlTestDate();
 process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "*";
 
 async function seedOwnerWorkspace(label: string) {
@@ -82,7 +83,7 @@ test("Control policy refuses a no-op category set and outside-policy approve nee
         category: "AI_MODEL",
         amountMinor: "4500000",
         currency: "INR",
-        firstChargeDate: "2026-09-01",
+        firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
       },
@@ -168,7 +169,7 @@ test("eligible uncited exposure cannot be within policy, and irregular spend cit
         category: "AI_MODEL",
         amountMinor: "199900",
         currency: "INR",
-        firstChargeDate: "2026-09-01",
+        firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
       },
@@ -188,7 +189,7 @@ test("eligible uncited exposure cannot be within policy, and irregular spend cit
         category: "AI_MODEL",
         amountMinor: "199900",
         currency: "INR",
-        firstChargeDate: "2026-09-01",
+        firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [commitment.rows[0]!.id],
       },

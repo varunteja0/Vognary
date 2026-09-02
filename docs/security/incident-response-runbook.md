@@ -18,6 +18,21 @@ Names, personal phone numbers, credentials, and private escalation channels stay
 in a restricted operator record, not Git. No pilot enrollment is allowed while
 either incident-command role is unassigned.
 
+After both people accept, hash the restricted staffing record and set only the
+non-secret evidence fields from `.env.example`:
+
+```text
+COMMITMENT_CONTROL_INCIDENT_COMMANDER_STATUS=assigned
+COMMITMENT_CONTROL_BACKUP_INCIDENT_COMMANDER_STATUS=assigned
+COMMITMENT_CONTROL_INCIDENT_STAFFING_RECORD_SHA256=<sha256>
+```
+
+After the tabletop below passes, record its date and private-record hash using
+`COMMITMENT_CONTROL_INCIDENT_TABLETOP_STATUS`,
+`COMMITMENT_CONTROL_INCIDENT_TABLETOP_AT`, and
+`COMMITMENT_CONTROL_INCIDENT_TABLETOP_RECORD_SHA256`. These attestations do not
+replace the restricted record or prove that an unrun response will succeed.
+
 ## Severity
 
 | Level | Examples | Immediate objective |

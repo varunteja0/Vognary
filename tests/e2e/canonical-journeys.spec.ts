@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 test("canonical product entry keeps forwarding unavailable without seeded data", async ({ page }) => {
   const failures = collectRuntimeFailures(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "Decide before the obligation exists." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Commitment Control: freeze the cap before the obligation exists." })).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/i)).toHaveCount(0);
   await expect(page.getByText(/One receipt is enough to begin/i)).toBeVisible();
   await expect(page.getByText(/sample audit/i)).toHaveCount(0);
@@ -28,7 +28,11 @@ test("mobile production entry keeps the authorization action focused and bounded
   await page.goto("/");
   const initial = await pageMetrics(page);
   expect(initial.visibleControls).toBeLessThanOrEqual(8);
-  expect(initial.scrollHeight).toBeLessThanOrEqual(812 * 3);
+  // The landing now carries the working authorization record itself, so it is
+  // taller than a copy-only page. What has to stay true is that the record is
+  // reachable immediately and the page does not sprawl into marketing.
+  expect(initial.recordTop).toBeLessThanOrEqual(812 * 2);
+  expect(initial.scrollHeight).toBeLessThanOrEqual(812 * 6);
   expect(initial.horizontalOverflow).toBe(false);
 });
 
@@ -75,6 +79,7 @@ async function pageMetrics(page: Page) {
     };
     return {
       visibleControls: [...document.querySelectorAll("button,a,input,textarea,select")].filter(visible).length,
+      recordTop: Math.round(document.querySelector("#example-decision")?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY),
       scrollHeight: document.documentElement.scrollHeight,
       horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
     };

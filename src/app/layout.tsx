@@ -1,11 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from "next/font/google";
+import { Fraunces, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import PwaRegister from "./pwa-register";
 import "./globals.css";
 
-// The Evidence File: a documentary voice, not a product voice. Plex was drawn
-// for technical documentation and Newsreader for long-form record, which is
-// what this product actually is.
+// Plex carries the documentary record; Fraunces remains Vognary's fixed
+// display voice for the moments that need authority.
 const grotesk = IBM_Plex_Sans({
   variable: "--font-grotesk",
   subsets: ["latin"],
@@ -22,7 +21,7 @@ const monoData = IBM_Plex_Mono({
   preload: false,
 });
 
-const display = Newsreader({
+const display = Fraunces({
   variable: "--font-display-serif",
   subsets: ["latin"],
   display: "optional",
@@ -34,7 +33,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.vognary.com"),
   applicationName: "Vognary",
   title: {
-    default: "Vognary - Decide before the obligation exists",
+    default: "Vognary - Commitment Control for India-first AI companies",
     template: "%s - Vognary",
   },
   description:
@@ -65,13 +64,13 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "Vognary",
     url: "/",
-    title: "Vognary - Decide before the obligation exists",
+    title: "Vognary - Commitment Control for India-first AI companies",
     description:
       "Vognary is Commitment Control for India-first 20–100 person AI-native companies: propose the spend, see cited exposure and policy, then a named human freezes a cap.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vognary - Decide before the obligation exists",
+    title: "Vognary - Commitment Control for India-first AI companies",
     description:
       "Vognary is Commitment Control for India-first 20–100 person AI-native companies: propose the spend, see cited exposure and policy, then a named human freezes a cap.",
   },

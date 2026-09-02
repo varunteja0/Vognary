@@ -30,6 +30,7 @@ import {
 import { VognaryMark } from "../../brand";
 import { correctionFieldLabels, decisionLabels } from "./labels";
 import { ControlView, useCommitmentControl } from "./control/control-view";
+import { ControlLockedPanel } from "./control-locked-panel";
 import { RecoveryAddEvidence } from "./recovery-add-evidence";
 import { RecoveryCommitments, type CommitmentsHandlers } from "./recovery-commitments";
 import { RecoveryOverlay } from "./ui/overlay";
@@ -43,6 +44,7 @@ import {
   correctionPatchFromDraft,
   evidenceRequestFromDraft,
   initialRecoveryState,
+  recoveryPrimaryViewLimit,
   recoveryReducer,
   recoveryViewLabels,
   recoveryViews,
@@ -795,12 +797,16 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   const mandateAvailable = Boolean(state.home?.autopilot?.mandate)
     || state.home?.autopilot?.noticeReadiness.state === "proven-ready";
   const controlPilotOff = controlDesk.unavailable;
-  const primaryViews = recoveryViews.filter((view) =>
-    (view !== "CONTROL" || controlAvailable)
-    && (view !== "MANDATE" || mandateAvailable));
-  const navColumnsClass = primaryViews.length >= 5
+  // Control is the product the public site sells, so it never disappears from
+  // the workspace. Enrollment decides whether the desk is live, not whether the
+  // destination exists.
+  const availableViews = recoveryViews.filter((view) => view !== "MANDATE" || mandateAvailable);
+  const primaryViews = availableViews.slice(0, recoveryPrimaryViewLimit);
+  const overflowViews = availableViews.slice(recoveryPrimaryViewLimit);
+  const navCellCount = primaryViews.length + (overflowViews.length ? 1 : 0);
+  const navColumnsClass = navCellCount >= 5
     ? "grid-cols-5"
-    : primaryViews.length === 4 ? "grid-cols-4" : "grid-cols-3";
+    : navCellCount === 4 ? "grid-cols-4" : "grid-cols-3";
   return (
     <main id="recovery-workspace" className="relative px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-5 text-foreground sm:px-6 sm:pb-10 lg:px-8">
       <div className="mx-auto w-full max-w-7xl lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-10">
@@ -859,20 +865,31 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
                 </button>
               </li>
             ))}
+            {overflowViews.length ? (
+              <li className="min-w-0">
+                <details className="viewnav-more">
+                  <summary aria-label="More destinations">More</summary>
+                  <ul>
+                    {overflowViews.map((view) => (
+                      <li key={view}>
+                        <button
+                          type="button"
+                          onClick={() => selectView(view)}
+                          aria-current={state.view === view ? "page" : undefined}
+                        >
+                          {recoveryViewLabels[view]}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </li>
+            ) : null}
           </ul>
         </nav>
         </div>
 
-        <div className="min-w-0">
-        {controlPilotOff ? (
-          <div className="mt-3 grid gap-3 lg:mt-0">
-            <p className="text-sm leading-6 text-(--muted)">
-              Commitment Control unlocks after pilot enrollment. Cited bills still save here.{" "}
-              <Link href="/pay" className="link-quiet">See the pilot offer</Link>
-            </p>
-          </div>
-        ) : null}
-
+        <div className="workspace-measure min-w-0">
         <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{state.announcement}</p>
 
         <div className="mt-5 grid gap-4">
@@ -904,7 +921,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           className={
             state.view === "HOME" || state.view === "CONTROL"
               ? "sr-only"
-              : "mt-6 w-fit font-display text-2xl font-semibold tracking-tight text-(--ink) outline-none"
+              : "mt-6 w-fit font-display text-2xl font-semibold text-(--ink) outline-none"
           }
         >
           {recoveryViewLabels[state.view]}
@@ -920,7 +937,8 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
               <button type="button" onClick={() => void loadSnapshot()} className="btn btn-sm btn-primary">Try again</button>
             </FailureBlock>
           ) : (
-            renderView()
+            // Keyed so switching views replays the entrance instead of swapping in place.
+            <div key={state.view} className="enter">{renderView()}</div>
           )}
         </div>
         </div>
@@ -1002,6 +1020,12 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
 
   function renderView() {
     if (state.view === "CONTROL") {
+      // Enrollment gates the live desk, never the explanation of it. A workspace
+      // without the pilot still sees the whole loop — rendered by these same
+      // components, from a synthetic record that can never be written.
+      if (controlPilotOff) {
+        return <ControlLockedPanel />;
+      }
       return (
         <ControlView
           desk={controlDesk}

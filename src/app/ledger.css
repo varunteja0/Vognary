@@ -1,0 +1,476 @@
+/*
+  Public ledger composition.
+
+  The commercial, identity, trust and legal routes render a fixed record rail
+  beside ruled detail. `/` does not, so these rules are imported only by the
+  pages that use them.
+*/
+
+/* ---- Public ledger -------------------------------------------------------
+   Commercial and trust decisions use a fixed record rail beside ruled detail,
+   not a generic centered card. The rail returns to document order on narrow
+   screens so the command stays early and thumb-reachable. */
+.public-ledger {
+  display: grid;
+  gap: 0;
+  padding-block: 2rem;
+}
+.public-ledger-rail {
+  min-width: 0;
+  padding-bottom: 2rem;
+  border-bottom: 2px solid var(--gold-deep);
+}
+.public-ledger-body {
+  min-width: 0;
+}
+.public-price {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 2.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--ink);
+}
+.public-band {
+  padding-block: 1.75rem;
+  border-bottom: 1px solid var(--line-strong);
+}
+.public-band-lead {
+  padding-top: 2rem;
+}
+.public-facts {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+.public-facts > div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.38fr) minmax(0, 1fr);
+  gap: 1rem;
+  padding-block: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+.public-facts dt {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  color: var(--muted);
+}
+.public-facts dd {
+  font-size: var(--text-body);
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.public-status-list,
+.public-record-list,
+.public-disclosure-list {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+.public-status-list > li {
+  padding-block: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.public-record-list > div {
+  display: grid;
+  gap: 0.35rem;
+  padding-block: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.public-record-list dt {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: var(--text-lead);
+  font-weight: 600;
+  color: var(--ink);
+}
+.public-record-list dd,
+.public-disclosure p {
+  font-size: var(--text-body);
+  line-height: 1.65;
+  color: var(--muted);
+}
+.public-disclosure {
+  border-bottom: 1px solid var(--line);
+}
+.public-disclosure > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding-block: 0.7rem;
+  font-size: var(--text-body);
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  list-style: none;
+}
+.public-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.public-disclosure > summary::after {
+  content: "+";
+  margin-left: auto;
+  padding-left: 1rem;
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  color: var(--muted);
+}
+.public-disclosure[open] > summary::after {
+  content: "−";
+}
+.public-disclosure > p {
+  max-width: 46rem;
+  padding: 0 2rem 1rem 0;
+}
+.public-index {
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+.public-index > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  color: var(--ink-soft);
+  cursor: pointer;
+  list-style: none;
+}
+.public-index > summary::-webkit-details-marker {
+  display: none;
+}
+.public-index > summary::after {
+  content: "+";
+  margin-left: auto;
+}
+.public-index[open] > summary::after {
+  content: "−";
+}
+.public-index ol {
+  display: grid;
+  max-height: 16rem;
+  padding-bottom: 0.6rem;
+  overflow-y: auto;
+}
+.public-index a {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  border-top: 1px solid var(--line);
+  font-size: var(--text-fine);
+  line-height: 1.35;
+  color: var(--muted);
+}
+.public-index a:hover {
+  color: var(--ink);
+}
+@media (min-width: 56rem) {
+  .public-ledger {
+    grid-template-columns: minmax(17rem, 0.72fr) minmax(0, 1.28fr);
+    gap: 4rem;
+    padding-block: 3.5rem;
+  }
+  .public-ledger-rail {
+    position: sticky;
+    top: 2rem;
+    align-self: start;
+    padding: 0 2rem 2rem 0;
+    border-right: 2px solid var(--gold-deep);
+    border-bottom: 0;
+  }
+  .public-band:first-child {
+    padding-top: 0;
+  }
+  .public-price {
+    font-size: 3.25rem;
+  }
+  .public-record-list > div {
+    grid-template-columns: minmax(12rem, 0.65fr) minmax(0, 1.35fr);
+    gap: 2rem;
+  }
+}
+
+/* Moved out of globals.css: next.config.ts enables experimental.inlineCss, so
+   every rule left there is inlined into the HTML of every route — including the
+   public front door, which uses none of these.
+   ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ *
+ * Decision objects — the pre-renewal queue
+ *
+ * One financial decision, one object. Money and due date read first, the
+ * reasons read second, the choices read last. The leading card carries a
+ * single gold edge; every following card stays quiet so a queue of three
+ * never becomes three competing alarms.
+ * ------------------------------------------------------------------ */
+
+.decision {
+  display: grid;
+  gap: 1.1rem;
+  padding: 1.05rem 1.1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+/* The lead record is marked the way the signed-in desk marks it: one gold edge.
+   No gradient, no lifted shadow — the public page and the product are the same
+   object seen twice, not a marketing card and a working one. */
+.decision[data-lead="true"] {
+  border-color: var(--gold-line);
+  box-shadow: var(--shadow-1), inset 2px 0 0 var(--gold);
+}
+.decision-cue {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ochre);
+}
+.decision-sentence {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.decision-quote {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.decision-evidence {
+  display: grid;
+  gap: 0.35rem;
+}
+
+@media (min-width: 34rem) {
+  .decision {
+    gap: 1.25rem;
+    padding: 1.35rem 1.5rem 1.4rem;
+  }
+}
+
+/* Reason list — hairline markers, never bullet-point noise */
+.reason-list {
+  display: grid;
+  gap: 0.3rem;
+}
+.reason-list > li {
+  position: relative;
+  padding-left: 0.95rem;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.reason-list > li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  width: 5px;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+/* Choice row — one primary, one neutral, one deliberate */
+.decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.link-quiet {
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  cursor: pointer;
+  transition: color 0.16s ease;
+}
+.link-quiet:hover {
+  color: var(--ink);
+}
+
+/* ---- MOTION VOCABULARY ----------------------------------------------------
+   One set of primitives, reused everywhere, so the product moves in a single
+   language. Compositor-only: transform and opacity, never layout.
+
+   .enter        a region arriving (decelerates, settles)
+   .enter-list   children arrive in sequence, capped so long lists never crawl
+   .enter-origin something expanding from the control that spawned it
+   Motion is interruptible because every rule is a transition or a one-shot
+   animation, never a loop that must finish. */
+@keyframes enter-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes enter-scale {
+  from { opacity: 0; transform: scale(0.985) translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.enter {
+  animation: enter-rise var(--motion-enter) var(--ease-enter) both;
+}
+/* Backdrops and scrims fade; only objects travel. */
+.enter-fade {
+  animation: enter-fade var(--motion-move) var(--ease-standard) both;
+}
+@keyframes enter-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.enter-origin {
+  animation: enter-scale var(--motion-move) var(--ease-emphasis) both;
+  transform-origin: var(--enter-origin, center);
+}
+/* Stagger reads as a hand dealing records, not a queue loading. The ramp stops
+   at the ninth child so a forty-row ledger never crawls. */
+.enter-list > * {
+  animation: enter-rise var(--motion-move) var(--ease-enter) both;
+}
+.enter-list > *:nth-child(2) { animation-delay: 28ms; }
+.enter-list > *:nth-child(3) { animation-delay: 56ms; }
+.enter-list > *:nth-child(4) { animation-delay: 84ms; }
+.enter-list > *:nth-child(5) { animation-delay: 112ms; }
+.enter-list > *:nth-child(6) { animation-delay: 140ms; }
+.enter-list > *:nth-child(7) { animation-delay: 168ms; }
+.enter-list > *:nth-child(n + 8) { animation-delay: 196ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  /* Reduced motion means no travel, not no feedback. The primitives are pinned
+     to their resolved state first, then the global switch below stops every
+     animation and transition unconditionally — `!important` is the enforcement
+     for that guarantee, not an escape from the system. */
+  .enter,
+  .enter-fade,
+  .enter-origin,
+  .enter-list > * {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Moved out of globals.css: form fields, verdict stamps and status pills belong
+   to the route families that render them. next.config.ts enables inlineCss, so
+   anything left in globals is inlined into every route's HTML.
+   ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ *
+ * Form fields
+ * ------------------------------------------------------------------ */
+
+.file-target {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-target:disabled {
+  cursor: not-allowed;
+}
+
+.field {
+  height: var(--tap);
+  width: 100%;
+  padding: 0 0.85rem;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font-size: 0.9rem;
+  color: var(--ink);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  outline: none;
+}
+textarea.field {
+  height: auto;
+  padding: 0.7rem 0.8rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+.field::placeholder {
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+}
+.field:focus {
+  border-color: color-mix(in srgb, var(--gold) 55%, var(--line-strong));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 14%, transparent);
+}
+.field-mono {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+}
+
+/* Native <select> — strip OS chrome and add one consistent chevron so every
+   dropdown ("drag-down") lines up with the inputs and buttons exactly. */
+select.field {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-right: 2.5rem;
+  background-color: var(--card-2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a8e98' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  background-size: 0.85rem;
+  cursor: pointer;
+}
+select.field:hover {
+  border-color: var(--line-strong);
+}
+select.field:focus {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d8b87a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+select.field option {
+  background: var(--card);
+  color: var(--ink);
+}
+
+/* Aligned form label + hint helpers */
+.field-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+
+
+/* Status pills (readiness / coverage). A verdict is meaningful text, so it sits
+   at the 12px floor rather than the micro scale. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.pill-ready { color: var(--verdict); background: var(--verdict-tint); }
+.pill-blocked { color: var(--ember); background: var(--ember-tint); }
+.pill-partial { color: var(--indigo); background: var(--indigo-tint); }
+.pill-planned { color: var(--ink-soft); background: rgba(23, 26, 31, 0.05); }

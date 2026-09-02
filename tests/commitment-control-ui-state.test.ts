@@ -163,9 +163,13 @@ test("major-unit text converts to exact minor units and refuses anything that is
 });
 
 test("server minor units render India-first without a floating point anywhere", () => {
-  assert.equal(formatControlMoney("4500000", "INR"), "₹45,000.00");
+  // The same notation MoneyValue prints, so a cap never appears twice in two
+  // different forms on one screen.
+  assert.equal(formatControlMoney("4500000", "INR"), "INR 45,000");
+  assert.equal(formatControlMoney("135000", "INR"), "INR 1,350");
+  assert.equal(formatControlMoney("199950", "INR"), "INR 1,999.50");
   // Beyond Number.MAX_SAFE_INTEGER: the trailing 93 paise survive intact.
-  assert.equal(formatControlMoney("9007199254740993", "INR"), "₹9,00,71,99,25,47,409.93");
+  assert.equal(formatControlMoney("9007199254740993", "INR"), "INR 9,00,71,99,25,47,409.93");
   assert.equal(formatControlMoney(null, null), "Not published");
   // A value this device cannot render is echoed, never rounded into a guess.
   assert.equal(formatControlMoney("12.5", "INR"), "12.5 minor units INR");

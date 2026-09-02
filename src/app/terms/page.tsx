@@ -1,6 +1,9 @@
+import "../public.css";
+import "../ledger.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { VognaryMark } from "../brand";
+import { PublicDocument } from "../public-document";
 
 export const metadata: Metadata = {
   title: "Terms",
@@ -34,10 +37,11 @@ const terms = [
 ] as const;
 
 export default function TermsPage() {
+  const sections = terms.map(([title, body]) => ({ title, body }));
   return (
-    <main id="ledger-main" className="relative px-4 py-8 text-foreground sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <main id="ledger-main" className="relative px-4 pb-12 text-foreground sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-line py-3">
           <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
             <VognaryMark size={22} />
             Vognary
@@ -47,19 +51,14 @@ export default function TermsPage() {
             <Link href="/app" className="btn btn-sm btn-ghost">Back to app</Link>
           </div>
         </div>
-        <article className="panel p-6 sm:p-8 rise">
-          <span className="folio" data-folio="Trust">Terms</span>
-          <h1 className="mt-4 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">Terms for evidence-backed decisions</h1>
-          <p className="mt-3 text-sm leading-7 text-(--muted)">Effective {effectiveDate}. These terms define Vognary 1.0 capabilities, user responsibilities, payment boundaries, and financial-safety limits.</p>
-          <div className="mt-8 grid gap-6">
-            {terms.map(([heading, body]) => (
-              <section key={heading}>
-                <h2 className="font-display text-lg font-semibold text-(--ink)">{heading}</h2>
-                <p className="mt-2 text-sm leading-7 text-(--muted)">{body}</p>
-              </section>
-            ))}
-          </div>
-        </article>
+        <PublicDocument
+          folio="Terms"
+          title="Terms for evidence-backed decisions"
+          effectiveDate={effectiveDate}
+          summary="These terms define Vognary 1.0 capabilities, user responsibilities, payment boundaries, and financial-safety limits."
+          idPrefix="terms"
+          sections={sections}
+        />
       </div>
     </main>
   );

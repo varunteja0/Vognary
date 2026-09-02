@@ -394,7 +394,7 @@ async function waitForCall(calls: Recorded[], predicate: (call: Recorded) => boo
   return calls.find(predicate)!;
 }
 
-test("a workspace outside the private pilot sees no Control surface at all", async ({ page }) => {
+test("a workspace outside the private pilot keeps the Control destination and sees the loop as a labelled demonstration", async ({ page }) => {
   await signIn(page);
   const { controlRequests, runtimeProblems } = await mockWorkspace(page, {
     briefResponse: {
@@ -404,16 +404,27 @@ test("a workspace outside the private pilot sees no Control surface at all", asy
   });
   await page.goto("/app");
 
+  // The product the public site sells stays in navigation. Only the live desk
+  // is gated, and the gate is never bypassed.
   const nav = page.getByRole("navigation", { name: "Primary" });
-  await expect(nav.getByRole("button", { name: "Now" })).toBeVisible();
-  await expect(nav.getByRole("button", { name: "Control" })).toHaveCount(0);
-  await expect(page.getByText(composerHeading)).toHaveCount(0);
-  await expect(page.getByText(/Commitment Control unlocks after pilot enrollment/)).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Today" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Control" })).toBeVisible();
+
+  await nav.getByRole("button", { name: "Control" }).click();
+  await expect(page.getByRole("heading", { name: "Live decisions unlock with pilot enrollment" })).toBeVisible();
+  await expect(page.getByText("Synthetic demonstration")).toBeVisible();
   await expect(page.getByRole("link", { name: "See the pilot offer" })).toHaveAttribute("href", "/pay");
+
+  // Populated, but unmistakably not this workspace and not writable.
+  await expect(page.getByText("Model API vendor (placeholder)")).toBeVisible();
+  await expect(page.getByText("Founder (placeholder)")).toBeVisible();
+  await expect(page.getByText(composerHeading)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Decide this proposal" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Link observed evidence" })).toHaveCount(0);
   await expect(page.getByText("workspace-1")).toHaveCount(0);
   await expect(page.getByText(/waitlist|coming soon/i)).toHaveCount(0);
 
-  await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
+  // The gated desk is asked for exactly once and never retried behind the gate.
   await expect.poll(() => controlRequests.length).toBe(1);
   await page.waitForTimeout(500);
   expect(controlRequests).toHaveLength(1);
@@ -453,9 +464,9 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
   const card = page.getByRole("article", { name: "Anthropic" });
   await expect(card.getByText("User-entered assumption")).toBeVisible();
   await expect(card.getByText("Cited existing exposure")).toBeVisible();
-  await expect(card.getByText("₹45,000.00").first()).toBeVisible();
-  await expect(card.getByText("₹1,35,000.00").first()).toBeVisible();
-  await expect(card.getByText("₹5,40,000.00").first()).toBeVisible();
+  await expect(card.getByText("INR 45,000").first()).toBeVisible();
+  await expect(card.getByText("INR 1,35,000").first()).toBeVisible();
+  await expect(card.getByText("INR 5,40,000").first()).toBeVisible();
   await expect(card.getByText("Outside policy")).toBeVisible();
   await expect(card.getByText("Policy version 3")).toBeVisible();
   await expect(card.getByText("The per-charge limit is exceeded.")).toBeVisible();
@@ -483,7 +494,7 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
 
   const authorized = page.getByRole("article", { name: "Anthropic" });
   await expect(authorized.getByText("Approved with a cap")).toBeVisible();
-  await expect(authorized.getByText("₹40,000.00").first()).toBeVisible();
+  await expect(authorized.getByText("INR 40,000").first()).toBeVisible();
 
   await authorized.getByRole("button", { name: "Link observed evidence" }).click();
   const linkDialog = page.getByRole("dialog", { name: "Link observed evidence" });
@@ -498,9 +509,9 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
   const settled = page.getByRole("article", { name: "Anthropic" });
   await expect(settled.getByText("Over the frozen cap")).toBeVisible();
   await expect(settled.getByText("The observed amount is above the frozen cap. The cap itself is unchanged.")).toBeVisible();
-  await expect(settled.getByText("₹51,000.00").first()).toBeVisible();
+  await expect(settled.getByText("INR 51,000").first()).toBeVisible();
   // The frozen cap is still the authorized figure, not the observed one.
-  await expect(settled.getByText("₹40,000.00").first()).toBeVisible();
+  await expect(settled.getByText("INR 40,000").first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expectNoSeriousAxeViolations(page);
   expect(runtimeProblems).toEqual([]);
@@ -608,9 +619,13 @@ test("all five observed verdicts render without false success or failure languag
   ]) {
     await expect(page.getByText(label, { exact: true })).toBeVisible();
   }
-  await expect(page.getByText("Not published").first()).toBeVisible();
+  await expect(page.getByText("No comparable amount published").first()).toBeVisible();
   await expect(page.getByText(/\bfailed\b|\bviolation\b|\bsuccess\b/i)).toHaveCount(0);
-  await expect(page.getByText("The frozen cap never changes. A later observation is appended beside it, whatever it shows.")).toBeVisible();
+  await expect(page.getByText("The frozen cap never changes. A later observation is appended below it, whatever it shows.")).toBeVisible();
+  // The authorization is printed once, above the cap line, whatever any later
+  // observation shows: five observations must not reprint five caps.
+  await expect(page.getByText("Frozen cap", { exact: true })).toHaveCount(1);
+  await expect(page.getByText("Frozen before", { exact: true })).toHaveCount(1);
   await expectNoSeriousAxeViolations(page);
 });
 
@@ -661,10 +676,11 @@ test("an in-flight brief, an empty ledger, a missing policy, and an offline devi
   await mockWorkspace(page, { blockBrief: true });
   await page.goto("/app");
 
-  // While the brief is in flight the destination does not exist yet, so Home is
-  // exactly what it was before Commitment Control shipped.
+  // While the brief is in flight the destination exists but stays quiet: Home is
+  // still the first screen, and nothing about the desk is claimed yet.
   await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Control" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Control" })).toBeVisible();
+  await expect(page.getByText("Live decisions unlock with pilot enrollment")).toHaveCount(0);
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await mockWorkspace(page, { brief: { policy: null, proposals: [], capabilities: ownerCapabilities } });
@@ -735,6 +751,106 @@ test("Control honours reduced motion and fits a 390px viewport", async ({ page }
   expect(motion.buttonTransition.split(",").every((duration) => durationToMs(duration) <= 0.001)).toBe(true);
 
   await expectNoHorizontalOverflow(page);
+  await expectNoSeriousAxeViolations(page);
+});
+
+/**
+ * The signature record. An authorization frozen at INR 1,350 against a later
+ * observation of INR 1,700 is the state the whole product exists to produce, so
+ * it is asserted from a fixed contract payload rather than reached by typing:
+ * the authorization is printed once, the cap does not move when evidence lands,
+ * and the exact server verdict names the breach without a client-derived ratio.
+ */
+const capLineDecision = {
+  ...decision,
+  approvedCapMinor: "135000",
+  expectedAmountMinor: "170000",
+  overrideReason: "Board-approved exception for this vendor.",
+};
+
+const capLineBrief = {
+  policy,
+  proposals: [{
+    proposal: { ...proposal, merchant: "Cursor Pro", purpose: "Editor seats for the product loop", amountMinor: "170000" },
+    evaluation,
+    decision: capLineDecision,
+    reconciliations: [{
+      ...overCapReconciliation,
+      expectedAmountMinor: "170000",
+      approvedCapMinor: "135000",
+      observedAmountMinor: "170000",
+      observedCurrency: "INR",
+      verdict: "OVER_CAP" as const,
+    }],
+  }],
+  capabilities: ownerCapabilities,
+};
+
+// 720x450 is the CSS viewport a 1440x900 desktop exposes at 200% browser zoom.
+for (const viewport of [{ label: "1440x900", width: 1440, height: 900 }, { label: "720x450-zoom200", width: 720, height: 450 }, { label: "390x844", width: 390, height: 844 }, { label: "360x800", width: 360, height: 800 }]) {
+  test(`an observation of INR 1,700 against a frozen INR 1,350 cap reads as one record at ${viewport.label}`, async ({ page }, testInfo) => {
+    await signIn(page);
+    await mockWorkspace(page, { brief: capLineBrief });
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/app");
+
+    const record = page.getByRole("article", { name: "Cursor Pro" });
+    await expect(record).toBeVisible();
+
+    // Both sides of the comparison are on screen together, exactly once each.
+    // Scoped to the ledger: the proposal's own assumed amount legitimately
+    // appears again inside the policy-reading disclosure, as a different class.
+    const ledger = record.locator(".ledger");
+    await expect(ledger.getByText("INR 1,350", { exact: true })).toHaveCount(1);
+    await expect(ledger.getByText("INR 1,700", { exact: true })).toHaveCount(2); // proposed + observed
+    await expect(record.getByText("Authorized cap", { exact: true })).toHaveCount(1);
+    await expect(record.getByText("Over the frozen cap")).toBeVisible();
+    await expect(record.getByText("The observed amount is above the frozen cap. The cap itself is unchanged.")).toBeVisible();
+
+    // Actor, policy version and evidence access sit in the same record.
+    await expect(record.getByText(/Founder .* policy version 3/)).toBeVisible();
+    await expect(record.getByRole("button", { name: "Open the observed receipt" })).toBeVisible();
+
+    // Nothing invents a difference between the two figures.
+    await expect(record.getByText(/INR\s*350/)).toHaveCount(0);
+    await expect(record.getByText(/\bblocked\b|\breversed\b|\brefunded\b|\bstopped\b/i)).toHaveCount(0);
+
+    await expectNoHorizontalOverflow(page);
+    await expectNoSeriousAxeViolations(page);
+    const surface = testInfo.project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    await record.screenshot({ path: evidencePath(`cc-v0-over-cap-record-${viewport.label}-${surface}.png`), animations: "disabled" });
+  });
+}
+
+/** The cap must not move when later evidence arrives. */
+test("linking evidence appends an observation without changing the frozen cap", async ({ page }) => {
+  await signIn(page);
+  await mockWorkspace(page, {
+    brief: { ...capLineBrief, proposals: [{ ...capLineBrief.proposals[0], reconciliations: [] }] },
+    reconciliationResponse: {
+      status: 201,
+      body: {
+        data: { decision: capLineDecision, reconciliation: capLineBrief.proposals[0].reconciliations[0] },
+        meta: { requestId: "request-reconcile", workspaceVersion: 7 },
+      },
+    },
+  });
+  await page.goto("/app");
+
+  const record = page.getByRole("article", { name: "Cursor Pro" });
+  const capRow = record.locator(".ledger .control-fact", { hasText: "Authorized cap" });
+  const before = await capRow.textContent();
+  await expect(record.getByText("Awaiting evidence")).toBeVisible();
+
+  await record.getByRole("button", { name: "Link observed evidence" }).click();
+  const linkDialog = page.getByRole("dialog", { name: "Link observed evidence" });
+  await linkDialog.getByLabel("Saved bill to take the receipt from").selectOption(commitment.id);
+  await linkDialog.getByRole("radio").first().check();
+  await linkDialog.getByRole("button", { name: "Link this receipt" }).click();
+
+  await expect(record.getByText("Over the frozen cap")).toBeVisible();
+  expect(await capRow.textContent()).toBe(before);
+  await expect(record.locator(".ledger").getByText("INR 1,350", { exact: true })).toHaveCount(1);
   await expectNoSeriousAxeViolations(page);
 });
 

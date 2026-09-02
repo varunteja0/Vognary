@@ -71,16 +71,29 @@ test("step labels stay numbered from the same five sentences", () => {
   assert.equal(commitmentControlStepLabel(4), "4 · A named owner or admin freezes a cap, or declines.");
 });
 
-test("public and desk surfaces import the same loop, so the USP cannot drift", () => {
-  const landing = readFileSync("src/app/launch-landing.tsx", "utf8");
+test("public and desk surfaces express the same loop, and the lesson never restarts", () => {
+  const narrative = readFileSync("src/app/home-field-narrative.tsx", "utf8");
+  const field = readFileSync("src/lib/authority-field.ts", "utf8");
   const about = readFileSync("src/app/about/page.tsx", "utf8");
   const start = readFileSync("src/app/start/start-client.tsx", "utf8");
   const login = readFileSync("src/app/login/login-client.tsx", "utf8");
   const home = readFileSync("src/app/workspace/recovery/recovery-home.tsx", "utf8");
   const control = readFileSync("src/app/workspace/recovery/control/control-view.tsx", "utf8");
   const agent = readFileSync("src/lib/agent-content.ts", "utf8");
-  for (const source of [landing, about, start, login, home, control]) {
-    assert.match(source, /AuthorizationLoop/);
+
+  // The public front door walks the same primitive, in order, through one field
+  // rather than by re-printing the five sentences.
+  for (const stage of ["EVIDENCE", "PROPOSED", "POLICY", "AUTHORIZED", "OBSERVED"]) {
+    assert.match(narrative, new RegExp(`stage: "${stage}"`));
   }
+  assert.match(field, /authorityFieldSequence/);
   assert.match(agent, /COMMITMENT_CONTROL_STEPS/);
+
+  // A journey advances; it does not restart the same lesson on every page. The
+  // step rail survives in exactly one place: where the operator's current stage
+  // is the thing they need.
+  assert.match(control, /AuthorizationLoop/);
+  for (const source of [about, start, login, home]) {
+    assert.doesNotMatch(source, /AuthorizationLoop/);
+  }
 });

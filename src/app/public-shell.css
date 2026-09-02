@@ -1,0 +1,211 @@
+/*
+  Public shell — header, menu dialog and footer.
+
+  Route-scoped: imported by the shell component, so the signed-in desk never
+  carries these bytes.
+*/
+
+.pshell {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+/* On the immersive scenes the shell rides the graphite field instead of
+   punching a light band across it. */
+.pshell[data-tone="field"] {
+  background: color-mix(in srgb, var(--field) 88%, transparent);
+  border-bottom-color: var(--field-line);
+}
+.pshell[data-tone="field"] .pshell-brand {
+  color: var(--field-ink);
+}
+
+.pshell-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: min(100% - 2rem, 84rem);
+  margin-inline: auto;
+  min-height: 3.75rem;
+}
+
+@media (min-width: 48rem) {
+  .pshell-bar {
+    width: min(100% - 4rem, 84rem);
+    min-height: 4.25rem;
+  }
+}
+
+.pshell-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: var(--tap);
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.pshell-commands {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Exactly two controls at every width. The menu carries everything else. */
+.pshell-menu-button {
+  gap: 0.4rem;
+}
+
+/* ---- Menu dialog -------------------------------------------------------- */
+
+.pshell-menu {
+  width: min(100vw - 1.5rem, 30rem);
+  max-height: min(90dvh, 44rem);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-2);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.pshell-menu::backdrop {
+  background: color-mix(in srgb, var(--field) 62%, transparent);
+  backdrop-filter: blur(2px);
+}
+.pshell-menu[open] {
+  animation: pshell-menu-in var(--motion-move) var(--ease-emphasis) both;
+}
+@keyframes pshell-menu-in {
+  from { opacity: 0; transform: translateY(0.6rem); }
+  to { opacity: 1; transform: none; }
+}
+
+.pshell-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1rem 0.85rem 1.15rem;
+  border-bottom: 1px solid var(--line);
+}
+.pshell-menu-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.pshell-menu-list {
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  display: grid;
+  gap: 1px;
+}
+.pshell-menu-list a {
+  display: grid;
+  gap: 0.1rem;
+  min-height: var(--tap);
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radius-xs);
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+.pshell-menu-list a:hover {
+  background: var(--card-2);
+}
+.pshell-menu-list a[aria-current="page"] {
+  background: var(--card-2);
+  box-shadow: inset 2px 0 0 var(--gold);
+}
+.pshell-menu-label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.pshell-menu-note {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.pshell-menu-foot {
+  padding: 0.6rem 0.8rem 0.9rem;
+  border-top: 1px solid var(--line);
+}
+
+/* ---- Footer ------------------------------------------------------------- */
+
+.pfoot {
+  margin-top: auto;
+  padding: 3rem 0 2rem;
+  border-top: 1px solid var(--line);
+  background: var(--paper-2);
+}
+.pfoot-inner {
+  display: grid;
+  gap: 2rem;
+  width: min(100% - 2rem, 84rem);
+  margin-inline: auto;
+}
+@media (min-width: 48rem) {
+  .pfoot-inner {
+    grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
+    gap: 2.5rem;
+    width: min(100% - 4rem, 84rem);
+  }
+}
+.pfoot-inner > div {
+  display: grid;
+  gap: 0.15rem;
+  align-content: start;
+}
+.pfoot-inner a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+.pfoot-inner a:hover {
+  color: var(--ink);
+}
+.pfoot-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.pfoot-brand {
+  gap: 0.35rem;
+}
+.pfoot-brand p {
+  margin: 0.4rem 0 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.pfoot-brand span {
+  font-size: 0.9375rem;
+  color: var(--muted);
+}
+.pfoot-floor {
+  width: min(100% - 2rem, 84rem);
+  margin: 2.25rem auto 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+@media (min-width: 48rem) {
+  .pfoot-floor { width: min(100% - 4rem, 84rem); }
+}

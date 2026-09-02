@@ -456,6 +456,32 @@ test("operator evidence flags default blank and the runbook forbids secret-only 
   assert.match(preflight, /readinessAuthentication/);
 });
 
+test("the Control pilot preflight composes external proof without exposing restricted records", () => {
+  const env = read(".env.example");
+  const runbook = read("docs/production-activation-runbook.md");
+  const script = read("scripts/check-control-pilot-readiness.mjs");
+  for (const name of [
+    "COMMITMENT_CONTROL_INCIDENT_COMMANDER_STATUS",
+    "COMMITMENT_CONTROL_BACKUP_INCIDENT_COMMANDER_STATUS",
+    "COMMITMENT_CONTROL_INCIDENT_STAFFING_RECORD_SHA256",
+    "COMMITMENT_CONTROL_INCIDENT_TABLETOP_STATUS",
+    "COMMITMENT_CONTROL_INCIDENT_TABLETOP_AT",
+    "COMMITMENT_CONTROL_INCIDENT_TABLETOP_RECORD_SHA256",
+    "COMMITMENT_CONTROL_LEGAL_LOGGING_REVIEW_STATUS",
+    "COMMITMENT_CONTROL_LEGAL_LOGGING_REVIEW_AT",
+    "COMMITMENT_CONTROL_LEGAL_LOGGING_REVIEW_SHA256",
+    "COMMITMENT_CONTROL_PROPOSAL_REVIEW_PROCEDURE_STATUS",
+    "COMMITMENT_CONTROL_PROPOSAL_REVIEW_PROCEDURE_SHA256",
+  ]) {
+    assert.match(env, new RegExp(`^${name}=$`, "m"));
+  }
+  assert.match(runbook, /npm run control:preflight/);
+  assert.match(runbook, /does not prove legal applicability or compliance/i);
+  assert.match(script, /getCommitmentControlEnrollmentReadiness/);
+  assert.match(script, /\/api\/readiness/);
+  assert.doesNotMatch(script, /console\.log\(process\.env|JSON\.stringify\(process\.env/);
+});
+
 test("public health remains a minimal liveness surface", () => {
   const source = read("src/app/api/health/route.ts");
   assert.doesNotMatch(source, /DATABASE_URL|schema_migrations|capabilities|partnerRails|RESEND/);

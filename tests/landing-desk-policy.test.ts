@@ -9,7 +9,7 @@ test("the example Cursor increase is review, not a frozen authorization", () => 
     citedPriorInr: 1350,
   });
   assert.equal(annotation.status, "Review required");
-  assert.match(annotation.reason, /₹350 higher/);
+  assert.match(annotation.reason, /INR 350 higher/);
   assert.doesNotMatch(annotation.reason, /auto-approve|purchase|move money/i);
 });
 

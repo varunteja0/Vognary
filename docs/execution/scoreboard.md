@@ -19,17 +19,17 @@
 | Production activation | 7 | 2026-08-24 | Production Neon is through `0056_decision_cycle_expected_amount` with the verified checksum; legacy expected amounts remain null, so no history was invented. Durable R2 backup GET-restore remains proven at `0053` by GitHub run `32109925496`. Inbox processing is on (unsigned inbound 401). Google forwarding confirmation URL is stored; `forwarding_verified_at` is still null. HMAC key id remains `receipt-alias-v1`. Real automatic receipt, second automatic receipt, reminder delivery, and retention attestation remain unproven |
 | Live connector depth | 4 | 2026-07-21 | Registry ≠ live |
 | Data / network moat | 3 | 2026-07-21 | No network data yet |
-| Business validation | 1.5 | 2026-09-01 | Commitment Control remains unvalidated: 0 current-thesis conversations, offers, payments, real proposals, changed decisions, or renewals |
-| Distribution | 1.5 | 2026-09-01 | Five founder-qualified prospects exist; P10, P12, and stress-test P02 have verified pending LinkedIn invitations. Fifteen exploratory rows are prepared but unsent. No substantive reply yet, so the score remains 1.5 |
+| Business validation | 1.5 | 2026-09-02 | Commitment Control remains unvalidated: 0 current-thesis conversations, repeated jobs, committed events, offers, payments, real proposals, changed decisions, or renewals |
+| Distribution | 1.5 | 2026-09-02 | The three-cell sourcing gate is READY at 5/5/5 public-evidence-ready candidates. Three of 15 active-test candidates have transmitted contact attempts; there are 0 replies or conversations. Preparation does not raise the score |
 | **COMPOSITE (min)** | **1.5** | 2026-07-21 | Still floor = business |
 
 ## Commitment Control operating metrics
 
-| Metric | Seven-day target | Day 30 target | Current |
+| Metric | Active test target | Day 30 target | Current |
 | --- | ---: | ---: | ---: |
-| Strictly qualified contacts | 5 | — | 3 of 5 sent |
-| Exploratory contacts, never counted as qualified | 15 | — | 15 prepared / 0 sent |
-| Substantive conversations | 10 | 10 | 0 |
+| Strictly qualified direct-finance contacts | 5 | — | 5 ready / 3 sent |
+| Exploratory Cell B/C candidates, never counted as qualified | 10 | — | 10 evidence-ready / 0 sent |
+| Substantive conversations | 15: five per cell | 15 | 0 |
 | Explicit one-time ₹14,999 offers | 10 | 10 | 0 |
 | Upfront paid pilots | 2 | 3 | 0 |
 | Pre-spend proposals evaluated | 0 before assurance exit | 30 | 0 |
@@ -37,14 +37,32 @@
 | Requests received before spend | unmeasured | ≥80% | unmeasured |
 | Voluntary paid pilot renewals | 0 | 2 | 0 |
 
+## Three-cell wedge metrics — 2026-09-02 baseline
+
+Preparation and contact attempts do not raise business validation. A pending
+invitation is not a reply. A cell is only a directional winner at 3/5 concrete
+repeated jobs, 2/5 committed events, and 1/5 payment or specific invoice
+commitment.
+
+| Test cell | Selected | Evidence-ready | Contacted | Replied | Conversations | Repeated jobs | Committed events | Payment / invoice commitment | State |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `DIRECT_FINANCE` | 5 | 5 | 3 | 0 | 0/5 | 0/3 | 0/2 | 0/1 | INCOMPLETE |
+| `FRACTIONAL_FINANCE` | 5 | 5 | 0 | 0 | 0/5 | 0/3 | 0/2 | 0/1 | INCOMPLETE |
+| `FINOPS_AI_OPERATIONS` | 5 | 5 | 0 | 0 | 0/5 | 0/3 | 0/2 | 0/1 | INCOMPLETE |
+
+Sourcing cohort gate: **READY** at 5/5/5. Company demand gate:
+**INCOMPLETE** — 0/10 offers and 0/2 cleared payments. Run `npm run
+market:report` for the private-CRM aggregate; never paste private rows into this
+scoreboard.
+
 ## Phase status
 
 | Phase | Status | Notes |
 | --- | --- | --- |
 | 0 Hygiene | DONE | 2026-07-21 |
-| A Paid proof | ACTIVE / SEVEN-DAY TEST | Five founder-qualified contacts plus fifteen separately labeled exploratory contacts; ten substantive conversations; ten identical one-time ₹14,999 offers; two cleared payments. Current qualified contacts sent: 3; exploratory sent: 0; conversations/offers/payments: 0. LinkedIn is paused after the authenticated browser session logged out following an anti-scraping protection request. |
+| A Paid proof | ACTIVE / 14-DAY THREE-CELL TEST | Candidate preparation is READY at 5/5/5. Five conversations each across direct finance, fractional finance, and FinOps/AI operations; ten identical one-time ₹14,999 offers; two cleared payments. The original seven-day gate was missed and is not reset. Contacts sent: 3/15; replies/conversations/offers/payments: 0. LinkedIn remains paused after the authenticated browser session logged out following an anti-scraping protection request. |
 | B Control V0 | CODE COMPLETE / CUSTOMER DATA BLOCKED | CC-0–7 remain the product spine. No real customer financial data may enter Vognary until the independent security assessment and retest exit. Synthetic demonstrations do not raise this row. |
-| C Production min | ACTIVE / REVERIFY FAIL-CLOSED | Fresh exact-HEAD CI, encrypted pre-0057 restore proof, bounded 0057, canonical 0058/0059, monitoring, incident readiness, and independent assessment remain required. Keep pilot enrollment blank; payment alone never authorizes enrollment. |
+| C Production min | ACTIVE / PREFLIGHT BLOCKED | `control:preflight` currently blocks on target readiness, Control migrations, incident staffing, tabletop, legal/logging review, restore proof, monitoring delivery, and proposal-review approval. Restricted evidence remains outside Git; payment alone never authorizes customer-data access. |
 | D Intelligence moat | PENDING | Needs corpus |
 | E Distribution | PENDING | After A signal |
 | F Platform | BLOCKED | Until A–E |

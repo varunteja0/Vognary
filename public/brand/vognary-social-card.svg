@@ -1,7 +1,7 @@
 <!-- Open Graph and X link-card master. 1200 × 630. This is not an X profile header. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none" role="img" aria-labelledby="title desc">
-  <title id="title">Vognary recurring-spend audit</title>
-  <desc id="desc">Find what renews next. Act before it charges.</desc>
+  <title id="title">Vognary Commitment Control</title>
+  <desc id="desc">Freeze the cap. Prove what followed.</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
       <stop stop-color="#050609"/>
@@ -37,35 +37,35 @@
     <path d="M57 11H40l-5 7h17l5-7ZM51 23H36l-5 7h15l5-7Z" fill="#F0F1F5"/>
     <path d="m20.5 35 11.5 14L43.5 35" stroke="#D8B87A" stroke-width="8" stroke-linecap="square" stroke-linejoin="miter"/>
   </g>
-  <text x="128" y="94" fill="#F0F1F5" font-family="Geist, Arial, sans-serif" font-size="31" font-weight="650" letter-spacing="-.6">Vognary</text>
-  <text x="72" y="153" fill="#9198A4" font-family="Geist, Arial, sans-serif" font-size="16" font-weight="600" letter-spacing="3.5">EVIDENCE-FIRST RECURRING MONEY</text>
+  <text x="128" y="94" fill="#F0F1F5" font-family="IBM Plex Sans, Arial, sans-serif" font-size="31" font-weight="650" letter-spacing="0">Vognary</text>
+  <text x="72" y="153" fill="#9198A4" font-family="IBM Plex Sans, Arial, sans-serif" font-size="16" font-weight="600" letter-spacing="0">HUMAN-AUTHORIZED COMMITMENT CONTROL</text>
   <rect x="72" y="178" width="1056" height="2" fill="url(#rule)"/>
 
-  <text x="72" y="286" fill="#F0F1F5" font-family="Fraunces, Georgia, serif" font-size="74" font-weight="600" letter-spacing="-1.3">Find what renews next.</text>
-  <text x="72" y="373" fill="#D8B87A" font-family="Fraunces, Georgia, serif" font-size="74" font-weight="600" letter-spacing="-1.3">Act before it charges.</text>
-  <text x="76" y="425" fill="#BEC3CB" font-family="Geist, Arial, sans-serif" font-size="24">Recurring payments, reviewed with proof.</text>
+  <text x="72" y="286" fill="#F0F1F5" font-family="Fraunces, Georgia, serif" font-size="74" font-weight="600" letter-spacing="0">Freeze the cap.</text>
+  <text x="72" y="373" fill="#D8B87A" font-family="Fraunces, Georgia, serif" font-size="74" font-weight="600" letter-spacing="0">Prove what followed.</text>
+  <text x="76" y="425" fill="#BEC3CB" font-family="IBM Plex Sans, Arial, sans-serif" font-size="24">Proposal → policy → human authorization → reconciliation.</text>
 
-  <g transform="translate(72 481)" font-family="Geist Mono, monospace">
+  <g transform="translate(72 481)" font-family="IBM Plex Mono, monospace">
     <g>
       <rect width="238" height="76" rx="11" fill="#FFFFFF" fill-opacity=".035" stroke="#FFFFFF" stroke-opacity=".1"/>
-      <text x="18" y="29" fill="#7F8793" font-size="11" font-weight="700" letter-spacing="2">SEE</text>
-      <text x="18" y="55" fill="#E4E6EA" font-size="17">MONTHLY BURN</text>
+      <text x="18" y="29" fill="#7F8793" font-size="11" font-weight="700" letter-spacing="0">PROPOSE</text>
+      <text x="18" y="55" fill="#E4E6EA" font-size="17">ASSUMPTION</text>
     </g>
     <g transform="translate(250)">
       <rect width="238" height="76" rx="11" fill="#FFFFFF" fill-opacity=".035" stroke="#FFFFFF" stroke-opacity=".1"/>
-      <text x="18" y="29" fill="#7F8793" font-size="11" font-weight="700" letter-spacing="2">KNOW</text>
-      <text x="18" y="55" fill="#E4E6EA" font-size="17">NEXT RENEWAL</text>
+      <text x="18" y="29" fill="#7F8793" font-size="11" font-weight="700" letter-spacing="0">CITE</text>
+      <text x="18" y="55" fill="#E4E6EA" font-size="17">EXPOSURE</text>
     </g>
     <g transform="translate(500)">
       <rect width="238" height="76" rx="11" fill="#FFFFFF" fill-opacity=".035" stroke="#FFFFFF" stroke-opacity=".1"/>
-      <text x="18" y="29" fill="#7F8793" font-size="11" font-weight="700" letter-spacing="2">VERIFY</text>
-      <text x="18" y="55" fill="#E4E6EA" font-size="17">SOURCE PROOF</text>
+      <text x="18" y="29" fill="#7F8793" font-size="11" font-weight="700" letter-spacing="0">AUTHORIZE</text>
+      <text x="18" y="55" fill="#E4E6EA" font-size="17">FROZEN CAP</text>
     </g>
     <g transform="translate(750)">
       <rect width="238" height="76" rx="11" fill="#D8B87A" fill-opacity=".1" stroke="#D8B87A" stroke-opacity=".32"/>
-      <text x="18" y="29" fill="#BDA06A" font-size="11" font-weight="700" letter-spacing="2">ACT</text>
-      <text x="18" y="55" fill="#F0D79E" font-size="17">ONE CLEAR MOVE</text>
+      <text x="18" y="29" fill="#BDA06A" font-size="11" font-weight="700" letter-spacing="0">RECONCILE</text>
+      <text x="18" y="55" fill="#F0D79E" font-size="17">OBSERVED</text>
     </g>
   </g>
-  <text x="1128" y="600" text-anchor="end" fill="#8F96A2" font-family="Geist Mono, monospace" font-size="16" letter-spacing="1">vognary.com</text>
+  <text x="1128" y="600" text-anchor="end" fill="#8F96A2" font-family="IBM Plex Mono, monospace" font-size="16" letter-spacing="0">vognary.com</text>
 </svg>

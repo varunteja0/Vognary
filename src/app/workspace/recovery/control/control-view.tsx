@@ -356,7 +356,6 @@ export function ControlView({
             {policy === null ? "No policy version recorded" : `Policy version ${policy.policyVersion} · recorded ${formatMoment(policy.createdAt)}`}
           </p>
         </div>
-        <AuthorizationLoop compact activeStep={activeStep} />
         <dl className="control-figures">
           <div className="control-figure truth-policy">
             <dt>Policy in force</dt>
@@ -375,6 +374,15 @@ export function ControlView({
             <dd>{String(awaitingEvidence.length)}<small>{`${authorized.length} authorized in total`}</small></dd>
           </div>
         </dl>
+        {/* Orientation, not operation. Each band below already prints the step
+            it belongs to, so the whole run is opened on demand rather than
+            spending the first screen on explanation. */}
+        <details className="control-more">
+          <summary>The five steps this desk records</summary>
+          <div className="control-more-body">
+            <AuthorizationLoop compact activeStep={activeStep} />
+          </div>
+        </details>
       </section>
 
       {state.staleNotice ? (
@@ -401,7 +409,7 @@ export function ControlView({
             <button
               id="control-policy-setup"
               type="button"
-              className="btn btn-sm btn-seal"
+              className="btn btn-sm btn-primary"
               onClick={() => handlers.openPolicy("control-policy-setup")}
             >
               Set the policy
@@ -443,7 +451,7 @@ export function ControlView({
               : "Every evaluated proposal already carries a decision."}
           </p>
         ) : (
-          <div className="control-card-list">
+          <div className="control-card-list enter-list">
             {awaitingDecision.map((entry, index) => (
               <ControlProposalRow
                 key={entry.proposal.id}

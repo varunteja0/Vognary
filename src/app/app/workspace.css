@@ -19,6 +19,21 @@
   display: grid;
   gap: var(--space-4);
 }
+.recovery-empty {
+  display: grid;
+  gap: 3rem;
+  max-width: 62rem;
+}
+@media (min-width: 75rem) {
+  .recovery-empty {
+    grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+    gap: 4rem;
+  }
+  .recovery-empty-sequence {
+    padding-left: 2rem;
+    border-left: 2px solid var(--gold-deep);
+  }
+}
 /* ------------------------------------------------------------------ *
  * Segmented control / tabbed navigation
  * ------------------------------------------------------------------ */
@@ -87,11 +102,6 @@
   font-weight: 500;
   line-height: 1.45;
   color: var(--ink);
-}
-.outcome-alert .outcome-title {
-  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-size: 1.12rem;
-  font-weight: 600;
 }
 /* Ledger rows — vendor, money, date. Two lines narrow, one line wide.
    Separators live on the list so a single-child row never draws a stray rule. */
@@ -182,48 +192,6 @@
 .ledger-item-state[data-tone="due"] { color: var(--ochre); }
 .ledger-item-state[data-tone="cancel"] { color: var(--ember); }
 .ledger-item-state[data-tone="keep"] { color: var(--verdict); }
-/* Decision memory — dated timeline, not an audit log */
-.timeline {
-  display: grid;
-  gap: 0;
-  margin-left: 0.28rem;
-  border-left: 1px solid var(--line);
-}
-.timeline > li {
-  position: relative;
-  padding: 0.5rem 0 0.5rem 1.15rem;
-}
-.timeline > li::before {
-  content: "";
-  position: absolute;
-  left: -3.5px;
-  top: 0.98rem;
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--card);
-  border: 1px solid var(--line-strong);
-}
-.timeline > li[data-current="true"]::before {
-  background: var(--gold);
-  border-color: var(--gold);
-}
-.timeline-when {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 0.72rem;
-  color: var(--muted);
-}
-.timeline-what {
-  margin-top: 0.1rem;
-  font-size: 0.88rem;
-  line-height: 1.5;
-  color: var(--ink);
-}
-.timeline-note {
-  font-size: 0.8rem;
-  color: var(--ink-soft);
-}
 /* A short settle for a disclosure that opens under the pointer */
 .settle {
   animation: settle-in var(--motion-fast) var(--ease-enter) both;
@@ -233,18 +201,6 @@
 .truth-authority { --truth-rule: var(--truth-authority); }
 .truth-frozen { --truth-rule: var(--truth-frozen); }
 .truth-observed { --truth-rule: var(--truth-observed); }
-/* The seal — a deliberate, weighty ink action. Used where the command is
-   consequential but is NOT the single gold act of the context. */
-.btn-seal {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 10px 24px -18px rgba(23, 26, 31, 0.9);
-}
-.btn-seal:hover {
-  background: color-mix(in srgb, var(--ink) 88%, var(--paper));
-  border-color: color-mix(in srgb, var(--ink) 88%, var(--paper));
-}
 /* ------------------------------------------------------------------ *
  * Tick — the one checkbox/radio in the product.
  *
@@ -335,7 +291,6 @@
 }
 .control-masthead-title {
   font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-optical-sizing: auto;
   font-size: var(--text-page);
   font-weight: 500;
   line-height: 1.15;
@@ -349,14 +304,11 @@
 }
 .control-figures {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Each figure carries a sentence, so a column never narrows past the point
+     where words break mid-syllable; it wraps to another row instead. */
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
   gap: var(--space-3) var(--space-5);
 }
-
-@media (min-width: 48rem) {
-  .control-figures {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }}
 .control-figure {
   display: grid;
   align-content: start;
@@ -416,7 +368,6 @@
 }
 .control-heading {
   font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-optical-sizing: auto;
   font-size: var(--text-band);
   font-weight: 500;
   line-height: 1.2;
@@ -559,7 +510,7 @@
   padding: var(--space-4) var(--space-4) var(--space-4) calc(var(--space-4) - 2px);
   border: 1px solid var(--line);
   border-left: 3px solid var(--line-strong);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--card);
   box-shadow: var(--shadow-1);
 }
@@ -569,6 +520,11 @@
 }
 .control-card[data-settled="true"] {
   border-left-color: var(--truth-authority);
+}
+/* A breached authorization is identifiable from the queue, before the record is
+   opened or a single figure is read. */
+.control-card[data-verdict="OVER_CAP"] {
+  border-left-color: var(--ember);
 }
 .control-card-head {
   display: grid;
@@ -655,45 +611,48 @@
   color: var(--ink);
   overflow-wrap: anywhere;
 }
-/* --- The proof ledger -------------------------------------------------- *
+/* --- The ledger and the cap line --------------------------------------- *
  *
- * The most important object in the product. Frozen expected, approved cap
- * and the later observation sit in one block, on adjacent rows, sharing a
- * single right-hand money column: identical left edge, identical width,
- * decimal points aligned. Zero horizontal separation, so the comparison is
- * a glance and never an act of memory. Nothing here is computed on the
- * client; every figure is the server's, rendered as published.
+ * The most important object in the product. What a person froze before the
+ * obligation existed sits above one ruled cap line; everything observed
+ * afterwards is appended below it. Both halves share a single right-hand money
+ * column — identical left edge, identical width, digits aligned — so the
+ * comparison is a glance and never an act of memory. The cap is printed once
+ * and never repeated, and every figure is the server's, rendered as published.
  * --------------------------------------------------------------------- */
 
-.proof {
+.ledger {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* The money column may shrink below its longest written state, so a sentence
+     like "No comparable amount published" wraps instead of widening the desk.
+     Amounts still hold the column open: .money-amount never wraps. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
   align-items: baseline;
-  column-gap: var(--space-4);
-  padding: 0.15rem 0.75rem 0.15rem 0.7rem;
+  padding: 0.15rem 0.75rem 0.5rem 0.7rem;
   border-left: 2px solid var(--truth-frozen);
   border-radius: 0 6px 6px 0;
   background: var(--card-2);
 }
-/* The row wrapper is transparent to the grid so both columns line up
-   across every row, whatever the label length. */
-.proof > .control-fact {
+/* The list and each row are transparent to the grid, so every label and every
+   amount lines up down the whole record whatever the label length. */
+.ledger-rows,
+.ledger .control-fact {
   display: contents;
 }
-.proof > .control-fact > dt {
+.ledger .control-fact > dt {
   grid-column: 1;
   align-self: baseline;
-  padding: 0.45rem 0;
+  padding: 0.4rem var(--space-4) 0.4rem 0;
   border-top: 1px solid var(--line);
   font-size: var(--text-body);
   line-height: 1.35;
   color: var(--ink-soft);
   overflow-wrap: anywhere;
 }
-.proof > .control-fact > dd {
+.ledger .control-fact > dd {
   grid-column: 2;
   align-self: baseline;
-  padding: 0.45rem 0;
+  padding: 0.4rem 0;
   border-top: 1px solid var(--line);
   font-family: var(--font-mono-data), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
@@ -701,20 +660,97 @@
   line-height: 1.35;
   color: var(--ink);
   text-align: right;
-  white-space: nowrap;
+  /* Amounts never break (.money-amount is nowrap); a written state such as
+     "No comparable amount published" must wrap rather than widen the desk. */
+  overflow-wrap: anywhere;
 }
-.proof > .control-fact:first-child > dt,
-.proof > .control-fact:first-child > dd {
+.ledger > .ledger-rows:first-child > .control-fact:first-child > dt,
+.ledger > .ledger-rows:first-child > .control-fact:first-child > dd {
   border-top: 0;
 }
-/* The observation is the one row that carries weight. */
-.proof > .control-fact[data-observed="true"] > dt {
+/* The observation is the one row that carries weight; the frozen rows above it
+   never change, whatever it shows. */
+.ledger .control-fact[data-observed="true"] > dt {
   color: var(--ink);
   font-weight: 500;
-}
-.proof > .control-fact[data-observed="true"] > dd {
-  font-weight: 600;
   border-top-color: var(--line-strong);
+}
+.ledger .control-fact[data-observed="true"] > dd {
+  border-top-color: var(--line-strong);
+  font-weight: 600;
+}
+/* A written state ("Awaiting evidence") is not an amount, so it never carries
+   more weight in the money column than a real figure does. */
+.ledger .control-fact > dd.font-data {
+  font-size: var(--text-body);
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.ledger-rows[data-verdict="OVER_CAP"] .money-observed .money-amount,
+.ledger-rows[data-verdict="OVER_CAP"] .money-observed .money-provenance {
+  color: var(--ember);
+}
+/* THE CAP LINE. The divide between what a person authorized and what arrived
+   later. Gold, because gold is this product's seal and marks nothing else. */
+.ledger-line {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.2rem var(--space-3);
+  margin-top: 0.4rem;
+  padding-top: 0.3rem;
+  border-top: 2px solid var(--gold-deep);
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-micro);
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.ledger-closed {
+  grid-column: 1 / -1;
+  padding-top: 0.4rem;
+  font-size: var(--text-fine);
+  line-height: 1.5;
+  color: var(--muted);
+}
+.ledger-verdict {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: start;
+  gap: 0.4rem;
+  padding-top: 0.55rem;
+}
+/* Wide desks read the verdict and its paperwork side by side rather than as one
+  long column with a dead half. */
+@media (min-width: 56rem) {
+  .ledger-verdict {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    column-gap: var(--space-5);
+    align-items: start;
+  }
+  .ledger-verdict > .proof-head,
+  .ledger-verdict > .control-note {
+    grid-column: 1;
+  }
+  .ledger-verdict > .control-card-meta,
+  .ledger-verdict > .link-quiet {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  /* Sits where the evidence link would. Without its own row it lands on top of
+     the reconciliation timestamp whenever the receipt cannot be opened. */
+  .ledger-verdict > .link-quiet,
+  .ledger-verdict > .control-observation-index {
+    grid-row: 3;
+  }
+}
+/* The verdict sentence is the record's conclusion, so it reads at full ink
+   rather than as a footnote. */
+.ledger-verdict > .control-note {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
 }
 .proof-head {
   display: flex;
@@ -829,45 +865,16 @@
 }
 /* --- Authority, observation and policy -------------------------------- */
 
-.control-authority,
-.control-outcomes {
+.control-authority {
   display: grid;
   gap: 0.6rem;
   padding-top: var(--space-3);
   border-top: 1px solid var(--line);
 }
-.control-authority:first-of-type,
-.control-outcomes:first-of-type {
+.control-authority:first-of-type {
   padding-top: 0;
   border-top: 0;
 }
-.control-outcome-list {
-  display: grid;
-  gap: var(--space-4);
-}
-.control-outcome {
-  display: grid;
-  gap: 0.5rem;
-}
-/* A settled record reads across, not down: the frozen ledger on the left, the
-   verdict that judges it on the right, both inside one eye span. */
-.control-settled {
-  display: grid;
-  gap: var(--space-3);
-}
-.control-settled-side {
-  display: grid;
-  align-content: start;
-  gap: 0.4rem;
-  min-width: 0;
-}
-
-@media (min-width: 45rem) {
-  .control-settled {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: var(--space-4);
-      align-items: start;
-    }}
 .control-choice-set {
   display: grid;
   gap: 0;
@@ -985,3 +992,589 @@
   from { opacity: 0; transform: translateY(-3px); }
   to { opacity: 1; transform: none; }
 }
+
+/* Overflow destination. Never more than four direct labels compete for a phone
+   bar, so anything past the fourth opens from here instead of being squeezed. */
+.viewnav-more > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 2.75rem;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+.viewnav-more > summary::-webkit-details-marker { display: none; }
+.viewnav-more > summary:hover { color: var(--ink); }
+.viewnav-more[open] > summary { color: var(--ink); }
+.viewnav-more > ul {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 3.4rem;
+  z-index: 40;
+  min-width: 11rem;
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow-2);
+}
+.viewnav-more > ul > li > button {
+  width: 100%;
+  height: 2.75rem;
+  padding: 0 0.75rem;
+  border-radius: 8px;
+  text-align: left;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+.viewnav-more > ul > li > button:hover { color: var(--ink); background: var(--card-2); }
+@media (min-width: 640px) {
+  .viewnav-more > ul {
+    position: static;
+    box-shadow: none;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    min-width: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Moved out of globals.css.
+ *
+ * next.config.ts enables experimental.inlineCss, so every rule left in
+ * globals.css is inlined into the HTML of every route — including the public
+ * front door, which does not use any of these. They are workspace-only, so
+ * they are billed to the workspace.
+ * ------------------------------------------------------------------ */
+
+@media (min-width: 40rem) {
+  .viewnav {
+    display: inline-flex;
+    padding: 3px;
+    background: var(--card-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-xs);
+  }
+  .viewnav > li > button {
+    height: 2.1rem;
+  }
+}
+
+@media (min-width: 40rem) and (pointer: coarse) {
+  .viewnav > li > button {
+    height: var(--tap);
+  }
+}
+
+@media (min-width: 64rem) {
+  .workspace-rail {
+    position: sticky;
+    top: 1.5rem;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  /* The header's box is dropped so the rail can order brand, index, then
+     account independently. Its children stay in the accessibility tree. */
+  .workspace-rail > header {
+    display: contents;
+  }
+  .workspace-rail .rail-brand { order: 1; }
+  .workspace-rail nav { order: 2; }
+  .workspace-rail .rail-actions { order: 3; }
+  /* A record is read, not scanned across a metre of glass. The desk keeps a
+     measure even when the window is wide. */
+  .workspace-measure {
+    max-width: 68rem;
+  }
+  .viewnav {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-top: 1px solid var(--line);
+  }
+  .viewnav > li > button {
+    height: auto;
+    min-height: var(--tap);
+    justify-content: flex-start;
+    padding: 0 0 0 0.7rem;
+    border-radius: 0;
+    border-bottom: 1px solid var(--line);
+    box-shadow: none;
+    font-size: 0.85rem;
+  }
+  .viewnav > li > button[aria-current="page"] {
+    background: transparent;
+    box-shadow: inset 2px 0 0 var(--gold-deep);
+    color: var(--ink);
+    font-weight: 600;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Rubber-stamp verdict chips
+ * ------------------------------------------------------------------ */
+
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.24rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.stamp::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+}
+.stamp-keep {
+  color: var(--verdict);
+  background: var(--verdict-tint);
+}
+.stamp-watch {
+  color: var(--ochre);
+  background: var(--ochre-tint);
+}
+.stamp-downgrade {
+  color: var(--indigo);
+  background: var(--indigo-tint);
+}
+.stamp-cancel {
+  color: var(--ember);
+  background: var(--ember-tint);
+}
+.stamp-investigate {
+  color: var(--ink-soft);
+  background: rgba(23, 26, 31, 0.05);
+}
+
+/* ---- The Commitment Control loop -----------------------------------------
+   The product is these five steps, so the list is built as a sequential
+   register rather than a marketing timeline: tabular numerals in a fixed
+   gutter, hairline rules between rows, and a continuous spine so the eye
+   reads it as one ordered run instead of five detached bullets.
+   Three states carry meaning — settled work recedes, the current step is the
+   only thing at full ink, and steps not yet reached stay quiet. */
+.authorization-loop {
+  display: grid;
+  gap: 0;
+  margin-top: 1.25rem;
+  max-width: 30rem;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+  counter-reset: loop;
+}
+.authorization-loop > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.6rem 0 0.6rem 0.7rem;
+  margin-left: -0.7rem;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-body);
+  line-height: 1.5;
+  color: var(--ink-soft);
+  counter-increment: loop;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+/* Tabular numerals keep the gutter optically straight at every step. */
+.authorization-loop > li::before {
+  content: counter(loop);
+  grid-column: 1;
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5rem;
+  color: var(--muted);
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+/* The spine runs between numerals, stopping short of the last row. */
+.authorization-loop > li::after {
+  content: "";
+  position: absolute;
+  left: calc(0.7rem + 0.8rem);
+  top: 2.1rem;
+  bottom: -0.1rem;
+  width: 1px;
+  background: var(--line);
+}
+.authorization-loop > li:last-child::after {
+  display: none;
+}
+
+.authorization-loop > li[data-complete="true"] {
+  color: var(--muted);
+}
+.authorization-loop > li[data-complete="true"]::before {
+  color: var(--verdict);
+}
+.authorization-loop > li[data-complete="true"]::after {
+  background: color-mix(in srgb, var(--verdict) 38%, transparent);
+}
+
+/* Exactly one row is the present tense; it is the only full-ink line. */
+.authorization-loop > li[aria-current="step"] {
+  color: var(--ink);
+  font-weight: 500;
+  box-shadow: inset 0.15rem 0 0 var(--gold-deep);
+}
+.authorization-loop > li[aria-current="step"]::before {
+  color: var(--gold-deep);
+}
+
+.authorization-loop-compact {
+  margin-top: 0;
+  max-width: none;
+}
+.authorization-loop-compact > li {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  font-size: var(--text-fine);
+}
+.authorization-loop-compact > li::after {
+  top: 1.8rem;
+}
+
+/* Workspace view switcher. Deliberately not gold: gold marks the action a
+   founder can take, never the page they are already on. */
+.viewnav {
+  display: grid;
+  gap: 2px;
+}
+.viewnav > li > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 2.75rem;
+  padding: 0 0.85rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.viewnav > li > button:hover {
+  color: var(--ink);
+}
+.viewnav > li > button[aria-current="page"] {
+  background: var(--card-3);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+
+/* Moved out of globals.css: next.config.ts enables experimental.inlineCss, so
+   every rule left there is inlined into the HTML of every route — including the
+   public front door, which uses none of these.
+   ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ *
+ * Decision objects — the pre-renewal queue
+ *
+ * One financial decision, one object. Money and due date read first, the
+ * reasons read second, the choices read last. The leading card carries a
+ * single gold edge; every following card stays quiet so a queue of three
+ * never becomes three competing alarms.
+ * ------------------------------------------------------------------ */
+
+.decision {
+  display: grid;
+  gap: 1.1rem;
+  padding: 1.05rem 1.1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+/* The lead record is marked the way the signed-in desk marks it: one gold edge.
+   No gradient, no lifted shadow — the public page and the product are the same
+   object seen twice, not a marketing card and a working one. */
+.decision[data-lead="true"] {
+  border-color: var(--gold-line);
+  box-shadow: var(--shadow-1), inset 2px 0 0 var(--gold);
+}
+.decision-cue {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ochre);
+}
+.decision-sentence {
+  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.decision-quote {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.decision-evidence {
+  display: grid;
+  gap: 0.35rem;
+}
+
+@media (min-width: 34rem) {
+  .decision {
+    gap: 1.25rem;
+    padding: 1.35rem 1.5rem 1.4rem;
+  }
+}
+
+/* Reason list — hairline markers, never bullet-point noise */
+.reason-list {
+  display: grid;
+  gap: 0.3rem;
+}
+.reason-list > li {
+  position: relative;
+  padding-left: 0.95rem;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.reason-list > li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  width: 5px;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+/* Choice row — one primary, one neutral, one deliberate */
+.decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.link-quiet {
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  cursor: pointer;
+  transition: color 0.16s ease;
+}
+.link-quiet:hover {
+  color: var(--ink);
+}
+
+/* ---- MOTION VOCABULARY ----------------------------------------------------
+   One set of primitives, reused everywhere, so the product moves in a single
+   language. Compositor-only: transform and opacity, never layout.
+
+   .enter        a region arriving (decelerates, settles)
+   .enter-list   children arrive in sequence, capped so long lists never crawl
+   .enter-origin something expanding from the control that spawned it
+   Motion is interruptible because every rule is a transition or a one-shot
+   animation, never a loop that must finish. */
+@keyframes enter-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes enter-scale {
+  from { opacity: 0; transform: scale(0.985) translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.enter {
+  animation: enter-rise var(--motion-enter) var(--ease-enter) both;
+}
+/* Backdrops and scrims fade; only objects travel. */
+.enter-fade {
+  animation: enter-fade var(--motion-move) var(--ease-standard) both;
+}
+@keyframes enter-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.enter-origin {
+  animation: enter-scale var(--motion-move) var(--ease-emphasis) both;
+  transform-origin: var(--enter-origin, center);
+}
+/* Stagger reads as a hand dealing records, not a queue loading. The ramp stops
+   at the ninth child so a forty-row ledger never crawls. */
+.enter-list > * {
+  animation: enter-rise var(--motion-move) var(--ease-enter) both;
+}
+.enter-list > *:nth-child(2) { animation-delay: 28ms; }
+.enter-list > *:nth-child(3) { animation-delay: 56ms; }
+.enter-list > *:nth-child(4) { animation-delay: 84ms; }
+.enter-list > *:nth-child(5) { animation-delay: 112ms; }
+.enter-list > *:nth-child(6) { animation-delay: 140ms; }
+.enter-list > *:nth-child(7) { animation-delay: 168ms; }
+.enter-list > *:nth-child(n + 8) { animation-delay: 196ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  /* Reduced motion means no travel, not no feedback. The primitives are pinned
+     to their resolved state first, then the global switch below stops every
+     animation and transition unconditionally — `!important` is the enforcement
+     for that guarantee, not an escape from the system. */
+  .enter,
+  .enter-fade,
+  .enter-origin,
+  .enter-list > * {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Moved out of globals.css: form fields, verdict stamps and status pills belong
+   to the route families that render them. next.config.ts enables inlineCss, so
+   anything left in globals is inlined into every route's HTML.
+   ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ *
+ * Form fields
+ * ------------------------------------------------------------------ */
+
+.file-target {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-target:disabled {
+  cursor: not-allowed;
+}
+
+.field {
+  height: var(--tap);
+  width: 100%;
+  padding: 0 0.85rem;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font-size: 0.9rem;
+  color: var(--ink);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  outline: none;
+}
+textarea.field {
+  height: auto;
+  padding: 0.7rem 0.8rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+.field::placeholder {
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+}
+.field:focus {
+  border-color: color-mix(in srgb, var(--gold) 55%, var(--line-strong));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 14%, transparent);
+}
+.field-mono {
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+}
+
+/* Native <select> — strip OS chrome and add one consistent chevron so every
+   dropdown ("drag-down") lines up with the inputs and buttons exactly. */
+select.field {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-right: 2.5rem;
+  background-color: var(--card-2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a8e98' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  background-size: 0.85rem;
+  cursor: pointer;
+}
+select.field:hover {
+  border-color: var(--line-strong);
+}
+select.field:focus {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d8b87a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+select.field option {
+  background: var(--card);
+  color: var(--ink);
+}
+
+/* Aligned form label + hint helpers */
+.field-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+
+
+/* Status pills (readiness / coverage). A verdict is meaningful text, so it sits
+   at the 12px floor rather than the micro scale. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: var(--text-fine);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.pill-ready { color: var(--verdict); background: var(--verdict-tint); }
+.pill-blocked { color: var(--ember); background: var(--ember-tint); }
+.pill-partial { color: var(--indigo); background: var(--indigo-tint); }
+.pill-planned { color: var(--ink-soft); background: rgba(23, 26, 31, 0.05); }

@@ -21,9 +21,13 @@ const payload = await readJson(response);
 
 console.log(JSON.stringify({
   baseUrl,
+  observedAt: new Date().toISOString(),
   httpStatus: response.status,
   ok: response.ok,
   payload,
+  next: response.ok && payload?.status === "delivered"
+    ? "Retain the provider receipt and this output in a restricted record, hash that record, then set MONITORING_DELIVERY_TEST_STATUS, MONITORING_DELIVERY_TEST_AT, and MONITORING_DELIVERY_TEST_RECORD_SHA256 together."
+    : "Do not set monitoring readiness evidence. Repair delivery and rerun the test.",
 }, null, 2));
 
 if (!response.ok || payload?.status !== "delivered") process.exit(1);

@@ -13,9 +13,10 @@ import {
 import { getDatabasePool } from "../../src/lib/server/database";
 import { RecoveryServiceError } from "../../src/lib/server/recovery-api";
 import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
-import { completeControlPolicyRequest } from "../commitment-control-policy-fixture";
+import { completeControlPolicyRequest, futureControlTestDate } from "../commitment-control-policy-fixture";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
+const futureFirstChargeDate = futureControlTestDate();
 process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "*";
 
 test("selected Recovery exposure stays cited and currency-separated through persistence", {
@@ -136,7 +137,7 @@ test("concurrent decisions serialize, and consented events do not duplicate on r
         category: "AI_MODEL",
         amountMinor: "199900",
         currency: "INR",
-        firstChargeDate: "2026-09-01",
+        firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
       },
@@ -215,7 +216,7 @@ test("deleting an actor nulls identity fields without mutating immutable financi
         category: "AI_MODEL",
         amountMinor: "199900",
         currency: "INR",
-        firstChargeDate: "2026-09-01",
+        firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
       },
@@ -309,7 +310,7 @@ test("analytics failure cannot roll back or duplicate a frozen Control decision"
         category: "AI_MODEL",
         amountMinor: "199900",
         currency: "INR",
-        firstChargeDate: "2026-09-01",
+        firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
       },

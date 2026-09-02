@@ -40,7 +40,6 @@ import {
   purposeLabels,
 } from "./labels";
 import { MoneyValue } from "./recovery-states";
-import { AuthorizationLoop } from "@/app/authorization-loop";
 
 export function RecoveryHome({
   home,
@@ -174,14 +173,23 @@ function SectionHeading({ id, children }: { id: string; children: string }) {
 
 function EmptyRecoveryHome({ onAddEvidence }: { onAddEvidence: () => void }) {
   return (
-    <section aria-label="Get started" className="max-w-2xl py-6 sm:py-10">
-      <h3 className="font-display text-3xl font-semibold tracking-tight text-(--ink) sm:text-4xl">{customerPhrases.emptyHomeTitle}</h3>
-      <p className="mt-4 max-w-prose text-base leading-7 text-(--muted)">{customerPhrases.emptyHomeBody}</p>
-      <div className="mt-7"><AuthorizationLoop activeStep={1} /></div>
-      <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-8">
-        {customerPhrases.addBills}
-      </button>
-      <p className="mt-4 text-sm text-(--muted)">{customerPhrases.noMailbox}</p>
+    <section aria-label="Get started" className="recovery-empty py-6 sm:py-10">
+      <div className="recovery-empty-intro">
+        <p className="truth-label truth-citation">First cited evidence</p>
+        <h3 className="mt-3 font-display text-3xl font-semibold text-(--ink) sm:text-4xl">{customerPhrases.emptyHomeTitle}</h3>
+        <p className="mt-4 max-w-prose text-base leading-7 text-(--muted)">{customerPhrases.emptyHomeBody}</p>
+        <button type="button" onClick={onAddEvidence} className="btn btn-primary btn-lg mt-7">
+          {customerPhrases.addBills}
+        </button>
+        <p className="mt-4 text-sm text-(--muted)">{customerPhrases.noMailbox}</p>
+      </div>
+      <div className="recovery-empty-sequence">
+        <p className="truth-label truth-policy">What follows the first bill</p>
+        <p className="mt-3 max-w-prose text-sm leading-7 text-(--muted)">
+          One cited charge is enough to open the Control desk. From there a proposal is measured
+          against what your record already proves, and a named owner or admin freezes the boundary.
+        </p>
+      </div>
     </section>
   );
 }
@@ -202,7 +210,7 @@ function FirstObservationHome({
           : `We saved ${home.coverage.evidenceCount.toLocaleString("en-IN")} bills, but no tool has appeared twice yet.`}
       </p>
       {home.recentObservations.length ? (
-        <ul className="ledger-list mt-5 grid">
+        <ul className="ledger-list enter-list mt-5 grid">
           {home.recentObservations.map((observation) => (
             <li key={observation.evidenceId}>
               <p className="ledger-line">
@@ -275,7 +283,7 @@ function DecisionQueue({
     return (
       <section aria-labelledby="recovery-decisions">
         {lastHook ? <DecisionHook hook={lastHook} onReminderConsent={onReminderConsent} /> : null}
-        <h3 id="recovery-decisions" className="font-display text-2xl font-semibold tracking-tight text-(--ink)">
+        <h3 id="recovery-decisions" className="font-display text-2xl font-semibold text-(--ink)">
           {watching ? customerPhrases.watchingHomeTitle : customerPhrases.quietHomeTitle}
         </h3>
         <p className="mt-2 text-sm leading-6 text-(--muted)">
@@ -607,7 +615,7 @@ function DecisionHook({
 function PaymentAsk({ onAnswer }: { onAnswer: (answer: "yes" | "no") => void }) {
   return (
     <section className="stack-section" aria-labelledby="payment-ask">
-      <h3 id="payment-ask" className="font-display text-lg font-semibold tracking-tight text-(--ink)">
+      <h3 id="payment-ask" className="font-display text-lg font-semibold text-(--ink)">
         {paymentAskQuestion}
       </h3>
       <div className="mt-3 flex flex-wrap gap-2">

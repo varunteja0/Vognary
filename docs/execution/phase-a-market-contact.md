@@ -5,21 +5,22 @@
 > deadline and kill metric. Full doctrine: [`THE-LAW.md`](../THE-LAW.md).
 
 > **Parent law:** [`docs/THE-LAW.md`](../THE-LAW.md)
-> **Goal:** Prove companies will put Vognary before a real obligation and make a one-time ₹14,999 payment for a one-month human-approved control pilot.
+> **Goal:** Determine which of three buyer cells will pay for a rail-neutral decision-to-outcome record for AI, SaaS, and cloud commitments, without changing the product before behavior chooses the wedge.
 > **Owner:** Founder owns targeting, conversations, offers, contracts, and payment evidence. Agents support CRM structure, proposal intake, and evidence-safe artifacts.
-> **Day 7 gate:** five qualified plus fifteen explicitly exploratory contacts reached, 10 substantive conversations, ten identical explicit offers, and two upfront payments.
+> **Day 14 wedge gate (2026-09-16):** five completed conversations in each test cell, 10 identical explicit offers across credible buyers, and two upfront payments. The original seven-day gate was missed; this test does not erase or reclassify that result.
 > **Day 30 gate:** three paid pilots, 30 pre-spend proposals, three materially changed/capped/declined decisions, at least 80% pre-spend arrival, and two paid renewals.
 
 ---
 
 ## 0. Success / stop criteria
 
-### Day 7 success
+### Day 14 wedge success
 
-- Five companies match the strict ICP using public evidence; fifteen additional plausible buyers are contacted as `EXPLORATORY`, never counted as qualified.
-- 10 founder-confirmed conversations happen.
+- Five completed conversations per test cell, each founder-confirmed: `DIRECT_FINANCE`, `FRACTIONAL_FINANCE`, and `FINOPS_AI_OPERATIONS`.
+- A cell wins directionally only when at least three of five buyers describe a concrete repeated job, at least two commit to bring a qualifying upcoming or recent event, and at least one pays or makes a specific invoice commitment.
 - Ten identical one-time ₹14,999 pilot offers are made.
 - Two pilots pay upfront. Written intent, invoice sent, and payment received remain separate fields.
+- Pending LinkedIn invitations count as transmitted contact attempts only. They do not count as a reply or conversation.
 
 ### Day 30 success
 
@@ -32,21 +33,119 @@
 ### Kill / rework
 
 - Fewer than two of ten offers pay.
+- No test cell reaches three concrete repeated jobs and two committed events.
 - Fewer than half of proposal requests arrive before spending.
 - 30 proposals change zero decisions.
 - Buyers require Vognary to move money, issue cards, or auto-approve before they will pay.
 - Any proposal, policy result, or reconciliation is presented as evidence when it is only an assumption.
+- Interviews consistently select post-spend Recovery over pre-spend authorization: make Recovery the front-door wedge and keep Control as the next-cycle action rather than averaging the two jobs.
 
 ### Measurable funnel
 
 ```text
-5 qualified + 15 exploratory contacts
-  → 10 conversations
+5 DIRECT_FINANCE + 5 FRACTIONAL_FINANCE + 5 FINOPS_AI_OPERATIONS conversations
+  → one cell meets 3 concrete jobs + 2 committed events + 1 payment/invoice commitment
   → 10 identical one-time ₹14,999 offers
-  → 2 upfront payments by Day 7
+  → 2 upfront payments by Day 14
 ```
 
-Current Commitment Control counts (private CRM, 2026-09-01): rows **35**; founder-qualified **5**; exploratory selected **15**; older sourced/unselected **15**; qualified contacted **3**; exploratory contacted **0**; conversations **0**; offers **0**; invoices **0**; payments **0**. P10, P12, and stress-test P02 have verified pending LinkedIn invitations. LinkedIn is paused after the authenticated browser logged out following an anti-scraping protection request. Historical Autopilot conversations do not count toward the new thesis. Drafts and opened profiles are not contacts.
+Current Commitment Control counts (private CRM, 2026-09-02): rows **45**;
+founder-qualified direct-finance **5**; exploratory public-evidence-ready Cell
+B/C candidates **10**; older unassigned **30**; contacted **3/15**; replied
+**0**; conversations **0**; repeated jobs **0**; committed events **0**; offers
+**0**; invoice commitments **0**; invoices **0**; payments **0**. The sourcing
+cohort gate is **READY** at 5/5/5; the company demand gate remains
+**INCOMPLETE**. LinkedIn is paused after the authenticated browser logged out
+following an anti-scraping protection request. Historical Autopilot
+conversations do not count toward the new thesis. Drafts and opened profiles are
+not contacts.
+
+### Three-cell test — one product, three possible buyers
+
+This is a buyer-and-job test, not three products. `contact_cohort` continues to
+describe evidence quality (`QUALIFIED | EXPLORATORY`); `test_cell` describes the
+hypothesis being tested. The existing five qualified contacts remain
+`DIRECT_FINANCE`. New candidates in the other cells remain `EXPLORATORY` until
+their cell-specific public criteria and buyer authority are verified.
+
+| Test cell | Public qualification before contact | Unknown that conversation must resolve |
+| --- | --- | --- |
+| `DIRECT_FINANCE` | India-registered, 20–100-person AI-native company, recent seed–Series B funding, named finance owner | Whether a real pre-spend decision gap exists and an advisory record is valuable without enforcement |
+| `FRACTIONAL_FINANCE` | Fractional CFO, CA, or finance-operations firm publicly serving at least five startup clients | Whether one operator has repeated cross-client commitment decisions and can buy or sponsor a one-to-many workflow |
+| `FINOPS_AI_OPERATIONS` | FinOps, platform-engineering, or AI-operations leader with explicit responsibility for variable AI, SaaS, or cloud costs | Whether decision-to-outcome evidence is missing and materially different from existing provider budgets and procurement tooling |
+
+Test the descriptor **Authorization Ledger** only in interviews. It means a
+rail-neutral record that preserves evidence, policy, actor, decision, and frozen
+cap, then reconciles observed evidence. It is not a rename and must never imply
+that Vognary blocks a card, API call, purchase, or payment.
+
+### Five-call C3 candidate desk — run before more product code
+
+This desk tests one candidate against two rival explanations of the same buyer
+behavior. It does not select a company direction. Keep private identities and
+case details in the gitignored CRM; commit aggregate counts only.
+
+| Candidate | Buyer/job claim under test | What one call can support | What one call cannot prove |
+| --- | --- | --- | --- |
+| `C3` | An MSP/FinOps operator repeatedly needs a named client authorization before an exact gateway remediation, can delegate a narrowly scoped sandbox management credential, and will pay to close action-to-outcome proof. | Two concrete cases, a missing authorization/action/outcome link, named credential authority, one committed case, and price-specific invoice behavior. | Production safety, a working LiteLLM contract, retention, or another operator's demand. |
+| `C1` | A multi-client adviser needs a common authorization record, but an advisory workflow without technical enforcement is sufficient. | The operator chooses a cross-client advisory record as the job they will bring and rejects enforcement as unnecessary. | Fractional-CFO buying behavior; that still requires the five `FRACTIONAL_FINANCE` calls. |
+| `R2` | The funded job begins after spend: resolve an invoice/cost variance, attach an owner, and prove the outcome. | The buyer's actual next event starts from observed spend and they choose evidence-to-resolution over pre-action authorization. | That pre-action control has no market elsewhere. |
+
+**Observed roll-up at desk creation (2026-09-02):**
+
+| Evidence | `C3` | `C1` | `R2` |
+| --- | ---: | ---: | ---: |
+| Completed candidate-classifying calls | 0/5 | 0/5 | 0/5 |
+| Concrete repeated jobs | 0 | 0 | 0 |
+| Committed qualifying cases/events | 0 | 0 | 0 |
+| Scoped sandbox credential delegation: willing **and authorized** | 0 | N/A | N/A |
+| Price-specific invoice commitments | 0 | 0 | 0 |
+| Cleared payments | 0 | 0 | 0 |
+
+Zero means no evidence, not a negative market result. Recompute this table only
+from founder-confirmed CRM fields after each call.
+
+#### One call sheet, repeated five times
+
+Do not explain Vognary before question 7. Ask for artifacts by screen share or
+verbal reconstruction; do not collect customer financial data in Vognary.
+
+| Min | Ask | Count only when |
+| ---: | --- | --- |
+| 0–4 | “Walk me through the last two client technology-cost variances you personally helped resolve. What happened and when?” | Two specific instances or one instance plus a buyer-stated recurring cadence establishes `repeated_job_status=YES`. |
+| 4–7 | “What system detected each case, what exact remediation was proposed, and where did the work wait?” | The buyer names the actual console/ticket/script and a concrete wait or handoff. |
+| 7–10 | “Who could authorize the change, what did they see, where was approval recorded, and who held the credential that could act?” | Actor, authority, evidence, action point, and credential custodian are specific. |
+| 10–13 | “How did you determine whether the action happened and whether actual impact matched the estimate?” | A provider request/result, later bill, or explicit absence of proof is named. |
+| 13–16 | “Which one job would you bring next: a cross-client advisory authorization record (`C1`), a post-spend variance resolution (`R2`), or a client-authorized bounded action with outcome proof (`C3`)? Show me the event, not a preference.” | `primary_candidate_observed` follows the event they commit, not the option they praise. |
+| 16–18 | For a `C3` event only: “Could your organization authorize a dedicated disposable-sandbox management credential limited to reading and updating one test key, never a master or production key? Who signs that off?” | Both willingness and named organizational authority exist. A founder cannot infer authority from title. |
+| 18–20 | Explain the candidate in one sentence, ask for one dated synthetic/cleared case, then make the fixed offer only if its price was founder-approved before the first offer. | Commitment, offer, invoice commitment, invoice, and cleared payment retain separate timestamps. |
+
+Record for each call: private CRM ID, two-case evidence status, recurrence,
+current tool, authorization gap, exact action point, primary candidate observed,
+credential willingness, credential authority, committed case/date, fixed price
+offered, invoice commitment, invoice, payment, and disqualifying reason. Do not
+record secrets, raw customer amounts, or private case text in Git.
+
+#### Candidate decision rule after call five
+
+- `C3` may advance to founder acceptance only with **at least 3/5** repeated
+  C3-class gaps, **at least 2/5** operators both authorized to delegate the
+  scoped sandbox role and committed to a qualifying case, **at least 1/5**
+  price-specific invoice commitment, and at least a two-call lead over each
+  rival job classification. It still does not become a company pivot until the
+  company payment gate clears.
+- `C1` is supported when at least 3/5 committed events require cross-client
+  advisory authorization but not action enforcement. Confirm buying behavior in
+  the separate fractional-finance cell before choosing it.
+- `R2` is supported when at least 3/5 committed events begin with observed
+  spend/invoice variance and buyers choose post-spend resolution over a
+  pre-action control.
+- If none clears its rule, report `INCONCLUSIVE`; do not average counts or use
+  the thesis scores to manufacture a winner.
+- The currently authorized company offer remains the one-time ₹14,999
+  Commitment Control pilot. The report's ₹75,000 C3 design-partner price is an
+  unapproved hypothesis. No C3 offer counts until the founder chooses one fixed
+  price; after that, do not discount or vary it inside the test.
 
 ---
 
@@ -60,12 +159,15 @@ Agents never infer `qualified`, `offered`, `paid`, `renewed`, or `decision_chang
 ### Required columns
 
 The closed `contact_cohort` vocabulary is `QUALIFIED | EXPLORATORY`. Exploratory
-rows keep `qualified_at` blank and never count toward the qualified cohort.
+rows keep `qualified_at` blank and never count toward the qualified cohort. The
+independent `test_cell` vocabulary is
+`DIRECT_FINANCE | FRACTIONAL_FINANCE | FINOPS_AI_OPERATIONS`.
 
 | Column | Type | Values / notes |
 | --- | --- | --- |
 | `id` | string | `P01`, `P02`, … stable |
 | `contact_cohort` | enum | `QUALIFIED` \| `EXPLORATORY`. Exploratory rows keep `qualified_at` blank and never count as qualified. |
+| `test_cell` | enum | `DIRECT_FINANCE` \| `FRACTIONAL_FINANCE` \| `FINOPS_AI_OPERATIONS` |
 | `company_name` | string | Private working identity; never commit the populated row |
 | `company_public_url` | URL | Canonical company source |
 | `india_entity_evidence_url` | URL | Public evidence of an India-registered operating entity |
@@ -75,18 +177,29 @@ rows keep `qualified_at` blank and never count toward the qualified cohort.
 | `ai_native_evidence_url` | URL | Public evidence that AI is core to product or operations |
 | `finance_owner_role` | string | Finance lead, fractional CFO, or ops-owning cofounder; `UNKNOWN` is not qualified |
 | `finance_owner_public_url` | URL | Public source for the role, not assumed identity |
+| `operator_scope_count` | integer or blank | Publicly proved number of client companies or governed workloads; blank is unknown, never inferred |
+| `technology_spend_responsibility` | enum | `YES` \| `NO` \| `UNMEASURED`; requires role evidence or buyer confirmation |
+| `buying_role` | enum | `BUYER` \| `SPONSOR` \| `USER` \| `UNKNOWN`; never inferred from title alone |
+| `contact_channel` | enum | `WARM_INTRO` \| `MANUAL_DIRECT` \| `REFERRAL` \| `PARTNER` \| `OTHER`; blank until an actual contact attempt |
+| `founder_minutes` | non-negative integer or blank | Cumulative founder minutes for sourcing, outreach, calls, offer follow-up, and delivery on this row; never estimate or backfill |
 | `qualified_at` | datetime | Public beachhead criteria verified; spend is still unmeasured until a conversation |
 | `contacted_at` | datetime | A message was actually sent; drafts stay blank |
+| `replied_at` | datetime | A substantive reply was received; delivery/pending state stays blank |
 | `conversation_at` | datetime | A real call or substantive reply, not a sent message |
 | `last_real_commitment_at` | datetime | Last specific obligation discussed; blank until the buyer names it |
 | `last_real_commitment_amount_minor` | integer string | Exact amount only when the buyer states or cites it |
 | `last_real_commitment_currency` | char(3) | Currency paired with the amount |
 | `pain_class` | enum | `PRE_SPEND` \| `POST_SPEND` \| `BOTH` \| `NONE` \| `UNMEASURED` |
+| `repeated_job_status` | enum | `YES` \| `NO` \| `UNMEASURED`; `YES` requires at least two concrete instances or a buyer-stated recurring cadence |
+| `job_selected` | enum | `PRE_SPEND` \| `RECOVERY` \| `DECISION_TO_OUTCOME` \| `NONE` \| `UNMEASURED`; based on the event the buyer will bring, not stated preference |
+| `enforcement_requirement` | enum | `ADVISORY_ACCEPTED` \| `NEEDS_ENFORCEMENT` \| `UNMEASURED` |
+| `next_event_committed_at` | datetime | Buyer committed to bring a qualifying upcoming or recent event; a compliment is not a commitment |
 | `spend_threshold_confirmed_at` | datetime | Buyer confirmed ≥₹8 lakh/month controllable exposure; public proxies do not count |
 | `monthly_controllable_spend_minor` | integer string | Buyer-stated/cited amount only |
 | `monthly_controllable_spend_currency` | char(3) | Usually INR; never convert FX |
 | `working_session_at` | datetime | One real upcoming commitment was brought to the desk |
 | `offer_at` | datetime | Explicit one-time ₹14,999 pilot offer made |
+| `invoice_commitment_at` | datetime | Buyer agreed to a specific invoice path; does not count as invoice delivery or payment |
 | `invoice_sent_at` | datetime | Invoice delivery; does not count as payment |
 | `payment_received_at` | datetime | Cleared upfront payment; the paid gate |
 | `payment_amount_inr` | integer | Cleared gross INR amount |
@@ -95,6 +208,7 @@ rows keep `qualified_at` blank and never count toward the qualified cohort.
 | `obligation_created_at` | datetime | Buyer-confirmed creation time for the latest proposal; needed to classify pre-spend honestly |
 | `pre_spend_status` | enum | `YES` \| `NO` \| `UNKNOWN`; first-charge date is not a substitute |
 | `changed_decision_count` | integer | Capped, declined, or materially changed after evaluation |
+| `t0_status` … `t5_status` | enum | `PASS` \| `RESCUED` \| `FAIL` \| `NOT_YET_ELIGIBLE`; T5 is later evidence reconciled against the frozen authorization |
 | `renewal_offered_at` | datetime | Renewal explicitly offered |
 | `renewal_paid_at` | datetime | Cleared renewal payment |
 | `status` | enum | Exact state below |
@@ -118,14 +232,23 @@ rows keep `qualified_at` blank and never count toward the qualified cohort.
 ### Minimum weekly CRM hygiene
 
 - Same day: conversation, offer, invoice, and cleared payment timestamps.
+- After each actual action: add measured elapsed time to `founder_minutes`; set
+  `contact_channel` on the first transmitted contact and do not rewrite it to
+  make a later channel look better.
 - Record proposal counts from product evidence; never reconstruct them from memory.
 - Friday: export aggregate counts to the scoreboard; never commit the private CRM.
+- Run `npm run market:cohort-gate`; it remains red until every cell has five public-evidence-ready candidates. Assigned labels alone never pass it.
+- Current measured state (2026-09-02): cohort gate READY at 5/5/5; rerun after every candidate-evidence change.
 
 ---
 
-## 2. ICP (who to contact first)
+## 2. ICP cells (who to contact first)
 
-**First beachhead:** India-registered, 20–100-person AI-native companies that raised seed through Series B in the last 24 months and have a named finance owner: finance lead, fractional CFO, or ops-owning cofounder. Public sources must support entity, size, funding recency, AI relevance, and finance ownership before `qualified_at` is set.
+**Cell A / current beachhead:** India-registered, 20–100-person AI-native companies that raised seed through Series B in the last 24 months and have a named finance owner: finance lead, fractional CFO, or ops-owning cofounder. Public sources must support entity, size, funding recency, AI relevance, and finance ownership before `qualified_at` is set.
+
+**Cell B / operator channel:** India-serving fractional CFO, CA, and finance-operations firms with public evidence of at least five startup clients. The conversation must establish whether the operator repeatedly governs AI, SaaS, or cloud commitments and whether they are buyer, sponsor, or user. Client count does not prove pain or authority.
+
+**Cell C / technology-value owner:** FinOps, platform-engineering, or AI-operations leaders with public responsibility for variable technology cost. Company size is exploratory in this cell. The conversation must establish a real decision-to-outcome gap; FinOps macro demand does not prove this buyer needs Vognary.
 
 **Conversation gate:** the buyer confirms at least ₹8 lakh/month of controllable AI, cloud, software, contractor, or campaign exposure and can bring one real upcoming commitment before spend. Until then, spend remains `UNMEASURED`; never infer it from funding or headcount.
 
@@ -155,25 +278,33 @@ Ask about the last real financial obligation; do not explain Vognary until quest
 
 | Min | Ask | Evidence sought |
 | ---: | --- | --- |
-| 0–3 | “Walk me through the last real commitment your company made for AI, cloud, software, a contractor, or a campaign.” | A dated, specific obligation — not general frustration |
+| 0–3 | “Walk me through the last real commitment you governed for AI, cloud, or software.” | A dated, specific obligation — not general frustration |
 | 3–6 | “When was the company committed: before the invoice, when someone said yes, or only when the card/bill arrived?” | `PRE_SPEND`, `POST_SPEND`, `BOTH`, or `NONE` |
 | 6–9 | “Who could have capped or declined it, and what information did they have at that moment?” | Named authority and missing context |
 | 9–12 | “Show me how that approval happened — message, call, sheet, accounting tool, or nothing.” | Actual incumbent behavior, not feature preference |
-| 12–15 | “What did the obligation cost, over what period, and what would have changed the decision?” | Exact amount/currency and counterfactual decision |
-| 15–17 | “What happens if someone ignores an approved cap today?” | Whether advisory accountability is valuable or physical enforcement is mandatory |
-| 17–20 | Only if the pain is pre-spend: explain the control desk in one sentence and ask them to bring the next real commitment. | Working-session behavior, not praise |
+| 12–15 | “Could you reconstruct the original evidence, policy, person, cap, and what the later bill showed?” | Whether the missing job is pre-spend, Recovery, or decision-to-outcome |
+| 15–17 | “If Vognary records and proves the decision but does not block the card or API, is that useful enough to adopt?” | `ADVISORY_ACCEPTED` or `NEEDS_ENFORCEMENT` without negotiating the boundary |
+| 17–20 | Explain the Authorization Ledger in one sentence and ask which qualifying upcoming or recent event they will bring next. | `job_selected`, `next_event_committed_at`, and working-session behavior — not praise |
 
-Classify the conversation the same day. If most buyers describe only post-hoc bill surprise, that supports Recovery, not Commitment Control. If they require cards or money movement to pay, record `NEEDS_ENFORCEMENT`; do not build rails.
+Classify the conversation the same day. Ask the same rival-job and enforcement questions in all three cells. If most buyers bring post-hoc bill evidence, that supports Recovery as the wedge, not Commitment Control. If they require cards or money movement to pay, record `NEEDS_ENFORCEMENT`; do not build rails.
 
-## 5. Ten-day execution cadence
+### Cell scorecard and decision rule
+
+For each cell report only aggregate counts: completed conversations, concrete
+repeated jobs, committed next/recent events, advisory accepted, enforcement
+required, explicit offers, invoice commitments, invoices, and cleared payments.
+Do not average the cells. Choose one winner only when it reaches **3/5 concrete
+repeated jobs + 2/5 committed events + 1/5 payment or invoice commitment**.
+The company still requires ten offers and two cleared payments to proceed.
+
+## 5. Fourteen-day execution cadence
 
 | Day | Founder action | Evidence |
 | ---: | --- | --- |
-| 1 | Send the five founder-qualified first touches | `contacted_at`, never drafts |
-| 2 | Source and send fifteen plausible buyers labeled `EXPLORATORY`; do not infer qualification or spend | `contact_cohort`, public URL, `contacted_at`; `qualified_at` stays blank |
-| 2–4 | Run at least 10 behavioral conversations; collect no real customer financial data in Vognary before independent security clearance | `conversation_at`, pain class, minimum necessary notes |
-| 3–6 | Make the identical one-time ₹14,999 offer to credible buyers until ten offers are recorded | `offer_at`, `invoice_sent_at` |
-| 7 | Apply the two-payment demand gate with cleared funds only; payment grants no data access before assurance clearance | GO / REWORK / KILL worksheet in CONTINUE-HERE |
+| 1–3 | Verify current role evidence and complete the 12 remaining touches across the prepared 5/5/5 cohorts | `test_cell`, public evidence, `contacted_at`; do not route around channel restrictions |
+| 2–10 | Complete five behavioral conversations per cell; collect no real customer financial data in Vognary before independent security clearance | `replied_at`, `conversation_at`, `job_selected`, `enforcement_requirement`, minimum necessary notes |
+| 4–12 | Ask credible buyers to commit one qualifying upcoming or recent event and make the identical one-time ₹14,999 offer until ten offers are recorded | `next_event_committed_at`, `offer_at`, `invoice_commitment_at` |
+| 13–14 | Apply the cell winner rule and two-payment company gate using cleared funds only; payment grants no data access before assurance clearance | One `WIN / REWORK / KILL` decision in CONTINUE-HERE and the scoreboard |
 
 Agents may prepare sources, copy, redaction, and aggregate reports. Only the founder sends messages, confirms identities, records private notes, invoices, and marks payment.
 

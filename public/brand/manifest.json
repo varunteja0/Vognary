@@ -1,17 +1,25 @@
 {
   "brand": "Vognary",
-  "identity": "Ledger to Verdict",
-  "version": 2,
+  "identity": "Ledger to Authorization",
+  "version": 3,
   "palette": {
+    "paper": "#F2EFE7",
+    "card": "#FBFAF6",
+    "ink": "#16140F",
+    "inkSoft": "#3C382F",
+    "authorizationGold": "#8A6A1F",
+    "citedEvidence": "#2F5D3F",
+    "review": "#7D5410",
+    "exceeded": "#A8321F"
+  },
+  "markPalette": {
     "graphite": "#08090C",
     "platinum": "#F0F1F5",
-    "champagneGold": "#D8B87A",
-    "goldHighlight": "#F1DCA6",
-    "ink": "#15171C"
+    "champagneGold": "#D8B87A"
   },
   "meaning": {
-    "platinumRows": "Evidence from scattered recurring-payment sources",
-    "goldV": "The single reviewable verdict and next action"
+    "evidenceRows": "Cited exposure and policy context converging into one record",
+    "goldV": "The named human authorization and frozen cap"
   },
   "standards": {
     "clearSpace": "At least one quarter of the mark width on every side",
@@ -22,7 +30,7 @@
       "stretch",
       "outline",
       "recolor individual evidence rows",
-      "move or recolor the gold verdict",
+      "move or recolor the gold authorization",
       "place copy inside the mark"
     ]
   },

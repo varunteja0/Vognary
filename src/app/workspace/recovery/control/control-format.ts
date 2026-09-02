@@ -2,7 +2,8 @@ import type { ControlReconciliationDto } from "@/lib/commitment-control/contract
 import type { ProposalDecisionAction } from "@/lib/commitment-control/decision";
 import type { CategoryPosture, PolicyEvaluationStatus, PolicyReasonCode, ProposalCategory } from "@/lib/commitment-control/policy";
 import type { ProposalCadence } from "@/lib/commitment-control/project";
-import { decimalToMinorUnits, toMoneyDto } from "@/lib/recovery/domain";
+import { formatExactMinorUnits } from "@/components/ui/money-value";
+import { decimalToMinorUnits } from "@/lib/recovery/domain";
 
 // Presentation and exact-conversion helpers for Commitment Control. Every map is
 // keyed by a contract union, so a contract change fails typecheck here instead of
@@ -139,13 +140,15 @@ export const controlVerdictToneClass: Record<ControlReconciliationVerdict, strin
 };
 
 /**
- * Render server minor units exactly. When the currency is one this device cannot
- * format, the canonical minor-unit string is shown rather than a guessed amount.
+ * Render server minor units exactly, through the same formatter `MoneyValue`
+ * uses, so one figure never appears in two notations on one screen. When the
+ * currency is one this device cannot format, the canonical minor-unit string is
+ * shown rather than a guessed amount.
  */
 export function formatControlMoney(minor: string | null, currency: string | null): string {
   if (minor === null || currency === null) return "Not published";
   try {
-    return toMoneyDto(minor, currency).display;
+    return formatExactMinorUnits(minor, currency);
   } catch {
     return `${minor} minor units ${currency}`;
   }

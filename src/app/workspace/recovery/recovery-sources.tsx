@@ -211,7 +211,7 @@ function AdvancedPanel({
 }) {
   return (
     <details>
-      <summary className="cursor-pointer text-sm font-medium text-(--ink-soft)">Advanced</summary>
+      <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-(--ink-soft)">Advanced</summary>
       <div className="mt-4 grid gap-4">
         {receiptInbox?.alias ? (
           <div className="flex flex-wrap gap-2">

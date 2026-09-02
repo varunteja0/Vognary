@@ -77,14 +77,29 @@ export function ControlReconciliationDialog({
       }
     >
       <p className="truth-label truth-frozen">Frozen authorization · never rewritten</p>
-      <dl className="proof mt-2">
-        <ControlFact label="Frozen expected" money={{ minor: decision.expectedAmountMinor, currency: decision.currency, provenance: { kind: "frozen" } }} />
-        {decision.approvedCapMinor === null ? (
-          <ControlFact label="Approved cap" value="No cap — declined" engraved />
-        ) : (
-          <ControlFact label="Approved cap" money={{ minor: decision.approvedCapMinor, currency: decision.currency, provenance: { kind: "frozen" } }} />
-        )}
-      </dl>
+      <div className="ledger mt-2">
+        <dl className="ledger-rows">
+          {decision.approvedCapMinor === decision.expectedAmountMinor ? (
+            <ControlFact label="Frozen cap" money={{ minor: decision.expectedAmountMinor, currency: decision.currency, provenance: { kind: "frozen", label: "Authorized in full" } }} />
+          ) : (
+            <>
+              <ControlFact label="Proposed" money={{ minor: decision.expectedAmountMinor, currency: decision.currency, provenance: { kind: "frozen", label: "At decision" } }} />
+              {decision.approvedCapMinor === null ? (
+                <ControlFact label="Authorized cap" value="No cap — declined" engraved />
+              ) : (
+                <ControlFact label="Authorized cap" money={{ minor: decision.approvedCapMinor, currency: decision.currency, provenance: { kind: "frozen", label: "Frozen" } }} />
+              )}
+            </>
+          )}
+        </dl>
+        <p className="ledger-line">
+          <span>Frozen before</span>
+          <span>Observed after</span>
+        </p>
+        <dl className="ledger-rows">
+          <ControlFact label="Observed" value="The receipt you pick below" observed />
+        </dl>
+      </div>
       <p className="control-card-meta mt-2">{proposal.merchant} · authorized in {decision.currency}</p>
 
       <div className="control-field mt-5">

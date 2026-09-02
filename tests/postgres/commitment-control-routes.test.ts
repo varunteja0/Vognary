@@ -18,10 +18,11 @@ import type { ApiFailure, ApiSuccess } from "../../src/lib/recovery/contracts";
 import { getDatabasePool } from "../../src/lib/server/database";
 import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
 import { createSessionCookie } from "../../src/lib/server/session";
-import { completeControlPolicyRequest } from "../commitment-control-policy-fixture";
+import { completeControlPolicyRequest, futureControlTestDate } from "../commitment-control-policy-fixture";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
 const baseUrl = "https://vognary.test";
+const futureFirstChargeDate = futureControlTestDate();
 process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "*";
 
 test("Commitment Control HTTP routes preserve auth, RBAC, ETags, and the complete control loop", {
@@ -142,7 +143,7 @@ test("Commitment Control HTTP routes preserve auth, RBAC, ETags, and the complet
         category: "AI_MODEL",
         amountMinor: "199900",
         currency: "INR",
-        firstChargeDate: "2026-09-01",
+        firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
       }),

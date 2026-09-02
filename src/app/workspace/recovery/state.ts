@@ -23,14 +23,20 @@ import { decimalToMinorUnits, minorUnitsToDecimal } from "@/lib/recovery/domain"
 // (draft input, selection, dialogs, focus, pending mutation, rollback metadata).
 // It never derives recurrence, totals, confidence, ordering, or exposure.
 
-export const recoveryViews = ["CONTROL", "HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"] as const;
+// Destination order is the operator's order: what needs attention, what must be
+// decided, what is already committed, what proves it. Labels name a task, not a
+// container or a time of day.
+export const recoveryViews = ["HOME", "CONTROL", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"] as const;
 export type RecoveryView = (typeof recoveryViews)[number];
+
+/** Never more than four of these reach the mobile bar; the rest go to More. */
+export const recoveryPrimaryViewLimit = 4;
 
 export const recoveryViewLabels: Record<RecoveryView, string> = {
   CONTROL: "Control",
-  HOME: "Now",
-  COMMITMENTS: "Bills",
-  ADD_EVIDENCE: "Sources",
+  HOME: "Today",
+  COMMITMENTS: "Commitments",
+  ADD_EVIDENCE: "Evidence",
   MANDATE: "Automation",
 };
 
