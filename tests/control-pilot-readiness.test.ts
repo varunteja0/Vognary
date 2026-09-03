@@ -7,6 +7,7 @@ import {
 } from "../scripts/lib/control-pilot-readiness.mjs";
 
 const sha = "a".repeat(64);
+const releaseSha = "b".repeat(40);
 const requiredMigrations = [
   "0057_commitment_control_v0",
   "0058_workspace_invites",
@@ -24,6 +25,7 @@ const readyEnvironment = {
   COMMITMENT_CONTROL_LEGAL_LOGGING_REVIEW_SHA256: sha,
   COMMITMENT_CONTROL_PROPOSAL_REVIEW_PROCEDURE_STATUS: "approved",
   COMMITMENT_CONTROL_PROPOSAL_REVIEW_PROCEDURE_SHA256: sha,
+  COMMITMENT_CONTROL_OPERATIONS_EVIDENCE_COMMIT_SHA: releaseSha,
   BACKUP_RESTORE_DRILL_STATUS: "passed",
   BACKUP_RESTORE_DRILL_AT: "2026-09-01",
   BACKUP_RESTORE_DRILL_RECORD_SHA256: sha,
@@ -38,6 +40,7 @@ test("Control pilot readiness requires every independent customer-data proof", (
     enrollment: { status: "ready", enrolledWorkspaceCount: 1 },
     appliedMigrations: requiredMigrations,
     targetReadinessAuthenticated: true,
+    targetCommitSha: releaseSha,
     now: new Date("2026-09-02T00:00:00.000Z"),
   });
 
@@ -47,6 +50,7 @@ test("Control pilot readiness requires every independent customer-data proof", (
     "target-readiness",
     "control-migrations",
     "paid-assessed-enrollment",
+    "operations-release-binding",
     "incident-staffing",
     "incident-tabletop",
     "legal-logging-review",
@@ -63,6 +67,7 @@ test("blank evidence fails closed without exposing environment values", () => {
     enrollment: { status: "disabled-no-workspaces", enrolledWorkspaceCount: 0 },
     appliedMigrations: [],
     targetReadinessAuthenticated: false,
+    targetCommitSha: "",
     now: new Date("2026-09-02T00:00:00.000Z"),
   });
 
@@ -71,6 +76,7 @@ test("blank evidence fails closed without exposing environment values", () => {
     "target-readiness",
     "control-migrations",
     "paid-assessed-enrollment",
+    "operations-release-binding",
     "incident-staffing",
     "incident-tabletop",
     "legal-logging-review",
@@ -92,6 +98,7 @@ test("stale restore and tabletop evidence stay blocked", () => {
     enrollment: { status: "ready", enrolledWorkspaceCount: 1 },
     appliedMigrations: requiredMigrations,
     targetReadinessAuthenticated: true,
+    targetCommitSha: releaseSha,
     now: new Date("2026-09-02T00:00:00.000Z"),
   });
 
@@ -110,6 +117,7 @@ test("bare restore and monitoring status strings cannot clear readiness", () => 
     enrollment: { status: "ready", enrolledWorkspaceCount: 1 },
     appliedMigrations: requiredMigrations,
     targetReadinessAuthenticated: true,
+    targetCommitSha: releaseSha,
     now: new Date("2026-09-02T00:00:00.000Z"),
   });
 
@@ -132,8 +140,29 @@ test("every dated readiness status requires its restricted record hash", () => {
       enrollment: { status: "ready", enrolledWorkspaceCount: 1 },
       appliedMigrations: requiredMigrations,
       targetReadinessAuthenticated: true,
+      targetCommitSha: releaseSha,
       now: new Date("2026-09-02T00:00:00.000Z"),
     });
     assert.equal(result.checks.find((check) => check.id === checkId)?.reason, `${checkId}-record-hash-invalid`);
   }
+});
+
+test("operations evidence must match the authenticated target release", () => {
+  const result = evaluateControlPilotReadiness({
+    environment: {
+      ...readyEnvironment,
+      COMMITMENT_CONTROL_OPERATIONS_EVIDENCE_COMMIT_SHA: "b".repeat(40),
+    },
+    enrollment: { status: "ready", enrolledWorkspaceCount: 1 },
+    appliedMigrations: requiredMigrations,
+    targetReadinessAuthenticated: true,
+    targetCommitSha: "c".repeat(40),
+    now: new Date("2026-09-02T00:00:00.000Z"),
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.equal(
+    result.checks.find((check) => check.id === "operations-release-binding")?.reason,
+    "operations-evidence-commit-mismatch",
+  );
 });

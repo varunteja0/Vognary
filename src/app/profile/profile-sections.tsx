@@ -104,7 +104,7 @@ export function NotificationsSection({ settings }: { settings: Settings }) {
           <p className="text-sm leading-6 text-(--muted)">Reminders and the weekly digest are off by default. Each is an explicit choice under one revocable notification consent.</p>
           <div className="inset mt-4 p-4">
             <CheckBox label="Weekly recurring-money digest" checked={alerts.weeklyDigestEnabled} disabled={settings.renewalAlertBusy} onChange={(checked) => settings.setRenewalAlerts({ ...alerts, weeklyDigestEnabled: checked })} />
-            <p className="mt-2 text-xs leading-5 text-(--muted)">When enabled, a Monday digest is scheduled at your local send hour only when the ledger contains commitments: monthly INR burn, foreign currencies kept separate, renewals due in seven days, and one deterministic review suggestion.</p>
+            <p className="mt-2 text-xs leading-5 text-(--muted)">When enabled, a Monday digest is scheduled at your local send hour only when this workspace holds recorded commitments: monthly INR burn, foreign currencies kept separate, renewals due in seven days, and one deterministic review suggestion.</p>
           </div>
           <p className="mt-4 text-sm font-semibold text-(--ink)">Renewal reminders</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">

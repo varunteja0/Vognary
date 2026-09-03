@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { VognaryMark } from "../brand";
-import { Nakul, NakulBadge, type NakulPose } from "../character";
 
 export const metadata: Metadata = {
   title: "Brand",
@@ -12,18 +11,30 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const foundations: Array<[string, string]> = [
-  ["Paper", "#f2efe7"],
-  ["Card", "#fbfaf6"],
-  ["Ink", "#16140f"],
-  ["Ink soft", "#3c382f"],
+/*
+  Every hex on this page is asserted against src/app/globals.css by
+  tests/brand-page-truth.test.ts. This page previously documented a Fraunces /
+  graphite / gold identity the product had stopped rendering, so the swatches
+  now paint from the live token and the printed hex is gate-checked against it.
+  A brand page that can drift from the product is worse than no brand page.
+*/
+
+/** Paper and ink: the record surface, and what is written on it. */
+const foundations: Array<[string, string, string]> = [
+  ["Paper", "#f4f1ea", "--paper"],
+  ["Paper, recessed", "#eae5da", "--paper-2"],
+  ["Card", "#fffdf8", "--card"],
+  ["Ink", "#17140f", "--ink"],
+  ["Ink, soft", "#453f34", "--ink-soft"],
+  ["Muted", "#6b6357", "--muted"],
 ];
 
-const signals: Array<[string, string]> = [
-  ["Authorization", "#8a6a1f"],
-  ["Cited evidence", "#2f5d3f"],
-  ["Review", "#7d5410"],
-  ["Exceeded", "#a8321f"],
+/** Colour is spent on exactly these meanings and nothing else. */
+const signals: Array<[string, string, string, string]> = [
+  ["Limit crossed", "#b02d17", "--ember", "Vermilion. Past a policy limit or past a frozen cap."],
+  ["Human froze it", "#1c5240", "--frozen", "Forest. A named person set a boundary, or evidence proved an outcome."],
+  ["A rule is speaking", "#3a4a86", "--policy", "Slate-blue. A constraint narrowing a decision it can never make."],
+  ["Someone typed it", "#6b6357", "--assumption", "Muted. Unproven until a document cites it."],
 ];
 
 export default function BrandPage() {
@@ -38,6 +49,12 @@ export default function BrandPage() {
           <Link href="/app" className="btn btn-ghost">Back to app</Link>
         </div>
 
+        <p className="inset mb-5 px-4 py-3 text-sm leading-6 text-(--ink-soft)">
+          <b className="text-(--ink)">Unaccepted candidate.</b> This is the &ldquo;Decision
+          Threshold v3.0&rdquo; frontend candidate. The founder has not accepted it, it is not a
+          released identity, and it must not be used externally or treated as final.
+        </p>
+
         <article className="panel overflow-hidden rise">
           <div className="grid gap-0 md:grid-cols-[0.9fr_1.1fr]">
             <div className="flex items-center justify-center border-b border-line bg-(--card-2) p-12 md:border-b-0 md:border-r">
@@ -49,10 +66,15 @@ export default function BrandPage() {
                 Vognary brand basics
               </h1>
               <p className="mt-4 text-sm leading-7 text-(--muted)">
-                The Ledger-to-Authorization mark turns scattered evidence into one human-controlled commitment record. Ink carries the proof; restrained gold carries the frozen authorization.
+                The Ledger-to-Authorization mark turns scattered evidence into one human-controlled
+                commitment record: evidence rows in ink, and one champagne-gold V for the human
+                authorization. The mark is versioned and gate-checked, and this candidate does not
+                change it.
               </p>
               <p className="mt-3 text-sm leading-7 text-(--muted)">
-                Use this page for the mark, colors, type, spacing rules, and downloadable assets.
+                The interface around the mark is a different question, and this candidate does
+                change that: warm paper, warm near-black ink, and colour spent on exactly four
+                meanings. Everything below describes what the product renders today.
               </p>
             </div>
           </div>
@@ -61,46 +83,12 @@ export default function BrandPage() {
         <section className="panel mt-6 p-5 sm:p-6">
           <span className="folio" data-folio="Use">The mark in use</span>
           <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">One mark for every surface</h2>
-          <p className="mt-1 text-sm leading-6 text-(--muted)">Two evidence tiers resolve into the authorization V. The silhouette stays recognizable on graphite, gold, paper, and one-color production.</p>
+          <p className="mt-1 text-sm leading-6 text-(--muted)">Two evidence tiers resolve into the authorization V. The silhouette stays recognizable on card, on the inverted register, on paper, and in one-color production.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <MarkTile label="On graphite" bg="var(--card-2)" markClass="text-(--ink)" />
-            <MarkTile label="On gold" bg="var(--gold)" markClass="text-[#14161b]" mono />
-            <MarkTile label="On paper" bg="#f4f1ea" markClass="text-[#17181c]" />
-            <MarkTile label="Single ink" bg="#0b0c0f" markClass="text-(--gold)" mono />
-          </div>
-        </section>
-
-        <section className="panel mt-6 p-5 sm:p-6">
-          <span className="folio" data-folio="Nakul">The keeper</span>
-          <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Nakul, the ledger mongoose</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-(--muted)">
-            In Indian iconography, Kubera&rsquo;s mongoose guards treasure — and the mongoose is the one animal a snake fears.
-            Unseen obligations are the snakes in the grass. Nakul watches the evidence ledger and guards the gold authorization
-            seal between his paws. His eye and the seal stay gold on every surface.
-          </p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {(
-              [
-                ["sentinel", "Sentinel — watching commitments"],
-                ["guide", "Guide — proposing the next yes"],
-                ["found", "Found — evidence cited"],
-                ["celebrate", "Reconciled — outcome proven"],
-                ["rest", "Rest — empty states"],
-              ] as Array<[NakulPose, string]>
-            ).map(([pose, label]) => (
-              <div key={pose} className="overflow-hidden rounded-xl border border-line">
-                <div className="flex h-36 items-center justify-center bg-(--card-2)">
-                  <Nakul pose={pose} size={104} className="text-(--ink)" title={label} />
-                </div>
-                <div className="border-t border-line bg-(--card-2) px-3 py-2">
-                  <p className="eyebrow eyebrow-xs">{label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center gap-4 rounded-xl border border-line bg-(--card-2) px-4 py-3">
-            <NakulBadge size={30} className="text-(--ink)" title="Nakul badge" />
-            <p className="text-xs leading-5 text-(--muted)">The badge is the tight-space version: loading states, list markers, and avatars from 20&nbsp;px up.</p>
+            <MarkTile label="On card" bg="var(--card-2)" markClass="text-(--ink)" />
+            <MarkTile label="On the inverted register" bg="var(--field)" markClass="text-(--field-ink)" />
+            <MarkTile label="On paper" bg="var(--paper)" markClass="text-(--ink)" />
+            <MarkTile label="Single ink" bg="var(--field-2)" markClass="text-(--field-ink)" mono />
           </div>
         </section>
 
@@ -108,7 +96,11 @@ export default function BrandPage() {
           <span className="folio" data-folio="Social">Platform-fit exports</span>
           <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">One system, three correct aspect ratios</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-(--muted)">
-            The X profile header is a 3:1 composition with critical copy outside the avatar-overlap zone. The square avatar is circle-crop safe. The 1200×630 card is only for shared links — never stretch it into a profile header.
+            These are exports of the mark on its dark master, not screenshots of the interface —
+            the product surface is warm paper. The X profile header is a 3:1 composition with
+            critical copy outside the avatar-overlap zone. The square avatar is circle-crop safe.
+            The 1200&times;630 card is only for shared links — never stretch it into a profile
+            header.
           </p>
           <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_15rem]">
             <div className="overflow-hidden rounded-xl border border-line bg-(--card-2)">
@@ -136,34 +128,50 @@ export default function BrandPage() {
 
         <section className="panel mt-6 p-5 sm:p-6">
           <span className="folio" data-folio="01">Palette</span>
-          <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Paper, graphite, and authorization gold</h2>
-          <p className="mt-1 text-sm leading-6 text-(--muted)">Gold marks human authority and frozen decisions, never general decoration. Evidence, review, and exceeded states each keep a separate semantic color and structural label.</p>
+          <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Warm paper, warm ink, and four meanings</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-(--muted)">
+            The surface is a record, not a dashboard field. Beyond paper and ink, colour is spent
+            only on the four meanings below — and each one also carries a non-colour cue, so the
+            identity survives in grayscale. <code className="font-data text-xs">--gold</code> still
+            exists as a legacy alias, but it now resolves to forest; the champagne gold survives
+            only inside the mark.
+          </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {foundations.map(([name, hex]) => (
-              <Swatch key={hex} name={name} hex={hex} />
+            {foundations.map(([name, hex, token]) => (
+              <Swatch key={token} name={name} hex={hex} token={token} />
             ))}
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {signals.map(([name, hex]) => (
-              <Swatch key={hex} name={name} hex={hex} />
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {signals.map(([name, hex, token, meaning]) => (
+              <Swatch key={token} name={name} hex={hex} token={token} meaning={meaning} />
             ))}
           </div>
         </section>
 
         <section className="panel mt-6 p-5 sm:p-6">
           <span className="folio" data-folio="02">Typography</span>
+          <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Newsreader, IBM Plex Sans, IBM Plex Mono</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="inset p-5">
-              <p className="eyebrow">Display &middot; Fraunces / UI &middot; IBM Plex Sans</p>
+              <p className="eyebrow">Display &middot; Newsreader</p>
               <p className="mt-3 font-display text-3xl font-semibold text-(--ink)">Commitment Control</p>
-              <p className="mt-2 text-sm text-(--muted)">Fraunces carries true headings and the wordmark; IBM Plex Sans carries the interface.</p>
+              <p className="mt-2 text-sm text-(--muted)">
+                Newsreader carries headings and the wordmark. It has real optical sizing, so a
+                headline reads as something that was set rather than something that was configured.
+              </p>
             </div>
             <div className="inset p-5">
+              <p className="eyebrow">UI &middot; IBM Plex Sans</p>
+              <p className="mt-3 text-3xl font-semibold text-(--ink)">Approve before it bills</p>
+              <p className="mt-2 text-sm text-(--muted)">Plex Sans carries every interface surface and all running copy.</p>
+            </div>
+            <div className="inset p-5 md:col-span-2">
               <p className="eyebrow">Data &middot; IBM Plex Mono</p>
               <p className="font-data mt-3 text-3xl font-medium tnum text-(--ink)">
                 INR 1,350
               </p>
               <p className="font-data mt-2 text-sm tnum text-(--muted)">FROZEN CAP &middot; 0 1 2 3 4 5 6 7 8 9</p>
+              <p className="mt-2 text-sm text-(--muted)">Every amount is tabular, so two figures can be compared down a column.</p>
             </div>
           </div>
         </section>
@@ -176,7 +184,7 @@ export default function BrandPage() {
               <ul className="mt-2 grid gap-1.5 text-sm leading-6 text-(--muted)">
                 <li>- Keep clear space equal to one quarter of the mark&rsquo;s width on every side.</li>
                 <li>- Minimum size: 20&nbsp;px full color; 16&nbsp;px with the one-color master.</li>
-                <li>- Evidence rows stay platinum or ink; the authorization V stays champagne gold.</li>
+                <li>- Evidence rows inherit the surrounding text colour; the authorization V stays champagne gold.</li>
                 <li>- Never rotate, stretch, outline, add shadows to, or place copy inside the mark.</li>
               </ul>
             </div>
@@ -216,19 +224,24 @@ function MarkTile({ label, bg, markClass, mono }: { label: string; bg: string; m
   );
 }
 
-function Swatch({ name, hex }: { name: string; hex: string }) {
+function Swatch({ name, hex, token, meaning }: { name: string; hex: string; token: string; meaning?: string }) {
   return (
-    <div className="inset flex items-center gap-3 p-3">
+    <div className="inset flex items-start gap-3 p-3">
+      {/* Painted from the live token, labelled with the hex the token holds, so
+          a drifted token shows as a mismatch instead of hiding behind copy. */}
       <span
         className="size-10 shrink-0 rounded-lg"
         style={{
-          background: hex,
-          boxShadow: "0 0 0 1px rgba(22,20,15,0.14)",
+          background: `var(${token})`,
+          boxShadow: "0 0 0 1px var(--line)",
         }}
       />
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-(--ink)">{name}</p>
-        <p className="font-data text-xs text-(--muted)">{hex}</p>
+        <p className="font-data text-xs text-(--muted)">
+          {token} &middot; {hex}
+        </p>
+        {meaning ? <p className="mt-1 text-xs leading-5 text-(--muted)">{meaning}</p> : null}
       </div>
     </div>
   );

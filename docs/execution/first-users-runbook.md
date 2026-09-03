@@ -1,6 +1,7 @@
 # First-10 users — operating runbook (activation, funnel, observation, value, WTP)
 
-> **Operating motto: Take smart risks. Do not play safe.** Prefer a decisive
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Prefer a decisive
 > customer test over another internal refinement; record the success threshold,
 > kill threshold, and downside bound. Full doctrine: [`THE-LAW.md`](../THE-LAW.md).
 

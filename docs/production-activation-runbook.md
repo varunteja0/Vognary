@@ -1,6 +1,7 @@
 # Vognary Production Activation
 
-> **Operating motto: Take smart risks. Do not play safe.** Move quickly on
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Move quickly on
 > bounded experiments, never by weakening migration integrity, rollback,
 > authentication, or readiness proof. Full doctrine: [`THE-LAW.md`](THE-LAW.md).
 
@@ -142,6 +143,9 @@ following at the target release:
 - authenticated internal readiness with migrations `0057`, `0058`, and `0059`;
 - exactly one enrolled workspace with cleared-payment and release-bound
 	independent-assessment evidence accepted by the existing enrollment guard;
+- a valid target release commit from authenticated readiness that exactly
+	matches `COMMITMENT_CONTROL_OPERATIONS_EVIDENCE_COMMIT_SHA` in the restricted
+	operator evidence pack;
 - assigned incident commander and independent backup, referenced only by a
 	SHA-256 restricted staffing record;
 - a passed tabletop no older than 90 days and its restricted record hash;
@@ -152,6 +156,12 @@ following at the target release:
 - a passed monitoring delivery test, with observation date and restricted
 	record hash; and
 - an approved proposal-review procedure and record hash.
+
+The operations evidence commit is the immutable deployed Git SHA, not the local
+working tree or a branch name. A matching SHA binds the staffing, tabletop,
+legal/logging, restore, monitoring, and proposal-review records to that release;
+it does not prove the records' contents. Keep it blank until those restricted
+records name the same candidate release returned by authenticated readiness.
 
 The legal/logging flag records a written founder/counsel decision about the
 actual deployment. It **does not prove legal applicability or compliance** and

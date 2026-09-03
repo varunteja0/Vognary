@@ -1,6 +1,7 @@
 # Renewal Alert Activation Runbook
 
-> **Operating motto: Take smart risks. Do not play safe.** Test retention value
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Test retention value
 > decisively, but never bypass opt-in, delivery evidence, unsubscribe, or
 > fail-closed provider controls. Full doctrine: [`THE-LAW.md`](THE-LAW.md).
 

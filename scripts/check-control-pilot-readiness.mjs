@@ -28,23 +28,24 @@ const result = evaluateControlPilotReadiness({
   enrollment,
   appliedMigrations: targetReadiness.appliedMigrations,
   targetReadinessAuthenticated: targetReadiness.authenticated,
+  targetCommitSha: targetReadiness.commitSha,
 });
 
 console.log(json ? JSON.stringify(result, null, 2) : formatControlPilotReadiness(result));
 if (!reportOnly && result.status !== "ready") process.exitCode = 1;
 
 async function readTargetReadiness(baseUrl) {
-  if (!baseUrl) return { authenticated: false, appliedMigrations: [], enrollment: null };
+  if (!baseUrl) return { authenticated: false, appliedMigrations: [], enrollment: null, commitSha: null };
   const secret = process.env.PRODUCTION_INTERNAL_SYNC_SECRET?.trim()
     || process.env.INTERNAL_SYNC_SECRET?.trim()
     || "";
-  if (!secret) return { authenticated: false, appliedMigrations: [], enrollment: null };
+  if (!secret) return { authenticated: false, appliedMigrations: [], enrollment: null, commitSha: null };
   try {
     const response = await fetch(`${baseUrl}/api/readiness`, {
       headers: { authorization: `Bearer ${secret}` },
       signal: AbortSignal.timeout(8_000),
     });
-    if (!response.ok) return { authenticated: false, appliedMigrations: [], enrollment: null };
+    if (!response.ok) return { authenticated: false, appliedMigrations: [], enrollment: null, commitSha: null };
     const payload = await response.json();
     const appliedMigrations = Array.isArray(payload.capabilities?.schema?.applied)
       ? payload.capabilities.schema.applied.filter((value) => typeof value === "string")
@@ -58,8 +59,11 @@ async function readTargetReadiness(baseUrl) {
             : 0,
         }
       : null;
-    return { authenticated: true, appliedMigrations, enrollment };
+    const commitSha = typeof payload.release?.commitSha === "string"
+      ? payload.release.commitSha
+      : null;
+    return { authenticated: true, appliedMigrations, enrollment, commitSha };
   } catch {
-    return { authenticated: false, appliedMigrations: [], enrollment: null };
+    return { authenticated: false, appliedMigrations: [], enrollment: null, commitSha: null };
   }
 }

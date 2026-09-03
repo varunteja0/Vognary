@@ -14,90 +14,76 @@ test("Journey 1 — a cold visitor reaches a frozen authorization and its outcom
   const failures = collectRuntimeFailures(page);
 
   await page.goto("/");
-  // Ten-second comprehension: category, the human-authority boundary, one command.
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("leave a line behind it");
+  // Ten-second comprehension: category, the literal promise, one command.
+  await expect(page.getByRole("heading", { level: 1 }))
+    .toContainText("Approve AI and cloud commitments before they become bills.");
   await expect(page.getByText("Commitment Control for India-first AI companies")).toBeVisible();
 
-  // The Authority Field is the first-viewport subject, and the rejected hero
-  // form and ticker are gone.
-  const field = page.locator(".afield").first();
-  await expect(field).toBeVisible();
-  await expect(field).toHaveAttribute("data-stage", "EVIDENCE");
+  // The product is the first-viewport subject: the live record, not a diagram.
+  // The rejected hero form, ticker and Authority Field are gone.
+  const sheet = page.locator(".sheet").first();
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toContainText("INR 4,80,000");
+  await expect(page.locator(".afield")).toHaveCount(0);
   await expect(page.locator(".landing-signal-track")).toHaveCount(0);
   await expect(page.locator("#control-index")).toHaveCount(0);
   await expect(page.locator("main form")).toHaveCount(0);
 
-  const primary = page.getByRole("link", { name: "Walk a decision" }).first();
+  const primary = page.getByRole("link", { name: "Review the synthetic request" }).first();
   await expect(primary).toBeVisible();
   await primary.click();
   await expect(page).toHaveURL(/\/demo$/);
 
   // The demonstration says what it is, on the first frame and every frame after.
-  const stamp = page.getByTestId("synthetic-demonstration-label");
+  const stamp = page.getByTestId("synthetic-demonstration-label").first();
   await expect(stamp).toHaveText("Synthetic demonstration");
 
-  // Proven evidence first: the only thing that is true before anyone asks.
-  await expect(page.getByText("Proven by receipt")).toBeVisible();
-  await expect(page.getByText("INR 3,050").first()).toBeVisible();
-
-  // The request is an assumption, and it stays one while policy speaks.
-  await page.getByRole("button", { name: "See the request" }).click();
-  await expect(page.getByText("INR 4,200").first()).toBeVisible();
+  // It opens AT the decision: the request, its cited history and the policy
+  // result are all present before the visitor does anything.
+  await expect(page.getByText("INR 4,80,000").first()).toBeVisible();
   await expect(page.getByText("Assumption").first()).toBeVisible();
+  await expect(page.getByText("INR 3,20,000").first()).toBeVisible();
+  await expect(page.getByText(/outside policy/i).first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Apply the policy" }).click();
-  await expect(page.getByText("Outside policy above here")).toBeVisible();
-  await expect(stamp).toBeVisible();
-
-  // Only a person ends it, and the field records the freeze.
-  await page.getByRole("button", { name: "Take the decision" }).click();
+  // Only a person ends it, and the record names them.
   await page.getByRole("button", { name: "Approve with a lower cap" }).click();
-  await expect(page.getByRole("heading", { name: "Authorized. The boundary is frozen." })).toBeVisible();
-  await expect(page.getByText("Founder (placeholder),")).toBeVisible();
-  await expect(field).toHaveAttribute("data-stage", "AUTHORIZED");
+  await expect(page.getByRole("heading", { name: "Authorized. The cap is frozen." })).toBeVisible();
+  await expect(page.getByText("Frozen by Finance owner (placeholder)").first()).toBeVisible();
+  await expect(page.getByText("INR 3,60,000").first()).toBeVisible();
 
-  // Later evidence lands against a boundary that did not move.
-  await page.getByRole("button", { name: "Bring the later receipt" }).click();
-  await expect(field).toHaveAttribute("data-stage", "OBSERVED");
-  await expect(page.getByText("INR 4,720").first()).toBeVisible();
-  await expect(page.getByText(/Over the boundary\./)).toBeVisible();
-  await expect(page.getByText("INR 3,600").first()).toBeVisible();
+  // Later evidence lands against a cap that did not move.
+  await page.getByRole("button", { name: /Let the September invoice arrive/ }).click();
+  await expect(page.getByText("INR 4,72,000").first()).toBeVisible();
+  await expect(page.getByText(/over cap/i).first()).toBeVisible();
+  await expect(page.getByText("INR 3,60,000").first()).toBeVisible();
 
   // The exit is a real next action, not a dead end.
-  await expect(page.getByRole("link", { name: "Do this with your own bill" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "See the one-month pilot" })).toBeVisible();
   expect(failures).toEqual([]);
 });
 
 test("the demonstration's three decision branches produce three different frozen outcomes", async ({ page }) => {
-  const field = page.locator(".afield").first();
-
   async function decide(choice: string) {
     await page.goto("/demo");
-    await page.getByRole("button", { name: "See the request" }).click();
-    await page.getByRole("button", { name: "Apply the policy" }).click();
-    await page.getByRole("button", { name: "Take the decision" }).click();
     await page.getByRole("button", { name: choice }).click();
   }
 
-  await decide("Approve at the proposed amount");
-  await expect(field).toHaveAttribute("data-stage", "AUTHORIZED");
-  await expect(page.getByText("INR 4,200").first()).toBeVisible();
+  await decide("Approve the full request");
+  await expect(page.getByRole("heading", { name: "Authorized. The cap is frozen." })).toBeVisible();
+  await expect(page.getByText("INR 4,80,000").first()).toBeVisible();
 
   await decide("Approve with a lower cap");
-  await expect(field).toHaveAttribute("data-stage", "AUTHORIZED");
-  await expect(page.getByText("INR 3,600").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Authorized. The cap is frozen." })).toBeVisible();
+  await expect(page.getByText("INR 3,60,000").first()).toBeVisible();
 
-  // A refusal creates no boundary, so the record must end at the refusal. It may
-  // not grow a reconciled step, a cap, or any comparison against one.
+  // A refusal creates no cap, so the record must end at the refusal. It may not
+  // grow a reconciled step, a cap, or any comparison against one.
   await decide("Decline");
-  await expect(field).toHaveAttribute("data-stage", "REFUSED");
-  await expect(page.getByRole("heading", { name: "Refused. No boundary exists." })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Bring the later receipt" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "What actually arrived" })).toHaveCount(0);
-  await expect(page.getByText(/Frozen cap/)).toHaveCount(0);
-  await expect(page.getByText(/never moved/i)).toHaveCount(0);
-  await expect(page.getByText(/Reconciled/)).toHaveCount(0);
-  await expect(page.getByText(/Over the boundary/)).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Refused. No cap exists." })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Let the September invoice arrive/ })).toHaveCount(0);
+  await expect(page.getByText(/Frozen by/)).toHaveCount(0);
+  await expect(page.getByText(/over cap/i)).toHaveCount(0);
+  await expect(page.getByText("INR 4,72,000")).toHaveCount(0);
 });
 
 test("the demonstration is read-only: it offers no control that writes and never calls the product API", async ({ page }) => {
@@ -110,35 +96,27 @@ test("the demonstration is read-only: it offers no control that writes and never
   });
 
   await page.goto("/demo");
-  await page.getByRole("button", { name: "See the request" }).click();
-  await page.getByRole("button", { name: "Apply the policy" }).click();
-  await page.getByRole("button", { name: "Take the decision" }).click();
   await page.getByRole("button", { name: "Approve with a lower cap" }).click();
-  await page.getByRole("button", { name: "Bring the later receipt" }).click();
+  await page.getByRole("button", { name: /Let the September invoice arrive/ }).click();
 
   await expect(page.getByRole("button", { name: "Decide this proposal" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Link observed evidence" })).toHaveCount(0);
   expect(productCalls, `the demonstration must never touch the product API: ${productCalls.join(", ")}`).toEqual([]);
 
-  await page.getByRole("button", { name: "Start over" }).click();
-  await expect(page.getByText("Proven by receipt")).toBeVisible();
-  await expect(page.locator(".afield").first()).toHaveAttribute("data-stage", "EVIDENCE");
+  await page.getByRole("button", { name: "Clear and choose again" }).click();
+  await expect(page.getByText(/The record is unresolved/)).toBeVisible();
 });
 
 test("the demonstration is fully keyboard operable and free of serious accessibility defects", async ({ page }) => {
   await page.goto("/demo");
 
-  for (const label of ["See the request", "Apply the policy", "Take the decision"]) {
-    await page.getByRole("button", { name: label }).focus();
-    await page.keyboard.press("Enter");
-  }
   await page.getByRole("button", { name: "Approve with a lower cap" }).focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByText("Founder (placeholder),")).toBeVisible();
+  await expect(page.getByText("Frozen by Finance owner (placeholder)").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Bring the later receipt" }).focus();
+  await page.getByRole("button", { name: /Let the September invoice arrive/ }).focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByText(/Over the boundary\./)).toBeVisible();
+  await expect(page.getByText(/over cap/i).first()).toBeVisible();
 
   const result = await new AxeBuilder({ page }).analyze();
   const serious = result.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical");

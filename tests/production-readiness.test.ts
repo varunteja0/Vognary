@@ -332,6 +332,8 @@ test("internal readiness distinguishes schema, observed evidence, and operator a
   assert.match(source, /configured-postgres/);
   assert.match(source, /getCommitmentControlEnrollmentReadiness/);
   assert.match(source, /commitmentControlEnrollment/);
+  assert.match(source, /release: \{ commitSha: deployedCommitSha \}/);
+  assert.match(source, /VERCEL_GIT_COMMIT_SHA \|\| process\.env\.COMMITMENT_CONTROL_DEPLOYED_COMMIT_SHA/);
   assert.match(source, /payments: "retired-public-checkout"/);
   assert.match(source, /leadPersistence: "retired-public-intake"/);
   assert.match(read("src/lib/server/feature-readiness.ts"), /checkout\.plan = \$1[\s\S]*checkout\.offer_id = \$2[\s\S]*orders\.status in \('pending', 'in_progress', 'delivered'\)/);
@@ -461,6 +463,7 @@ test("the Control pilot preflight composes external proof without exposing restr
   const runbook = read("docs/production-activation-runbook.md");
   const script = read("scripts/check-control-pilot-readiness.mjs");
   for (const name of [
+    "COMMITMENT_CONTROL_OPERATIONS_EVIDENCE_COMMIT_SHA",
     "COMMITMENT_CONTROL_INCIDENT_COMMANDER_STATUS",
     "COMMITMENT_CONTROL_BACKUP_INCIDENT_COMMANDER_STATUS",
     "COMMITMENT_CONTROL_INCIDENT_STAFFING_RECORD_SHA256",
@@ -476,9 +479,13 @@ test("the Control pilot preflight composes external proof without exposing restr
     assert.match(env, new RegExp(`^${name}=$`, "m"));
   }
   assert.match(runbook, /npm run control:preflight/);
+  assert.match(runbook, /COMMITMENT_CONTROL_OPERATIONS_EVIDENCE_COMMIT_SHA/);
+  assert.match(runbook, /authenticated readiness/);
   assert.match(runbook, /does not prove legal applicability or compliance/i);
   assert.match(script, /getCommitmentControlEnrollmentReadiness/);
   assert.match(script, /\/api\/readiness/);
+  assert.match(script, /payload\.release\?\.commitSha/);
+  assert.match(script, /targetCommitSha: targetReadiness\.commitSha/);
   assert.doesNotMatch(script, /console\.log\(process\.env|JSON\.stringify\(process\.env/);
 });
 

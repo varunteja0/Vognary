@@ -1,6 +1,7 @@
 # Live scoreboard (update with measured evidence only)
 
-> **Operating motto: Take smart risks. Do not play safe.** Reward measured,
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Reward measured,
 > category-defining outcomes, not activity or polish; every strategic bet needs a
 > kill threshold and bounded downside. Full doctrine: [`THE-LAW.md`](../THE-LAW.md).
 

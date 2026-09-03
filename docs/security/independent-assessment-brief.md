@@ -1,6 +1,7 @@
 # Independent security assessment brief
 
-> **Operating motto: Take smart risks. Do not play safe.** Seek disconfirming
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Seek disconfirming
 > evidence before customer data creates irreversible downside. Product law:
 > [`../THE-LAW.md`](../THE-LAW.md). Threat model:
 > [`commitment-control-threat-model.md`](commitment-control-threat-model.md).

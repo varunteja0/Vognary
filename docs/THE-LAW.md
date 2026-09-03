@@ -1,12 +1,74 @@
 # THE LAW — Vognary company, product, and agent directive
 
-## Founder motto — supreme operating principle
+## Founder motto — supreme product operating sequence
 
-> **Take smart risks. Do not play safe.**
+> **Make it work. Make it perfect. Make it fast. Make it cheap.**
 
-Vognary exists to pursue category-defining outcomes, not to preserve a familiar
-product through incremental polish. Prefer an asymmetric bet with a spectacular
-measurable upside over a comfortable feature when the bet has all of these:
+This is Vognary's mandatory order of product investment:
+
+| Stage | Meaning | Gate before advancing |
+| --- | --- | --- |
+| **1. Work** | The smallest honest end-to-end loop solves a named target customer's real job. A green build, scaffold, demo, or isolated feature does not count. | The applicable Phase A/B gate and observed customer outcome are proven with evidence. |
+| **2. Perfect** | Make the proven loop correct, trustworthy, secure, accessible, understandable, and complete for its stated contract. This means no known material defect, not limitless polish. | Target-user acceptance evidence and all applicable quality, trust, and security gates pass. |
+| **3. Fast** | Measure and remove the bottlenecks in user cycle time and runtime performance without weakening the first two stages. | The measured latency and workflow-speed targets pass on the representative path. |
+| **4. Cheap** | Reduce infrastructure, model, support, and operating cost without degrading work, quality, or speed. | Measured unit economics improve while every earlier gate stays green. |
+
+Do not fund a later stage while an earlier stage is unproven, except for work
+strictly required to unblock that earlier stage or satisfy a hard constraint.
+Honesty, exact money, cite-or-shut-up AI, security, privacy, consent,
+accessibility, tests, existing performance budgets, and bounded spend are
+constraints from Stage 1; they are never debts deferred to a later stage.
+
+At the company level Vognary remains in **Make it work** until paid behavior and
+the Commitment Control loop are observed with target customers. Product slices
+may advance independently only when their own earlier-stage evidence is linked.
+
+### Simplicity rule — reduce before building
+
+> **Every complex problem is a set of simple problems. Reduce it to the core
+> customer outcome, then solve those simple problems in order.**
+
+Before starting work, answer five questions in plain language:
+
+1. Who has the problem?
+2. At what exact moment does it occur?
+3. What input is cited, what is assumed, and what is unknown?
+4. What single human decision or action is required?
+5. What observable result would prove the problem is solved?
+
+If an answer contains multiple independent outcomes, split the work until each
+unit has one owner, one primary action, one success condition, and one cheap
+check that can falsify it. “Improve everything,” “make it world-class,” and
+“build the best product” are ambitions, not executable tasks.
+
+For Vognary, the irreducible product unit is:
+
+```text
+one proposed obligation
+        → one cited exposure and policy context
+        → one authorized human decision
+        → one frozen cap or recorded decline
+        → one later observed evidence item
+        → one exact reconciliation result
+```
+
+Product placement follows that decision order: pending obligation first,
+evidence versus assumptions second, policy context third, human action fourth,
+and the frozen decision plus observed outcome fifth. Creation, settings,
+explanation, and secondary evidence stay progressively disclosed. In the
+operating product, attention always comes before creation.
+
+Vognary may aspire to be the best product ever built, but it may never award
+itself that claim. It earns the ambition through observed customer outcomes,
+correctness and trust, measured speed, and measured unit economics, in that
+order. More features, pages, motion, models, or documents do not count.
+
+> **Strategy-selection rule: Take smart risks. Do not play safe.**
+
+Within the current stage, Vognary exists to pursue category-defining outcomes,
+not to preserve a familiar product through incremental polish. Prefer an
+asymmetric bet with a spectacular measurable upside over a comfortable feature
+when the bet has all of these:
 
 1. A named customer and company outcome, not novelty for its own sake.
 2. The cheapest real-world test that can disprove it.
@@ -27,7 +89,7 @@ legal or consent bypasses, irreversible customer harm, or hidden production
 experiments. Honesty, security, privacy, consent, and cite-or-shut-up remain hard
 constraints because violating them destroys the upside.
 
-> **Status:** CANONICAL. Effective 2026-07-21. Live checkout process: CONTINUE-HERE.
+> **Status:** CANONICAL. Effective 2026-07-21; founder sequence amended 2026-09-03. Live checkout process: CONTINUE-HERE.
 > **Audience:** every human, every agent, every model (including Fable / top-tier coding models).  
 > **Priority:** This file outranks all other plans when they conflict.  
 > **If you are a new agent session:** read this file **first**, then the chain in §0.2. Do not invent a parallel strategy.
@@ -67,6 +129,33 @@ Prior-generation material lives only in `docs/archive/`. Treat it as history, no
 - The first irreversible bet is paid behavior, not payment infrastructure: five qualified plus fifteen exploratory contacts, at least 10 substantive conversations, ten identical offers, and two upfront payments by Day 7.
 - Two cleared payments are `GO`; one is `REWORK`; zero of ten offers pay means the offer or economic value failed. Also kill or rework if fewer than half of requests arrive before spending or 30 proposals change zero decisions.
 - An independent security assessment and retest must close before any real customer financial data enters Vognary, with no unresolved Critical/High finding and no unresolved data-impacting Medium finding. Payment does not grant data access. Production enrollment requires both cleared payment and that assurance exit.
+
+### 0.1.1 Founder frontend candidate override — 2026-09-03
+
+For one final, non-production frontend acceptance challenge, the founder
+explicitly overrides the fixed visual identity, the design-system/public-
+redesign ban, and the earlier frontend freeze. Claude Opus 5 must begin from the
+delivered candidate as an incumbent, compare it with two bounded challengers,
+and may replace frontend information architecture, visual identity, components,
+assets, imagery, motion, interaction, route composition, frontend-only synthetic
+fixtures, and frontend proof tooling in one sustained run without founder pauses
+between implementation waves.
+
+The sole execution authority is
+[`output/opus-final-era-institution-grade-frontend-prompt-2026-09-02.md`](../output/opus-final-era-institution-grade-frontend-prompt-2026-09-02.md).
+If subagents are used, they must be GPT-5.6 Sol. The current exact-tree evidence
+may establish the incumbent's measured baseline but not visual acceptance. All
+older frontend prompts, self-awarded completion claims, and pre-incumbent concept
+scores are inadmissible for selection.
+
+This exception is presentation-only. Vognary's name, Commitment Control product
+truth, exact money, cited evidence versus assumptions, deterministic policy,
+owner/admin human authority, frozen decisions and caps, privacy, security,
+enrollment, settlement, accessibility, and fail-closed behavior remain
+non-waivable. Backend/domain/API/store/auth/migration contracts are read-only.
+The work may not commit, deploy, launch, use real customer data, invent proof, or
+raise Business Validation or Distribution. The resulting identity remains a
+candidate until the founder accepts the complete rendered result.
 
 ---
 
@@ -120,7 +209,10 @@ proposed obligation (user-entered assumption)
 ## 4. Five invariants (non-negotiable code law)
 
 1. **One live checkout.** Default is an isolated worktree from freshest `main`. If CONTINUE-HERE names a same-repo branch, stay in this folder and do **not** spawn `../vognary-*` copies. Never dirty-edit the same file as another agent.
-2. **Brand is fixed:** Nakul the mongoose, Fraunces display, graphite/gold. Deepen, never swap.
+2. **Brand is fixed outside the named 2026-09-03 candidate:** Vognary's name is
+        fixed. The candidate may replace Nakul treatment, Fraunces, graphite/gold,
+        and existing visual assets under §0.1.1; no replacement becomes canonical
+        until founder acceptance.
 3. **Honesty is machine-enforced.** Merchants are *watched*, never *linked*; rails/sources use *connect* voice. `scripts/check-public-claims.mjs` fails the build. Blank env → “Not yet proven.”
 4. **Scoring is minimum-row.** Before building: *does this raise the lowest scoreboard row?*
 5. **No engine change without a failing test first.** Gate before merge:
@@ -203,7 +295,8 @@ Agents **must refuse** or redirect:
 1. New plan / leap / perfection / surface-N docs  
 2. New connectors, cards, wallets, payment rails, or agent execution in V0
 3. Platform API partner sales before 25 active workspaces  
-4. Design-system rewrite (enforce `globals.css`; no restyle)  
+4. Design-system rewrite, except the single frontend candidate in §0.1.1; its
+        fixed performance, accessibility, truth, and rollback gates still apply
 5. Uncited AI financial claims  
 6. Razorpay/Setu product code or money movement for the pilot
 7. `/app` route restructure during monolith decomposition  
@@ -217,11 +310,12 @@ Agents **must refuse** or redirect:
 
 ### 8.1 Before any code
 
-1. State which **scoreboard row** this raises.  
-2. State which **loop step** it improves.  
-3. List **files** you will touch (prefer existing modules).  
-4. Write or cite the **failing test** for engine changes.  
-5. Confirm the CONTINUE-HERE checkout (this folder / named branch). Do not create sibling worktrees while that override is live. PR against `main`.
+1. State the **Work / Perfect / Fast / Cheap stage**. Cite the evidence that every earlier stage passed, or explain how the task unblocks the earliest unproven stage.
+2. State which **scoreboard row** this raises.
+3. State which **loop step** it improves.
+4. List **files** you will touch (prefer existing modules).
+5. Write or cite the **failing test** for engine changes.
+6. Confirm the CONTINUE-HERE checkout (this folder / named branch). Do not create sibling worktrees while that override is live. PR against `main`.
 
 ### 8.2 Architecture rules when designing
 
@@ -230,7 +324,7 @@ Agents **must refuse** or redirect:
 | Deterministic engines | Sole fact source: `recurring-audit`, `renewal-timeline`, `receipt-parser`, Proof Graph |
 | AI | `src/lib/server/ai/*` only; cite-or-shut-up; budget-capped; degrade without key |
 | Twin | Pure lib `src/lib/twin/*`; never invent amounts |
-| UI | Brief-first home; progressive disclosure; tokens from `globals.css` |
+| UI | Brief-first home; progressive disclosure; one selected token system. The §0.1.1 candidate may replace and route-split the current `globals.css` system. |
 | Connectors | Honesty states only; registry ≠ live coverage |
 | Money | Server-owned prices; signed webhooks only; fail closed |
 | Data | Prefer Recovery (`src/lib/recovery`) as the sole financial authority. Living ledger is frozen read-only. |
@@ -242,6 +336,7 @@ Agents **must refuse** or redirect:
 
 ### 8.4 Definition of done (every PR)
 
+- [ ] Belongs to the earliest unproven stage or is required by a hard constraint
 - [ ] Raises min scoreboard row or unblocks Phase A/B gate  
 - [ ] Lint, typecheck, claims, tokens, tests green  
 - [ ] No new public claim without production proof  

@@ -15,11 +15,11 @@ import "./public-shell.css";
  * than a hand-rolled approximation of them.
  */
 
-type PrimaryCommand = { href: string; label: string };
+type PrimaryCommand = { href: string; label: string; quiet?: boolean };
 
 const DESTINATIONS: readonly { href: string; label: string; note: string }[] = [
-  { href: "/demo", label: "Walk a decision", note: "A synthetic request from asked to answered" },
-  { href: "/start", label: "Bring your own bill", note: "Cite one charge you already hold" },
+  { href: "/demo", label: "Review the synthetic request", note: "A synthetic request from asked to answered" },
+  { href: "/start", label: "Use your own evidence", note: "Cite one charge you already hold" },
   { href: "/pay", label: "The pilot", note: "Scope, price and what activation means" },
   { href: "/security", label: "Security", note: "Boundaries, data flow and open questions" },
   { href: "/about", label: "About", note: "Why this product refuses to decide for you" },
@@ -28,13 +28,12 @@ const DESTINATIONS: readonly { href: string; label: string; note: string }[] = [
 
 /** The one command that is worth interrupting for, per route. */
 function primaryFor(pathname: string): PrimaryCommand {
-  if (pathname === "/demo") return { href: "/start", label: "Use your own bill" };
-  if (pathname === "/start") return { href: "/demo", label: "Walk a decision" };
-  if (pathname === "/pay") return { href: "/demo", label: "Walk a decision" };
-  if (pathname.startsWith("/security") || pathname.startsWith("/about") || pathname.startsWith("/contact")) {
-    return { href: "/demo", label: "Walk a decision" };
-  }
-  return { href: "/demo", label: "Walk a decision" };
+  if (pathname === "/demo") return { href: "/start", label: "Use your own evidence" };
+  // Home's hero already owns this exact command. A second filled button for the
+  // same destination gives the first screen two primaries and no hierarchy, so
+  // here the header keeps the shortcut but yields the emphasis.
+  if (pathname === "/") return { href: "/demo", label: "Review the request", quiet: true };
+  return { href: "/demo", label: "Review the request" };
 }
 
 export function PublicHeader() {
@@ -57,7 +56,10 @@ export function PublicHeader() {
         </Link>
 
         <div className="pshell-commands">
-          <Link href={primary.href} className="btn btn-primary btn-sm pshell-primary">
+          <Link
+            href={primary.href}
+            className={`btn ${primary.quiet ? "btn-ghost" : "btn-primary"} btn-sm pshell-primary`}
+          >
             {primary.label}
           </Link>
           <button
@@ -121,8 +123,8 @@ export function PublicFooter() {
         </div>
         <div>
           <p className="pfoot-label">Experience</p>
-          <Link href="/demo">Walk a decision</Link>
-          <Link href="/start">Bring your own bill</Link>
+          <Link href="/demo">Review the synthetic request</Link>
+          <Link href="/start">Use your own evidence</Link>
           <Link href="/pay" prefetch={false}>The pilot</Link>
         </div>
         <div>
@@ -131,16 +133,18 @@ export function PublicFooter() {
           <Link href="/security">Security</Link>
           <Link href="/contact">Contact</Link>
         </div>
-        <div>
-          <p className="pfoot-label">Record</p>
+      </div>
+      <div className="pfoot-floor">
+        {/* Kept on one line: this boundary sentence is asserted verbatim. */}
+        <p>Human authorization only. Vognary never auto-approves, purchases, provisions or moves money.</p>
+        {/* Legal and brand sit on one row rather than a fourth stacked column:
+            same destinations, one tap-target row instead of three. */}
+        <nav className="pfoot-fine" aria-label="Record">
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
           <Link href="/brand">Brand</Link>
-        </div>
+        </nav>
       </div>
-      <p className="pfoot-floor">
-        Human authorization only. Vognary never auto-approves, purchases, provisions or moves money.
-      </p>
     </footer>
   );
 }

@@ -1,6 +1,7 @@
 # Vognary — UI/UX Quality + AI Live-Path Execution Plan
 
-> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Pursue asymmetric,
 > falsifiable upside and bound irreversible downside. Full doctrine:
 > [`THE-LAW.md`](THE-LAW.md).
 
@@ -15,6 +16,12 @@
 >
 > Work packages (WP-0 … WP-6) in order; *parallel-safe* WPs can run in separate
 > worktrees. Companion: [master-build-plan.md](master-build-plan.md) Parts 3 & 5.
+
+> **2026-09-03 frontend override:** THE-LAW §0.1.1 and the newest
+> CONTINUE-HERE entry supersede this file's fixed-brand, no-rewrite, worktree,
+> and incremental frontend mechanics for one complete candidate. Its honesty,
+> accessibility, performance, citation, and test gates remain binding. The sole
+> execution mandate is the current Opus prompt named there.
 
 ---
 

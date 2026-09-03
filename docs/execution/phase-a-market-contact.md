@@ -1,6 +1,7 @@
 # Phase A — Paid Commitment Control pilots (30 days)
 
-> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Pursue asymmetric,
 > falsifiable upside and bound irreversible downside. Every market bet needs a
 > deadline and kill metric. Full doctrine: [`THE-LAW.md`](../THE-LAW.md).
 

@@ -272,6 +272,40 @@
   background: var(--line-strong);
 }
 
+/* Ordered steps — the number is the structure, so it is set in the data face
+   and never replaced by a decorative bullet. */
+.public-steps {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  max-width: 46rem;
+}
+.public-steps > li {
+  position: relative;
+  counter-increment: step;
+  padding-left: 2rem;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.public-steps > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0.05rem;
+  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  padding: 0.1rem 0.34rem;
+}
+.public-steps b { color: var(--ink); font-weight: 600; }
+
 /* Choice row — one primary, one neutral, one deliberate */
 .decision-actions {
   display: flex;

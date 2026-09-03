@@ -4,6 +4,7 @@ const requiredMigrations = [
   "0059_control_authority_hardening",
 ];
 
+const commitShaPattern = /^[a-f0-9]{40}$/i;
 const sha256Pattern = /^[a-f0-9]{64}$/i;
 const millisecondsPerDay = 86_400_000;
 
@@ -12,6 +13,7 @@ export function evaluateControlPilotReadiness({
   enrollment,
   appliedMigrations,
   targetReadinessAuthenticated,
+  targetCommitSha,
   now = new Date(),
 }) {
   const checks = [
@@ -25,6 +27,10 @@ export function evaluateControlPilotReadiness({
       "paid-assessed-enrollment",
       enrollment?.status === "ready" && enrollment.enrolledWorkspaceCount === 1,
       enrollment?.status === "ready" ? "expected-exactly-one-enrolled-workspace" : `enrollment-${enrollment?.status ?? "unavailable"}`,
+    ),
+    operationsReleaseBindingCheck(
+      environment.COMMITMENT_CONTROL_OPERATIONS_EVIDENCE_COMMIT_SHA,
+      targetCommitSha,
     ),
     check(
       "incident-staffing",
@@ -93,6 +99,22 @@ function check(id, ready, reason) {
   return ready ? { id, ready: true } : { id, ready: false, reason };
 }
 
+function operationsReleaseBindingCheck(evidenceCommitSha, targetCommitSha) {
+  const evidenceSha = normalizeCommitSha(evidenceCommitSha);
+  const targetSha = normalizeCommitSha(targetCommitSha);
+  if (!commitShaPattern.test(targetSha)) {
+    return check("operations-release-binding", false, "target-release-commit-unavailable");
+  }
+  if (!commitShaPattern.test(evidenceSha)) {
+    return check("operations-release-binding", false, "operations-evidence-commit-invalid");
+  }
+  return check(
+    "operations-release-binding",
+    evidenceSha === targetSha,
+    "operations-evidence-commit-mismatch",
+  );
+}
+
 function datedEvidenceCheck({
   id,
   statusReady,
@@ -122,4 +144,8 @@ function parseEvidenceDate(value) {
 
 function validHash(value) {
   return typeof value === "string" && sha256Pattern.test(value.trim());
+}
+
+function normalizeCommitSha(value) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
 }

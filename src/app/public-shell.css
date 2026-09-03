@@ -146,29 +146,35 @@
 
 .pfoot {
   margin-top: auto;
-  padding: 3rem 0 2rem;
+  padding: 2rem 0 1.5rem;
   border-top: 1px solid var(--line);
   background: var(--paper-2);
 }
+/* The two link groups pair up on a phone instead of stacking into a column of
+   twelve 44px targets. Tap size is never traded for height. */
 .pfoot-inner {
   display: grid;
-  gap: 2rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
   width: min(100% - 2rem, 84rem);
   margin-inline: auto;
 }
+.pfoot-brand { grid-column: 1 / -1; }
 @media (min-width: 48rem) {
   .pfoot-inner {
-    grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1.4fr repeat(2, minmax(0, 1fr));
     gap: 2.5rem;
     width: min(100% - 4rem, 84rem);
   }
+  .pfoot-brand { grid-column: auto; }
 }
 .pfoot-inner > div {
   display: grid;
   gap: 0.15rem;
   align-content: start;
 }
-.pfoot-inner a {
+.pfoot-inner a,
+.pfoot-fine a {
   display: inline-flex;
   align-items: center;
   min-height: var(--tap);
@@ -176,7 +182,8 @@
   color: var(--ink-soft);
   transition: color var(--motion-fast) var(--ease-standard);
 }
-.pfoot-inner a:hover {
+.pfoot-inner a:hover,
+.pfoot-fine a:hover {
   color: var(--ink);
 }
 .pfoot-label {
@@ -198,14 +205,21 @@
   color: var(--muted);
 }
 .pfoot-floor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1.5rem;
   width: min(100% - 2rem, 84rem);
-  margin: 2.25rem auto 0;
-  padding-top: 1.25rem;
+  margin: 1.25rem auto 0;
+  padding-top: 0.75rem;
   border-top: 1px solid var(--line);
   font-size: 0.8125rem;
   line-height: 1.5;
   color: var(--muted);
 }
+.pfoot-floor p { margin: 0; max-width: 52ch; }
+.pfoot-fine { display: flex; flex-wrap: wrap; gap: 0 1.25rem; }
 @media (min-width: 48rem) {
   .pfoot-floor { width: min(100% - 4rem, 84rem); }
 }

@@ -1,128 +1,105 @@
-/*
-  Home — route-scoped.
+@import "./record-sheet.css";
 
-  One rule governs this file: the Authority Field is the subject and the copy is
-  the caption. Everything here either presents the field or gets out of its way.
+/*
+  Home — five bands.
+
+  The rhythm is deliberate: band 1 gives a full screen to one decision, bands 2
+  and 3 tighten as the reader gains context, band 4 is plain prose, and band 5
+  inverts to close. Each band reveals a hint of the next at both mobile and
+  desktop, so no band ever reads as the end of the page.
+
+  Type is stepped at three breakpoints. Nothing scales continuously with the
+  viewport: a headline that resizes with every pixel cannot be art-directed, and
+  a figure that does cannot be compared between two captures.
 */
 
-.home {
-  display: flex;
-  flex-direction: column;
-}
+.home { display: block; }
+
+.home-band { padding: 1.75rem 0; border-bottom: 1px solid var(--line); }
 
 .home-measure {
-  width: min(100% - 2rem, 84rem);
+  width: min(100% - 2.5rem, 74rem);
   margin-inline: auto;
 }
+
 @media (min-width: 48rem) {
-  .home-measure { width: min(100% - 4rem, 84rem); }
+  .home-band { padding: 4rem 0; }
+  .home-measure { width: min(100% - 4rem, 74rem); }
 }
 
-/* ---- Stage: sticky field, scrolling scenes ------------------------------ *
-   On a phone the field pins to the top and the scenes run beneath it, so the
-   subject is never scrolled away from its own explanation. On a desktop the
-   field takes the larger half and the scenes run down the other side. These are
-   two compositions, not one composition at two widths. */
+/* ---- 1. DECISION NOW ---------------------------------------------- */
 
-.home-stage {
+/* One decision per screen is a desktop rhythm. On a phone the reader scrolls
+   regardless, so forcing a full viewport only adds slack above and below the
+   record they came to see. Height is content-driven below 60rem. */
+.home-decision {
+  display: flex;
+  flex-direction: column;
+  padding-top: 1rem;
+  background: var(--paper);
+}
+
+@media (min-width: 60rem) {
+  /* Deliberately shorter than the viewport. A full 100svh band centred its
+     content, which bought a dead strip above the request and hid the next
+     band completely; the reader saw one screen and no reason to continue.
+     svh, not vh: a URL bar must never push the request out of view. */
+  .home-decision { min-height: calc(100svh - 15rem); }
+}
+
+.home-decision-grid {
+  flex: 1;
   display: grid;
-  background: var(--field);
+  gap: 1.25rem;
+  align-content: center;
+  min-width: 0;
 }
 
-.home-field {
-  position: sticky;
-  top: 3.75rem;
-  z-index: 1;
-  order: -1;
-}
+.home-decision-grid > * { min-width: 0; }
 
-.home-stage-copy {
-  display: grid;
-  align-content: start;
-}
-
-@media (min-width: 64rem) {
-  .home-stage {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-    align-items: start;
-    gap: 0;
-  }
-  .home-field {
-    order: 0;
-    top: 4.25rem;
-    height: calc(100dvh - 4.25rem);
-    display: grid;
-    align-content: center;
-    border-left: 1px solid var(--field-line);
-  }
-  .home-stage-copy {
-    padding-block: clamp(3rem, 9vh, 6rem) 0;
-  }
-}
-
-/* ---- The say ------------------------------------------------------------ */
-
-.home-say {
-  padding: 2.25rem 1rem 2rem;
-  color: var(--field-ink);
-}
-@media (min-width: 64rem) {
-  .home-say {
-    padding: 0 clamp(2.5rem, 5vw, 5rem) clamp(3rem, 7vh, 5rem);
-    min-height: calc(100dvh - 4.25rem - clamp(3rem, 9vh, 6rem));
-    display: grid;
-    align-content: center;
+@media (min-width: 60rem) {
+  .home-decision-grid {
+    grid-template-columns: 5fr 7fr;
+    gap: 4rem;
+    align-items: center;
+    align-content: start;
   }
 }
 
 .home-category {
-  margin: 0 0 0.9rem;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  line-height: 1.4;
-  color: var(--gold-soft);
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  margin: 0 0 0.75rem;
 }
 
 .home-title {
   margin: 0;
-  font-size: clamp(2.05rem, 5.6vw, 3.5rem);
-  font-weight: 600;
-  line-height: 1.06;
-  letter-spacing: 0;
-  color: var(--field-ink);
-  text-wrap: balance;
-}
-@media (min-width: 64rem) {
-  .home-title { font-size: clamp(2.6rem, 3.4vw, 3.9rem); }
+  font-size: 1.9375rem;
+  line-height: 1.08;
+  max-width: 16ch;
 }
 
+@media (min-width: 48rem) { .home-title { font-size: 2.75rem; } }
+@media (min-width: 75rem) { .home-title { font-size: 3.5rem; } }
+
 .home-lead {
-  margin: 1.15rem 0 0;
-  max-width: 34rem;
-  font-size: 1.0625rem;
-  line-height: 1.6;
-  color: var(--field-soft);
-  text-wrap: pretty;
+  margin: 1rem 0 0;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 44ch;
 }
+
+.home-lead-wide { max-width: 60ch; }
 
 .home-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.85rem 1.25rem;
-  margin-top: 1.65rem;
-}
-
-/* The primary command is light on graphite so it reads as the one lit control
-   in a dark room. Gold stays reserved for the boundary. */
-.home-stage .btn-primary {
-  background: var(--field-ink);
-  color: var(--field);
-  border-color: var(--field-ink);
-}
-.home-stage .btn-primary:hover {
-  background: #ffffff;
-  border-color: #ffffff;
+  gap: 0.875rem 1.25rem;
+  margin-top: 1.5rem;
 }
 
 .home-quiet {
@@ -130,348 +107,110 @@
   align-items: center;
   min-height: var(--tap);
   font-size: 0.9375rem;
-  color: var(--field-soft);
+  color: var(--ink-soft);
   text-decoration: underline;
   text-underline-offset: 4px;
-  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
-  transition: color var(--motion-fast) var(--ease-standard);
-}
-.home-quiet:hover { color: var(--field-ink); }
-
-.home-close .home-quiet {
-  color: var(--ink-soft);
-}
-.home-close .home-quiet:hover { color: var(--ink); }
-
-/* ---- Scenes -------------------------------------------------------------- *
-   Each scene owns a screen. The one in front is at full ink; the others recede
-   without disappearing, so the reader can always see where the argument is
-   going. */
-
-.home-scenes {
-  margin: 0;
-  padding: 0 1rem 2.5rem;
-  list-style: none;
-  display: grid;
-  color: var(--field-ink);
-}
-@media (min-width: 64rem) {
-  .home-scenes {
-    padding: 0 clamp(2.5rem, 5vw, 5rem) clamp(6rem, 22vh, 12rem);
-  }
 }
 
-.home-scenes > li {
-  display: grid;
-  align-content: center;
-  gap: 0.55rem;
-  min-height: max(52vh, 22rem);
-  padding-block: clamp(1.5rem, 3vw, 2rem);
-  border-top: 1px solid var(--field-line);
-}
+/* ---- 2. AUTHORIZATION TO OUTCOME ---------------------------------- */
 
-/* A scene that is not in front recedes by colour weight, never by opacity.
-   Fading text is how a design ends up shipping 2.3:1 contrast and calling it
-   hierarchy; every state here stays above AA. */
-.home-scene-question {
-  margin: 0;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--field-muted);
-  transition: color var(--motion-enter) var(--ease-standard);
-}
-.home-scenes > li[data-active="true"] .home-scene-question {
-  color: var(--gold-soft);
-}
-.home-scene-heading {
-  margin: 0;
-  font-size: clamp(1.5rem, 3.6vw, 2.15rem);
-  font-weight: 600;
-  line-height: 1.18;
-  color: var(--field-soft);
-  text-wrap: balance;
-  transition: color var(--motion-enter) var(--ease-standard);
-}
-.home-scenes > li[data-active="true"] .home-scene-heading {
-  color: var(--field-ink);
-}
-.home-scene-body {
-  margin: 0;
-  max-width: 34rem;
-  font-size: 1rem;
-  line-height: 1.62;
-  color: var(--field-muted);
-  text-wrap: pretty;
-  transition: color var(--motion-enter) var(--ease-standard);
-}
-.home-scenes > li[data-active="true"] .home-scene-body {
-  color: var(--field-soft);
-}
+.home-freeze { background: var(--paper-2); }
 
-/* ---- Operating record ---------------------------------------------------- */
+.home-freeze-grid { display: grid; gap: 1.25rem; min-width: 0; }
+.home-freeze-grid > * { min-width: 0; }
 
-.home-work {
-  padding: clamp(3.5rem, 9vh, 6rem) 0;
-  background: var(--paper);
-  border-top: 1px solid var(--line);
-}
-
-.home-work-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0 0 0.75rem;
-  padding: 0.2rem 0.55rem;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-xs);
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-  background: var(--card-2);
+@media (min-width: 60rem) {
+  .home-freeze-grid { grid-template-columns: 6fr 6fr; gap: 4rem; align-items: start; }
 }
 
 .home-section-heading {
   margin: 0;
-  font-size: clamp(1.75rem, 4vw, 2.5rem);
-  font-weight: 600;
-  line-height: 1.15;
-  color: var(--ink);
-  text-wrap: balance;
+  font-size: 1.5rem;
+  line-height: 1.18;
+  max-width: 20ch;
 }
 
-.home-work-lead {
-  margin: 0.9rem 0 0;
-  max-width: 42rem;
-  font-size: 1.0625rem;
-  line-height: 1.6;
-  color: var(--ink-soft);
-  text-wrap: pretty;
-}
+@media (min-width: 48rem) { .home-section-heading { font-size: 2rem; } }
 
-.home-work-rows {
-  margin: 2rem 0 0;
+/* ---- 3. THE DESK --------------------------------------------------- */
+
+.home-week { background: var(--paper); }
+
+/* ---- 4. BOUNDARIES ------------------------------------------------- */
+
+.home-trust { background: var(--paper); }
+
+.home-refusals {
+  margin: 1.125rem 0;
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 0.75rem;
-}
-@media (min-width: 64rem) {
-  .home-work-rows {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-/* A repeated record is one of the few objects that earns a frame. */
-.home-work-rows > li {
-  display: grid;
-  align-content: start;
-  gap: 0.85rem;
-  padding: 1.1rem 1.15rem 1.2rem;
+  gap: 1px;
+  background: var(--line);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+}
+
+@media (min-width: 48rem) {
+  .home-refusals { grid-template-columns: 1fr 1fr; margin-block: 1.5rem; }
+}
+
+.home-refusals li {
   background: var(--card);
-}
-.home-work-rows > li[data-state="AUTHORIZED"] {
-  border-color: var(--gold-line);
-  box-shadow: inset 2px 0 0 var(--gold);
-}
-.home-work-rows > li[data-state="OBSERVED"] {
-  border-color: color-mix(in srgb, var(--ember) 34%, var(--line));
-}
-
-.home-work-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.4rem 0.75rem;
-}
-.home-work-merchant {
-  margin: 0;
+  padding: 0.75rem 1rem;
   font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--ink);
-}
-.home-work-state {
-  margin: 0;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--muted);
-}
-.home-work-state[data-state="AUTHORIZED"] { color: var(--gold-deep); }
-.home-work-state[data-state="OBSERVED"] { color: var(--ember); }
-
-/* The axis, laid flat. Same objects, same meanings, one twentieth the height. */
-.home-work-axis {
-  position: relative;
-  height: 1.75rem;
-  border-bottom: 1px solid var(--line);
-}
-.home-work-axis > span {
-  position: absolute;
-  bottom: 0;
-}
-.home-work-band {
-  left: calc(var(--from) * 1%);
-  width: calc((var(--to) - var(--from)) * 1%);
-  height: 0.85rem;
-  background: color-mix(in srgb, var(--assumption) 16%, transparent);
-  border-top: 1px dashed color-mix(in srgb, var(--assumption) 60%, transparent);
-}
-.home-work-limit {
-  left: calc(var(--x) * 1%);
-  width: 1px;
-  height: 100%;
-  background: repeating-linear-gradient(to top, var(--policy) 0 3px, transparent 3px 6px);
-}
-.home-work-boundary {
-  left: calc(var(--x) * 1%);
-  width: 2px;
-  height: 100%;
-  background: var(--gold);
-}
-.home-work-observed {
-  left: calc(var(--x) * 1%);
-  width: 0.55rem;
-  height: 0.55rem;
-  margin-left: -0.275rem;
-  border-radius: 999px;
-  background: var(--evidence);
-}
-.home-work-observed[data-verdict="OVER_CAP"] {
-  background: var(--ember);
-}
-
-.home-work-figures {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin: 0;
-}
-.home-work-figures > div {
-  display: grid;
-  gap: 0.2rem;
-  min-width: 0;
-}
-.home-work-figures dt {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--muted);
-}
-.home-work-figures dd {
-  margin: 0;
-  min-width: 0;
-}
-.home-work-figures .money {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.05rem;
-}
-.home-work-figures .money-provenance {
-  white-space: normal;
-}
-
-.home-work-next {
-  margin: 0;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--ink-soft);
 }
 
-.home-work-note {
-  margin: 1.25rem 0 0;
-  font-size: 0.875rem;
-  line-height: 1.55;
-  color: var(--muted);
-}
-.home-quiet-inline {
-  color: var(--ink-soft);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.home-quiet-inline:hover { color: var(--ink); }
+.home-refusals b { display: block; color: var(--ink); font-weight: 600; margin-bottom: 0.25rem; }
 
-/* ---- What you can do today ----------------------------------------------- */
+/* ---- 5. PILOT ------------------------------------------------------ */
 
-.home-try {
-  padding: clamp(3.5rem, 9vh, 6rem) 0;
-  background: var(--paper-2);
-  border-top: 1px solid var(--line);
+/* The one inverted register on the page. It closes the document rather than
+   decorating it, and it holds no figure that carries financial truth about a
+   customer — only Vognary's own price. */
+.home-pilot {
+  background: var(--field);
+  color: var(--field-ink);
+  border-bottom: 0;
 }
-.home-try-list {
-  margin: 2rem 0 0;
+
+.home-pilot .home-section-heading { color: var(--field-ink); }
+
+.home-pilot-grid { display: grid; gap: 1.25rem; align-items: start; }
+
+@media (min-width: 60rem) {
+  .home-pilot-grid { grid-template-columns: auto 1fr auto; gap: 3.5rem; align-items: center; }
+}
+
+.home-price { margin-top: 1rem; }
+.home-price .money-amount { color: var(--field-ink); }
+.home-price .money-provenance { color: var(--field-soft); }
+.home-price .money-amount::before,
+.home-price .money-amount::after { border-color: var(--field-line-strong); }
+
+.home-pilot-terms {
+  margin: 0;
   padding: 0;
   list-style: none;
-  display: grid;
-  gap: 1.5rem;
+  max-width: 46ch;
 }
-@media (min-width: 64rem) {
-  .home-try-list {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2rem;
-  }
-}
-.home-try-list > li {
-  display: grid;
-  align-content: start;
-  gap: 0.6rem;
-  padding-top: 1.15rem;
-  border-top: 2px solid var(--ink);
-}
-.home-try-list h3 {
-  margin: 0;
-  font-size: 1.0625rem;
-  font-weight: 600;
-  color: var(--ink);
-}
-.home-try-list p {
-  margin: 0;
+
+.home-pilot-terms li {
+  padding: 0.5625rem 0;
+  border-top: 1px solid var(--field-line);
   font-size: 0.9375rem;
-  line-height: 1.6;
-  color: var(--ink-soft);
-  text-wrap: pretty;
-}
-.home-try-list .btn {
-  justify-self: start;
-  margin-top: 0.35rem;
+  line-height: 1.45;
+  color: var(--field-soft);
 }
 
-/* ---- Close ---------------------------------------------------------------- */
+.home-pilot-terms li:first-child { border-top: 0; }
 
-.home-close {
-  padding: clamp(3.5rem, 10vh, 7rem) 0;
-  background: var(--paper);
-  border-top: 1px solid var(--line);
+.home-pilot-action .btn-primary {
+  background: var(--field-ink);
+  color: var(--field);
+  border-color: var(--field-ink);
 }
-.home-close-inner {
-  display: grid;
-  gap: 2rem;
-}
-@media (min-width: 64rem) {
-  .home-close-inner {
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-    align-items: start;
-    gap: 4rem;
-  }
-}
-.home-close-heading {
-  margin: 0;
-  font-size: clamp(1.75rem, 4.2vw, 2.6rem);
-  font-weight: 600;
-  line-height: 1.14;
-  color: var(--ink);
-  text-wrap: balance;
-}
-.home-close-body {
-  margin: 1rem 0 0;
-  max-width: 40rem;
-  font-size: 1.0625rem;
-  line-height: 1.62;
-  color: var(--ink-soft);
-  text-wrap: pretty;
-}
-.home-close-action {
-  display: grid;
-  justify-items: start;
-  gap: 0.5rem;
-}
+
+/* Sheets sit on paper inside the inverted band without inheriting it. */
+.home-pilot .sheet { color: var(--ink); }

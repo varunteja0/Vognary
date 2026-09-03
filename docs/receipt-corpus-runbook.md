@@ -1,6 +1,7 @@
 # Private receipt corpus gate
 
-> **Operating motto: Take smart risks. Do not play safe.** Test ambitious parser
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Test ambitious parser
 > claims quickly, but never trade away consent, redaction, provenance, or the
 > precision and recall kill gates. Full doctrine: [`THE-LAW.md`](THE-LAW.md).
 

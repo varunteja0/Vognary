@@ -1,95 +1,145 @@
 import Link from "next/link";
 import { PublicFooter, PublicHeader } from "./public-shell";
-import { HomeFieldNarrative } from "./home-field-narrative";
-import { HomeOperatingRecord } from "./home-operating-record";
-import { commitmentControlPilotOffer, pilotOfferMajorUnits } from "@/lib/pilot-offer";
+import { DeskStrip } from "./desk-strip";
+import { FreezeSheet, RequestSheet } from "./record-sheet";
+import { MoneyValue } from "@/components/ui/money-value";
+import { commitmentControlPilotOffer } from "@/lib/pilot-offer";
 import "./home.css";
 
+/**
+ * Home — five bands, in the order a stranger needs them.
+ *
+ *   1. the decision that is waiting, with the product visible immediately
+ *   2. what a human freezing a cap actually does to a later invoice
+ *   3. one synthetic record per state, so the shape of the job is visible
+ *   4. the boundaries — including what Vognary refuses to do
+ *   5. one price, one month, one action
+ *
+ * The product is the hero. Supporting copy before the first product state is
+ * deliberately under 35 words, and there is exactly one primary call to action.
+ *
+ * Prose here never restates what a sheet already renders. The sheets carry the
+ * amounts, the freeze, the decider and the verdict; a paragraph that repeated
+ * them would be teaching the reader something the page is already showing, and
+ * it would cost the height that keeps this page under its anti-sprawl cap.
+ */
+
 export default function LaunchLanding() {
-  const price = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: commitmentControlPilotOffer.currency,
-    currencyDisplay: "code",
-    maximumFractionDigits: 0,
-  }).format(pilotOfferMajorUnits());
   return (
     <>
       <PublicHeader />
       <main id="ledger-main" className="home">
-        <HomeFieldNarrative>
-          <div className="home-say">
-            <p className="home-category">Commitment Control for India-first AI companies</p>
-            <h1 id="home-title" className="home-title font-display">
-              Your next expensive yes should leave a line behind it.
-            </h1>
-            <p className="home-lead">
-              Someone asks for money. Vognary shows what your record already proves, applies your own
-              rule, and then waits. Only a named human freezes the boundary — and later receipts are
-              measured against that boundary rather than against a memory.
-            </p>
-            <div className="home-actions">
-              <Link href="/demo" className="btn btn-primary btn-lg">Walk a decision</Link>
-              <Link href="/start" className="home-quiet">Or cite a bill you already hold</Link>
+        {/* 1 — DECISION NOW */}
+        <section className="home-band home-decision" aria-labelledby="home-title">
+          <div className="home-measure home-decision-grid">
+            <div className="home-say">
+              <p className="home-category">Commitment Control for India-first AI companies</p>
+              <h1 id="home-title" className="home-title font-display">
+                Approve AI and cloud commitments before they become bills.
+              </h1>
+              <p className="home-lead">
+                One request is waiting. Its history is cited, your rule is applied, and nothing
+                moves until a named person decides.
+              </p>
+              <div className="home-actions">
+                <Link href="/demo" className="btn btn-primary btn-lg">Review the synthetic request</Link>
+                <Link href="/start" className="home-quiet">Use your own evidence</Link>
+              </div>
             </div>
-          </div>
-        </HomeFieldNarrative>
-
-        <HomeOperatingRecord />
-
-        <section className="home-try" aria-labelledby="home-try-heading">
-          <div className="home-measure">
-            <h2 id="home-try-heading" className="home-section-heading font-display">
-              What you can truthfully do today
-            </h2>
-            <ul className="home-try-list">
-              <li>
-                <h3>Walk a synthetic decision</h3>
-                <p>
-                  Every stage above, under your control, with placeholder figures. Approve, cap or
-                  decline and watch the record change. Nothing is stored and no account is involved.
-                </p>
-                <Link href="/demo" className="btn btn-ghost">Walk a decision</Link>
-              </li>
-              <li>
-                <h3>Cite one bill you already hold</h3>
-                <p>
-                  Bring a single invoice or receipt. Vognary reads what is on it, states plainly what
-                  it cannot know, and shows the exposure that would surround a proposal. No bank
-                  password and no mailbox access are involved at any point.
-                </p>
-                <Link href="/start" className="btn btn-ghost">Bring your own bill</Link>
-              </li>
-              <li>
-                <h3>Run the loop with your team</h3>
-                <p>
-                  Live decisions, frozen boundaries and reconciliation run inside an enrolled
-                  workspace. Enrollment is deliberate and manual today, which is why there is a
-                  pilot rather than a sign-up button.
-                </p>
-                <Link href="/pay" prefetch={false} className="btn btn-ghost">See the pilot</Link>
-              </li>
-            </ul>
+            <RequestSheet headingId="home-title" />
           </div>
         </section>
 
-        <section className="home-close" aria-labelledby="home-close-heading">
-          <div className="home-measure home-close-inner">
-            <div>
-              <h2 id="home-close-heading" className="home-close-heading font-display">
-                One pilot month. One price. No automatic renewal.
+        {/* 2 — AUTHORIZATION TO OUTCOME */}
+        <section className="home-band home-freeze" aria-labelledby="home-freeze-title">
+          <div className="home-measure home-freeze-grid">
+            <div className="home-say">
+              <h2 id="home-freeze-title" className="home-section-heading font-display">
+                A rule can annotate. Only a person can decide.
               </h2>
-              <p className="home-close-body">
-                {price} covers one workspace for a single pilot month. Payment is not activation: a
-                person at Vognary enrolls you, and you can ask for a refund before that happens.
-                Vognary never auto-approves, never purchases or provisions, and never moves money on
-                your behalf.
+              <p className="home-lead">
+                The finance owner freezes a cap below what was asked for. Weeks later the invoice
+                arrives above it, and the gap is a fact instead of an argument.
               </p>
             </div>
-            <div className="home-close-action">
+            <FreezeSheet headingId="home-freeze-title" />
+          </div>
+        </section>
+
+        {/* 3 — DAILY OPERATION */}
+        <section className="home-band home-week" aria-labelledby="home-week-title">
+          <div className="home-measure">
+            <h2 id="home-week-title" className="home-section-heading font-display">
+              Six constructed records, one per state.
+            </h2>
+            <p className="home-lead home-lead-wide">
+              No customer has used Vognary yet, so nothing below was observed. These six records
+              were written by us and run through the same policy and reconciliation engines the
+              product uses, which is why the states and figures are real output and the companies
+              are not. Grouped by what would have to happen next, never ranked by a score no one
+              can audit.
+            </p>
+            <DeskStrip headingId="home-week-title" />
+          </div>
+        </section>
+
+        {/* 4 — BOUNDARIES */}
+        <section className="home-band home-trust" aria-labelledby="home-trust-title">
+          <div className="home-measure">
+            <h2 id="home-trust-title" className="home-section-heading font-display">
+              What Vognary will not do.
+            </h2>
+            <ul className="home-refusals">
+              <li>
+                <b>It never decides.</b> No auto-approval, no auto-denial, no threshold that
+                quietly says yes on your behalf.
+              </li>
+              <li>
+                <b>It never moves money.</b> No card, no wallet, no vendor contact, no purchase,
+                no cancellation.
+              </li>
+              <li>
+                <b>It never guesses a number.</b> Unknown renders as unknown. A figure you typed
+                is labelled an assumption until a document proves it.
+              </li>
+              <li>
+                <b>It never needs your bank password or your mailbox.</b> You bring one document
+                at a time.
+              </li>
+            </ul>
+            <p className="home-lead">
+              Real customer financial data stays blocked until an independent security assessment
+              and retest are complete. <Link href="/security">Read the current boundaries</Link>.
+            </p>
+          </div>
+        </section>
+
+        {/* 5 — PILOT */}
+        <section className="home-band home-pilot" aria-labelledby="home-pilot-title">
+          <div className="home-measure home-pilot-grid">
+            <div>
+              <h2 id="home-pilot-title" className="home-section-heading font-display">
+                One pilot month.
+              </h2>
+              <MoneyValue
+                minor={String(commitmentControlPilotOffer.amountMinor)}
+                currency={commitmentControlPilotOffer.currency}
+                provenance={{ kind: "frozen", label: "One-time, no automatic renewal" }}
+                size="lead"
+                layout="stacked"
+                className="home-price"
+              />
+            </div>
+            <ul className="home-pilot-terms">
+              <li>Covers one pilot month. A second month is a separate purchase.</li>
+              <li>Payment reserves the pilot. Payment is not activation.</li>
+              <li>Nothing renews. There is no subscription to cancel.</li>
+              <li>Refundable before the pilot month starts.</li>
+            </ul>
+            <div className="home-pilot-action">
               <Link href="/pay" prefetch={false} className="btn btn-primary btn-lg">
-                See pilot scope and price
+                See the one-month pilot
               </Link>
-              <Link href="/security" className="home-quiet">Read the security boundaries first</Link>
             </div>
           </div>
         </section>

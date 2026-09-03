@@ -6,8 +6,15 @@ import { launch } from "chrome-launcher";
 
 const root = process.cwd();
 const serverPath = new URL("../.next/standalone/server.js", import.meta.url);
+// Every public route a stranger can reach, not a sample of three. An
+// authenticated /app state needs credentials the gate does not hold, so it is
+// measured separately in the signed-in capture run rather than faked here.
 const routes = [
   { path: "/", categories: ["performance", "accessibility", "best-practices", "seo"] },
+  { path: "/demo", categories: ["performance", "accessibility", "best-practices"] },
+  { path: "/start", categories: ["performance", "accessibility", "best-practices"] },
+  { path: "/pay", categories: ["performance", "accessibility", "best-practices"] },
+  { path: "/security", categories: ["performance", "accessibility", "best-practices"] },
   { path: "/login?next=/app", categories: ["performance", "accessibility", "best-practices"] },
   { path: "/verify", categories: ["performance", "accessibility", "best-practices"] },
 ];
@@ -85,7 +92,7 @@ if (failures.length) {
   failures.forEach((failure) => console.error(`- ${failure}`));
   process.exitCode = 1;
 } else {
-  console.log("Lighthouse budgets passed for landing, app, and verify routes.");
+  console.log(`Lighthouse budgets passed for all ${routes.length} measured public routes.`);
 }
 
 async function findOpenPort() {

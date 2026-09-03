@@ -117,8 +117,8 @@ test("every contract enum has presentation copy, so a contract change cannot ren
 });
 
 test("Control stays a primary destination at the enrollment boundary, and the phone bar never carries more than four direct labels", () => {
-  assert.deepEqual([...recoveryViews], ["HOME", "CONTROL", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
-  assert.deepEqual(Object.values(recoveryViewLabels), ["Control", "Today", "Commitments", "Evidence", "Automation"]);
+  assert.deepEqual([...recoveryViews], ["CONTROL", "HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
+  assert.deepEqual(Object.values(recoveryViewLabels), ["Decisions", "Today", "Bills", "Evidence", "Automation"]);
   assert.equal(recoveryPrimaryViewLimit, 4);
   assert.match(clientSource, /<nav aria-label="Primary"/);
   // The product the public site sells is never removed from navigation. Only
@@ -153,17 +153,20 @@ test("a workspace without the pilot sees the whole loop rendered by the product'
 
 test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
   assert.match(landingSource, /Commitment Control for India-first AI companies/);
-  assert.match(landingSource, /Your next expensive yes should leave a line behind it/);
-  assert.match(landingSource, /Only a named human\s*\n?\s*freezes the boundary/);
-  assert.match(landingSource, /Walk a decision/);
+  // The fixed public copy hypothesis: literal, active, specific, ≤12 words.
+  assert.match(landingSource, /Approve AI and cloud commitments before they become bills\./);
+  assert.match(landingSource, /Review the synthetic request/);
+  assert.match(landingSource, /Use your own evidence/);
+  assert.match(landingSource, /See the one-month pilot/);
+  // Human authority is stated on the first screen, not deferred to a later band.
+  assert.match(landingSource, /nothing\s*\n?\s*moves until a named person decides/);
   assert.match(loginSource, /named human authorization before a new obligation exists/);
   assert.match(allSource, /Start with a software bill/);
   assert.match(allSource, /Add a receipt to see the charge/);
   assert.doesNotMatch(landingSource, /Want it done for you\?/);
   assert.doesNotMatch(landingSource, /href="\/private-audit"/);
   assert.match(clientSource, />Vognary</);
-  assert.match(landingSource, /No bank\s*\n?\s*password and no mailbox access are involved/);
-  assert.match(landingSource, /Enrollment is deliberate and manual today/);
+  assert.match(landingSource, /never needs your bank password or your mailbox/);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
   assert.doesNotMatch(landingSource, /Set up billing forwarding once so matching mail keeps arriving/);
 });
@@ -461,6 +464,10 @@ test("motion is left to the token layer, so reduced motion is honoured globally"
   assert.doesNotMatch(allSource, /scrollIntoView|requestAnimationFrame|behavior: "smooth"/);
   const globals = readFileSync("src/app/globals.css", "utf8");
   assert.match(globals, /@media \(prefers-reduced-motion: reduce\)/);
-  assert.match(globals, /animation-duration: 0\.001ms !important/);
-  assert.match(globals, /transition-duration: 0\.001ms !important/);
+  // Reduced motion removes animation outright. A near-zero duration still runs a
+  // frame and still lets an element start from a state a reader cannot read, so
+  // the guarantee is `none`, not `0.001ms`.
+  assert.match(globals, /animation: none !important/);
+  assert.match(globals, /transition: none !important/);
+  assert.doesNotMatch(globals, /animation-duration: 0\.001ms/);
 });

@@ -108,34 +108,38 @@ test("public primary routes have no serious or critical axe violations", async (
 
 test("reduced-motion preference suppresses decorative motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  // /demo is where the field's unsettled region — now the only looping motion in
-  // the product — is reachable, so the probe measures the real thing.
+  // /demo carries the one signature transition in the product — the cap line
+  // resolving under the request — so the probe measures the real thing.
   await page.goto("/demo");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await page.getByRole("button", { name: "See the request" }).click();
+  await page.getByRole("button", { name: "Approve with a lower cap" }).click();
 
   const motion = await page.evaluate(() => {
     const button = document.querySelector<HTMLElement>(".btn");
-    const band = document.querySelector<HTMLElement>(".afield-band");
+    const capRule = document.querySelector<HTMLElement>(".demo-cap-rule");
     if (!button) throw new Error("Reduced-motion button probe is missing");
-    if (!band) throw new Error("Reduced-motion unsettled-region probe is missing");
+    if (!capRule) throw new Error("Reduced-motion cap-rule probe is missing");
     const buttonStyle = getComputedStyle(button);
-    const bandStyle = getComputedStyle(band);
+    const ruleStyle = getComputedStyle(capRule);
     return {
       matches: matchMedia("(prefers-reduced-motion: reduce)").matches,
       scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
       transitionDurations: buttonStyle.transitionDuration.split(",").map((value) => value.trim()),
-      bandAnimationName: bandStyle.animationName,
-      // Meaning is not hidden: the region is still drawn, it simply does not move.
-      bandOpacity: bandStyle.opacity,
+      capAnimationName: ruleStyle.animationName,
+      // Meaning is not hidden: the frozen cap is fully drawn, it simply does not
+      // draw itself in. Base CSS is the resolved state, so there is nothing to
+      // wait for and nothing at zero width.
+      capTransform: ruleStyle.transform,
+      capWidth: capRule.getBoundingClientRect().width,
     };
   });
 
   expect(motion.matches).toBe(true);
   expect(motion.scrollBehavior).toBe("auto");
   expect(motion.transitionDurations.every((duration) => durationInMilliseconds(duration) <= 0.01)).toBe(true);
-  expect(motion.bandAnimationName).toBe("none");
-  expect(Number(motion.bandOpacity)).toBeGreaterThan(0);
+  expect(motion.capAnimationName).toBe("none");
+  expect(["none", "matrix(1, 0, 0, 1, 0, 0)"]).toContain(motion.capTransform);
+  expect(motion.capWidth).toBeGreaterThan(0);
 });
 
 test("brand previews render the exact downloadable raster exports", async ({ page }) => {

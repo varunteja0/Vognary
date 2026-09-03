@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AuthorizationLoop } from "@/app/authorization-loop";
-import { activeCommitmentControlStep, commitmentControlStepLabel } from "@/lib/commitment-control-loop";
+import { activeCommitmentControlStep } from "@/lib/commitment-control-loop";
 import { controlDraftFromGuestProposal, readGuestProposalDraft } from "@/lib/guest-proposal-draft";
 import type { CommitmentSummaryDto, EvidenceDto } from "@/lib/recovery/contracts";
 import { currencyExponent, minorUnitsToDecimal } from "@/lib/recovery/domain";
@@ -353,36 +353,27 @@ export function ControlView({
         <div className="control-masthead-top">
           <h3 id="control-masthead-heading" className="control-masthead-title">Commitment Control</h3>
           <p className="control-masthead-stamp">
-            {policy === null ? "No policy version recorded" : `Policy version ${policy.policyVersion} · recorded ${formatMoment(policy.createdAt)}`}
+            {policy === null
+              ? "No policy version recorded"
+              : `Policy v${policy.policyVersion} · ${policy.currencyLimits.length === 0 ? "no currency limit" : policy.currencyLimits.map((limit) => limit.currency).join(" · ")} · recorded ${formatMoment(policy.createdAt)}`}
           </p>
         </div>
-        <dl className="control-figures">
-          <div className="control-figure truth-policy">
-            <dt>Policy in force</dt>
-            <dd>{policy === null ? "None" : `v${policy.policyVersion}`}<small>{policy === null ? "No proposal can be evaluated" : `${policy.categoryRules.length} of ${controlCategories.length} categories set`}</small></dd>
-          </div>
-          <div className="control-figure truth-frozen">
-            <dt>Currency limits</dt>
-            <dd>{policy === null ? "0" : String(policy.currencyLimits.length)}<small>{policy === null || policy.currencyLimits.length === 0 ? "No currency carries a limit" : policy.currencyLimits.map((limit) => limit.currency).join(" · ")}</small></dd>
-          </div>
-          <div className="control-figure truth-authority">
-            <dt>Needs a human decision</dt>
-            <dd>{String(awaitingDecision.length)}<small>{brief.capabilities.canDecide ? "You can decide these" : "Owner or admin only"}</small></dd>
-          </div>
-          <div className="control-figure truth-observed">
-            <dt>Awaiting evidence</dt>
-            <dd>{String(awaitingEvidence.length)}<small>{`${authorized.length} authorized in total`}</small></dd>
-          </div>
-        </dl>
-        {/* Orientation, not operation. Each band below already prints the step
-            it belongs to, so the whole run is opened on demand rather than
-            spending the first screen on explanation. */}
-        <details className="control-more">
-          <summary>The five steps this desk records</summary>
-          <div className="control-more-body">
-            <AuthorizationLoop compact activeStep={activeStep} />
-          </div>
-        </details>
+        {/* A desk opens on what is owed, not on a grid of counters. Policy
+            version and currency limits are reference, so they sit in the stamp
+            line above rather than competing with the standing obligation. */}
+        <p className="control-standing" data-waiting={awaitingDecision.length > 0 ? "true" : undefined}>
+          {policy === null
+            ? "No policy is in force, so no proposal can be evaluated yet."
+            : awaitingDecision.length === 0
+              ? "Nothing needs a decision right now."
+              : `${awaitingDecision.length} ${awaitingDecision.length === 1 ? "proposal needs" : "proposals need"} a human decision.`}
+        </p>
+        <p className="control-standing-note">
+          {policy !== null && awaitingDecision.length > 0
+            ? `${brief.capabilities.canDecide ? "You can decide these." : "A workspace owner or admin decides these."} `
+            : ""}
+          {`${awaitingEvidence.length} awaiting evidence · ${authorized.length} authorized in total`}
+        </p>
       </section>
 
       {state.staleNotice ? (
@@ -420,21 +411,6 @@ export function ControlView({
 
       {state.failure && !state.staleNotice ? <FailureBlock failure={state.failure} /> : null}
 
-      <ControlProposalComposer
-        draft={state.draft}
-        errors={state.draftErrors}
-        pending={state.pending?.kind === "PROPOSAL"}
-        online={online}
-        primary={awaitingDecision.length === 0}
-        blockedReason={blockedReason}
-        eligibleCommitments={eligibleExposureCommitments(commitments)}
-        handlers={{
-          onChange: handlers.changeDraft,
-          onToggleCommitment: handlers.toggleCommitment,
-          onSubmit: handlers.submitProposal,
-        }}
-      />
-
       <section
         aria-labelledby="control-queue-heading"
         className="control-band"
@@ -442,7 +418,6 @@ export function ControlView({
       >
         <div className="control-band-head">
           <h3 id="control-queue-heading" className="control-heading">Needs a decision</h3>
-          <p className="control-band-count">{commitmentControlStepLabel(4)}</p>
         </div>
         {awaitingDecision.length === 0 ? (
           <p className="control-note">
@@ -478,7 +453,6 @@ export function ControlView({
       >
         <div className="control-band-head">
           <h3 id="control-authorized-heading" className="control-heading">Authorized commitments</h3>
-          <p className="control-band-count">{commitmentControlStepLabel(5)}</p>
         </div>
         {authorized.length === 0 ? (
           <p className="control-note">No proposal has been decided yet.</p>
@@ -502,6 +476,23 @@ export function ControlView({
           </div>
         )}
       </section>
+
+      {/* Creation comes after attention. On an empty desk it opens itself,
+          because then entering the first proposal is the work. */}
+      <ControlProposalComposer
+        draft={state.draft}
+        errors={state.draftErrors}
+        pending={state.pending?.kind === "PROPOSAL"}
+        online={online}
+        primary={awaitingDecision.length === 0}
+        blockedReason={blockedReason}
+        eligibleCommitments={eligibleExposureCommitments(commitments)}
+        handlers={{
+          onChange: handlers.changeDraft,
+          onToggleCommitment: handlers.toggleCommitment,
+          onSubmit: handlers.submitProposal,
+        }}
+      />
 
       <section
         aria-labelledby="control-policy-heading"
@@ -606,6 +597,15 @@ export function ControlView({
           onSubmit={handlers.submitPolicy}
         />
       ) : null}
+
+      {/* Orientation, not operation. It sits after the work so the desk opens
+          on what is owed rather than on an explanation of itself. */}
+      <details className="control-more">
+        <summary>The five steps this desk records</summary>
+        <div className="control-more-body">
+          <AuthorizationLoop compact activeStep={activeStep} />
+        </div>
+      </details>
     </div>
   );
 }

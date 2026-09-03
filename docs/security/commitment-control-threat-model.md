@@ -1,6 +1,7 @@
 # Commitment Control threat model
 
-> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Pursue asymmetric,
 > falsifiable upside while bounding irreversible customer harm. Product law:
 > [`../THE-LAW.md`](../THE-LAW.md). Incident procedure:
 > [`incident-response-runbook.md`](incident-response-runbook.md).

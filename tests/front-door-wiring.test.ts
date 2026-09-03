@@ -4,21 +4,21 @@ import test from "node:test";
 
 const pageSource = readFileSync("src/app/page.tsx", "utf8");
 const landingSource = readFileSync("src/app/launch-landing.tsx", "utf8");
-const narrativeSource = readFileSync("src/app/home-field-narrative.tsx", "utf8");
+const sheetSource = readFileSync("src/app/record-sheet.tsx", "utf8");
 const shellSource = readFileSync("src/app/public-shell.tsx", "utf8");
-const workSource = readFileSync("src/app/home-operating-record.tsx", "utf8");
+const workSource = readFileSync("src/app/desk-strip.tsx", "utf8");
 const appPageSource = readFileSync("src/app/app/page.tsx", "utf8");
 const experienceSource = readFileSync("src/app/app/experience-client.tsx", "utf8");
 const loginSource = readFileSync("src/app/login/login-client.tsx", "utf8");
 const layoutSource = readFileSync("src/app/layout.tsx", "utf8");
-const publicFront = [landingSource, narrativeSource, shellSource, workSource].join("\n");
+const publicFront = [landingSource, sheetSource, shellSource, workSource].join("\n");
 
 test("the public page is a cacheable readiness-neutral shell", () => {
   assert.match(pageSource, /export const revalidate = 3600/);
   assert.doesNotMatch(pageSource, /force-dynamic|isReceiptInboxPubliclyAvailable/);
 });
 
-test("the landing leads with the demonstration and keeps the guest evidence path second", () => {
+test("the landing leads with the decision and keeps the guest evidence path second", () => {
   // One primary command to the demonstration, one quiet secondary to the
   // visitor's own evidence. The rejected hero form is gone for good.
   assert.match(landingSource, /href="\/demo" className="btn btn-primary btn-lg"/);
@@ -26,6 +26,15 @@ test("the landing leads with the demonstration and keeps the guest evidence path
   assert.match(landingSource, /href="\/pay" prefetch=\{false\}/);
   assert.doesNotMatch(landingSource, /LandingDecisionPreview|LandingSignalRail|control-index/);
   assert.doesNotMatch(landingSource, /<form|<input|<textarea/);
+  // The product is above the promise-copy, not an abstract diagram: the first
+  // band renders the canonical record itself.
+  assert.match(landingSource, /<RequestSheet/);
+  assert.ok(
+    landingSource.indexOf("<RequestSheet") < landingSource.indexOf("home-freeze"),
+    "the live request appears in the first band, before the explanatory band",
+  );
+  // The rejected visual era does not come back through a side door.
+  assert.doesNotMatch(publicFront, /AuthorityField|authority-field|home-field-narrative/);
   // The public shell offers exactly one primary command plus one menu, so a
   // phone header can never crowd three text buttons beside the brand.
   assert.match(shellSource, /pshell-primary/);
@@ -41,16 +50,17 @@ test("the landing leads with the demonstration and keeps the guest evidence path
 test("the landing states concise evidence and action boundaries without unsupported claims", () => {
   // Every boundary survives the redesign. They are now stated where they answer
   // a live concern rather than as a column of limitations in the first viewport.
-  assert.match(publicFront, /No bank\s*\n?\s*password and no mailbox access/);
-  assert.match(publicFront, /never auto-approves, never purchases or provisions, and never moves money/);
+  assert.match(publicFront, /never needs your bank\s*\n?\s*password or your mailbox/i);
   assert.match(publicFront, /never auto-approves, purchases, provisions or moves money/);
+  assert.match(publicFront, /It never decides|No auto-approval/);
+  assert.match(publicFront, /It never moves money/);
   assert.match(publicFront, /Payment is not activation/);
-  // The operating-record section is labelled synthetic and cannot be mistaken
-  // for customer activity.
-  assert.match(workSource, /SYNTHETIC_DEMO_LABEL/);
-  assert.match(workSource, /placeholders in a fixed example, not customer activity/);
+  // The desk is labelled synthetic and cannot be mistaken for customer activity.
+  assert.match(workSource, /SYNTHETIC_DEMO_LABEL|SyntheticStamp/);
+  assert.match(workSource, /there is no\s+\*?\s*total, no saving, no risk number/);
   // Nothing on the public front derives money; it renders canonical components.
   assert.match(workSource, /MoneyValue/);
+  assert.match(sheetSource, /MoneyValue/);
   assert.doesNotMatch(landingSource, /30 days/i);
   assert.doesNotMatch(landingSource, /only billing evidence you intentionally forward/i);
   assert.doesNotMatch(landingSource, /Gmail/i);

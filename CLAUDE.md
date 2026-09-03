@@ -1,6 +1,7 @@
 # Claude / coding agents — start here
 
-> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Pursue asymmetric,
 > falsifiable upside and bound irreversible downside. Full doctrine:
 > [`docs/THE-LAW.md`](docs/THE-LAW.md).
 

@@ -200,6 +200,11 @@ Hash the completed restricted record locally without printing it:
 shasum -a 256 /restricted/path/control-pilot-operator-evidence.md
 ```
 
+Set `COMMITMENT_CONTROL_OPERATIONS_EVIDENCE_COMMIT_SHA` to the exact
+40-character Candidate commit SHA recorded above. `control:preflight` compares
+it with the commit reported by the authenticated deployment and blocks missing,
+malformed, stale-release, or mismatched evidence.
+
 Copy only the resulting SHA-256 and non-secret status/date values into the
 matching `.env.example` fields. Keep the completed record outside Git. Rerun:
 

@@ -1,6 +1,7 @@
 # Vognary — Master Build Plan (AI / Twin / UI implementation law)
 
-> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Pursue asymmetric,
 > falsifiable upside and bound irreversible downside. Full doctrine:
 > [`THE-LAW.md`](THE-LAW.md).
 
@@ -325,6 +326,12 @@ the wow lands with zero login — consistent with the guest-first architecture.
 ---
 
 ## Part 5 — The UI/UX quality system (the "100× improvement" demand)
+
+> **2026-09-03 candidate override:** THE-LAW §0.1.1 permits one complete
+> frontend reconstruction and replacement visual identity. The no-rewrite and
+> fixed-brand statements below are historical constraints for normal work, not
+> restrictions on that named candidate. Exact-money honesty, accessibility,
+> component rigor, and fixed performance gates remain law.
 
 The concern raised — *"presentation and design and placement quality is worst …
 fragile … nothing implemented properly … needs a huge upscale"* — is a **quality

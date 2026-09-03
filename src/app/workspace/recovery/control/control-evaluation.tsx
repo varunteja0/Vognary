@@ -29,21 +29,37 @@ export function ControlEvaluation({
   evaluation: ControlEvaluationDto;
   onInspectEvidence: ((evidenceId: string, buttonId: string) => void) | null;
 }) {
+  // A one-time charge projects to itself over every horizon. Printing the same
+  // exact figure three times under three labels invites the reader to hunt for
+  // a difference that cannot exist, so the identity is stated once instead.
+  const flatHorizon = proposal.amountMinor === proposal.projectedThirteenWeekMinor
+    && proposal.amountMinor === proposal.projectedAnnualMinor;
   return (
     <div className="control-evaluation">
       <section className="control-section" aria-labelledby={`assumption-${evaluation.id}`}>
         <p id={`assumption-${evaluation.id}`} className="truth-label truth-assumption">User-entered assumption</p>
-        <dl className="control-facts">
-          <ControlFact label="Per charge" money={{ minor: proposal.amountMinor, currency: proposal.currency, provenance: { kind: "assumed" } }} />
-          <ControlFact label="13 weeks" money={{ minor: proposal.projectedThirteenWeekMinor, currency: proposal.currency, provenance: { kind: "assumed" } }} />
-          <ControlFact label="12 months" money={{ minor: proposal.projectedAnnualMinor, currency: proposal.currency, provenance: { kind: "assumed" } }} />
+        <dl className="control-facts" data-columns={flatHorizon ? "1" : undefined}>
+          <ControlFact
+            label={flatHorizon ? "Per charge, 13 weeks and 12 months" : "Per charge"}
+            money={{ minor: proposal.amountMinor, currency: proposal.currency, provenance: { kind: "assumed" } }}
+          />
+          {flatHorizon ? null : (
+            <>
+              <ControlFact label="13 weeks" money={{ minor: proposal.projectedThirteenWeekMinor, currency: proposal.currency, provenance: { kind: "assumed" } }} />
+              <ControlFact label="12 months" money={{ minor: proposal.projectedAnnualMinor, currency: proposal.currency, provenance: { kind: "assumed" } }} />
+            </>
+          )}
         </dl>
         <p className="control-card-meta">
           {controlCategoryLabels[proposal.category]} · {controlCadenceLabels[proposal.cadence]} · first charge {formatDay(proposal.firstChargeDate)} · projected from {formatDay(proposal.asOfDate)}
         </p>
       </section>
 
-      <section className="control-section" aria-labelledby={`cited-${evaluation.id}`}>
+      <section
+        className="control-section"
+        aria-labelledby={`cited-${evaluation.id}`}
+        data-empty={evaluation.citedEvidenceIds.length === 0 && evaluation.citedExposureBasis !== "OBSERVATION_ONLY" ? "true" : undefined}
+      >
         <p id={`cited-${evaluation.id}`} className="truth-label truth-citation">Cited existing exposure</p>
         {evaluation.citedEvidenceIds.length ? (
           <ul className="control-evidence-list">
@@ -65,7 +81,7 @@ export function ControlEvaluation({
             ))}
           </ul>
         ) : (
-          <p className="control-note">No existing commitment was cited, so the exposure below counts this proposal alone.</p>
+          <p className="control-note">None cited, so the exposure below counts this proposal alone.</p>
         )}
         {evaluation.citedExposureBasis === "OBSERVATION_ONLY" ? (
           <p className="control-note">Cited exposure is assumption-grade: last observed amount only. It is not a 13-week or annual projection.</p>

@@ -76,6 +76,19 @@ DATABASE_URL='<disposable-postgres-url>' POSTGRES_SSL=false npm run test:postgre
 
 Detailed operational checks are internal-secret protected because they expose deployment state. Public `/api/health` is deliberately limited to liveness.
 
+Use `npm run security:inbox` for a privacy-minimized report of the security
+mailbox without a browser login. It requires `RESEND_API_KEY`; default runs are
+read-only and emit only timestamps, sender domains, safe categories, opaque
+review refs, and review state. After a verified action or no-action review, run
+`npm run security:inbox -- --mark-handled <review-ref>`. The ignored local
+ledger stores only versioned SHA-256 refs.
+
+For the temporary founder workflow, `npm run company-mail:forward` previews new
+approved role-address messages and `npm run company-mail:forward -- --execute`
+forwards them to the ignored `COMPANY_MAIL_FORWARD_TO` destination while
+retaining originals in Resend. The command excludes synthetic tests and uses
+provider tags to prevent duplicate forwarding.
+
 ## Canonical documentation
 
 1. [THE-LAW](docs/THE-LAW.md) — company, product, and agent directive

@@ -15,7 +15,6 @@ export const ALLOWED_FILES = new Set([
   "src/app/twitter-image.tsx",
   "src/app/brand.tsx",
   "src/app/brand/page.tsx",
-  "src/app/character.tsx", // Nakul mongoose brand-mark geometry
   "src/app/global-error.tsx", // renders WITHOUT globals.css — cannot use var(--x)
   "src/app/pwa/startup/[size]/route.tsx", // PWA splash image spec
 ]);

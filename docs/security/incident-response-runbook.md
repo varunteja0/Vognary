@@ -1,6 +1,7 @@
 # Commitment Control incident response
 
-> **Operating motto: Take smart risks. Do not play safe.** Contain irreversible
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Contain irreversible
 > customer harm first, preserve evidence, communicate truthfully, and restore
 > only from verified state. Product law: [`../THE-LAW.md`](../THE-LAW.md).
 

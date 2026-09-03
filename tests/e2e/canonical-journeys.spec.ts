@@ -4,9 +4,11 @@ import { expect, test, type Page } from "@playwright/test";
 test("canonical product entry keeps forwarding unavailable without seeded data", async ({ page }) => {
   const failures = collectRuntimeFailures(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "Commitment Control: freeze the cap before the obligation exists." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Approve AI and cloud commitments before they become bills." })).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/i)).toHaveCount(0);
-  await expect(page.getByText(/One receipt is enough to begin/i)).toBeVisible();
+  // The evidence path is offered, and the record that needs a human is present.
+  await expect(page.getByRole("link", { name: "Use your own evidence" }).first()).toBeVisible();
+  await expect(page.getByText("INR 4,80,000").first()).toBeVisible();
   await expect(page.getByText(/sample audit/i)).toHaveCount(0);
   await expect(page.locator('a[href*="demo="], a[href*="guest="]')).toHaveCount(0);
   await expectNoSeriousAxeViolations(page);
@@ -32,6 +34,9 @@ test("mobile production entry keeps the authorization action focused and bounded
   // taller than a copy-only page. What has to stay true is that the record is
   // reachable immediately and the page does not sprawl into marketing.
   expect(initial.recordTop).toBeLessThanOrEqual(812 * 2);
+  // Six viewports. The anti-sprawl cap is the product constraint, not a number
+  // negotiated against whatever Home happens to measure: Home is shortened to
+  // meet it rather than the reverse.
   expect(initial.scrollHeight).toBeLessThanOrEqual(812 * 6);
   expect(initial.horizontalOverflow).toBe(false);
 });
@@ -79,7 +84,9 @@ async function pageMetrics(page: Page) {
     };
     return {
       visibleControls: [...document.querySelectorAll("button,a,input,textarea,select")].filter(visible).length,
-      recordTop: Math.round(document.querySelector("#example-decision")?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY),
+      // The working record on the landing is the request sheet: the same
+      // component the demonstration and the desk render, from the same fixture.
+      recordTop: Math.round(document.querySelector(".sheet")?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY),
       scrollHeight: document.documentElement.scrollHeight,
       horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth + 1,
     };

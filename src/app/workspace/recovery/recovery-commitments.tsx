@@ -274,8 +274,8 @@ function CommitmentDetailPanel({
         ) : null}
       </header>
 
-      <section aria-labelledby="recovery-ledger-action-heading">
-        <h4 id="recovery-ledger-action-heading" className="sr-only">Ledger action</h4>
+      <section aria-labelledby="recovery-commitment-action-heading">
+        <h4 id="recovery-commitment-action-heading" className="sr-only">Commitment action</h4>
         <div className="flex flex-wrap items-center gap-3">
           <span className="font-data text-xs uppercase tracking-wide text-(--muted)">{statusLabel}</span>
           {inQueue ? (

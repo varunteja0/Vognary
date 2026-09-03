@@ -241,7 +241,7 @@ async function loginAsDevelopmentUser(page: Page) {
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
 }
 
-async function selectRecoveryView(page: Page, name: "Today" | "Commitments" | "Evidence" | "Automation") {
+async function selectRecoveryView(page: Page, name: "Today" | "Bills" | "Evidence" | "Automation") {
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name }).click();
 }
 
@@ -263,7 +263,7 @@ async function openAddBills(page: Page) {
 }
 
 async function openCommitment(page: Page, merchant: string) {
-  await selectRecoveryView(page, "Commitments");
+  await selectRecoveryView(page, "Bills");
   const heading = page.getByRole("heading", { name: merchant, exact: true });
   if (await heading.isVisible()) return;
   const commitment = page.getByRole("button", { name: new RegExp(merchant) }).first();

@@ -1,118 +1,143 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+/* Tailwind v4 auto-detects sources from the repository root, so prose in docs/,
+   output/, audit-pack/ and the worktrees was minting utilities no component
+   ever renders. Only src/ ships markup, so only src/ is scanned. This deletes
+   generated CSS, not authored CSS: no rule that any element matches is
+   removed.
+
+   Note for anyone editing this file: src/ is now scanned, so a comment here
+   that spells a utility class name will mint that class. Describe them, do not
+   quote them. */
+@source "../../src";
+
+/* Namespaces nothing in the product uses. Dropping them removes their theme
+   variables and every utility built from them. */
+@theme {
+  --container-*: initial;
+  --animate-*: initial;
+}
 
 /*
-  VOGNARY — "FIELD & INSTRUMENT" (v2.0)
+  VOGNARY — "DECISION THRESHOLD" (v3.0)
 
-  One idea: a proposed obligation is an unstable region until a named human
-  freezes one boundary through it. Everything else is instrument.
+  One idea: an expensive request is a document on a desk, and the only thing
+  that resolves it is a named person drawing a line through it.
 
-  The surface is not paper. It is a cool, neutral operating field that gets out
-  of the way of numbers. Graphite is reserved for the Authority Field scenes so
-  it means "this is the moment of consequence" instead of meaning "Vognary".
-  Gold is spent on exactly one thing — named authority and the frozen boundary
-  it creates — so a cap still reads as the most expensive object on screen.
+  The surface is warm paper, not a cool dashboard field. Work happens on
+  something that looks like it holds a record. Ink is near-black and warm.
+  Colour is spent on exactly three meanings and nothing else:
+
+    vermilion  a limit was crossed
+    forest     a human froze a boundary
+    slate-blue a rule is speaking, and a rule cannot decide
+
+  Everything else is ink, paper and rule weight. The identity survives in
+  grayscale and with motion disabled, because hierarchy is carried by size,
+  weight, position and rule — never by hue alone.
 
   Legacy token names are re-pointed here, so the whole product re-skins from
   this one file. This is the only shared token source.
 */
 
 :root {
-  /* ---- OPERATING FIELD ---------------------------------------------
-     Cool neutral, never warm paper. Work surfaces recede so evidence,
-     constraint and authority are the only things with colour. ------- */
-  --paper: #f6f7f9;
-  --paper-2: #eceef2;
-  --card: #ffffff;
-  --card-2: #f3f5f8;
-  --card-3: #e8ebf0;
+  /* ---- PAPER --------------------------------------------------------
+     Warm, low-chroma, slightly off-white. A record surface, not a field. */
+  --paper: #f4f1ea;
+  --paper-2: #eae5da;
+  --card: #fffdf8;
+  --card-2: #f8f5ee;
+  --card-3: #ece7dc;
 
-  /* Graphite ink — the fixed brand anchor, read as structure not theme. */
-  --ink: #14171c;
-  --ink-soft: #39404a;
-  --muted: #626a77;
+  /* Warm near-black. Reads as printed ink rather than UI grey. */
+  --ink: #17140f;
+  --ink-soft: #453f34;
+  --muted: #6b6357;
 
-  /* Structure. Rules are used to separate registers, not every object. */
-  --line: rgba(20, 23, 28, 0.12);
-  --line-strong: rgba(20, 23, 28, 0.28);
+  /* Rules separate registers, not every object. */
+  --line: rgba(23, 20, 15, 0.14);
+  --line-strong: rgba(23, 20, 15, 0.32);
 
   /* ---- AUTHORITY ----------------------------------------------------
-     Gold is not prestige. Gold is "a named person froze this boundary."
-     If it appears anywhere else the frozen cap stops meaning anything. */
-  --gold: #8a6620;
-  --gold-soft: #b0862f;
-  --gold-deep: #6b4e16;
-  --gold-line: rgba(138, 102, 32, 0.42);
-  --dossier-fill: rgba(138, 102, 32, 0.08);
-  --glow: var(--gold);
+     Forest is not decoration. Forest is "a named person froze this cap."
+     If it appears anywhere else a frozen cap stops meaning anything. */
+  --frozen: #1c5240;
+  --frozen-soft: #2b6b55;
+  --frozen-deep: #123a2c;
+  --frozen-line: rgba(28, 82, 64, 0.42);
+  --frozen-tint: rgba(28, 82, 64, 0.09);
 
   /* ---- SEMANTIC STATE -----------------------------------------------
-     Five meanings, five hues, each AA on the operating field and each
-     carrying a non-colour cue as well (rule style, bracket, position). */
-  --evidence: #0b6a5f;          /* proven: cited history, observed receipt */
-  --policy: #3f47a0;            /* constraint: narrows, never decides */
-  --ember: #a8321f;             /* breach: observed past the boundary */
-  --verdict: #1f6b45;           /* resolved: landed within authority */
-  --assumption: #626a77;        /* unproven: someone typed this */
+     Each meaning is AA on paper and each carries a non-colour cue as well
+     (rule weight, bracket, position, label). */
+  --evidence: #1c5240;          /* proven: cited history, observed invoice */
+  --policy: #3a4a86;            /* constraint: narrows, never decides */
+  --ember: #b02d17;             /* breach: past a limit or past a cap */
+  --verdict: #1c5240;           /* resolved: landed inside authority */
+  --assumption: #6b6357;        /* unproven: someone typed this */
 
-  --evidence-tint: rgba(11, 106, 95, 0.10);
-  --policy-tint: rgba(63, 71, 160, 0.10);
-  --ember-tint: rgba(168, 50, 31, 0.10);
-  --verdict-tint: rgba(31, 107, 69, 0.10);
+  --evidence-tint: rgba(28, 82, 64, 0.09);
+  --policy-tint: rgba(58, 74, 134, 0.09);
+  --ember-tint: rgba(176, 45, 23, 0.09);
+  --verdict-tint: rgba(28, 82, 64, 0.09);
 
-  /* Legacy verdict aliases, re-pointed. */
+  /* ---- INVERTED REGISTER --------------------------------------------
+     Used only where the page must stop being paper: the footer and the
+     single pilot band. Never a global inversion, never behind a figure. */
+  --field: #17140f;
+  --field-2: #211d16;
+  --field-3: #2d281f;
+  --field-ink: #f4f1ea;
+  --field-soft: #cdc5b6;
+  --field-muted: #a29889;
+  --field-line: rgba(244, 241, 234, 0.16);
+  --field-line-strong: rgba(244, 241, 234, 0.32);
+  --dossier: var(--field);
+
+  /* Legacy aliases, re-pointed so every route re-skins from this file. */
+  --gold: var(--frozen);
+  --gold-soft: var(--frozen-soft);
+  --gold-deep: var(--frozen-deep);
+  --gold-line: var(--frozen-line);
+  --dossier-fill: var(--frozen-tint);
+  --glow: var(--frozen);
   --ochre: var(--policy);
   --ochre-tint: var(--policy-tint);
   --indigo: var(--policy);
   --indigo-tint: var(--policy-tint);
-
-  /* ---- THE FIELD SCENE ----------------------------------------------
-     Immersive graphite used only where the Authority Field is the
-     subject. Deliberately composed, never a global inversion. */
-  --field: #0d1015;
-  --field-2: #161a21;
-  --field-3: #1e232c;
-  --field-ink: #e9ecf1;
-  --field-soft: #b3bbc7;
-  --field-muted: #8a93a1;
-  --field-line: rgba(233, 236, 241, 0.14);
-  --field-line-strong: rgba(233, 236, 241, 0.30);
-  --dossier: var(--field);
-
-  /* Legacy aliases */
   --surface: var(--card);
-  --accent: var(--gold);
-  --accent-strong: var(--gold-deep);
+  --accent: var(--frozen);
+  --accent-strong: var(--frozen-deep);
 
-  /* Geometry. Cards are for repeated records only, so the radius is small
-     enough that a framed object never reads as a marketing tile. */
-  --radius: 8px;
-  --radius-xs: 6px;
+  /* Geometry. A record is a sheet with a hairline, not a rounded tile.
+     The radius is small enough that a framed object never reads as a
+     marketing card. */
+  --radius: 3px;
+  --radius-xs: 2px;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
   --space-5: 1.5rem;
   --space-6: 2rem;
-  --shadow-1: 0 1px 2px rgba(20, 23, 28, 0.06);
-  --shadow-2: 0 1px 2px rgba(20, 23, 28, 0.05), 0 18px 42px -30px rgba(20, 23, 28, 0.30);
+  --shadow-1: 0 1px 0 var(--line);
+  --shadow-2: 0 1px 0 var(--line), 0 18px 44px -30px rgba(23, 20, 15, 0.45);
 
-  /* Motion. Durations are graded by how much area moves: press feedback must
-     land inside the 100ms perception window, element changes read at 200ms,
-     and only whole-region entrances earn 400ms+.
-     Easing carries meaning: entrances decelerate (fast in, settle out), exits
-     accelerate away, and moves use an emphasis curve with a slight overshoot.
+  /* Motion. Durations are graded by how much area moves: press feedback lands
+     inside the 100ms perception window, element changes read at 160ms, panels
+     and navigation at 220ms, and only the one signature change earns 480ms.
      `ease` is never used — its symmetric curve reads as mechanical.
-     --motion-freeze is the one decisive curve: a wide unstable region
-     collapsing to a single line. It is used for authorization and nothing else. */
-  --motion-press: 90ms;
+     --motion-freeze is the single decisive curve: a cap line resolving under a
+     request. It is used for authorization and for nothing else. */
+  --motion-press: 80ms;
   --motion-fast: 160ms;
   --motion-move: 220ms;
-  --motion-enter: 420ms;
-  --motion-emphasis: 500ms;
-  --motion-freeze: 340ms;
+  --motion-enter: 220ms;
+  --motion-emphasis: 480ms;
+  --motion-freeze: 480ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-enter: cubic-bezier(0.22, 0.7, 0.25, 1);
-  --ease-emphasis: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-freeze: cubic-bezier(0.16, 0.9, 0.2, 1);
+  --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-emphasis: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-freeze: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @theme inline {
@@ -131,6 +156,12 @@
 }
 
 html {
+  /* Vognary is deliberately one theme: warm paper under near-black ink. There
+     is no prefers-color-scheme branch anywhere in this codebase. Declaring it
+     stops a dark-mode OS from painting native select, date-picker and scrollbar
+     chrome dark inside a light page — the proposal composer's date field and
+     the desk's selects are on the decision path. */
+  color-scheme: light;
   scroll-behavior: smooth;
 }
 
@@ -161,13 +192,13 @@ select {
  * Typographic devices
  * ------------------------------------------------------------------ */
 
-/* Display voice — Fraunces. The engraved-ledger serif that separates
-   Vognary from every grotesk-on-graphite dashboard. Falls back to the
-   UI grotesk while the serif loads. */
+/* Display voice — Newsreader. An editorial serif with true optical sizing, so a
+   headline reads as set type rather than a configured web font. Falls back to
+   the UI sans while it loads. */
 .font-display {
-  font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  letter-spacing: 0;
-  font-weight: 500;
+  font-family: var(--font-display-serif), ui-serif, Georgia, serif;
+  letter-spacing: -0.015em;
+  font-weight: 400;
 }
 
 .font-data {
@@ -306,7 +337,8 @@ select {
 
 /* Touch pointers get a full 44px box on every control, at every width — a
    tablet is not a phone but it is still a thumb. Fine pointers keep the denser
-   .btn-sm sizing, which a mouse can hit accurately. */
+   .btn-sm sizing, which a mouse can hit accurately. Width is not a proxy for
+   pointer, so this is a pointer query and not a breakpoint. */
 @media (pointer: coarse) {
   .btn,
   .btn-sm {
@@ -314,46 +346,22 @@ select {
   }
 }
 
-/* Width is not a proxy for pointer: a tablet clears 40rem and is still a thumb.
-   Coarse pointers keep the full --tap box, the same rule .btn already follows. */
-
-
-/* The desk earns a rail once there is room for one. The view switcher stops
-   being a pill group and becomes a vertical index: left-aligned, full width,
-   the current view marked by a rule rather than a filled chip. */
-
-
-/* Numbered step rail — the guided, easy-to-remember path */
-
-
-
-/* ------------------------------------------------------------------ *
- * Depth, glass, reveal & data-viz
- * ------------------------------------------------------------------ */
-
-/* Frosted glass (sticky instrument bar) */
-
-/* Interactive lift */
-
-/* Fluid type */
-
-/* Spend spectrum — a glowing heat bar of recurring money */
-
-
-
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
-  /* Reduced motion means no travel, not no feedback. Every animation and
-     transition in the product is stopped unconditionally here; `!important` is
-     the enforcement of that guarantee, not an escape from the system. */
+  /* Reduced motion means zero travel and no delayed understanding — not a
+     1-microsecond animation that still runs. Animations and transitions are
+     removed outright, so every element renders at its base state.
+     The convention that makes this safe: base CSS is always the *resolved*
+     state, and a keyframe only describes where a thing came from. Nothing in
+     the product depends on animation-fill-mode to become readable. */
   *,
   *::before,
   *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -379,11 +387,15 @@ select {
   --text-micro: 0.75rem;
   --text-page: 1.625rem;
   --text-record: 1.125rem;
+  /* Colour is spent on three meanings only: a limit crossed, a human freeze,
+     and a rule speaking. A citation and an observation are plain ink — they are
+     distinguished by their printed provenance label and their rule weight, so
+     the whole system still reads in grayscale and in forced colours. */
   --truth-assumption: var(--assumption);
-  --truth-authority: var(--gold-deep);
-  --truth-citation: var(--evidence);
-  --truth-frozen: var(--gold-deep);
-  --truth-observed: var(--evidence);
+  --truth-authority: var(--frozen-deep);
+  --truth-citation: var(--ink-soft);
+  --truth-frozen: var(--frozen-deep);
+  --truth-observed: var(--ink);
   --truth-policy: var(--policy);
 }
 
@@ -434,7 +446,15 @@ select {
   background: var(--truth-rule, var(--line-strong));
 }
 
+/* The rule before a truth label is the provenance itself. Every variant below is
+   in use across the public and workspace surfaces; without these each one fell
+   back to the same grey, so the marker encoded nothing it claimed to. */
 .truth-policy { --truth-rule: var(--truth-policy); }
+.truth-assumption { --truth-rule: var(--truth-assumption); }
+.truth-citation { --truth-rule: var(--truth-citation); }
+.truth-frozen { --truth-rule: var(--truth-frozen); }
+.truth-observed { --truth-rule: var(--truth-observed); }
+.truth-authority { --truth-rule: var(--truth-authority); }
 
 /* ---- Money -----------------------------------------------------------------
    A number's provenance is carried by structure, not colour alone, so the

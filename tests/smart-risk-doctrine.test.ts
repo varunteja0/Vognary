@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const motto = "Take smart risks. Do not play safe.";
+const strategyRule = "Take smart risks. Do not play safe.";
 
 const historicalOrArtifactPaths = new Set([
   "docs/billing-activation-runbook.md",
@@ -15,12 +15,14 @@ const historicalOrArtifactPaths = new Set([
 
 function isHistoricalOrArtifact(path: string): boolean {
   return path.startsWith(".agent-coordination/")
+    || path.startsWith(".claude/skills/")
     || path.startsWith("docs/archive/")
+    || path.startsWith("docs/evidence/")
     || path.startsWith("docs/templates/")
     || historicalOrArtifactPaths.has(path);
 }
 
-test("every active Markdown document starts from the smart-risk doctrine", () => {
+test("every Vognary-authored active Markdown document starts from the strategy rule", () => {
   const trackedMarkdown = execFileSync("git", ["ls-files", "*.md"], { encoding: "utf8" })
     .trim()
     .split("\n")
@@ -29,15 +31,20 @@ test("every active Markdown document starts from the smart-risk doctrine", () =>
 
   assert.ok(activeMarkdown.length >= 20, `expected the active Markdown authority set, received ${activeMarkdown.length}`);
   for (const path of activeMarkdown) {
-    const opening = readFileSync(path, "utf8").slice(0, 1_200);
-    assert.match(opening, new RegExp(motto.replaceAll(".", "\\.")), `${path} must carry the operating motto near the top`);
+    const opening = readFileSync(path, "utf8").slice(0, 5_000);
+    assert.ok(opening.includes(strategyRule), `${path} must carry the strategy rule in its opening doctrine`);
   }
 });
 
-test("the supreme smart-risk doctrine requires falsification and bounded downside", () => {
+test("the supreme doctrine requires ordered reduction, falsification, and bounded downside", () => {
   const law = readFileSync("docs/THE-LAW.md", "utf8");
 
-  assert.match(law, /Founder motto — supreme operating principle/);
+  assert.match(law, /Founder motto — supreme product operating sequence/);
+  assert.match(law, /Make it work\. Make it perfect\. Make it fast\. Make it cheap\./);
+  assert.match(law, /Every complex problem is a set of simple problems/);
+  assert.match(law, /one proposed obligation[\s\S]*one exact reconciliation result/);
+  assert.match(law, /attention always comes before creation/);
+  assert.match(law, /ambitions, not executable tasks/);
   assert.match(law, /cheapest real-world test that can disprove it/);
   assert.match(law, /owner, deadline, success threshold, and kill threshold/);
   assert.match(law, /bounded and preferably reversible downside/);

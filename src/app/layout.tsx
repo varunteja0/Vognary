@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from "next/font/google";
 import PwaRegister from "./pwa-register";
 import "./globals.css";
 
-// Plex carries the documentary record; Fraunces remains Vognary's fixed
-// display voice for the moments that need authority.
+// Plex carries the documentary record. Newsreader is the display voice: an
+// editorial serif with real optical sizing, so a headline reads as something
+// that was set rather than something that was configured.
 const grotesk = IBM_Plex_Sans({
   variable: "--font-grotesk",
   subsets: ["latin"],
@@ -21,7 +22,7 @@ const monoData = IBM_Plex_Mono({
   preload: false,
 });
 
-const display = Fraunces({
+const display = Newsreader({
   variable: "--font-display-serif",
   subsets: ["latin"],
   display: "optional",

@@ -28,6 +28,11 @@ const signedInOnly = args.get("--signed-in-only") === true;
 const wantSignedIn = signedInOnly || args.get("--signed-in") === true;
 const freshAuth = args.get("--fresh-auth") === true;
 const navTimeout = Number(args.get("--timeout") ?? 90_000);
+// One theme ships, so one theme is captured. `--schemes light,dark` restores the
+// old duplicate pass if a second theme is ever actually built.
+const SCHEMES = typeof args.get("--schemes") === "string"
+  ? args.get("--schemes").split(",").map((s) => s.trim()).filter(Boolean)
+  : ["light"];
 // Session cache lives under node_modules (gitignored) so a cookie never reaches a commit.
 const authFile = typeof args.get("--auth") === "string" ? args.get("--auth") : "node_modules/.cache/vognary-auth.json";
 
@@ -60,8 +65,8 @@ const ROUTES = [
 // not once per run. Workspace views are real in-page destinations, not routes.
 const SIGNED_IN_ROUTES = [
   { slug: "workspace-today", route: "/app", view: "Today" },
-  { slug: "workspace-control", route: "/app", view: "Control" },
-  { slug: "workspace-bills", route: "/app", view: "Commitments" },
+  { slug: "workspace-control", route: "/app", view: "Decisions" },
+  { slug: "workspace-bills", route: "/app", view: "Bills" },
   { slug: "workspace-sources", route: "/app", view: "Evidence" },
   { slug: "profile", route: "/profile" },
 ];
@@ -140,7 +145,10 @@ async function captureRoute(page, slug, route, vp, scheme, view) {
   await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
   await page.evaluate(() => document.fonts.ready);
   if (view) {
-    const button = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: view, exact: true });
+    // Destination labels carry a live count ("Decisions (2)"), so an exact-name
+    // match finds nothing the moment the queue is non-empty.
+    const button = page.getByRole("navigation", { name: "Primary" })
+      .getByRole("button", { name: new RegExp(`^${view}\\b`) });
     if (await button.count() === 0) {
       findings.push({ route, viewport: vp.name, scheme, issue: `${view} workspace view is unavailable` });
       page.off("pageerror", onPageError);
@@ -150,7 +158,7 @@ async function captureRoute(page, slug, route, vp, scheme, view) {
     await button.click();
     await page.waitForFunction((label) => {
       return [...document.querySelectorAll('nav[aria-label="Primary"] button')]
-        .some((candidate) => candidate.textContent?.trim() === label && candidate.getAttribute("aria-current") === "page");
+        .some((candidate) => candidate.textContent?.trim().startsWith(label) && candidate.getAttribute("aria-current") === "page");
     }, view);
   }
   await page.evaluate(async () => {
@@ -190,7 +198,11 @@ async function captureRoute(page, slug, route, vp, scheme, view) {
 }
 
 let captured = 0;
-for (const scheme of ["light", "dark"]) {
+// Vognary is deliberately one theme. There is no prefers-color-scheme rule in
+// the codebase, so a "dark" pass produced a byte-identical duplicate of every
+// artifact under a label implying two themes had been tested. The canonical set
+// is light; dark is verified below as an assertion instead of as 85 more files.
+for (const scheme of SCHEMES) {
   for (const vp of VIEWPORTS) {
     const contextOptions = {
       viewport: { width: vp.width, height: vp.height },
@@ -221,8 +233,48 @@ for (const scheme of ["light", "dark"]) {
   }
 }
 
+// Proves the single-theme claim instead of asserting it in prose: render a
+// sample under a dark OS preference and require pixel-identical output. This is
+// what guards `color-scheme: light` and the absence of prefers-color-scheme.
+// Light is captured twice first — a route that differs from itself across two
+// loads (client-generated draft ids, timestamps) cannot testify about theming,
+// so it is skipped rather than reported as drift.
+let singleThemeCheck = null;
+if (SCHEMES.length === 1 && SCHEMES[0] === "light" && !signedInOnly) {
+  const sample = ROUTES.slice(0, 3);
+  const shots = {};
+  for (const pass of ["light", "light-control", "dark"]) {
+    const context = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      deviceScaleFactor: 1,
+      colorScheme: pass === "dark" ? "dark" : "light",
+      reducedMotion: "no-preference",
+    });
+    const page = await context.newPage();
+    for (const [slug, route] of sample) {
+      await page.goto(base + route, { waitUntil: "domcontentloaded", timeout: navTimeout });
+      await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+      await page.evaluate(() => document.fonts.ready);
+      shots[`${pass}:${slug}`] = await page.screenshot({ fullPage: false });
+    }
+    await context.close();
+  }
+  const stable = sample.filter(([slug]) => shots[`light:${slug}`].equals(shots[`light-control:${slug}`]));
+  const skipped = sample.filter(([slug]) => !stable.some(([s]) => s === slug)).map(([slug]) => slug);
+  const drift = stable
+    .filter(([slug]) => !shots[`light:${slug}`].equals(shots[`dark:${slug}`]))
+    .map(([slug]) => slug);
+  const skipNote = skipped.length ? ` (${skipped.length} nondeterministic route(s) skipped: ${skipped.join(", ")})` : "";
+  singleThemeCheck = drift.length
+    ? `single-theme check FAILED: ${drift.join(", ")} render differently under a dark OS preference${skipNote}`
+    : `single-theme check passed: ${stable.length} route(s) render identically under light and dark OS preference${skipNote}`;
+  if (drift.length) process.exitCode = 1;
+}
+
 await browser.close();
 console.log(`captured ${captured} screenshots to ${outDir}`);
+console.log(`theme: single (light). schemes captured: ${SCHEMES.join(", ")}`);
+if (singleThemeCheck) console.log(singleThemeCheck);
 if (sessionPath) console.log(`signed-in surfaces used cached session ${authFile}`);
 if (!findings.length) console.log("no layout or touch-target findings");
 else {

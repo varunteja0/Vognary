@@ -72,8 +72,9 @@ test("step labels stay numbered from the same five sentences", () => {
 });
 
 test("public and desk surfaces express the same loop, and the lesson never restarts", () => {
-  const narrative = readFileSync("src/app/home-field-narrative.tsx", "utf8");
-  const field = readFileSync("src/lib/authority-field.ts", "utf8");
+  const landing = readFileSync("src/app/launch-landing.tsx", "utf8");
+  const sheet = readFileSync("src/app/record-sheet.tsx", "utf8");
+  const demo = readFileSync("src/app/demo/demo-client.tsx", "utf8");
   const about = readFileSync("src/app/about/page.tsx", "utf8");
   const start = readFileSync("src/app/start/start-client.tsx", "utf8");
   const login = readFileSync("src/app/login/login-client.tsx", "utf8");
@@ -81,19 +82,23 @@ test("public and desk surfaces express the same loop, and the lesson never resta
   const control = readFileSync("src/app/workspace/recovery/control/control-view.tsx", "utf8");
   const agent = readFileSync("src/lib/agent-content.ts", "utf8");
 
-  // The public front door walks the same primitive, in order, through one field
-  // rather than by re-printing the five sentences.
-  for (const stage of ["EVIDENCE", "PROPOSED", "POLICY", "AUTHORIZED", "OBSERVED"]) {
-    assert.match(narrative, new RegExp(`stage: "${stage}"`));
-  }
-  assert.match(field, /authorityFieldSequence/);
+  // The public front door renders the loop as one record moving through its
+  // own stages, from the canonical fixture — it never re-prints the five
+  // sentences as a lecture.
+  assert.match(sheet, /syntheticControlBrief/);
+  assert.match(landing, /RequestSheet/);
+  assert.match(landing, /FreezeSheet/);
   assert.match(agent, /COMMITMENT_CONTROL_STEPS/);
+
+  // The demonstration opens at the decision. A numbered tour is the thing that
+  // was removed, so its return is a regression.
+  assert.doesNotMatch(demo, /STEP_LABELS|demo-steps|Demonstration steps/);
 
   // A journey advances; it does not restart the same lesson on every page. The
   // step rail survives in exactly one place: where the operator's current stage
   // is the thing they need.
   assert.match(control, /AuthorizationLoop/);
-  for (const source of [about, start, login, home]) {
+  for (const source of [about, start, login, home, landing]) {
     assert.doesNotMatch(source, /AuthorizationLoop/);
   }
 });

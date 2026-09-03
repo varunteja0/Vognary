@@ -1,538 +1,1128 @@
-# Opus 5 frontier frontend reset mandate
+# Claude Opus 5 — final Vognary frontend acceptance mandate
 
-Give everything below the divider to Claude Code with repository write access,
-live web access, browser automation, and Playwright. Use Claude Opus 5 only if
-that model is actually available in the account; otherwise use the strongest
-available Claude Opus model and name it honestly.
+**Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+**Strategy rule: Take smart risks. Do not play safe.** Pursue asymmetric,
+falsifiable upside and bound irreversible downside. The permanent truth,
+security, privacy, consent, exact-money, and human-authority rules in
+[`docs/THE-LAW.md`](../docs/THE-LAW.md) remain non-waivable.
 
-This file is the sole frontend execution authority. It replaces every earlier
-Vognary frontend, visual-quality, redesign, reconstruction, and Opus prompt.
-Do not load those older prompts as design context.
+**Founder authorization, reconfirmed 2026-09-03:** complete one final
+frontend-only acceptance challenge from the candidate already delivered on
+`main`. This is a bounded **Make it work** usability and sales-enablement
+investment, not proof that Vognary works in the market. Founder-led outreach and
+security-assessment work continue in parallel. When this candidate and its
+evidence package are complete, freeze further frontend redesign until Phase A
+produces new paid-behavior evidence or a real working session exposes a blocking
+defect.
+
+Give everything below the divider to **Claude Opus 5** in Claude Code with
+repository write access, live web access, browser automation, and Playwright.
+Use the exact Opus 5 model. If it is unavailable, stop and name the unavailable
+model; do not silently substitute or mislabel another model.
+
+This file is the sole frontend execution mandate. It replaces every earlier
+Vognary frontend, visual-quality, redesign, reconstruction, concept, and Opus
+prompt. The delivered candidate is an incumbent to test, not an instruction to
+preserve its style. Older prompts must not influence implementation or stopping
+behavior.
 
 ---
 
-# FINAL FRONTEND RESET: EARN THE DIRECTION BEFORE REBUILDING THE APP
+## Final Frontend Acceptance: Make the Decision Product Unmistakably Vognary
 
-Operating date: **2026-09-02**. Recheck the date, branch, runtime, processes,
-and worktree before acting.
-
-Repository:
-
-`/Users/varunteja/Desktop/CVT Group/Vognary`
+**Operating date:** 2026-09-03
+**Repository:** `/Users/varunteja/Desktop/CVT Group/Vognary`
+**Branch:** `main`
+**Primary owner:** Claude Opus 5
+**Independent subagents:** GPT-5.6 Sol only
 
 You are Vognary's sole frontend writer for this execution: creative director,
-product designer, interaction designer, design engineer, frontend architect,
-accessibility owner, and rendered-browser quality owner.
+product designer, interaction designer, motion designer, design engineer,
+frontend architect, accessibility owner, and rendered-browser quality owner.
 
-The founder has rejected the current frontend without reservation. Do not
-polish it. Do not defend it with test totals. Do not preserve its central
-metaphor because it was expensive to build.
+The current candidate is technically strong and visually unaccepted. Do not
+blindly preserve it, and do not destroy working behavior merely to make the diff
+look ambitious. First render and prosecute the incumbent. Then build two small,
+materially different challengers against the same truth and choose with the
+hard gates and 1,000-point acceptance rubric below. A challenger earns the right
+to replace the incumbent only by demonstrating a substantial improvement in the
+browser. Otherwise repair the incumbent's specific weaknesses and finish it.
 
-The current Authority Field candidate, dark chart, split hero, serif-ledger
-voice, graphite/gold treatment, current mark treatment, sticky five-scene
-story, repeated INR 3,050 / INR 4,200 example, cloned public-ledger layouts,
-and current component styling are all disposable. They may be deleted.
+Continue in one sustained run through selection, implementation, every route,
+every meaningful state, responsive behavior, accessibility, authenticated
+browser proof, performance, and final evidence. Do not stop for founder approval
+between stages. The comparison is a rapid falsification mechanism, not the
+deliverable.
 
-Vognary's name and product truth remain fixed. The visual identity of this
-unreleased candidate does not. For this private experiment, the founder
-explicitly permits replacement of the current mark treatment, mascot usage,
-typefaces, palette, spacing, layout, motion grammar, components, route
-composition, imagery, and navigation. This is not permission to launch or to
-change the company thesis. Final brand adoption still requires founder visual
-acceptance and an explicit doctrine update.
+## 0. Founder Override and Boundaries
 
-No model, library, prompt, or design process guarantees a great result. Your
-job is to make weak directions cheap to reject before they spread across the
-app, then execute the winning direction with unusual care.
+For this one frontend candidate, the founder explicitly overrides:
 
-## 1. The actual product job
+- the previous `GATE A ONLY` stop;
+- the fixed mark, mascot treatment, Fraunces, graphite/gold palette, and current
+  visual identity;
+- the bans on public redesign, route recomposition, design-system
+  reconstruction, new frontend assets, and justified frontend dependencies;
+- every older frontend completion claim, concept score, screenshot, and prompt.
 
-Vognary is currently Commitment Control for an India-first finance owner:
+This is a **frontend-only override**. It authorizes changes to:
 
-> Before a consequential AI, cloud, software, contractor, or campaign
-> obligation is created, show cited existing exposure and policy context,
-> record the named human decision and exact cap, then compare later evidence
-> with the frozen authorization.
+- frontend information architecture and route presentation;
+- visual identity, typography, palette, design tokens, icons, and brand assets;
+- frontend components, layouts, CSS, responsive composition, interaction, and
+  motion;
+- frontend-only deterministic synthetic fixtures;
+- public metadata, OG/PWA/brand exports, and frontend asset generation;
+- frontend tests, capture tooling, performance tooling, motion tooling, and
+  obsolete presentation assertions.
 
-The interface must make this concrete in seconds. A cold finance owner should
-understand:
+It does **not** authorize:
+
+- changing the company thesis or product domain;
+- changing backend, domain, API, persistence, migration, authentication,
+  settlement, enrollment, readiness, or production behavior;
+- commits, branches, stashes, pushes, pull requests, deployments, migrations,
+  production changes, or real customer data;
+- fake customers, traction, integrations, savings, security clearance,
+  payments, investors, usage, readiness, or market proof.
+
+Treat these paths as read-only contracts:
+
+```text
+src/lib/commitment-control/**
+src/lib/server/**
+src/lib/recovery/**
+src/lib/finops-control/**
+infra/postgres/**
+private CRM and market evidence
+payment settlement, enrollment, readiness, and production configuration
+```
+
+`src/lib/synthetic-control-demo.ts` is a frontend-only fixture and may be
+replaced, provided it continues deriving facts through the read-only domain
+functions and makes zero product mutation calls.
+
+Vognary's **name** remains fixed. The reconstructed identity is a candidate
+until the founder accepts it after the complete run. No frontend work may call
+it launched, production-ready, secure, paid, customer-validated, or
+market-validated.
+
+## 1. Non-Waivable Product Law
+
+Every visual decision must preserve these truths:
+
+1. Every amount is an exact minor-unit string with an explicit uppercase ISO
+   currency. Never silently convert, sum, or compare unlike currencies.
+2. Existing financial facts cite evidence. Proposed values are visibly
+   user-entered assumptions. Unknown is never rendered as zero.
+3. Policy is deterministic, versioned context. It never impersonates a human
+   decision.
+4. Only a workspace owner or admin may approve, approve with a cap, or decline.
+5. Actor, role, time, reason, policy version, decision, expected amount, and cap
+   are preserved. Later evidence cannot rewrite them.
+6. Reconciliation appends `MATCHED`, `WITHIN_CAP`, `OVER_CAP`,
+   `CURRENCY_MISMATCH`, or `CANNOT_EVALUATE` against the frozen authorization.
+7. A decline creates no cap and no later cap comparison.
+8. Vognary never auto-approves, auto-denies, buys, provisions, cancels, contacts
+   a vendor, or moves money.
+9. Synthetic records are persistently visible and programmatically marked,
+   use placeholder identities, make zero product mutation calls, and never
+   count as activity or usage.
+10. Preserve RBAC, CSRF, idempotency, workspace-version/ETag, privacy,
+    retention, safe-redirect, settlement-webhook, and fail-closed enrollment
+    contracts.
+11. Payment reserves a pilot; payment is not activation. Real customer
+    financial data remains blocked until the independent security assessment
+    and retest exit.
+12. Never invent a customer, logo, testimonial, quote, saving, benchmark,
+    integration, certification, assessment, payment, deployment, readiness,
+    activity stream, or scale metric.
+
+This reconstruction raises only the **Product UX hypothesis**. Current market
+truth remains 3 contacts and zero replies, conversations, offers, or cleared
+payments. Business Validation and Distribution remain **1.5**.
+
+“Investor-ready” means coherent, truthful, technically disciplined, and
+commercially legible. Investor excitement is not demand, traction, payment, or
+validation.
+
+## 2. Product Job and Cold-User Test
+
+Vognary is Commitment Control for an India-first finance owner:
+
+> Before an AI, cloud, software, contractor, or campaign obligation exists,
+> show cited exposure and policy context, let a named human decide the exact
+> boundary, and later compare observed evidence with that frozen authorization.
+
+A cold finance owner must understand within 30 seconds:
 
 1. what expensive request needs a decision;
-2. what evidence supports or contradicts it;
-3. who has authority;
-4. what was approved, capped, or refused;
-5. what happened later;
-6. what they should do next.
+2. what is proven and what is only assumed;
+3. what policy says and cannot say;
+4. who has authority;
+5. what was approved, capped, or refused;
+6. what happened later;
+7. what action should happen next.
 
-Do not lead with internal ontology such as field, boundary, ledger, graph,
-provenance, reconciliation, or immutable record. Those concepts may appear
-after the buyer sees the practical job. Prefer literal outcome language.
+Do not lead with “field,” “boundary,” “ledger,” “graph,” “provenance,”
+“reconciliation,” or “immutable record.” Show the recognizable business event
+first. Technical vocabulary may appear after the job is understood.
 
-A valid starting copy hypothesis is:
+Use this fixed public copy hypothesis in all concept comparisons so copy does
+not confound visual selection:
 
-> Approve AI and cloud commitments before they become bills.
+- **H1:** `Approve AI and cloud commitments before they become bills.`
+- **Primary CTA:** `Review the synthetic request`
+- **Secondary path:** `Use your own evidence`
+- **Pilot action:** `See the one-month pilot`
 
-You may improve it, but the final H1 must remain literal, specific, and under
-12 words. Do not use a poetic metaphor as the main promise.
+You may refine supporting interface copy after concept selection, but the final
+H1 must remain literal, active, specific, and at most 12 words.
 
-## 2. Why the current candidate failed
+## 3. Exact Current Incumbent
 
-Treat these as reproduced defects, not suggestions:
+Recheck every fact before relying on it. The current clean `main` candidate was
+last recorded at `3b46d6e1e4bd84901a1c07d75c2caa180a6de247`; Node is pinned to
+`22.23.2`, npm to `10.9.8`, Next.js to `16.3.0`, and React to `19.2.4`.
 
-- At 390 x 844, the abstract field occupies y=61..541. The H1 begins at y=611.
-  The buyer sees the diagram before the product promise.
-- The mobile page is 6,927 CSS pixels long.
-- At 1440, the first scene is a 670/770 split between long copy and an abstract
-  plot. Neither side resembles a useful operating product.
-- The same low-consequence synthetic example dominates Home and Demo even
-  though the current ICP gate is at least INR 8 lakh/month of controllable
-  exposure and the pilot itself costs INR 14,999.
-- The site explains evidence, policy, authority, and outcome repeatedly instead
-  of showing one realistic decision being handled.
-- About, Contact, Login, Pay, Security, Start, Verify, and Billing Return still
-  inherit variants of one document/ledger template.
-- The operating workspace and public story do not feel like the same product.
-- Demo also puts 565 CSS pixels of abstract media before its mobile H1 and
-  delays the actual decision controls.
-- Start leads with a post-spend receipt and the H1 "See the charge" even though
-  the current wedge claims to begin before a consequential obligation exists.
-- Pay is an oversized commercial document rather than a confident continuation
-  of the product experience; scope, activation, and refund details do not read
-  as one decision.
-- Security is a 3,699-CSS-pixel mobile status and warning wall with no clear
-  trust-summary action. Unauthenticated App and Profile both collapse into the
-  same generic Login composition instead of showing credible product context.
-- Generated screenshot quantity was treated as evidence of taste.
-- A browser context retained zoom while captures were named by viewport size.
-  Capture labels therefore did not prove the visual viewport that was judged.
+The incumbent is **Decision Threshold v3.0**: warm paper, near-black ink,
+Newsreader display type, vermilion for a crossed limit, forest for a human
+freeze, and slate-blue for policy. It already replaced the rejected Authority
+Field, graphite/gold system, Fraunces, and mascot-led public story.
 
-The root cause was the brief. It prescribed a metaphor, palette semantics,
-route architecture, scene order, and reference set before design exploration.
-You are not bound by those choices.
+Measured evidence on the delivered tree:
 
-## 3. Permanent truth and safety boundaries
+- protected frontend boundary unchanged across 351 files;
+- lint 0 errors; typecheck, build, claims, research, brand, and token checks
+  pass;
+- database-unset unit wall **1,179/1,179**;
+- all **16** user-facing route budgets pass: Home CSS **11,706 B / 15,000 B**
+  and App CSS **14,445 B / 15,000 B**;
+- seven public Lighthouse routes score **100** for performance,
+  accessibility, and best practices, with LCP **713–796 ms**;
+- motion passes **4/4** near 60 fps, p95 at most 18.5 ms, with zero long tasks
+  under 4x CPU;
+- public E2E passes **82/82** across desktop and mobile;
+- 140 fresh-context route captures live under
+  `docs/evidence/frontend-final-2026-09-03/` with source and artifact hashes.
 
-Visual freedom does not include semantic freedom. Preserve all of these:
+That evidence proves implementation quality, not visual acceptance. The
+remaining known gaps are:
 
-- exact minor-unit money and explicit currency;
-- cited evidence versus user-entered assumption;
-- deterministic policy that never impersonates a human decision;
-- owner/admin-only approval, cap, or refusal;
-- named actor, time, reason, and frozen authorization;
-- later evidence never rewriting the earlier decision;
-- no silent FX conversion or cross-currency sum;
-- unknown and unsupported facts fail closed;
-- synthetic content is persistently and programmatically identified;
-- no fake customer, testimonial, logo, saving, integration, certification,
-  activity, payment, deployment, or readiness;
-- no autonomous approval, purchasing, provisioning, cancellation, or money
-  movement;
-- payment is not activation;
-- real customer financial data remains blocked until the independent security
-  assessment and retest exit;
-- no enrollment, RBAC, CSRF, idempotency, ETag, privacy, or payment bypass.
+1. The founder has not accepted the visual identity.
+2. No GPT-5.6 Sol blind review was available, so selection remains
+   `VISUAL SELECTION UNVALIDATED`.
+3. The authenticated browser matrix did not run after development-login rate
+   limiting, and the final evidence package contains no enrolled App capture.
+4. Light- and dark-requested public captures are byte-identical. A deliberate
+   single theme is valid, but evidence must not imply that two themes were
+   tested when only one visual result exists.
+5. App CSS has only 555 B of hard-ceiling headroom and about 195 B less than the
+   preferred reserve. The fixed ceiling remains 15,000 B.
 
-Do not edit backend, domain, persistence, migration, auth, readiness, payment
-settlement, market evidence, private CRM, or FinOps candidate files. Consume
-their contracts; do not reinterpret them.
+Treat these rendered observations as hypotheses to test, not automatic orders
+to redesign:
 
-## 4. Worktree and ownership
+- the incumbent closely resembles a common AI-design cluster: warm cream,
+  high-contrast editorial serif, hairline rules, and broadsheet-like sheets;
+- Home uses a split copy/product-sheet hero and leaves a large quiet upper band
+  on desktop rather than making the product moment immersive;
+- the visual grammar depends heavily on bordered white documents and text, so
+  brand recognition beyond the small mark is weak;
+- Demo's unresolved-result area is a large empty rectangle before a choice;
+- Pay and Security are truthful but read as long static documents, and Security
+  is expensive to scan;
+- mobile is coherent but often behaves like desktop bands stacked vertically
+  rather than a separately authored handheld workflow.
 
-One writer only. Before editing:
+Disconfirm those observations in a fresh browser before changing code. Preserve
+what survives scrutiny. Delete or replace only what the selected direction
+proves inferior.
 
-1. Read `AGENTS.md`, `docs/THE-LAW.md`, and the newest entries in
-   `docs/CONTINUE-HERE.md`.
-2. Confirm `main`, exact HEAD, Node `22.23.2`, and npm `10.9.8` or the pinned
-   equivalents.
-3. Inspect `git status --short`, staged and unstaged diffs, active writer
-   processes, and open handles.
-4. If another Opus, Claude, or coding agent is writing frontend files, stop.
-5. Read the relevant Next.js 16.3 guides under `node_modules/next/dist/docs/`
-   before changing routing, metadata, fonts, images, CSS, or client boundaries.
+## 4. Preflight and Ownership
 
-Never reset, restore, stash, move, overwrite, or temporarily hide another
-agent's work. Do not create a sibling worktree, branch, commit, push, deploy,
-migrate, enroll, or use real customer data.
+Before editing:
 
-Protected surfaces include:
+1. Read `AGENTS.md`, `docs/THE-LAW.md`, the newest entries in
+   `docs/CONTINUE-HERE.md`, `docs/execution/phase-b-loop-shipping.md`, this
+   mandate, the three pinned Claude skills, and relevant Next.js 16.3 guides
+   under `node_modules/next/dist/docs/`.
+2. Confirm the exact branch, HEAD, working tree, staged paths, Node/npm versions,
+   running servers, active frontend writers, and open ports.
+3. Inspect every existing diff. Preserve user and other-agent work. Never reset,
+   restore, stash, move, or hide work you did not create.
+4. If another agent is actively writing frontend files, stop and report the
+   collision.
+5. Record a frontend-owned file manifest and ignored rollback snapshots under
+  `.fallow/frontend-acceptance/2026-09-03/checkpoints/`. Do not use Git commits or
+   stashes as checkpoints.
+6. Activate Node `22.23.2` before every npm command.
 
-- `src/lib/commitment-control/**`
-- `src/lib/server/**`
-- `src/lib/recovery/**`
-- `src/lib/finops-control/**`
-- `infra/postgres/**`
-- market instruments and private CRM files
-- payment, enrollment, readiness, and production configuration
-- staged work not created by this frontend execution
+Use the canonical `src/app/workspace/**` implementation. Do not revive a
+parallel workspace or the retired monolith.
 
-## 5. Required Claude Code skills and tools
+After the first substantive edit, run the cheapest focused executable check
+before reading or editing a second area. Validate each slice before widening.
 
-The project already includes these pinned Claude Code skills. Read and invoke
-all three before ideation or code:
+## 5. Exact Canonical Fixtures
+
+The incumbent already contains the canonical fixture builder and multi-record
+desk. Treat this section as an acceptance contract. Verify the derived values,
+DTO validation, deterministic hashes, and zero-write boundary before editing.
+Do not recreate, rename, or churn a passing fixture unless a focused check first
+proves that the implementation differs from this contract.
+
+### 5.1 Hero Record: `SYNTHETIC_CC_V2`
+
+Preserve and verify the deterministic frontend fixture in its recognizable UUID
+namespace. These are the only hand-authored inputs:
+
+| Fact | Exact input |
+| --- | --- |
+| Buyer | Finance owner at a 20–100-person India-first AI-native company |
+| Requester | Engineering lead (placeholder) |
+| Counterparty | Model API vendor (placeholder) |
+| Purpose | One-month inference-capacity reservation before a customer launch |
+| Fixture clock | as-of `2026-08-03`; first proposed charge `2026-08-10` |
+| Cited history | invoices dated `2026-06-10` and `2026-07-10`, each INR 3,20,000 / `"32000000"` minor units |
+| Existing recurring commitment | INR 3,20,000 monthly, next occurrence `2026-08-10`, supported by those two invoices |
+| Request assumption | INR 4,80,000 one-time / `"48000000"` minor units, submitted `2026-08-03T09:12:00.000Z` |
+| Policy | v7; AI Model `ALLOW`; per-charge INR 4,00,000 / `"40000000"`; high enough 13-week and annual ceilings that only the per-charge limit is breached |
+| Evaluation | `OUTSIDE_POLICY`; only `PER_CHARGE_LIMIT_EXCEEDED`; human decision required |
+| Decision | Finance owner (placeholder), `APPROVE_WITH_CAP`, INR 3,60,000 / `"36000000"`, decided `2026-08-04T11:40:00.000Z` |
+| Override reason | `Customer launch capacity only; revisit before the next cycle.` |
+| Later evidence | cited invoice dated and observed `2026-09-01T04:31:00.000Z`, INR 4,72,000 / `"47200000"` |
+| Reconciliation | `OVER_CAP`; frozen cap remains INR 3,60,000 |
+| Next action | Inspect the cited invoice and ask the request owner for the overrun explanation |
+| Offer | One pilot month, INR 14,999 / `"1499900"`; no automatic renewal |
+
+Derive all projections and statuses in this order:
+
+```text
+projectProposalExposure
+  → evaluateProposalPolicy
+  → authorizeProposalDecision
+  → reconcileAuthorizedProposal
+  → isCommitmentControlBriefDto === true
+```
+
+Use the pure functions from `src/lib/commitment-control/**` without modifying
+them. The INR 1,12,000 difference may render only after exact minor-unit
+subtraction is validated; otherwise render the frozen and observed values plus
+`OVER_CAP`.
+
+Use the UUID namespace prefix `5eeded02-0000-4000-8000-` and stable documented
+suffixes for every fixture proposal, evaluation, actor, evidence record,
+decision, and reconciliation. Define all category rules required by
+`ProposalPolicy`; set the INR 13-week ceiling to `"300000000"` and annual ceiling
+to `"1200000000"`. Tests must assert the engine derives existing exposure of
+`"96000000"` over 13 weeks and `"384000000"` annually, proposal exposure of
+`"48000000"` in both horizons, the sole reason code above, the frozen cap, and
+the `OVER_CAP` verdict.
+
+Serialize fixture hashes deterministically: recursively sort object keys,
+preserve array order, encode the resulting JSON as UTF-8 without whitespace or
+a trailing newline, then SHA-256 the bytes. Test that two independent builds
+produce the same fixture bytes and hash.
+
+Generate and validate all three branches:
+
+- approve at INR 4,80,000;
+- approve with a cap at INR 3,60,000;
+- decline with no cap and no reconciliation.
+
+### 5.2 Multi-Record Daily Desk
+
+One record cannot prove a daily operating product. Preserve and verify the
+second read-only, versioned fixture through the same pure functions and shared
+policy. It must contain at least these deterministic states:
+
+| Record | Input | Derived/recorded state | Next action |
+| --- | --- | --- | --- |
+| Model API vendor | INR 4,80,000 one-time | `OUTSIDE_POLICY`, awaiting owner/admin | Decide now |
+| Cloud failover capacity | INR 2,40,000 one-time | `REVIEW_REQUIRED`, awaiting owner/admin | Review request |
+| Observability capacity | INR 2,20,000 one-time | capped at INR 2,00,000, awaiting evidence | Link evidence later |
+| Vector database vendor | INR 1,80,000 monthly | approved at INR 1,80,000; observed INR 1,95,000; `OVER_CAP` | Inspect overrun |
+| Security assessment firm | INR 3,00,000 one-time | approved and observed at INR 3,00,000; `MATCHED` | Closed; inspect evidence |
+| Launch campaign vendor | INR 6,50,000 one-time | `DECLINE`; no cap or reconciliation | Closed as refused |
+
+Separate the test data into three explicit families:
+
+1. **Valid domain fixtures:** construct accepted proposals, evaluations,
+   decisions, and reconciliations through the pure engines and require the
+   resulting DTO validator to pass.
+2. **Rejected-input fixtures:** unknown/invalid amount, currency, date,
+   recurrence, cross-currency misuse, missing citation, and malformed DTO. Assert
+   normalization or validation rejects them; never render them as valid domain
+   records.
+3. **Transport/view wrappers:** loading, offline, server error, stale `412`,
+   replay/conflict `409`, missing policy, no eligible evidence, and retry-safe
+   recovery. Wrap or withhold the last valid DTO; do not claim these states are
+   domain-engine outputs.
+
+Cover at least:
+
+- `WITHIN_POLICY`, `REVIEW_REQUIRED`, and `OUTSIDE_POLICY`;
+- `MATCHED`, `WITHIN_CAP`, `OVER_CAP`, `CURRENCY_MISMATCH`, and
+  `CANNOT_EVALUATE`;
+- no policy, no citations, unknown amount, unknown currency, and long names;
+- owner, admin, member read-only, unenrolled, offline, loading, server error,
+  stale `412`, replay/conflict `409`, and retry-safe recovery.
+
+Use fixed clocks, exact UUIDs, placeholder identities, evidence IDs, and source
+excerpts. Preserve deterministic server order inside each group. Do not invent a
+risk score, probability, benchmark, saving, total company spend, or activity.
+
+Wrap each canonical DTO in a frontend-only fixture envelope containing
+`synthetic: true`, `fixtureVersion`, `fixtureId`, and `sourceSha256`; do not add
+those fields to or change the domain DTO contract. Compute `sourceSha256` over
+the canonical envelope payload with the `sourceSha256` field omitted, then set
+the resulting digest. Every contained DTO keeps all write capabilities `false`,
+including Demo. Demo interaction uses a separate frontend-only local state
+machine/callback that selects among already validated branches; it never changes
+DTO capabilities. Browser tests must assert zero product mutation calls.
+Presentation components may not contain hand-authored money, verdict, age, or
+policy literals.
+
+Acceptance challengers may consume generated JSON under `.fallow/`. The final
+app must use one canonical frontend fixture builder and the same truth/money
+renderers as the live components.
+
+## 6. Reference Forensics: Learn the Machinery, Not the Skin
+
+Do not merely browse hero themes. Deconstruct how excellent sites work
+underneath, then re-author mechanisms for Vognary.
+
+Inspect at least four current product sites and two current Awwwards projects.
+Start with Linear, Attio, Stripe, Mercury, Ramp, Raycast, and current Awwwards
+winners, but recheck live pages. Include at least one dense operational product
+and one non-SaaS experience with exceptional pacing.
+
+For every reference, inspect desktop and mobile in fresh contexts and record:
+
+1. **Page skeleton:** landmarks, region order, viewport occupancy, grid tracks,
+   content width, section rhythm, and where the next band becomes visible.
+2. **Responsive transformation:** what reorders, disappears, changes density,
+   becomes a sheet, or gets a separate mobile composition.
+3. **Product-media placement:** aspect ratio, crop, frame, overlap, depth,
+   relationship to copy, and whether the real interface or atmosphere carries
+   the promise.
+4. **Motion mechanism:** trigger, affected property, start/end state, duration,
+   delay, easing, travel distance, layering, interruption, offscreen behavior,
+   and reduced-motion fallback. Use browser animation inspection and short
+   recordings; do not guess from a screenshot.
+5. **Transition architecture:** route changes, section changes, shared elements,
+   state continuity, browser-back behavior, focus destination, and failure
+   fallback.
+6. **Interaction grammar:** hover, focus, press, drag, scroll, keyboard, touch,
+   and what meaning survives without pointer precision or motion.
+7. **Performance mechanics:** first-loaded media, lazy boundaries, network
+   weight, animation thread, layout shift, and whether spectacle delays meaning.
+8. **Accessibility mechanics:** heading order, landmarks, focus, dialog
+   behavior, text alternatives, reduced motion, and contrast.
+9. **Conversion structure:** literal promise, product proof, trust, expansion,
+   offer, and the exact action path.
+10. **Originality risk:** what would become copied trade dress if reproduced too
+    literally.
+
+Store a concise mechanism ledger and reference captures only under `.fallow/`.
+Mark every observation `OBSERVED`, `INFERRED`, or `UNKNOWN`. Never copy source
+code, assets, prose, icons, motion signatures, layouts, or adjacent combinations
+of type, palette, and composition. Use at most one primary mechanism from a
+single reference.
+
+Awwwards is a reference for authorship, pacing, composition, and memorable
+state change. It is not the usability authority for repeated finance work.
+
+The transferable sequence is:
+
+```text
+literal outcome
+  → recognizable product doing the job
+  → evidence and consequence
+  → wider operating system
+  → one clear commercial action
+```
+
+## 7. Incumbent-versus-Challenger Acceptance
+
+The incumbent is concept **I**. Render it first from the exact current tree at
+1440 x 900 and 390 x 844, including Home, the Demo decision, and the populated
+App desk. Record a concise `KEEP / REPAIR / REPLACE` prosecution for hierarchy,
+brand recognition, product realism, interaction, mobile composition, operating
+density, and conversion.
+
+Then build exactly two compact working challengers under
+`.fallow/frontend-acceptance/2026-09-03/`. Add no public route and no runtime
+dependency during comparison. Use identical canonical fixtures, facts, H1,
+labels, CTA copy, and offer so design is the variable.
+
+| ID | Territory | Required first impression | Required structural break |
+| --- | --- | --- | --- |
+| J | **Decision Room** | The finance owner is inside one consequential human authorization, not reading a marketing page | No split text/card hero, card mosaic, cream-broadsheet imitation, or decorative dashboard; product state composes the viewport |
+| K | **Commitment Signal** | A repeated operating system shows what needs a human now, what is frozen, and what outcome broke the boundary | Non-editorial operating language, unmistakable state geometry, and a separately composed mobile action path |
+
+I, J, and K must differ materially on at least five of these six axes: page grid,
+navigation model, product-state frame, typography strategy, palette/material
+strategy, and signature transition. A font swap, dark mode, denser dashboard,
+or decorative reskin is not a challenger.
+
+Each challenger must declare in five lines or fewer its design thesis, signature
+element, mobile composition, one justified aesthetic risk, and cheapest
+rejection test. Spend boldness in one place. The result must feel specific to
+human authority over future obligations, not to generic fintech, SaaS, an AI
+landing-page generator, or an editorial template.
+
+For I, J, and K capture:
+
+1. Home first viewport at 1440 x 900 and 390 x 844.
+2. Human decision moment at both viewports.
+3. Populated operating desk at both viewports.
+4. Reduced-motion Home at both viewports.
+5. One 15–30 second desktop and one 15–30 second mobile recording of the
+  decision-to-outcome transition.
+
+Produce one contact sheet per direction, two separately randomized unlabeled
+comparison sheets, viewport telemetry, a six-axis separation table, and a
+pre-mortem naming what feels generated, what a finance owner may distrust, and
+what should be deleted first.
+
+At 390 x 844, without scrolling, Home must show Vognary, the literal H1, INR
+4,80,000, the fact that a human decides, one primary action, and recognizable
+product state. At 1440 x 900, product state must carry more explanatory weight
+than copy and show one citation, policy context, and the human action.
+
+## 8. The 1,000-Point Gate and Deterministic Selection
+
+The founder's “0 to 1,000” ambition is a measurement frame, not a score you are
+allowed to invent. Score only rendered, exercised evidence. `1,000/1,000` means
+every point is independently supported; it is not a required completion claim.
+
+| Dimension | Points | What earns the points |
+| --- | ---: | --- |
+| 30-second comprehension and product truth | 180 | buyer, event, evidence/assumption, policy limit, human authority, and next action are correctly understood |
+| Core task completion and state continuity | 170 | Demo and App decisions, evidence, reconciliation, failures, back behavior, and retained context work without coaching |
+| Visual authorship and Vognary recognition | 150 | distinctive identity and signature mechanism specific to Commitment Control, without copied trade dress or default AI-design tropes |
+| Operating UX and information density | 130 | attention before creation, fast scanning, stable geometry, clear consequence, useful progressive disclosure |
+| Mobile composition | 100 | independently authored handheld flow, thumb-safe actions, software-keyboard survival, no stacked-desktop feel |
+| Accessibility and inclusive states | 100 | WCAG 2.2 AA, Axe, keyboard, focus, announcements, forced colors, zoom, reduced motion, and non-color meaning |
+| Interaction and motion | 60 | state-driven, interruptible, restrained, performant choreography that never animates money through false values |
+| Runtime performance and resilience | 60 | fixed byte/Lighthouse/motion budgets, no console/network failures, loading/offline/error truth |
+| Trust and commercial continuity | 50 | coherent Home → Demo → App → Pilot → Security journey with exact offer and activation boundaries |
+| **Total** | **1,000** | hard gates below still override the sum |
+
+Apply these rules:
+
+1. Truth, protected boundaries, accessibility, keyboard/focus, mobile geometry,
+  fixed performance budgets, and zero product writes from synthetic routes are
+  pass/fail gates. A failed hard gate disqualifies a direction regardless of
+  score.
+2. If subagents are invoked, use **GPT-5.6 Sol only**. Run two independent blind
+  reviews in fresh contexts with separately randomized order. Do not reveal
+  names, implementation notes, references, or prior scores.
+3. Opus may self-critique but may not occupy an independent slot or rewrite a
+  reviewer answer. Preserve raw outputs. If Sol is unavailable, record
+  `UNAVAILABLE`; never fabricate a score.
+4. A challenger may replace I only if its conservative score is at least 60
+  points higher, it does not lose points in comprehension, task completion,
+  accessibility, or performance, and both blind reviews prefer it. Otherwise
+  keep I and repair its evidenced weaknesses.
+5. If independent review is unavailable, select by hard-gate results, cold
+  comprehension evidence if available, higher conservative rubric score, lower
+  route bytes, fewer dependencies, less motion, then direction ID. Label the
+  result `VISUAL SELECTION UNVALIDATED`.
+6. Repair the leading direction once. If it still fails a hard gate, use the
+  next qualifying direction once. Stop after a second hard-gate failure.
+
+Do not wait for founder selection. Proceed immediately with the selected
+direction, complete the entire frontend, and leave one founder-ready rendered
+candidate rather than three themes.
+
+## 9. Information Architecture and Route Jobs
+
+Preserve URLs and backend contracts. Recompose the frontend around one
+continuous journey:
+
+```text
+Walk a decision
+  → use your own evidence
+  → sign in to retain it
+  → operate the attention queue
+  → see the one-month pilot
+  → request invoice / reserve
+```
+
+Never restart the five-step product lesson on every route.
+
+### `/` — authored public product
+
+Use at most five substantive bands before the footer:
+
+1. **Decision now:** literal promise plus the live synthetic request and action
+   in the first viewport.
+2. **Authorization to outcome:** one compact authored interaction showing the
+   human cap freeze and later evidence without moving it.
+3. **Daily operation:** the populated desk proves this is repeated work, not a
+   one-off animation.
+4. **Human and trust context:** concise operating boundaries; optionally one
+   original illustrative human image after product proof.
+5. **Pilot:** INR 14,999, scope, activation boundary, refund, and one action.
+
+The product, not an abstract diagram or stock scene, is dominant above the
+fold. Supporting copy before product state is at most 35 words. Use one primary
+CTA and at most one quiet secondary route. Reveal a real hint of the next band
+at desktop and mobile.
+
+### Route contract
+
+| Route | First-screen job | Primary exit and continuity | Required states / prohibited result |
+| --- | --- | --- | --- |
+| `/demo` | Open directly at the human decision on the canonical record | Outcome → Pilot; alternate → Start | All three branches in ≤3 actions; later evidence enters distinctly; zero product API writes; no Next-button lecture |
+| `/start` | Bring one permitted invoice/receipt and immediately show formats/privacy | Cited result → Sign in while retaining staged context | idle, reading, unreadable, partial, duplicate, invalid, failure, cited result; never present receipt intake as the pre-spend wedge |
+| `/login` | Authenticate an invited/returning member and explain retained staged context | Safe `next` → intended destination | ready, not configured, provider launching/failure, authenticated redirect, rate-limited; no product-story restart |
+| `/app` enrolled | Show attention queue before creation | Select → decision/detail; Create opens separately | owner/admin/member, loading, empty, failed, offline, no policy, stale, conflict, all proposal/decision/reconciliation states |
+| `/app` unenrolled | Show the complete labelled synthetic loop through real components | Pilot conversion | no write controls, no API loop, no fake workspace activity |
+| `/pay` | Present one price and bounded pilot as product continuation | Request invoice/reserve; Security and Terms return here | exact scope, activation, refund, no renewal, unavailable/payment-link truth; never fake checkout readiness |
+| `/security` | Answer whether real customer data may be submitted today | Pilot or security contact | concise trust model, data flow, proven/configured/not-proven controls, open assessment gate, deletion/retention; no warning wall |
+| `/billing/return` | Explain actual settlement state | safe retry/support or App | missing, loading, not found, unavailable, pending, paid, partially refunded, refunded, failed/cancelled/expired; webhook stays authoritative |
+| `/profile` | Find account, workspace, people/roles, security, export, deletion | Return to App | independent loading/saving/saved/failed/unauthorized/destructive states; no invented dashboard metrics |
+| `/verify` | Verify a local audit pack without uploading it | Return to App/Start | invalid JSON, checksum state, issuer-signature state, key unavailable; never call cryptography financial certification |
+| `/offline` | Explain protected failure and reconnect | Retry | no cached private financial surface or ambiguous success |
+| `/about` | State concise company purpose and boundaries | Demo or Contact | no second landing page, team fiction, or category lecture |
+| `/contact` | Route pilot, security, privacy, and support contact | Correct channel | prohibited-secret warning; no invented SLA |
+| `/privacy`, `/terms` | Read, navigate, print, and deep-link legal text | Return to prior task | reflow and section navigation; no semantic/legal rewrite without explicit founder/legal text |
+| `/brand` | Show candidate identity, accessible assets, and usage rules | Download candidate exports | no founder-acceptance claim; no stale rejected assets |
+| System surfaces | Recover truthfully | Retry or safe route | 404, route/global error, loading, offline banner, metadata, OG/PWA; preserve `/index.md`, `/llms.txt`, robots, sitemap, and security.txt |
+
+Public routes may be expressive and memorable. `/app` must be quiet, dense,
+stable, and optimized for repeated scanning.
+
+## 10. Component System and State Matrix
+
+Build one selected component grammar. Do not ship three themes or a generic
+component-kit skin.
+
+| Component | Required behavior | Required states and focus contract |
+| --- | --- | --- |
+| Public/App shells | related identity, task-specific composition, skip link, landmarks, active route, safe areas | mobile menu/dialog focus, offline, account access, keyboard and browser-back parity |
+| `MoneyValue` / truth value | one exact ISO representation; cited, assumed, projected, frozen, observed, unknown distinguishable beyond color | long INR, zero only when proven, unknown em dash, no duplicate number formats |
+| Attention queue | server-ordered priority list; request/cap, policy, authority, age, evidence, next action visible in one scan | populated first, selected, pending, awaiting evidence, over-cap, matched, declined, loading, empty, failed, stale, offline |
+| Request detail | request, purpose, submitter, dates, citations, policy, authorization, observations, next action as one record | stable list-detail desktop; dedicated detail/page or sheet with browser-back semantics on mobile |
+| Proposal composer | closed by default on populated desk; opens as focused panel/sheet/mode | pristine, dirty, invalid, pending, stale-retained, conflict, failure, success; focus first invalid field |
+| Evidence citation/inspector | immutable excerpt/source disclosure, never ornamental | loading, unavailable, missing, partial, retained; restore focus to invoking citation |
+| Policy context | version, category posture, reason codes, currency-separated exposure | no policy, within, review, outside; never styled or worded as approval |
+| Decision surface | explicit approve/cap/decline; conditional cap and outside-policy reason | owner/admin enabled, member disabled with reason, pending, stale `412`, conflict `409`, offline, failure, success |
+| Decision confirmation | state exact irreversible result | button labels `Approve INR …`, `Freeze cap at INR …`, or `Decline proposal`; trap focus, Escape, restore invoker |
+| Frozen authorization | actor, role, time, policy version, reason, expected amount, cap | visually and structurally stationary when evidence appears |
+| Reconciliation | explicit evidence selection and append-only result | idle, loading, empty, failed, selected, pending, all five verdicts; decline offers no cap comparison |
+| Intake | drop, paste, CSV/PDF/image preparation and confirmation | accepted, duplicate, invalid, unreadable, partial, clear/discard; user-selected preview only |
+| Feedback | persistent status for financial/data mutations | one concise live announcement after server confirmation; errors focus summary; no premature toast |
+| Overlay/destructive flow | accessible focus trap, Escape, restore, scroll lock, keyboard-safe mobile sheet | destructive confirmation names object and consequence; completion receives dedicated heading |
+| Empty/loading/error | reserve geometry and provide one next action | no layout-shifting spinner wall, fake record, shimmer-dependent meaning, or vague apology |
+
+The attention queue and current decision come before creation. A returning
+operator must never cross empty canvas or a permanent intake form to reach the
+only item requiring action.
+
+At 1440 x 900, active request, decisive figures, policy result, authority, and
+primary action fit in the first App viewport. At 390 x 844, request summary,
+policy state, authority, and primary human action fit before the first scroll;
+evidence, projection, policy reasons, history, and reconciliation progressively
+disclose below.
+
+Use proportional text for reading. Reserve monospaced type for values and
+identifiers that benefit from fixed-width comparison. Frames, pills, rules, and
+status colors must encode actual state, not replace hierarchy.
+
+## 11. Visual Identity, Images, and Media Placement
+
+Choose one unmistakable direction and execute it completely.
+
+- Create a compact token system for color roles, typography roles, spacing,
+  geometry, elevation, focus, and motion. Every selected decision becomes a
+  token or component rule; no second theme survives.
+- Typography must have distinct display, body, and data roles. Do not use a
+  fashionable serif, mono-everywhere texture, or neutral SaaS grotesk without a
+  subject-specific reason.
+- The product's own artifacts — request, invoice excerpt, policy, named
+  authorization, frozen cap, and observed outcome — are the primary visual
+  material.
+- Home, Demo, and App product media must be semantic live DOM generated from
+  canonical fixtures, not rasterized screenshots or fake charts.
+- `/app` gets no decorative image. Density, alignment, exact money, and state
+  distinction carry the design.
+- Start may show only the user's local preview. Security may use one truthful
+  data-flow diagram. Pay may use one compact continuity strip from the selected
+  product state.
+
+### Human imagery
+
+You may add one original, licensed, commissioned, or generated editorial image
+that shows the emotional outcome: a calm finance owner making a consequential
+decision in a credible India-first startup environment. It must:
+
+- appear only after real product proof and before the pilot conversion;
+- be captioned `Illustrative scene — not a Vognary customer`;
+- avoid logos, dashboards with fake data, handshakes, celebration poses,
+  conference-room stock clichés, exaggerated happiness, and testimonial framing;
+- use separate art-directed desktop and mobile crops with explicit dimensions,
+  `sizes`, stable aspect ratio, alt text, local provenance/license record, and
+  compression;
+- be removed if it weakens comprehension, trust, originality, or route budget.
+
+Do not fabricate “happy customers.” Human warmth is allowed; false proof is not.
+
+Any bitmap, photography, video, 3D, Rive, or generated asset requires a named
+narrative job, provenance/license note, stable dimensions, alt/fallback,
+compression, route ownership, and measured budget. It may never carry financial
+truth or imply a customer/event.
+
+Video belongs in evidence recordings by default, not inside the product. In-app
+video requires an explicit need, muted controls, captions when semantic, a
+poster, a no-video fallback, reduced-motion removal, and a reviewed CSP change.
+Do not loosen `media-src 'none'` casually.
+
+No generic purple gradient, glassmorphism, floating blobs, stock office scene,
+coins, cards, fake charts, decorative finance art, copied dashboard, or nested
+card architecture. The identity must remain recognizable in grayscale and with
+motion disabled.
+
+## 12. Exact Motion and Transition Choreography
+
+Motion follows state. Public Home may spend its spectacle budget on one
+memorable authorization-to-outcome transition. Demo and App remain controlled,
+interruptible, and task-first.
+
+Use these base timing roles unless measured interaction testing proves a better
+value:
+
+```text
+press feedback     80ms
+state feedback    160ms
+panel/navigation  220ms
+signature change  480ms maximum
+entrance easing   cubic-bezier(.2,.8,.2,1)
+exit easing       cubic-bezier(.4,0,1,1)
+```
+
+| Event | Full-motion choreography | Reduced-motion result |
+| --- | --- | --- |
+| First paint | Vognary, H1, CTA, and critical request facts exist immediately; product depth resolves once over ≤220ms with ≤8px travel | Complete final state at first paint |
+| Open decision | scrim 0–120ms; panel ≤16px over 220ms; focus enters only after mount | panel appears immediately; identical focus |
+| Submit decision | 0–80ms controls lock; persistent pending status appears; no optimistic success | immediate pending state |
+| Human freeze | 80–320ms cap line/bracket resolves; 220–380ms actor/time/reason appears; request and cap remain separate intact exact strings | frozen cap and actor appear together, intact |
+| Approve | proposed amount remains visible; identical approved amount appears separately as frozen | static before/after |
+| Approve with cap | assumed request remains; lower cap appears independently; never morph one number into another | static before/after |
+| Decline | controls resolve over ≤160ms; refusal appears; no cap/boundary/reconciliation object is created | refusal appears immediately |
+| Evidence arrival | evidence enters from its source edge by ≤12px over 180ms; comparison resolves 160–360ms; verdict appears 300–460ms; frozen cap never moves | evidence and verdict append together; cap remains fixed |
+| Queue selection | desktop selection rule ≤120ms and detail cross-fade ≤160ms; geometry remains reserved | immediate selection/detail |
+| Mobile detail | ≤220ms page/sheet transition with browser-back behavior and focus restoration | immediate page/sheet |
+| Public route | optional native/View Transition opacity-only ≤160ms with hard-cut fallback; no shared-money morph | native hard cut |
+| Async/stale/error | no shake, bounce, or travel; preserve input and reveal persistent status; announce once | identical status/focus |
+
+Do not animate exact money through intermediate values. No number counters,
+bouncy springs on finance state, ambient loops, text marquees, magnetic buttons,
+custom cursor, scroll hijacking, loader theater, autoplay sound, hover-only
+meaning, or parallax for atmosphere.
+
+One compact public sequence may respond to normal scroll only if content remains
+in document flow, the page never hijacks input, mobile is independently
+composed, reduced motion is static, and no scroll event generates a live-region
+announcement. Prefer the user's decision action as the signature trigger.
+
+Replace near-zero-duration reduced-motion hacks with explicit `animation: none`
+and `transition: none` or resolved-state rules. Reduced motion means zero travel,
+scale, blur, parallax, continuous animation, or delayed understanding.
+
+## 13. Responsive and Accessibility Contract
+
+Test `320`, `360`, `390`, `768`, `1024`, and `1440` widths plus a `720 x 450`
+200%-zoom equivalent.
+
+- Mobile is separately composed, never a desktop grid stacked into cards.
+- Desktop App uses list-detail where space permits; mobile uses priority summary
+  plus dedicated detail with browser-back semantics.
+- Home reveals a hint of the next substantive band at mobile and desktop.
+- Do not scale font size continuously with viewport width. Use stepped type.
+- Public body copy is normally at least 16px; operating text at least 14px;
+  meaningful labels never below 12px.
+- Coarse-pointer controls are at least 44 x 44px. Persistent navigation reserves
+  safe-area and software-keyboard space.
+- WCAG 2.2 AA; valid heading order; one visible H1; landmarks, lists, tables,
+  forms, names, labels, descriptions, and errors are semantic.
+- Visible focus, keyboard/touch parity, focus trapping/restoration, useful live
+  regions, and forced-colors behavior are required.
+- Announce once per user action. Never announce scroll, hover, animation,
+  decorative media, or the same mutation from nested live regions.
+- Test long merchant names, text expansion, exact large INR values, unknown
+  values, all verdicts, offline/stale/error states, and software keyboard.
+- Zero incoherent overlap, clipping, horizontal scroll, covered action,
+  unexplained layout shift, or meaning conveyed only by color or motion.
+- Axe serious/critical = 0. Review every moderate finding rather than silently
+  ignoring it. Manually test focus order, dialog behavior, announcements,
+  landmarks, and labels.
+
+## 14. Libraries, Skills, MCPs, and Supply-Chain Discipline
+
+Read and invoke the pinned project skills:
 
 - `.claude/skills/frontend-design/SKILL.md`
 - `.claude/skills/vercel-react-best-practices/SKILL.md`
 - `.claude/skills/webapp-testing/SKILL.md`
 
-Use browser automation and Playwright throughout. Do not evaluate design from
-source code alone.
+Use live browser/web tooling for reference inspection and Playwright for rendered
+proof. If you invoke subagents, use GPT-5.6 Sol only. Never give a model or MCP
+credentials, cookies, customer data, or private financial evidence.
 
-### Default implementation stack
+You may install a modern frontend library, skill, plugin, or MCP only after
+recording:
 
-Adopt a library only after the concept gate identifies a need.
+```text
+named interaction or media need
+→ native HTML/CSS/WAAPI alternative attempted
+→ exact package/tool and version
+→ license and source review
+→ imported symbols and affected routes
+→ before/after route gzip bytes
+→ loading and fallback strategy
+→ accessibility/security risk
+→ removal condition
+```
 
-| Need | Default | Decision |
+The comparison stage installs nothing. After selection, install one candidate at a time and
+retain it only when it materially improves the chosen interaction and all hard
+gates remain green.
+
+Potential tools are conditional, not goals:
+
+| Need | Candidate | Retention test |
 | --- | --- | --- |
-| Styling and responsive composition | Existing Tailwind CSS 4 plus route-scoped CSS | Keep |
-| Accessible complex controls | `react-aria-components` | Preferred primitive layer; use selectively |
-| Simple state and entrance motion | CSS transitions/keyframes or WAAPI | Default; zero dependency cost |
-| Complex layout, gesture, and shared-element motion | `motion` via `motion/react` | Conditional; prove the imported slice fits the fixed JS budget |
-| Interface icons | `lucide-react` | Preferred; import icons directly |
-| Simple hover/focus/color transitions | CSS | Prefer over a JS library |
-| Complex scroll-authored marketing sequence | GSAP ScrollTrigger | Conditional; one sequence at most |
-| Component state workshop | Existing fixtures and focused pages | Start here; add Storybook only if this proves insufficient |
-| Vector state-machine media | Rive | Prototype only after a static concept wins |
-| 3D | Three.js | Reject by default; require a separate proof that 2D cannot communicate the job |
+| Accessible complex controls | React Aria Components | measurably better keyboard/focus behavior without generic kit styling |
+| Icons | Lucide direct imports | replaces textual tool buttons cleanly with negligible route cost |
+| Shared/layout motion | Motion for React | selected signature cannot be delivered robustly with CSS/WAAPI and affected routes remain under budget |
+| One public scroll sequence | GSAP ScrollTrigger | concept explicitly earns it; no mobile/reduced-motion/accessibility regression; dynamically isolated |
+| Vector state media | Rive | real narrative state-machine need, static fallback, route isolation, measured budget |
+| 3D | Three.js | 2D demonstrably cannot express the selected public concept; full-bleed, nonessential, dynamically loaded, canvas-pixel-tested, absent from App/reduced motion |
+| Component workshop | focused fixture pages first; Storybook only if insufficient | reduces state-regression cost enough to justify installation |
 
-Do not install shadcn blocks, a themed component kit, dashboard templates, or a
-second primitive library. They will make the result more generic, not less.
+Do not install shadcn blocks, a themed dashboard template, a marketing template,
+or a second primitive library. A dependency may execute an authored idea; it
+may not supply the idea.
 
-If Motion is selected after concept approval, measure a minimal import in the
-vertical slice before keeping it, then install and use the official Motion AI
-Kit for Claude Code with `npx motion-ai@latest`. Do not configure it before the
-concept requires motion, and remove it if the existing JS budget fails.
+For any internet skill/plugin/MCP: inspect its files and license before running,
+pin source/version/hash, use least privilege, reject install scripts that request
+secrets or production access, and remove it if the final implementation does not
+depend on its guidance.
 
-## 6. External calibration
+## 15. Frontend Architecture and Gate Repair
 
-Use live web research, but do not copy layout, copy, assets, animation, trade
-dress, or code.
+Architecture:
 
-Inspect at least six current products across these mechanisms:
+- Server Components by default; client boundaries only around interaction.
+- Preserve URLs and APIs while route groups and frontend files may be
+  reorganized.
+- Keep `globals.css` to reset, selected base tokens, typography, focus, and true
+  cross-route primitives.
+- Use route-scoped CSS or CSS Modules for Home, Demo, public documents, App,
+  account, and utilities.
+- Delete rejected/dead CSS and components before adding replacements.
+- Direct imports; dynamically load optional heavy media; avoid broad barrels and
+  excess client serialization.
+- One canonical money/truth renderer and one canonical synthetic fixture
+  builder.
+- Do not make every route share one visual page template. Share primitives and
+  tokens; compose each route around its job.
 
-- literal outcome clarity and conversion: Ramp, Stripe;
-- real product media and workflow storytelling: Linear, Attio, Raycast;
-- financial restraint and trust: Mercury;
-- dense repeated work: one best-in-class operational product chosen by you;
-- one non-SaaS digital experience chosen for pacing or art direction.
+Preserve the proof tooling that already passes and close the remaining evidence
+gaps before acceptance:
 
-For each, inspect desktop and mobile first viewport, open navigation, one
-meaningful interaction, product-media treatment, proof transition, and final
-conversion. Record a maximum 20-line mechanism matrix under `.fallow/` and
-delete it after the mechanisms are encoded. Do not put a reference report in
-Git.
+1. Keep exact-byte performance measurement on every user-facing route and
+  report dependency deltas for this execution.
+2. Keep Lighthouse on the seven measured public routes and add a representative
+  authenticated App measurement without weakening the development-login
+  production boundary.
+3. Retarget motion checks only if the selected signature transition changes.
+4. Keep a new browser context for every canonical route/state capture and emit
+  complete provenance into a new evidence directory; never overwrite the
+  incumbent evidence.
+5. Preserve user-outcome, truth-boundary, contract, geometry, and accessibility
+  assertions. Replace a test only when the selected presentation makes the old
+  presentation-specific assertion obsolete.
+6. Keep brand and token checks exact for the selected candidate.
+7. Complete the fail-closed route/state coverage manifest for enrolled App,
+  owner/admin/member authorization, stale/conflict/offline/error behavior,
+  focus restoration, and the four canonical journeys. Every `page.tsx` and
+  frontend system surface must name its fixture, viewport, byte-budget check,
+  Axe check, geometry check, keyboard/focus check, capture IDs, and journey.
+8. Resolve the light/dark evidence ambiguity: either implement and test a real
+  second theme because it improves the selected product, or record the product
+  as intentionally single-theme and stop generating duplicate theme-labelled
+  artifacts.
 
-The useful shared pattern is not a visual style:
-
-1. literal buyer outcome;
-2. actual product doing a recognizable job;
-3. evidence or proof;
-4. expansion into the wider system;
-5. one clear conversion.
-
-## 7. Gate A: three working concepts before the rewrite
-
-Do not begin the application-wide rewrite immediately.
-
-Build three genuinely different working prototypes in
-`.fallow/frontend-concepts/`. They must be runnable HTML/CSS/JS or isolated
-React pages and must not add public application routes. Moodboards, prose,
-wireframes, and color swatches do not count.
-
-Use identical truthful content and the same synthetic decision in all three so
-the visual direction is the variable. The synthetic case must be economically
-credible for the declared ICP, clearly labeled synthetic, use exact INR, and be
-derived through existing pure domain functions where possible. Do not reuse the
-current INR 3,050 / INR 4,200 example.
-
-Each concept must include:
-
-- Home first viewport at 1440 x 900 and 390 x 844;
-- one consequential approve/cap/refuse moment;
-- one populated operating-desk viewport at both sizes;
-- one clear conversion to the current INR 14,999 pilot;
-- a reduced-motion still;
-- no fake customer proof.
-
-The three concepts must differ materially in composition, typography, palette,
-media strategy, density, and interaction model. A color variation is not a
-second concept. The current Authority Field may appear in one concept only; it
-must not anchor all three.
-
-### Concept evaluation
-
-The implementer may not grade its own work. Give unlabeled screenshot sets to:
-
-- two independent vision-capable model families, not two instances of the
-  implementing model, when the host exposes them; and
-- the founder as final visual authority.
-
-Ask only:
-
-1. What does this product do?
-2. Who is it for?
-3. What is the expensive moment?
-4. What action would you take next?
-5. Which screen looks like a real product you would trust daily?
-6. What feels generated, decorative, confusing, or copied?
-
-Score each concept from 0-5 on comprehension, consequence, product realism,
-visual authorship, mobile composition, operational credibility, and conversion
-clarity. Preserve unedited evaluator outputs in a dated evidence artifact.
-
-Do not roll a concept into the app unless:
-
-- it scores at least 28/35 from each independent evaluator;
-- no category scores below 3;
-- both evaluators identify the same buyer and job;
-- neither confuses it with a budget tracker, generic spend dashboard,
-  procurement suite, or payment rail; and
-- the founder explicitly selects it.
-
-If no concept passes, stop after the prototype evidence. Do not average them
-into a fourth generic direction.
-
-## 8. Gate B: one vertical slice
-
-After concept selection, rebuild only this coherent slice first:
+Hard budgets remain:
 
 ```text
-Home `/`
-  -> synthetic decision `/demo`
-  -> representative operating state `/app`
+initial JS per route  ≤ 220,000 B gzip
+CSS per route         ≤ 15,000 B gzip
+individual JS chunk   ≤ 80,000 B gzip
+Lighthouse categories ≥ 95
+median LCP             ≤ 2,000 ms
+CLS                    effectively zero
+motion under 4x CPU    ≥ 55 fps, p95 frame ≤ 25 ms
+input-to-next-frame    ≤ 200 ms
+long tasks ≥ 50 ms      0
 ```
 
-The `/app` work in this slice is presentation-only and must consume existing
-fixtures/contracts. Do not bypass enrollment or mutate a live workspace.
+Design toward at least 750 B CSS headroom on critical routes rather than sitting
+on the hard ceiling. Do not raise a threshold to pass. Heavy media must be
+route-isolated, paused offscreen, and absent from reduced-motion paths.
 
-### Home
+## 16. Evidence Provenance
 
-- Brand, literal category, outcome-led H1, primary action, and recognizable
-  product content must all appear within 390 x 844 without scrolling.
-- The product, not an abstract diagram, is the dominant first-viewport media.
-- One primary CTA. One quiet secondary route at most.
-- Supporting copy should normally fit within 35 words.
-- Show the high-consequence decision and why it matters before explaining the
-  full evidence-policy-authority model.
-- Reveal a hint of the next section on desktop and mobile.
-- Use at most five substantive page bands before the footer.
+Every canonical still or recording uses a fresh browser and context. Viewport
+evidence must use `fullPage: false`; full-page images are supplemental only.
 
-### Demo
-
-- A finance owner can complete approve, cap, or refuse without instruction
-  text describing the interface.
-- Policy is visible but cannot act for the person.
-- The actor and authority are unmistakable.
-- Refuse creates no cap and no reconciliation comparison.
-- Later evidence is supplied or visibly arrives from a distinct evidence step;
-  it is not presented as magic.
-- The final state explains the consequence in plain business language and
-  offers one next action.
-- Synthetic status is persistent, programmatic, and visually calm.
-- No product API or store mutation occurs.
-
-### Operating product
-
-- Optimize for repeated scanning, not cinematic storytelling.
-- The first screen answers: what needs attention, why, who can act, what changed,
-  and what happens next.
-- Populated state must look credible before empty state is polished.
-- Use stable table/list/detail patterns, deliberate density, keyboard behavior,
-  responsive drawers/sheets, and compact exact-money treatment.
-- Mobile gets its own composition. Persistent navigation must reserve space and
-  never cover content, overlays, software keyboards, or safe-area controls.
-
-Repeat the independent comprehension review on the vertical slice. If it does
-not beat the selected static concept, repair once. If it still loses, roll back
-the slice and return to concepts.
-
-## 9. Gate C: expand by route job
-
-Only after Gate B passes, expand in this order:
-
-1. `/start`, `/pay`, `/security`;
-2. `/login`, `/billing/return`, `/profile`, `/verify`, `/offline`;
-3. `/about`, `/contact`, `/privacy`, `/terms`, `/brand`.
-
-Each route gets a composition based on its task. Shared tokens and primitives
-are required; shared page templates are not.
-
-- Start: one evidence action, immediate accepted formats, cited result,
-  unknowns, and next step.
-- Pay: one price, bounded scope, response timing, activation condition, refund
-  rule, and an intentional invoice-request path.
-- Security: current controls, open gates, data flow, retention/deletion, and
-  incident contact without warning-wall aesthetics.
-- Login: identity for invited/returning workspace members; preserve destination
-  and staged evidence.
-- Profile: account, membership, security, export, and deletion easy to find.
-- Legal: readable documents with section navigation, print, and reflow.
-- About and Contact: concise and useful. Do not restart the product lesson.
-
-## 10. Visual system quality bar
-
-Choose one coherent direction. Do not preserve any current visual token by
-default and do not present multiple themes in the final app.
-
-The final system must have:
-
-- a distinctive type system with clear display, body, and data roles;
-- a balanced palette with semantic states and excellent contrast;
-- real product media made from canonical synthetic states;
-- clear hierarchy without a pill, border, eyebrow, or card around everything;
-- buttons with icons where a familiar symbol exists;
-- cards only for repeated records, modals, or objects that require frames;
-- no cards inside cards;
-- no giant marketing typography inside operating tools;
-- no generic purple gradient, glassmorphism, floating blobs, fake charts,
-  stock-office imagery, coins, cards, handshakes, or abstract finance art;
-- no copied dashboard, reference composition, or recognizable trade dress;
-- no visible text that explains styling, animation, keyboard shortcuts, or how
-  to interpret decorative structure;
-- stable dimensions for controls, data rows, navigation, and product media;
-- no viewport-width font scaling;
-- no overlapping text, clipped controls, covered content, or layout shift.
-
-Motion follows state. Use one or two memorable transitions, not constant
-movement. Every effect must answer one of: what changed, where did it come from,
-what is now fixed, or what requires attention.
-
-## 11. Fresh-context browser protocol
-
-Every capture and browser assertion must start in a fresh page/context. Before
-capturing, assert and record:
+Write a JSONL manifest beside artifacts with:
 
 ```text
-page.viewportSize()
-window.innerWidth / window.innerHeight
-visualViewport.width / visualViewport.scale
-window.devicePixelRatio
-prefers-reduced-motion
-color scheme
+captureId, concept, route, state, fixtureId, fixtureSha256,
+headSha, workingTreeSha256, buildId, timestamp, URL,
+browser/version, Playwright version, OS, server mode,
+requestedViewport, page.viewportSize, innerWidth/innerHeight,
+visualViewport width/height/scale, DPR, locale, timezone,
+colorScheme, reducedMotion, forcedColors, pointer, authMode, networkMode,
+font readiness, interactionSteps, API-call summary,
+console/page/request errors, Axe summary,
+artifact path, SHA-256, bytes
 ```
 
-At 1440 x 900 require `innerWidth=1440` and `visualViewport.scale=1`. At
-390 x 844 require `innerWidth=390` and `visualViewport.scale=1`. A filename is
-not viewport evidence. Never reuse a page after browser zoom or 200% zoom tests.
+Recordings also include duration, dimensions, FPS, codec, poster, and
+reduced-motion alternative. Require `visualViewport.scale=1` for canonical
+captures. Hash raw artifacts before assembling contact sheets. Never write
+credentials, cookies, emails, customer data, or raw financial evidence into a
+manifest.
 
-Capture only the canonical set needed for judgment:
+Define `workingTreeSha256` over the complete delivered source path set,
+including tracked, staged, unstaged, and untracked frontend source, public
+assets, frontend tests/scripts, package manifests/lockfiles, and authority
+files. Exclude generated captures, recordings, contact sheets, their manifest,
+and the digest's own included-path file to prevent circular hashing; each of
+those artifacts receives its own SHA-256 in the evidence manifest. Sort source
+paths by UTF-8 byte order and hash the UTF-8 sequence
+`path + NUL + sha256(fileBytes) + LF`. Exclude only `.git`, `.next`,
+`node_modules`, transient test results, browser caches, and raw third-party
+reference captures. Write the included path list beside the digest. The
+preflight protected-boundary manifest uses the same algorithm and must match at
+the end.
 
-- Home first viewport and one lower product/proof scene;
-- Demo before decision, human-decision moment, and outcome;
-- populated App overview and decision detail;
-- Start result, Pay, Security, Login, and Profile;
-- desktop and mobile; light/dark only if the selected direction supports both.
+Final evidence covers every route at 1440 x 900 and 390 x 844; critical routes
+also at 360 x 800, 768 x 1024, 1024 x 768, and 720 x 450, plus reduced motion and
+forced colors.
 
-Screenshot counts are regression coverage, never evidence of taste.
+Record four short final journeys:
 
-## 12. Acceptance gates
+1. cold Home comprehension → capped Demo;
+2. all three Demo branches;
+3. enrolled attention queue → human decision → later reconciliation;
+4. mobile evidence intake → sign in → retained context.
 
-### Human comprehension and usefulness
+Screenshot volume is regression coverage, never evidence of taste.
 
-- Five cold evaluators from the intended role eventually complete a real test;
-  model reviews do not count as user evidence.
-- Before that external test, two blind independent reviewers must identify the
-  buyer, job, decision, and next action after 30 seconds on Home plus Demo.
-- A reviewer can complete each demo branch without coaching.
-- A reviewer can find pilot price, activation condition, and refund path in
-  under 60 seconds.
-- A reviewer can identify the next operating action in under 10 seconds.
+## 17. Sustained Implementation Order
 
-### Visual authorship
+Continue autonomously through these stages. Do not pause for founder approval.
 
-- No evaluator identifies a copied reference layout.
-- No evaluator describes the result as a template, AI-generated landing page,
-  generic dashboard, or styled documentation.
-- Public narrative and operating product feel related without sharing the same
-  composition.
-- The interface remains recognizable in grayscale and without motion.
+1. **Preflight and ownership:** inventory the exact current tree, protected
+  paths, active writers, running servers, current evidence, and rollback bytes.
+2. **Incumbent prosecution:** render I fresh, exercise it, classify each major
+  decision `KEEP / REPAIR / REPLACE`, and identify the cheapest disconfirming
+  check for every proposed change.
+3. **Reference forensics:** inspect current mechanisms, record the ledger, and
+  reject copied trade dress and default AI-design patterns.
+4. **Compact challenge:** build J and K only in `.fallow/`, capture all three,
+  run blind review when available, score conservatively, repair once, and
+  select deterministically.
+5. **Vertical implementation:** implement only the winner across Home → Demo →
+  representative App. Run focused truth, Axe, keyboard, geometry, route-byte,
+  and comprehension checks immediately after the first substantive edit.
+6. **Fallback:** if the selected slice fails after one repair, restore only
+  Opus-owned frontend bytes and try the next qualifying direction once. Stop on
+  a second hard-gate failure.
+7. **Public continuity:** finish Start, Login, Pay, Security, Billing Return,
+  About, Contact, Privacy, Terms, Brand, 404/error/loading, metadata, OG/PWA,
+  and machine surfaces. Validate each route before continuing.
+8. **Private operation:** finish enrolled and unenrolled App, all workspace
+  views, Profile, Verify, and Offline; keep queue before composer; test every
+  role, state, and mutation boundary.
+9. **Authenticated closure:** use only a disposable local database and existing
+  development login. Run public tests first, then signed-in groups serially;
+  clear only the disposable `auth-login` rate-limit bucket between groups when
+  required. Capture enrolled App at desktop and mobile. Never weaken or expose
+  development login in production.
+10. **State and accessibility wall:** execute every state, keyboard path,
+   viewport, forced-colors, reduced-motion, stale/conflict, long-content, and
+   software-keyboard case.
+11. **Performance and simplification:** measure every changed route, remove
+   rejected/dead styles and dependencies, and repair without increasing a
+   threshold.
+12. **Final evidence:** build fresh, capture from fresh contexts into a new
+   evidence directory, preserve raw reviews, record exact commands, calculate
+   the conservative 1,000-point result, and add one bounded live-state entry to
+   `docs/CONTINUE-HERE.md`.
 
-### Responsive and accessible behavior
+At every checkpoint, run the narrowest executable validation before opening the
+next slice. Preserve a changed-file manifest. Roll back only files owned by this
+execution; never overwrite unrelated work.
 
-- 360, 390, 768, 1024, and 1440 widths, plus 200% zoom.
-- Zero incoherent overlap, clipping, horizontal scroll, or covered action.
-- WCAG 2.2 AA, visible focus, semantic landmarks, correct labels, keyboard and
-  touch operation, forced colors, coarse pointer, and reduced motion.
-- Touch targets meet the repository's existing geometry gate.
-- State never depends on color or animation alone.
+## 18. Review Roles
 
-### Performance and engineering
+- **Opus 5:** authors and implements; may self-critique but cannot fill a Sol
+  review slot.
+- **GPT-5.6 Sol:** the only allowed subagent; provides blind concept and final
+  vertical-slice criticism. Its score is design evidence, not customer proof.
+- **Cold finance-owner humans:** eventually validate 30-second comprehension,
+  uncoached Demo completion, <10-second next-action discovery, and <60-second
+  price/activation/refund discovery. Their absence does not stop this build but
+  blocks human-validation claims.
+- **Founder:** reviews the complete candidate after the sustained run and alone
+  may accept the visual identity, commit, deploy, or launch it.
+- **Security assessor:** owns the real-customer-data assurance exit.
+- **Investor:** may assess coherence, truth, technical discipline, and
+  commercial legibility. Interest has no acceptance or validation role.
 
-- Use the existing fixed route budgets; do not raise a threshold.
-- No unapproved dependency enters the first-load bundle.
-- Heavy media is dynamically loaded, paused offscreen, and absent from the
-  reduced-motion path.
-- Lint, typecheck, claims, research, brand, tokens, unit, build,
-  `perf:budget`, `perf:lighthouse`, and four first-attempt `perf:motion` runs
-  pass on the exact final combined tree.
-- Relevant Playwright journeys pass from a clean server.
-- No moved concurrent file, hidden failure, stale screenshot, or invalid
-  harness is reported as a pass.
+## 19. Final Command Wall
 
-### Truth
+Run the repository's exact scripts against the final combined tree. Never hide a
+failure or run against different bytes.
 
-- Every amount, currency, actor, policy result, decision, and reconciliation in
-  product media is generated from or checked against canonical contracts.
-- Synthetic state cannot be mistaken for customer activity.
-- No real customer data is used.
-- No market, payment, assessment, deployment, or readiness claim is created by
-  frontend work.
+```zsh
+export NVM_DIR="$HOME/.nvm"
+source "$NVM_DIR/nvm.sh"
+nvm use 22.23.2
+unset DATABASE_URL
 
-## 13. Canonical journeys
+git diff --check
+git diff --cached --check
 
-Prove these separately:
+# Run the frontend boundary checker created in preflight. It must compare byte
+# manifests, not only Git's unstaged diff, so pre-existing changes and new
+# untracked files cannot be hidden.
+node scripts/check-frontend-protected-boundary.mjs \
+  --baseline .fallow/frontend-acceptance/2026-09-03/protected-baseline.json
 
-1. Cold visitor understands the job, completes each synthetic decision branch,
-   and reaches the correct consequence.
-2. Visitor supplies permitted evidence, sees cited facts and unknowns, signs
-   in, and retains staged context.
-3. Invited member enters the operating product, finds the next decision, and
-   never crosses an authority boundary.
-4. Buyer understands the INR 14,999 pilot, manual invoice path, security gate,
-   activation timing, and refund rule.
-5. Returning operator finds an observed outcome and reconciles it without
-   rewriting the frozen authorization.
+npm run lint
+npm run typecheck
+npm run claims:check
+npm run research:check
+npm run brand:build
+npm run brand:check
+npm run tokens:check
+env -u DATABASE_URL npm test
 
-Tests must assert user outcomes and truth boundaries, not old copy strings or
-obsolete DOM structure.
+VERCEL='' CI=1 npm run build
+npm run perf:budget
+npm run perf:lighthouse
+for run in 1 2 3 4; do npm run perf:motion || exit 1; done
+```
 
-## 14. Stop conditions
+The boundary checker must cover tracked, staged, unstaged, and untracked files
+under `src/lib/commitment-control`, `src/lib/server`, `src/lib/recovery`,
+`src/lib/finops-control`, `src/app/api`, `infra/postgres`, payment/settlement,
+enrollment/readiness, production configuration, and private market paths. It
+must print `PROTECTED FRONTEND BOUNDARY UNCHANGED`. Any added, removed, or
+changed byte is a hard stop; do not rationalize it.
 
-Stop and report rather than claim completion if:
+Run the relevant public tests without credentials first, then use the existing
+development-login environment without printing secrets for the authenticated
+matrix. Use a disposable local PostgreSQL database, run signed-in groups with
+`--workers=1`, keep each group below the login-bucket limit, and clear only
+`rate-limit:auth-login:%` in that disposable database between groups if a 429 is
+observed. Never clear production persistence or weaken the limiter. Start a
+development server on an open port and provide the local URL.
 
-- no working concept passes Gate A;
-- the founder has not selected a concept;
-- the vertical slice loses to its prototype after one repair;
-- another frontend writer becomes active;
-- product truth, security, authority, exact money, or enrollment is weakened;
-- a dependency is added without a demonstrated concept need;
-- mobile is a stacked desktop composition;
-- abstract media precedes the literal product promise;
-- a low-consequence example makes the pilot look irrational;
-- any route still exists mainly to explain the design metaphor;
-- generated screenshot count is offered as design quality;
-- final validation runs against bytes other than those delivered.
+```zsh
+env -u VOGNARY_E2E_DEV_LOGIN_EMAIL -u VOGNARY_E2E_DEV_LOGIN_CODE CI=1 \
+  npx playwright test \
+  tests/e2e/primary-route-quality.spec.ts \
+  tests/e2e/synthetic-demonstration.spec.ts \
+  tests/e2e/landing-instant-audit.spec.ts \
+  --project=desktop-chromium --project=mobile-chromium
 
-## 15. Final response
+PLAYWRIGHT_EXTERNAL_SERVER=1 \
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:<PORT> \
+npm run test:e2e -- --workers=1
 
-Return only:
+node scripts/capture-surfaces.mjs \
+  --base http://127.0.0.1:<PORT> \
+  --signed-in --fresh-auth \
+  --out docs/evidence/frontend-acceptance-2026-09-03
 
-1. model and installed skills actually used;
-2. the three concept names and their screenshot paths;
-3. unedited blind-evaluator scores and founder selection;
-4. what was deleted from the rejected candidate;
-5. the selected design thesis in one paragraph;
-6. library decisions and measured bundle cost;
-7. route and journey results;
-8. exact accessibility, test, bundle, Lighthouse, and motion results;
-9. canonical acceptance-capture path;
-10. unresolved external/backend blockers;
-11. local review URL and a five-minute founder review path.
+git status --short
+```
 
-Do not call the work world-class, final, launched, validated, secure, paid,
-deployed, or production-ready. The only permitted completion label is:
+Do not run PostgreSQL migrations, production commands, commits, pushes, or
+deployments. Run disposable PostgreSQL tests only if a store/schema/migration
+path somehow changed; such a protected-path change should instead trigger the
+hard stop.
 
-`CONCEPT-GATED FRONTEND CANDIDATE - AWAITING FOUNDER VISUAL ACCEPTANCE`
+## 20. Stop and Completion
 
-The objective is not to make the current frontend prettier. It is to replace
-it with a product experience that a finance owner immediately recognizes as
-useful, consequential, credible, and distinctly Vognary.
+Stop and report `HARD GATE FAILED` if any of these remains after the permitted
+single repair/fallback cycle:
+
+- truth, exact money, evidence, human authority, privacy, security, enrollment,
+  or payment semantics regress;
+- a protected backend/domain path changes;
+- no concept clears hard fixture/accessibility/geometry gates;
+- the selected vertical slice fails and the one fallback concept also fails;
+- mobile is still stacked desktop composition;
+- product media or literal promise is below abstract/decorative media;
+- the daily desk still puts creation before attention;
+- a dependency or asset breaks a fixed route budget;
+- reduced motion, keyboard, focus, forced colors, or screen-reader behavior is
+  materially broken;
+- evidence cannot be tied to the exact delivered tree;
+- another writer begins changing the same frontend files.
+
+Permitted completion label:
+
+`FRONTEND RECONSTRUCTION CANDIDATE — AWAITING FOUNDER VISUAL ACCEPTANCE`
+
+Also report exactly one selection status:
+
+- `INDEPENDENTLY QUALIFIED`, or
+- `VISUAL SELECTION UNVALIDATED`.
+
+The final response must include:
+
+1. exact model, GPT-5.6 Sol calls, skills, MCPs, libraries, and assets used;
+2. incumbent I and challengers J/K, canonical captures, raw Sol outputs,
+  conservative 1,000-point scorecards, repair, and deterministic selection;
+3. selected design thesis, identity, signature transition, and selection status;
+4. rejected systems, assets, components, CSS, and tests deleted;
+5. final information architecture, component system, route matrix, and state
+   coverage;
+6. every library/media decision with exact per-route byte delta and fallback;
+7. exact lint, typecheck, claims, tokens, unit, E2E, accessibility, responsive,
+   build, route budget, Lighthouse, and four motion results;
+8. provenance manifest, canonical stills, contact sheets, and four recordings;
+9. exact changed-file list and proof that protected paths, commits, deployment,
+   production state, and real customer data were untouched;
+10. remaining founder, cold-human, security, enrollment, payment, market, and
+    deployment gates;
+11. local review URL and a five-minute founder path:
+    Home → capped Demo → populated App → Pay → Security.
+
+Also provide a one-page founder acceptance sheet with only:
+
+- what visibly changed and why it is better;
+- five before/after pairs at identical viewport and state;
+- the actual 1,000-point score with every deduction named;
+- the exact unresolved risks;
+- `ACCEPT CANDIDATE`, `REPAIR NAMED DEFECT`, and `REJECT CANDIDATE` as the three
+  founder decisions. Do not preselect one.
+
+Never call the result final, world-class, best in the world, launched,
+production-ready, secure, paid, customer-validated, market-validated, or
+investor-validated. Show the work and the measured result; do not award yourself
+the adjective.

@@ -1,6 +1,5 @@
 "use client";
 
-import { commitmentControlStepLabel } from "@/lib/commitment-control-loop";
 import type { CommitmentSummaryDto } from "@/lib/recovery/contracts";
 import { formatDay } from "../labels";
 import {
@@ -44,10 +43,15 @@ export function ControlProposalComposer({
   const selectedCount = draft.existingCommitmentIds.length;
   return (
     <section aria-labelledby="control-composer-heading" className="control-band control-band-open">
-      <div className="control-band-head">
-        <h3 id="control-composer-heading" className="control-heading">What are you considering committing to?</h3>
-        <p className="control-band-count">{commitmentControlStepLabel(2)}</p>
-      </div>
+      {/* On a populated desk the composer is closed. A returning operator must
+          never cross a form to reach the one record that needs them, and
+          <details> gives the disclosure keyboard, focus and browser-back
+          behaviour without a custom system. On an empty desk creating the first
+          proposal *is* the work, so it opens. */}
+      <details className="control-composer-shell" open={primary}>
+        <summary className="control-band-head control-composer-summary">
+          <h3 id="control-composer-heading" className="control-heading">What are you considering committing to?</h3>
+        </summary>
 
       <form
         id="control-proposal-form"
@@ -226,6 +230,7 @@ export function ControlProposalComposer({
           ) : null}
         </div>
       </form>
+      </details>
     </section>
   );
 }

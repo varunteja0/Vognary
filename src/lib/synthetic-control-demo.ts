@@ -3,13 +3,23 @@ import { authorizeProposalDecision } from "./commitment-control/decision";
 import { evaluateProposalPolicy, type ProposalPolicy } from "./commitment-control/policy";
 import { projectProposalExposure } from "./commitment-control/project";
 import { reconcileAuthorizedProposal } from "./commitment-control/reconcile";
+import {
+  SYNTHETIC_DEMO_LABEL,
+  SYNTHETIC_DEMO_UUID_NAMESPACE,
+  syntheticFixtureIdentity,
+  syntheticId as id,
+} from "./synthetic-fixture-identity";
+
+export { SYNTHETIC_DEMO_LABEL, SYNTHETIC_DEMO_UUID_NAMESPACE };
 
 /**
- * A frontend-only, deterministic Commitment Control brief.
+ * SYNTHETIC_CC_V2 — the canonical Commitment Control demonstration record.
  *
- * It exists so a stranger can experience the whole loop — request, cited
- * exposure, policy context, a named human decision, a frozen cap and a later
- * observed outcome — before any account, enrollment or customer data exists.
+ * A finance owner at a small India-first AI company is asked to reserve a month
+ * of inference capacity before a customer launch. The company already carries a
+ * monthly commitment to the same vendor, proven by two invoices. The request is
+ * larger than the per-charge limit the company wrote for itself, so no rule can
+ * settle it — a named human has to.
  *
  * Four rules keep it honest:
  *
@@ -28,23 +38,13 @@ import { reconcileAuthorizedProposal } from "./commitment-control/reconcile";
  *      for display and no float ever touches an amount.
  */
 
-export const SYNTHETIC_DEMO_LABEL = "Synthetic demonstration";
-
-/**
- * The contract validator requires real UUIDs, so every synthetic id lives in one
- * fixed namespace. A reader, a log line or a test can recognise a demonstration
- * record on sight, and nothing here can collide with a real workspace id.
- */
-export const SYNTHETIC_DEMO_UUID_NAMESPACE = "5eeded00-0000-4000-8000-";
-const id = (suffix: string) => `${SYNTHETIC_DEMO_UUID_NAMESPACE}${suffix}`;
-
 const IDS = {
   proposal: id("00000000c0de"),
   evaluation: id("00000000900d"),
   userOwner: id("0000000000f1"),
   userEngineering: id("0000000000f2"),
-  evidenceJuly: id("00000000ea01"),
-  evidenceAugust: id("00000000ea02"),
+  evidenceJune: id("00000000ea01"),
+  evidenceJuly: id("00000000ea02"),
   evidenceSeptember: id("00000000ea03"),
   decisionApprove: id("00000000dec1"),
   decisionCapped: id("00000000dec2"),
@@ -68,40 +68,53 @@ export const syntheticDemoBranchOrder: readonly SyntheticDemoBranch[] = [
 ];
 
 export const syntheticDemoBranchLabels: Record<SyntheticDemoBranch, string> = {
-  APPROVE: "Approve at the proposed amount",
+  APPROVE: "Approve the full request",
   APPROVE_WITH_CAP: "Approve with a lower cap",
   DECLINE: "Decline",
 };
 
 /** What each branch changes, in one sentence, for the reader who has not decided yet. */
 export const syntheticDemoBranchOutcomes: Record<SyntheticDemoBranch, string> = {
-  APPROVE: "The boundary freezes at the amount that was asked for. The later receipt still lands above it.",
-  APPROVE_WITH_CAP: "The boundary freezes below the request. The later receipt lands further above it.",
-  DECLINE: "No boundary is created, so there is nothing for a later receipt to be measured against. The refusal is the record.",
+  APPROVE: "The cap freezes at the amount that was asked for. September's invoice lands under it.",
+  APPROVE_WITH_CAP: "The cap freezes below the request. September's invoice lands above it.",
+  DECLINE: "No cap exists, so a later invoice has nothing to be measured against. The refusal is the record.",
 };
 
 /* ------------------------------------------------------------------ *
- * SYNTHETIC INPUTS — the only hand-written facts in this file.
+ * DECLARED INPUTS — the only hand-written facts in this file.
  * ------------------------------------------------------------------ */
 
 const REQUEST = {
   merchant: "Model API vendor (placeholder)",
-  purpose: "Raise the inference tier before the launch window",
+  purpose: "One-month inference-capacity reservation before a customer launch",
   category: "AI_MODEL",
-  amountMinor: "420000",
+  /** INR 4,80,000. A one-time reservation, not a new subscription. */
+  amountMinor: "48000000",
   currency: "INR",
   firstChargeDate: "2026-09-01",
+  cadence: "ONE_TIME",
+} as const;
+
+/**
+ * The two invoices the placeholder company already holds for this vendor. They
+ * are what makes the existing INR 3,20,000 monthly commitment a cited fact
+ * rather than a recollection.
+ */
+export const syntheticDemoCitedEvidence = [
+  { id: IDS.evidenceJune, period: "June", minor: "32000000", currency: "INR", source: "Vendor invoice (placeholder)" },
+  { id: IDS.evidenceJuly, period: "July", minor: "32000000", currency: "INR", source: "Vendor invoice (placeholder)" },
+] as const;
+
+/** The existing monthly commitment those two invoices prove. */
+export const syntheticDemoExistingCommitment = {
+  merchant: REQUEST.merchant,
+  minor: "32000000",
+  currency: "INR",
   cadence: "MONTHLY",
 } as const;
 
-/** Two vendor invoices a placeholder company already holds. Exact minor units. */
-export const syntheticDemoCitedEvidence = [
-  { id: IDS.evidenceJuly, period: "July", minor: "305000", currency: "INR", source: "Vendor invoice (placeholder)" },
-  { id: IDS.evidenceAugust, period: "August", minor: "305000", currency: "INR", source: "Vendor invoice (placeholder)" },
-] as const;
-
-/** The later receipt. One number, shared by every branch, because a boundary does not move. */
-const OBSERVED_MINOR = "472000";
+/** The later invoice. One number, shared by every branch, because a cap does not move. */
+const OBSERVED_MINOR = "47200000";
 export const syntheticDemoObservedMinor = OBSERVED_MINOR;
 export const syntheticDemoObservedEvidence = {
   id: IDS.evidenceSeptember,
@@ -112,10 +125,16 @@ export const syntheticDemoObservedEvidence = {
   observedAt: OBSERVED_AT,
 } as const;
 
+/**
+ * Policy v7. AI model spend is allowed as a category — the company is not
+ * arguing about whether to buy inference. The only thing this request breaches
+ * is the per-charge ceiling, so exactly one reason code appears and the
+ * decision cannot hide behind a category argument.
+ */
 const policy = {
-  policyVersion: 3,
+  policyVersion: 7,
   categoryRules: [
-    { category: "AI_MODEL", posture: "REVIEW" },
+    { category: "AI_MODEL", posture: "ALLOW" },
     { category: "CLOUD_INFRASTRUCTURE", posture: "REVIEW" },
     { category: "SOFTWARE", posture: "ALLOW" },
     { category: "CONTRACTOR", posture: "REVIEW" },
@@ -123,19 +142,29 @@ const policy = {
     { category: "OTHER", posture: "REVIEW" },
   ],
   currencyLimits: [
-    { currency: "INR", maxPerChargeMinor: "500000", maxThirteenWeekMinor: "2000000", maxAnnualMinor: "10000000" },
+    {
+      currency: "INR",
+      /** INR 4,00,000 — the single limit this request crosses. */
+      maxPerChargeMinor: "40000000",
+      /** INR 20,00,000 and INR 60,00,000: deliberately clear of this request. */
+      maxThirteenWeekMinor: "200000000",
+      maxAnnualMinor: "600000000",
+    },
   ],
 } as const satisfies ProposalPolicy;
 
 /**
- * Exposure the placeholder company already carries, cited to the two invoices
- * above. OBSERVATION_ONLY is the honest basis: it is what was observed, not a
- * projection anyone signed off.
+ * Exposure the placeholder company already carries from the monthly commitment,
+ * cited to the two invoices above. OBSERVATION_ONLY is the honest basis: it is
+ * what was observed, not a projection anyone signed off.
+ *
+ * INR 3,20,000 monthly = INR 9,60,000 across thirteen weeks and INR 38,40,000
+ * across a year.
  */
 const EXISTING_EXPOSURE = [{
   currency: "INR",
-  thirteenWeekMinor: "915000",
-  annualMinor: "3660000",
+  thirteenWeekMinor: "96000000",
+  annualMinor: "384000000",
   evidenceIds: syntheticDemoCitedEvidence.map((entry) => entry.id),
   basis: "OBSERVATION_ONLY" as const,
 }];
@@ -171,6 +200,7 @@ const evaluation = evaluateProposalPolicy({
 
 export const syntheticDemoEvaluation = evaluation;
 export const syntheticDemoPolicy = policy;
+export const syntheticDemoProjection = projected;
 
 const proposal = {
   id: IDS.proposal,
@@ -210,14 +240,33 @@ const policyDto = {
   createdAt: "2026-07-02T06:00:00.000Z",
 } satisfies NonNullable<CommitmentControlBriefDto["policy"]>;
 
-/** The lower cap a placeholder founder chooses. Below the request, as the engine requires. */
-const LOWER_CAP_MINOR = "360000";
+/** The lower cap a placeholder finance owner chooses: INR 3,60,000. */
+const LOWER_CAP_MINOR = "36000000";
 
 const DECISION_REASON: Record<SyntheticDemoBranch, string> = {
-  APPROVE: "Launch window is committed. Accepting the ceiling breach for one cycle.",
-  APPROVE_WITH_CAP: "Launch window only. Revisit before the next renewal.",
-  DECLINE: "Existing thirteen-week exposure is already at the ceiling.",
+  APPROVE: "Customer launch capacity only; revisit before the next cycle.",
+  APPROVE_WITH_CAP: "Customer launch capacity only; revisit before the next cycle.",
+  DECLINE: "Reserve capacity from the existing monthly commitment instead.",
 };
+
+/**
+ * Identity for evidence provenance. Hashing the declared inputs — not the
+ * derived output — means a capture stops matching the moment a hand-written
+ * fact moves, while an engine change is caught by the engine's own tests.
+ */
+export const syntheticDemoIdentity = syntheticFixtureIdentity("SYNTHETIC_CC_V2", "2", {
+  REQUEST,
+  policy,
+  EXISTING_EXPOSURE,
+  LOWER_CAP_MINOR,
+  OBSERVED_MINOR,
+  AS_OF,
+  PROPOSED_AT,
+  DECIDED_AT,
+  OBSERVED_AT,
+  DECISION_REASON,
+  citedEvidence: syntheticDemoCitedEvidence,
+});
 
 const decisionIds: Record<SyntheticDemoBranch, string> = {
   APPROVE: IDS.decisionApprove,
@@ -319,7 +368,7 @@ export function syntheticControlBrief(
       currency: authorized.currency,
       expectedAmountMinor: authorized.expectedAmountMinor,
       decidedByUserId: authorized.decidedByUserId,
-      decidedByDisplayName: "Founder (placeholder)",
+      decidedByDisplayName: "Finance owner (placeholder)",
       overrideReason: authorized.overrideReason,
       decidedAt: authorized.decidedAt,
     };

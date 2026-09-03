@@ -11,6 +11,7 @@ import {
   controlVerdictLabels,
   controlVerdictMeanings,
   controlVerdictToneClass,
+  formatControlMoney,
 } from "./control-format";
 
 export type ControlProposalEntry = CommitmentControlBriefDto["proposals"][number];
@@ -217,8 +218,21 @@ export function ControlProposalRow({
               <ControlEvaluation proposal={proposal} evaluation={evaluation} onInspectEvidence={onInspectEvidence} />
             </div>
           </details>
-        ) : (
+        ) : lead ? (
           <ControlEvaluation proposal={proposal} evaluation={evaluation} onInspectEvidence={onInspectEvidence} />
+        ) : (
+          // Only the proposal being decided is read in full. The rest of the
+          // queue stays one scannable line — the amount, which the card header
+          // does not carry — and opens its policy reading on demand. The
+          // verdict is not repeated here; the body owns it.
+          <details className="control-more">
+            <summary>
+              {formatControlMoney(proposal.amountMinor, proposal.currency)}
+            </summary>
+            <div className="control-more-body">
+              <ControlEvaluation proposal={proposal} evaluation={evaluation} onInspectEvidence={onInspectEvidence} />
+            </div>
+          </details>
         )
       ) : (
         <p className="control-note">This proposal carries no evaluation, so there is no policy context to show.</p>

@@ -1,6 +1,7 @@
 # Market signal bank — recurring software money (evidence-first)
 
-> **Operating motto: Take smart risks. Do not play safe.** Seek asymmetric,
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Seek asymmetric,
 > falsifiable opportunities without promoting hypotheses into facts. Full
 > doctrine: [`THE-LAW.md`](../THE-LAW.md).
 

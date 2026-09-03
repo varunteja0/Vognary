@@ -126,34 +126,45 @@ test("the server-rendered landing has no skipped heading levels", async ({ reque
 test("the landing demonstrates the decision loop and sends visitors to their own bill", async ({ page }) => {
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Commitment Control: freeze the cap before the obligation exists." });
-  const hero = page.locator("section").filter({ has: heading });
+  const heading = page.getByRole("heading", {
+    level: 1,
+    name: "Approve AI and cloud commitments before they become bills.",
+  });
   await expect(heading).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
 
-  const getStarted = hero.getByRole("link", { name: "See a decision made", exact: true });
-  const citeBill = hero.getByRole("link", { name: "Cite your own bill", exact: true });
-  const signIn = page.getByRole("navigation", { name: "Public" }).getByRole("link", { name: "Sign in", exact: true });
-  await expect(getStarted).toHaveAttribute("href", "/demo");
-  await expect(citeBill).toHaveAttribute("href", "/start");
-  await expect(signIn).toHaveAttribute("href", "/login?next=/app");
+  // One primary command, one quiet secondary, one pilot action. Nothing else.
+  await expect(page.getByRole("link", { name: "Review the synthetic request" }).first())
+    .toHaveAttribute("href", "/demo");
+  await expect(page.getByRole("link", { name: "Use your own evidence" }).first())
+    .toHaveAttribute("href", "/start");
+  await expect(page.getByRole("link", { name: "See the one-month pilot" })).toHaveAttribute("href", "/pay");
 
-  await expect(page.getByText("No account required", { exact: true })).toBeVisible();
-  await expect(page.getByText("No bank passwords", { exact: true })).toBeVisible();
-  await expect(page.getByText("No mailbox access", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Every yes has a state." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Freeze the line" })).toBeVisible();
-  await expect(page.getByText("Human only", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Cursor costs INR 350 more this month." })).toBeVisible();
-  await expect(page.getByText("From two example receipts", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Example only\. Your review uses your receipts/)).toBeVisible();
+  // The product carries the promise: the live record, its cited history, the
+  // policy result and the named human are all on the page as real DOM.
+  await expect(page.getByText("INR 4,80,000").first()).toBeVisible();
+  await expect(page.getByText("INR 3,20,000").first()).toBeVisible();
+  await expect(page.getByText(/outside policy/i).first()).toBeVisible();
+  await expect(page.getByText("INR 3,60,000").first()).toBeVisible();
+  await expect(page.getByText("INR 4,72,000").first()).toBeVisible();
+  await expect(page.getByTestId("synthetic-demonstration-label").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Approve with cap", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "A named human freezes INR 1,350 as the cap." })).toBeVisible();
-  await expect(page.getByText(/Vognary does not cancel Cursor or move money|later evidence cannot rewrite it/)).toBeVisible();
+  // The desk shows the shape of the job, and the pilot states its own terms.
+  await expect(page.getByRole("heading", { name: /Six constructed records, one per state\./ })).toBeVisible();
+  await expect(page.getByText("Needs a decision").first()).toBeVisible();
+  await expect(page.getByText(/Payment is not activation/)).toBeVisible();
+  await expect(page.getByText("INR 14,999").first()).toBeVisible();
 
-  await expect(page.getByLabel("Vendor / commitment")).toBeVisible();
-  await expect(page.getByText("Review required", { exact: true }).first()).toBeVisible();
+  // The desk must never read as customer activity. Six synthetic records cannot
+  // be described as a week of observed work, as states records "arrive" in, or
+  // as anything a customer has done, because no customer has used Vognary.
+  await expect(page.getByText(/no customer has used vognary yet/i).first()).toBeVisible();
+  await expect(page.getByText(/not observed from any customer/i).first()).toBeVisible();
+  await expect(page.getByText(/this is a week|states they actually arrive|demonstration loop/i)).toHaveCount(0);
+  await expect(page.getByText(/customers (?:use|have used|are using)|teams (?:use|trust)|companies use/i)).toHaveCount(0);
+  await expect(page.getByText(/last (?:week|month)|so far this|per week|this week alone/i)).toHaveCount(0);
+
+  // Nothing invented, nothing retired.
   await expect(page.getByLabel("Paste receipts or invoices")).toHaveCount(0);
   await expect(page.getByText(/sample audit/i)).toHaveCount(0);
   await expect(page.getByText(/verified savings/i)).toHaveCount(0);
@@ -161,24 +172,16 @@ test("the landing demonstrates the decision loop and sends visitors to their own
 
   const axe = await new AxeBuilder({ page }).analyze();
   const serious = axe.violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical");
-  expect(serious).toEqual([]);
-
-  await page.getByLabel("Vendor / commitment").fill("OpenAI API");
-  await expect(page.getByRole("heading", { name: "OpenAI API: existing exposure is not cited." })).toBeVisible();
-  await expect(page.getByText(/EXPOSURE_NOT_CITED/)).toBeVisible();
-  await page.getByRole("link", { name: "Cite a bill you already have" }).click();
-  await expect(page).toHaveURL(/\/start/);
-  await expect(page.getByText(/You named OpenAI API as the next yes at ₹1,700/)).toBeVisible();
+  expect(serious, serious.map((violation) => `${violation.id}: ${violation.help}`).join("\n")).toEqual([]);
 });
 
 test("the mobile landing keeps the primary action visible without overflow", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
 
-  const heading = page.getByRole("heading", { level: 1, name: "Commitment Control: freeze the cap before the obligation exists." });
-  const getStarted = page.locator("section").filter({ has: heading }).getByRole("link", { name: "See a decision made", exact: true });
-  await expect(getStarted).toBeVisible();
-  const actionBottom = await getStarted.evaluate((element) => element.getBoundingClientRect().bottom);
+  const primary = page.getByRole("link", { name: "Review the synthetic request" }).first();
+  await expect(primary).toBeVisible();
+  const actionBottom = await primary.evaluate((element) => element.getBoundingClientRect().bottom);
   const metrics = await page.evaluate(() => ({
     viewportHeight: window.innerHeight,
     documentWidth: document.documentElement.scrollWidth,

@@ -87,6 +87,7 @@ test("the first-pilot operator record keeps external proof restricted and hash-a
     /proposal-review procedure/i,
     /restore drill/i,
     /monitoring delivery/i,
+    /COMMITMENT_CONTROL_OPERATIONS_EVIDENCE_COMMIT_SHA/,
     /assessment report/i,
     /cleared payment/i,
     /exact workspace/i,

@@ -1,6 +1,7 @@
 # Phase B — Commitment Control V0 (10 days)
 
-> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Pursue asymmetric,
 > falsifiable upside and bound irreversible downside. Full doctrine:
 > [`THE-LAW.md`](../THE-LAW.md).
 
@@ -33,7 +34,9 @@ V0 records authority. It never purchases, provisions, cancels, auto-approves, au
 7. Only owners/admins may approve, approve with a cap, or decline.
 8. Decisions and caps are append-only and cannot be rewritten by later evidence.
 9. Reconciliation links same-workspace Recovery evidence and returns `MATCHED`, `WITHIN_CAP`, `OVER_CAP`, `CURRENCY_MISMATCH`, or `CANNOT_EVALUATE`.
-10. Private pilot enrollment fails closed; no public launch or broad redesign.
+10. Private pilot enrollment fails closed; no public launch. Broad frontend
+  reconstruction is authorized only for the non-production candidate under
+  THE-LAW §0.1.1 and cannot change this loop or its contracts.
 
 ## 1. Architecture boundary
 
@@ -131,7 +134,11 @@ npm run perf:budget
 
 ## 5. Explicitly deferred
 
-Cards, wallets, payments, autonomous agents, Slack integration, Gmail expansion, bank connectors, automatic merchant matching, procurement suites, contract negotiation, public redesign, and any action that creates or terminates an obligation.
+Cards, wallets, payments, autonomous agents, Slack integration, Gmail expansion,
+bank connectors, automatic merchant matching, procurement suites, contract
+negotiation, public launch, and any action that creates or terminates an
+obligation. Frontend reconstruction is confined to the candidate authorized by
+THE-LAW §0.1.1.
 
 ## Historical Autopilot implementation record — superseded 2026-08-25
 

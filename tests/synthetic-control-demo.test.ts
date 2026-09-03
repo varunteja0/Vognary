@@ -60,8 +60,23 @@ test("the frozen cap never moves when the observed outcome arrives", () => {
     assert.equal(outcome.observedAmountMinor, syntheticDemoObservedMinor);
     // One currency throughout. Nothing is converted or summed across currencies.
     assert.equal(outcome.observedCurrency, outcome.authorizationCurrency);
-    assert.equal(outcome.verdict, "OVER_CAP");
+    // The verdict is whatever the frozen cap makes true, never a chosen label.
+    const observed = BigInt(syntheticDemoObservedMinor);
+    const cap = BigInt(String(outcome.approvedCapMinor));
+    const expected = BigInt(outcome.expectedAmountMinor);
+    assert.equal(
+      outcome.verdict,
+      observed > cap ? "OVER_CAP" : observed === expected ? "MATCHED" : "WITHIN_CAP",
+    );
   }
+});
+
+test("the canonical record ends over the cap a human chose", () => {
+  // The whole point of the hero record: a lower cap changes the later verdict.
+  const capped = syntheticControlBrief("RECONCILED", "APPROVE_WITH_CAP").proposals[0];
+  const full = syntheticControlBrief("RECONCILED", "APPROVE").proposals[0];
+  assert.equal(capped.reconciliations[0].verdict, "OVER_CAP");
+  assert.notEqual(full.reconciliations[0].verdict, capped.reconciliations[0].verdict);
 });
 
 test("a declined proposal creates no cap and no comparison", () => {
@@ -102,7 +117,9 @@ test("nothing in the demonstration can be mistaken for a customer or reach the n
   assert.match(entry.proposal.merchant, /placeholder/i);
   assert.match(String(entry.decision?.decidedByDisplayName), /placeholder/i);
   assert.equal(SYNTHETIC_DEMO_LABEL, "Synthetic demonstration");
-  assert.match(demoClient, /SYNTHETIC_DEMO_LABEL/);
+  // The demonstration stamps itself, whether by the constant directly or through
+  // the shared component that renders it.
+  assert.match(demoClient, /SYNTHETIC_DEMO_LABEL|SyntheticStamp/);
 });
 
 test("exact money stays in minor units and is never recomputed for display", () => {

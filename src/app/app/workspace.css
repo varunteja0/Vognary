@@ -302,40 +302,27 @@
   font-size: var(--text-fine);
   color: var(--muted);
 }
-.control-figures {
-  display: grid;
-  /* Each figure carries a sentence, so a column never narrows past the point
-     where words break mid-syllable; it wraps to another row instead. */
-  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
-  gap: var(--space-3) var(--space-5);
-}
-.control-figure {
-  display: grid;
-  align-content: start;
-  gap: 0.15rem;
-  min-width: 0;
-  padding-left: 0.7rem;
-  border-left: 2px solid var(--truth-rule, var(--line-strong));
-}
-.control-figure > dt {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-size: var(--text-micro);
-  line-height: 1.4;
-  color: var(--muted);
-}
-.control-figure > dd {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-record);
-  line-height: 1.25;
+/* The standing obligation, stated as a sentence. A counter grid made the desk
+   open on four numbers of unequal worth; one line carries the only figure that
+   changes what the reader does next. */
+.control-standing {
+  margin: var(--space-3) 0 0;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: var(--text-lead);
+  line-height: 1.2;
   color: var(--ink);
-  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
-.control-figure > dd > small {
-  display: block;
+.control-standing[data-waiting] {
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--authority, var(--ember));
+}
+.control-standing-note {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-mono-data), ui-monospace, monospace;
   font-size: var(--text-fine);
   line-height: 1.45;
-  color: var(--ink-soft);
+  color: var(--muted);
 }
 /* --- Bands ------------------------------------------------------------ */
 
@@ -365,6 +352,14 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 0.25rem var(--space-4);
+}
+/* The composer's disclosure. Native <details>, so keyboard, focus, the marker
+   and browser-back behaviour are the platform's job rather than 400 bytes of
+   re-implementation. Closed on a populated desk. */
+.control-composer-summary {
+  cursor: pointer;
+  min-height: var(--tap);
+  align-items: center;
 }
 .control-heading {
   font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
@@ -597,6 +592,11 @@
   .control-facts {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }}
+
+/* A one-time charge collapses to a single figure, so its label no longer has to
+   wrap inside a column sized for three. */
+.control-facts[data-columns="1"] { grid-template-columns: minmax(0, 1fr); }
+
 .control-fact {
   min-width: 0;
 }
@@ -832,11 +832,17 @@
 .control-verdict {
   display: grid;
   gap: 0.5rem;
-  padding: 0.7rem 0.75rem 0.75rem 0.7rem;
+  padding: 0.1rem 0 0.1rem 0.7rem;
+  /* Policy is context, never an approval. A filled panel made it the heaviest
+     object in the record — heavier than the human decision it defers to — so it
+     is marked by its rule alone. */
   border-left: 2px solid var(--truth-policy);
-  border-radius: 0 6px 6px 0;
-  background: var(--ochre-tint);
 }
+
+/* A provenance label plus a whole sentence to say "nothing was cited" spent two
+   lines on an absence. The absence sits on the label's own line instead. */
+.control-section[data-empty="true"] { display: flex; flex-wrap: wrap; gap: 0 0.5rem; align-items: baseline; }
+.control-section[data-empty="true"] .control-note { margin: 0; }
 .control-reasons {
   display: grid;
   gap: 0.2rem;
@@ -1149,7 +1155,10 @@
   border-radius: 999px;
   background: currentColor;
 }
-.stamp-keep {
+/* Stamps and pills are two shapes for one meaning, so the meaning is declared
+   once. Each pair had byte-identical bodies 400 lines apart. */
+.stamp-keep,
+.pill-ready {
   color: var(--verdict);
   background: var(--verdict-tint);
 }
@@ -1157,15 +1166,18 @@
   color: var(--ochre);
   background: var(--ochre-tint);
 }
-.stamp-downgrade {
+.stamp-downgrade,
+.pill-partial {
   color: var(--indigo);
   background: var(--indigo-tint);
 }
-.stamp-cancel {
+.stamp-cancel,
+.pill-blocked {
   color: var(--ember);
   background: var(--ember-tint);
 }
-.stamp-investigate {
+.stamp-investigate,
+.pill-planned {
   color: var(--ink-soft);
   background: rgba(23, 26, 31, 0.05);
 }
@@ -1574,7 +1586,3 @@ select.field option {
   letter-spacing: 0;
   text-transform: none;
 }
-.pill-ready { color: var(--verdict); background: var(--verdict-tint); }
-.pill-blocked { color: var(--ember); background: var(--ember-tint); }
-.pill-partial { color: var(--indigo); background: var(--indigo-tint); }
-.pill-planned { color: var(--ink-soft); background: rgba(23, 26, 31, 0.05); }

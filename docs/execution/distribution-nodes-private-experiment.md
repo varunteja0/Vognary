@@ -1,6 +1,7 @@
 # Distribution nodes — private stack-review experiment
 
-> **Operating motto: Take smart risks. Do not play safe.** Prefer a bounded,
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Prefer a bounded,
 > high-upside distribution experiment with a deadline and kill metric over safe
 > low-signal activity. Full doctrine: [`THE-LAW.md`](../THE-LAW.md).
 

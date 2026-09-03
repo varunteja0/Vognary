@@ -280,7 +280,7 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 
   const nav = page.getByRole("navigation", { name: "Primary" });
-  for (const label of ["Today", "Control", "Commitments", "Evidence"]) {
+  for (const label of ["Today", "Decisions", "Bills", "Evidence"]) {
     await expect(nav.getByRole("button", { name: label })).toBeVisible();
   }
   await expect(nav.getByRole("button", { name: "Automation" })).toHaveCount(0);
@@ -359,7 +359,7 @@ test("a commitment exposes its exact evidence and returns focus after inspection
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   await expect(page.getByRole("heading", { name: "OpenAI" })).toBeVisible();
@@ -396,7 +396,7 @@ test("Now keeps the three primary choices; Bills routes decisions back to Now", 
     await expect(nowChoices.getByRole("button", { name: new RegExp(`^${label}`) })).toBeVisible();
   }
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
   await expect(page.getByRole("group", { name: "Your choice" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Decide on Now" })).toBeVisible();
@@ -436,7 +436,7 @@ test("correcting a commitment offers every contract field and shows reversible h
   await mockRecoveryApi(page);
   await page.goto("/app");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" }).click();
+  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   await page.getByText("Something wrong?").click();
@@ -466,10 +466,10 @@ test("the workspace stays usable and keyboard-reachable on a 390px phone", async
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   expect(overflow).toBe(false);
 
-  const commitmentsTab = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Commitments" });
+  const commitmentsTab = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" });
   await commitmentsTab.focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { level: 2, name: "Commitments" })).toBeFocused();
+  await expect(page.getByRole("heading", { level: 2, name: "Bills" })).toBeFocused();
 });
 
 test("Mandate stays hidden until notice delivery is proven", async ({ page }) => {

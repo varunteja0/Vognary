@@ -4,11 +4,22 @@ import vm from "node:vm";
 
 const nextRoot = new URL("../.next/", import.meta.url);
 const rootManifestUrl = new URL("build-manifest.json", nextRoot);
-const routes = [
-  { route: "/", key: "/page", manifest: "server/app/page_client-reference-manifest.js", jsGzipLimit: 220_000 },
-  { route: "/app", key: "/app/page", manifest: "server/app/app/page_client-reference-manifest.js", jsGzipLimit: 220_000 },
-  { route: "/verify", key: "/verify/page", manifest: "server/app/verify/page_client-reference-manifest.js", jsGzipLimit: 220_000 },
+// Every user-facing route, not a sample of three. A budget that only watches
+// the routes someone remembered to add is a budget that has already been beaten
+// by the next route.
+const userFacingRoutes = [
+  "/", "/demo", "/start", "/login", "/app", "/pay", "/security", "/billing/return",
+  "/profile", "/verify", "/offline", "/about", "/contact", "/privacy", "/terms", "/brand",
 ];
+const routes = userFacingRoutes.map((route) => {
+  const segment = route === "/" ? "" : route;
+  return {
+    route,
+    key: `${segment}/page`,
+    manifest: `server/app${segment}/page_client-reference-manifest.js`,
+    jsGzipLimit: 220_000,
+  };
+});
 const cssGzipLimit = 15_000;
 const chunkGzipLimit = 80_000;
 
@@ -71,7 +82,13 @@ for (const config of routes) {
 }
 
 for (const row of report) {
-  console.log(`${row.route.padEnd(7)} JS ${formatBytes(row.jsGzip)} / ${formatBytes(row.jsLimit)} (${row.jsFiles} files) · CSS ${formatBytes(row.cssGzip)} / ${formatBytes(row.cssLimit)} (${row.cssFiles} files)`);
+  // Exact bytes, not only rounded KB: a route can sit 40 B under a ceiling and
+  // look identical to one with 3 KB of headroom when both round to the same KB.
+  console.log(
+    `${row.route.padEnd(16)} JS ${String(row.jsGzip).padStart(7)} B / ${row.jsLimit} B (${row.jsFiles} files)`
+    + ` \u00b7 CSS ${String(row.cssGzip).padStart(6)} B / ${row.cssLimit} B`
+    + ` (${row.cssFiles} files, ${row.cssLimit - row.cssGzip} B headroom)`,
+  );
 }
 
 if (failures.length) {
@@ -79,7 +96,7 @@ if (failures.length) {
   failures.forEach((failure) => console.error(`- ${failure}`));
   process.exitCode = 1;
 } else {
-  console.log("Performance budgets passed for landing, app, and verify routes.");
+  console.log(`Performance budgets passed for all ${report.length} user-facing routes.`);
 }
 
 function normalizeAssetPath(value) {

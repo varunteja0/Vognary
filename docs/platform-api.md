@@ -1,6 +1,7 @@
 # Vognary Read-Only Platform API
 
-> **Operating motto: Take smart risks. Do not play safe.** Pursue a
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Pursue a
 > category-defining API outcome through bounded, falsifiable use cases; never
 > weaken scopes, tenant isolation, token handling, or auditability. Full
 > doctrine: [`THE-LAW.md`](THE-LAW.md).

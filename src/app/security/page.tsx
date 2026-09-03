@@ -40,16 +40,28 @@ export default function SecurityPage() {
             <VognaryMark size={22} />
             Vognary
           </Link>
-          <Link href="/app" className="btn btn-ghost">Back to app</Link>
+          <Link href="/contact" className="btn btn-ghost">Contact</Link>
         </div>
         <article className="public-ledger">
           <header className="public-ledger-rail">
             <span className="folio" data-folio="Trust">Security</span>
-            <h1 className="mt-5 font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-5xl">How Vognary handles data</h1>
-            <p className="mt-5 text-sm leading-7 text-(--ink-soft)">Google is used for sign-in only. Receipt mail enters through a signed provider webhook, is bounded before parsing, and is saved only through the canonical Recovery workspace.</p>
-            <div className="mt-6 border-l-2 border-ochre pl-4">
-              <p className="font-data text-xs font-semibold text-ochre">ASSESSMENT NOT YET PROVEN</p>
-              <p className="mt-2 text-sm leading-7 text-(--muted)">Real customer financial data remains blocked until the independent assessment and remediation retest gate closes.</p>
+            <h1 className="mt-5 font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-5xl">Where your data goes</h1>
+            <p className="mt-5 text-sm leading-7 text-(--ink-soft)">
+              Three things decide everything on this page: what this deployment can currently
+              prove, the one path evidence travels, and the boundaries the system will not cross.
+              Each is stated below, in that order.
+            </p>
+            {/* Stated once, as current status, then not repeated. A page that
+                opens with a wall of warnings buries the operating facts a
+                reader came for. */}
+            <dl className="public-facts mt-6">
+              <div><dt>Mailbox access</dt><dd>None. Google is sign-in only</dd></div>
+              <div><dt>Customer financial data</dt><dd>Blocked until the independent assessment and retest close</dd></div>
+              <div><dt>Model training on your invoices</dt><dd>Never</dd></div>
+            </dl>
+            <div className="mt-6 grid gap-2">
+              <Link href="/contact" className="btn btn-primary">Ask a security question</Link>
+              <a className="btn btn-ghost" href="/.well-known/security.txt">Report a vulnerability</a>
             </div>
           </header>
 
@@ -72,7 +84,22 @@ export default function SecurityPage() {
           </section>
 
           <section className="public-band">
-            <p className="truth-label truth-citation">Operating boundaries</p>
+            <p className="truth-label truth-citation">Data flow</p>
+            <h2 className="mt-3 font-display text-xl font-semibold text-(--ink)">The one path evidence travels</h2>
+            <p className="mt-2 text-sm leading-6 text-(--muted)">
+              There is no second route in. Nothing is scanned, polled, or fetched on your behalf.
+            </p>
+            <ol className="public-steps mt-5">
+              {dataFlow.map((step) => (
+                <li key={step.title}>
+                  <b>{step.title}.</b> {step.body}
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          <section className="public-band">
+            <p className="truth-label truth-frozen">Operating boundaries</p>
             <h2 className="mt-3 font-display text-xl font-semibold text-(--ink)">What the system does and does not hold</h2>
             <dl className="public-record-list mt-5">
               {items.map((item) => (
@@ -85,7 +112,7 @@ export default function SecurityPage() {
           </section>
 
           <section className="public-band">
-            <p className="truth-label truth-policy">Inspect the boundary</p>
+            <p className="truth-label truth-policy">Detail on request</p>
             <h2 className="mt-3 font-display text-xl font-semibold text-(--ink)">Questions the evidence policy must answer</h2>
             <div className="public-disclosure-list mt-5">
               {trustAnswers.map((item) => (
@@ -95,6 +122,12 @@ export default function SecurityPage() {
                 </details>
               ))}
             </div>
+            <p className="mt-6 text-sm leading-7 text-(--muted)">
+              If your question is not answered above, ask it directly —{" "}
+              <Link href="/contact" className="link-quiet">contact Vognary</Link>. Security reports
+              have their own channel in{" "}
+              <a className="link-quiet" href="/.well-known/security.txt">security.txt</a>.
+            </p>
           </section>
           </div>
         </article>
@@ -102,6 +135,29 @@ export default function SecurityPage() {
     </main>
   );
 }
+
+const dataFlow = [
+  {
+    title: "You submit one document",
+    body: "A paste, an upload, or mail you send to a private receipt address. Vognary never reaches into a mailbox, a bank, or a card account to find it.",
+  },
+  {
+    title: "Ingress is verified and bounded",
+    body: "Resend webhook requests are checked against the untouched request body, size-bounded, replay-fenced, and resolved through a secret alias before any content is retrieved.",
+  },
+  {
+    title: "Accepted text is encrypted at the application layer",
+    body: "Raw source text is stored with authenticated encryption. Normalized facts keep a reference back to the evidence they came from.",
+  },
+  {
+    title: "Every read rechecks who is asking",
+    body: "Protected routes revalidate the session and the workspace role, and queries are scoped to the signed-in workspace id.",
+  },
+  {
+    title: "Retention is minimized, not promised away",
+    body: "Encrypted raw source text and terminal transport metadata are minimized after 30 days when retention runs. Provider-held email follows Resend's own schedule, and Vognary does not promise instant deletion from backups.",
+  },
+] as const;
 
 const trustAnswers = [
   { title: "Does Vognary read my Gmail?", body: "No. Google is used for sign-in only." },

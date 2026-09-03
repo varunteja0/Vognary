@@ -82,9 +82,12 @@ async function measure(viewport, attempt) {
     const page = await context.newPage();
     const client = await context.newCDPSession(page);
     await client.send("Emulation.setCPUThrottlingRate", { rate: 4 });
-    await page.goto(origin, { waitUntil: "networkidle" });
+    await page.goto(`${origin}/demo`, { waitUntil: "networkidle" });
     await page.evaluate(() => document.fonts.ready);
-    const transitionTarget = page.getByRole("button", { name: "Decline" });
+    // The selected signature change is the cap line resolving under the request
+    // when a human authorizes. That is the one transition worth a frame budget,
+    // so it is the one the budget measures.
+    const transitionTarget = page.getByRole("button", { name: "Approve with a lower cap" });
     await transitionTarget.scrollIntoViewIfNeeded();
     // The budget measures the transition, not the page arriving. Smooth
     // scrolling and deferred load work both land after `networkidle`, so wait
@@ -161,9 +164,9 @@ async function runProbe(page, durationMs, clickTarget) {
     };
     requestAnimationFrame(sample);
     if (!click) return;
-    const target = [...document.querySelectorAll("#example-decision button")]
-      .find((button) => button.textContent?.trim() === "Decline");
-    if (!target) throw new Error("The motion probe could not find the Decline control.");
+    const target = [...document.querySelectorAll(".demo-choice")]
+      .find((button) => button.getAttribute("data-action") === "APPROVE_WITH_CAP");
+    if (!target) throw new Error("The motion probe could not find the approve-with-cap control.");
     setTimeout(() => target.click(), 100);
   }, { windowMs: durationMs, click: Boolean(clickTarget) });
   await page.waitForFunction(() => window.__vognaryMotionProbe?.finished === true);

@@ -1,6 +1,7 @@
 # Founder-ops setup — click-by-click
 
-> **Operating motto: Take smart risks. Do not play safe.** Accelerate the
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Accelerate the
 > falsifiable customer outcome, never secret handling, consent, legal review, or
 > readiness claims. Full doctrine: [`THE-LAW.md`](THE-LAW.md).
 
@@ -150,6 +151,70 @@ RESEND_FROM_EMAIL=Vognary <no-reply@vognary.com>    # address MUST be on the ver
 **Verify**
 - Trigger a magic-link sign-in from `/login` and confirm the email arrives. Deeper flow: `docs/renewal-alerts-runbook.md`.
 - Renewal alerts only send to users who explicitly opted in.
+
+---
+
+## 3A. Company mailbox — Google Workspace (founder-controlled purchase)
+
+**Current truth:** `security@vognary.com` is a Resend receiving address, not a
+Google mailbox or alias. The root MX points to Resend, which stores mail in its
+dashboard/API. There is no primary human receiver. `npm run security:inbox`
+provides a privacy-minimized, read-only report without browser login.
+
+**Current temporary direction — no Workspace purchase:** the founder deferred
+the paid account on 2026-09-03. Keep Resend on the root MX and set
+`COMPANY_MAIL_FORWARD_TO` only in an ignored local or deployment secret. Run
+`npm run company-mail:forward` to preview and
+`npm run company-mail:forward -- --execute` to forward approved aliases while
+retaining originals in Resend. Synthetic tests are excluded; provider tags and
+source hashes prevent duplicate forwarding. This is pull-based until a reviewed
+webhook deployment exists.
+
+Do not reply from the personal destination unless Gmail `Send mail as` is
+configured with a dedicated Resend `sending_access` SMTP credential. Otherwise
+the personal address is exposed. Agents may reply through the existing Resend
+API path. Never give Gmail the full-access application key.
+
+**Recommended future direction after purchase approval:** use one Google Workspace
+Starter user, `varun@vognary.com`, as the named human company login. Add these
+free aliases to that user: `founder`, `security`, `support`, `hello`, `privacy`,
+and `legal`. Google routes every alias into the primary user's Gmail inbox. Keep
+the personal Google account as recovery only and use Google's account switcher;
+do not forward security/privacy mail into the personal inbox by default.
+
+Do not purchase or change DNS until the founder accepts Google's displayed
+price and terms. The current India list price observed 2026-09-03 is INR 270 per
+user/month for Starter, but the checkout price controls.
+
+**Cutover order:**
+
+1. Create the Workspace organization and `varun@vognary.com`; enable 2-Step
+   Verification and add the personal account only as recovery.
+2. Verify `vognary.com` in Google Admin. Keep the existing Google verification
+   TXT record unless Google explicitly replaces it.
+3. Add the six aliases above under Directory → Users → varun → Alternate
+   emails. An alias is not another paid user and cannot sign in separately.
+4. Before changing MX, run `npm run security:inbox` and retain the existing
+   assessor-thread references. Resend keeps historical received messages after
+   the cutover.
+5. In Cloudflare DNS, remove only the **root** Resend receiving MX and add the
+   Google Workspace MX: host `@`, priority `1`, destination `smtp.google.com`.
+   Preserve `resend._domainkey` TXT plus the `send` MX/TXT records; those keep
+   Resend outbound delivery authenticated.
+6. Activate Gmail in Google Admin. Test every alias from an unrelated external
+   account and verify replies use the intended alias in Gmail's From selector.
+7. Add `_dmarc` TXT with the monitoring policy already recorded in the revenue
+   desk, verify `dmarc=pass` for Google Workspace and Resend, then tighten only
+   after every legitimate sender is observed.
+8. After Gmail is proven, disable root-domain receiving in Resend to remove
+   ambiguity. If product receipt ingestion is activated later, use a dedicated
+   subdomain such as `receipts.vognary.com`; never compete with Workspace's root
+   MX.
+
+Do not use Cloudflare forwarding as the canonical company mailbox: it can place
+mail in a personal inbox, but it does not provide a company account and replies
+default to the destination address. Do not create competing root MX records;
+delivery would be unpredictable.
 
 ---
 

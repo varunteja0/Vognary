@@ -34,12 +34,14 @@ export async function GET(request: Request) {
   const receiptInboxLaunch = getReceiptInboxLaunchReadiness();
   const receiptInboxMigrationsReady = features.schema.applied?.includes("0053_phase_a_receipt_activation") === true;
   const commitmentControlEnrollment = getCommitmentControlEnrollmentReadiness();
+  const deployedCommitSha = getDeployedCommitSha();
 
   return Response.json({
     service: "vognary-web",
     status: database.status === "error" || schemaDegraded ? "degraded" : "ok",
     stage: "recovery-receipt-forwarding",
     timestamp: new Date().toISOString(),
+    release: { commitSha: deployedCommitSha },
     database,
     tokenVault,
     auth: {
@@ -129,6 +131,12 @@ function getIdentityProviderStatus(googleAuth: ReturnType<typeof checkGoogleAuth
 
 function getPrivacyLifecycleStatus(feature: { status: string }) {
   return feature.status;
+}
+
+function getDeployedCommitSha() {
+  const value = process.env.VERCEL_GIT_COMMIT_SHA || process.env.COMMITMENT_CONTROL_DEPLOYED_COMMIT_SHA || "";
+  const normalized = value.trim().toLowerCase();
+  return /^[a-f0-9]{40}$/.test(normalized) ? normalized : null;
 }
 
 function getRetentionSchedulerStatus(feature: { status: string; lastEnforcedAt: string | null }) {

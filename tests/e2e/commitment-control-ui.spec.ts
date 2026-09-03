@@ -366,6 +366,14 @@ async function signIn(page: Page) {
 
 const composerHeading = "What are you considering committing to?";
 
+/** The composer collapses once the desk has records, so opening it is a step. */
+async function openComposer(page: Page) {
+  const heading = page.getByRole("heading", { name: composerHeading });
+  await heading.waitFor();
+  if (!(await page.getByLabel("Merchant or counterparty").isVisible())) await heading.click();
+  await expect(page.getByLabel("Merchant or counterparty")).toBeVisible();
+}
+
 async function fillProposal(page: Page) {
   await page.getByLabel("Merchant or counterparty").fill("Anthropic");
   await page.getByLabel("Purpose").fill("Claude API for the product loop");
@@ -408,16 +416,16 @@ test("a workspace outside the private pilot keeps the Control destination and se
   // is gated, and the gate is never bypassed.
   const nav = page.getByRole("navigation", { name: "Primary" });
   await expect(nav.getByRole("button", { name: "Today" })).toBeVisible();
-  await expect(nav.getByRole("button", { name: "Control" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Decisions" })).toBeVisible();
 
-  await nav.getByRole("button", { name: "Control" }).click();
+  await nav.getByRole("button", { name: "Decisions" }).click();
   await expect(page.getByRole("heading", { name: "Live decisions unlock with pilot enrollment" })).toBeVisible();
   await expect(page.getByText("Synthetic demonstration")).toBeVisible();
   await expect(page.getByRole("link", { name: "See the pilot offer" })).toHaveAttribute("href", "/pay");
 
   // Populated, but unmistakably not this workspace and not writable.
   await expect(page.getByText("Model API vendor (placeholder)")).toBeVisible();
-  await expect(page.getByText("Founder (placeholder)")).toBeVisible();
+  await expect(page.getByText("Finance owner (placeholder)")).toBeVisible();
   await expect(page.getByText(composerHeading)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Decide this proposal" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Link observed evidence" })).toHaveCount(0);
@@ -438,7 +446,7 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
   const { controlRequests, runtimeProblems } = await mockWorkspace(page);
   await page.goto("/app");
 
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Control" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Decisions" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("heading", { name: composerHeading })).toBeInViewport();
   await expect(page.getByRole("heading", { name: "Needs a decision" })).toBeVisible();
   await expect(page.getByText("No proposal has been entered yet. The first one you evaluate appears here.")).toBeVisible();
@@ -531,6 +539,7 @@ test("a member may propose but never sees a decision or policy command", async (
   await page.goto("/app");
 
   await expect(page.getByRole("heading", { name: composerHeading })).toBeVisible();
+  await openComposer(page);
   await expect(page.getByRole("button", { name: "Evaluate proposal" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Decide this proposal" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Record a new policy version" })).toHaveCount(0);
@@ -567,6 +576,12 @@ test("all three policy statuses read as policy context, never as an authorizatio
   const within = page.getByRole("article", { name: "Vercel" });
   const review = page.getByRole("article", { name: "Figma" });
   const outside = page.getByRole("article", { name: "Anthropic" });
+  // Only the proposal being decided is read in full; the rest of the queue
+  // keeps its verdict visible and opens the reasoning on demand.
+  for (const record of [within, review, outside]) {
+    const disclosure = record.locator("details.control-more > summary");
+    if (await disclosure.count()) await disclosure.first().click();
+  }
   await expect(within.getByText("Within policy")).toBeVisible();
   await expect(within.getByText("Policy found no limit or posture that this proposal crosses. It is not approved.")).toBeVisible();
   await expect(within.getByText("No existing commitment was cited, so the exposure below counts this proposal alone.")).toBeVisible();
@@ -679,7 +694,7 @@ test("an in-flight brief, an empty ledger, a missing policy, and an offline devi
   // While the brief is in flight the destination exists but stays quiet: Home is
   // still the first screen, and nothing about the desk is claimed yet.
   await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Control" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Decisions" })).toBeVisible();
   await expect(page.getByText("Live decisions unlock with pilot enrollment")).toHaveCount(0);
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
@@ -706,6 +721,9 @@ test("the composer and dialog are usable with a keyboard alone", async ({ page }
   });
   await page.goto("/app");
 
+  // A populated desk keeps the composer collapsed so the queue is reached first,
+  // so a keyboard user opens it before typing, exactly as the pointer user does.
+  await openComposer(page);
   await page.getByLabel("Merchant or counterparty").focus();
   await page.keyboard.type("Anthropic");
   await expect(page.getByLabel("Merchant or counterparty")).toHaveValue("Anthropic");
@@ -740,7 +758,10 @@ test("Control honours reduced motion and fits a 390px viewport", async ({ page }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/app");
 
-  await expect(page.getByRole("heading", { name: composerHeading })).toBeInViewport();
+  // Attention before creation: on a populated desk the queue owns the first
+  // screen and the composer waits behind its own disclosure.
+  await expect(page.getByRole("heading", { name: "Needs a decision" })).toBeInViewport();
+  await expect(page.getByRole("heading", { name: composerHeading })).toHaveCount(1);
   await expect(page.getByRole("heading", { name: "Needs a decision" })).toHaveCount(1);
 
   const motion = await page.evaluate(() => ({

@@ -4,12 +4,10 @@ test("the first-value path leads into the product without a cancel promise", asy
   const failures = collectRuntimeFailures(page);
   await page.goto("/");
 
-  const primary = page.locator("section").filter({ has: page.getByRole("heading", { name: "Commitment Control: freeze the cap before the obligation exists." }) })
-    .getByRole("link", { name: "See a decision made", exact: true });
+  const primary = page.getByRole("link", { name: "Review the synthetic request" }).first();
+  const evidence = page.getByRole("link", { name: "Use your own evidence" }).first();
   await expect(primary).toBeVisible();
   await expect(primary).toHaveAttribute("href", "/demo");
-  const evidence = page.locator("section").filter({ has: page.getByRole("heading", { name: "Commitment Control: freeze the cap before the obligation exists." }) })
-    .getByRole("link", { name: "Cite your own bill", exact: true });
   await expect(evidence).toHaveAttribute("href", "/start");
   await evidence.click();
   await expect(page).toHaveURL(/\/start/);

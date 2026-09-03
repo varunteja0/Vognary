@@ -3,13 +3,18 @@ import "../ledger.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { VognaryMark } from "../brand";
-import { formatMoney } from "@/lib/format";
+import { formatExactMinorUnits } from "@/components/ui/money-value";
 import { commitmentControlPilotOffer, pilotOfferMajorUnits } from "@/lib/pilot-offer";
 import { getPilotPaymentLink } from "@/lib/pilot-payment-link";
 
 export const dynamic = "force-dynamic";
 
-const priceCopy = formatMoney(pilotOfferMajorUnits(), commitmentControlPilotOffer.currency);
+// The canonical renderer, so the offer is not "INR 14,999" on Home and
+// "₹14,999" here — two notations for one number across the same journey.
+const priceCopy = formatExactMinorUnits(
+  String(commitmentControlPilotOffer.amountMinor),
+  commitmentControlPilotOffer.currency,
+);
 
 export const metadata: Metadata = {
   title: "Reserve the Commitment Control pilot",
@@ -100,7 +105,35 @@ export default function PayPage() {
             <p className="mt-3 max-w-2xl text-sm leading-7 text-(--muted)">
               Vognary records a proposed obligation, shows cited existing exposure, records who approved what limit, and later checks observed evidence against that decision. It never auto-approves, auto-denies, purchases, provisions, cancels, or moves vendor money.
             </p>
-            <ul className="reason-list mt-3">
+            {/* A reader arrives here straight from the request they just watched
+                a person freeze. The pilot is described in that same order so the
+                page continues the product story instead of restarting as a
+                price list. */}
+            <ol className="public-steps mt-5">
+              <li>
+                <b>Your policy, once.</b> The limits you already enforce in your head become a
+                versioned rule that annotates a proposal and never decides one.
+              </li>
+              <li>
+                <b>Up to {commitmentControlPilotOffer.proposalLimit} proposals.</b> Each one arrives
+                as a request with its cited existing exposure beside it, exactly like the synthetic
+                request on this site.
+              </li>
+              <li>
+                <b>You freeze a cap, or you decline.</b> The decision, the person, the policy
+                version and the reason are preserved and never recomputed.
+              </li>
+              <li>
+                <b>Weekly reconciliation.</b> The invoices that actually arrive are measured against
+                the cap that was frozen &mdash; matched, within, or over.
+              </li>
+            </ol>
+            <p className="mt-4 text-sm leading-7 text-(--muted)">
+              If you have not seen that loop yet,{" "}
+              <Link href="/demo" className="link-quiet">review the synthetic request</Link> before
+              you pay for a month of it.
+            </p>
+            <ul className="reason-list mt-4">
               {included.map((item) => <li key={item}>{item}</li>)}
             </ul>
           </section>

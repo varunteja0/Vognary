@@ -53,8 +53,11 @@ export default function AboutPage() {
             Vognary is built for India-first, 20–100 person AI-native companies that need a named human to authorize a new obligation before it exists, then prove later spend against that frozen cap. It starts with receipts and invoices the company already has. Recovery remains the evidence foundation; Control is the authorization desk.
           </p>
           <div className="mt-6 grid gap-2">
-            <Link href="/start" className="btn btn-primary btn-lg">Add a bill</Link>
-            <Link href="/pay" prefetch={false} className="btn btn-ghost">Reserve the private pilot</Link>
+            {/* About answers "why does this refuse to decide for me". The honest
+                next step is to watch it refuse, or to ask a person — not to go
+                file a bill. */}
+            <Link href="/demo" className="btn btn-primary btn-lg">Review the synthetic request</Link>
+            <Link href="/contact" className="btn btn-ghost">Ask us a question</Link>
           </div>
           </header>
 
@@ -76,6 +79,7 @@ export default function AboutPage() {
             <div className="mt-5 flex flex-wrap gap-2.5">
               <Link href="/security" className="btn btn-ghost">Security and readiness</Link>
               <Link href="/privacy" className="btn btn-ghost">Privacy</Link>
+              <Link href="/pay" prefetch={false} className="btn btn-ghost">Reserve the private pilot</Link>
             </div>
           </section>
           </div>

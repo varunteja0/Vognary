@@ -1,8 +1,12 @@
 # AGENTS — mandatory instructions for every model and coding agent
 
-> **Operating motto: Take smart risks. Do not play safe.** Pursue asymmetric,
+> **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
+> **Strategy rule: Take smart risks. Do not play safe.** Pursue asymmetric,
 > falsifiable upside and bound irreversible downside. The full doctrine in
 > [`docs/THE-LAW.md`](docs/THE-LAW.md) outranks incremental scope convenience.
+> **Reduction rule:** Every complex problem is a set of simple problems. Name
+> one user, one exact moment, one decision, and one observable proof before
+> adding scope.
 
 ## 0. Read order (do this before writing code or plans)
 
@@ -17,11 +21,18 @@
 
 ## 1. What we are building
 
-**Founder scope freeze (2026-08-25): Commitment Control replaces Commitment Intelligence.** Vognary is the human-authorized commitment firewall for India-first, 5–100-person AI-native companies: proposed obligation → policy context → human authorization → approved cap → observed outcome. Recovery remains the evidence and reconciliation foundation.
+**Founder scope freeze (2026-08-25): Commitment Control replaces Commitment Intelligence.** Vognary records human-authorized commitment decisions for India-first, 20–100-person AI-native companies: proposed obligation → policy context → human authorization → approved cap → observed outcome. Recovery remains the evidence and reconciliation foundation.
 
 Current loop: user-entered proposal → cited existing exposure → deterministic policy → owner/admin decision → frozen cap → later Recovery evidence → reconciliation.
 
-Build only the thin ten-day V0 needed for paid pilots at ₹14,999/month. V0 never auto-approves, auto-denies, purchases, provisions, cancels, or moves money. Do **not** build cards, wallets, payments, autonomous agents, Slack, Gmail OAuth, bank connectors, automatic merchant matching, procurement suites, contract negotiation, or a public redesign. Existing billing evidence may reconcile an approved proposal.
+Build only the thin ten-day V0 needed for a one-time ₹14,999 payment covering
+one pilot month; a second month requires a separate purchase. V0 never
+auto-approves, auto-denies, purchases, provisions, cancels, or moves money. Do
+**not** build cards, wallets, payment rails, autonomous agents, Slack, Gmail
+OAuth, bank connectors, automatic merchant matching, procurement suites, or
+contract negotiation. A public frontend reconstruction is authorized only for
+the candidate under THE-LAW §0.1.1. Existing billing evidence may reconcile an
+approved proposal.
 
 AI must **cite or shut up**. Never invent amounts, merchants, or connector liveness.
 
@@ -33,6 +44,7 @@ AI must **cite or shut up**. Never invent amounts, merchants, or connector liven
 - Engine changes: **failing test first**
 - Use the canonical `src/app/workspace/*` implementation; do not recreate the retired monolith.
 - Founder-only ops: API keys, Google verification, Razorpay, legal, Setu — agents prepare, never fake READY
+- Reduce each task to one owner, one customer outcome, one primary action, and one falsifiable check. Split requests that contain independent outcomes before implementation.
 
 ### Commitment Control loop — same-repo sequential branch
 
@@ -40,7 +52,12 @@ Commitment Control V0 continues on `main` in this folder. One Git owner. No sibl
 
 ## 3. Hard stops
 
-No new connectors, payment rails, autonomous action, design-system rewrite, uncited AI, platform sales theater, PII in git, work outside this repo, or $100B-feature justifications that skip the paid-pilot gates.
+No new connectors, payment rails, autonomous action, uncited AI, platform sales
+theater, PII in git, work outside this repo, or $100B-feature justifications that
+skip the paid-pilot gates. A design-system rewrite is forbidden except for the
+single frontend candidate explicitly authorized by THE-LAW §0.1.1 and the newest
+CONTINUE-HERE entry; that exception cannot change product truth, backend
+contracts, customer-data gates, or launch status.
 
 ## 4. Next.js note
 
@@ -55,7 +72,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ```text
 [ ] Read docs/THE-LAW.md
 [ ] Read docs/CONTINUE-HERE.md
-[ ] State scoreboard row + loop step this task raises
+[ ] State Work / Perfect / Fast / Cheap stage, its evidence gate, scoreboard row, and loop step
+[ ] Name one user, one exact problem moment, one decision/action, and one observable proof
 [ ] List files; stay in this repo folder on the CONTINUE-HERE branch (`main`). Do not create sibling folders.
 [ ] Implement; tests; gate chain
 [ ] Update CONTINUE-HERE / docs/execution/scoreboard.md if phase evidence changed
