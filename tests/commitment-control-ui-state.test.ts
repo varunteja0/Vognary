@@ -4,6 +4,8 @@ import type {
   CommitmentControlBriefDto,
   ControlDecisionDto,
   ControlEvaluationDto,
+  ControlExceptionReviewDto,
+  ControlOutcomeObservationDto,
   ControlPolicyDto,
   ControlProposalDto,
   ControlReconciliationDto,
@@ -11,8 +13,11 @@ import type {
 } from "../src/lib/commitment-control/contracts";
 import {
   controlDecisionRequest,
+  controlExceptionReviewRequest,
+  controlOutcomeObservationRequest,
   controlPolicyRequest,
   controlProposalRequest,
+  controlReconciliationRequest,
   controlReducer,
   initialControlState,
   policyDraftFrom,
@@ -41,6 +46,13 @@ const proposal: ControlProposalDto = {
   asOfDate: "2026-08-25",
   projectedThirteenWeekMinor: "13500000",
   projectedAnnualMinor: "54000000",
+  intendedOutcome: {
+    metric: "Resolved support cases",
+    targetDirection: "AT_LEAST",
+    targetValue: "1200",
+    unit: "cases",
+    reviewOn: "2026-10-15",
+  },
   assumptionBasis: "USER_ENTERED_ASSUMPTION",
   createdAt: "2026-08-25T09:00:00.000Z",
 };
@@ -82,6 +94,7 @@ const decision: ControlDecisionDto = {
   decidedByDisplayName: "Control owner",
   overrideReason: null,
   decidedAt: "2026-08-25T10:00:00.000Z",
+  authorizationExpiresOn: "2026-09-30",
 };
 
 const reconciliation: ControlReconciliationDto = {
@@ -95,6 +108,14 @@ const reconciliation: ControlReconciliationDto = {
   authorizationCurrency: "INR",
   observedAmountMinor: "5100000",
   observedCurrency: "INR",
+  observedEvidenceDate: "2026-09-15",
+  outcome: {
+    ...proposal.intendedOutcome!,
+    observedValue: "1000",
+    observedOn: "2026-10-15",
+    observationBasis: "USER_ENTERED_OBSERVATION",
+    verdict: "MISSED",
+  },
   reconciledByUserId: "1b1a1f2c-7f52-4a76-9b0c-9d5b6a7c1d21",
   reconciledAt: "2026-08-26T10:00:00.000Z",
 };
@@ -124,6 +145,11 @@ const draft: ControlProposalDraft = {
   firstChargeDate: "2026-09-01",
   cadence: "MONTHLY",
   existingCommitmentIds: ["7c1a1f2c-7f52-4a76-9b0c-9d5b6a7c1d26"],
+  outcomeMetric: " Resolved support cases ",
+  outcomeDirection: "AT_LEAST",
+  outcomeTargetText: "01200.5000",
+  outcomeUnit: " cases ",
+  outcomeReviewOn: "2026-10-15",
 };
 
 const submitted: CreateControlProposalRequest = {
@@ -135,6 +161,13 @@ const submitted: CreateControlProposalRequest = {
   firstChargeDate: "2026-09-01",
   cadence: "MONTHLY",
   existingCommitmentIds: ["7c1a1f2c-7f52-4a76-9b0c-9d5b6a7c1d26"],
+  intendedOutcome: {
+    metric: "Resolved support cases",
+    targetDirection: "AT_LEAST",
+    targetValue: "1200.5",
+    unit: "cases",
+    reviewOn: "2026-10-15",
+  },
 };
 
 const failure = (code: TransportFailure["error"]["code"], extra: Record<string, unknown> = {}): TransportFailure => ({
@@ -181,13 +214,27 @@ test("a proposal request trims text, converts money once, and reports each missi
   assert.equal(built.ok, true);
   if (built.ok) assert.deepEqual(built.request, submitted);
 
-  const rejected = controlProposalRequest({ ...draft, merchant: " ", purpose: "", amountText: "abc", firstChargeDate: "2026-02-30" });
+  const rejected = controlProposalRequest({
+    ...draft,
+    merchant: " ",
+    purpose: "",
+    amountText: "abc",
+    firstChargeDate: "2026-02-30",
+    outcomeMetric: "",
+    outcomeTargetText: "not-a-value",
+    outcomeUnit: "",
+    outcomeReviewOn: "2026-02-30",
+  });
   assert.equal(rejected.ok, false);
   if (!rejected.ok) {
     assert.ok(rejected.errors.merchant);
     assert.ok(rejected.errors.purpose);
     assert.ok(rejected.errors.amountText);
     assert.ok(rejected.errors.firstChargeDate);
+    assert.ok(rejected.errors.outcomeMetric);
+    assert.ok(rejected.errors.outcomeTargetText);
+    assert.ok(rejected.errors.outcomeUnit);
+    assert.ok(rejected.errors.outcomeReviewOn);
   }
 });
 
@@ -262,8 +309,26 @@ test("only the fields the server echoed back are cleared from the composer", () 
   assert.equal(echoedDifferently.draft.merchant, draft.merchant);
 });
 
+test("a saved Control write keeps an explicit reminder projection retry notice", () => {
+  const started = controlReducer(ready({ draft }), {
+    type: "PROPOSAL_STARTED",
+    idempotencyKey: "key-attention-retry",
+    signature: "signature-attention-retry",
+  });
+  const saved = controlReducer(started, {
+    type: "PROPOSAL_SAVED",
+    proposal,
+    evaluation,
+    submitted,
+    meta: { ...meta, attentionProjection: "pending-worker-retry" },
+  });
+
+  assert.equal(saved.brief?.proposals[0]?.proposal.id, proposal.id);
+  assert.equal(saved.attentionProjection, "pending-worker-retry");
+});
+
 test("a recorded decision never rewrites the evaluation and a later observation never rewrites the cap", () => {
-  const withProposal = ready({ brief: { ...brief, proposals: [{ proposal, evaluation, decision: null, reconciliations: [] }] } });
+  const withProposal = ready({ brief: { ...brief, proposals: [{ proposal, evaluation, decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [] }] } });
   const decided = controlReducer(withProposal, { type: "DECISION_SAVED", decision, meta });
   const entry = decided.brief?.proposals[0];
   assert.deepEqual(entry?.evaluation, evaluation);
@@ -277,36 +342,151 @@ test("a recorded decision never rewrites the evaluation and a later observation 
   assert.equal(settled?.reconciliations[0]?.approvedCapMinor, "4000000");
 });
 
-test("an approved cap must be exact, positive, and never above the proposed per-charge amount", () => {
+test("an approval requires a bounded expiry and an exact cap", () => {
   const within = { ...evaluation, status: "WITHIN_POLICY" as const, reasonCodes: [] };
-  assert.deepEqual(controlDecisionRequest({ action: "APPROVE", capText: "", overrideReason: "", error: null }, proposal, within), {
+  assert.deepEqual(controlDecisionRequest({ action: "APPROVE", capText: "", authorizationExpiresOn: "2026-09-30", overrideReason: "", error: null }, proposal, within, "2026-08-25"), {
     ok: true,
-    request: { action: "APPROVE" },
+    request: { action: "APPROVE", authorizationExpiresOn: "2026-09-30" },
   });
-  assert.deepEqual(controlDecisionRequest({ action: "DECLINE", capText: "999", overrideReason: "", error: null }, proposal, within), {
+  assert.deepEqual(controlDecisionRequest({ action: "DECLINE", capText: "999", authorizationExpiresOn: "", overrideReason: "", error: null }, proposal, within, "2026-08-25"), {
     ok: true,
     request: { action: "DECLINE" },
   });
-  assert.deepEqual(controlDecisionRequest({ action: "APPROVE_WITH_CAP", capText: "40000", overrideReason: "", error: null }, proposal, within), {
+  assert.deepEqual(controlDecisionRequest({ action: "APPROVE_WITH_CAP", capText: "40000", authorizationExpiresOn: "2026-09-30", overrideReason: "", error: null }, proposal, within, "2026-08-25"), {
     ok: true,
-    request: { action: "APPROVE_WITH_CAP", approvedCapMinor: "4000000" },
+    request: { action: "APPROVE_WITH_CAP", approvedCapMinor: "4000000", authorizationExpiresOn: "2026-09-30" },
   });
-  assert.equal(controlDecisionRequest({ action: "APPROVE_WITH_CAP", capText: "45000.01", overrideReason: "", error: null }, proposal, within).ok, false);
-  assert.equal(controlDecisionRequest({ action: "APPROVE_WITH_CAP", capText: "0", overrideReason: "", error: null }, proposal, within).ok, false);
-  assert.equal(controlDecisionRequest({ action: "APPROVE", capText: "", overrideReason: "", error: null }, proposal, evaluation).ok, false);
+  assert.equal(controlDecisionRequest({ action: "APPROVE_WITH_CAP", capText: "45000.01", authorizationExpiresOn: "2026-09-30", overrideReason: "", error: null }, proposal, within, "2026-08-25").ok, false);
+  assert.equal(controlDecisionRequest({ action: "APPROVE_WITH_CAP", capText: "0", authorizationExpiresOn: "2026-09-30", overrideReason: "", error: null }, proposal, within, "2026-08-25").ok, false);
+  assert.equal(controlDecisionRequest({ action: "APPROVE", capText: "", authorizationExpiresOn: "", overrideReason: "", error: null }, proposal, within, "2026-08-25").ok, false);
+  assert.equal(controlDecisionRequest({ action: "APPROVE", capText: "", authorizationExpiresOn: "2026-10-16", overrideReason: "", error: null }, proposal, within, "2026-08-25").ok, false);
+  assert.equal(controlDecisionRequest({ action: "APPROVE", capText: "", authorizationExpiresOn: "2026-09-30", overrideReason: "", error: null }, proposal, evaluation, "2026-08-25").ok, false);
+  assert.equal(controlDecisionRequest({ action: "APPROVE", capText: "", authorizationExpiresOn: "2026-09-30", overrideReason: "", error: null }, proposal, within, "2026-10-16").ok, false);
   assert.deepEqual(controlDecisionRequest({
     action: "APPROVE_WITH_CAP",
     capText: "40000",
+    authorizationExpiresOn: "2026-09-30",
     overrideReason: "Board-approved exception for this vendor.",
     error: null,
-  }, proposal, evaluation), {
+  }, proposal, evaluation, "2026-08-25"), {
     ok: true,
     request: {
       action: "APPROVE_WITH_CAP",
       approvedCapMinor: "4000000",
+      authorizationExpiresOn: "2026-09-30",
       overrideReason: "Board-approved exception for this vendor.",
     },
   });
+});
+
+test("an observed outcome is optional but its exact value and date travel together", () => {
+  const evidenceId = "3c1a1f2c-7f52-4a76-9b0c-9d5b6a7c1d23";
+  assert.deepEqual(controlReconciliationRequest({
+    commitmentId: null,
+    evidenceId,
+    outcomeValueText: "",
+    outcomeObservedOn: "",
+    error: null,
+  }, proposal, "2026-10-15"), { ok: true, request: { evidenceId } });
+  assert.deepEqual(controlReconciliationRequest({
+    commitmentId: null,
+    evidenceId,
+    outcomeValueText: "001250.000",
+    outcomeObservedOn: "2026-10-15",
+    error: null,
+  }, proposal, "2026-10-15"), {
+    ok: true,
+    request: { evidenceId, observedOutcome: { value: "1250", observedOn: "2026-10-15" } },
+  });
+  assert.equal(controlReconciliationRequest({
+    commitmentId: null,
+    evidenceId,
+    outcomeValueText: "1250",
+    outcomeObservedOn: "",
+    error: null,
+  }, proposal, "2026-10-15").ok, false);
+  assert.equal(controlReconciliationRequest({
+    commitmentId: null,
+    evidenceId,
+    outcomeValueText: "1250",
+    outcomeObservedOn: "2026-10-14",
+    error: null,
+  }, proposal, "2026-10-15").ok, false);
+  assert.equal(controlReconciliationRequest({
+    commitmentId: null,
+    evidenceId,
+    outcomeValueText: "1250",
+    outcomeObservedOn: "2026-10-16",
+    error: null,
+  }, proposal, "2026-10-15").ok, false);
+});
+
+test("a standalone outcome request is exact, due, and independent of receipt evidence", () => {
+  assert.deepEqual(controlOutcomeObservationRequest({
+    valueText: "001250.000",
+    observedOn: "2026-10-15",
+  }, proposal, "2026-10-15"), {
+    ok: true,
+    request: { observedOutcome: { value: "1250", observedOn: "2026-10-15" } },
+  });
+  assert.equal(controlOutcomeObservationRequest({ valueText: "", observedOn: "2026-10-15" }, proposal, "2026-10-15").ok, false);
+  assert.equal(controlOutcomeObservationRequest({ valueText: "1250", observedOn: "2026-10-14" }, proposal, "2026-10-15").ok, false);
+  assert.equal(controlOutcomeObservationRequest({ valueText: "1250", observedOn: "2026-10-16" }, proposal, "2026-10-15").ok, false);
+});
+
+test("an exception disposition requires an explicit outcome and a bounded note", () => {
+  const target = { targetKind: "RECONCILIATION" as const, targetId: reconciliation.id };
+  assert.deepEqual(controlExceptionReviewRequest({
+    disposition: "NEW_PROPOSAL_REQUIRED",
+    note: "  A fresh authorization is required. ",
+  }, target), {
+    ok: true,
+    request: {
+      ...target,
+      disposition: "NEW_PROPOSAL_REQUIRED",
+      note: "A fresh authorization is required.",
+    },
+  });
+  assert.equal(controlExceptionReviewRequest({ disposition: null, note: "Review complete." }, target).ok, false);
+  assert.equal(controlExceptionReviewRequest({ disposition: "NO_FURTHER_ACTION", note: " " }, target).ok, false);
+});
+
+test("follow-through writes append records without rewriting authorization or reconciliation", () => {
+  const observation: ControlOutcomeObservationDto = {
+    id: "0a000000-0000-4000-8000-000000000001",
+    proposalId: proposal.id,
+    decisionId: decision.id,
+    observedValue: "900",
+    observedOn: "2026-10-15",
+    target: proposal.intendedOutcome!,
+    observationBasis: "USER_ENTERED_OBSERVATION",
+    verdict: "MISSED",
+    observedByUserId: decision.decidedByUserId,
+    observedAt: "2026-10-15T10:00:00.000Z",
+  };
+  const review: ControlExceptionReviewDto = {
+    id: "0b000000-0000-4000-8000-000000000001",
+    proposalId: proposal.id,
+    decisionId: decision.id,
+    targetKind: "OUTCOME_OBSERVATION",
+    targetId: observation.id,
+    disposition: "NEW_PROPOSAL_REQUIRED",
+    note: "The missed target needs a fresh proposal.",
+    reviewedByUserId: decision.decidedByUserId,
+    reviewedAt: "2026-10-15T11:00:00.000Z",
+  };
+  const starting = ready({ brief: {
+    ...brief,
+    proposals: [{ proposal, evaluation, decision, reconciliations: [reconciliation], outcomeObservations: [], exceptionReviews: [] }],
+  } });
+  const observed = controlReducer(starting, { type: "OUTCOME_SAVED", observation, meta });
+  assert.deepEqual(observed.brief?.proposals[0]?.outcomeObservations, [observation]);
+  assert.equal(observed.brief?.proposals[0]?.decision?.approvedCapMinor, decision.approvedCapMinor);
+  assert.deepEqual(observed.brief?.proposals[0]?.reconciliations, [reconciliation]);
+
+  const reviewed = controlReducer(observed, { type: "EXCEPTION_REVIEW_SAVED", review, meta });
+  assert.deepEqual(reviewed.brief?.proposals[0]?.exceptionReviews, [review]);
+  assert.deepEqual(reviewed.brief?.proposals[0]?.outcomeObservations, [observation]);
 });
 
 test("a policy draft round-trips exact minor units and refuses a silent duplicate currency", () => {
@@ -340,7 +520,7 @@ test("a policy draft round-trips exact minor units and refuses a silent duplicat
 });
 
 test("a new policy version replaces only the published policy, never a recorded decision", () => {
-  const withDecision = ready({ brief: { ...brief, proposals: [{ proposal, evaluation, decision, reconciliations: [] }] } });
+  const withDecision = ready({ brief: { ...brief, proposals: [{ proposal, evaluation, decision, reconciliations: [], outcomeObservations: [], exceptionReviews: [] }] } });
   const next = controlReducer(withDecision, {
     type: "POLICY_SAVED",
     policy: { ...policy, policyVersion: 4 },

@@ -178,6 +178,77 @@ export function ControlProposalComposer({
           />
         </ControlField>
 
+        <details className="control-disclosure" open>
+          <summary>Outcome this commitment must prove</summary>
+          <div className="control-disclosure-body">
+            <ControlField label="Metric" htmlFor="control-outcome-metric" error={errors.outcomeMetric}>
+              <input
+                id="control-outcome-metric"
+                name="outcomeMetric"
+                className="field"
+                autoComplete="off"
+                maxLength={120}
+                value={draft.outcomeMetric}
+                aria-invalid={errors.outcomeMetric ? true : undefined}
+                aria-describedby={errors.outcomeMetric ? "control-outcome-metric-error" : undefined}
+                onChange={(event) => handlers.onChange({ outcomeMetric: event.target.value })}
+              />
+            </ControlField>
+            <ControlField label="Target direction" htmlFor="control-outcome-direction" className="mt-3">
+              <select
+                id="control-outcome-direction"
+                name="outcomeDirection"
+                className="field"
+                value={draft.outcomeDirection}
+                onChange={(event) => handlers.onChange({ outcomeDirection: event.target.value as ControlProposalDraft["outcomeDirection"] })}
+              >
+                <option value="AT_LEAST">At least</option>
+                <option value="AT_MOST">At most</option>
+              </select>
+            </ControlField>
+            <ControlField label="Target value" htmlFor="control-outcome-target" error={errors.outcomeTargetText} className="mt-3">
+              <input
+                id="control-outcome-target"
+                name="outcomeTarget"
+                className="field font-data tnum"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                value={draft.outcomeTargetText}
+                aria-invalid={errors.outcomeTargetText ? true : undefined}
+                aria-describedby={errors.outcomeTargetText ? "control-outcome-target-error" : undefined}
+                onChange={(event) => handlers.onChange({ outcomeTargetText: event.target.value })}
+              />
+            </ControlField>
+            <ControlField label="Unit" htmlFor="control-outcome-unit" error={errors.outcomeUnit} className="mt-3">
+              <input
+                id="control-outcome-unit"
+                name="outcomeUnit"
+                className="field"
+                autoComplete="off"
+                maxLength={40}
+                value={draft.outcomeUnit}
+                aria-invalid={errors.outcomeUnit ? true : undefined}
+                aria-describedby={errors.outcomeUnit ? "control-outcome-unit-error" : undefined}
+                onChange={(event) => handlers.onChange({ outcomeUnit: event.target.value })}
+              />
+            </ControlField>
+            <ControlField label="Review date" htmlFor="control-outcome-review" error={errors.outcomeReviewOn} className="mt-3">
+              <input
+                id="control-outcome-review"
+                name="outcomeReviewOn"
+                className="field font-data"
+                type="date"
+                value={draft.outcomeReviewOn}
+                aria-invalid={errors.outcomeReviewOn ? true : undefined}
+                aria-describedby={errors.outcomeReviewOn ? "control-outcome-review-error" : undefined}
+                onChange={(event) => handlers.onChange({ outcomeReviewOn: event.target.value })}
+              />
+            </ControlField>
+            <p className="field-hint mt-3">This target is a user-entered assumption. Later, a person may record a labelled outcome observation; it is not Recovery evidence or independent proof.</p>
+          </div>
+        </details>
+
         <details className="control-disclosure">
           <summary>
             Existing exposure to count with it

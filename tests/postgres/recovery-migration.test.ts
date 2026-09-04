@@ -86,6 +86,7 @@ const recoveryRelations = [
   "commitment_control_evaluation_evidence",
   "commitment_control_decisions",
   "commitment_control_reconciliations",
+  "commitment_control_attention_notifications",
 ] as const;
 
 test("a targeted migration refuses a fresh database before creating schema or ledger state", {
@@ -290,15 +291,15 @@ test("the real migration runner installs and records the Recovery receipt inbox 
 }, async () => {
   await withDisposableDatabase("recovery_fresh", async (connectionString) => {
     const result = runMigrations(connectionString);
-    assert.equal(result.applied.at(-1)?.id, "0059_control_authority_hardening");
+    assert.equal(result.applied.at(-1)?.id, "0068_control_attention_target_identity");
 
     const pool = createPool(connectionString);
     try {
       const migrations = await pool.query<{ id: string }>(
         `select id from schema_migrations order by id`,
       );
-      assert.equal(migrations.rows.at(-1)?.id, "0059_control_authority_hardening");
-      assert.equal(migrations.rows.length, 59);
+      assert.equal(migrations.rows.at(-1)?.id, "0068_control_attention_target_identity");
+      assert.equal(migrations.rows.length, 68);
       await assertRecoveryRelations(pool);
       const phaseA = await pool.query<{
         milestone_columns: number;
@@ -307,6 +308,7 @@ test("the real migration runner installs and records the Recovery receipt inbox 
         metric_names: string;
         mutation_kinds: string;
         control_triggers: number;
+        control_outcome_columns: number;
       }>(
         `select
            (select count(*)::int
@@ -325,7 +327,22 @@ test("the real migration runner installs and records the Recovery receipt inbox 
              'commitment_control_evaluation_evidence_immutable',
              'commitment_control_decisions_immutable',
              'commitment_control_reconciliations_immutable'
-           ])) as control_triggers`,
+           ])) as control_triggers,
+           (select count(*)::int
+            from information_schema.columns
+            where table_schema = 'public'
+              and (table_name, column_name) in (
+                ('commitment_control_proposals', 'intended_outcome_metric'),
+                ('commitment_control_proposals', 'intended_outcome_direction'),
+                ('commitment_control_proposals', 'intended_outcome_target_value'),
+                ('commitment_control_proposals', 'intended_outcome_unit'),
+                ('commitment_control_proposals', 'intended_outcome_review_on'),
+                ('commitment_control_decisions', 'authorization_expires_on'),
+                ('commitment_control_reconciliations', 'observed_outcome_value'),
+                ('commitment_control_reconciliations', 'observed_outcome_on'),
+                ('commitment_control_reconciliations', 'outcome_observation_basis'),
+                ('commitment_control_reconciliations', 'outcome_verdict')
+              )) as control_outcome_columns`,
       );
       assert.equal(phaseA.rows[0]?.milestone_columns, 3);
       assert.equal(phaseA.rows[0]?.immutable_trigger, true);
@@ -333,10 +350,30 @@ test("the real migration runner installs and records the Recovery receipt inbox 
       assert.match(phaseA.rows[0]?.event_names ?? "", /receipt_backfill\.completed/);
       assert.match(phaseA.rows[0]?.event_names ?? "", /control\.proposal_submitted/);
       assert.match(phaseA.rows[0]?.event_names ?? "", /control\.decision_recorded/);
+      assert.match(phaseA.rows[0]?.event_names ?? "", /control\.outcome_recorded/);
+      assert.match(phaseA.rows[0]?.event_names ?? "", /control\.exception_reviewed/);
       assert.match(phaseA.rows[0]?.metric_names ?? "", /secondsToTrustworthyPicture/);
       assert.match(phaseA.rows[0]?.mutation_kinds ?? "", /MANDATE/);
       assert.match(phaseA.rows[0]?.mutation_kinds ?? "", /CONTROL_RECONCILIATION/);
+      assert.match(phaseA.rows[0]?.mutation_kinds ?? "", /CONTROL_OUTCOME_OBSERVATION/);
+      assert.match(phaseA.rows[0]?.mutation_kinds ?? "", /CONTROL_EXCEPTION_REVIEW/);
       assert.equal(phaseA.rows[0]?.control_triggers, 6);
+      assert.equal(phaseA.rows[0]?.control_outcome_columns, 10);
+      const followThrough = await pool.query<{ tables: number; triggers: number }>(
+        `select
+           (select count(*)::int from unnest(array[
+             'commitment_control_outcome_observations',
+             'commitment_control_exception_reviews'
+           ]) as requested(name) where to_regclass('public.' || name) is not null) as tables,
+           (select count(*)::int from pg_trigger where tgname = any(array[
+             'commitment_control_outcome_observations_immutable',
+             'commitment_control_outcome_observations_single_outcome',
+             'commitment_control_exception_reviews_immutable',
+             'commitment_control_exception_reviews_adverse_target',
+             'commitment_control_reconciliations_single_outcome'
+           ])) as triggers`,
+      );
+      assert.deepEqual(followThrough.rows[0], { tables: 2, triggers: 5 });
       const integrity = await pool.query<{ conname: string | null; trigger: string | null }>(
         `select
            (select conname from pg_constraint where conname = 'commitment_decisions_workspace_recurring_item_fkey') as conname,
@@ -593,14 +630,23 @@ test("the real migration runner upgrades an existing 0022 database through Recov
       { id: "0057_commitment_control_v0", mode: "applied-migration" },
       { id: "0058_workspace_invites", mode: "applied-migration" },
       { id: "0059_control_authority_hardening", mode: "applied-migration" },
+      { id: "0060_control_outcome_authorization_window", mode: "applied-migration" },
+      { id: "0061_control_outcome_observation_honesty", mode: "applied-migration" },
+      { id: "0062_control_outcome_basis_constraint_name", mode: "applied-migration" },
+      { id: "0063_control_authorization_expiry_verdict", mode: "applied-migration" },
+      { id: "0064_control_expired_verdict_integrity", mode: "applied-migration" },
+      { id: "0065_control_attention_outbox", mode: "applied-migration" },
+      { id: "0066_control_attention_provider_events", mode: "applied-migration" },
+      { id: "0067_control_follow_through", mode: "applied-migration" },
+      { id: "0068_control_attention_target_identity", mode: "applied-migration" },
     ]);
 
     const verifyPool = createPool(connectionString);
     try {
       const migration = await verifyPool.query<{ id: string }>(
-        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source', '0029_legacy_tenant_integrity', '0030_legacy_tenant_ownership_immutable', '0031_autopilot_loop', '0032_autopilot_proof_integrity', '0033_autopilot_integrity', '0034_autopilot_repair', '0035_autopilot_codex_repair', '0036_autopilot_notice_hold', '0037_autopilot_clock_integrity', '0038_autopilot_reconcile_integrity', '0039_autopilot_frozen_notice_integrity', '0040_autopilot_review_integrity', '0041_workspace_activation_integrity', '0042_workspace_activation_semantic_reset', '0043_workspace_activation_semantic_version', '0044_autopilot_audit_immutability', '0045_autopilot_mandate_execution_immutability', '0046_billed_window_immutability', '0047_billed_window_insert_immutability', '0048_receipt_sender_provenance', '0049_recovery_merchant_identity', '0050_recovery_commitment_lifecycle', '0051_recovery_change_signals', '0052_recovery_correction_learning', '0053_phase_a_receipt_activation', '0054_recovery_commitment_context', '0055_recovery_decision_cycles', '0056_decision_cycle_expected_amount', '0057_commitment_control_v0', '0058_workspace_invites', '0059_control_authority_hardening')`,
+        `select id from schema_migrations where id in ('0023_recovery_v1', '0024_recovery_inbound_receipts', '0025_recovery_renewal_alerts', '0026_recovery_inbound_retention', '0027_gmail_forwarding_verification', '0028_recovery_gmail_oauth_source', '0029_legacy_tenant_integrity', '0030_legacy_tenant_ownership_immutable', '0031_autopilot_loop', '0032_autopilot_proof_integrity', '0033_autopilot_integrity', '0034_autopilot_repair', '0035_autopilot_codex_repair', '0036_autopilot_notice_hold', '0037_autopilot_clock_integrity', '0038_autopilot_reconcile_integrity', '0039_autopilot_frozen_notice_integrity', '0040_autopilot_review_integrity', '0041_workspace_activation_integrity', '0042_workspace_activation_semantic_reset', '0043_workspace_activation_semantic_version', '0044_autopilot_audit_immutability', '0045_autopilot_mandate_execution_immutability', '0046_billed_window_immutability', '0047_billed_window_insert_immutability', '0048_receipt_sender_provenance', '0049_recovery_merchant_identity', '0050_recovery_commitment_lifecycle', '0051_recovery_change_signals', '0052_recovery_correction_learning', '0053_phase_a_receipt_activation', '0054_recovery_commitment_context', '0055_recovery_decision_cycles', '0056_decision_cycle_expected_amount', '0057_commitment_control_v0', '0058_workspace_invites', '0059_control_authority_hardening', '0060_control_outcome_authorization_window', '0061_control_outcome_observation_honesty', '0062_control_outcome_basis_constraint_name', '0063_control_authorization_expiry_verdict', '0064_control_expired_verdict_integrity', '0065_control_attention_outbox', '0066_control_attention_provider_events', '0067_control_follow_through', '0068_control_attention_target_identity')`,
       );
-      assert.equal(migration.rowCount, 37);
+      assert.equal(migration.rowCount, 46);
       await assertRecoveryRelations(verifyPool);
 
       const preserved = await verifyPool.query<{
@@ -798,6 +844,15 @@ test("the real migration runner upgrades 0027 through 0028 without dropping Reco
       { id: "0057_commitment_control_v0", mode: "applied-migration" },
       { id: "0058_workspace_invites", mode: "applied-migration" },
       { id: "0059_control_authority_hardening", mode: "applied-migration" },
+      { id: "0060_control_outcome_authorization_window", mode: "applied-migration" },
+      { id: "0061_control_outcome_observation_honesty", mode: "applied-migration" },
+      { id: "0062_control_outcome_basis_constraint_name", mode: "applied-migration" },
+      { id: "0063_control_authorization_expiry_verdict", mode: "applied-migration" },
+      { id: "0064_control_expired_verdict_integrity", mode: "applied-migration" },
+      { id: "0065_control_attention_outbox", mode: "applied-migration" },
+      { id: "0066_control_attention_provider_events", mode: "applied-migration" },
+      { id: "0067_control_follow_through", mode: "applied-migration" },
+      { id: "0068_control_attention_target_identity", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -1282,6 +1337,15 @@ test("0029 installs over historical cross-workspace rows without rewriting owner
       { id: "0057_commitment_control_v0", mode: "applied-migration" },
       { id: "0058_workspace_invites", mode: "applied-migration" },
       { id: "0059_control_authority_hardening", mode: "applied-migration" },
+      { id: "0060_control_outcome_authorization_window", mode: "applied-migration" },
+      { id: "0061_control_outcome_observation_honesty", mode: "applied-migration" },
+      { id: "0062_control_outcome_basis_constraint_name", mode: "applied-migration" },
+      { id: "0063_control_authorization_expiry_verdict", mode: "applied-migration" },
+      { id: "0064_control_expired_verdict_integrity", mode: "applied-migration" },
+      { id: "0065_control_attention_outbox", mode: "applied-migration" },
+      { id: "0066_control_attention_provider_events", mode: "applied-migration" },
+      { id: "0067_control_follow_through", mode: "applied-migration" },
+      { id: "0068_control_attention_target_identity", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{ decision_workspace: string; item_workspace: string }>(
@@ -1531,6 +1595,15 @@ test("0030 leaves historical cross-workspace rows untouched and they remain cuto
       { id: "0057_commitment_control_v0", mode: "applied-migration" },
       { id: "0058_workspace_invites", mode: "applied-migration" },
       { id: "0059_control_authority_hardening", mode: "applied-migration" },
+      { id: "0060_control_outcome_authorization_window", mode: "applied-migration" },
+      { id: "0061_control_outcome_observation_honesty", mode: "applied-migration" },
+      { id: "0062_control_outcome_basis_constraint_name", mode: "applied-migration" },
+      { id: "0063_control_authorization_expiry_verdict", mode: "applied-migration" },
+      { id: "0064_control_expired_verdict_integrity", mode: "applied-migration" },
+      { id: "0065_control_attention_outbox", mode: "applied-migration" },
+      { id: "0066_control_attention_provider_events", mode: "applied-migration" },
+      { id: "0067_control_follow_through", mode: "applied-migration" },
+      { id: "0068_control_attention_target_identity", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{
@@ -1744,6 +1817,15 @@ test("upgrading from 0030 through 0033 cannot insert fee rows until 0034 sets fi
       { id: "0057_commitment_control_v0", mode: "applied-migration" },
       { id: "0058_workspace_invites", mode: "applied-migration" },
       { id: "0059_control_authority_hardening", mode: "applied-migration" },
+      { id: "0060_control_outcome_authorization_window", mode: "applied-migration" },
+      { id: "0061_control_outcome_observation_honesty", mode: "applied-migration" },
+      { id: "0062_control_outcome_basis_constraint_name", mode: "applied-migration" },
+      { id: "0063_control_authorization_expiry_verdict", mode: "applied-migration" },
+      { id: "0064_control_expired_verdict_integrity", mode: "applied-migration" },
+      { id: "0065_control_attention_outbox", mode: "applied-migration" },
+      { id: "0066_control_attention_provider_events", mode: "applied-migration" },
+      { id: "0067_control_follow_through", mode: "applied-migration" },
+      { id: "0068_control_attention_target_identity", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -1915,6 +1997,15 @@ test("upgrading a genuinely frozen 0037 notice retries through the real store an
       { id: "0057_commitment_control_v0", mode: "applied-migration" },
       { id: "0058_workspace_invites", mode: "applied-migration" },
       { id: "0059_control_authority_hardening", mode: "applied-migration" },
+      { id: "0060_control_outcome_authorization_window", mode: "applied-migration" },
+      { id: "0061_control_outcome_observation_honesty", mode: "applied-migration" },
+      { id: "0062_control_outcome_basis_constraint_name", mode: "applied-migration" },
+      { id: "0063_control_authorization_expiry_verdict", mode: "applied-migration" },
+      { id: "0064_control_expired_verdict_integrity", mode: "applied-migration" },
+      { id: "0065_control_attention_outbox", mode: "applied-migration" },
+      { id: "0066_control_attention_provider_events", mode: "applied-migration" },
+      { id: "0067_control_follow_through", mode: "applied-migration" },
+      { id: "0068_control_attention_target_identity", mode: "applied-migration" },
     ]);
     const retryOutput = execFileSync(
       process.execPath,
@@ -2080,6 +2171,15 @@ test("0042 purges legacy workspace.activated rows that 0041 would have preserved
       { id: "0057_commitment_control_v0", mode: "applied-migration" },
       { id: "0058_workspace_invites", mode: "applied-migration" },
       { id: "0059_control_authority_hardening", mode: "applied-migration" },
+      { id: "0060_control_outcome_authorization_window", mode: "applied-migration" },
+      { id: "0061_control_outcome_observation_honesty", mode: "applied-migration" },
+      { id: "0062_control_outcome_basis_constraint_name", mode: "applied-migration" },
+      { id: "0063_control_authorization_expiry_verdict", mode: "applied-migration" },
+      { id: "0064_control_expired_verdict_integrity", mode: "applied-migration" },
+      { id: "0065_control_attention_outbox", mode: "applied-migration" },
+      { id: "0066_control_attention_provider_events", mode: "applied-migration" },
+      { id: "0067_control_follow_through", mode: "applied-migration" },
+      { id: "0068_control_attention_target_identity", mode: "applied-migration" },
     ]);
 
     const helperOutput = execFileSync(
@@ -2182,6 +2282,15 @@ test("0043 requires a semantic-version marker so old-style activations cannot be
       { id: "0057_commitment_control_v0", mode: "applied-migration" },
       { id: "0058_workspace_invites", mode: "applied-migration" },
       { id: "0059_control_authority_hardening", mode: "applied-migration" },
+      { id: "0060_control_outcome_authorization_window", mode: "applied-migration" },
+      { id: "0061_control_outcome_observation_honesty", mode: "applied-migration" },
+      { id: "0062_control_outcome_basis_constraint_name", mode: "applied-migration" },
+      { id: "0063_control_authorization_expiry_verdict", mode: "applied-migration" },
+      { id: "0064_control_expired_verdict_integrity", mode: "applied-migration" },
+      { id: "0065_control_attention_outbox", mode: "applied-migration" },
+      { id: "0066_control_attention_provider_events", mode: "applied-migration" },
+      { id: "0067_control_follow_through", mode: "applied-migration" },
+      { id: "0068_control_attention_target_identity", mode: "applied-migration" },
     ]);
 
     const after = createPool(connectionString);
@@ -2366,6 +2475,15 @@ test("production-upgrade rehearsal from 0030 preserves Recovery facts through 00
       "0057_commitment_control_v0",
       "0058_workspace_invites",
       "0059_control_authority_hardening",
+      "0060_control_outcome_authorization_window",
+      "0061_control_outcome_observation_honesty",
+      "0062_control_outcome_basis_constraint_name",
+      "0063_control_authorization_expiry_verdict",
+      "0064_control_expired_verdict_integrity",
+      "0065_control_attention_outbox",
+      "0066_control_attention_provider_events",
+      "0067_control_follow_through",
+      "0068_control_attention_target_identity",
     ]);
 
     const after = createPool(connectionString);
@@ -2751,6 +2869,22 @@ async function seedCommitmentControlAuditFacts(
      ) values ($1, $2, $3, $4, 'CANNOT_EVALUATE', 199900, 180000, 'INR', null, null, $5)`,
     [ids.workspaceId, proposalId, decisionId, ids.evidenceId, ids.userId],
   );
+  const observationId = randomUUID();
+  await pool.query(
+    `insert into commitment_control_outcome_observations (
+       id, workspace_id, proposal_id, decision_id, observed_value, observed_on,
+       target_metric, target_direction, target_value, target_unit, target_review_on,
+       verdict, observed_by_user_id
+     ) values ($1, $2, $3, $4, '8', '2026-10-15', 'Resolved support cases', 'AT_LEAST',
+       '10', 'cases', '2026-10-15', 'MISSED', $5)`,
+    [observationId, ids.workspaceId, proposalId, decisionId, ids.userId],
+  );
+  await pool.query(
+    `insert into commitment_control_exception_reviews (
+       workspace_id, proposal_id, decision_id, outcome_observation_id, disposition, note, reviewed_by_user_id
+     ) values ($1, $2, $3, $4, 'NEW_PROPOSAL_REQUIRED', 'Restore drill disposition.', $5)`,
+    [ids.workspaceId, proposalId, decisionId, observationId, ids.userId],
+  );
 }
 
 test("pg_dump/pg_restore preserves the exact pre-0053 production profile", {
@@ -2825,6 +2959,9 @@ test("pg_dump/pg_restore preserves the exact pre-0057 production profile", {
         evaluation_evidence: [],
         decisions: [],
         reconciliations: [],
+        outcome_observations: [],
+        exception_reviews: [],
+        attention_notifications: [],
       });
       const expected = await readRecoveryBackupVerification(source, "pre-0057");
       assert.equal(expected.migrationHead, "0056_decision_cycle_expected_amount");

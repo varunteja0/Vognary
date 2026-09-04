@@ -393,6 +393,22 @@ function isFeatureMigrationsReady({ endpointPayloads }) {
     && capabilities.schema.applied?.includes("0058_workspace_invites") === true
     && capabilities.schema.required?.includes("0059_control_authority_hardening") === true
     && capabilities.schema.applied?.includes("0059_control_authority_hardening") === true
+    && capabilities.schema.required?.includes("0060_control_outcome_authorization_window") === true
+    && capabilities.schema.applied?.includes("0060_control_outcome_authorization_window") === true
+    && capabilities.schema.required?.includes("0061_control_outcome_observation_honesty") === true
+    && capabilities.schema.applied?.includes("0061_control_outcome_observation_honesty") === true
+    && capabilities.schema.required?.includes("0062_control_outcome_basis_constraint_name") === true
+    && capabilities.schema.applied?.includes("0062_control_outcome_basis_constraint_name") === true
+    && capabilities.schema.required?.includes("0063_control_authorization_expiry_verdict") === true
+    && capabilities.schema.applied?.includes("0063_control_authorization_expiry_verdict") === true
+    && capabilities.schema.required?.includes("0064_control_expired_verdict_integrity") === true
+    && capabilities.schema.applied?.includes("0064_control_expired_verdict_integrity") === true
+    && capabilities.schema.required?.includes("0065_control_attention_outbox") === true
+    && capabilities.schema.applied?.includes("0065_control_attention_outbox") === true
+    && capabilities.schema.required?.includes("0067_control_follow_through") === true
+    && capabilities.schema.applied?.includes("0067_control_follow_through") === true
+    && capabilities.schema.required?.includes("0068_control_attention_target_identity") === true
+    && capabilities.schema.applied?.includes("0068_control_attention_target_identity") === true
     && capabilities.privacyLifecycle?.status !== "schema-query-failed"
     && capabilities.renewalAlerts?.status !== "schema-query-failed"
     && capabilities.commitmentDecisions?.status !== "schema-query-failed"

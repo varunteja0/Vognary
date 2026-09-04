@@ -1,6 +1,7 @@
 "use client";
 
 import type { ControlEvaluationDto, ControlProposalDto } from "@/lib/commitment-control/contracts";
+import { indiaCalendarDate } from "@/lib/date-only";
 import { RecoveryDialog } from "../recovery-dialog";
 import { FailureBlock } from "../recovery-states";
 import type { RecoveryFailure } from "../state";
@@ -14,6 +15,7 @@ import {
   formatControlMoney,
 } from "./control-format";
 import type { ControlDecisionDraft } from "./control-state";
+import { ControlOutcomeFact } from "./control-outcome-fact";
 
 export function ControlDecisionDialog({
   proposal,
@@ -38,6 +40,8 @@ export function ControlDecisionDialog({
   onClose: () => void;
   onSubmit: () => void;
 }) {
+  const today = indiaCalendarDate();
+  const approvalWindowClosed = proposal.intendedOutcome !== null && proposal.intendedOutcome.reviewOn < today;
   return (
     <RecoveryDialog
       title="Authorize this obligation"
@@ -58,6 +62,7 @@ export function ControlDecisionDialog({
         <ControlFact label="Merchant" value={proposal.merchant} />
         <ControlFact label="Purpose" value={proposal.purpose} />
         <ControlFact label="Assumption per charge" money={{ minor: proposal.amountMinor, currency: proposal.currency, provenance: { kind: "assumed" } }} />
+        <ControlOutcomeFact outcome={proposal.intendedOutcome} />
       </dl>
 
       {evaluation ? (
@@ -87,6 +92,7 @@ export function ControlDecisionDialog({
                 name="control-decision-action"
                 value={action}
                 checked={draft.action === action}
+                disabled={approvalWindowClosed && action !== "DECLINE"}
                 onChange={() => onChange({ action })}
               />
               <span className="control-choice-title">{controlDecisionActionLabels[action]}</span>
@@ -94,6 +100,28 @@ export function ControlDecisionDialog({
             </label>
           ))}
         </fieldset>
+
+        {approvalWindowClosed ? (
+          <p role="alert" className="control-note mt-3">The outcome review date has passed. This proposal can only be declined; submit a new proposal to create a new authorization window.</p>
+        ) : null}
+
+        {draft.action && draft.action !== "DECLINE" ? (
+          <div className="control-field mt-4">
+            <label className="field-label" htmlFor="control-authorization-expiry">Authorization expires on</label>
+            <input
+              id="control-authorization-expiry"
+              name="authorizationExpiresOn"
+              className="field font-data"
+              type="date"
+              min={today}
+              max={proposal.intendedOutcome?.reviewOn}
+              value={draft.authorizationExpiresOn}
+              aria-invalid={draft.error ? true : undefined}
+              onChange={(event) => onChange({ authorizationExpiresOn: event.target.value })}
+            />
+            <p className="field-hint">The decision stays frozen after this date. Renewal requires a new proposal; nothing expires automatically.</p>
+          </div>
+        ) : null}
 
         {draft.action === "APPROVE_WITH_CAP" ? (
           <div className="control-field mt-4">

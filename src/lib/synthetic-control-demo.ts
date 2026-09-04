@@ -58,6 +58,14 @@ const AS_OF = "2026-08-24";
 const PROPOSED_AT = "2026-08-24T09:12:00.000Z";
 const DECIDED_AT = "2026-08-24T11:40:00.000Z";
 const OBSERVED_AT = "2026-09-01T04:31:00.000Z";
+const AUTHORIZATION_EXPIRES_ON = "2026-09-01";
+const INTENDED_OUTCOME = {
+  metric: "Customer launch requests served",
+  targetDirection: "AT_LEAST",
+  targetValue: "1",
+  unit: "launch",
+  reviewOn: "2026-09-07",
+} as const;
 
 export type SyntheticDemoBranch = "APPROVE" | "APPROVE_WITH_CAP" | "DECLINE";
 
@@ -216,6 +224,7 @@ const proposal = {
   asOfDate: AS_OF,
   projectedThirteenWeekMinor: projected.thirteenWeekMinor,
   projectedAnnualMinor: projected.annualMinor,
+  intendedOutcome: INTENDED_OUTCOME,
   assumptionBasis: projected.basis,
   createdAt: PROPOSED_AT,
 } as const satisfies CommitmentControlBriefDto["proposals"][number]["proposal"];
@@ -264,6 +273,8 @@ export const syntheticDemoIdentity = syntheticFixtureIdentity("SYNTHETIC_CC_V2",
   PROPOSED_AT,
   DECIDED_AT,
   OBSERVED_AT,
+  AUTHORIZATION_EXPIRES_ON,
+  INTENDED_OUTCOME,
   DECISION_REASON,
   citedEvidence: syntheticDemoCitedEvidence,
 });
@@ -281,6 +292,7 @@ function authorize(branch: SyntheticDemoBranch) {
     evaluation,
     action: branch,
     approvedCapMinor: branch === "APPROVE_WITH_CAP" ? LOWER_CAP_MINOR : undefined,
+    authorizationExpiresOn: branch === "DECLINE" ? undefined : AUTHORIZATION_EXPIRES_ON,
     decidedAt: DECIDED_AT,
     submittedByUserId: IDS.userEngineering,
     overrideReason: DECISION_REASON[branch],
@@ -311,7 +323,9 @@ function reconciliationFor(branch: SyntheticDemoBranch) {
       evidenceId: IDS.evidenceSeptember,
       amountMinor: OBSERVED_MINOR,
       currency: syntheticDemoObservedEvidence.currency,
+      evidenceDate: "2026-09-01",
     },
+    intendedOutcome: INTENDED_OUTCOME,
   });
   return {
     id: branch === "APPROVE" ? IDS.reconcileApprove : IDS.reconcileCapped,
@@ -324,6 +338,8 @@ function reconciliationFor(branch: SyntheticDemoBranch) {
     authorizationCurrency: reconciled.authorizationCurrency,
     observedAmountMinor: reconciled.observedAmountMinor,
     observedCurrency: reconciled.observedCurrency,
+    observedEvidenceDate: reconciled.observedEvidenceDate,
+    outcome: reconciled.outcome,
     reconciledByUserId: IDS.userOwner,
     reconciledAt: OBSERVED_AT,
   } satisfies CommitmentControlBriefDto["proposals"][number]["reconciliations"][number];
@@ -371,6 +387,7 @@ export function syntheticControlBrief(
       decidedByDisplayName: "Finance owner (placeholder)",
       overrideReason: authorized.overrideReason,
       decidedAt: authorized.decidedAt,
+      authorizationExpiresOn: authorized.authorizationExpiresOn,
     };
 
   const reconciliation = reconciliations[branch];
@@ -383,6 +400,8 @@ export function syntheticControlBrief(
         evaluation: evaluationDto,
         decision,
         reconciliations: stage === "RECONCILED" && decision && reconciliation ? [reconciliation] : [],
+        outcomeObservations: [],
+        exceptionReviews: [],
       },
     ],
     // Read-only. The demonstration never offers a control that would write.

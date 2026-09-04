@@ -8,10 +8,20 @@ import {
 
 const sha = "a".repeat(64);
 const releaseSha = "b".repeat(40);
+const readyAttention = { status: "delivery-observed", queued: 0, sending: 0, retryScheduled: 0, providerAccepted: 0, failed: 0, deadLetters: 0 };
 const requiredMigrations = [
   "0057_commitment_control_v0",
   "0058_workspace_invites",
   "0059_control_authority_hardening",
+  "0060_control_outcome_authorization_window",
+  "0061_control_outcome_observation_honesty",
+  "0062_control_outcome_basis_constraint_name",
+  "0063_control_authorization_expiry_verdict",
+  "0064_control_expired_verdict_integrity",
+  "0065_control_attention_outbox",
+  "0066_control_attention_provider_events",
+  "0067_control_follow_through",
+  "0068_control_attention_target_identity",
 ];
 const readyEnvironment = {
   COMMITMENT_CONTROL_INCIDENT_COMMANDER_STATUS: "assigned",
@@ -41,6 +51,7 @@ test("Control pilot readiness requires every independent customer-data proof", (
     appliedMigrations: requiredMigrations,
     targetReadinessAuthenticated: true,
     targetCommitSha: releaseSha,
+    targetAttention: readyAttention,
     now: new Date("2026-09-02T00:00:00.000Z"),
   });
 
@@ -56,6 +67,7 @@ test("Control pilot readiness requires every independent customer-data proof", (
     "legal-logging-review",
     "backup-restore",
     "monitoring-delivery",
+    "control-attention-delivery",
     "proposal-review-procedure",
   ]);
 });
@@ -68,6 +80,7 @@ test("blank evidence fails closed without exposing environment values", () => {
     appliedMigrations: [],
     targetReadinessAuthenticated: false,
     targetCommitSha: "",
+    targetAttention: null,
     now: new Date("2026-09-02T00:00:00.000Z"),
   });
 
@@ -82,6 +95,7 @@ test("blank evidence fails closed without exposing environment values", () => {
     "legal-logging-review",
     "backup-restore",
     "monitoring-delivery",
+    "control-attention-delivery",
     "proposal-review-procedure",
   ]);
   assert.doesNotMatch(JSON.stringify(result), /private-value-do-not-print/);
@@ -99,6 +113,7 @@ test("stale restore and tabletop evidence stay blocked", () => {
     appliedMigrations: requiredMigrations,
     targetReadinessAuthenticated: true,
     targetCommitSha: releaseSha,
+    targetAttention: readyAttention,
     now: new Date("2026-09-02T00:00:00.000Z"),
   });
 
@@ -118,6 +133,7 @@ test("bare restore and monitoring status strings cannot clear readiness", () => 
     appliedMigrations: requiredMigrations,
     targetReadinessAuthenticated: true,
     targetCommitSha: releaseSha,
+    targetAttention: readyAttention,
     now: new Date("2026-09-02T00:00:00.000Z"),
   });
 
@@ -141,6 +157,7 @@ test("every dated readiness status requires its restricted record hash", () => {
       appliedMigrations: requiredMigrations,
       targetReadinessAuthenticated: true,
       targetCommitSha: releaseSha,
+      targetAttention: readyAttention,
       now: new Date("2026-09-02T00:00:00.000Z"),
     });
     assert.equal(result.checks.find((check) => check.id === checkId)?.reason, `${checkId}-record-hash-invalid`);
@@ -157,6 +174,7 @@ test("operations evidence must match the authenticated target release", () => {
     appliedMigrations: requiredMigrations,
     targetReadinessAuthenticated: true,
     targetCommitSha: "c".repeat(40),
+    targetAttention: readyAttention,
     now: new Date("2026-09-02T00:00:00.000Z"),
   });
 
@@ -165,4 +183,25 @@ test("operations evidence must match the authenticated target release", () => {
     result.checks.find((check) => check.id === "operations-release-binding")?.reason,
     "operations-evidence-commit-mismatch",
   );
+});
+
+test("Control attention delivery blocks on unproven delivery or open dead letters", () => {
+  for (const [targetAttention, reason] of [
+    [{ status: "worker-configured-delivery-unproven", deadLetters: 0 }, "control-attention-delivery-unproven"],
+    [{ status: "blocked-dead-letters", deadLetters: 1 }, "control-attention-dead-letters-open"],
+    [{ ...readyAttention, status: "delivery-observed-work-pending", providerAccepted: 1 }, "control-attention-delivery-pending"],
+  ] as const) {
+    const result = evaluateControlPilotReadiness({
+      environment: readyEnvironment,
+      enrollment: { status: "ready", enrolledWorkspaceCount: 1 },
+      appliedMigrations: requiredMigrations,
+      targetReadinessAuthenticated: true,
+      targetCommitSha: releaseSha,
+      targetAttention,
+      now: new Date("2026-09-02T00:00:00.000Z"),
+    });
+    const check = result.checks.find((item) => item.id === "control-attention-delivery");
+    assert.equal(check?.ready, false);
+    assert.equal(check?.reason, reason);
+  }
 });

@@ -1,8 +1,23 @@
 import { proposalDecisionActions, type ProposalDecisionAction } from "./decision";
 import { normalizeCurrency, parsePositiveMinorUnits, requireUuid } from "./money";
+import {
+  isControlOutcomeReconciliation,
+  isIntendedControlOutcome,
+  normalizeControlOutcomeObservation,
+  normalizeIntendedControlOutcome,
+  type ControlOutcomeObservation,
+  type ControlOutcomeReconciliation,
+  type IntendedControlOutcome,
+} from "./outcome";
 import type { CategoryPosture, PolicyReasonCode, ProposalCategory, ProposalPolicy, ProposalPolicyEvaluation } from "./policy";
 import { assertRecordableControlPolicy } from "./policy";
 import { proposalCadences, type ProposalCadence } from "./project";
+import {
+  boundedControlText as boundedText,
+  isCanonicalControlDateOnly as isDateOnly,
+  rejectUnknownControlFields as rejectUnknown,
+  requireControlRecord as requireRecord,
+} from "./validation";
 
 export type PutControlPolicyRequest = Omit<ProposalPolicy, "policyVersion">;
 export type CreateControlProposalRequest = {
@@ -14,13 +29,27 @@ export type CreateControlProposalRequest = {
   firstChargeDate: string;
   cadence: ProposalCadence;
   existingCommitmentIds: string[];
+  intendedOutcome: IntendedControlOutcome;
 };
 export type DecideControlProposalRequest = {
   action: ProposalDecisionAction;
   approvedCapMinor?: string;
+  authorizationExpiresOn?: string;
   overrideReason?: string;
 };
-export type ReconcileControlProposalRequest = { evidenceId: string };
+export type ReconcileControlProposalRequest = {
+  evidenceId: string;
+  observedOutcome?: ControlOutcomeObservation;
+};
+export type RecordControlOutcomeObservationRequest = {
+  observedOutcome: ControlOutcomeObservation;
+};
+export type RecordControlExceptionReviewRequest = {
+  targetKind: ControlExceptionTargetKind;
+  targetId: string;
+  disposition: ControlExceptionDisposition;
+  note: string;
+};
 
 export type ControlPolicyDto = ProposalPolicy & {
   createdByUserId: string | null;
@@ -41,6 +70,7 @@ export type ControlProposalDto = {
   asOfDate: string;
   projectedThirteenWeekMinor: string;
   projectedAnnualMinor: string;
+  intendedOutcome: IntendedControlOutcome | null;
   assumptionBasis: "USER_ENTERED_ASSUMPTION";
   createdAt: string;
 };
@@ -64,6 +94,7 @@ export type ControlDecisionDto = {
   decidedByDisplayName: string | null;
   overrideReason: string | null;
   decidedAt: string;
+  authorizationExpiresOn: string | null;
 };
 
 export type ControlReconciliationDto = {
@@ -71,14 +102,52 @@ export type ControlReconciliationDto = {
   proposalId: string;
   decisionId: string;
   evidenceId: string;
-  verdict: "MATCHED" | "WITHIN_CAP" | "OVER_CAP" | "CURRENCY_MISMATCH" | "CANNOT_EVALUATE";
+  verdict: "MATCHED" | "WITHIN_CAP" | "OVER_CAP" | "CURRENCY_MISMATCH" | "CANNOT_EVALUATE" | "AUTHORIZATION_EXPIRED";
   expectedAmountMinor: string;
   approvedCapMinor: string | null;
   authorizationCurrency: string;
   observedAmountMinor: string | null;
   observedCurrency: string | null;
+  observedEvidenceDate: string | null;
+  outcome: ControlOutcomeReconciliation | null;
   reconciledByUserId: string | null;
   reconciledAt: string;
+};
+
+export const controlExceptionTargetKinds = ["RECONCILIATION", "OUTCOME_OBSERVATION"] as const;
+export type ControlExceptionTargetKind = typeof controlExceptionTargetKinds[number];
+
+export const controlExceptionDispositions = [
+  "NO_FURTHER_ACTION",
+  "NEW_PROPOSAL_REQUIRED",
+  "CORRECTED_OUTSIDE_VOGNARY",
+] as const;
+export type ControlExceptionDisposition = typeof controlExceptionDispositions[number];
+
+/** A user-entered business outcome. It cites no receipt because a receipt cannot prove it. */
+export type ControlOutcomeObservationDto = {
+  id: string;
+  proposalId: string;
+  decisionId: string;
+  observedValue: string;
+  observedOn: string;
+  target: IntendedControlOutcome;
+  observationBasis: "USER_ENTERED_OBSERVATION";
+  verdict: "MET" | "MISSED";
+  observedByUserId: string | null;
+  observedAt: string;
+};
+
+export type ControlExceptionReviewDto = {
+  id: string;
+  proposalId: string;
+  decisionId: string;
+  targetKind: ControlExceptionTargetKind;
+  targetId: string;
+  disposition: ControlExceptionDisposition;
+  note: string;
+  reviewedByUserId: string | null;
+  reviewedAt: string;
 };
 
 export type CommitmentControlBriefDto = {
@@ -88,6 +157,8 @@ export type CommitmentControlBriefDto = {
     evaluation: ControlEvaluationDto | null;
     decision: ControlDecisionDto | null;
     reconciliations: ControlReconciliationDto[];
+    outcomeObservations: ControlOutcomeObservationDto[];
+    exceptionReviews: ControlExceptionReviewDto[];
   }>;
   capabilities: {
     canSubmitProposal: boolean;
@@ -99,7 +170,17 @@ export type CommitmentControlBriefDto = {
 export type ControlPolicyWriteDto = { policy: ControlPolicyDto };
 export type ControlProposalWriteDto = { proposal: ControlProposalDto; evaluation: ControlEvaluationDto };
 export type ControlDecisionWriteDto = { decision: ControlDecisionDto };
-export type ControlReconciliationWriteDto = { decision: ControlDecisionDto; reconciliation: ControlReconciliationDto };
+export type ControlReconciliationWriteDto = {
+  proposal: ControlProposalDto;
+  decision: ControlDecisionDto;
+  reconciliation: ControlReconciliationDto;
+};
+export type ControlOutcomeObservationWriteDto = {
+  proposal: ControlProposalDto;
+  decision: ControlDecisionDto;
+  observation: ControlOutcomeObservationDto;
+};
+export type ControlExceptionReviewWriteDto = { review: ControlExceptionReviewDto };
 
 export const commitmentControlEndpoints = {
   brief: { method: "GET" as const, path: "/api/workspaces/current/control/brief" },
@@ -113,6 +194,18 @@ export const commitmentControlEndpoints = {
   reconciliations: (proposalId: string) => ({
     method: "POST" as const,
     path: `/api/workspaces/current/control/proposals/${encodeURIComponent(proposalId)}/reconciliations`,
+  }),
+  reconciliationCandidates: (proposalId: string) => ({
+    method: "GET" as const,
+    path: `/api/workspaces/current/control/proposals/${encodeURIComponent(proposalId)}/reconciliation-candidates`,
+  }),
+  outcome: (proposalId: string) => ({
+    method: "POST" as const,
+    path: `/api/workspaces/current/control/proposals/${encodeURIComponent(proposalId)}/outcome`,
+  }),
+  exceptionReviews: (proposalId: string) => ({
+    method: "POST" as const,
+    path: `/api/workspaces/current/control/proposals/${encodeURIComponent(proposalId)}/exception-reviews`,
   }),
 } as const;
 
@@ -139,15 +232,61 @@ export function isCommitmentControlBriefDto(value: unknown): value is Commitment
       || decision.evaluationPolicyVersion !== evaluation.policyVersion
       || decision.expectedAmountMinor !== proposal.amountMinor
       || decision.currency !== proposal.currency
+      || !decisionMatchesProposalEnvelope(decision, proposal)
     )) return false;
     if (!Array.isArray(reconciliations) || !reconciliations.every(isControlReconciliationDto)) return false;
     if (reconciliations.length && (!decision || decision.action === "DECLINE")) return false;
-    return reconciliations.every((reconciliation) => decision !== null
+    if (!reconciliations.every((reconciliation) => decision !== null
       && reconciliation.proposalId === proposal.id
       && reconciliation.decisionId === decision.id
       && reconciliation.expectedAmountMinor === decision.expectedAmountMinor
       && reconciliation.approvedCapMinor === decision.approvedCapMinor
-      && reconciliation.authorizationCurrency === decision.currency);
+      && reconciliation.authorizationCurrency === decision.currency
+      && reconciliationMatchesDecisionWindow(reconciliation, decision)
+      && outcomeMatchesProposal(reconciliation.outcome, proposal.intendedOutcome))) return false;
+    return followThroughMatchesEnvelope(entry.outcomeObservations, entry.exceptionReviews, proposal, decision, reconciliations);
+  });
+}
+
+/**
+ * A proposal holds at most one observed outcome in total, wherever it was
+ * recorded, and a disposition exists only against an adverse record on the same
+ * authorized decision.
+ */
+function followThroughMatchesEnvelope(
+  outcomeObservations: unknown,
+  exceptionReviews: unknown,
+  proposal: ControlProposalDto,
+  decision: ControlDecisionDto | null,
+  reconciliations: readonly ControlReconciliationDto[],
+) {
+  if (!Array.isArray(outcomeObservations) || !outcomeObservations.every(isControlOutcomeObservationDto)) return false;
+  if (!Array.isArray(exceptionReviews) || !exceptionReviews.every(isControlExceptionReviewDto)) return false;
+  if ((outcomeObservations.length || exceptionReviews.length) && (!decision || decision.action === "DECLINE")) return false;
+  if (outcomeObservations.length > 1) return false;
+  if (outcomeObservations.length && reconciliations.some((entry) => entry.outcome?.verdict === "MET" || entry.outcome?.verdict === "MISSED")) return false;
+  if (!outcomeObservations.every((observation) => decision !== null
+    && observation.proposalId === proposal.id
+    && observation.decisionId === decision.id
+    && proposal.intendedOutcome !== null
+    && targetMatchesIntendedOutcome(observation.target, proposal.intendedOutcome))) return false;
+
+  const adverseReconciliations = new Set(reconciliations
+    .filter((entry) => adverseReconciliationVerdicts.has(entry.verdict) || entry.outcome?.verdict === "MISSED")
+    .map((entry) => entry.id));
+  const adverseObservations = new Set(outcomeObservations
+    .filter((observation) => observation.verdict === "MISSED")
+    .map((observation) => observation.id));
+  const reviewedTargets = new Set<string>();
+  return exceptionReviews.every((review) => {
+    if (decision === null
+      || review.proposalId !== proposal.id
+      || review.decisionId !== decision.id
+      || reviewedTargets.has(review.targetId)) return false;
+    reviewedTargets.add(review.targetId);
+    return review.targetKind === "RECONCILIATION"
+      ? adverseReconciliations.has(review.targetId)
+      : adverseObservations.has(review.targetId);
   });
 }
 
@@ -163,19 +302,92 @@ export function isControlProposalWriteDto(value: unknown): value is ControlPropo
 }
 
 export function isControlDecisionWriteDto(value: unknown): value is ControlDecisionWriteDto {
-  return isRecord(value) && isControlDecisionDto(value.decision);
+  return isRecord(value)
+    && isControlDecisionDto(value.decision)
+    && (value.decision.action === "DECLINE" || value.decision.authorizationExpiresOn !== null);
 }
 
 export function isControlReconciliationWriteDto(value: unknown): value is ControlReconciliationWriteDto {
   return isRecord(value)
+    && isControlProposalDto(value.proposal)
     && isControlDecisionDto(value.decision)
     && value.decision.action !== "DECLINE"
+    && value.decision.proposalId === value.proposal.id
+    && value.decision.expectedAmountMinor === value.proposal.amountMinor
+    && value.decision.currency === value.proposal.currency
+    && decisionMatchesProposalEnvelope(value.decision, value.proposal)
     && isControlReconciliationDto(value.reconciliation)
     && value.reconciliation.proposalId === value.decision.proposalId
     && value.reconciliation.decisionId === value.decision.id
     && value.reconciliation.expectedAmountMinor === value.decision.expectedAmountMinor
     && value.reconciliation.approvedCapMinor === value.decision.approvedCapMinor
-    && value.reconciliation.authorizationCurrency === value.decision.currency;
+    && value.reconciliation.authorizationCurrency === value.decision.currency
+    && reconciliationMatchesDecisionWindow(value.reconciliation, value.decision)
+    && outcomeMatchesProposal(value.reconciliation.outcome, value.proposal.intendedOutcome);
+}
+
+export function isControlOutcomeObservationWriteDto(value: unknown): value is ControlOutcomeObservationWriteDto {
+  return isRecord(value)
+    && isControlProposalDto(value.proposal)
+    && isControlDecisionDto(value.decision)
+    && value.decision.action !== "DECLINE"
+    && value.decision.proposalId === value.proposal.id
+    && decisionMatchesProposalEnvelope(value.decision, value.proposal)
+    && isControlOutcomeObservationDto(value.observation)
+    && value.observation.proposalId === value.proposal.id
+    && value.observation.decisionId === value.decision.id
+    && value.proposal.intendedOutcome !== null
+    && targetMatchesIntendedOutcome(value.observation.target, value.proposal.intendedOutcome);
+}
+
+export function isControlExceptionReviewWriteDto(value: unknown): value is ControlExceptionReviewWriteDto {
+  return isRecord(value) && isControlExceptionReviewDto(value.review);
+}
+
+function isControlOutcomeObservationDto(value: unknown): value is ControlOutcomeObservationDto {
+  if (!isRecord(value)
+    || !isUuid(value.id)
+    || !isUuid(value.proposalId)
+    || !isUuid(value.decisionId)
+    || !isIntendedControlOutcome(value.target)
+    || value.observationBasis !== "USER_ENTERED_OBSERVATION"
+    || (value.verdict !== "MET" && value.verdict !== "MISSED")
+    || !isNullableUuid(value.observedByUserId)
+    || !isTimestamp(value.observedAt)
+    || typeof value.observedValue !== "string"
+    || typeof value.observedOn !== "string") return false;
+  const target = value.target;
+  const expected = isControlOutcomeReconciliation({
+    ...target,
+    observedValue: value.observedValue,
+    observedOn: value.observedOn,
+    observationBasis: "USER_ENTERED_OBSERVATION",
+    verdict: value.verdict,
+  });
+  return expected;
+}
+
+function isControlExceptionReviewDto(value: unknown): value is ControlExceptionReviewDto {
+  return isRecord(value)
+    && isUuid(value.id)
+    && isUuid(value.proposalId)
+    && isUuid(value.decisionId)
+    && typeof value.targetKind === "string"
+    && controlExceptionTargetKinds.includes(value.targetKind as ControlExceptionTargetKind)
+    && isUuid(value.targetId)
+    && typeof value.disposition === "string"
+    && controlExceptionDispositions.includes(value.disposition as ControlExceptionDisposition)
+    && isBoundedText(value.note, 1, 500)
+    && isNullableUuid(value.reviewedByUserId)
+    && isTimestamp(value.reviewedAt);
+}
+
+function targetMatchesIntendedOutcome(target: IntendedControlOutcome, intended: IntendedControlOutcome) {
+  return target.metric === intended.metric
+    && target.targetDirection === intended.targetDirection
+    && target.targetValue === intended.targetValue
+    && target.unit === intended.unit
+    && target.reviewOn === intended.reviewOn;
 }
 
 function isControlPolicyDto(value: unknown): value is ControlPolicyDto {
@@ -219,13 +431,14 @@ function isControlProposalDto(value: unknown): value is ControlProposalDto {
     && proposalCategories.includes(value.category as ProposalCategory)
     && isPositiveMinorUnits(value.amountMinor)
     && isCurrency(value.currency)
-    && isCanonicalDateOnly(value.firstChargeDate)
+    && isDateOnly(value.firstChargeDate)
     && typeof value.cadence === "string"
     && proposalCadences.includes(value.cadence as ProposalCadence)
-    && isCanonicalDateOnly(value.asOfDate)
+    && isDateOnly(value.asOfDate)
     && value.firstChargeDate >= value.asOfDate
     && isPositiveMinorUnits(value.projectedThirteenWeekMinor)
     && isPositiveMinorUnits(value.projectedAnnualMinor)
+    && (value.intendedOutcome === null || isIntendedControlOutcome(value.intendedOutcome))
     && value.assumptionBasis === "USER_ENTERED_ASSUMPTION"
     && isTimestamp(value.createdAt);
 }
@@ -288,8 +501,10 @@ function isControlDecisionDto(value: unknown): value is ControlDecisionDto {
     || !isNullableUuid(value.decidedByUserId)
     || !(value.decidedByDisplayName === null || isBoundedText(value.decidedByDisplayName, 1, 120))
     || !(value.overrideReason === null || isBoundedText(value.overrideReason, 1, 500))
-    || !isTimestamp(value.decidedAt)) return false;
-  if (value.action === "DECLINE") return value.approvedCapMinor === null;
+    || !isTimestamp(value.decidedAt)
+    || !(value.authorizationExpiresOn === null || isDateOnly(value.authorizationExpiresOn))) return false;
+  if (value.authorizationExpiresOn !== null && value.authorizationExpiresOn < value.decidedAt.slice(0, 10)) return false;
+  if (value.action === "DECLINE") return value.approvedCapMinor === null && value.authorizationExpiresOn === null;
   if (value.approvedCapMinor === null) return false;
   if (value.action === "APPROVE") return value.approvedCapMinor === value.expectedAmountMinor;
   return BigInt(value.approvedCapMinor) <= BigInt(value.expectedAmountMinor);
@@ -301,14 +516,21 @@ function isControlReconciliationDto(value: unknown): value is ControlReconciliat
     || !isUuid(value.proposalId)
     || !isUuid(value.decisionId)
     || !isUuid(value.evidenceId)
-    || !["MATCHED", "WITHIN_CAP", "OVER_CAP", "CURRENCY_MISMATCH", "CANNOT_EVALUATE"].includes(String(value.verdict))
+    || !["MATCHED", "WITHIN_CAP", "OVER_CAP", "CURRENCY_MISMATCH", "CANNOT_EVALUATE", "AUTHORIZATION_EXPIRED"].includes(String(value.verdict))
     || !isPositiveMinorUnits(value.expectedAmountMinor)
     || !isNullableMinorUnits(value.approvedCapMinor)
     || !isCurrency(value.authorizationCurrency)
     || !isNullableMinorUnits(value.observedAmountMinor)
     || !(value.observedCurrency === null || isCurrency(value.observedCurrency))
+    || !(value.observedEvidenceDate === null || isDateOnly(value.observedEvidenceDate))
+    || !(value.outcome === null || isControlOutcomeReconciliation(value.outcome))
     || !isNullableUuid(value.reconciledByUserId)
     || !isTimestamp(value.reconciledAt)) return false;
+  if (value.verdict === "AUTHORIZATION_EXPIRED") {
+    return value.observedEvidenceDate !== null
+      && value.observedAmountMinor !== null
+      && value.observedCurrency !== null;
+  }
   if (value.verdict === "CANNOT_EVALUATE") return value.observedAmountMinor === null || value.observedCurrency === null;
   if (value.verdict === "CURRENCY_MISMATCH") return value.observedCurrency !== null && value.observedCurrency !== value.authorizationCurrency;
   if (value.observedAmountMinor === null || value.observedCurrency !== value.authorizationCurrency || value.approvedCapMinor === null) return false;
@@ -318,6 +540,40 @@ function isControlReconciliationDto(value: unknown): value is ControlReconciliat
   if (value.verdict === "MATCHED") return observed === expected && observed <= cap;
   if (value.verdict === "OVER_CAP") return observed > cap;
   return observed <= cap && observed !== expected;
+}
+
+function decisionMatchesProposalEnvelope(decision: ControlDecisionDto, proposal: ControlProposalDto) {
+  if (proposal.intendedOutcome === null) return true;
+  if (decision.action === "DECLINE") return decision.authorizationExpiresOn === null;
+  return decision.authorizationExpiresOn !== null
+    && decision.authorizationExpiresOn >= decision.decidedAt.slice(0, 10)
+    && decision.authorizationExpiresOn <= proposal.intendedOutcome.reviewOn;
+}
+
+function reconciliationMatchesDecisionWindow(
+  reconciliation: ControlReconciliationDto,
+  decision: ControlDecisionDto,
+) {
+  if (decision.authorizationExpiresOn !== null
+    && reconciliation.observedAmountMinor !== null
+    && reconciliation.observedCurrency !== null
+    && reconciliation.observedEvidenceDate === null) return false;
+  const afterExpiry = decision.authorizationExpiresOn !== null
+    && reconciliation.observedEvidenceDate !== null
+    && reconciliation.observedEvidenceDate > decision.authorizationExpiresOn;
+  return reconciliation.verdict === "AUTHORIZATION_EXPIRED" ? afterExpiry : !afterExpiry;
+}
+
+function outcomeMatchesProposal(
+  outcome: ControlOutcomeReconciliation | null,
+  intended: IntendedControlOutcome | null,
+) {
+  if (outcome === null || intended === null) return outcome === null && intended === null;
+  return outcome.metric === intended.metric
+    && outcome.targetDirection === intended.targetDirection
+    && outcome.targetValue === intended.targetValue
+    && outcome.unit === intended.unit
+    && outcome.reviewOn === intended.reviewOn;
 }
 
 const policyReasonCodes: readonly PolicyReasonCode[] = [
@@ -330,6 +586,13 @@ const policyReasonCodes: readonly PolicyReasonCode[] = [
   "ANNUAL_LIMIT_EXCEEDED",
   "EXPOSURE_NOT_CITED",
 ];
+
+const adverseReconciliationVerdicts = new Set<ControlReconciliationDto["verdict"]>([
+  "OVER_CAP",
+  "CURRENCY_MISMATCH",
+  "CANNOT_EVALUATE",
+  "AUTHORIZATION_EXPIRED",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Object.prototype.toString.call(value) === "[object Object]";
@@ -365,14 +628,6 @@ function isCurrency(value: unknown): value is string {
   } catch {
     return false;
   }
-}
-
-function isCanonicalDateOnly(value: unknown): value is string {
-  if (typeof value !== "string") return false;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return false;
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  return date.getFullYear() === Number(match[1]) && date.getMonth() === Number(match[2]) - 1 && date.getDate() === Number(match[3]);
 }
 
 function isTimestamp(value: unknown): value is string {
@@ -428,7 +683,7 @@ export function normalizeControlPolicyRequest(value: unknown): PutControlPolicyR
 
 export function normalizeControlProposalRequest(value: unknown): CreateControlProposalRequest {
   const record = requireRecord(value, "Proposal request");
-  rejectUnknown(record, ["merchant", "purpose", "category", "amountMinor", "currency", "firstChargeDate", "cadence", "existingCommitmentIds"], "proposal request");
+  rejectUnknown(record, ["merchant", "purpose", "category", "amountMinor", "currency", "firstChargeDate", "cadence", "existingCommitmentIds", "intendedOutcome"], "proposal request");
   if (typeof record.category !== "string" || !proposalCategories.includes(record.category as ProposalCategory)) {
     throw new Error("Proposal category is not supported.");
   }
@@ -441,6 +696,10 @@ export function normalizeControlProposalRequest(value: unknown): CreateControlPr
   if (!Array.isArray(record.existingCommitmentIds) || record.existingCommitmentIds.length > 50) {
     throw new Error("Proposal existingCommitmentIds must be an array with at most 50 ids.");
   }
+  const intendedOutcome = normalizeIntendedControlOutcome(record.intendedOutcome);
+  if (intendedOutcome.reviewOn < record.firstChargeDate) {
+    throw new Error("Intended outcome review date cannot be before the first charge date.");
+  }
   return {
     merchant: boundedText(record.merchant, "Proposal merchant", 1, 240),
     purpose: boundedText(record.purpose, "Proposal purpose", 1, 500),
@@ -450,18 +709,27 @@ export function normalizeControlProposalRequest(value: unknown): CreateControlPr
     firstChargeDate: record.firstChargeDate,
     cadence: record.cadence as (typeof proposalCadences)[number],
     existingCommitmentIds: record.existingCommitmentIds.map((id, index) => requireUuid(id, `Existing commitment id ${index + 1}`)),
+    intendedOutcome,
   };
 }
 
 export function normalizeControlDecisionRequest(value: unknown): DecideControlProposalRequest {
   const record = requireRecord(value, "Decision request");
-  rejectUnknown(record, ["action", "approvedCapMinor", "overrideReason"], "decision request");
+  rejectUnknown(record, ["action", "approvedCapMinor", "authorizationExpiresOn", "overrideReason"], "decision request");
   if (typeof record.action !== "string" || !proposalDecisionActions.includes(record.action as (typeof proposalDecisionActions)[number])) {
     throw new Error("Proposal decision action is not supported.");
   }
   if (record.action === "APPROVE" && record.approvedCapMinor !== undefined) throw new Error("APPROVE does not accept a cap.");
   if (record.action === "DECLINE" && record.approvedCapMinor !== undefined) throw new Error("DECLINE cannot carry a cap.");
   if (record.action === "APPROVE_WITH_CAP" && record.approvedCapMinor === undefined) throw new Error("APPROVE_WITH_CAP requires a cap.");
+  if (record.action === "DECLINE" && record.authorizationExpiresOn !== undefined) throw new Error("DECLINE cannot carry an authorization expiry.");
+  let authorizationExpiresOn: string | undefined;
+  if (record.action !== "DECLINE") {
+    if (typeof record.authorizationExpiresOn !== "string" || !isDateOnly(record.authorizationExpiresOn)) {
+      throw new Error("An approved decision requires a real ISO authorization expiry date.");
+    }
+    authorizationExpiresOn = record.authorizationExpiresOn;
+  }
   const overrideReason = record.overrideReason === undefined
     ? undefined
     : boundedText(record.overrideReason, "Override reason", 1, 500);
@@ -470,40 +738,41 @@ export function normalizeControlDecisionRequest(value: unknown): DecideControlPr
     ...(record.approvedCapMinor === undefined
       ? {}
       : { approvedCapMinor: parsePositiveMinorUnits(record.approvedCapMinor, "Approved cap").toString() }),
+    ...(authorizationExpiresOn === undefined ? {} : { authorizationExpiresOn }),
     ...(overrideReason === undefined ? {} : { overrideReason }),
   };
 }
 
 export function normalizeControlReconciliationRequest(value: unknown): ReconcileControlProposalRequest {
   const record = requireRecord(value, "Reconciliation request");
-  rejectUnknown(record, ["evidenceId"], "reconciliation request");
-  return { evidenceId: requireUuid(record.evidenceId, "Evidence id") };
+  rejectUnknown(record, ["evidenceId", "observedOutcome"], "reconciliation request");
+  return {
+    evidenceId: requireUuid(record.evidenceId, "Evidence id"),
+    ...(record.observedOutcome === undefined
+      ? {}
+      : { observedOutcome: normalizeControlOutcomeObservation(record.observedOutcome) }),
+  };
 }
 
-function requireRecord(value: unknown, label: string): Record<string, unknown> {
-  if (Object.prototype.toString.call(value) !== "[object Object]") throw new Error(`${label} must be an object.`);
-  return value as Record<string, unknown>;
+export function normalizeControlOutcomeObservationRequest(value: unknown): RecordControlOutcomeObservationRequest {
+  const record = requireRecord(value, "Outcome observation request");
+  rejectUnknown(record, ["observedOutcome"], "outcome observation request");
+  return { observedOutcome: normalizeControlOutcomeObservation(record.observedOutcome) };
 }
 
-function rejectUnknown(record: Record<string, unknown>, allowed: readonly string[], label: string) {
-  const allowedSet = new Set(allowed);
-  const unknown = Object.keys(record).find((key) => !allowedSet.has(key));
-  if (unknown) throw new Error(`${label} has unknown field ${unknown}.`);
-}
-
-function boundedText(value: unknown, label: string, minimum: number, maximum: number) {
-  if (typeof value !== "string") throw new Error(`${label} is required.`);
-  const normalized = value.trim();
-  if (normalized.length < minimum || normalized.length > maximum) throw new Error(`${label} length is invalid.`);
-  return normalized;
-}
-
-function isDateOnly(value: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return false;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const date = new Date(year, month - 1, day);
-  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+export function normalizeControlExceptionReviewRequest(value: unknown): RecordControlExceptionReviewRequest {
+  const record = requireRecord(value, "Exception review request");
+  rejectUnknown(record, ["targetKind", "targetId", "disposition", "note"], "exception review request");
+  if (typeof record.targetKind !== "string" || !controlExceptionTargetKinds.includes(record.targetKind as ControlExceptionTargetKind)) {
+    throw new Error("Exception review target kind is not supported.");
+  }
+  if (typeof record.disposition !== "string" || !controlExceptionDispositions.includes(record.disposition as ControlExceptionDisposition)) {
+    throw new Error("Exception review disposition is not supported.");
+  }
+  return {
+    targetKind: record.targetKind as ControlExceptionTargetKind,
+    targetId: requireUuid(record.targetId, "Exception review target id"),
+    disposition: record.disposition as ControlExceptionDisposition,
+    note: boundedText(record.note, "Exception review note", 1, 500),
+  };
 }

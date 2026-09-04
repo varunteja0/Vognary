@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  explicitCommitmentControlWorkspaceIds,
   getCommitmentControlEnrollmentReadiness,
   isCommitmentControlWorkspaceEnrolled,
 } from "../src/lib/commitment-control/enrollment";
@@ -89,6 +90,18 @@ test("the wildcard is development-only and cannot enroll every production worksp
     nodeEnv: undefined,
     assessment: null,
   }), false);
+});
+
+test("background work enumerates only an explicit valid enrollment list", () => {
+  const otherWorkspaceId = "b1000000-0000-4000-8000-000000000001";
+  assert.deepEqual(explicitCommitmentControlWorkspaceIds(undefined), []);
+  assert.deepEqual(explicitCommitmentControlWorkspaceIds(""), []);
+  assert.deepEqual(explicitCommitmentControlWorkspaceIds("*"), []);
+  assert.deepEqual(explicitCommitmentControlWorkspaceIds(`${workspaceId},invalid`), []);
+  assert.deepEqual(
+    explicitCommitmentControlWorkspaceIds(`${otherWorkspaceId}, ${workspaceId}, ${otherWorkspaceId}`),
+    [otherWorkspaceId, workspaceId],
+  );
 });
 
 test("production readiness names payment and assessment blockers without exposing workspace ids", () => {

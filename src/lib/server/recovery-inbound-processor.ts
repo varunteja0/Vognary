@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { extractForwardedReceiptTexts, forwardedEmailMaxMimeBytes } from "@/lib/recovery/inbound-email";
 import { getDatabasePool } from "@/lib/server/database";
+import { refreshControlAttentionAfterMutation } from "@/lib/server/commitment-control-attention-trigger";
 import { reportServerError } from "@/lib/server/monitoring";
 import { RecoveryMaterializationError } from "@/lib/server/recovery-api";
 import {
@@ -126,7 +127,14 @@ export async function processResendReceivedEvent(
       },
       afterAuthorityInspection: dependencies.afterAuthorityInspection,
     });
-    if (materialized.submission.acceptedEvidenceCount > 0) return { status: "processed" };
+    if (materialized.submission.acceptedEvidenceCount > 0) {
+      await refreshControlAttentionAfterMutation({
+        workspaceId: reservation.workspaceId,
+        requestId: reservation.id,
+        routePath: "/api/webhooks/resend/inbound",
+      });
+      return { status: "processed" };
+    }
     await reportTerminalFailure(reservation, "PARSE_FAILED", dependencies);
     return { status: "ignored" };
   } catch (error) {

@@ -1,6 +1,7 @@
 import { getRateLimitBackendStatus } from "@/lib/rate-limit";
 import { getCommitmentControlEnrollmentReadiness } from "@/lib/commitment-control/enrollment";
 import { checkBackupConfiguration } from "@/lib/server/backup-readiness";
+import { checkControlAttentionEmailConfiguration } from "@/lib/server/commitment-control-attention-mailer";
 import { checkDatabaseConnection } from "@/lib/server/database";
 import { checkFeatureReadiness, getUnconfiguredFeatureReadiness } from "@/lib/server/feature-readiness";
 import { checkGoogleAuthConfiguration } from "@/lib/server/google-auth";
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
   const backups = checkBackupConfiguration();
   const features = database.status === "ready" ? await checkFeatureReadiness() : getUnconfiguredFeatureReadiness();
   const renewalAlertEmail = checkRenewalAlertEmailConfiguration();
+  const controlAttentionEmail = checkControlAttentionEmailConfiguration();
   const schemaDegraded = database.status === "ready" && features.schema.status !== "ready";
   const receiptInboxLaunch = getReceiptInboxLaunchReadiness();
   const receiptInboxMigrationsReady = features.schema.applied?.includes("0053_phase_a_receipt_activation") === true;
@@ -55,6 +57,7 @@ export async function GET(request: Request) {
       privacyLifecycle: features.privacyLifecycle,
       renewalAlerts: features.renewalAlerts,
       commitmentDecisions: features.commitmentDecisions,
+      controlAttention: features.controlAttention,
       platformApi: features.platformApi,
     },
     hardening: {
@@ -85,6 +88,10 @@ export async function GET(request: Request) {
       renewalAlertEmail: renewalAlertEmail.status === "ready" ? "configured" : `missing-${renewalAlertEmail.missing.join("-")}`,
       commitmentDecisions: features.commitmentDecisions.status,
       commitmentControlEnrollment,
+      commitmentControlAttention: {
+        ...features.controlAttention,
+        status: getControlAttentionStatus(features.controlAttention, controlAttentionEmail),
+      },
       platformApi: getPlatformApiStatus(features.platformApi, rateLimitBackend),
       recoveryV1: features.recoveryV1.status,
     },
@@ -158,6 +165,34 @@ function getRenewalAlertStatus(
   if (process.env.RENEWAL_ALERT_DELIVERY_STATUS === "production-live" && feature.lastSentAt) return "operator-attested-production-live";
   if (process.env.RENEWAL_ALERT_DELIVERY_STATUS === "production-live") return "invalid-attestation-no-delivery-observed";
   if (feature.lastSentAt) return "delivery-observed-deployment-schedule-unverified";
+  return "worker-configured-delivery-unproven";
+}
+
+function getControlAttentionStatus(
+  feature: {
+    status: string;
+    enrolledWorkspaceCount: number;
+    workspacesWithDelivery: number | null;
+    queued: number | null;
+    sending: number | null;
+    retryScheduled: number | null;
+    providerAccepted: number | null;
+    failed: number | null;
+    deadLetters: number | null;
+    lastDeliveredAt: string | null;
+  },
+  email: ReturnType<typeof checkControlAttentionEmailConfiguration>,
+) {
+  if (feature.status === "migration-pending" || feature.status === "database-not-configured" || feature.status === "schema-query-failed") return feature.status;
+  if (feature.enrolledWorkspaceCount === 0 || feature.status === "enrollment-not-configured") return "enrollment-not-configured";
+  if ((feature.failed ?? 0) > 0 || (feature.deadLetters ?? 0) > 0) return "blocked-terminal-failures";
+  if (email.status !== "ready") return "schema-ready-email-not-configured";
+  if (!isOperationalSecretValid(process.env.CRON_SECRET)) return "email-ready-cron-secret-missing";
+  if ((feature.queued ?? 0) > 0
+    || (feature.sending ?? 0) > 0
+    || (feature.retryScheduled ?? 0) > 0
+    || (feature.providerAccepted ?? 0) > 0) return "delivery-observed-work-pending";
+  if (feature.lastDeliveredAt && feature.workspacesWithDelivery === feature.enrolledWorkspaceCount) return "delivery-observed";
   return "worker-configured-delivery-unproven";
 }
 

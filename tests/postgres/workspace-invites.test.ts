@@ -20,7 +20,7 @@ import {
   listWorkspacePeople,
   revokeWorkspaceInvite,
 } from "../../src/lib/server/workspace-invite-store";
-import { completeControlPolicyRequest, futureControlTestDate } from "../commitment-control-policy-fixture";
+import { completeControlPolicyRequest, futureControlTestDate, testControlOutcome } from "../commitment-control-policy-fixture";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
 const baseUrl = "https://vognary.test";
@@ -186,6 +186,7 @@ test("a second owner or admin must record the decision when the desk is not solo
         firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
+        intendedOutcome: testControlOutcome(),
       },
     });
 
@@ -196,7 +197,7 @@ test("a second owner or admin must record the decision when the desk is not solo
         proposalId: proposal.data.proposal.id,
         expectedVersion: proposal.workspaceVersion,
         idempotencyKey: `invite-self-decision-${desk.suffix}`,
-        request: { action: "APPROVE" },
+        request: { action: "APPROVE", authorizationExpiresOn: "2099-12-30" },
       }),
       (error: unknown) => error instanceof RecoveryServiceError && error.code === "FORBIDDEN",
     );
@@ -207,7 +208,7 @@ test("a second owner or admin must record the decision when the desk is not solo
       proposalId: proposal.data.proposal.id,
       expectedVersion: proposal.workspaceVersion,
       idempotencyKey: `invite-second-decision-${desk.suffix}`,
-      request: { action: "APPROVE" },
+      request: { action: "APPROVE", authorizationExpiresOn: "2099-12-30" },
     });
     assert.equal(decided.data.decision.decidedByUserId, adminUserId);
     assert.equal(decided.data.decision.decidedByDisplayName, "Second admin");

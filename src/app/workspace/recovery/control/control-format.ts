@@ -1,8 +1,10 @@
-import type { ControlReconciliationDto } from "@/lib/commitment-control/contracts";
+import type { ControlExceptionDisposition, ControlReconciliationDto } from "@/lib/commitment-control/contracts";
+import type { ControlOutcomeReconciliation } from "@/lib/commitment-control/outcome";
 import type { ProposalDecisionAction } from "@/lib/commitment-control/decision";
 import type { CategoryPosture, PolicyEvaluationStatus, PolicyReasonCode, ProposalCategory } from "@/lib/commitment-control/policy";
 import type { ProposalCadence } from "@/lib/commitment-control/project";
 import { formatExactMinorUnits } from "@/components/ui/money-value";
+import { parseIsoDateOnly } from "@/lib/date-only";
 import { decimalToMinorUnits } from "@/lib/recovery/domain";
 
 // Presentation and exact-conversion helpers for Commitment Control. Every map is
@@ -11,6 +13,7 @@ import { decimalToMinorUnits } from "@/lib/recovery/domain";
 // policy status, a verdict, or a cap: those are server facts, rendered verbatim.
 
 export type ControlReconciliationVerdict = ControlReconciliationDto["verdict"];
+export type ControlOutcomeVerdict = ControlOutcomeReconciliation["verdict"];
 
 // Runtime option lists are declared locally and checked against the contract
 // unions, so the client bundle never pulls the server-side domain modules in.
@@ -121,6 +124,7 @@ export const controlVerdictLabels: Record<ControlReconciliationVerdict, string> 
   OVER_CAP: "Over the frozen cap",
   CURRENCY_MISMATCH: "Different currency — not comparable",
   CANNOT_EVALUATE: "Cannot be evaluated",
+  AUTHORIZATION_EXPIRED: "Outside the authorization window",
 };
 
 export const controlVerdictMeanings: Record<ControlReconciliationVerdict, string> = {
@@ -129,6 +133,7 @@ export const controlVerdictMeanings: Record<ControlReconciliationVerdict, string
   OVER_CAP: "The observed amount is above the frozen cap. The cap itself is unchanged.",
   CURRENCY_MISMATCH: "The observed currency is not the authorized currency, so the two amounts cannot be compared.",
   CANNOT_EVALUATE: "This evidence carries no comparable amount and currency, or the proposal was declined.",
+  AUTHORIZATION_EXPIRED: "The evidence date is after the frozen authorization expiry. A new proposal is required before treating this spend as authorized.",
 };
 
 export const controlVerdictToneClass: Record<ControlReconciliationVerdict, string> = {
@@ -137,6 +142,25 @@ export const controlVerdictToneClass: Record<ControlReconciliationVerdict, strin
   OVER_CAP: "pill pill-blocked",
   CURRENCY_MISMATCH: "pill control-pill-review",
   CANNOT_EVALUATE: "pill pill-planned",
+  AUTHORIZATION_EXPIRED: "pill pill-blocked",
+};
+
+export const controlOutcomeVerdictLabels: Record<ControlOutcomeVerdict, string> = {
+  MET: "Outcome met",
+  MISSED: "Outcome missed",
+  NOT_OBSERVED: "Outcome not observed",
+};
+
+export const controlOutcomeVerdictToneClass: Record<ControlOutcomeVerdict, string> = {
+  MET: "pill pill-ready",
+  MISSED: "pill pill-blocked",
+  NOT_OBSERVED: "pill pill-planned",
+};
+
+export const controlExceptionDispositionLabels: Record<ControlExceptionDisposition, string> = {
+  NO_FURTHER_ACTION: "No further action",
+  NEW_PROPOSAL_REQUIRED: "New proposal required",
+  CORRECTED_OUTSIDE_VOGNARY: "Corrected outside Vognary",
 };
 
 /**
@@ -171,11 +195,6 @@ export function parseControlAmount(text: string, currency: string, label = "amou
 }
 
 export function isCalendarDate(value: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (!match) return false;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const date = new Date(year, month - 1, day);
-  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+  const normalized = value.trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) && parseIsoDateOnly(normalized) !== null;
 }

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { explicitCommitmentControlWorkspaceIds } from "@/lib/commitment-control/enrollment";
 import { publicOffer } from "@/lib/public-offer";
 import { isAutopilotExecutionEnabled, isAutopilotNoticeChannelReady, isAutopilotNoticeEnabled } from "@/lib/recovery/autopilot-switch";
 import { isVetoTokenSecretValid } from "@/lib/recovery/veto-token";
@@ -64,6 +65,15 @@ export const productionFeatureMigrations = [
   "0057_commitment_control_v0",
   "0058_workspace_invites",
   "0059_control_authority_hardening",
+  "0060_control_outcome_authorization_window",
+  "0061_control_outcome_observation_honesty",
+  "0062_control_outcome_basis_constraint_name",
+  "0063_control_authorization_expiry_verdict",
+  "0064_control_expired_verdict_integrity",
+  "0065_control_attention_outbox",
+  "0066_control_attention_provider_events",
+  "0067_control_follow_through",
+  "0068_control_attention_target_identity",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];
@@ -79,6 +89,21 @@ export function getUnconfiguredFeatureReadiness() {
     privacyLifecycle: { status: "database-not-configured" as const, migrationId: "0004_privacy_lifecycle" as const, lastEnforcedAt: null },
     renewalAlerts: { status: "database-not-configured" as const, migrationId: "0006_renewal_alerts" as const, weeklyDigestMigrationId: "0022_weekly_digest" as const, enabledPreferences: null, enabledWeeklyDigests: null, lastSentAt: null, lastWeeklyDigestSentAt: null },
     commitmentDecisions: { status: "database-not-configured" as const, migrationId: "0007_commitment_decisions" as const, savedDecisions: null },
+    controlAttention: {
+      status: "database-not-configured" as const,
+      migrationId: "0068_control_attention_target_identity" as const,
+      enrolledWorkspaceCount: 0,
+      workspacesWithDelivery: null,
+      queued: null,
+      sending: null,
+      retryScheduled: null,
+      providerAccepted: null,
+      delivered: null,
+      failed: null,
+      deadLetters: null,
+      oldestPendingAt: null,
+      lastDeliveredAt: null,
+    },
     platformApi: { status: "database-not-configured" as const, migrationId: "0008_platform_api" as const, activeTokens: null, lastUsedAt: null },
     billing: { status: "database-not-configured" as const, migrationId: "0016_assisted_audit_orders" as const, paidCheckouts: null, assistedAuditOrders: null, activeEntitlements: null, lastPaidAt: null },
     syncWorkers: { status: "database-not-configured" as const, migrationId: "0014_sync_run_invocation" as const, successfulCronRuns: null, lastCronEvidenceAt: null },
@@ -128,6 +153,7 @@ export async function checkFeatureReadiness() {
       privacyLifecycle: { ...unavailable.privacyLifecycle, status: "migration-ledger-unavailable" as const },
       renewalAlerts: { ...unavailable.renewalAlerts, status: "migration-ledger-unavailable" as const },
       commitmentDecisions: { ...unavailable.commitmentDecisions, status: "migration-ledger-unavailable" as const },
+      controlAttention: { ...unavailable.controlAttention, status: "migration-ledger-unavailable" as const },
       platformApi: { ...unavailable.platformApi, status: "migration-ledger-unavailable" as const },
       billing: { ...unavailable.billing, status: "migration-ledger-unavailable" as const },
       syncWorkers: { ...unavailable.syncWorkers, status: "migration-ledger-unavailable" as const },
@@ -140,10 +166,11 @@ export async function checkFeatureReadiness() {
 
   const appliedMigrations = productionFeatureMigrations.filter((id) => applied.has(id));
   const missingMigrations = productionFeatureMigrations.filter((id) => !applied.has(id));
-  const [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes, recoveryV1, autopilot] = await Promise.all([
+  const [privacyLifecycle, renewalAlerts, commitmentDecisions, controlAttention, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes, recoveryV1, autopilot] = await Promise.all([
     checkPrivacyLifecycle(applied),
     checkRenewalAlerts(applied),
     checkCommitmentDecisions(applied),
+    checkControlAttention(applied, explicitCommitmentControlWorkspaceIds()),
     checkPlatformApi(applied),
     checkBilling(applied),
     checkSyncWorkers(applied),
@@ -152,7 +179,7 @@ export async function checkFeatureReadiness() {
     checkRecoveryV1(applied),
     checkAutopilot(applied),
   ]);
-  const capabilityQueryFailed = [privacyLifecycle, renewalAlerts, commitmentDecisions, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes, recoveryV1, autopilot]
+  const capabilityQueryFailed = [privacyLifecycle, renewalAlerts, commitmentDecisions, controlAttention, platformApi, billing, syncWorkers, proofGraph, verifiedOutcomes, recoveryV1, autopilot]
     .some((feature) => feature.status === "schema-query-failed");
 
   return {
@@ -169,6 +196,7 @@ export async function checkFeatureReadiness() {
     privacyLifecycle,
     renewalAlerts,
     commitmentDecisions,
+    controlAttention,
     platformApi,
     billing,
     syncWorkers,
@@ -431,6 +459,88 @@ async function checkCommitmentDecisions(applied: Set<string>) {
     };
   } catch {
     return { status: "schema-query-failed" as const, migrationId, savedDecisions: null };
+  }
+}
+
+async function checkControlAttention(applied: Set<string>, workspaceIds: readonly string[]) {
+  const migrationId = "0068_control_attention_target_identity" as const;
+  const empty = {
+    migrationId,
+    enrolledWorkspaceCount: workspaceIds.length,
+    workspacesWithDelivery: null,
+    queued: null,
+    sending: null,
+    retryScheduled: null,
+    providerAccepted: null,
+    delivered: null,
+    failed: null,
+    deadLetters: null,
+    oldestPendingAt: null,
+    lastDeliveredAt: null,
+  };
+  if (!applied.has(migrationId)) return { status: "migration-pending" as const, ...empty };
+  if (!workspaceIds.length) {
+    return {
+      ...empty,
+      status: "enrollment-not-configured" as const,
+      workspacesWithDelivery: 0,
+      queued: 0,
+      sending: 0,
+      retryScheduled: 0,
+      providerAccepted: 0,
+      delivered: 0,
+      failed: 0,
+      deadLetters: 0,
+    };
+  }
+  try {
+    const result = await getDatabasePool().query<{
+      workspaces_with_delivery: number;
+      queued: number;
+      sending: number;
+      retry_scheduled: number;
+      provider_accepted: number;
+      delivered: number;
+      failed: number;
+      dead_letters: number;
+      oldest_pending_at: Date | null;
+      last_delivered_at: Date | null;
+    }>(
+      `select
+        count(distinct workspace_id) filter (where delivery_state in ('DELIVERED', 'UNSUBSCRIBED') and delivered_at is not null)::int as workspaces_with_delivery,
+         count(*) filter (where delivery_state = 'QUEUED')::int as queued,
+         count(*) filter (where delivery_state = 'SENDING')::int as sending,
+         count(*) filter (where delivery_state = 'RETRY_SCHEDULED')::int as retry_scheduled,
+         count(*) filter (where delivery_state = 'PROVIDER_ACCEPTED')::int as provider_accepted,
+         count(*) filter (where delivery_state = 'DELIVERED')::int as delivered,
+         count(*) filter (where delivery_state = 'FAILED')::int as failed,
+         count(*) filter (where delivery_state = 'DEAD_LETTER')::int as dead_letters,
+         min(created_at) filter (where delivery_state in ('QUEUED', 'SENDING', 'RETRY_SCHEDULED', 'PROVIDER_ACCEPTED')) as oldest_pending_at,
+         max(delivered_at) filter (where delivery_state in ('DELIVERED', 'UNSUBSCRIBED')) as last_delivered_at
+      from commitment_control_attention_notifications
+      where workspace_id = any($1::uuid[])`,
+          [workspaceIds],
+    );
+    const row = result.rows[0];
+    const failed = row?.failed ?? 0;
+    const deadLetters = row?.dead_letters ?? 0;
+    return {
+      status: failed > 0 || deadLetters > 0 ? "terminal-failures-open" as const : "schema-ready" as const,
+      migrationId,
+      enrolledWorkspaceCount: workspaceIds.length,
+      workspacesWithDelivery: row?.workspaces_with_delivery ?? 0,
+      queued: row?.queued ?? 0,
+      sending: row?.sending ?? 0,
+      retryScheduled: row?.retry_scheduled ?? 0,
+      providerAccepted: row?.provider_accepted ?? 0,
+      delivered: row?.delivered ?? 0,
+      failed,
+      deadLetters,
+      oldestPendingAt: row?.oldest_pending_at?.toISOString() ?? null,
+      lastDeliveredAt: row?.last_delivered_at?.toISOString() ?? null,
+    };
+  } catch {
+    return { status: "schema-query-failed" as const, ...empty };
   }
 }
 

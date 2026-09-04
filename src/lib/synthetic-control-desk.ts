@@ -1,5 +1,6 @@
 import type { CommitmentControlBriefDto } from "./commitment-control/contracts";
 import { authorizeProposalDecision, type ProposalDecisionAction } from "./commitment-control/decision";
+import type { IntendedControlOutcome } from "./commitment-control/outcome";
 import { evaluateProposalPolicy, type ProposalCategory } from "./commitment-control/policy";
 import { projectProposalExposure, type ProposalCadence } from "./commitment-control/project";
 import { reconcileAuthorizedProposal } from "./commitment-control/reconcile";
@@ -74,6 +75,7 @@ type DeclaredRecord = {
   citations: readonly DeskCitation[];
   /** Exposure the citations prove. Empty means nothing is cited yet, and the record says so. */
   existingExposure: readonly { thirteenWeekMinor: string; annualMinor: string }[];
+  intendedOutcome: IntendedControlOutcome;
   decision: null | {
     action: ProposalDecisionAction;
     approvedCapMinor?: string;
@@ -120,6 +122,7 @@ const DECLARED: readonly DeclaredRecord[] = [
       { id: id("00000000ea02"), label: "July invoice", minor: "32000000", currency: "INR", source: "Vendor invoice (placeholder)", excerpt: "Inference capacity — monthly commitment" },
     ],
     existingExposure: [{ thirteenWeekMinor: "96000000", annualMinor: "384000000" }],
+    intendedOutcome: { metric: "Customer launch requests served", targetDirection: "AT_LEAST", targetValue: "1", unit: "launch", reviewOn: "2026-09-07" },
     decision: null,
     observed: null,
   },
@@ -140,6 +143,7 @@ const DECLARED: readonly DeclaredRecord[] = [
     // implying an exposure history that does not exist.
     citations: [],
     existingExposure: [],
+    intendedOutcome: { metric: "Failover tests completed", targetDirection: "AT_LEAST", targetValue: "1", unit: "tests", reviewOn: "2026-09-09" },
     decision: null,
     observed: null,
   },
@@ -160,6 +164,7 @@ const DECLARED: readonly DeclaredRecord[] = [
       { id: id("00000000eb01"), label: "May invoice", minor: "9000000", currency: "INR", source: "Vendor invoice (placeholder)", excerpt: "Log retention — base tier" },
     ],
     existingExposure: [{ thirteenWeekMinor: "27000000", annualMinor: "108000000" }],
+    intendedOutcome: { metric: "Incident investigation time", targetDirection: "AT_MOST", targetValue: "30", unit: "minutes", reviewOn: "2026-09-05" },
     decision: {
       action: "APPROVE_WITH_CAP",
       approvedCapMinor: "20000000",
@@ -186,6 +191,7 @@ const DECLARED: readonly DeclaredRecord[] = [
       { id: id("00000000eb02"), label: "June invoice", minor: "12000000", currency: "INR", source: "Vendor invoice (placeholder)", excerpt: "Index tier — monthly" },
     ],
     existingExposure: [{ thirteenWeekMinor: "36000000", annualMinor: "144000000" }],
+    intendedOutcome: { metric: "Retrieval requests served", targetDirection: "AT_LEAST", targetValue: "1000", unit: "requests", reviewOn: "2026-08-21" },
     decision: {
       action: "APPROVE",
       reason: "Index tier matches the retrieval plan.",
@@ -216,6 +222,7 @@ const DECLARED: readonly DeclaredRecord[] = [
     nextAction: "Closed — inspect the evidence",
     citations: [],
     existingExposure: [],
+    intendedOutcome: { metric: "Assessment reviews completed", targetDirection: "AT_LEAST", targetValue: "1", unit: "reviews", reviewOn: "2026-08-14" },
     decision: {
       action: "APPROVE",
       reason: "Assessment scope agreed in writing.",
@@ -246,6 +253,7 @@ const DECLARED: readonly DeclaredRecord[] = [
     nextAction: "Closed — refused",
     citations: [],
     existingExposure: [],
+    intendedOutcome: { metric: "Qualified launch conversations", targetDirection: "AT_LEAST", targetValue: "10", unit: "conversations", reviewOn: "2026-09-12" },
     decision: {
       action: "DECLINE",
       reason: "Not before the launch proves retention.",
@@ -329,6 +337,7 @@ function buildRecord(declared: DeclaredRecord, index: number): DeskRecord {
     asOfDate,
     projectedThirteenWeekMinor: projected.thirteenWeekMinor,
     projectedAnnualMinor: projected.annualMinor,
+    intendedOutcome: declared.intendedOutcome,
     assumptionBasis: projected.basis,
     createdAt: declared.submittedAt,
   } satisfies CommitmentControlBriefDto["proposals"][number]["proposal"];
@@ -348,7 +357,7 @@ function buildRecord(declared: DeclaredRecord, index: number): DeskRecord {
   } satisfies NonNullable<CommitmentControlBriefDto["proposals"][number]["evaluation"]>;
 
   if (!declared.decision) {
-    return record(declared, { proposal, evaluation: evaluationDto, decision: null, reconciliations: [] });
+    return record(declared, { proposal, evaluation: evaluationDto, decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [] });
   }
 
   const authorized = authorizeProposalDecision({
@@ -357,6 +366,7 @@ function buildRecord(declared: DeclaredRecord, index: number): DeskRecord {
     evaluation,
     action: declared.decision.action,
     approvedCapMinor: declared.decision.approvedCapMinor,
+    authorizationExpiresOn: declared.decision.action === "DECLINE" ? undefined : declared.intendedOutcome.reviewOn,
     decidedAt: declared.decision.decidedAt,
     submittedByUserId: proposal.submittedByUserId,
     overrideReason: declared.decision.reason,
@@ -375,16 +385,23 @@ function buildRecord(declared: DeclaredRecord, index: number): DeskRecord {
     decidedByDisplayName: declared.decision.decidedBy,
     overrideReason: authorized.overrideReason,
     decidedAt: authorized.decidedAt,
+    authorizationExpiresOn: authorized.authorizationExpiresOn,
   } satisfies NonNullable<CommitmentControlBriefDto["proposals"][number]["decision"]>;
 
   if (!declared.observed || authorized.action === "DECLINE") {
-    return record(declared, { proposal, evaluation: evaluationDto, decision: decisionDto, reconciliations: [] });
+    return record(declared, { proposal, evaluation: evaluationDto, decision: decisionDto, reconciliations: [], outcomeObservations: [], exceptionReviews: [] });
   }
 
   const evidenceId = id(`00000000d4${row}`);
   const reconciled = reconcileAuthorizedProposal({
     decision: authorized,
-    evidence: { evidenceId, amountMinor: declared.observed.minor, currency: declared.observed.currency },
+    evidence: {
+      evidenceId,
+      amountMinor: declared.observed.minor,
+      currency: declared.observed.currency,
+      evidenceDate: declared.observed.observedAt.slice(0, 10),
+    },
+    intendedOutcome: declared.intendedOutcome,
   });
 
   return record(declared, {
@@ -402,9 +419,13 @@ function buildRecord(declared: DeclaredRecord, index: number): DeskRecord {
       authorizationCurrency: reconciled.authorizationCurrency,
       observedAmountMinor: reconciled.observedAmountMinor,
       observedCurrency: reconciled.observedCurrency,
+      observedEvidenceDate: reconciled.observedEvidenceDate,
+      outcome: reconciled.outcome,
       reconciledByUserId: OWNER,
       reconciledAt: declared.observed.observedAt,
     }],
+    outcomeObservations: [],
+    exceptionReviews: [],
   });
 }
 
@@ -486,6 +507,7 @@ function variantDecision(action: ProposalDecisionAction, approvedCapMinor?: stri
     evaluation,
     action,
     approvedCapMinor,
+    authorizationExpiresOn: action === "DECLINE" ? undefined : "2026-08-28",
     decidedAt: "2026-08-19T10:15:00.000Z",
     submittedByUserId: PLATFORM,
     overrideReason: "Retention only through the launch window.",
@@ -501,17 +523,17 @@ export const syntheticDeskVerdictVariants = {
   /** Observed below a cap that sits below the request. */
   WITHIN_CAP: reconcileAuthorizedProposal({
     decision: variantDecision("APPROVE_WITH_CAP", "20000000"),
-    evidence: { evidenceId: id("00000000f101"), amountMinor: "18000000", currency: "INR" },
+    evidence: { evidenceId: id("00000000f101"), amountMinor: "18000000", currency: "INR", evidenceDate: "2026-08-28" },
   }),
   /** The invoice arrived in another currency. Nothing is converted. */
   CURRENCY_MISMATCH: reconcileAuthorizedProposal({
     decision: variantDecision("APPROVE_WITH_CAP", "20000000"),
-    evidence: { evidenceId: id("00000000f102"), amountMinor: "24000", currency: "USD" },
+    evidence: { evidenceId: id("00000000f102"), amountMinor: "24000", currency: "USD", evidenceDate: "2026-08-28" },
   }),
   /** The amount could not be read off the document. Unknown, not zero. */
   CANNOT_EVALUATE: reconcileAuthorizedProposal({
     decision: variantDecision("APPROVE_WITH_CAP", "20000000"),
-    evidence: { evidenceId: id("00000000f103"), amountMinor: null, currency: null },
+    evidence: { evidenceId: id("00000000f103"), amountMinor: null, currency: null, evidenceDate: "2026-08-28" },
   }),
 } as const;
 

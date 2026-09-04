@@ -10,7 +10,28 @@ import {
   normalizeEvidenceRequest,
   normalizeForwardedEmailMaterializationRequest,
   recoveryFailureResponse,
+  recoverySuccessResponse,
 } from "../src/lib/server/recovery-api";
+
+test("a committed write can expose pending attention projection in success metadata", async () => {
+  const response = recoverySuccessResponse(
+    { recorded: true },
+    "request-attention-pending",
+    8,
+    201,
+    { attentionProjection: "pending-worker-retry" },
+  );
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(await response.json(), {
+    data: { recorded: true },
+    meta: {
+      requestId: "request-attention-pending",
+      workspaceVersion: 8,
+      attentionProjection: "pending-worker-retry",
+    },
+  });
+});
 
 test("Recovery mutations require an idempotency key and an exactly quoted workspace version", () => {
   const request = new Request("https://vognary.test/api/workspaces/current/evidence", {

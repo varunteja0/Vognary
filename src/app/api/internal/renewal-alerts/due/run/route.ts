@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { rateLimit, rateLimitExceeded } from "@/lib/rate-limit";
+import { explicitCommitmentControlWorkspaceIds } from "@/lib/commitment-control/enrollment";
+import { deliverControlAttentionNotifications, type ControlAttentionDeliverySummary } from "@/lib/server/commitment-control-attention-delivery";
 import { isDatabaseConfigured } from "@/lib/server/database";
 import { requireCronSecret, requireInternalSecret } from "@/lib/server/internal-auth";
 import { checkRenewalAlertEmailConfiguration, RenewalAlertDeliveryError, sendRenewalAlertEmail, sendWeeklyDigestEmail } from "@/lib/server/renewal-alert-mailer";
@@ -54,6 +56,15 @@ async function deliverDueRenewalAlerts(request: Request, invocation: "internal-a
   const url = new URL(request.url);
   const batchSize = clampNumber(Number.parseInt(url.searchParams.get("limit") ?? "10", 10), 1, 25);
   const workerId = `renewal-alert-${randomUUID()}`;
+  const controlWorkspaceIds = explicitCommitmentControlWorkspaceIds();
+  const controlAttentionPromise: Promise<ControlAttentionDeliverySummary | null> = controlWorkspaceIds.length
+    ? deliverControlAttentionNotifications({
+      workspaceIds: controlWorkspaceIds,
+      now: new Date(),
+      lockOwner: `${workerId}-control`,
+      limit: batchSize,
+    }).catch(() => failedControlAttentionSummary())
+    : Promise.resolve(null);
   await scheduleDueWeeklyDigests();
   const deliveries = await claimDueRenewalAlerts({ limit: batchSize, workerId, invocation });
   const weeklyDigests = await claimDueWeeklyDigests({ limit: batchSize, workerId, invocation });
@@ -114,16 +125,34 @@ async function deliverDueRenewalAlerts(request: Request, invocation: "internal-a
   const sent = outcomes.filter((outcome) => outcome === "sent").length;
   const failed = outcomes.filter((outcome) => outcome === "failed").length;
   const cancelled = outcomes.filter((outcome) => outcome === "cancelled").length;
+  const controlAttention = await controlAttentionPromise;
+  const controlFailed = controlAttention !== null && controlAttention.status !== "completed";
   return Response.json({
-    status: failed ? "completed-with-failures" : "completed",
+    status: failed || controlFailed ? "completed-with-failures" : "completed",
     selected: outcomes.length,
     remindersSelected: deliveries.length,
     weeklyDigestsSelected: weeklyDigests.length,
     sent,
     failed,
     cancelled,
+    controlAttention,
     invocation,
-  }, { status: failed ? 207 : 200, headers: noStoreHeaders });
+  }, { status: failed || controlFailed ? 207 : 200, headers: noStoreHeaders });
+}
+
+function failedControlAttentionSummary(): ControlAttentionDeliverySummary {
+  return {
+    status: "completed-with-failures",
+    scheduled: 0,
+    selected: 0,
+    providerAccepted: 0,
+    retryScheduled: 0,
+    failed: 1,
+    deadLettered: 0,
+    cancelled: 0,
+    suppressed: 0,
+    unsubscribed: 0,
+  };
 }
 
 async function mapWithConcurrency<T, R>(items: T[], concurrency: number, task: (item: T) => Promise<R>) {

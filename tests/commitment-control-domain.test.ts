@@ -13,6 +13,14 @@ const proposal = {
   annualMinor: "3000000",
 };
 
+const intendedOutcome = {
+  metric: "Resolved support cases",
+  targetDirection: "AT_LEAST" as const,
+  targetValue: "1200",
+  unit: "cases",
+  reviewOn: "2026-10-15",
+};
+
 const policy = {
   policyVersion: 3,
   categoryRules: [
@@ -184,6 +192,7 @@ test("only owners and admins can append a human decision and the approved cap is
     evaluation,
     action: "APPROVE_WITH_CAP",
     approvedCapMinor: "200000",
+    authorizationExpiresOn: "2026-09-30",
     decidedAt: "2026-08-25T10:00:00.000Z",
   });
   assert.deepEqual(approved, {
@@ -195,8 +204,43 @@ test("only owners and admins can append a human decision and the approved cap is
     expectedAmountMinor: "250000",
     decidedByUserId: "b1000000-0000-4000-8000-000000000001",
     decidedAt: "2026-08-25T10:00:00.000Z",
+    authorizationExpiresOn: "2026-09-30",
     overrideReason: null,
   });
+
+  assert.throws(
+    () => authorizeProposalDecision({
+      actorRole: "owner",
+      actorUserId: "b1000000-0000-4000-8000-000000000001",
+      evaluation,
+      action: "APPROVE",
+      decidedAt: "2026-08-25T10:00:00.000Z",
+    }),
+    /authorization expiry/i,
+  );
+  assert.throws(
+    () => authorizeProposalDecision({
+      actorRole: "owner",
+      actorUserId: "b1000000-0000-4000-8000-000000000001",
+      evaluation,
+      action: "APPROVE",
+      authorizationExpiresOn: "2026-08-24",
+      decidedAt: "2026-08-25T10:00:00.000Z",
+    }),
+    /before the decision/i,
+  );
+  assert.throws(
+    () => authorizeProposalDecision({
+      actorRole: "owner",
+      actorUserId: "b1000000-0000-4000-8000-000000000001",
+      evaluation,
+      action: "APPROVE",
+      authorizationExpiresOn: "2026-10-16",
+      outcomeReviewOn: "2026-10-15",
+      decidedAt: "2026-08-25T10:00:00.000Z",
+    }),
+    /after the outcome review date/i,
+  );
 
   assert.throws(
     () => authorizeProposalDecision({
@@ -218,17 +262,101 @@ test("reconciles cited observed evidence against the frozen authorization withou
     actorUserId: "b1000000-0000-4000-8000-000000000001",
     evaluation,
     action: "APPROVE",
+    authorizationExpiresOn: "2026-09-30",
     decidedAt: "2026-08-25T10:00:00.000Z",
   });
   const frozen = structuredClone(approved);
   const evidenceId = "e1000000-0000-4000-8000-000000000001";
 
-  assert.equal(reconcileAuthorizedProposal({ decision: approved, evidence: { evidenceId, amountMinor: "250000", currency: "INR" } }).verdict, "MATCHED");
-  assert.equal(reconcileAuthorizedProposal({ decision: approved, evidence: { evidenceId, amountMinor: "200000", currency: "INR" } }).verdict, "WITHIN_CAP");
-  assert.equal(reconcileAuthorizedProposal({ decision: approved, evidence: { evidenceId, amountMinor: "250001", currency: "INR" } }).verdict, "OVER_CAP");
-  assert.equal(reconcileAuthorizedProposal({ decision: approved, evidence: { evidenceId, amountMinor: "250000", currency: "USD" } }).verdict, "CURRENCY_MISMATCH");
-  assert.equal(reconcileAuthorizedProposal({ decision: approved, evidence: { evidenceId, amountMinor: null, currency: null } }).verdict, "CANNOT_EVALUATE");
+  assert.equal(reconcileAuthorizedProposal({ decision: approved, evidence: { evidenceId, amountMinor: "250000", currency: "INR", evidenceDate: "2026-09-01" } }).verdict, "MATCHED");
+  assert.equal(reconcileAuthorizedProposal({ decision: approved, evidence: { evidenceId, amountMinor: "200000", currency: "INR", evidenceDate: "2026-09-01" } }).verdict, "WITHIN_CAP");
+  assert.equal(reconcileAuthorizedProposal({ decision: approved, evidence: { evidenceId, amountMinor: "250001", currency: "INR", evidenceDate: "2026-09-01" } }).verdict, "OVER_CAP");
+  assert.equal(reconcileAuthorizedProposal({ decision: approved, evidence: { evidenceId, amountMinor: "250000", currency: "USD", evidenceDate: "2026-09-01" } }).verdict, "CURRENCY_MISMATCH");
+  assert.equal(reconcileAuthorizedProposal({ decision: approved, evidence: { evidenceId, amountMinor: null, currency: null, evidenceDate: "2026-09-01" } }).verdict, "CANNOT_EVALUATE");
   assert.deepEqual(approved, frozen, "reconciliation cannot rewrite the frozen authorization");
+});
+
+test("reconciles the intended measurable outcome without inferring it from spend", () => {
+  const evaluation = evaluateProposalPolicy({ proposal, policy, existingExposure: [] });
+  const decision = authorizeProposalDecision({
+    actorRole: "owner",
+    actorUserId: "b1000000-0000-4000-8000-000000000001",
+    evaluation,
+    action: "APPROVE",
+    authorizationExpiresOn: "2026-09-30",
+    decidedAt: "2026-08-25T10:00:00.000Z",
+  });
+  const evidence = {
+    evidenceId: "e1000000-0000-4000-8000-000000000001",
+    amountMinor: "250000",
+    currency: "INR",
+    evidenceDate: "2026-09-15",
+  };
+
+  const met = reconcileAuthorizedProposal({
+    decision,
+    evidence,
+    intendedOutcome,
+    observedOutcome: { value: "1250", observedOn: "2026-10-15" },
+    observedThrough: "2026-10-15",
+  });
+  assert.deepEqual(met.outcome, {
+    ...intendedOutcome,
+    observedValue: "1250",
+    observedOn: "2026-10-15",
+    observationBasis: "USER_ENTERED_OBSERVATION",
+    verdict: "MET",
+  });
+
+  const missed = reconcileAuthorizedProposal({
+    decision,
+    evidence,
+    intendedOutcome: { ...intendedOutcome, targetDirection: "AT_MOST", targetValue: "1000" },
+    observedOutcome: { value: "1000.01", observedOn: "2026-10-15" },
+    observedThrough: "2026-10-15",
+  });
+  assert.equal(missed.outcome?.verdict, "MISSED");
+
+  const notObserved = reconcileAuthorizedProposal({ decision, evidence, intendedOutcome });
+  assert.deepEqual(notObserved.outcome, {
+    ...intendedOutcome,
+    observedValue: null,
+    observedOn: null,
+    observationBasis: "NOT_OBSERVED",
+    verdict: "NOT_OBSERVED",
+  });
+
+  assert.throws(() => reconcileAuthorizedProposal({
+    decision,
+    evidence,
+    intendedOutcome,
+    observedOutcome: { value: "1250", observedOn: "2026-10-16" },
+    observedThrough: "2026-10-15",
+  }), /future/i);
+});
+
+test("evidence after the authorization window is never treated as authorized spend", () => {
+  const evaluation = evaluateProposalPolicy({ proposal, policy, existingExposure: [] });
+  const decision = authorizeProposalDecision({
+    actorRole: "owner",
+    actorUserId: "b1000000-0000-4000-8000-000000000001",
+    evaluation,
+    action: "APPROVE",
+    authorizationExpiresOn: "2026-09-30",
+    decidedAt: "2026-08-25T10:00:00.000Z",
+  });
+
+  const expired = reconcileAuthorizedProposal({
+    decision,
+    evidence: {
+      evidenceId: "e1000000-0000-4000-8000-000000000001",
+      amountMinor: "250000",
+      currency: "INR",
+      evidenceDate: "2026-10-01",
+    },
+  });
+  assert.equal(expired.verdict, "AUTHORIZATION_EXPIRED");
+  assert.equal(expired.observedEvidenceDate, "2026-10-01");
 });
 
 test("uncited eligible exposure cannot be within policy and outside-policy approve needs a written override", () => {
@@ -261,6 +389,7 @@ test("uncited eligible exposure cannot be within policy and outside-policy appro
     actorUserId: "b1000000-0000-4000-8000-000000000001",
     evaluation: outside,
     action: "APPROVE",
+    authorizationExpiresOn: "2026-09-30",
     overrideReason: "Board-approved exception for this vendor.",
   });
   assert.equal(overridden.overrideReason, "Board-approved exception for this vendor.");
@@ -286,6 +415,7 @@ test("a second owner or admin must decide when the workspace is not a solo desk"
     authorizingAdminCount: 2,
     evaluation,
     action: "APPROVE",
+    authorizationExpiresOn: "2026-09-30",
   });
   assert.equal(approved.decidedByUserId, "b1000000-0000-4000-8000-000000000002");
 });

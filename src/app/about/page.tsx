@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 const principles = [
   {
     heading: "Evidence before inference",
-    body: "Important amounts, dates, changes, and expected charges remain tied to billing evidence the user intentionally provides. When the evidence cannot support a financial fact, Vognary leaves it unknown instead of filling the gap with a plausible answer. Proposal amounts are labeled as user-entered assumptions until later receipts prove an outcome.",
+    body: "Important amounts, dates, changes, and expected charges remain tied to billing evidence the user intentionally provides. When the evidence cannot support a financial fact, Vognary leaves it unknown instead of filling the gap with a plausible answer. Proposal amounts remain user-entered assumptions until later receipts prove observed cost; a separately labelled outcome observation remains user-entered and unverified.",
   },
   {
     heading: "A decision before the obligation",

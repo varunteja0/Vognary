@@ -1,20 +1,30 @@
 import {
   commitmentControlEndpoints,
   isCommitmentControlBriefDto,
+  isControlExceptionReviewWriteDto,
   isControlDecisionWriteDto,
+  isControlOutcomeObservationWriteDto,
   isControlPolicyWriteDto,
   isControlProposalWriteDto,
   isControlReconciliationWriteDto,
   type CommitmentControlBriefDto,
+  type ControlExceptionReviewWriteDto,
   type ControlDecisionWriteDto,
   type ControlPolicyWriteDto,
+  type ControlOutcomeObservationWriteDto,
   type ControlProposalWriteDto,
   type ControlReconciliationWriteDto,
   type CreateControlProposalRequest,
   type DecideControlProposalRequest,
+  type RecordControlExceptionReviewRequest,
+  type RecordControlOutcomeObservationRequest,
   type PutControlPolicyRequest,
   type ReconcileControlProposalRequest,
 } from "@/lib/commitment-control/contracts";
+import {
+  isControlReconciliationCandidatesDto,
+  type ControlReconciliationCandidatesDto,
+} from "@/lib/commitment-control/reconciliation-candidates";
 import {
   callWorkspaceApi,
   workspaceMutationHeaders,
@@ -72,6 +82,28 @@ export function createControlTransport(fetchImpl?: FetchLike) {
         headers: workspaceMutationHeaders(context),
         body: JSON.stringify(request),
       }, isControlDecisionWriteDto),
+
+    recordOutcome: (proposalId: string, request: RecordControlOutcomeObservationRequest, context: MutationContext) =>
+      callWorkspaceApi<ControlOutcomeObservationWriteDto>(doFetch, commitmentControlEndpoints.outcome(proposalId).path, {
+        method: commitmentControlEndpoints.outcome(proposalId).method,
+        headers: workspaceMutationHeaders(context),
+        body: JSON.stringify(request),
+      }, isControlOutcomeObservationWriteDto),
+
+    reviewException: (proposalId: string, request: RecordControlExceptionReviewRequest, context: MutationContext) =>
+      callWorkspaceApi<ControlExceptionReviewWriteDto>(doFetch, commitmentControlEndpoints.exceptionReviews(proposalId).path, {
+        method: commitmentControlEndpoints.exceptionReviews(proposalId).method,
+        headers: workspaceMutationHeaders(context),
+        body: JSON.stringify(request),
+      }, isControlExceptionReviewWriteDto),
+
+    reconciliationCandidates: (proposalId: string) =>
+      callWorkspaceApi<ControlReconciliationCandidatesDto>(
+        doFetch,
+        commitmentControlEndpoints.reconciliationCandidates(proposalId).path,
+        undefined,
+        isControlReconciliationCandidatesDto,
+      ),
 
     reconcileProposal: (proposalId: string, request: ReconcileControlProposalRequest, context: MutationContext) =>
       callWorkspaceApi<ControlReconciliationWriteDto>(

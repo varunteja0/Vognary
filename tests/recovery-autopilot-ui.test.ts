@@ -26,7 +26,8 @@ test("exception-only home is honest about shadow mode and missing coverage", () 
   assert.match(autopilotHomeSource, /Watching/);
   assert.match(autopilotHomeSource, /48-hour veto window/);
   assert.match(autopilotHomeSource, /Delivery pending/);
-  assert.match(autopilotHomeSource, /Handled for you/);
+  assert.match(autopilotHomeSource, /Recorded and checked/);
+  assert.match(autopilotHomeSource, /No action was taken by Vognary/);
   assert.match(autopilotHomeSource, /Needs your help/);
   assert.match(autopilotHomeSource, /Proof and savings/);
   assert.match(autopilotHomeSource, /Fees and refunds/);
@@ -36,7 +37,7 @@ test("exception-only home is honest about shadow mode and missing coverage", () 
   assert.doesNotMatch(autopilotHomeSource, /money stops without chores/i);
   assert.doesNotMatch(autopilotHomeSource, /title="Connected"|Cancelled for you|Saved ₹|Paid in full/);
   assert.ok(autopilotHomeSource.indexOf("48-hour veto window") < autopilotHomeSource.indexOf("Watching"));
-  assert.ok(autopilotHomeSource.indexOf("Needs your help") < autopilotHomeSource.indexOf("Handled for you"));
+  assert.ok(autopilotHomeSource.indexOf("Needs your help") < autopilotHomeSource.indexOf("Recorded and checked"));
 });
 
 test("active mandate stays off the customer Now surface; cited activation remains honest", () => {

@@ -50,7 +50,14 @@ export function RecoveryAutopilotHome({
         pendingVetoId={pendingVetoId}
       />
       <CandidateSection title="Watching" empty="No shadow cases yet." items={autopilot.watching} />
-      <CandidateSection title="Handled for you" empty="No handled cases yet." items={autopilot.handled} />
+      <CandidateSection
+        title="Recorded and checked"
+        detail={autopilot.executionEnabled
+          ? "Open a record to verify what happened and what evidence supports it."
+          : "No action was taken by Vognary. These are recorded classifications only."}
+        empty="No checked records yet."
+        items={autopilot.handled}
+      />
 
       <section className="rounded-2xl border border-line bg-card p-4" aria-labelledby="autopilot-proof">
         <h3 id="autopilot-proof" className="font-display text-lg font-semibold text-(--ink)">Proof and savings</h3>
@@ -106,12 +113,14 @@ export function RecoveryAutopilotHome({
 
 function CandidateSection({
   title,
+  detail,
   empty,
   items,
   onVeto,
   pendingVetoId,
 }: {
   title: string;
+  detail?: string;
   empty: string;
   items: readonly AutopilotCandidateDto[];
   onVeto?: (candidateId: string) => void;
@@ -121,6 +130,7 @@ function CandidateSection({
   return (
     <section className="rounded-2xl border border-line bg-card p-4" aria-labelledby={headingId}>
       <h3 id={headingId} className="font-display text-lg font-semibold text-(--ink)">{title}</h3>
+      {detail ? <p className="mt-2 text-sm leading-6 text-(--muted)">{detail}</p> : null}
       {items.length ? (
         <ul className="mt-3 grid gap-3">
           {items.map((item) => {

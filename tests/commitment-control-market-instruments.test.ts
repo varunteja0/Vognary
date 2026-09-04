@@ -43,6 +43,7 @@ test("the private Commitment Control CRM has a committed schema and stays gitign
     "pain_class",
     "repeated_job_status",
     "job_selected",
+    "idea_candidate_observed",
     "enforcement_requirement",
     "next_event_committed_at",
     "spend_threshold_confirmed_at",

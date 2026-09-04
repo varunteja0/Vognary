@@ -19,10 +19,12 @@ import {
   decideCommitmentControlProposal,
   putCommitmentControlPolicy,
   reconcileCommitmentControlProposal,
+  recordCommitmentControlExceptionReview,
+  recordCommitmentControlOutcomeObservation,
 } from "../../src/lib/server/commitment-control-store";
 import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
 import { createWorkspaceInvite } from "../../src/lib/server/workspace-invite-store";
-import { completeControlPolicyRequest } from "../commitment-control-policy-fixture";
+import { completeControlPolicyRequest, testControlOutcome } from "../commitment-control-policy-fixture";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
 process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "*";
@@ -219,6 +221,7 @@ test("privacy export includes held product data and excludes all credential mate
         firstChargeDate: recoveryDates.renews_on,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
+        intendedOutcome: testControlOutcome(),
       },
     });
     const controlDecision = await decideCommitmentControlProposal({
@@ -227,8 +230,19 @@ test("privacy export includes held product data and excludes all credential mate
       proposalId: controlProposal.data.proposal.id,
       expectedVersion: controlProposal.workspaceVersion,
       idempotencyKey: `privacy-control-decision:${randomUUID()}`,
-      request: { action: "APPROVE_WITH_CAP", approvedCapMinor: "180000" },
+      request: {
+        action: "APPROVE_WITH_CAP",
+        approvedCapMinor: "180000",
+        authorizationExpiresOn: "2099-12-30",
+      },
     });
+    await pool.query(
+      `insert into commitment_control_attention_notifications (
+         workspace_id, proposal_id, recipient_user_id, attention_kind, due_on,
+         delivery_state, next_attempt_at
+       ) values ($1, $2, $3, 'OUTCOME_REVIEW_APPROACHING', '2099-12-31', 'QUEUED', now())`,
+      [workspaceId, controlProposal.data.proposal.id, userId],
+    );
     const controlEvidenceId = (await pool.query<{ id: string }>(
       `select id from recovery_evidence where workspace_id = $1 order by created_at asc limit 1`,
       [workspaceId],
@@ -240,7 +254,90 @@ test("privacy export includes held product data and excludes all credential mate
       proposalId: controlProposal.data.proposal.id,
       expectedVersion: controlDecision.workspaceVersion,
       idempotencyKey: `privacy-control-reconciliation:${randomUUID()}`,
-      request: { evidenceId: controlEvidenceId },
+      request: {
+        evidenceId: controlEvidenceId,
+        observedOutcome: { value: "12", observedOn: "2099-12-31" },
+      },
+      now: new Date("2099-12-31T09:00:00.000Z"),
+    });
+    const controlReconciliationId = (await pool.query<{ id: string }>(
+      `select id from commitment_control_reconciliations where workspace_id = $1 order by reconciled_at desc limit 1`,
+      [workspaceId],
+    )).rows[0]?.id;
+    assert.ok(controlReconciliationId);
+    await pool.query(
+      `insert into commitment_control_attention_notifications (
+         workspace_id, proposal_id, recipient_user_id, attention_kind, due_on,
+         target_kind, target_id, delivery_state, next_attempt_at
+       ) values ($1, $2, $3, 'RECONCILIATION_EXCEPTION', '2099-12-31', 'RECONCILIATION', $4, 'QUEUED', now())`,
+      [workspaceId, controlProposal.data.proposal.id, userId, controlReconciliationId],
+    );
+    const workspaceVersion = Number((await pool.query<{ version: string }>(
+      `select version::text from recovery_workspace_states where workspace_id = $1`,
+      [workspaceId],
+    )).rows[0]?.version ?? 0);
+    const controlExceptionReview = await recordCommitmentControlExceptionReview({
+      workspaceId,
+      actorUserId: userId,
+      proposalId: controlProposal.data.proposal.id,
+      expectedVersion: workspaceVersion,
+      idempotencyKey: `privacy-control-review:${randomUUID()}`,
+      request: {
+        targetKind: "RECONCILIATION",
+        targetId: controlReconciliationId,
+        disposition: "NO_FURTHER_ACTION",
+        note: "The vendor credited the difference outside Vognary.",
+      },
+    });
+    assert.equal(controlExceptionReview.data.review.targetKind, "RECONCILIATION");
+
+    const standaloneProposal = await createCommitmentControlProposal({
+      workspaceId,
+      actorUserId: userId,
+      expectedVersion: controlExceptionReview.workspaceVersion,
+      idempotencyKey: `privacy-control-standalone-proposal:${randomUUID()}`,
+      request: {
+        merchant: "Anthropic",
+        purpose: "Evaluation capacity",
+        category: "AI_MODEL",
+        amountMinor: "120000",
+        currency: "INR",
+        firstChargeDate: recoveryDates.renews_on,
+        cadence: "MONTHLY",
+        existingCommitmentIds: [],
+        intendedOutcome: testControlOutcome(),
+      },
+    });
+    const standaloneDecision = await decideCommitmentControlProposal({
+      workspaceId,
+      actorUserId: userId,
+      proposalId: standaloneProposal.data.proposal.id,
+      expectedVersion: standaloneProposal.workspaceVersion,
+      idempotencyKey: `privacy-control-standalone-decision:${randomUUID()}`,
+      request: { action: "APPROVE", authorizationExpiresOn: "2099-12-30" },
+    });
+    const standaloneObservation = await recordCommitmentControlOutcomeObservation({
+      workspaceId,
+      actorUserId: userId,
+      proposalId: standaloneProposal.data.proposal.id,
+      expectedVersion: standaloneDecision.workspaceVersion,
+      idempotencyKey: `privacy-control-standalone-outcome:${randomUUID()}`,
+      request: { observedOutcome: { value: "3", observedOn: "2099-12-31" } },
+      now: new Date("2099-12-31T09:00:00.000Z"),
+    });
+    assert.equal(standaloneObservation.data.observation.verdict, "MISSED");
+    await recordCommitmentControlExceptionReview({
+      workspaceId,
+      actorUserId: userId,
+      proposalId: standaloneProposal.data.proposal.id,
+      expectedVersion: standaloneObservation.workspaceVersion,
+      idempotencyKey: `privacy-control-standalone-review:${randomUUID()}`,
+      request: {
+        targetKind: "OUTCOME_OBSERVATION",
+        targetId: standaloneObservation.data.observation.id,
+        disposition: "CORRECTED_OUTSIDE_VOGNARY",
+        note: "The team changed the plan directly with the vendor.",
+      },
     });
     await createWorkspaceInvite({
       workspaceId,
@@ -294,13 +391,51 @@ test("privacy export includes held product data and excludes all credential mate
     assert.equal(document.recovery.commitmentEvidence.length, 3);
     assert.equal(document.recovery.decisions.length, 0);
     assert.equal(document.commitmentControl.policies.length, 1);
-    assert.equal(document.commitmentControl.proposals.length, 1);
+    assert.equal(document.commitmentControl.proposals.length, 2);
     assert.equal(document.commitmentControl.proposals[0].assumptionBasis, "USER_ENTERED_ASSUMPTION");
-    assert.equal(document.commitmentControl.evaluations.length, 1);
-    assert.equal(document.commitmentControl.decisions.length, 1);
+    assert.equal(document.commitmentControl.proposals[0].submittedByDisplayName, "Export Owner");
+    assert.equal(document.commitmentControl.proposals[0].intendedOutcomeMetric, "Resolved fixture tasks");
+    assert.equal(document.commitmentControl.proposals[0].intendedOutcomeTargetValue, "10");
+    assert.equal(document.commitmentControl.proposals[0].intendedOutcomeReviewOn, "2099-12-31");
+    assert.equal(document.commitmentControl.evaluations.length, 2);
+    assert.equal(document.commitmentControl.evaluations[0].citedExposureBasis, "NONE");
+    assert.equal(document.commitmentControl.decisions.length, 2);
     assert.equal(document.commitmentControl.decisions[0].approvedCapMinor, "180000");
+    assert.equal(document.commitmentControl.decisions[0].decidedByDisplayName, "Export Owner");
+    assert.equal(document.commitmentControl.decisions[0].overrideReason, null);
+    assert.equal(document.commitmentControl.decisions[0].authorizationExpiresOn, "2099-12-30");
     assert.equal(document.commitmentControl.reconciliations.length, 1);
     assert.equal(document.commitmentControl.reconciliations[0].verdict, "OVER_CAP");
+    assert.equal(document.commitmentControl.reconciliations[0].observedOutcomeValue, "12");
+    assert.match(document.commitmentControl.reconciliations[0].observedEvidenceDate, /^\d{4}-\d{2}-\d{2}$/);
+    assert.equal(document.commitmentControl.reconciliations[0].outcomeObservationBasis, "USER_ENTERED_OBSERVATION");
+    assert.equal(document.commitmentControl.reconciliations[0].outcomeVerdict, "MET");
+    assert.equal(document.commitmentControl.outcomeObservations.length, 1);
+    assert.equal(document.commitmentControl.outcomeObservations[0].verdict, "MISSED");
+    assert.equal(document.commitmentControl.outcomeObservations[0].observedValue, "3");
+    assert.equal(document.commitmentControl.outcomeObservations[0].observationBasis, "USER_ENTERED_OBSERVATION");
+    assert.equal(document.commitmentControl.outcomeObservations[0].targetMetric, "Resolved fixture tasks");
+    assert.equal(document.commitmentControl.exceptionReviews.length, 2);
+    assert.deepEqual(
+      document.commitmentControl.exceptionReviews.map((review: Record<string, unknown>) => review.disposition).sort(),
+      ["CORRECTED_OUTSIDE_VOGNARY", "NO_FURTHER_ACTION"],
+    );
+    assert.equal(document.commitmentControl.attentionNotifications.length, 2);
+    const untargetedNotification = document.commitmentControl.attentionNotifications
+      .find((entry: Record<string, unknown>) => entry.attentionKind === "OUTCOME_REVIEW_APPROACHING");
+    const targetedNotification = document.commitmentControl.attentionNotifications
+      .find((entry: Record<string, unknown>) => entry.attentionKind === "RECONCILIATION_EXCEPTION");
+    assert.equal(untargetedNotification.proposalId, controlProposal.data.proposal.id);
+    assert.equal(untargetedNotification.recipientUserId, userId);
+    assert.equal(untargetedNotification.deliveryState, "QUEUED");
+    assert.equal(untargetedNotification.targetKind, null);
+    assert.equal(untargetedNotification.targetId, null);
+    assert.equal(targetedNotification.targetKind, "RECONCILIATION");
+    assert.equal(targetedNotification.targetId, controlReconciliationId);
+    for (const notification of document.commitmentControl.attentionNotifications) {
+      assert.equal("lockedBy" in notification, false);
+      assert.equal("lockedAt" in notification, false);
+    }
     assert.equal(document.commitmentControl.workspaceInvites.length, 1);
     assert.equal(
       document.commitmentControl.workspaceInvites.some((invite: Record<string, unknown>) => "tokenHash" in invite || "token_hash" in invite),

@@ -27,17 +27,37 @@ export const requiredAutopilotIntegrityMigrations = [
   "0057_commitment_control_v0",
   "0058_workspace_invites",
   "0059_control_authority_hardening",
+  "0060_control_outcome_authorization_window",
+  "0061_control_outcome_observation_honesty",
+  "0062_control_outcome_basis_constraint_name",
+  "0063_control_authorization_expiry_verdict",
+  "0064_control_expired_verdict_integrity",
+  "0065_control_attention_outbox",
+  "0066_control_attention_provider_events",
+  "0067_control_follow_through",
+  "0068_control_attention_target_identity",
 ];
 export const pre0057IntegrityMigrations = requiredAutopilotIntegrityMigrations.filter(
   (migration) =>
     migration !== "0057_commitment_control_v0"
     && migration !== "0058_workspace_invites"
-    && migration !== "0059_control_authority_hardening",
+    && migration !== "0059_control_authority_hardening"
+    && migration !== "0060_control_outcome_authorization_window"
+    && migration !== "0061_control_outcome_observation_honesty"
+    && migration !== "0062_control_outcome_basis_constraint_name"
+    && migration !== "0063_control_authorization_expiry_verdict"
+    && migration !== "0064_control_expired_verdict_integrity"
+    && migration !== "0065_control_attention_outbox"
+    && migration !== "0066_control_attention_provider_events"
+    && migration !== "0067_control_follow_through"
+    && migration !== "0068_control_attention_target_identity",
 );
 export const requiredAutopilotIntegrityTriggers = [
   "commitment_control_decisions_immutable",
   "commitment_control_evaluation_evidence_immutable",
   "commitment_control_evaluations_immutable",
+  "commitment_control_exception_reviews_immutable",
+  "commitment_control_outcome_observations_immutable",
   "commitment_control_policies_immutable",
   "commitment_control_proposals_immutable",
   "commitment_control_reconciliations_immutable",
@@ -79,6 +99,8 @@ export const requiredCommitmentControlCountKeys = [
   "commitment_control_evaluation_evidence",
   "commitment_control_decisions",
   "commitment_control_reconciliations",
+  "commitment_control_outcome_observations",
+  "commitment_control_exception_reviews",
 ];
 
 export const backupVerificationProfiles = ["pre-0053", "pre-0057", "current"];
@@ -145,6 +167,8 @@ export function requiredRecoveryTablesForProfile(value) {
     "commitment_control_evaluation_evidence",
     "commitment_control_decisions",
     "commitment_control_reconciliations",
+    "commitment_control_outcome_observations",
+    "commitment_control_exception_reviews",
   ];
 }
 
@@ -170,7 +194,7 @@ function verificationProfile(value) {
   }
   return {
     profile,
-    migrationHead: "0059_control_authority_hardening",
+    migrationHead: "0068_control_attention_target_identity",
     requiredMigrations: [requiredRecoveryMigration, ...requiredAutopilotIntegrityMigrations],
     integrityMigrations: requiredAutopilotIntegrityMigrations,
     requiredTriggers: requiredAutopilotIntegrityTriggers,
@@ -285,7 +309,9 @@ const pre0057CountQuery =
       (select count(*)::text from commitment_control_evaluations) as commitment_control_evaluations,
       (select count(*)::text from commitment_control_evaluation_evidence) as commitment_control_evaluation_evidence,
       (select count(*)::text from commitment_control_decisions) as commitment_control_decisions,
-      (select count(*)::text from commitment_control_reconciliations) as commitment_control_reconciliations`;
+      (select count(*)::text from commitment_control_reconciliations) as commitment_control_reconciliations,
+      (select count(*)::text from commitment_control_outcome_observations) as commitment_control_outcome_observations,
+      (select count(*)::text from commitment_control_exception_reviews) as commitment_control_exception_reviews`;
 
 export function recoveryBackupVerificationMatches(expected, actual) {
   if (!expected || expected.requiredMigration !== requiredRecoveryMigration) return false;

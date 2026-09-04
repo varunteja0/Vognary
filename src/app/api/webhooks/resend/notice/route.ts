@@ -5,6 +5,8 @@ import { noticeProviderEventTypes } from "@/lib/recovery/notice-delivery";
 import { hasAutopilotNoticeTag } from "@/lib/recovery/notice-payload";
 import { isDatabaseConfigured } from "@/lib/server/database";
 import { autopilotNoticeWebhookSecret } from "@/lib/server/autopilot-mailer";
+import { hasControlAttentionTag } from "@/lib/server/commitment-control-attention-mailer";
+import { applyControlAttentionProviderEvent } from "@/lib/server/commitment-control-attention-store";
 import { applyAutopilotNoticeEvent } from "@/lib/server/recovery-autopilot-store";
 import {
   assertContentType,
@@ -62,7 +64,8 @@ export async function POST(request: Request) {
   const providerMessageId = typeof data?.email_id === "string" ? data.email_id.trim() : "";
   const occurredAt = typeof record?.created_at === "string" ? record.created_at : "";
   if (providerMessageId.length < 8 || !occurredAt) return json("ignored");
-  if (!hasAutopilotNoticeTag(data?.tags)) return json("ignored");
+  const controlAttentionEvent = hasControlAttentionTag(data?.tags);
+  if (!controlAttentionEvent && !hasAutopilotNoticeTag(data?.tags)) return json("ignored");
 
   const rate = await rateLimit(request, {
     namespace: "resend-notice-webhook",
@@ -72,6 +75,18 @@ export async function POST(request: Request) {
     identity: "provider:resend-notice",
   });
   if (!rate.allowed) return json("retry", 503);
+
+  if (controlAttentionEvent) {
+    const occurred = new Date(occurredAt);
+    if (Number.isNaN(occurred.getTime())) return json("ignored");
+    const controlResult = await applyControlAttentionProviderEvent({
+      type: type as (typeof noticeProviderEventTypes)[number],
+      providerMessageId,
+      occurredAt: occurred,
+    });
+    if (controlResult.result === "pending") return json("pending", 503);
+    return json(controlResult.result);
+  }
 
   const result = await applyAutopilotNoticeEvent({
     providerEventId: svixId,

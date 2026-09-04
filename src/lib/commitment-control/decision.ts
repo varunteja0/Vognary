@@ -1,5 +1,6 @@
 import type { ProposalPolicyEvaluation } from "./policy";
 import { normalizeCurrency, parsePositiveMinorUnits, requireUuid } from "./money";
+import { normalizeControlDateOnly } from "./outcome";
 
 export const proposalDecisionActions = ["APPROVE", "APPROVE_WITH_CAP", "DECLINE"] as const;
 export type ProposalDecisionAction = typeof proposalDecisionActions[number];
@@ -14,6 +15,7 @@ export type AuthorizedProposalDecision = {
   expectedAmountMinor: string;
   decidedByUserId: string | null;
   decidedAt: string;
+  authorizationExpiresOn: string | null;
   overrideReason: string | null;
 };
 
@@ -23,6 +25,8 @@ export function authorizeProposalDecision(input: {
   evaluation: ProposalPolicyEvaluation;
   action: ProposalDecisionAction;
   approvedCapMinor?: string;
+  authorizationExpiresOn?: string;
+  outcomeReviewOn?: string;
   decidedAt?: string;
   submittedByUserId?: string | null;
   authorizingAdminCount?: number;
@@ -59,6 +63,21 @@ export function authorizeProposalDecision(input: {
   }
   const decidedAt = new Date(input.decidedAt ?? new Date().toISOString());
   if (Number.isNaN(decidedAt.getTime())) throw new Error("Decision timestamp is invalid.");
+  let authorizationExpiresOn: string | null = null;
+  if (input.action === "DECLINE") {
+    if (input.authorizationExpiresOn !== undefined) throw new Error("DECLINE cannot carry an authorization expiry.");
+  } else {
+    authorizationExpiresOn = normalizeControlDateOnly(input.authorizationExpiresOn, "Authorization expiry");
+    if (authorizationExpiresOn < decidedAt.toISOString().slice(0, 10)) {
+      throw new Error("Authorization expiry cannot be before the decision date.");
+    }
+    if (input.outcomeReviewOn !== undefined) {
+      const outcomeReviewOn = normalizeControlDateOnly(input.outcomeReviewOn, "Outcome review date");
+      if (authorizationExpiresOn > outcomeReviewOn) {
+        throw new Error("Authorization expiry cannot be after the outcome review date.");
+      }
+    }
+  }
   return {
     proposalId: requireUuid(input.evaluation.proposal.proposalId, "Proposal id"),
     evaluationPolicyVersion: input.evaluation.policyVersion,
@@ -68,6 +87,7 @@ export function authorizeProposalDecision(input: {
     expectedAmountMinor: expectedAmount.toString(),
     decidedByUserId: requireUuid(input.actorUserId, "Decision actor id"),
     decidedAt: decidedAt.toISOString(),
+    authorizationExpiresOn,
     overrideReason: input.evaluation.status === "OUTSIDE_POLICY" && input.action !== "DECLINE"
       ? (input.overrideReason?.trim() ?? "")
       : null,

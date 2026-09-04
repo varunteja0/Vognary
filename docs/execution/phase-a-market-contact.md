@@ -80,6 +80,23 @@ rail-neutral record that preserves evidence, policy, actor, decision, and frozen
 cap, then reconciles observed evidence. It is not a rename and must never imply
 that Vognary blocks a card, API call, purchase, or payment.
 
+Every completed conversation also classifies the event the buyer will actually
+bring, using `idea_candidate_observed`. This is an entry-path test, not three
+products or a public rename:
+
+| Value | Count only when |
+| --- | --- |
+| `AI_SPEND_CHANGE_CONTROL` | The buyer commits an upcoming human-initiated AI or cloud obligation that needs a named decision, cap, expiry, and later outcome proof. |
+| `RECOVERY_FIRST_CONTROL` | The buyer starts with an observed bill or variance and commits to use that evidence to govern the next cycle. |
+| `AGENT_SPEND_AUTHORIZATION` | An AI agent or automated workflow initiated the proposed spend or action, while a named human remains responsible for its cap and outcome. |
+| `NONE` | A completed conversation produces no qualifying committed event for any candidate. |
+| `UNMEASURED` | The conversation did not establish enough evidence to classify the event. |
+
+A concrete candidate value requires `conversation_at`. Praise, macro market
+interest, or a hypothetical event stays `UNMEASURED`; the reporter rejects a
+concrete value without a recorded conversation. The existing C1/R2/C3 desk below
+remains a narrower operator test and cannot manufacture a broad candidate win.
+
 ### Five-call C3 candidate desk — run before more product code
 
 This desk tests one candidate against two rival explanations of the same buyer
@@ -193,6 +210,7 @@ independent `test_cell` vocabulary is
 | `pain_class` | enum | `PRE_SPEND` \| `POST_SPEND` \| `BOTH` \| `NONE` \| `UNMEASURED` |
 | `repeated_job_status` | enum | `YES` \| `NO` \| `UNMEASURED`; `YES` requires at least two concrete instances or a buyer-stated recurring cadence |
 | `job_selected` | enum | `PRE_SPEND` \| `RECOVERY` \| `DECISION_TO_OUTCOME` \| `NONE` \| `UNMEASURED`; based on the event the buyer will bring, not stated preference |
+| `idea_candidate_observed` | enum | `AI_SPEND_CHANGE_CONTROL` \| `RECOVERY_FIRST_CONTROL` \| `AGENT_SPEND_AUTHORIZATION` \| `NONE` \| `UNMEASURED`; concrete values require `conversation_at` and a buyer-committed event, not stated preference |
 | `enforcement_requirement` | enum | `ADVISORY_ACCEPTED` \| `NEEDS_ENFORCEMENT` \| `UNMEASURED` |
 | `next_event_committed_at` | datetime | Buyer committed to bring a qualifying upcoming or recent event; a compliment is not a commitment |
 | `spend_threshold_confirmed_at` | datetime | Buyer confirmed ≥₹8 lakh/month controllable exposure; public proxies do not count |
@@ -285,25 +303,28 @@ Ask about the last real financial obligation; do not explain Vognary until quest
 | 9–12 | “Show me how that approval happened — message, call, sheet, accounting tool, or nothing.” | Actual incumbent behavior, not feature preference |
 | 12–15 | “Could you reconstruct the original evidence, policy, person, cap, and what the later bill showed?” | Whether the missing job is pre-spend, Recovery, or decision-to-outcome |
 | 15–17 | “If Vognary records and proves the decision but does not block the card or API, is that useful enough to adopt?” | `ADVISORY_ACCEPTED` or `NEEDS_ENFORCEMENT` without negotiating the boundary |
-| 17–20 | Explain the Authorization Ledger in one sentence and ask which qualifying upcoming or recent event they will bring next. | `job_selected`, `next_event_committed_at`, and working-session behavior — not praise |
+| 17–20 | Explain the Authorization Ledger in one sentence and ask which qualifying upcoming or recent event they will bring next, including whether a human, agent, or automation initiated it. | `job_selected`, `idea_candidate_observed`, `next_event_committed_at`, and working-session behavior — not praise |
 
 Classify the conversation the same day. Ask the same rival-job and enforcement questions in all three cells. If most buyers bring post-hoc bill evidence, that supports Recovery as the wedge, not Commitment Control. If they require cards or money movement to pay, record `NEEDS_ENFORCEMENT`; do not build rails.
 
 ### Cell scorecard and decision rule
 
-For each cell report only aggregate counts: completed conversations, concrete
-repeated jobs, committed next/recent events, advisory accepted, enforcement
-required, explicit offers, invoice commitments, invoices, and cleared payments.
-Do not average the cells. Choose one winner only when it reaches **3/5 concrete
-repeated jobs + 2/5 committed events + 1/5 payment or invoice commitment**.
-The company still requires ten offers and two cleared payments to proceed.
+For each buyer-cell × idea-candidate pair report only aggregate counts: completed
+conversations in the cell, candidate observations, concrete repeated jobs,
+committed next/recent events, and payment or invoice commitments. Also report
+cell-level advisory acceptance, enforcement requirements, offers, invoices, and
+cleared payments. Do not average cells or candidates. A pair is a directional
+winner only after the cell completes five conversations and that candidate
+reaches **3/5 concrete repeated jobs + 2/5 committed events + 1/5 payment or
+invoice commitment**. Multiple qualifying pairs remain explicitly multiple;
+the company still requires ten offers and two cleared payments to proceed.
 
 ## 5. Fourteen-day execution cadence
 
 | Day | Founder action | Evidence |
 | ---: | --- | --- |
 | 1–3 | Verify current role evidence and complete the 12 remaining touches across the prepared 5/5/5 cohorts | `test_cell`, public evidence, `contacted_at`; do not route around channel restrictions |
-| 2–10 | Complete five behavioral conversations per cell; collect no real customer financial data in Vognary before independent security clearance | `replied_at`, `conversation_at`, `job_selected`, `enforcement_requirement`, minimum necessary notes |
+| 2–10 | Complete five behavioral conversations per cell; collect no real customer financial data in Vognary before independent security clearance | `replied_at`, `conversation_at`, `job_selected`, `idea_candidate_observed`, `enforcement_requirement`, minimum necessary notes |
 | 4–12 | Ask credible buyers to commit one qualifying upcoming or recent event and make the identical one-time ₹14,999 offer until ten offers are recorded | `next_event_committed_at`, `offer_at`, `invoice_commitment_at` |
 | 13–14 | Apply the cell winner rule and two-payment company gate using cleared funds only; payment grants no data access before assurance clearance | One `WIN / REWORK / KILL` decision in CONTINUE-HERE and the scoreboard |
 

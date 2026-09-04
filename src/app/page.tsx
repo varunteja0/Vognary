@@ -11,7 +11,7 @@ const jsonLd = {
   applicationSubCategory: "Commitment Control",
   operatingSystem: "Web",
   url: "https://www.vognary.com/",
-  description: "Vognary is Commitment Control: propose a spend, see cited exposure and policy, then a named human freezes a cap. Later receipts prove the outcome.",
+  description: "Vognary is Commitment Control: propose a spend, see cited exposure and policy, then a named human freezes a cap and expiry. Later receipts prove observed cost; outcome observations stay labelled as user-entered.",
   featureList: [
     "User-entered proposals labeled as assumptions",
     "Cited existing exposure and versioned policy",

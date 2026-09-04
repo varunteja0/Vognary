@@ -31,6 +31,7 @@ const decision: AuthorizedProposalDecision = {
   expectedAmountMinor: "12500",
   decidedByUserId: actorId,
   decidedAt: issuedAt,
+  authorizationExpiresOn: "2026-09-02",
   overrideReason: null,
 };
 
@@ -306,6 +307,7 @@ test("later evidence reconciles against the frozen authorization without mutatin
       evidenceId: "e1000000-0000-4000-8000-000000000001",
       amountMinor: "11000",
       currency: "USD",
+      evidenceDate: "2026-09-02",
     },
   });
   assert.equal(result.verdict, "OVER_CAP");
@@ -420,6 +422,7 @@ test("reconciliation requires the complete frozen decision identity", async () =
         evidenceId: "e1000000-0000-4000-8000-000000000001",
         amountMinor: "11000",
         currency: "USD",
+        evidenceDate: "2026-09-02",
       },
     }),
     /policy version/i,
@@ -432,6 +435,7 @@ test("reconciliation requires the complete frozen decision identity", async () =
         evidenceId: "e1000000-0000-4000-8000-000000000001",
         amountMinor: "11000",
         currency: "USD",
+        evidenceDate: "2026-09-02",
       },
     }),
     /expected amount/i,
@@ -444,6 +448,7 @@ test("reconciliation requires the complete frozen decision identity", async () =
         evidenceId: "e1000000-0000-4000-8000-000000000001",
         amountMinor: "11000",
         currency: "USD",
+        evidenceDate: "2026-09-02",
       },
     }),
     /decision actor/i,
@@ -562,6 +567,7 @@ test("reconciliation binds every semantically relevant decision field", async ()
     evidenceId: "e1000000-0000-4000-8000-000000000001",
     amountMinor: "11000",
     currency: "USD",
+    evidenceDate: "2026-09-02",
   };
   const mutations: Array<{ field: keyof AuthorizedProposalDecision; value: AuthorizedProposalDecision }> = [
     { field: "proposalId", value: { ...decision, proposalId: "b1000000-0000-4000-8000-000000000099" } },

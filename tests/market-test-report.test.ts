@@ -23,6 +23,7 @@ const header = [
   "conversation_at",
   "repeated_job_status",
   "job_selected",
+  "idea_candidate_observed",
   "enforcement_requirement",
   "next_event_committed_at",
   "offer_at",
@@ -82,6 +83,93 @@ test("company gate separates incomplete, rework, failure, and go using cleared p
   assert.equal(summarizeMarketTest(baseRows.map((entry, index) => ({ ...entry, payment_received_at: index === 0 ? "2026-09-12" : "" }))).companyGate.status, "REWORK");
   assert.equal(summarizeMarketTest(baseRows.map((entry, index) => ({ ...entry, payment_received_at: index < 2 ? "2026-09-12" : "" }))).companyGate.status, "GO");
   assert.equal(summarizeMarketTest(baseRows.slice(0, 9)).companyGate.status, "INCOMPLETE");
+});
+
+test("idea tournament selects one buyer-cell and observed job without averaging cells", () => {
+  const directFinance = Array.from({ length: 5 }, (_, index) => ({
+    id: `P0${index + 1}`,
+    test_cell: "DIRECT_FINANCE",
+    conversation_at: "2026-09-08",
+    repeated_job_status: index < 3 ? "YES" : "NO",
+    idea_candidate_observed: index < 3 ? "AI_SPEND_CHANGE_CONTROL" : "NONE",
+    next_event_committed_at: index < 2 ? "2026-09-09" : "",
+    invoice_commitment_at: index === 0 ? "2026-09-10" : "",
+  }));
+  const fractionalFinance = Array.from({ length: 5 }, (_, index) => ({
+    id: `P1${index + 1}`,
+    test_cell: "FRACTIONAL_FINANCE",
+    conversation_at: "2026-09-08",
+    repeated_job_status: index < 2 ? "YES" : "NO",
+    idea_candidate_observed: index < 2 ? "RECOVERY_FIRST_CONTROL" : "NONE",
+    next_event_committed_at: index === 0 ? "2026-09-09" : "",
+  }));
+
+  const summary = summarizeMarketTest([...directFinance, ...fractionalFinance]);
+  assert.equal(summary.ideaTournament.status, "WIN_CANDIDATE");
+  assert.deepEqual(summary.ideaTournament.winnerPairs, [{
+    testCell: "DIRECT_FINANCE",
+    ideaCandidate: "AI_SPEND_CHANGE_CONTROL",
+  }]);
+  assert.equal(summary.ideaTournament.candidates.AI_SPEND_CHANGE_CONTROL.observed, 3);
+  assert.equal(summary.ideaTournament.candidates.RECOVERY_FIRST_CONTROL.observed, 2);
+  assert.equal(summary.ideaTournament.candidates.AGENT_SPEND_AUTHORIZATION.observed, 0);
+  assert.equal(
+    summary.ideaTournament.pairs.DIRECT_FINANCE.AI_SPEND_CHANGE_CONTROL.directionalGate,
+    "WIN_CANDIDATE",
+  );
+  assert.equal(
+    summary.ideaTournament.pairs.FRACTIONAL_FINANCE.RECOVERY_FIRST_CONTROL.directionalGate,
+    "INCOMPLETE",
+  );
+
+  const secondWinner = fractionalFinance.map((entry, index) => ({
+    ...entry,
+    repeated_job_status: index < 3 ? "YES" : "NO",
+    idea_candidate_observed: index < 3 ? "RECOVERY_FIRST_CONTROL" : "NONE",
+    next_event_committed_at: index < 2 ? "2026-09-09" : "",
+    invoice_commitment_at: index === 0 ? "2026-09-10" : "",
+  }));
+  const multiple = summarizeMarketTest([...directFinance, ...secondWinner]);
+  assert.equal(multiple.ideaTournament.status, "MULTIPLE_CANDIDATES");
+  assert.equal(multiple.ideaTournament.winnerPairs.length, 2);
+
+  const output = formatMarketTestReport(summary);
+  assert.match(output, /Idea gate WIN_CANDIDATE/);
+  assert.match(output, /DIRECT_FINANCE.*AI_SPEND_CHANGE_CONTROL/);
+  assert.doesNotMatch(output, /P0[1-5]|P1[1-5]/);
+});
+
+test("idea candidates fail closed when invented or recorded without a conversation", () => {
+  assert.throws(
+    () => parseMarketTestCsv([header, row({
+      id: "P01",
+      conversation_at: "2026-09-08",
+      idea_candidate_observed: "MAGIC_GLOBAL_WINNER",
+    })].join("\n")),
+    /invalid idea_candidate_observed/i,
+  );
+  assert.throws(
+    () => parseMarketTestCsv([header, row({
+      id: "P01",
+      idea_candidate_observed: "AGENT_SPEND_AUTHORIZATION",
+    })].join("\n")),
+    /idea_candidate_observed requires conversation_at/i,
+  );
+  assert.throws(
+    () => parseMarketTestCsv([header, row({
+      id: "P01",
+      idea_candidate_observed: "UNMEASURED",
+    })].join("\n")),
+    /idea_candidate_observed requires conversation_at/i,
+  );
+  assert.throws(
+    () => parseMarketTestCsv([header, row({
+      id: "P01",
+      conversation_at: "2026-09-08",
+      idea_candidate_observed: "AGENT_SPEND_AUTHORIZATION",
+    })].join("\n")),
+    /idea_candidate_observed requires next_event_committed_at/i,
+  );
 });
 
 test("cohort gate requires public evidence rather than five assigned labels", () => {

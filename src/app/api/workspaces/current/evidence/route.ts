@@ -6,6 +6,10 @@ import {
   recoveryFailureResponse,
   recoverySuccessResponse,
 } from "@/lib/server/recovery-api";
+import {
+  refreshControlAttentionAfterMutation,
+  type ControlAttentionProjectionStatus,
+} from "@/lib/server/commitment-control-attention-trigger";
 import { recordProductEvent } from "@/lib/server/product-event-store";
 import { readRecoveryJson, runRecoveryRoute } from "@/lib/server/recovery-route";
 import { submitRecoveryEvidence } from "@/lib/server/recovery-store";
@@ -30,6 +34,7 @@ export async function POST(request: Request) {
       request: body,
       ...preconditions,
     });
+    let attentionProjection: ControlAttentionProjectionStatus | undefined;
     if (!result.replayed && result.data.submission.acceptedEvidenceCount > 0) {
       await recordProductEvent({
         workspaceId: session.workspaceId,
@@ -43,6 +48,19 @@ export async function POST(request: Request) {
         },
       }).catch(() => undefined);
     }
-    return recoverySuccessResponse(result.data, requestId, result.workspaceVersion, result.replayed ? 200 : 201);
+    if (result.data.submission.acceptedEvidenceCount > 0) {
+      attentionProjection = await refreshControlAttentionAfterMutation({
+        workspaceId: session.workspaceId,
+        requestId,
+        routePath: "/api/workspaces/current/evidence",
+      });
+    }
+    return recoverySuccessResponse(
+      result.data,
+      requestId,
+      result.workspaceVersion,
+      result.replayed ? 200 : 201,
+      attentionProjection ? { attentionProjection } : {},
+    );
   });
 }

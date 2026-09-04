@@ -8,6 +8,7 @@ import {
   recoverySuccessResponse,
 } from "@/lib/server/recovery-api";
 import { readCommitmentControlRequest } from "@/lib/server/commitment-control-route";
+import { refreshControlAttentionAfterMutation } from "@/lib/server/commitment-control-attention-trigger";
 import { runRecoveryRoute } from "@/lib/server/recovery-route";
 import { createCommitmentControlProposal } from "@/lib/server/commitment-control-store";
 
@@ -30,6 +31,17 @@ export async function POST(request: Request) {
       request: body,
       ...preconditions,
     });
-    return recoverySuccessResponse(result.data, requestId, result.workspaceVersion, result.replayed ? 200 : 201);
+    const attentionProjection = await refreshControlAttentionAfterMutation({
+      workspaceId: session.workspaceId,
+      requestId,
+      routePath: "/api/workspaces/current/control/proposals",
+    });
+    return recoverySuccessResponse(
+      result.data,
+      requestId,
+      result.workspaceVersion,
+      result.replayed ? 200 : 201,
+      { attentionProjection },
+    );
   });
 }

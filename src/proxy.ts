@@ -148,6 +148,6 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/index.md",
-    "/((?!api|_next/static|_next/image|autopilot|pwa|favicon.ico|icon.svg|apple-icon|opengraph-image.png|twitter-image.png|manifest.webmanifest|robots.txt|sitemap.xml|llms.txt|sw.js).*)",
+    "/((?!api|_next/static|_next/image|autopilot|pwa|favicon.ico|icon.svg|apple-icon|opengraph-image.png|twitter-image.png|manifest.webmanifest|robots.txt|sitemap.xml|llms.txt|demo.md|feed.json|feed.xml|sw.js).*)",
   ],
 };

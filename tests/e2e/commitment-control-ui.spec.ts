@@ -19,6 +19,13 @@ import { evidencePath } from "./evidence";
 const email = process.env.VOGNARY_E2E_DEV_LOGIN_EMAIL;
 const accessCode = process.env.VOGNARY_E2E_DEV_LOGIN_CODE;
 
+const controlToday = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kolkata",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+}).format(new Date());
+
 test.skip(!email || !accessCode, "development login env not configured");
 
 const money = { currency: "INR", minor: "199900", exponent: 2, display: "₹1,999.00" };
@@ -39,6 +46,12 @@ const commitment = {
   decision: null,
   evidenceCount: 1,
   updatedAt: "2026-08-09T10:00:00.000Z",
+};
+
+const merchantTextMatchCommitment = {
+  ...commitment,
+  id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  merchant: "Anthropic",
 };
 
 const evidenceId = "22222222-2222-4222-8222-222222222222";
@@ -163,11 +176,18 @@ const proposal = {
   category: "AI_MODEL",
   amountMinor: "4500000",
   currency: "INR",
-  firstChargeDate: "2026-09-01",
+  firstChargeDate: controlToday,
   cadence: "MONTHLY",
   asOfDate: "2026-08-25",
   projectedThirteenWeekMinor: "13500000",
   projectedAnnualMinor: "54000000",
+  intendedOutcome: {
+    metric: "Resolved support cases",
+    targetDirection: "AT_LEAST",
+    targetValue: "1200",
+    unit: "cases",
+    reviewOn: controlToday,
+  },
   assumptionBasis: "USER_ENTERED_ASSUMPTION",
   createdAt: "2026-08-25T09:00:00.000Z",
 };
@@ -211,6 +231,7 @@ const decision = {
   decidedByDisplayName: "Founder",
   overrideReason: "Board-approved exception for this vendor.",
   decidedAt: "2026-08-25T10:00:00.000Z",
+  authorizationExpiresOn: controlToday,
 };
 
 const overCapReconciliation = {
@@ -224,8 +245,41 @@ const overCapReconciliation = {
   authorizationCurrency: "INR",
   observedAmountMinor: "5100000",
   observedCurrency: "INR",
+  observedEvidenceDate: "2026-08-26",
+  outcome: {
+    ...proposal.intendedOutcome,
+    observedValue: "1000",
+    observedOn: controlToday,
+    observationBasis: "USER_ENTERED_OBSERVATION",
+    verdict: "MISSED",
+  },
   reconciledByUserId: "33333333-3333-4333-8333-333333333333",
-  reconciledAt: "2026-08-26T10:00:00.000Z",
+  reconciledAt: `${controlToday}T10:00:00.000Z`,
+};
+
+const standaloneObservation = {
+  id: "88888888-8888-4888-8888-888888888888",
+  proposalId,
+  decisionId,
+  observedValue: "1250",
+  observedOn: controlToday,
+  target: proposal.intendedOutcome,
+  observationBasis: "USER_ENTERED_OBSERVATION",
+  verdict: "MET",
+  observedByUserId: "33333333-3333-4333-8333-333333333333",
+  observedAt: `${controlToday}T11:00:00.000Z`,
+};
+
+const exceptionReview = {
+  id: "99999999-9999-4999-8999-999999999999",
+  proposalId,
+  decisionId,
+  targetKind: "RECONCILIATION",
+  targetId: overCapReconciliation.id,
+  disposition: "NEW_PROPOSAL_REQUIRED",
+  note: "The overage requires a fresh authorization.",
+  reviewedByUserId: "33333333-3333-4333-8333-333333333333",
+  reviewedAt: `${controlToday}T11:30:00.000Z`,
 };
 
 const ownerCapabilities = { canSubmitProposal: true, canDecide: true, canConfigurePolicy: true };
@@ -252,6 +306,10 @@ type ControlMock = {
   proposalResponse?: { status: number; body: unknown };
   decisionResponse?: { status: number; body: unknown };
   reconciliationResponse?: { status: number; body: unknown };
+  outcomeResponse?: { status: number; body: unknown };
+  exceptionReviewResponse?: { status: number; body: unknown };
+  candidateResponse?: { status: number; body: unknown };
+  commitments?: readonly typeof commitment[];
   blockBrief?: boolean;
 };
 
@@ -289,8 +347,9 @@ async function mockWorkspace(page: Page, options: ControlMock = {}) {
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: evidence, meta }) }));
   await page.route("**/api/workspaces/current/commitments**", (route) => {
     const path = new URL(route.request().url()).pathname;
+    const commitments = options.commitments ?? [commitment];
     const body = path.endsWith("/commitments")
-      ? { data: { items: [commitment], total: 1, nextCursor: null }, meta }
+      ? { data: { items: commitments, total: commitments.length, nextCursor: null }, meta }
       : { data: detail, meta };
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
@@ -329,7 +388,50 @@ async function mockWorkspace(page: Page, options: ControlMock = {}) {
     record(route.request());
     const response = options.reconciliationResponse ?? {
       status: 201,
-      body: { data: { decision, reconciliation: overCapReconciliation }, meta: { requestId: "request-reconcile", workspaceVersion: 7 } },
+      body: { data: { proposal, decision, reconciliation: overCapReconciliation }, meta: { requestId: "request-reconcile", workspaceVersion: 7 } },
+    };
+    return route.fulfill({ status: response.status, contentType: "application/json", body: JSON.stringify(response.body) });
+  });
+
+  await page.route("**/api/workspaces/current/control/proposals/*/reconciliation-candidates", (route) => {
+    record(route.request());
+    const response = options.candidateResponse ?? {
+      status: 200,
+      body: {
+        data: {
+          proposalId: proposal.id,
+          matchingPerformed: false,
+          candidates: [{
+            evidenceId,
+            commitmentId: commitment.id,
+            commitmentMerchant: commitment.merchant,
+            observedAmountMinor: evidence.amount.minor,
+            observedCurrency: evidence.amount.currency,
+            observedEvidenceDate: evidence.date,
+            basis: "SAME_CURRENCY_WITHIN_AUTHORIZATION_WINDOW",
+            requiresHumanConfirmation: true,
+          }],
+        },
+        meta,
+      },
+    };
+    return route.fulfill({ status: response.status, contentType: "application/json", body: JSON.stringify(response.body) });
+  });
+
+  await page.route("**/api/workspaces/current/control/proposals/*/outcome", (route) => {
+    record(route.request());
+    const response = options.outcomeResponse ?? {
+      status: 201,
+      body: { data: { proposal, decision, observation: standaloneObservation }, meta: { requestId: "request-outcome", workspaceVersion: 7 } },
+    };
+    return route.fulfill({ status: response.status, contentType: "application/json", body: JSON.stringify(response.body) });
+  });
+
+  await page.route("**/api/workspaces/current/control/proposals/*/exception-reviews", (route) => {
+    record(route.request());
+    const response = options.exceptionReviewResponse ?? {
+      status: 201,
+      body: { data: { review: exceptionReview }, meta: { requestId: "request-exception-review", workspaceVersion: 8 } },
     };
     return route.fulfill({ status: response.status, contentType: "application/json", body: JSON.stringify(response.body) });
   });
@@ -349,10 +451,12 @@ async function mockWorkspace(page: Page, options: ControlMock = {}) {
 // Each sign-in gets its own rate-limit identity, so one test can never exhaust
 // the development-login budget of the next one.
 let signInIdentity = 0;
+const signInIpOffset = Number.parseInt(process.env.VOGNARY_E2E_IP_OFFSET ?? "0", 10);
 
 async function signIn(page: Page) {
   signInIdentity += 1;
-  await page.context().setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${(signInIdentity % 200) + 20}` });
+  const lastOctet = ((signInIpOffset + signInIdentity) % 220) + 20;
+  await page.context().setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${lastOctet}` });
   await page.goto("/login");
   await page.getByText("Other ways to sign in").click();
   await page.getByPlaceholder("developer@example.com").fill(email!);
@@ -381,7 +485,12 @@ async function fillProposal(page: Page) {
   await page.getByLabel("Cadence").selectOption("MONTHLY");
   await page.getByLabel("Amount per charge").fill("45000.00");
   await page.getByLabel("Currency").selectOption("INR");
-  await page.getByLabel("First charge date").fill("2026-09-01");
+  await page.getByLabel("First charge date").fill(controlToday);
+  await page.getByLabel("Metric").fill("Resolved support cases");
+  await page.getByLabel("Target direction").selectOption("AT_LEAST");
+  await page.getByLabel("Target value").fill("1200");
+  await page.getByLabel("Unit").fill("cases");
+  await page.getByLabel("Review date").fill(controlToday);
 }
 
 async function expectNoSeriousAxeViolations(page: Page) {
@@ -443,7 +552,20 @@ test("a workspace outside the private pilot keeps the Control destination and se
 
 test("an enrolled owner runs proposal, evaluation, capped authorization, and an over-cap observation", async ({ page }, testInfo) => {
   await signIn(page);
-  const { controlRequests, runtimeProblems } = await mockWorkspace(page);
+  const { controlRequests, runtimeProblems } = await mockWorkspace(page, {
+    commitments: [merchantTextMatchCommitment, commitment],
+    proposalResponse: {
+      status: 201,
+      body: {
+        data: { proposal, evaluation },
+        meta: {
+          requestId: "request-proposal",
+          workspaceVersion: 5,
+          attentionProjection: "pending-worker-retry",
+        },
+      },
+    },
+  });
   await page.goto("/app");
 
   await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Decisions" })).toHaveAttribute("aria-current", "page");
@@ -464,13 +586,20 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
     category: "AI_MODEL",
     amountMinor: "4500000",
     currency: "INR",
-    firstChargeDate: "2026-09-01",
+    firstChargeDate: controlToday,
     cadence: "MONTHLY",
     existingCommitmentIds: [],
+    intendedOutcome: {
+      metric: "Resolved support cases",
+      targetDirection: "AT_LEAST",
+      targetValue: "1200",
+      unit: "cases",
+      reviewOn: controlToday,
+    },
   });
 
   const card = page.getByRole("article", { name: "Anthropic" });
-  await expect(card.getByText("User-entered assumption")).toBeVisible();
+  await expect(card.getByText("User-entered assumption", { exact: true })).toBeVisible();
   await expect(card.getByText("Cited existing exposure")).toBeVisible();
   await expect(card.getByText("INR 45,000").first()).toBeVisible();
   await expect(card.getByText("INR 1,35,000").first()).toBeVisible();
@@ -479,14 +608,20 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
   await expect(card.getByText("Policy version 3")).toBeVisible();
   await expect(card.getByText("The per-charge limit is exceeded.")).toBeVisible();
   await expect(card.getByText("Human decision required")).toBeVisible();
+  await expect(page.getByText("The record is saved; its reminder queue needs another pass")).toBeVisible();
   await expect(card.getByText(/\bapproved\b|\bsafe\b|\bcompliant\b|\brecommended\b/i)).toHaveCount(0);
   await expect(page.getByLabel("Merchant or counterparty")).toHaveValue("");
 
-  await card.getByRole("button", { name: "Decide this proposal" }).click();
+  const controlAttention = page.getByRole("region", { name: "Needs you" });
+  await expect(controlAttention).toBeVisible();
+  await expect(controlAttention.getByText("Decision needed")).toBeVisible();
+  await expect(controlAttention.getByText("Anthropic", { exact: true })).toBeVisible();
+  await controlAttention.getByRole("button", { name: "Decide now" }).click();
   const dialog = page.getByRole("dialog", { name: "Authorize this obligation" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("Vognary records your decision. It does not purchase, provision, cancel, or move any money.")).toBeVisible();
   await dialog.getByRole("radio", { name: /Approve with cap/ }).check();
+  await dialog.getByLabel("Authorization expires on").fill(controlToday);
   await dialog.getByLabel("Approved cap per charge (INR)").fill("40000");
   await dialog.getByLabel("Why this outside-policy proposal is authorized").fill("Board-approved exception for this vendor.");
   await dialog.getByRole("button", { name: "Record decision" }).click();
@@ -497,6 +632,7 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
   expect(JSON.parse(decisionCall.body ?? "{}")).toEqual({
     action: "APPROVE_WITH_CAP",
     approvedCapMinor: "4000000",
+    authorizationExpiresOn: controlToday,
     overrideReason: "Board-approved exception for this vendor.",
   });
 
@@ -506,20 +642,48 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
 
   await authorized.getByRole("button", { name: "Link observed evidence" }).click();
   const linkDialog = page.getByRole("dialog", { name: "Link observed evidence" });
-  await linkDialog.getByLabel("Saved bill to take the receipt from").selectOption(commitment.id);
+  const candidateRegion = linkDialog.getByRole("region", { name: "Receipts available to review" });
+  await expect(candidateRegion.getByText(/Vognary did not match a merchant or choose a receipt/)).toBeVisible();
+  await candidateRegion.getByRole("button", { name: "Review this saved bill" }).click();
+  await expect(linkDialog.getByLabel("Saved bill to take the receipt from")).toHaveValue(commitment.id);
+  await expect(linkDialog.getByText(/not matched by Vognary/)).toBeVisible();
   await linkDialog.getByRole("radio").first().check();
+  await linkDialog.getByLabel("Observed value (cases)").fill("1000");
+  await linkDialog.getByLabel("Observed on").fill(controlToday);
   await linkDialog.getByRole("button", { name: "Link this receipt" }).click();
 
   const reconcileCall = await waitForCall(controlRequests, (call) => call.url.endsWith("/reconciliations"));
   expect(reconcileCall.headers["if-match"]).toBe('"workspace:6"');
-  expect(JSON.parse(reconcileCall.body ?? "{}")).toEqual({ evidenceId });
+  expect(JSON.parse(reconcileCall.body ?? "{}")).toEqual({
+    evidenceId,
+    observedOutcome: { value: "1000", observedOn: controlToday },
+  });
 
   const settled = page.getByRole("article", { name: "Anthropic" });
   await expect(settled.getByText("Over the frozen cap")).toBeVisible();
   await expect(settled.getByText("The observed amount is above the frozen cap. The cap itself is unchanged.")).toBeVisible();
   await expect(settled.getByText("INR 51,000").first()).toBeVisible();
+  await expect(settled.getByText("Outcome missed")).toBeVisible();
+  await expect(settled.getByText(`1000 cases observed on ${controlToday}.`)).toBeVisible();
+  await expect(settled.getByText("User-entered outcome observation · not Recovery evidence or independently verified proof")).toBeVisible();
   // The frozen cap is still the authorized figure, not the observed one.
   await expect(settled.getByText("INR 40,000").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Record disposition" }).first().click();
+  const exceptionDialog = page.getByRole("dialog", { name: "Record the exception disposition" });
+  await exceptionDialog.getByRole("radio", { name: "A new proposal is required" }).check();
+  await exceptionDialog.getByLabel("Why this disposition was chosen").fill("The overage requires a fresh authorization.");
+  await exceptionDialog.getByRole("button", { name: "Record disposition" }).click();
+  const reviewCall = await waitForCall(controlRequests, (call) => call.url.endsWith("/exception-reviews"));
+  expect(JSON.parse(reviewCall.body ?? "{}")).toEqual({
+    targetKind: "RECONCILIATION",
+    targetId: overCapReconciliation.id,
+    disposition: "NEW_PROPOSAL_REQUIRED",
+    note: "The overage requires a fresh authorization.",
+  });
+  await expect(settled.getByText("New proposal required")).toBeVisible();
+  await expect(settled.getByText("Over the frozen cap")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Record disposition" })).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
   await expectNoSeriousAxeViolations(page);
   expect(runtimeProblems).toEqual([]);
@@ -527,12 +691,48 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
   await page.screenshot({ path: evidencePath(`cc-v0-control-desk-${surface}.png`), fullPage: true, animations: "disabled" });
 });
 
+test("an owner records a business outcome without attaching a receipt", async ({ page }) => {
+  await signIn(page);
+  const { controlRequests } = await mockWorkspace(page, {
+    brief: {
+      policy,
+      proposals: [{
+        proposal,
+        evaluation,
+        decision,
+        reconciliations: [],
+        outcomeObservations: [],
+        exceptionReviews: [],
+      }],
+      capabilities: ownerCapabilities,
+    },
+  });
+  await page.goto("/app");
+
+  await page.getByRole("button", { name: "Record outcome" }).click();
+  const dialog = page.getByRole("dialog", { name: "Record the observed outcome" });
+  await expect(dialog.getByText(/not a receipt or independently verified proof/i)).toBeVisible();
+  await dialog.getByLabel("Observed value (cases)").fill("1250");
+  await dialog.getByRole("button", { name: "Record outcome" }).click();
+
+  const outcomeCall = await waitForCall(controlRequests, (call) => call.url.endsWith("/outcome"));
+  expect(JSON.parse(outcomeCall.body ?? "{}")).toEqual({
+    observedOutcome: { value: "1250", observedOn: controlToday },
+  });
+  expect(outcomeCall.body).not.toContain("evidenceId");
+  const record = page.getByRole("article", { name: "Anthropic" });
+  await expect(record.getByText("Outcome met")).toBeVisible();
+  await expect(record.getByText(/Not Recovery evidence or independently verified proof/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Record outcome" })).toHaveCount(0);
+  await expectNoSeriousAxeViolations(page);
+});
+
 test("a member may propose but never sees a decision or policy command", async ({ page }) => {
   await signIn(page);
   await mockWorkspace(page, {
     brief: {
       policy,
-      proposals: [{ proposal, evaluation, decision: null, reconciliations: [] }],
+      proposals: [{ proposal, evaluation, decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [] }],
       capabilities: memberCapabilities,
     },
   });
@@ -559,14 +759,18 @@ test("all three policy statuses read as policy context, never as an authorizatio
           evaluation: { ...evaluation, id: "a5555555-5555-4555-8555-555555555501", proposalId: "a4444444-4444-4444-8444-444444444401", status: "WITHIN_POLICY", reasonCodes: [], citedEvidenceIds: [], citedExposureBasis: "NONE" },
           decision: null,
           reconciliations: [],
+          outcomeObservations: [],
+          exceptionReviews: [],
         },
         {
           proposal: { ...proposal, id: "a4444444-4444-4444-8444-444444444402", merchant: "Figma" },
           evaluation: { ...evaluation, id: "a5555555-5555-4555-8555-555555555502", proposalId: "a4444444-4444-4444-8444-444444444402", status: "REVIEW_REQUIRED", reasonCodes: ["CATEGORY_REQUIRES_REVIEW"] },
           decision: null,
           reconciliations: [],
+          outcomeObservations: [],
+          exceptionReviews: [],
         },
-        { proposal, evaluation, decision: null, reconciliations: [] },
+        { proposal, evaluation, decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [] },
       ],
       capabilities: ownerCapabilities,
     },
@@ -578,13 +782,14 @@ test("all three policy statuses read as policy context, never as an authorizatio
   const outside = page.getByRole("article", { name: "Anthropic" });
   // Only the proposal being decided is read in full; the rest of the queue
   // keeps its verdict visible and opens the reasoning on demand.
-  for (const record of [within, review, outside]) {
-    const disclosure = record.locator("details.control-more > summary");
-    if (await disclosure.count()) await disclosure.first().click();
+  for (const record of [review, outside]) {
+    const disclosure = record.locator("summary", { hasText: "INR 45,000" });
+    await expect(disclosure).toBeVisible();
+    await disclosure.click();
   }
   await expect(within.getByText("Within policy")).toBeVisible();
   await expect(within.getByText("Policy found no limit or posture that this proposal crosses. It is not approved.")).toBeVisible();
-  await expect(within.getByText("No existing commitment was cited, so the exposure below counts this proposal alone.")).toBeVisible();
+  await expect(within.getByText("None cited, so the exposure below counts this proposal alone.")).toBeVisible();
   await expect(review.getByText("Review required")).toBeVisible();
   await expect(review.getByText("Policy marks this category for review.")).toBeVisible();
   await expect(outside.getByText("Outside policy")).toBeVisible();
@@ -594,8 +799,8 @@ test("all three policy statuses read as policy context, never as an authorizatio
   await expectNoSeriousAxeViolations(page);
 });
 
-test("all five observed verdicts render without false success or failure language", async ({ page }) => {
-  const verdicts = ["MATCHED", "WITHIN_CAP", "OVER_CAP", "CURRENCY_MISMATCH", "CANNOT_EVALUATE"] as const;
+test("all six observed verdicts render without false success or failure language", async ({ page }) => {
+  const verdicts = ["MATCHED", "WITHIN_CAP", "OVER_CAP", "CURRENCY_MISMATCH", "CANNOT_EVALUATE", "AUTHORIZATION_EXPIRED"] as const;
   const fullCapDecision = { ...decision, action: "APPROVE" as const, approvedCapMinor: decision.expectedAmountMinor };
   await signIn(page);
   await mockWorkspace(page, {
@@ -618,7 +823,10 @@ test("all five observed verdicts render without false success or failure languag
                 ? null
                 : "5100000",
           observedCurrency: verdict === "CURRENCY_MISMATCH" ? "USD" : verdict === "CANNOT_EVALUATE" ? null : "INR",
+          observedEvidenceDate: verdict === "AUTHORIZATION_EXPIRED" ? "2026-10-01" : "2026-08-26",
         })),
+        outcomeObservations: [],
+        exceptionReviews: [],
       }],
       capabilities: ownerCapabilities,
     },
@@ -631,6 +839,7 @@ test("all five observed verdicts render without false success or failure languag
     "Over the frozen cap",
     "Different currency — not comparable",
     "Cannot be evaluated",
+    "Outside the authorization window",
   ]) {
     await expect(page.getByText(label, { exact: true })).toBeVisible();
   }
@@ -717,7 +926,7 @@ test("an in-flight brief, an empty ledger, a missing policy, and an offline devi
 test("the composer and dialog are usable with a keyboard alone", async ({ page }) => {
   await signIn(page);
   await mockWorkspace(page, {
-    brief: { policy, proposals: [{ proposal, evaluation, decision: null, reconciliations: [] }], capabilities: ownerCapabilities },
+    brief: { policy, proposals: [{ proposal, evaluation, decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [] }], capabilities: ownerCapabilities },
   });
   await page.goto("/app");
 
@@ -751,7 +960,7 @@ test("Control honours reduced motion and fits a 390px viewport", async ({ page }
   await mockWorkspace(page, {
     brief: {
       policy,
-      proposals: [{ proposal: { ...proposal, merchant: "Anthropic PBC with an unusually long counterparty name for layout", purpose: "A deliberately long purpose sentence that has to wrap without pushing the workspace sideways on a narrow phone." }, evaluation, decision, reconciliations: [overCapReconciliation] }],
+      proposals: [{ proposal: { ...proposal, merchant: "Anthropic PBC with an unusually long counterparty name for layout", purpose: "A deliberately long purpose sentence that has to wrap without pushing the workspace sideways on a narrow phone." }, evaluation, decision, reconciliations: [overCapReconciliation], outcomeObservations: [], exceptionReviews: [] }],
       capabilities: ownerCapabilities,
     },
   });
@@ -803,6 +1012,8 @@ const capLineBrief = {
       observedCurrency: "INR",
       verdict: "OVER_CAP" as const,
     }],
+    outcomeObservations: [],
+    exceptionReviews: [],
   }],
   capabilities: ownerCapabilities,
 };
@@ -847,11 +1058,11 @@ for (const viewport of [{ label: "1440x900", width: 1440, height: 900 }, { label
 test("linking evidence appends an observation without changing the frozen cap", async ({ page }) => {
   await signIn(page);
   await mockWorkspace(page, {
-    brief: { ...capLineBrief, proposals: [{ ...capLineBrief.proposals[0], reconciliations: [] }] },
+    brief: { ...capLineBrief, proposals: [{ ...capLineBrief.proposals[0], reconciliations: [], outcomeObservations: [], exceptionReviews: [] }] },
     reconciliationResponse: {
       status: 201,
       body: {
-        data: { decision: capLineDecision, reconciliation: capLineBrief.proposals[0].reconciliations[0] },
+        data: { proposal: capLineBrief.proposals[0].proposal, decision: capLineDecision, reconciliation: capLineBrief.proposals[0].reconciliations[0] },
         meta: { requestId: "request-reconcile", workspaceVersion: 7 },
       },
     },

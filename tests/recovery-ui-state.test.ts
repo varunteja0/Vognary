@@ -440,6 +440,16 @@ test("evidence results decide whether the draft is cleared or kept for repair", 
   assert.equal(accepted.view, "HOME");
   assert.equal(accepted.addBillsOpen, false);
 
+  const pendingAttention = recoveryReducer(withDraft, {
+    type: "EVIDENCE_SUBMITTED",
+    submission: { id: "submission-attention", type: "RECEIPT_PASTE", ingestedAt: "2026-08-09T10:00:00.000Z", acceptedEvidenceCount: 1, results: [{ clientRef: "receipt-paste-1", status: "ACCEPTED", code: null, message: null }] },
+    home,
+    commitments: [commitment],
+    total: 2,
+    meta: { ...meta, attentionProjection: "pending-worker-retry" },
+  });
+  assert.equal(pendingAttention.attentionProjection, "pending-worker-retry");
+
   const fromEmpty = recoveryReducer(
     {
       ...withDraft,

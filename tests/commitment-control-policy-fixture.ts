@@ -1,3 +1,15 @@
+import type { IntendedControlOutcome } from "../src/lib/commitment-control/outcome";
+
+export function testControlOutcome(overrides: Partial<IntendedControlOutcome> = {}): IntendedControlOutcome {
+  return {
+    metric: "Resolved fixture tasks",
+    targetDirection: "AT_LEAST",
+    targetValue: "10",
+    unit: "tasks",
+    reviewOn: "2099-12-31",
+    ...overrides,
+  };
+}
 import type { CategoryPosture, ProposalCategory } from "../src/lib/commitment-control/policy";
 
 export const completeControlCategoryRules: { category: ProposalCategory; posture: CategoryPosture }[] = [

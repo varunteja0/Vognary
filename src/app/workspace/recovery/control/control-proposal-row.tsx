@@ -2,10 +2,15 @@
 
 import { Fragment, useEffect, useRef } from "react";
 import type { CommitmentControlBriefDto } from "@/lib/commitment-control/contracts";
-import { formatMoment } from "../labels";
+import { formatDay, formatMoment } from "../labels";
 import { ControlEvaluation, ControlFact } from "./control-evaluation";
+import { ControlAuthorizationAmountFacts } from "./control-authorization-facts";
+import { ControlOutcomeFact } from "./control-outcome-fact";
 import {
   controlDecisionRecordedLabels,
+  controlExceptionDispositionLabels,
+  controlOutcomeVerdictLabels,
+  controlOutcomeVerdictToneClass,
   controlStatusLabels,
   controlStatusToneClass,
   controlVerdictLabels,
@@ -58,7 +63,7 @@ export function ControlProposalRow({
   onFocused: (() => void) | null;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const { proposal, evaluation, decision, reconciliations } = entry;
+  const { proposal, evaluation, decision, reconciliations, outcomeObservations, exceptionReviews } = entry;
 
   useEffect(() => {
     if (!focused) return;
@@ -69,7 +74,7 @@ export function ControlProposalRow({
   const decideButtonId = `control-decide-${proposal.id}`;
   const reconcileButtonId = `control-reconcile-${proposal.id}`;
   // The record's tone follows the most recent observation, never an average.
-  const settledVerdict = reconciliations.length ? reconciliations[reconciliations.length - 1].verdict : null;
+  const settledVerdict = reconciliations[0]?.verdict ?? null;
 
   return (
     <article
@@ -100,41 +105,21 @@ export function ControlProposalRow({
         <p className="control-card-meta">Entered {formatMoment(proposal.createdAt)} · {proposal.submittedByDisplayName ? `by ${proposal.submittedByDisplayName}` : "submitter name not on record"} · basis {proposal.assumptionBasis === "USER_ENTERED_ASSUMPTION" ? "user entered" : proposal.assumptionBasis}</p>
       </header>
 
+      <dl className="control-facts">
+        <ControlOutcomeFact outcome={proposal.intendedOutcome} />
+      </dl>
+
       {decision ? (
         <section aria-label={`Authorization record for ${proposal.merchant}`} className="control-authority">
           <p className="truth-label truth-authority">Human authorization · frozen</p>
           <p className="control-card-meta">
             {decision.decidedByDisplayName ?? "Deciding account not on record"} · {formatMoment(decision.decidedAt)} · policy version {decision.evaluationPolicyVersion}
+            {decision.authorizationExpiresOn ? ` · expires ${decision.authorizationExpiresOn}` : " · expiry not recorded on this legacy decision"}
           </p>
 
           <div className="ledger">
             <dl className="ledger-rows">
-              {decision.approvedCapMinor === null ? (
-                // Only a decline reaches here: the contract requires every
-                // approval to carry a cap.
-                <ControlFact
-                  label="Refused amount"
-                  money={{ minor: decision.expectedAmountMinor, currency: decision.currency, provenance: { kind: "frozen", label: "At decision" } }}
-                />
-              ) : decision.approvedCapMinor === decision.expectedAmountMinor ? (
-                // APPROVE freezes the cap at the proposed amount. One number,
-                // rendered once — never the same figure on two adjacent rows.
-                <ControlFact
-                  label="Frozen cap"
-                  money={{ minor: decision.expectedAmountMinor, currency: decision.currency, provenance: { kind: "frozen", label: "Authorized in full" } }}
-                />
-              ) : (
-                <>
-                  <ControlFact
-                    label="Proposed"
-                    money={{ minor: decision.expectedAmountMinor, currency: decision.currency, provenance: { kind: "frozen", label: "At decision" } }}
-                  />
-                  <ControlFact
-                    label="Authorized cap"
-                    money={{ minor: decision.approvedCapMinor, currency: decision.currency, provenance: { kind: "frozen", label: "Frozen" } }}
-                  />
-                </>
-              )}
+              <ControlAuthorizationAmountFacts decision={decision} />
             </dl>
 
             {/* The cap line. Everything above it a named person froze before the
@@ -181,8 +166,23 @@ export function ControlProposalRow({
                       <span className={controlVerdictToneClass[reconciliation.verdict]}>{controlVerdictLabels[reconciliation.verdict]}</span>
                     </p>
                     <p className="control-note">{controlVerdictMeanings[reconciliation.verdict]}</p>
+                    {reconciliation.outcome ? (
+                      <>
+                        <p className="proof-head mt-3">
+                          <span className={controlOutcomeVerdictToneClass[reconciliation.outcome.verdict]}>
+                            {controlOutcomeVerdictLabels[reconciliation.outcome.verdict]}
+                          </span>
+                        </p>
+                        <p className="control-note">
+                          {reconciliation.outcome.observedValue === null
+                            ? `No observed ${reconciliation.outcome.unit} value is recorded yet.`
+                            : `${reconciliation.outcome.observedValue} ${reconciliation.outcome.unit} observed on ${reconciliation.outcome.observedOn}.`}
+                        </p>
+                        <p className="control-card-meta">User-entered outcome observation · not Recovery evidence or independently verified proof</p>
+                      </>
+                    ) : null}
                     <p className="control-card-meta">
-                      {formatMoment(reconciliation.reconciledAt)} · authorized in {reconciliation.authorizationCurrency} · observed in {reconciliation.observedCurrency ?? "no published currency"}
+                      {formatMoment(reconciliation.reconciledAt)} · evidence dated {reconciliation.observedEvidenceDate ?? "not recorded"} · authorized in {reconciliation.authorizationCurrency} · observed in {reconciliation.observedCurrency ?? "no published currency"}
                     </p>
                     {onInspectEvidence ? (
                       <button
@@ -201,6 +201,39 @@ export function ControlProposalRow({
               ))
             )}
           </div>
+        </section>
+      ) : null}
+
+      {outcomeObservations.map((observation) => (
+        <section key={observation.id} aria-label={`Outcome observation for ${proposal.merchant}`} className="control-authority">
+          <p className="truth-label">User-entered outcome observation · append-only</p>
+          <p className="proof-head mt-2">
+            <span className={controlOutcomeVerdictToneClass[observation.verdict]}>
+              {controlOutcomeVerdictLabels[observation.verdict]}
+            </span>
+          </p>
+          <p className="control-note">
+            {observation.observedValue} {observation.target.unit} observed on {formatDay(observation.observedOn)} against the frozen {observation.target.targetValue} {observation.target.unit} target.
+          </p>
+          <p className="control-card-meta">Not Recovery evidence or independently verified proof · recorded {formatMoment(observation.observedAt)}</p>
+        </section>
+      ))}
+
+      {exceptionReviews.length > 0 ? (
+        <section aria-label={`Exception dispositions for ${proposal.merchant}`} className="control-authority">
+          <p className="truth-label truth-authority">Human disposition · append-only</p>
+          <ul className="control-review-list mt-2">
+            {exceptionReviews.map((review) => (
+              <li key={review.id}>
+                <span>
+                  <span className="block text-sm font-medium text-(--ink)">{controlExceptionDispositionLabels[review.disposition]}</span>
+                  <span className="control-note">{review.note}</span>
+                </span>
+                <span className="control-card-meta">Recorded {formatMoment(review.reviewedAt)}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="control-card-meta">The original evidence, authorization, and verdict remain unchanged.</p>
         </section>
       ) : null}
 

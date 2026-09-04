@@ -1,16 +1,135 @@
-# CONTINUE HERE — live handoff (2026-09-03)
+# CONTINUE HERE — live handoff (2026-09-04)
 
 > **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
 > **Strategy rule: Take smart risks. Do not play safe.** Pursue asymmetric,
 > falsifiable upside and bound irreversible downside. Full doctrine:
 > [`THE-LAW.md`](THE-LAW.md).
-
+>
 > Read [`docs/THE-LAW.md`](THE-LAW.md) first. This file is **live state only**.
 > Market: [`docs/execution/phase-a-market-contact.md`](execution/phase-a-market-contact.md).
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
+## 2026-09-04 — Commitment Control follow-through is complete locally
+
+**THIS BLOCK IS THE ONLY LIVE INSTRUCTION.**
+
+**Scoreboard row:** Product UX and Backend Readiness implementation; no score movement without production or customer evidence
+**Loop step:** proposal → policy context → human authorization → approved cap → observed outcome → reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. One India-first finance owner, when an obligation needs a decision or follow-through, sees one ordered `Needs you` desk and chooses the irreversible action. The observable local proof is a complete proposal-to-reconciliation journey plus explicit outcome and exception completion paths; Vognary remembers and follows up but never decides or executes for the person.
+- The immutable proposal → cited exposure → deterministic policy → human decision/cap/expiry → dated evidence or user-entered outcome → reconciliation envelope remains intact. Vognary never auto-approves, auto-denies, purchases, provisions, cancels, chooses evidence, or moves money.
+- The India-date attention engine derives pending decision, evidence due, authorization approaching/expired, outcome review approaching/due, every adverse reconciliation, and every missed standalone outcome. Explicit append-only exception dispositions suppress only their exact target; the adverse evidence and verdict remain visible.
+- Migrations `0065_control_attention_outbox`, `0066_control_attention_provider_events`, `0067_control_follow_through`, and `0068_control_attention_target_identity` add the consent-gated durable outbox, signed-provider callback handling, standalone outcome observations, exception dispositions, and target-specific notification occurrence identity. Provider acceptance is not delivery; only a verified callback may establish `DELIVERED`. The outbox retains the last applied provider event state and time, not an append-only provider-event history.
+- Proposal, decision, reconciliation, accepted manual/forwarded evidence, standalone outcome, and exception-disposition writes refresh attention. If immediate projection fails after a committed write, the success envelope and UI say `pending-worker-retry`; the authenticated worker re-derives source truth on its next run. Readiness now fails closed until `0068` is applied.
+- The authenticated candidate endpoint remains bounded to 100 same-workspace, same-currency, unreconciled receipts inside the frozen decision-to-expiry window and returns `matchingPerformed: false`. The UI performs no merchant-text filtering, shows every saved bill in server order, and requires the person to choose the exact receipt.
+- Privacy access export includes bounded outcome, exception-review, and targeted notification metadata while omitting transient locks and message bodies. Workspace, proposal, and recipient erasure cascade through the new records.
+- Broad promises such as “takes care of everything,” “handles it all,” and worry-free guarantees fail the market-copy and public-surface claim gates. User-entered outcomes remain labelled as unverified observations, never Recovery evidence.
+- Local PostgreSQL is exactly through `0068_control_attention_target_identity` with checksum `b0fa0d7cc7c3ef08d2261fd0ab254bd7a522d9fb4c961cea89c639a163ff5f47`. No production operation ran; the last recorded production head remains the pre-Control `0056` profile.
+- On the final dirty working tree, Node `22.23.2` / npm `10.9.8`, diff hygiene, lint, typecheck, public claims (**36** surfaces), market claims (**1** surface), research, brand, tokens (**75** components), database-unset unit **1,258/1,258**, PostgreSQL **205/205**, Control browser **32/32** across desktop Chrome and Pixel 7, standalone build, and all **16** route budgets pass. Motion under 4× CPU measured mobile **60.0 fps / 18.4 ms p95 / 9.9 ms input-to-frame** and desktop **59.9 fps / 18.6 ms p95 / 10.5 ms input-to-frame**, with zero long tasks. The production dependency audit reports zero vulnerabilities; the full development audit was unavailable because the npm registry request did not complete. Lint has zero errors and one pre-existing profile navigation warning.
+- Machine-readable final counters: `unit=1258/1258`; `postgres=205/205`; `control-browser=32/32`; `public-claim-surfaces=36`; `token-components=75`.
+- Distribution evidence is unchanged: two verified public artifacts, one public roundtable-recruitment reply, one guest-free roundtable scheduled for 2026-09-09 18:30–19:00 IST, two organizer-form submissions, and one founder-community application. The private CRM remains 0 replies, 0 conversations, 0 committed events, 0/10 offers, and 0/2 cleared payments; twelve buyer drafts remain blocked without a recorded permitted route.
+
+**WHAT IS NOT TRUE**
+
+- These changes are not committed, deployed, applied to production, explicitly enrolled for a paid workspace, exercised with real customer financial data, or proven with a delivered production Control email.
+- Vognary does not discover every proposed obligation, enforce a cap, verify a user-entered outcome, match a merchant, select a receipt, reconcile automatically, or execute an obligation. Email is an aid, not the decision authority or a delivery guarantee.
+- A scheduled worker retry is not proof that a reminder was queued or delivered. Same-currency/date-window candidates are not merchant matches. Notification state cannot manufacture financial evidence or authorization.
+- No Idea Quality, Product UX, Backend Readiness, Production Activation, Business Validation, Distribution, payment, renewal, or company composite score moved. Local tests and public/organizer activity are not customer proof, buyer demand, acceptance, partnership, membership, speaking selection, or revenue.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Have the release owner review the complete dirty-tree diff and create one immutable release candidate; green local gates are evidence, not approval.
+2. Complete the independent assessment/retest, incident staffing/tabletop, legal/logging review, restore drill, monitoring test, and manual proposal-review procedure. Apply `0057` through `0068` to production only after those gates and founder release authority.
+3. After one paid and assessed workspace is explicitly enrolled, run a synthetic Control notification through the deployed worker and signed callback; require authenticated readiness to show provider-confirmed delivery, a quiet queue, `failed = 0`, and `deadLetters = 0` before real financial data enters.
+4. Send up to ten specific warm-introduction requests through recorded permitted relationships. Record actual CRM target IDs, UTC timestamps, evidence references, founder minutes, and substantive outcomes separately.
+
+**HARD STOP:** Do not rewrite migrations `0057`–`0068`, auto-match merchants, hide valid bills through merchant text, auto-select evidence, auto-decide or execute obligations, present provider acceptance as delivery, claim append-only provider-event history, deploy or migrate production without founder release authority, enter real customer financial data before assurance clears, treat local tests as customer proof, or send through an unrecorded route.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-04 — Commitment Control owns attention locally
+
+> **SUPERSEDED 2026-09-04** — see the block above.
+
+**Scoreboard row:** Product UX, Backend Readiness, Business Validation, and Distribution implementation; no score movement without production or customer evidence
+**Loop step:** proposal → human authorization → reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- The immutable proposal → target → policy → human decision/cap/expiry → dated evidence → cost/outcome reconciliation envelope remains intact. Vognary still never auto-approves, auto-denies, purchases, provisions, cancels, or moves money.
+- A pure India-date attention engine now derives pending decision, evidence due, authorization approaching/expired, outcome review approaching/due, adverse reconciliation, and missed user-entered outcome states from the existing brief. The canonical Control desk opens with the complete ordered `Needs you` list before creation.
+- Email interrupts once per proposal and recipient with the highest-consequence current item; the in-app desk keeps every responsibility. Migrations `0065_control_attention_outbox` and `0066_control_attention_provider_events` add a consent-gated durable outbox, bounded retry/dead-letter handling, provider-message uniqueness, and ordered signed delivery events without storing message bodies. Only a signed Resend callback may establish `DELIVERED`; provider acceptance is not delivery, and a complaint disables future product email for that recipient.
+- Committed proposal, decision, reconciliation, manual Recovery evidence, and verified forwarded-email evidence paths refresh the durable Control queue. Resolved rows cancel before send. A daily authenticated worker rechecks live attention before delivery, and authenticated readiness exposes enrollment-scoped aggregate queue, delivery, failure, and dead-letter state without recipients or proposal contents. Pilot preflight now requires provider-confirmed delivery for every currently enrolled pilot workspace, a quiet queue, and zero terminal delivery failures; historical delivery outside the current enrollment cannot satisfy it.
+- An authenticated read-only reconciliation-candidate endpoint surfaces at most 100 same-workspace, same-currency, unreconciled receipts dated between the human decision and frozen expiry. It explicitly returns `matchingPerformed: false`; the UI says Vognary did not match a merchant or choose a receipt, opens the saved bill, and still requires a person to select the exact evidence before reconciliation.
+- Privacy access export now includes bounded Control attention delivery metadata and omits transient lock fields. Workspace, proposal, and recipient erasure cascade through the outbox.
+- Broad promises such as “takes care of everything,” “handles it all,” and worry-free guarantees now fail both market-copy and public-surface claim gates. The legacy “Handled for you” heading now reads “Recorded and checked,” with a no-action disclosure when execution is off.
+- Forward-only distribution coverage now extends through `2026-09-04T04:40:44.840Z`. Verified audience evidence is two public artifacts (one Hacker News question and one X FinOps question), one public X roundtable-recruitment reply, one guest-free roundtable scheduled for 2026-09-09 18:30–19:00 IST, two organizer proposals submitted through official forms, and one founder-community application submitted through its official form. The private ledger preserves one earlier long X submission as outcome-unknown and does not count it as an artifact.
+- The NSRCEL Partner form returned a success signal and reset. The GITEX speaker-interest form returned a success signal and disappeared; optional organizer-marketing and partner-sharing consents remained off, while the founder accepted only the required age / Terms / Privacy checkbox. The AIBoomi Builders Circle Typeform returned a completion signal and removed its answer form. Those are submissions, not acceptance, partnership, membership, speaking selection, or buyer demand.
+- Reddit rules and moderator-compose routes exposed no usable authenticated form, so no Reddit post or modmail was sent. Indie Hackers redirected to sign-in. SaaStr was not submitted because its minimum selectable company stage was `1–10M ARR`, while Vognary contracted ARR is zero. KubeCon Europe remains prepare-only under `.fallow/distribution/kubecon-cfp-packet-2026-09-04.md`; no Sessionize account, public speaker profile, Code of Conduct acceptance, or travel commitment was created.
+- At the last response check, Hacker News had zero comments and X had no external reply; the one X reply was Vognary's own verified roundtable invitation. The private CRM therefore remains 0 replies, 0 conversations, 0 committed events, 0/10 offers, and 0/2 cleared payments. Twelve buyer first-touch drafts remain blocked because no permitted warm, referral, partner, or manual route is recorded.
+- Local PostgreSQL is exactly through `0066_control_attention_provider_events` with checksum `65a1121069f4904b29c00b62352171581c8081d8b4a2fabe4bc424cdb2e92390`; production was not changed and remains on the pre-Control profile.
+- On the final combined working tree, Node `22.23.2` / npm `10.9.8`, diff hygiene, typecheck, public claims (34 surfaces), market claims, research, brand, tokens (73 components), database-unset unit **1,254/1,254**, PostgreSQL **194/194**, authenticated Control browser **30/30** across desktop and Pixel 7, standalone build, all **16** route budgets, and motion under 4× CPU pass. Motion measured mobile **60.0 fps / 18.4 ms p95 / 7.0 ms input-to-frame** and desktop **59.9 fps / 18.4 ms p95 / 10.9 ms input-to-frame**, with zero long tasks. Production dependency audit reports zero vulnerabilities. Lint has 0 errors and one pre-existing profile navigation warning. The full development dependency audit was not available because the npm registry audit endpoint timed out on 2026-09-04.
+
+**WHAT IS NOT TRUE**
+
+- These changes are not committed, deployed, applied to production, enrolled for a workspace, exercised with real customer data, or proven with a delivered production Control email.
+- Vognary does not discover every proposed obligation, enforce a cap, choose a receipt, reconcile automatically, verify a user-entered business outcome, or execute any obligation. Email is an aid, not the decision authority or a delivery guarantee.
+- Same-currency/date-window candidates are not merchant matches. A user-entered outcome value is not independently verified evidence. No notification state can manufacture financial evidence or authorization.
+- No Idea Quality, Product UX, Backend Readiness, Production Activation, Business Validation, Distribution, payment, renewal, or company composite score moved. Audience posts, organizer forms, a scheduled roundtable, and a community application do not create buyer outreach evidence. No buyer introduction request, prospect message, external reply, conversation, committed buyer event, offer, invoice, cleared payment, customer proposal, or repurchase was created.
+- The GITEX submission is not speaker acceptance. The NSRCEL submission is not a partnership or workshop slot. The AIBoomi submission is not community acceptance. The Calendar event has no guests yet.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Have the normal release owner review the complete dirty-tree diff and create one immutable release candidate; do not infer approval from green local gates.
+2. Complete the independent assessment/retest, incident staffing/tabletop, legal/logging review, restore drill, monitoring test, and manual proposal-review procedure. Apply `0057` through `0066` to production only after those gates and founder release authority.
+3. After one paid and assessed workspace is explicitly enrolled, run a synthetic Control attention delivery through the deployed worker and signed callback; require authenticated readiness to show `delivery-observed`, `failed = 0`, and `deadLetters = 0` before real financial data enters.
+4. Send up to ten specific warm-introduction requests through existing permitted relationships and record actual target CRM IDs, UTC timestamps, evidence references, and founder minutes. Monitor the verified HN/X artifacts and organizer/community submissions; handle substantive workflow replies before new public posts and invite only opted-in respondents to the September 9 roundtable.
+
+**HARD STOP:** Do not rewrite applied migrations `0057`–`0066`, auto-match merchants, auto-select evidence, auto-decide or execute obligations, present provider acceptance as delivery, deploy or migrate production without founder release authority, enter real customer financial data before assurance clears, treat local tests as customer proof, use a buyer draft whose route is unrecorded, reopen LinkedIn, use Resend for cold outreach, retry the outcome-unknown long X submission, or describe an organizer/community submission as acceptance.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-03 — authorization envelope and distribution desk exist locally
+
+> **SUPERSEDED 2026-09-04** — see the block above.
+
+## 2026-09-03 — buyer-job tournament instrumented
+
+> **SUPERSEDED 2026-09-03** — see the block above.
+
+**Scoreboard row:** Business Validation and Distribution measurement; both scores remain 1.5
+**Loop step:** proposal
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- The private CRM and committed schema now include `idea_candidate_observed` with closed values for human-initiated AI spend change control, Recovery-first next-cycle control, agent-initiated spend authorization, `NONE`, and `UNMEASURED`.
+- A concrete candidate fails closed unless the founder records both a substantive conversation and a buyer-committed dated event. `market:report` evaluates buyer-cell × idea-candidate pairs separately; it never averages cells or converts preparation into demand.
+- The measured state remains zero observations for all three candidates. The sourcing cohort remains READY at 5/5/5; the company gate remains INCOMPLETE at 0/10 offers and 0/2 cleared payments.
+- `npm run market:desk` generated 12 private first-touch drafts, three conditional day-three follow-ups dated no earlier than 2026-09-04, one interview guide, and an evidence-preserving send log under `.fallow/outreach-2026-09-03/`. Regeneration merges prior send/reply fields instead of erasing them.
+- All 15 generated touches have an unrecorded canonical CRM channel and are therefore not sendable. No generated artifact is tracked by Git. The focused market wall passes 13/13, changed market code/test files have no editor diagnostics, and `git diff --check` passes.
+
+**WHAT IS NOT TRUE**
+
+- No draft or follow-up was sent, and no reply, conversation, committed event, offer, invoice, payment, candidate winner, product rename, or company pivot was created.
+- A generated draft is not contact evidence or permission to route around LinkedIn protection, email-safety gates, consent, or channel restrictions.
+- The new instrumentation does not raise Idea Quality, Business Validation, Distribution, or the company composite.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Confirm and record the actual permitted contact channel for each selected target; do not infer it from a public profile or an earlier draft.
+2. On 2026-09-04, verify that each previously contacted target still has no substantive reply before choosing whether to send its single prepared day-three follow-up through the recorded channel.
+3. Send first touches individually only after channel confirmation, then record transmitted contact, reply, conversation, committed event, offer, invoice, and cleared payment as separate evidence transitions.
+
+**HARD STOP:** Do not send any row whose channel remains unrecorded; do not send a day-three follow-up before 2026-09-04; do not enter real customer financial data before assurance clears; do not award a candidate win or score movement from drafts, tests, or preparation.
+<!-- markdownlint-enable MD036 -->
+
 ## Live state — 2026-09-03 (temporary founder mail loop active)
+
+> **SUPERSEDED 2026-09-03** — see the block above.
 
 **Decision:** the founder deferred a paid Google Workspace mailbox. Resend
 remains the root-domain receiving authority and originals remain in its received

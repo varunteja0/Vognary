@@ -909,6 +909,14 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
               <button type="button" onClick={() => void loadSnapshot()} className="btn btn-sm btn-primary">Reload the saved workspace</button>
             </StateBlock>
           ) : null}
+          {state.attentionProjection === "pending-worker-retry" ? (
+            <StateBlock
+              eyebrow="Reminder retry pending"
+              title="The evidence is saved; its Control reminder queue needs another pass"
+              detail="The immediate reminder projection did not complete. The authenticated Control worker can rebuild it on its next run. Until then, open Decisions to review the current Needs you desk."
+              tone="caution"
+            />
+          ) : null}
           {state.rollback ? <RollbackAlert state={state} onDismiss={() => dispatch({ type: "ROLLBACK_DISMISSED" })} /> : null}
         </div>
 

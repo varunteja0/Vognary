@@ -45,11 +45,12 @@ For Vognary, the irreducible product unit is:
 
 ```text
 one proposed obligation
+        → one stated measurable outcome
         → one cited exposure and policy context
         → one authorized human decision
-        → one frozen cap or recorded decline
-        → one later observed evidence item
-        → one exact reconciliation result
+        → one frozen cap and expiry, or recorded decline
+        → one later observed financial evidence item
+        → one exact cost verdict and explicitly labelled outcome observation
 ```
 
 Product placement follows that decision order: pending obligation first,
@@ -117,13 +118,14 @@ Prior-generation material lives only in `docs/archive/`. Treat it as history, no
 
 **Commitment Control replaces Commitment Intelligence as the company direction.** Recovery remains the evidence and reconciliation foundation; the product moves one step earlier, before a new obligation is created.
 
-> **Vognary records a proposed obligation, shows cited existing exposure, records who approved what limit, and later checks observed evidence against that decision.**
+> **Vognary records a proposed obligation and intended outcome, shows cited existing exposure, records who approved what limit and expiry, and later checks observed cost and a clearly labelled outcome observation against that decision.**
 
 - First strict ICP: India-first, 20–100-person AI-native companies with a named finance owner and buyer-confirmed controllable exposure. Exploratory outreach may test plausible adjacent buyers but never counts as qualification.
 - V0 offer: a **one-time ₹14,999 payment for one pilot month**: one policy setup, up to ten proposals, up to four weekly 30-minute reconciliation reviews, and up to two additional founder-support hours.
-- V0 loop: proposal → deterministic exposure → stated policy → authorized human decision → frozen cap → later Recovery evidence → reconciliation.
+- V0 loop: proposal plus intended measurable outcome → deterministic exposure → stated policy → authorized human decision → frozen cap and expiry → later Recovery evidence plus optional user-entered outcome observation → cost and outcome reconciliation.
 - Recovery remains the sole evidence authority. Existing commitment graph facts may inform exposure, but a proposal is not evidence that money was spent.
 - Every amount is an exact minor-unit value with an explicit currency. Existing evidence is cited; user-entered proposal values are labeled assumptions.
+- Outcome targets are immutable user-entered assumptions. Outcome observations are exact user-entered values, not Recovery evidence or independently verified proof; Vognary labels them and computes only deterministic `MET`, `MISSED`, or `NOT_OBSERVED` against the frozen target.
 - Only workspace owners/admins may approve, approve with a cap, or decline. V0 **never auto-approves, auto-denies, purchases, provisions, cancels, or moves money**.
 - Direct Gmail OAuth, banks, cards, wallets, Slack, agent execution, procurement workflows, and autonomous action remain deferred. The existing private billing inbox may supply later reconciliation evidence; it is not a prerequisite for proposing or deciding.
 - The first irreversible bet is paid behavior, not payment infrastructure: five qualified plus fifteen exploratory contacts, at least 10 substantive conversations, ten identical offers, and two upfront payments by Day 7.
@@ -195,11 +197,12 @@ Scaffolding is necessary. **Scaffolding is not the building.**
 
 ```
 proposed obligation (user-entered assumption)
+        → stated measurable outcome (user-entered assumption)
         → cited existing exposure
         → deterministic policy evaluation
-        → authorized human decision and frozen cap
+        → authorized human decision, frozen cap, and expiry
         → later Recovery evidence
-        → exact reconciliation against that authorization
+        → exact cost verdict plus labelled outcome observation
 ```
 
 **Any PR that does not raise this loop or unblock a paid Commitment Control pilot is out of scope until the Day 30 gate.**

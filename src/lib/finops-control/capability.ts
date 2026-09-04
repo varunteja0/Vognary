@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { proposalDecisionActions, type AuthorizedProposalDecision } from "../commitment-control/decision";
 import { normalizeCurrency, parsePositiveMinorUnits, requireUuid } from "../commitment-control/money";
+import { normalizeControlDateOnly } from "../commitment-control/outcome";
 import { reconcileAuthorizedProposal } from "../commitment-control/reconcile";
 
 const capabilityAudience = "vognary:finops-control:v1";
@@ -178,6 +179,9 @@ export async function issueFinOpsCapability(input: {
   const notBefore = parseTimestamp(input.notBefore, "Capability not-before timestamp");
   const expiresAt = parseTimestamp(input.expiresAt, "Capability expiry timestamp");
   validateGrantTimes(issuedAt, notBefore, expiresAt);
+  if (!decision.authorizationExpiresOn || expiresAt.toISOString().slice(0, 10) > decision.authorizationExpiresOn) {
+    throw new Error("Capability expiry cannot outlive the human authorization.");
+  }
 
   const grant = normalizeGrant({
     grantId: requireUuid(input.grantId, "Capability grant id"),
@@ -404,7 +408,7 @@ export class InMemoryFinOpsCapabilityLedger {
 export function reconcileFinOpsCapabilityOutcome(input: {
   grant: FinOpsCapabilityGrant;
   decision: AuthorizedProposalDecision;
-  evidence: { evidenceId: string; amountMinor: string | null; currency: string | null };
+  evidence: { evidenceId: string; amountMinor: string | null; currency: string | null; evidenceDate: string | null };
 }) {
   const grant = normalizeGrant(input.grant);
   const decision = normalizeDecisionIdentity(input.decision);
@@ -494,6 +498,7 @@ function normalizeDecisionIdentity(decision: AuthorizedProposalDecision) {
     "expectedAmountMinor",
     "decidedByUserId",
     "decidedAt",
+    "authorizationExpiresOn",
     "overrideReason",
   ], "Capability decision");
   const action = requireString(data.action, "Capability decision action");
@@ -507,6 +512,12 @@ function normalizeDecisionIdentity(decision: AuthorizedProposalDecision) {
   const overrideReason = data.overrideReason === null
     ? null
     : normalizeText(requireString(data.overrideReason, "Capability override reason"), 500, "Capability override reason");
+  const authorizationExpiresOn = data.authorizationExpiresOn === null
+    ? null
+    : normalizeControlDateOnly(data.authorizationExpiresOn, "Capability authorization expiry");
+  if (action === "DECLINE" ? authorizationExpiresOn !== null : authorizationExpiresOn === null) {
+    throw new Error("Capability decision authorization expiry does not match its action.");
+  }
   return Object.freeze({
     proposalId: requireUuid(requireString(data.proposalId, "Capability proposal id"), "Capability proposal id"),
     evaluationPolicyVersion: normalizePolicyVersion(data.evaluationPolicyVersion),
@@ -516,6 +527,7 @@ function normalizeDecisionIdentity(decision: AuthorizedProposalDecision) {
     expectedAmountMinor: parsePositiveMinorUnits(requireString(data.expectedAmountMinor, "Expected proposal amount"), "Expected proposal amount").toString(),
     decidedByUserId: requireUuid(actorId, "Capability decision actor id"),
     decidedAt: parseTimestamp(requireString(data.decidedAt, "Decision timestamp"), "Decision timestamp").toISOString(),
+    authorizationExpiresOn,
     overrideReason,
   });
 }

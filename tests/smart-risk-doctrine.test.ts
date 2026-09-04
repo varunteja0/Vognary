@@ -42,7 +42,7 @@ test("the supreme doctrine requires ordered reduction, falsification, and bounde
   assert.match(law, /Founder motto — supreme product operating sequence/);
   assert.match(law, /Make it work\. Make it perfect\. Make it fast\. Make it cheap\./);
   assert.match(law, /Every complex problem is a set of simple problems/);
-  assert.match(law, /one proposed obligation[\s\S]*one exact reconciliation result/);
+  assert.match(law, /one proposed obligation[\s\S]*one exact cost verdict and explicitly labelled outcome observation/);
   assert.match(law, /attention always comes before creation/);
   assert.match(law, /ambitions, not executable tasks/);
   assert.match(law, /cheapest real-world test that can disprove it/);

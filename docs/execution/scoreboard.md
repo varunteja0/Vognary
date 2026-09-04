@@ -21,7 +21,7 @@
 | Live connector depth | 4 | 2026-07-21 | Registry ≠ live |
 | Data / network moat | 3 | 2026-07-21 | No network data yet |
 | Business validation | 1.5 | 2026-09-02 | Commitment Control remains unvalidated: 0 current-thesis conversations, repeated jobs, committed events, offers, payments, real proposals, changed decisions, or renewals |
-| Distribution | 1.5 | 2026-09-02 | The three-cell sourcing gate is READY at 5/5/5 public-evidence-ready candidates. Three of 15 active-test candidates have transmitted contact attempts; there are 0 replies or conversations. Preparation does not raise the score |
+| Distribution | 1.5 | 2026-09-04 | The three-cell sourcing gate is READY at 5/5/5 and three of 15 active-test candidates have transmitted contact attempts. The first measured audience wave produced two verified public artifacts, one public recruitment reply, one scheduled roundtable, two official organizer proposals, and one official founder-community application. There are still 0 external replies, buyer conversations, attributable introductions, offers, or payments; activity does not raise the score |
 | **COMPOSITE (min)** | **1.5** | 2026-07-21 | Still floor = business |
 
 ## Commitment Control operating metrics
@@ -61,7 +61,7 @@ scoreboard.
 | Phase | Status | Notes |
 | --- | --- | --- |
 | 0 Hygiene | DONE | 2026-07-21 |
-| A Paid proof | ACTIVE / 14-DAY THREE-CELL TEST | Candidate preparation is READY at 5/5/5. Five conversations each across direct finance, fractional finance, and FinOps/AI operations; ten identical one-time ₹14,999 offers; two cleared payments. The original seven-day gate was missed and is not reset. Contacts sent: 3/15; replies/conversations/offers/payments: 0. LinkedIn remains paused after the authenticated browser session logged out following an anti-scraping protection request. |
+| A Paid proof | ACTIVE / 14-DAY THREE-CELL TEST | Candidate preparation is READY at 5/5/5. Five conversations each across direct finance, fractional finance, and FinOps/AI operations; ten identical one-time ₹14,999 offers; two cleared payments. The original seven-day gate was missed and is not reset. Contacts sent: 3/15; replies/conversations/offers/payments: 0. Two public artifacts, one public recruitment reply, one scheduled roundtable, two organizer proposals, and one community application add audience evidence only. LinkedIn remains paused after the authenticated browser session logged out following an anti-scraping protection request. |
 | B Control V0 | CODE COMPLETE / CUSTOMER DATA BLOCKED | CC-0–7 remain the product spine. No real customer financial data may enter Vognary until the independent security assessment and retest exit. Synthetic demonstrations do not raise this row. |
 | C Production min | ACTIVE / PREFLIGHT BLOCKED | `control:preflight` currently blocks on target readiness, Control migrations, incident staffing, tabletop, legal/logging review, restore proof, monitoring delivery, and proposal-review approval. Restricted evidence remains outside Git; payment alone never authorizes customer-data access. |
 | D Intelligence moat | PENDING | Needs corpus |

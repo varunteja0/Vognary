@@ -10,15 +10,16 @@
 > **Market proof:** [`phase-a-market-contact.md`](phase-a-market-contact.md)
 > **UI/AI implementation law (historical, still binding for tokens/AI):** `docs/execution-plan-ui-ai-quality.md` and `docs/master-build-plan.md` Parts 3–5
 
-**Goal:** Ship the minimum repeatable proposal → policy → human decision → reconciliation workflow while the founder sells paid pilots.
+**Goal:** Ship the minimum repeatable proposal → intended outcome → policy → human decision and expiry → cost/outcome reconciliation workflow while the founder sells paid pilots.
 
 ```
 user-entered proposal assumptions
+  → user-entered measurable outcome target
   → cited existing exposure
   → deterministic policy evaluation
-  → owner/admin decision and frozen cap
+  → owner/admin decision, frozen cap, and expiry
   → later cited Recovery evidence
-  → exact reconciliation
+  → exact cost verdict and labelled outcome observation
 ```
 
 V0 records authority. It never purchases, provisions, cancels, auto-approves, auto-denies, or moves money.
@@ -33,8 +34,9 @@ V0 records authority. It never purchases, provisions, cancels, auto-approves, au
 6. Policy evaluation is deterministic and versioned. AI may explain cited results but cannot decide.
 7. Only owners/admins may approve, approve with a cap, or decline.
 8. Decisions and caps are append-only and cannot be rewritten by later evidence.
-9. Reconciliation links same-workspace Recovery evidence and returns `MATCHED`, `WITHIN_CAP`, `OVER_CAP`, `CURRENCY_MISMATCH`, or `CANNOT_EVALUATE`.
-10. Private pilot enrollment fails closed; no public launch. Broad frontend
+9. Reconciliation freezes the same-workspace Recovery evidence date and returns `MATCHED`, `WITHIN_CAP`, `OVER_CAP`, `CURRENCY_MISMATCH`, `CANNOT_EVALUATE`, or `AUTHORIZATION_EXPIRED`. Evidence after the frozen expiry is never treated as authorized spend.
+10. Every new proposal freezes one measurable target. Every approval freezes an expiry no later than the target review date. A later exact user-entered observation yields `MET`, `MISSED`, or `NOT_OBSERVED`; it is labelled as an observation and is never promoted to Recovery evidence or independently verified proof.
+11. Private pilot enrollment fails closed; no public launch. Broad frontend
   reconstruction is authorized only for the non-production candidate under
   THE-LAW §0.1.1 and cannot change this loop or its contracts.
 
@@ -73,13 +75,13 @@ Write red tests first for exact minor units, 13-week and annual recurrence, mont
 
 ### CC-2 — Proposal and policy domain (days 2–4)
 
-Define proposal assumptions, 13-week and annual exposure, policy inputs, policy results, uncertainty, and evidence citations. Evaluation may return allowed, review-required, or blocked; it never records a human decision by itself.
+Define proposal assumptions, one measurable outcome target, 13-week and annual exposure, policy inputs, policy results, uncertainty, and evidence citations. Evaluation may return allowed, review-required, or blocked; it never records a human decision by itself.
 
 **Status:** complete 2026-08-25. Deterministic statuses are `WITHIN_POLICY`, `REVIEW_REQUIRED`, and `OUTSIDE_POLICY`; all still require a human decision.
 
 ### CC-3 — Pilot persistence and authority (days 3–5)
 
-Add `0057_commitment_control_v0.sql`: workspace policy settings, proposals, immutable evaluations, evidence links, append-only decisions, and reconciliations. Require tenant-safe composite foreign keys, signed-64-bit money, explicit currency, idempotency keys, request hashes, workspace versions, role checks, audit, privacy export, and cascade erasure.
+Add `0057_commitment_control_v0.sql`: workspace policy settings, proposals, immutable evaluations, evidence links, append-only decisions, and reconciliations. Migrations `0060`–`0064` add the immutable outcome target, authorization expiry, labelled outcome observation, frozen evidence date, expired-window verdict, and stable database constraints without backfilling legacy rows. Migrations `0065`–`0066` add the consent-gated Control attention outbox and signed provider-event ordering without storing message bodies. Require tenant-safe composite foreign keys, signed-64-bit money, explicit currency, idempotency keys, request hashes, workspace versions, role checks, audit, privacy export, and cascade erasure.
 
 **Status:** complete in code 2026-08-25; fresh migration and disposable PostgreSQL gates pass. Production apply remains founder-controlled and unrun.
 
@@ -91,19 +93,19 @@ Add `/api/workspaces/current/control/` routes for brief, proposals, decisions, a
 
 ### CC-5 — Private Control-first experience (days 6–8)
 
-For enrolled pilot workspaces, lead with “What are you considering committing to?” Show user-entered assumptions separately from cited existing exposure, then 13-week/annual exposure, policy headroom, uncertainty, and Approve / Approve with cap / Decline. Preserve current tokens and canonical workspace shell.
+For enrolled pilot workspaces, lead with “What are you considering committing to?” Require a measurable target and review date; show user-entered assumptions separately from cited existing exposure, then 13-week/annual exposure, policy headroom, uncertainty, and Approve / Approve with cap / Decline with an explicit authorization expiry. Preserve current tokens and canonical workspace shell.
 
 **Status:** complete in code 2026-08-25. Control-first desktop/mobile experience passes 20/20 focused browser cases with Axe, keyboard, reduced-motion, and overflow checks; existing signed-in Recovery journeys also pass.
 
 ### CC-6 — Reconciliation (days 8–9)
 
-Allow an admin to link later same-workspace Recovery evidence to an approved proposal. Compare exact observed amount and currency to the frozen authorization; append a verdict without updating the original evaluation, decision, or cap.
+Allow an admin to link later same-workspace Recovery evidence to an approved proposal. Compare exact observed amount and currency to the frozen authorization; optionally compare an exact user-entered outcome observation with the frozen target. Append both verdicts without updating the original proposal, evaluation, decision, cap, expiry, or target.
 
-**Status:** complete in code 2026-08-25; all five verdicts, cross-workspace refusal, and cap immutability are tested.
+**Status:** complete in code; all six verdicts, cross-workspace refusal, evidence-date freezing, future-outcome rejection, and cap immutability are tested.
 
 ### CC-7 — Private release (days 9–10)
 
-Add privacy export/deletion coverage, consented product events, desktop/mobile accessibility, migration rehearsal, disposable PostgreSQL tests, and fail-closed pilot enrollment. Complete the full gate chain before deployment.
+Add privacy export/deletion coverage, consented product events, deterministic in-app attention, bounded email retry/dead-letter handling, signed delivery proof, desktop/mobile accessibility, migration rehearsal, disposable PostgreSQL tests, and fail-closed pilot enrollment. Complete the full gate chain before deployment.
 
 **Status:** code-controlled release obligations complete and gated. Exact-head CI, production backup/apply of `0057`, production enrollment configuration, deployment, and measured pilots remain pending founder/release work.
 
@@ -115,6 +117,8 @@ Add privacy export/deletion coverage, consented product events, desktop/mobile a
 - Stale workspace versions and concurrent decisions serialize or fail closed.
 - Cross-workspace evidence linking is refused.
 - Later observed evidence cannot mutate the approved cap.
+- Authorization expiry and the intended outcome cannot be changed after the human decision.
+- Cost evidence and user-entered outcome observations remain visibly distinct; neither can manufacture the other.
 - Privacy export contains the complete proposal → evaluation → decision → reconciliation chain; workspace erasure removes it.
 - No customer-facing amount lacks either an evidence citation or an assumption label.
 

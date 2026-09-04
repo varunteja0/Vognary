@@ -7,6 +7,8 @@ import type {
   CommitmentControlBriefDto,
   ControlDecisionDto,
   ControlEvaluationDto,
+  ControlExceptionReviewDto,
+  ControlOutcomeObservationDto,
   ControlPolicyDto,
   ControlProposalDto,
   ControlReconciliationDto,
@@ -14,6 +16,8 @@ import type {
   DecideControlProposalRequest,
   PutControlPolicyRequest,
   ReconcileControlProposalRequest,
+  RecordControlExceptionReviewRequest,
+  RecordControlOutcomeObservationRequest,
 } from "@/lib/commitment-control/contracts";
 import { isCommitmentControlWorkspaceEnrolled } from "@/lib/commitment-control/enrollment";
 import { authorizeProposalDecision, type ProposalDecisionAction } from "@/lib/commitment-control/decision";
@@ -27,16 +31,27 @@ import {
   type ProposalPolicyEvaluation,
 } from "@/lib/commitment-control/policy";
 import { calendarDateInTimeZone, projectProposalExposure, type ProposalCadence } from "@/lib/commitment-control/project";
+import { reconcileControlOutcome } from "@/lib/commitment-control/outcome";
 import { reconcileAuthorizedProposal } from "@/lib/commitment-control/reconcile";
+import {
+  selectControlReconciliationCandidates,
+  type ControlReconciliationCandidatesDto,
+  type ControlReconciliationEvidenceInput,
+} from "@/lib/commitment-control/reconciliation-candidates";
 import { advanceDateByFrequency, type Frequency } from "@/lib/recurring-audit";
 import { getDatabasePool } from "@/lib/server/database";
 import { hashRecoveryRequest, RecoveryServiceError } from "@/lib/server/recovery-api";
 import { recordConsentedProductEvent } from "@/lib/server/product-event-store";
 import { countAuthorizingAdmins } from "@/lib/server/workspace-invite-store";
-import { isResendConfigured, sendWithResend } from "@/lib/server/resend-mailer";
 
 type WorkspaceRole = "viewer" | "member" | "admin" | "owner";
-type ControlMutationKind = "CONTROL_POLICY" | "CONTROL_PROPOSAL" | "CONTROL_DECISION" | "CONTROL_RECONCILIATION";
+type ControlMutationKind =
+  | "CONTROL_POLICY"
+  | "CONTROL_PROPOSAL"
+  | "CONTROL_DECISION"
+  | "CONTROL_RECONCILIATION"
+  | "CONTROL_OUTCOME_OBSERVATION"
+  | "CONTROL_EXCEPTION_REVIEW";
 
 type WorkspaceStateRow = {
   version: string;
@@ -47,12 +62,26 @@ type WorkspaceStateRow = {
 };
 
 const roleRank: Record<WorkspaceRole, number> = { viewer: 1, member: 2, admin: 3, owner: 4 };
-const eventByMutation: Record<ControlMutationKind, "control.policy_recorded" | "control.proposal_submitted" | "control.decision_recorded" | "control.reconciliation_recorded"> = {
+const eventByMutation: Record<ControlMutationKind,
+  | "control.policy_recorded"
+  | "control.proposal_submitted"
+  | "control.decision_recorded"
+  | "control.reconciliation_recorded"
+  | "control.outcome_recorded"
+  | "control.exception_reviewed"> = {
   CONTROL_POLICY: "control.policy_recorded",
   CONTROL_PROPOSAL: "control.proposal_submitted",
   CONTROL_DECISION: "control.decision_recorded",
   CONTROL_RECONCILIATION: "control.reconciliation_recorded",
+  CONTROL_OUTCOME_OBSERVATION: "control.outcome_recorded",
+  CONTROL_EXCEPTION_REVIEW: "control.exception_reviewed",
 };
+const adverseReconciliationVerdicts = new Set<ControlReconciliationDto["verdict"]>([
+  "OVER_CAP",
+  "CURRENCY_MISMATCH",
+  "CANNOT_EVALUATE",
+  "AUTHORIZATION_EXPIRED",
+]);
 
 export async function putCommitmentControlPolicy(input: {
   workspaceId: string;
@@ -139,20 +168,30 @@ export async function createCommitmentControlProposal(input: {
       });
       const merchant = boundedText(input.request.merchant, "Proposal merchant", 1, 240);
       const purpose = boundedText(input.request.purpose, "Proposal purpose", 1, 500);
+      const intendedOutcome = input.request.intendedOutcome;
       const submittedByDisplayName = await readActorDisplayName(client, input.actorUserId);
       const proposalResult = await client.query<ProposalRow>(
         `insert into commitment_control_proposals (
            id, workspace_id, submitted_by_user_id, submitted_by_display_name, merchant, purpose, category,
            amount_minor, currency, first_charge_date, cadence, as_of_date,
-           projected_13_week_minor, projected_annual_minor, created_at
-         ) values ($1, $2, $3, $4, $5, $6, $7, $8::bigint, $9, $10::date, $11, $12::date, $13::bigint, $14::bigint, $15)
+           projected_13_week_minor, projected_annual_minor, intended_outcome_metric,
+           intended_outcome_direction, intended_outcome_target_value, intended_outcome_unit,
+           intended_outcome_review_on, created_at
+         ) values (
+           $1, $2, $3, $4, $5, $6, $7, $8::bigint, $9, $10::date, $11, $12::date,
+           $13::bigint, $14::bigint, $15, $16, $17, $18, $19::date, $20
+         )
          returning id, submitted_by_user_id, submitted_by_display_name, merchant, purpose, category, amount_minor::text,
            currency, first_charge_date, cadence, as_of_date, projected_13_week_minor::text,
-           projected_annual_minor::text, assumption_basis, created_at`,
+           projected_annual_minor::text, intended_outcome_metric, intended_outcome_direction,
+           intended_outcome_target_value, intended_outcome_unit, intended_outcome_review_on,
+           assumption_basis, created_at`,
         [
           proposalId, input.workspaceId, input.actorUserId, submittedByDisplayName, merchant, purpose, input.request.category,
           projected.amountMinor, projected.currency, projected.firstChargeDate, projected.cadence,
-          asOfDate, projected.thirteenWeekMinor, projected.annualMinor, now,
+          asOfDate, projected.thirteenWeekMinor, projected.annualMinor, intendedOutcome.metric,
+          intendedOutcome.targetDirection, intendedOutcome.targetValue, intendedOutcome.unit,
+          intendedOutcome.reviewOn, now,
         ],
       );
       const evaluationId = randomUUID();
@@ -226,6 +265,8 @@ export async function decideCommitmentControlProposal(input: {
           evaluation: loaded.evaluation,
           action: input.request.action,
           approvedCapMinor: input.request.approvedCapMinor,
+          authorizationExpiresOn: input.request.authorizationExpiresOn,
+          outcomeReviewOn: loaded.proposal.intendedOutcome?.reviewOn,
           decidedAt: now.toISOString(),
           submittedByUserId: loaded.proposal.submittedByUserId,
           authorizingAdminCount,
@@ -242,15 +283,16 @@ export async function decideCommitmentControlProposal(input: {
         `insert into commitment_control_decisions (
            id, workspace_id, proposal_id, evaluation_id, action, expected_amount_minor,
            approved_cap_minor, currency, decided_by_user_id, decided_by_display_name,
-           override_reason, decided_at
-         ) values ($1, $2, $3, $4, $5, $6::bigint, $7::bigint, $8, $9, $10, $11, $12)
+           override_reason, authorization_expires_on, decided_at
+         ) values ($1, $2, $3, $4, $5, $6::bigint, $7::bigint, $8, $9, $10, $11, $12::date, $13)
          returning id, proposal_id, evaluation_id, action, expected_amount_minor::text,
            approved_cap_minor::text, currency, decided_by_user_id, decided_by_display_name,
-           override_reason, decided_at`,
+           override_reason, authorization_expires_on, decided_at`,
         [
           decisionId, input.workspaceId, proposalId, loaded.evaluation.id, authorized.action,
           authorized.expectedAmountMinor, authorized.approvedCapMinor, authorized.currency,
-          input.actorUserId, decidedByDisplayName, authorized.overrideReason, authorized.decidedAt,
+          input.actorUserId, decidedByDisplayName, authorized.overrideReason,
+          authorized.authorizationExpiresOn, authorized.decidedAt,
         ],
       );
       const row = result.rows[0];
@@ -286,15 +328,15 @@ export async function reconcileCommitmentControlProposal(input: {
     minimumRole: "admin",
     operation: "commitment-control.reconcile-proposal",
     mutationKind: "CONTROL_RECONCILIATION",
-    requestForHash: { proposalId, evidenceId },
+    requestForHash: { proposalId, ...input.request },
     write: async (client, now) => {
       const loaded = await loadProposalEvaluation(client, input.workspaceId, proposalId);
       if (!loaded?.decision) throw new RecoveryServiceError("NOT_FOUND", "An authorized proposal decision is required before reconciliation.");
       if (loaded.decision.action === "DECLINE") {
         throw new RecoveryServiceError("CONFLICT", "A declined proposal cannot be reconciled to observed spend.");
       }
-      const evidence = await client.query<{ id: string; amount_minor: string | null; currency: string | null }>(
-        `select id, amount_minor::text, currency
+      const evidence = await client.query<{ id: string; amount_minor: string | null; currency: string | null; evidence_date: Date | string | null }>(
+        `select id, amount_minor::text, currency, evidence_date
          from recovery_evidence where workspace_id = $1 and id = $2`,
         [input.workspaceId, evidenceId],
       );
@@ -302,22 +344,39 @@ export async function reconcileCommitmentControlProposal(input: {
       if (!evidenceRow) throw new RecoveryServiceError("NOT_FOUND");
       const reconciled = reconcileAuthorizedProposal({
         decision: loaded.decision,
-        evidence: { evidenceId, amountMinor: evidenceRow.amount_minor, currency: evidenceRow.currency },
+        evidence: {
+          evidenceId,
+          amountMinor: evidenceRow.amount_minor,
+          currency: evidenceRow.currency,
+          evidenceDate: evidenceRow.evidence_date ? toDateOnly(evidenceRow.evidence_date) : null,
+        },
+        intendedOutcome: loaded.proposal.intendedOutcome ?? undefined,
+        observedOutcome: input.request.observedOutcome,
+        observedThrough: calendarDateInTimeZone(now, "Asia/Kolkata"),
       });
       const reconciliationId = randomUUID();
       const result = await client.query<ReconciliationRow>(
         `insert into commitment_control_reconciliations (
            id, workspace_id, proposal_id, decision_id, evidence_id, verdict,
            expected_amount_minor, approved_cap_minor, authorization_currency,
-           observed_amount_minor, observed_currency, reconciled_by_user_id, reconciled_at
-         ) values ($1, $2, $3, $4, $5, $6, $7::bigint, $8::bigint, $9, $10::bigint, $11, $12, $13)
+           observed_amount_minor, observed_currency, observed_evidence_date, observed_outcome_value,
+           observed_outcome_on, outcome_observation_basis, outcome_verdict,
+           reconciled_by_user_id, reconciled_at
+         ) values (
+           $1, $2, $3, $4, $5, $6, $7::bigint, $8::bigint, $9, $10::bigint, $11,
+           $12::date, $13, $14::date, $15, $16, $17, $18
+         )
          returning id, proposal_id, decision_id, evidence_id, verdict,
            expected_amount_minor::text, approved_cap_minor::text, authorization_currency,
-           observed_amount_minor::text, observed_currency, reconciled_by_user_id, reconciled_at`,
+           observed_amount_minor::text, observed_currency, observed_evidence_date, observed_outcome_value,
+           observed_outcome_on, outcome_observation_basis, outcome_verdict,
+           reconciled_by_user_id, reconciled_at`,
         [
           reconciliationId, input.workspaceId, proposalId, loaded.decision.id, evidenceId,
           reconciled.verdict, reconciled.expectedAmountMinor, reconciled.approvedCapMinor,
           reconciled.authorizationCurrency, reconciled.observedAmountMinor, reconciled.observedCurrency,
+          reconciled.observedEvidenceDate, reconciled.outcome?.observedValue ?? null, reconciled.outcome?.observedOn ?? null,
+          reconciled.outcome?.observationBasis ?? null, reconciled.outcome?.verdict ?? null,
           input.actorUserId, now,
         ],
       );
@@ -325,10 +384,148 @@ export async function reconcileCommitmentControlProposal(input: {
       if (!row) throw new RecoveryServiceError("SAVE_FAILED");
       return {
         data: {
+          proposal: loaded.proposal,
           decision: loaded.decision,
-          reconciliation: mapReconciliation(row),
+          reconciliation: mapReconciliation(row, loaded.proposal.intendedOutcome),
         },
         entityId: reconciliationId,
+      };
+    },
+  });
+}
+
+/**
+ * A business outcome is user-entered and cites no receipt: no financial
+ * evidence can prove it. The frozen target is copied onto the record so the
+ * verdict stays readable against the boundary that existed at authorization.
+ */
+export async function recordCommitmentControlOutcomeObservation(input: {
+  workspaceId: string;
+  actorUserId: string;
+  proposalId: string;
+  expectedVersion: number;
+  idempotencyKey: string;
+  request: RecordControlOutcomeObservationRequest;
+  now?: Date;
+}) {
+  const proposalId = requireUuid(input.proposalId, "Proposal id");
+  return runControlMutation({
+    ...input,
+    minimumRole: "admin",
+    operation: "commitment-control.record-outcome",
+    mutationKind: "CONTROL_OUTCOME_OBSERVATION",
+    requestForHash: { proposalId, ...input.request },
+    write: async (client, now) => {
+      const loaded = await loadProposalEvaluation(client, input.workspaceId, proposalId);
+      if (!loaded?.decision) throw new RecoveryServiceError("NOT_FOUND", "An authorized proposal decision is required before an outcome is recorded.");
+      if (loaded.decision.action === "DECLINE") {
+        throw new RecoveryServiceError("CONFLICT", "A declined proposal has no authorized outcome to observe.");
+      }
+      const intendedOutcome = loaded.proposal.intendedOutcome;
+      if (!intendedOutcome) {
+        throw new RecoveryServiceError("CONFLICT", "This proposal froze no intended outcome, so there is no target to observe against.");
+      }
+      const outcome = reconcileControlOutcome(
+        intendedOutcome,
+        input.request.observedOutcome,
+        calendarDateInTimeZone(now, "Asia/Kolkata"),
+      );
+      if (outcome.verdict === "NOT_OBSERVED" || outcome.observedValue === null || outcome.observedOn === null) {
+        throw new RecoveryServiceError("INVALID_EVIDENCE", "An outcome observation requires an observed value and date.");
+      }
+      const observationId = randomUUID();
+      const result = await client.query<OutcomeObservationRow>(
+        `insert into commitment_control_outcome_observations (
+           id, workspace_id, proposal_id, decision_id, observed_value, observed_on,
+           target_metric, target_direction, target_value, target_unit, target_review_on,
+           verdict, observed_by_user_id, observed_at
+         ) values ($1, $2, $3, $4, $5, $6::date, $7, $8, $9, $10, $11::date, $12, $13, $14)
+         returning id, proposal_id, decision_id, observed_value, observed_on, target_metric,
+           target_direction, target_value, target_unit, target_review_on, verdict,
+           observation_basis, observed_by_user_id, observed_at`,
+        [
+          observationId, input.workspaceId, proposalId, loaded.decision.id, outcome.observedValue,
+          outcome.observedOn, outcome.metric, outcome.targetDirection, outcome.targetValue,
+          outcome.unit, outcome.reviewOn, outcome.verdict, input.actorUserId, now,
+        ],
+      );
+      const row = result.rows[0];
+      if (!row) throw new RecoveryServiceError("SAVE_FAILED");
+      return {
+        data: {
+          proposal: loaded.proposal,
+          decision: loaded.decision,
+          observation: mapOutcomeObservation(row),
+        },
+        entityId: observationId,
+        auditMetadata: {
+          action: "outcome_recorded",
+          merchant: loaded.proposal.merchant,
+          verdict: outcome.verdict,
+          observationBasis: outcome.observationBasis,
+          metric: outcome.metric,
+        },
+      };
+    },
+  });
+}
+
+/** Records what a person concluded about an adverse record. It resolves nothing on its own. */
+export async function recordCommitmentControlExceptionReview(input: {
+  workspaceId: string;
+  actorUserId: string;
+  proposalId: string;
+  expectedVersion: number;
+  idempotencyKey: string;
+  request: RecordControlExceptionReviewRequest;
+  now?: Date;
+}) {
+  const proposalId = requireUuid(input.proposalId, "Proposal id");
+  return runControlMutation({
+    ...input,
+    minimumRole: "admin",
+    operation: "commitment-control.record-exception-review",
+    mutationKind: "CONTROL_EXCEPTION_REVIEW",
+    requestForHash: { proposalId, ...input.request },
+    write: async (client, now) => {
+      const loaded = await loadProposalEvaluation(client, input.workspaceId, proposalId);
+      if (!loaded?.decision) throw new RecoveryServiceError("NOT_FOUND", "An authorized proposal decision is required before an exception review.");
+      if (loaded.decision.action === "DECLINE") {
+        throw new RecoveryServiceError("CONFLICT", "A declined proposal has no adverse record to review.");
+      }
+      await assertAdverseExceptionTarget(client, {
+        workspaceId: input.workspaceId,
+        proposalId,
+        decisionId: loaded.decision.id,
+        targetKind: input.request.targetKind,
+        targetId: input.request.targetId,
+      });
+      const reviewId = randomUUID();
+      const result = await client.query<ExceptionReviewRow>(
+        `insert into commitment_control_exception_reviews (
+           id, workspace_id, proposal_id, decision_id, reconciliation_id,
+           outcome_observation_id, disposition, note, reviewed_by_user_id, reviewed_at
+         ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         returning id, proposal_id, decision_id, reconciliation_id, outcome_observation_id,
+           disposition, note, reviewed_by_user_id, reviewed_at`,
+        [
+          reviewId, input.workspaceId, proposalId, loaded.decision.id,
+          input.request.targetKind === "RECONCILIATION" ? input.request.targetId : null,
+          input.request.targetKind === "OUTCOME_OBSERVATION" ? input.request.targetId : null,
+          input.request.disposition, input.request.note, input.actorUserId, now,
+        ],
+      );
+      const row = result.rows[0];
+      if (!row) throw new RecoveryServiceError("SAVE_FAILED");
+      return {
+        data: { review: mapExceptionReview(row) },
+        entityId: reviewId,
+        auditMetadata: {
+          action: "exception_reviewed",
+          merchant: loaded.proposal.merchant,
+          targetKind: input.request.targetKind,
+          disposition: input.request.disposition,
+        },
       };
     },
   });
@@ -348,7 +545,9 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
     const proposals = await client.query<ProposalRow>(
       `select id, submitted_by_user_id, submitted_by_display_name, merchant, purpose, category, amount_minor::text,
          currency, first_charge_date, cadence, as_of_date, projected_13_week_minor::text,
-         projected_annual_minor::text, assumption_basis, created_at
+        projected_annual_minor::text, intended_outcome_metric, intended_outcome_direction,
+        intended_outcome_target_value, intended_outcome_unit, intended_outcome_review_on,
+        assumption_basis, created_at
        from commitment_control_proposals where workspace_id = $1
        order by created_at desc, id`,
       [input.workspaceId],
@@ -371,7 +570,7 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
       `select decision.id, decision.proposal_id, decision.evaluation_id, decision.action,
          decision.expected_amount_minor::text, decision.approved_cap_minor::text,
          decision.currency, decision.decided_by_user_id, decision.decided_by_display_name,
-         decision.override_reason, decision.decided_at,
+         decision.override_reason, decision.authorization_expires_on, decision.decided_at,
          evaluation.policy_version
        from commitment_control_decisions decision
        join commitment_control_evaluations evaluation
@@ -382,9 +581,26 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
     const reconciliations = await client.query<ReconciliationRow>(
       `select id, proposal_id, decision_id, evidence_id, verdict, expected_amount_minor::text,
          approved_cap_minor::text, authorization_currency, observed_amount_minor::text,
-         observed_currency, reconciled_by_user_id, reconciled_at
+         observed_currency, observed_evidence_date, observed_outcome_value, observed_outcome_on,
+        outcome_observation_basis, outcome_verdict, reconciled_by_user_id, reconciled_at
        from commitment_control_reconciliations where workspace_id = $1
        order by reconciled_at desc, id`,
+      [input.workspaceId],
+    );
+    const proposalsById = new Map(proposals.rows.map((row) => [row.id, mapProposal(row)]));
+    const observations = await client.query<OutcomeObservationRow>(
+      `select id, proposal_id, decision_id, observed_value, observed_on, target_metric,
+         target_direction, target_value, target_unit, target_review_on, verdict,
+         observation_basis, observed_by_user_id, observed_at
+       from commitment_control_outcome_observations where workspace_id = $1
+       order by observed_at desc, id`,
+      [input.workspaceId],
+    );
+    const reviews = await client.query<ExceptionReviewRow>(
+      `select id, proposal_id, decision_id, reconciliation_id, outcome_observation_id,
+         disposition, note, reviewed_by_user_id, reviewed_at
+       from commitment_control_exception_reviews where workspace_id = $1
+       order by reviewed_at desc, id`,
       [input.workspaceId],
     );
     const evaluationsByProposal = new Map(evaluations.rows.map((row) => [row.proposal_id, mapEvaluation(row, row.cited_evidence_ids)]));
@@ -392,16 +608,30 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
     const reconciliationsByProposal = new Map<string, ControlReconciliationDto[]>();
     for (const row of reconciliations.rows) {
       const current = reconciliationsByProposal.get(row.proposal_id) ?? [];
-      current.push(mapReconciliation(row));
+      current.push(mapReconciliation(row, proposalsById.get(row.proposal_id)?.intendedOutcome ?? null));
       reconciliationsByProposal.set(row.proposal_id, current);
+    }
+    const observationsByProposal = new Map<string, ControlOutcomeObservationDto[]>();
+    for (const row of observations.rows) {
+      const current = observationsByProposal.get(row.proposal_id) ?? [];
+      current.push(mapOutcomeObservation(row));
+      observationsByProposal.set(row.proposal_id, current);
+    }
+    const reviewsByProposal = new Map<string, ControlExceptionReviewDto[]>();
+    for (const row of reviews.rows) {
+      const current = reviewsByProposal.get(row.proposal_id) ?? [];
+      current.push(mapExceptionReview(row));
+      reviewsByProposal.set(row.proposal_id, current);
     }
     const data: CommitmentControlBriefDto = {
       policy: policy ? mapPolicy(policy) : null,
       proposals: proposals.rows.map((row) => ({
-        proposal: mapProposal(row),
+        proposal: proposalsById.get(row.id) ?? mapProposal(row),
         evaluation: evaluationsByProposal.get(row.id) ?? null,
         decision: decisionsByProposal.get(row.id) ?? null,
         reconciliations: reconciliationsByProposal.get(row.id) ?? [],
+        outcomeObservations: observationsByProposal.get(row.id) ?? [],
+        exceptionReviews: reviewsByProposal.get(row.id) ?? [],
       })),
       capabilities: {
         canSubmitProposal: true,
@@ -415,6 +645,96 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
     data.capabilities.canConfigurePolicy = roleRank[membership.role] >= roleRank.admin;
     await client.query("commit");
     return { data, workspaceVersion: Number(state.rows[0]?.version ?? 0) };
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw normalizeStoreError(error);
+  } finally {
+    client.release();
+  }
+}
+
+export async function getControlReconciliationCandidates(input: {
+  workspaceId: string;
+  actorUserId: string;
+  proposalId: string;
+}): Promise<{ data: ControlReconciliationCandidatesDto; workspaceVersion: number }> {
+  assertControlEnrollment(input.workspaceId);
+  const proposalId = requireUuid(input.proposalId, "Proposal id");
+  const client = await getDatabasePool().connect();
+  try {
+    await client.query("begin isolation level repeatable read read only");
+    await assertRole(client, input.actorUserId, input.workspaceId, "viewer");
+    const state = await client.query<{ version: string }>(
+      `select version::text from recovery_workspace_states where workspace_id = $1`,
+      [input.workspaceId],
+    );
+    const loaded = await loadProposalEvaluation(client, input.workspaceId, proposalId);
+    if (!loaded?.decision) throw new RecoveryServiceError("NOT_FOUND", "An authorized proposal decision is required before reviewing evidence.");
+    const evidence = await client.query<{
+      evidence_id: string;
+      commitment_id: string;
+      commitment_merchant: string;
+      amount_minor: string | null;
+      currency: string | null;
+      evidence_date: Date | string | null;
+      already_reconciled: boolean;
+    }>(
+      `select distinct on (evidence.id)
+         evidence.id as evidence_id,
+         link.commitment_id,
+         commitment.effective_merchant as commitment_merchant,
+         evidence.amount_minor::text,
+         evidence.currency,
+         evidence.evidence_date,
+         exists (
+           select 1 from commitment_control_reconciliations reconciliation
+           where reconciliation.workspace_id = evidence.workspace_id
+             and reconciliation.proposal_id = $2
+             and reconciliation.evidence_id = evidence.id
+         ) as already_reconciled
+       from recovery_evidence evidence
+       join recovery_commitment_evidence link
+         on link.workspace_id = evidence.workspace_id and link.evidence_id = evidence.id
+       join recovery_commitments commitment
+         on commitment.workspace_id = link.workspace_id and commitment.id = link.commitment_id
+       where evidence.workspace_id = $1
+         and evidence.amount_minor is not null
+         and evidence.currency = $3
+         and evidence.evidence_date >= $4::date
+         and evidence.evidence_date <= $5::date
+         and not exists (
+           select 1 from commitment_control_reconciliations reconciliation
+           where reconciliation.workspace_id = evidence.workspace_id
+             and reconciliation.proposal_id = $2
+             and reconciliation.evidence_id = evidence.id
+         )
+       order by evidence.id, link.commitment_id
+       limit 100`,
+      [
+        input.workspaceId,
+        proposalId,
+        loaded.decision.currency,
+        loaded.decision.decidedAt.slice(0, 10),
+        loaded.decision.authorizationExpiresOn,
+      ],
+    );
+    const candidates = selectControlReconciliationCandidates({
+      decision: loaded.decision,
+      evidence: evidence.rows.map((row): ControlReconciliationEvidenceInput => ({
+        evidenceId: row.evidence_id,
+        commitmentId: row.commitment_id,
+        commitmentMerchant: row.commitment_merchant,
+        amountMinor: row.amount_minor,
+        currency: row.currency,
+        evidenceDate: row.evidence_date === null ? null : toDateOnly(row.evidence_date),
+        alreadyReconciled: row.already_reconciled,
+      })),
+    });
+    await client.query("commit");
+    return {
+      data: { proposalId, matchingPerformed: false, candidates: [...candidates] },
+      workspaceVersion: Number(state.rows[0]?.version ?? 0),
+    };
   } catch (error) {
     await client.query("rollback").catch(() => undefined);
     throw normalizeStoreError(error);
@@ -483,26 +803,7 @@ async function runControlMutation<T>(input: {
     source: "workspace-api",
     status: "succeeded",
   }).catch(() => undefined);
-  if (input.mutationKind === "CONTROL_PROPOSAL") {
-    const proposal = (committed.data as { proposal?: { id?: string; merchant?: string; currency?: string; amountMinor?: string } }).proposal;
-    await notifyControlProposalSubmitted({
-      workspaceId: input.workspaceId,
-      actorUserId: input.actorUserId,
-      proposalId: proposal?.id ?? writtenEntity(committed.data),
-      merchant: proposal?.merchant ?? "a proposal",
-      currency: proposal?.currency,
-      amountMinor: proposal?.amountMinor,
-    }).catch(() => undefined);
-  }
   return committed;
-}
-
-function writtenEntity(data: unknown) {
-  if (!data || typeof data !== "object") return "";
-  if ("proposal" in data && data.proposal && typeof data.proposal === "object" && "id" in data.proposal) {
-    return String((data.proposal as { id?: unknown }).id ?? "");
-  }
-  return "";
 }
 
 async function loadExistingExposure(
@@ -598,7 +899,9 @@ async function loadProposalEvaluation(client: PoolClient, workspaceId: string, p
   const proposalResult = await client.query<ProposalRow>(
     `select id, submitted_by_user_id, submitted_by_display_name, merchant, purpose, category, amount_minor::text,
        currency, first_charge_date, cadence, as_of_date, projected_13_week_minor::text,
-       projected_annual_minor::text, assumption_basis, created_at
+       projected_annual_minor::text, intended_outcome_metric, intended_outcome_direction,
+       intended_outcome_target_value, intended_outcome_unit, intended_outcome_review_on,
+       assumption_basis, created_at
      from commitment_control_proposals where workspace_id = $1 and id = $2`,
     [workspaceId, proposalId],
   );
@@ -633,7 +936,7 @@ async function loadProposalEvaluation(client: PoolClient, workspaceId: string, p
   const decisionResult = await client.query<DecisionRow>(
     `select id, proposal_id, evaluation_id, action, expected_amount_minor::text,
        approved_cap_minor::text, currency, decided_by_user_id, decided_by_display_name,
-       override_reason, decided_at
+       override_reason, authorization_expires_on, decided_at
      from commitment_control_decisions where workspace_id = $1 and proposal_id = $2`,
     [workspaceId, proposalId],
   );
@@ -642,6 +945,38 @@ async function loadProposalEvaluation(client: PoolClient, workspaceId: string, p
     evaluation,
     decision: decisionResult.rows[0] ? mapDecision(decisionResult.rows[0], evaluation.policyVersion) : null,
   };
+}
+
+async function assertAdverseExceptionTarget(client: PoolClient, input: {
+  workspaceId: string;
+  proposalId: string;
+  decisionId: string;
+  targetKind: RecordControlExceptionReviewRequest["targetKind"];
+  targetId: string;
+}) {
+  if (input.targetKind === "RECONCILIATION") {
+    const result = await client.query<{ verdict: ControlReconciliationDto["verdict"]; outcome_verdict: string | null }>(
+      `select verdict, outcome_verdict from commitment_control_reconciliations
+       where workspace_id = $1 and id = $2 and proposal_id = $3 and decision_id = $4`,
+      [input.workspaceId, input.targetId, input.proposalId, input.decisionId],
+    );
+    const row = result.rows[0];
+    if (!row) throw new RecoveryServiceError("NOT_FOUND", "That reconciliation is not on this authorized proposal decision.");
+    if (!adverseReconciliationVerdicts.has(row.verdict) && row.outcome_verdict !== "MISSED") {
+      throw new RecoveryServiceError("CONFLICT", "Only an adverse Commitment Control record can be reviewed.");
+    }
+    return;
+  }
+  const result = await client.query<{ verdict: string }>(
+    `select verdict from commitment_control_outcome_observations
+     where workspace_id = $1 and id = $2 and proposal_id = $3 and decision_id = $4`,
+    [input.workspaceId, input.targetId, input.proposalId, input.decisionId],
+  );
+  const row = result.rows[0];
+  if (!row) throw new RecoveryServiceError("NOT_FOUND", "That outcome observation is not on this authorized proposal decision.");
+  if (row.verdict !== "MISSED") {
+    throw new RecoveryServiceError("CONFLICT", "Only an adverse Commitment Control record can be reviewed.");
+  }
 }
 
 async function ensureWorkspaceState(client: PoolClient, workspaceId: string) {
@@ -765,6 +1100,15 @@ function mapProposal(row: ProposalRow): ControlProposalDto {
     asOfDate: toDateOnly(row.as_of_date),
     projectedThirteenWeekMinor: row.projected_13_week_minor,
     projectedAnnualMinor: row.projected_annual_minor,
+    intendedOutcome: row.intended_outcome_metric === null
+      ? null
+      : {
+          metric: row.intended_outcome_metric,
+          targetDirection: row.intended_outcome_direction ?? invalidDatabaseOutcome(),
+          targetValue: row.intended_outcome_target_value ?? invalidDatabaseOutcome(),
+          unit: row.intended_outcome_unit ?? invalidDatabaseOutcome(),
+          reviewOn: row.intended_outcome_review_on ? toDateOnly(row.intended_outcome_review_on) : invalidDatabaseOutcome(),
+        },
     assumptionBasis: row.assumption_basis,
     createdAt: row.created_at.toISOString(),
   };
@@ -800,10 +1144,14 @@ function mapDecision(row: DecisionRow, policyVersion: number): ControlDecisionDt
     decidedByDisplayName: row.decided_by_display_name ?? null,
     overrideReason: row.override_reason ?? null,
     decidedAt: row.decided_at.toISOString(),
+    authorizationExpiresOn: row.authorization_expires_on ? toDateOnly(row.authorization_expires_on) : null,
   };
 }
 
-function mapReconciliation(row: ReconciliationRow): ControlReconciliationDto {
+function mapReconciliation(
+  row: ReconciliationRow,
+  intendedOutcome: ControlProposalDto["intendedOutcome"],
+): ControlReconciliationDto {
   return {
     id: row.id,
     proposalId: row.proposal_id,
@@ -815,9 +1163,62 @@ function mapReconciliation(row: ReconciliationRow): ControlReconciliationDto {
     authorizationCurrency: row.authorization_currency,
     observedAmountMinor: row.observed_amount_minor,
     observedCurrency: row.observed_currency,
+    observedEvidenceDate: row.observed_evidence_date ? toDateOnly(row.observed_evidence_date) : null,
+    outcome: row.outcome_verdict === null
+      ? null
+      : intendedOutcome === null
+        ? invalidDatabaseOutcome()
+        : {
+            ...intendedOutcome,
+            observedValue: row.observed_outcome_value,
+            observedOn: row.observed_outcome_on ? toDateOnly(row.observed_outcome_on) : null,
+            observationBasis: row.outcome_observation_basis ?? invalidDatabaseOutcome(),
+            verdict: row.outcome_verdict,
+          },
     reconciledByUserId: row.reconciled_by_user_id,
     reconciledAt: row.reconciled_at.toISOString(),
   };
+}
+
+function mapOutcomeObservation(row: OutcomeObservationRow): ControlOutcomeObservationDto {
+  return {
+    id: row.id,
+    proposalId: row.proposal_id,
+    decisionId: row.decision_id,
+    observedValue: row.observed_value,
+    observedOn: toDateOnly(row.observed_on),
+    target: {
+      metric: row.target_metric,
+      targetDirection: row.target_direction,
+      targetValue: row.target_value,
+      unit: row.target_unit,
+      reviewOn: toDateOnly(row.target_review_on),
+    },
+    observationBasis: row.observation_basis,
+    verdict: row.verdict,
+    observedByUserId: row.observed_by_user_id,
+    observedAt: row.observed_at.toISOString(),
+  };
+}
+
+function mapExceptionReview(row: ExceptionReviewRow): ControlExceptionReviewDto {
+  const targetId = row.reconciliation_id ?? row.outcome_observation_id;
+  if (!targetId) throw new RecoveryServiceError("SAVE_FAILED", "Database returned an exception review without a target.");
+  return {
+    id: row.id,
+    proposalId: row.proposal_id,
+    decisionId: row.decision_id,
+    targetKind: row.reconciliation_id ? "RECONCILIATION" : "OUTCOME_OBSERVATION",
+    targetId,
+    disposition: row.disposition,
+    note: row.note,
+    reviewedByUserId: row.reviewed_by_user_id,
+    reviewedAt: row.reviewed_at.toISOString(),
+  };
+}
+
+function invalidDatabaseOutcome(): never {
+  throw new RecoveryServiceError("SAVE_FAILED", "Database returned an incomplete Commitment Control outcome.");
 }
 
 function rollForwardDate(firstDate: string, cadence: ProposalCadence, asOfDate: string) {
@@ -901,51 +1302,6 @@ async function readActorDisplayName(client: PoolClient, userId: string) {
   return name.length ? name : null;
 }
 
-async function notifyControlProposalSubmitted(input: {
-  workspaceId: string;
-  actorUserId: string;
-  proposalId: string;
-  merchant: string;
-  currency?: string;
-  amountMinor?: string;
-}) {
-  if (!isResendConfigured() || !input.proposalId) return;
-  const origin = process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.APP_URL?.trim() || "";
-  const deskUrl = origin
-    ? `${origin.replace(/\/$/, "")}/app?view=CONTROL&proposal=${encodeURIComponent(input.proposalId)}`
-    : `/app?view=CONTROL&proposal=${encodeURIComponent(input.proposalId)}`;
-  const recipients = await getDatabasePool().query<{ email: string }>(
-    `select u.email
-     from workspace_members wm
-     join users u on u.id = wm.user_id
-     where wm.workspace_id = $1
-       and wm.role in ('owner', 'admin')
-       and wm.user_id <> $2
-       and u.deleted_at is null`,
-    [input.workspaceId, input.actorUserId],
-  );
-  const amountLine = input.amountMinor && input.currency
-    ? `${input.amountMinor} minor units ${input.currency}`
-    : "amount as recorded on the proposal";
-  for (const row of recipients.rows) {
-    const text = [
-      `A Commitment Control proposal for ${input.merchant} needs a human decision.`,
-      `Recorded amount: ${amountLine}.`,
-      `Open ${deskUrl}`,
-      "Vognary does not purchase, provision, cancel, or move money.",
-    ].join("\n");
-    await sendWithResend({
-      email: row.email,
-      idempotencyKey: `control-proposal/${input.proposalId}/${row.email}`,
-      message: {
-        subject: `Decision needed: ${input.merchant}`,
-        text,
-        html: `<p>${text.replaceAll("\n", "<br>")}</p>`,
-      },
-    }).catch(() => undefined);
-  }
-}
-
 function assertControlEnrollment(workspaceId: string) {
   if (!isCommitmentControlWorkspaceEnrolled(workspaceId)) {
     throw new RecoveryServiceError("FEATURE_UNAVAILABLE", "This workspace is not enrolled in the Commitment Control private pilot.");
@@ -975,6 +1331,11 @@ type ProposalRow = {
   as_of_date: Date | string;
   projected_13_week_minor: string;
   projected_annual_minor: string;
+  intended_outcome_metric: string | null;
+  intended_outcome_direction: NonNullable<ControlProposalDto["intendedOutcome"]>["targetDirection"] | null;
+  intended_outcome_target_value: string | null;
+  intended_outcome_unit: string | null;
+  intended_outcome_review_on: Date | string | null;
   assumption_basis: "USER_ENTERED_ASSUMPTION";
   created_at: Date;
 };
@@ -1003,6 +1364,7 @@ type DecisionRow = {
   decided_by_user_id: string | null;
   decided_by_display_name?: string | null;
   override_reason?: string | null;
+  authorization_expires_on: Date | string | null;
   decided_at: Date;
 };
 
@@ -1017,6 +1379,40 @@ type ReconciliationRow = {
   authorization_currency: string;
   observed_amount_minor: string | null;
   observed_currency: string | null;
+  observed_evidence_date: Date | string | null;
+  observed_outcome_value: string | null;
+  observed_outcome_on: Date | string | null;
+  outcome_observation_basis: NonNullable<ControlReconciliationDto["outcome"]>["observationBasis"] | null;
+  outcome_verdict: NonNullable<ControlReconciliationDto["outcome"]>["verdict"] | null;
   reconciled_by_user_id: string | null;
   reconciled_at: Date;
+};
+
+type OutcomeObservationRow = {
+  id: string;
+  proposal_id: string;
+  decision_id: string;
+  observed_value: string;
+  observed_on: Date | string;
+  target_metric: string;
+  target_direction: ControlOutcomeObservationDto["target"]["targetDirection"];
+  target_value: string;
+  target_unit: string;
+  target_review_on: Date | string;
+  verdict: ControlOutcomeObservationDto["verdict"];
+  observation_basis: ControlOutcomeObservationDto["observationBasis"];
+  observed_by_user_id: string | null;
+  observed_at: Date;
+};
+
+type ExceptionReviewRow = {
+  id: string;
+  proposal_id: string;
+  decision_id: string;
+  reconciliation_id: string | null;
+  outcome_observation_id: string | null;
+  disposition: ControlExceptionReviewDto["disposition"];
+  note: string;
+  reviewed_by_user_id: string | null;
+  reviewed_at: Date;
 };

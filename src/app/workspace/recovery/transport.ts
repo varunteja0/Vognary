@@ -1,6 +1,7 @@
 import {
   recoveryEndpoints,
   recoveryErrorCodes,
+  type AttentionProjectionStatus,
   type ApiFailure,
   type ApiSuccess,
   type CommitmentDetailDto,
@@ -85,10 +86,22 @@ export function readContractFailure(payload: unknown): RecoveryError | null {
 
 function readSuccess<T>(payload: unknown, accept?: (data: unknown) => data is T): { data: T; meta: ResponseMeta } | null {
   if (!isRecord(payload) || !("data" in payload) || !isRecord(payload.meta)) return null;
-  const { requestId, workspaceVersion } = payload.meta;
+  const { requestId, workspaceVersion, attentionProjection } = payload.meta;
   if (typeof requestId !== "string" || typeof workspaceVersion !== "number") return null;
+  if (attentionProjection !== undefined
+    && attentionProjection !== "scheduled"
+    && attentionProjection !== "pending-worker-retry") return null;
   if (accept && !accept(payload.data)) return null;
-  return { data: payload.data as T, meta: { requestId, workspaceVersion } };
+  return {
+    data: payload.data as T,
+    meta: {
+      requestId,
+      workspaceVersion,
+      ...(attentionProjection === undefined
+        ? {}
+        : { attentionProjection: attentionProjection as AttentionProjectionStatus }),
+    },
+  };
 }
 
 // Some pre-Recovery routes still answer with a bare `{ error: "…" }`. The message

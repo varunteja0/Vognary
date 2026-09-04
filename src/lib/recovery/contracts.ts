@@ -816,11 +816,14 @@ export type RecoveryError =
   | RecoveryErrorBase & { code: "RATE_LIMITED"; retryAfterSeconds: number; currentVersion?: never }
   | RecoveryErrorBase & { code: Exclude<RecoveryErrorCode, "STALE_STATE" | "RATE_LIMITED">; currentVersion?: never; retryAfterSeconds?: never };
 
+export type AttentionProjectionStatus = "scheduled" | "pending-worker-retry";
+
 export type ApiSuccess<T> = {
   data: T;
   meta: {
     requestId: string;
     workspaceVersion: number;
+    attentionProjection?: AttentionProjectionStatus;
   };
 };
 

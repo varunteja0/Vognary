@@ -8,6 +8,7 @@ import type {
   DecisionDto,
   EvidenceSubmissionDto,
   HomeProjectionDto,
+  AttentionProjectionStatus,
   RecoveryError,
   ReceiptInboxStatusDto,
   RecoverySessionResponse,
@@ -134,6 +135,7 @@ export type RecoveryState = {
   submission: EvidenceSubmissionDto | null;
   evidenceFailure: RecoveryFailure | null;
   refreshRequired: boolean;
+  attentionProjection: AttentionProjectionStatus | null;
   announcement: string;
 };
 
@@ -185,6 +187,7 @@ export const initialRecoveryState: RecoveryState = {
   submission: null,
   evidenceFailure: null,
   refreshRequired: false,
+  attentionProjection: null,
   announcement: "",
 };
 
@@ -604,6 +607,7 @@ export function recoveryReducer(state: RecoveryState, action: RecoveryAction): R
         requestId: action.meta.requestId,
         status: { kind: "READY" },
         refreshRequired: false,
+        attentionProjection: action.meta.attentionProjection ?? null,
         evidenceDraft: everyResultAccepted
           ? { ...emptyEvidenceDraft, imageDrafts: remainingImageDrafts }
           : { ...state.evidenceDraft, preparing: false },

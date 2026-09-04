@@ -11,6 +11,7 @@ import {
   recoveryLimits,
   senderAuthenticationResults,
   senderTrustTiers,
+  type AttentionProjectionStatus,
   type ApiFailure,
   type CreateCorrectionRequest,
   type EvidenceIngestRequest,
@@ -272,8 +273,14 @@ export function recoveryFailureResponse(error: unknown, requestId: string) {
   return Response.json(payload, { status: recoveryErrorStatusByCode[serviceError.code], headers });
 }
 
-export function recoverySuccessResponse<T>(data: T, requestId: string, workspaceVersion: number, status = 200) {
-  return Response.json({ data, meta: { requestId, workspaceVersion } }, {
+export function recoverySuccessResponse<T>(
+  data: T,
+  requestId: string,
+  workspaceVersion: number,
+  status = 200,
+  metadata: { attentionProjection?: AttentionProjectionStatus } = {},
+) {
+  return Response.json({ data, meta: { requestId, workspaceVersion, ...metadata } }, {
     status,
     headers: {
       "cache-control": "private, no-store",

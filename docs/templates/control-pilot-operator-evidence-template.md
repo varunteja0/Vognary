@@ -96,8 +96,10 @@ applicability or compliance.
 
 ## Proposal-review procedure
 
-Proposal email is best-effort and is not a delivery guarantee. The first pilot
-must have an approved manual dashboard-review procedure.
+Control email is consent-gated and durable, but it is not the decision authority
+or a delivery guarantee. Provider acceptance is not delivery; only the signed
+provider callback can prove delivery. The first pilot must also have an approved
+manual dashboard-review procedure.
 
 ```text
 Primary reviewer role:
@@ -107,7 +109,14 @@ Expected decision window (internal objective, not customer SLA):
 Escalation after missed review:
 Weekend/leave coverage:
 Synthetic proposal observed in desk: yes / no
-Synthetic email observed: yes / no / not relied upon
+Synthetic primary attention queued once: yes / no
+Provider accepted synthetic email: yes / no / not relied upon
+Signed callback confirmed delivery: yes / no / not relied upon
+Authenticated readiness attention status:
+Current enrolled workspace count / workspaces with signed delivery:
+Queued/sending/retrying/provider-accepted count:
+Open failed notification count:
+Open dead-letter count:
 Procedure accepted by owner and backup: yes / no
 Decision: APPROVED / REWORK
 ```

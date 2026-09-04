@@ -2,6 +2,15 @@ const requiredMigrations = [
   "0057_commitment_control_v0",
   "0058_workspace_invites",
   "0059_control_authority_hardening",
+  "0060_control_outcome_authorization_window",
+  "0061_control_outcome_observation_honesty",
+  "0062_control_outcome_basis_constraint_name",
+  "0063_control_authorization_expiry_verdict",
+  "0064_control_expired_verdict_integrity",
+  "0065_control_attention_outbox",
+  "0066_control_attention_provider_events",
+  "0067_control_follow_through",
+  "0068_control_attention_target_identity",
 ];
 
 const commitShaPattern = /^[a-f0-9]{40}$/i;
@@ -14,6 +23,7 @@ export function evaluateControlPilotReadiness({
   appliedMigrations,
   targetReadinessAuthenticated,
   targetCommitSha,
+  targetAttention,
   now = new Date(),
 }) {
   const checks = [
@@ -75,6 +85,7 @@ export function evaluateControlPilotReadiness({
       hash: environment.MONITORING_DELIVERY_TEST_RECORD_SHA256,
       now,
     }),
+    controlAttentionCheck(targetAttention),
     check(
       "proposal-review-procedure",
       environment.COMMITMENT_CONTROL_PROPOSAL_REVIEW_PROCEDURE_STATUS === "approved"
@@ -86,6 +97,24 @@ export function evaluateControlPilotReadiness({
     status: checks.every((item) => item.ready) ? "ready" : "blocked",
     checks,
   };
+}
+
+function controlAttentionCheck(attention) {
+  if ((attention?.deadLetters ?? 0) > 0 || (attention?.failed ?? 0) > 0 || attention?.status === "blocked-terminal-failures") {
+    return check("control-attention-delivery", false, "control-attention-dead-letters-open");
+  }
+  if ((attention?.queued ?? 0) > 0
+    || (attention?.sending ?? 0) > 0
+    || (attention?.retryScheduled ?? 0) > 0
+    || (attention?.providerAccepted ?? 0) > 0
+    || attention?.status === "delivery-observed-work-pending") {
+    return check("control-attention-delivery", false, "control-attention-delivery-pending");
+  }
+  return check(
+    "control-attention-delivery",
+    attention?.status === "delivery-observed",
+    "control-attention-delivery-unproven",
+  );
 }
 
 export function formatControlPilotReadiness(result) {

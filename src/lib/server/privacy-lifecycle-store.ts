@@ -836,7 +836,14 @@ async function buildAccessExport(client: PoolClient, input: {
         ) record) as source_disconnections`,
       [input.workspaceId, exportRowLimits.recoveryRecords + 1],
     ),
-    readCommitmentControlPrivacyExport(query, () => query<CommitmentControlExportRow>(
+    readCommitmentControlPrivacyExport(query, ({
+      authorityFieldsAvailable,
+      outcomeEnvelopeAvailable,
+      followThroughAvailable,
+      attentionOutboxAvailable,
+      attentionProviderEventsAvailable,
+      attentionTargetIdentityAvailable,
+    }) => query<CommitmentControlExportRow>(
       `select
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
           select version, category_rules as "categoryRules", currency_limits as "currencyLimits",
@@ -845,11 +852,18 @@ async function buildAccessExport(client: PoolClient, input: {
           order by version asc limit $2
         ) record) as policies,
         (select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
-          select id, submitted_by_user_id as "submittedByUserId", merchant, purpose, category,
+             select id, submitted_by_user_id as "submittedByUserId",
+               ${authorityFieldsAvailable ? `submitted_by_display_name as "submittedByDisplayName",` : ""}
+               merchant, purpose, category,
                  amount_minor::text as "amountMinor", currency,
                  first_charge_date as "firstChargeDate", cadence, as_of_date as "asOfDate",
                  projected_13_week_minor::text as "projectedThirteenWeekMinor",
                  projected_annual_minor::text as "projectedAnnualMinor",
+                 ${outcomeEnvelopeAvailable ? `intended_outcome_metric as "intendedOutcomeMetric",
+                 intended_outcome_direction as "intendedOutcomeDirection",
+                 intended_outcome_target_value as "intendedOutcomeTargetValue",
+                 intended_outcome_unit as "intendedOutcomeUnit",
+                 intended_outcome_review_on as "intendedOutcomeReviewOn",` : ""}
                  assumption_basis as "assumptionBasis", created_at as "createdAt"
           from commitment_control_proposals where workspace_id = $1
           order by created_at asc, id asc limit $2
@@ -858,7 +872,9 @@ async function buildAccessExport(client: PoolClient, input: {
           select id, proposal_id as "proposalId", policy_version as "policyVersion", status,
                  human_decision_required as "humanDecisionRequired",
                  assumption_fields as "assumptionFields", reason_codes as "reasonCodes",
-                 currency_results as "currencyResults", evaluated_at as "evaluatedAt"
+                 currency_results as "currencyResults",
+                 ${authorityFieldsAvailable ? `cited_exposure_basis as "citedExposureBasis",` : ""}
+                 evaluated_at as "evaluatedAt"
           from commitment_control_evaluations where workspace_id = $1
           order by evaluated_at asc, id asc limit $2
         ) record) as evaluations,
@@ -871,7 +887,11 @@ async function buildAccessExport(client: PoolClient, input: {
           select id, proposal_id as "proposalId", evaluation_id as "evaluationId", action,
                  expected_amount_minor::text as "expectedAmountMinor",
                  approved_cap_minor::text as "approvedCapMinor", currency,
-                 decided_by_user_id as "decidedByUserId", decided_at as "decidedAt"
+                 decided_by_user_id as "decidedByUserId",
+                 ${authorityFieldsAvailable ? `decided_by_display_name as "decidedByDisplayName",
+                 override_reason as "overrideReason",` : ""}
+                 ${outcomeEnvelopeAvailable ? `authorization_expires_on as "authorizationExpiresOn",` : ""}
+                 decided_at as "decidedAt"
           from commitment_control_decisions where workspace_id = $1
           order by decided_at asc, id asc limit $2
         ) record) as decisions,
@@ -883,10 +903,50 @@ async function buildAccessExport(client: PoolClient, input: {
                  authorization_currency as "authorizationCurrency",
                  observed_amount_minor::text as "observedAmountMinor",
                  observed_currency as "observedCurrency",
+                 ${outcomeEnvelopeAvailable ? `observed_outcome_value as "observedOutcomeValue",
+                 observed_outcome_on as "observedOutcomeOn",
+                 observed_evidence_date as "observedEvidenceDate",
+                 outcome_observation_basis as "outcomeObservationBasis",
+                 outcome_verdict as "outcomeVerdict",` : ""}
                  reconciled_by_user_id as "reconciledByUserId", reconciled_at as "reconciledAt"
           from commitment_control_reconciliations where workspace_id = $1
           order by reconciled_at asc, id asc limit $2
-        ) record) as reconciliations`,
+        ) record) as reconciliations,
+        ${followThroughAvailable ? `(select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, proposal_id as "proposalId", decision_id as "decisionId",
+                 observed_value as "observedValue", observed_on as "observedOn",
+                 target_metric as "targetMetric", target_direction as "targetDirection",
+                 target_value as "targetValue", target_unit as "targetUnit",
+                 target_review_on as "targetReviewOn", verdict,
+                 observation_basis as "observationBasis",
+                 observed_by_user_id as "observedByUserId", observed_at as "observedAt"
+          from commitment_control_outcome_observations where workspace_id = $1
+          order by observed_at asc, id asc limit $2
+        ) record)` : `'[]'::jsonb`} as outcome_observations,
+        ${followThroughAvailable ? `(select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, proposal_id as "proposalId", decision_id as "decisionId",
+                 reconciliation_id as "reconciliationId",
+                 outcome_observation_id as "outcomeObservationId",
+                 disposition, note, reviewed_by_user_id as "reviewedByUserId",
+                 reviewed_at as "reviewedAt"
+          from commitment_control_exception_reviews where workspace_id = $1
+          order by reviewed_at asc, id asc limit $2
+        ) record)` : `'[]'::jsonb`} as exception_reviews,
+        ${attentionOutboxAvailable ? `(select coalesce(jsonb_agg(to_jsonb(record)), '[]'::jsonb) from (
+          select id, proposal_id as "proposalId", recipient_user_id as "recipientUserId",
+                 channel, attention_kind as "attentionKind", due_on as "dueOn",
+                 ${attentionTargetIdentityAvailable ? `target_kind as "targetKind", target_id as "targetId",` : ""}
+                 delivery_state as "deliveryState", state_reason as "stateReason",
+                 attempt_count as "attemptCount", next_attempt_at as "nextAttemptAt",
+                 provider_message_id as "providerMessageId",
+                 provider_accepted_at as "providerAcceptedAt", delivered_at as "deliveredAt",
+                 failed_at as "failedAt", error_code as "errorCode",
+                 ${attentionProviderEventsAvailable ? `last_provider_event_type as "lastProviderEventType",
+                 last_provider_event_at as "lastProviderEventAt",` : ""}
+                 created_at as "createdAt", updated_at as "updatedAt"
+          from commitment_control_attention_notifications where workspace_id = $1
+          order by created_at asc, id asc limit $2
+        ) record)` : `'[]'::jsonb`} as attention_notifications`,
       [input.workspaceId, exportRowLimits.recoveryRecords + 1],
     )),
     query<{
@@ -1415,6 +1475,9 @@ async function buildAccessExport(client: PoolClient, input: {
     commitmentControl.evaluation_evidence,
     commitmentControl.decisions,
     commitmentControl.reconciliations,
+    commitmentControl.outcome_observations,
+    commitmentControl.exception_reviews,
+    commitmentControl.attention_notifications,
   ]) {
     assertWithinExportLimit("recoveryRecords", records.length);
   }
@@ -1582,6 +1645,9 @@ async function buildAccessExport(client: PoolClient, input: {
       evaluationEvidence: commitmentControl.evaluation_evidence,
       decisions: commitmentControl.decisions,
       reconciliations: commitmentControl.reconciliations,
+      outcomeObservations: commitmentControl.outcome_observations,
+      exceptionReviews: commitmentControl.exception_reviews,
+      attentionNotifications: commitmentControl.attention_notifications,
       workspaceInvites,
     },
     productEvents: productEventResult.rows.map((row) => ({
@@ -2185,11 +2251,21 @@ type CommitmentControlExportRow = {
   evaluation_evidence: Array<Record<string, unknown>>;
   decisions: Array<Record<string, unknown>>;
   reconciliations: Array<Record<string, unknown>>;
+  outcome_observations: Array<Record<string, unknown>>;
+  exception_reviews: Array<Record<string, unknown>>;
+  attention_notifications: Array<Record<string, unknown>>;
 };
 
 export async function readCommitmentControlPrivacyExport(
   query: ReturnType<typeof createSequentialQuery>,
-  load: () => Promise<{ rows: CommitmentControlExportRow[] }>,
+  load: (availability: {
+    authorityFieldsAvailable: boolean;
+    outcomeEnvelopeAvailable: boolean;
+    followThroughAvailable: boolean;
+    attentionOutboxAvailable: boolean;
+    attentionProviderEventsAvailable: boolean;
+    attentionTargetIdentityAvailable: boolean;
+  }) => Promise<{ rows: CommitmentControlExportRow[] }>,
 ): Promise<{ rows: CommitmentControlExportRow[] }> {
   const availability = await query<{ relation_count: number }>(
     `select count(*)::int as relation_count
@@ -2213,11 +2289,112 @@ export async function readCommitmentControlPrivacyExport(
         evaluation_evidence: [],
         decisions: [],
         reconciliations: [],
+        outcome_observations: [],
+        exception_reviews: [],
+        attention_notifications: [],
       }],
     };
   }
   if (relationCount !== 6) throw new Error("Commitment Control privacy schema is partially installed.");
-  return load();
+  const optionalColumns = await query<{ authority_column_count: number }>(
+    `select count(*)::int as authority_column_count
+     from (values
+       ('commitment_control_proposals', 'submitted_by_display_name'),
+       ('commitment_control_evaluations', 'cited_exposure_basis'),
+       ('commitment_control_decisions', 'decided_by_display_name'),
+       ('commitment_control_decisions', 'override_reason')
+     ) as requested(table_name, column_name)
+     join information_schema.columns column_info
+       on column_info.table_schema = 'public'
+      and column_info.table_name = requested.table_name
+      and column_info.column_name = requested.column_name`,
+  );
+  const authorityColumnCount = optionalColumns.rows[0]?.authority_column_count ?? 0;
+  if (authorityColumnCount !== 0 && authorityColumnCount !== 4) {
+    throw new Error("Commitment Control authority privacy schema is partially installed.");
+  }
+  const outcomeColumns = await query<{ column_count: number }>(
+    `select count(*)::int as column_count
+     from (values
+       ('commitment_control_proposals', 'intended_outcome_metric'),
+       ('commitment_control_proposals', 'intended_outcome_direction'),
+       ('commitment_control_proposals', 'intended_outcome_target_value'),
+       ('commitment_control_proposals', 'intended_outcome_unit'),
+       ('commitment_control_proposals', 'intended_outcome_review_on'),
+       ('commitment_control_decisions', 'authorization_expires_on'),
+      ('commitment_control_reconciliations', 'observed_evidence_date'),
+       ('commitment_control_reconciliations', 'observed_outcome_value'),
+       ('commitment_control_reconciliations', 'observed_outcome_on'),
+       ('commitment_control_reconciliations', 'outcome_observation_basis'),
+       ('commitment_control_reconciliations', 'outcome_verdict')
+     ) as requested(table_name, column_name)
+     join information_schema.columns column_info
+       on column_info.table_schema = 'public'
+      and column_info.table_name = requested.table_name
+      and column_info.column_name = requested.column_name`,
+  );
+  const outcomeColumnCount = outcomeColumns.rows[0]?.column_count ?? 0;
+  if (outcomeColumnCount !== 0 && outcomeColumnCount !== 11) {
+    throw new Error("Commitment Control outcome privacy schema is partially installed.");
+  }
+  const followThroughAvailability = await query<{ relation_count: number }>(
+    `select count(*)::int as relation_count
+     from unnest(array[
+       'commitment_control_outcome_observations',
+       'commitment_control_exception_reviews'
+     ]) as requested(name)
+     where to_regclass('public.' || name) is not null`,
+  );
+  const followThroughRelationCount = followThroughAvailability.rows[0]?.relation_count ?? 0;
+  if (followThroughRelationCount !== 0 && followThroughRelationCount !== 2) {
+    throw new Error("Commitment Control follow-through privacy schema is partially installed.");
+  }
+  const attentionAvailability = await query<{ present: boolean }>(
+    `select to_regclass('public.commitment_control_attention_notifications') is not null as present`,
+  );
+  const attentionOutboxAvailable = attentionAvailability.rows[0]?.present === true;
+  let attentionProviderColumnCount = 0;
+  let attentionTargetColumnCount = 0;
+  if (attentionOutboxAvailable) {
+    const attentionProviderColumns = await query<{ column_count: number }>(
+      `select count(*)::int as column_count
+       from (values
+         ('last_provider_event_type'),
+         ('last_provider_event_at')
+       ) as requested(column_name)
+       join information_schema.columns column_info
+         on column_info.table_schema = 'public'
+        and column_info.table_name = 'commitment_control_attention_notifications'
+        and column_info.column_name = requested.column_name`,
+    );
+    attentionProviderColumnCount = attentionProviderColumns.rows[0]?.column_count ?? 0;
+    if (attentionProviderColumnCount !== 0 && attentionProviderColumnCount !== 2) {
+      throw new Error("Commitment Control attention provider privacy schema is partially installed.");
+    }
+    const attentionTargetColumns = await query<{ column_count: number }>(
+      `select count(*)::int as column_count
+       from (values
+         ('target_kind'),
+         ('target_id')
+       ) as requested(column_name)
+       join information_schema.columns column_info
+         on column_info.table_schema = 'public'
+        and column_info.table_name = 'commitment_control_attention_notifications'
+        and column_info.column_name = requested.column_name`,
+    );
+    attentionTargetColumnCount = attentionTargetColumns.rows[0]?.column_count ?? 0;
+    if (attentionTargetColumnCount !== 0 && attentionTargetColumnCount !== 2) {
+      throw new Error("Commitment Control attention target privacy schema is partially installed.");
+    }
+  }
+  return load({
+    authorityFieldsAvailable: authorityColumnCount === 4,
+    outcomeEnvelopeAvailable: outcomeColumnCount === 11,
+    followThroughAvailable: followThroughRelationCount === 2,
+    attentionOutboxAvailable,
+    attentionProviderEventsAvailable: attentionProviderColumnCount === 2,
+    attentionTargetIdentityAvailable: attentionTargetColumnCount === 2,
+  });
 }
 
 async function loadWorkspaceInvitesPrivacyExport(

@@ -2,14 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AuthorizationLoop } from "@/app/authorization-loop";
+import { buildControlAttention } from "@/lib/commitment-control/attention";
 import { activeCommitmentControlStep } from "@/lib/commitment-control-loop";
+import { indiaCalendarDate } from "@/lib/date-only";
 import { controlDraftFromGuestProposal, readGuestProposalDraft } from "@/lib/guest-proposal-draft";
+import type {
+  ControlExceptionTargetKind,
+  RecordControlExceptionReviewRequest,
+  RecordControlOutcomeObservationRequest,
+} from "@/lib/commitment-control/contracts";
 import type { CommitmentSummaryDto, EvidenceDto } from "@/lib/recovery/contracts";
 import { currencyExponent, minorUnitsToDecimal } from "@/lib/recovery/domain";
 import { formatMoment } from "../labels";
 import { FailureBlock, LoadingBlock, StateBlock } from "../recovery-states";
 import type { TransportFailure } from "../transport";
+import { ControlAttention } from "./control-attention";
 import { ControlDecisionDialog } from "./control-decision-dialog";
+import { ControlExceptionReviewDialog } from "./control-exception-review-dialog";
 import {
   controlCategories,
   controlCategoryLabels,
@@ -19,11 +28,17 @@ import {
 import { ControlPolicyDialog } from "./control-policy-dialog";
 import { ControlProposalComposer } from "./control-proposal-composer";
 import { ControlProposalRow } from "./control-proposal-row";
-import { ControlReconciliationDialog, type ControlEvidenceState } from "./control-reconciliation-dialog";
+import { ControlOutcomeDialog } from "./control-outcome-dialog";
+import {
+  ControlReconciliationDialog,
+  type ControlCandidateState,
+  type ControlEvidenceState,
+} from "./control-reconciliation-dialog";
 import {
   controlDecisionRequest,
   controlPolicyRequest,
   controlProposalRequest,
+  controlReconciliationRequest,
   controlReducer,
   initialControlState,
   policyDraftFrom,
@@ -31,6 +46,7 @@ import {
   type ControlDecisionDraft,
   type ControlPolicyDraft,
   type ControlProposalDraft,
+  type ControlReconciliationDraft,
   type ControlState,
 } from "./control-state";
 import { createControlTransport } from "./control-transport";
@@ -73,6 +89,7 @@ export type CommitmentControlDesk = {
   available: boolean;
   unavailable: boolean;
   evidence: ControlEvidenceState;
+  candidates: ControlCandidateState;
   reload: () => void;
   handlers: {
     changeDraft: (draft: Partial<ControlProposalDraft>) => void;
@@ -80,13 +97,18 @@ export type CommitmentControlDesk = {
     submitProposal: () => void;
     openDecision: (proposalId: string, returnFocusId: string) => void;
     openReconciliation: (proposalId: string, returnFocusId: string) => void;
+    openOutcome: (proposalId: string, returnFocusId: string) => void;
+    openExceptionReview: (proposalId: string, targetKind: ControlExceptionTargetKind, targetId: string, returnFocusId: string) => void;
     openPolicy: (returnFocusId: string) => void;
     closeDialog: () => void;
     changeDecisionDraft: (draft: Partial<ControlDecisionDraft>) => void;
     submitDecision: () => void;
     selectReconciliationCommitment: (commitmentId: string) => void;
     selectReconciliationEvidence: (evidenceId: string) => void;
+    changeReconciliationDraft: (draft: Partial<ControlReconciliationDraft>) => void;
     submitReconciliation: () => void;
+    submitOutcome: (request: RecordControlOutcomeObservationRequest) => void;
+    submitExceptionReview: (request: RecordControlExceptionReviewRequest) => void;
     changePolicyDraft: (draft: Partial<ControlPolicyDraft>) => void;
     submitPolicy: () => void;
     focusProposal: (proposalId: string) => void;
@@ -111,6 +133,7 @@ export function useCommitmentControl({
   const transport = useMemo(() => createControlTransport(), []);
   const [state, dispatch] = useReducer(controlReducer, initialControlState);
   const [evidence, setEvidence] = useState<ControlEvidenceState>({ kind: "IDLE" });
+  const [candidates, setCandidates] = useState<ControlCandidateState>({ kind: "IDLE" });
   // Mutation handlers read the committed state, never a render-time snapshot,
   // so a retry always sends the workspace version the reader actually saw.
   const stateRef = useRef(state);
@@ -168,7 +191,7 @@ export function useCommitmentControl({
     if (current.dialog?.kind !== "DECISION" || current.workspaceVersion === null || current.pending) return;
     const entry = proposalFor(current.dialog.proposalId);
     if (!entry) return;
-    const built = controlDecisionRequest(current.decisionDraft, entry.proposal, entry.evaluation);
+    const built = controlDecisionRequest(current.decisionDraft, entry.proposal, entry.evaluation, indiaCalendarDate());
     if (!built.ok) {
       dispatch({ type: "DECISION_DRAFT_CHANGED", draft: { error: built.message } });
       return;
@@ -191,13 +214,18 @@ export function useCommitmentControl({
   const submitReconciliation = useCallback(async () => {
     const current = stateRef.current;
     if (current.dialog?.kind !== "RECONCILIATION" || current.workspaceVersion === null || current.pending) return;
-    const evidenceId = current.reconciliationDraft.evidenceId;
-    if (!evidenceId) return;
     const proposalId = current.dialog.proposalId;
-    const signature = JSON.stringify({ proposalId, evidenceId });
+    const entry = proposalFor(proposalId);
+    if (!entry) return;
+    const built = controlReconciliationRequest(current.reconciliationDraft, entry.proposal, indiaCalendarDate());
+    if (!built.ok) {
+      dispatch({ type: "RECONCILIATION_DRAFT_CHANGED", draft: { error: built.message } });
+      return;
+    }
+    const signature = JSON.stringify({ proposalId, ...built.request });
     const idempotencyKey = resolveIdempotencyKey(current.idempotency, "RECONCILIATION", signature, newIdempotencyKey);
     dispatch({ type: "RECONCILIATION_STARTED", proposalId, idempotencyKey, signature });
-    const result = await transport.reconcileProposal(proposalId, { evidenceId }, {
+    const result = await transport.reconcileProposal(proposalId, built.request, {
       workspaceVersion: current.workspaceVersion,
       idempotencyKey,
     });
@@ -206,6 +234,44 @@ export function useCommitmentControl({
       return;
     }
     dispatch({ type: "RECONCILIATION_FAILED", failure: result });
+    if (result.error.code === "STALE_STATE") await loadBrief();
+  }, [loadBrief, proposalFor, transport]);
+
+  const submitOutcome = useCallback(async (request: RecordControlOutcomeObservationRequest) => {
+    const current = stateRef.current;
+    if (current.dialog?.kind !== "OUTCOME" || current.workspaceVersion === null || current.pending) return;
+    const proposalId = current.dialog.proposalId;
+    const signature = JSON.stringify({ proposalId, ...request });
+    const idempotencyKey = resolveIdempotencyKey(current.idempotency, "OUTCOME", signature, newIdempotencyKey);
+    dispatch({ type: "OUTCOME_STARTED", proposalId, idempotencyKey, signature });
+    const result = await transport.recordOutcome(proposalId, request, {
+      workspaceVersion: current.workspaceVersion,
+      idempotencyKey,
+    });
+    if (result.ok) {
+      dispatch({ type: "OUTCOME_SAVED", observation: result.data.observation, meta: result.meta });
+      return;
+    }
+    dispatch({ type: "OUTCOME_FAILED", failure: result });
+    if (result.error.code === "STALE_STATE") await loadBrief();
+  }, [loadBrief, transport]);
+
+  const submitExceptionReview = useCallback(async (request: RecordControlExceptionReviewRequest) => {
+    const current = stateRef.current;
+    if (current.dialog?.kind !== "EXCEPTION_REVIEW" || current.workspaceVersion === null || current.pending) return;
+    const proposalId = current.dialog.proposalId;
+    const signature = JSON.stringify({ proposalId, ...request });
+    const idempotencyKey = resolveIdempotencyKey(current.idempotency, "EXCEPTION_REVIEW", signature, newIdempotencyKey);
+    dispatch({ type: "EXCEPTION_REVIEW_STARTED", proposalId, idempotencyKey, signature });
+    const result = await transport.reviewException(proposalId, request, {
+      workspaceVersion: current.workspaceVersion,
+      idempotencyKey,
+    });
+    if (result.ok) {
+      dispatch({ type: "EXCEPTION_REVIEW_SAVED", review: result.data.review, meta: result.meta });
+      return;
+    }
+    dispatch({ type: "EXCEPTION_REVIEW_FAILED", failure: result });
     if (result.error.code === "STALE_STATE") await loadBrief();
   }, [loadBrief, transport]);
 
@@ -242,11 +308,20 @@ export function useCommitmentControl({
       : { kind: "FAILED", failure: { error: result.failure.error, origin: result.failure.origin } });
   }, [loadEvidence]);
 
+  const loadReconciliationCandidates = useCallback(async (proposalId: string) => {
+    setCandidates({ kind: "LOADING" });
+    const result = await transport.reconciliationCandidates(proposalId);
+    setCandidates(result.ok
+      ? { kind: "READY", items: result.data.candidates }
+      : { kind: "FAILED" });
+  }, [transport]);
+
   return {
     state,
     available: state.status.kind === "READY",
     unavailable: state.status.kind === "UNAVAILABLE",
     evidence,
+    candidates,
     reload: () => void loadBrief(false),
     handlers: {
       changeDraft: (draft) => dispatch({ type: "DRAFT_CHANGED", draft }),
@@ -255,8 +330,20 @@ export function useCommitmentControl({
       openDecision: (proposalId, returnFocusId) => dispatch({ type: "DIALOG_OPENED", dialog: { kind: "DECISION", proposalId }, returnFocusId }),
       openReconciliation: (proposalId, returnFocusId) => {
         setEvidence({ kind: "IDLE" });
+        setCandidates({ kind: "LOADING" });
         dispatch({ type: "DIALOG_OPENED", dialog: { kind: "RECONCILIATION", proposalId }, returnFocusId });
+        void loadReconciliationCandidates(proposalId);
       },
+      openOutcome: (proposalId, returnFocusId) => dispatch({
+        type: "DIALOG_OPENED",
+        dialog: { kind: "OUTCOME", proposalId },
+        returnFocusId,
+      }),
+      openExceptionReview: (proposalId, targetKind, targetId, returnFocusId) => dispatch({
+        type: "DIALOG_OPENED",
+        dialog: { kind: "EXCEPTION_REVIEW", proposalId, targetKind, targetId },
+        returnFocusId,
+      }),
       openPolicy: (returnFocusId) => dispatch({
         type: "DIALOG_OPENED",
         dialog: { kind: "POLICY" },
@@ -268,7 +355,10 @@ export function useCommitmentControl({
       submitDecision: () => void submitDecision(),
       selectReconciliationCommitment: (commitmentId) => void selectReconciliationCommitment(commitmentId),
       selectReconciliationEvidence: (evidenceId) => dispatch({ type: "RECONCILIATION_DRAFT_CHANGED", draft: { evidenceId } }),
+      changeReconciliationDraft: (draft) => dispatch({ type: "RECONCILIATION_DRAFT_CHANGED", draft }),
       submitReconciliation: () => void submitReconciliation(),
+      submitOutcome: (request) => void submitOutcome(request),
+      submitExceptionReview: (request) => void submitExceptionReview(request),
       changePolicyDraft: (draft) => dispatch({ type: "POLICY_DRAFT_CHANGED", draft }),
       submitPolicy: () => void submitPolicy(),
       focusProposal: (proposalId) => dispatch({ type: "FOCUS_SET", proposalId }),
@@ -325,9 +415,17 @@ export function ControlView({
   const awaitingDecision = brief.proposals.filter((entry) => entry.evaluation !== null && entry.decision === null);
   const authorized = brief.proposals.filter((entry) => entry.decision !== null);
   const awaitingEvidence = authorized.filter((entry) => entry.decision?.action !== "DECLINE" && entry.reconciliations.length === 0);
+  const attention = buildControlAttention(brief.proposals, { today: indiaCalendarDate() });
+  const pendingProposalId = state.pending && state.pending.kind !== "PROPOSAL" && state.pending.kind !== "POLICY"
+    ? state.pending.proposalId
+    : null;
   const dialogProposalId = state.dialog && state.dialog.kind !== "POLICY" ? state.dialog.proposalId : null;
   const dialogEntry = dialogProposalId
     ? brief.proposals.find((entry) => entry.proposal.id === dialogProposalId) ?? null
+    : null;
+  const exceptionDialog = state.dialog?.kind === "EXCEPTION_REVIEW" ? state.dialog : null;
+  const dialogAttention = exceptionDialog
+    ? attention.find((item) => item.targetKind === exceptionDialog.targetKind && item.targetId === exceptionDialog.targetId) ?? null
     : null;
 
   const blockedReason = !brief.capabilities.canSubmitProposal
@@ -387,6 +485,17 @@ export function ControlView({
         </div>
       ) : null}
 
+      {state.attentionProjection === "pending-worker-retry" ? (
+        <div role="status">
+          <StateBlock
+            eyebrow="Reminder retry pending"
+            title="The record is saved; its reminder queue needs another pass"
+            detail="The immediate reminder projection did not complete. The authenticated Control worker can rebuild it on its next run. Until then, use this Needs you desk as the source of truth."
+            tone="caution"
+          />
+        </div>
+      ) : null}
+
       {policy === null ? (
         <StateBlock
           eyebrow="No policy yet"
@@ -410,6 +519,18 @@ export function ControlView({
       ) : null}
 
       {state.failure && !state.staleNotice ? <FailureBlock failure={state.failure} /> : null}
+
+      <ControlAttention
+        items={attention}
+        canAct={brief.capabilities.canDecide}
+        online={online}
+        pendingProposalId={pendingProposalId}
+        onDecide={handlers.openDecision}
+        onReconcile={handlers.openReconciliation}
+        onRecordOutcome={handlers.openOutcome}
+        onReviewException={handlers.openExceptionReview}
+        onReview={handlers.focusProposal}
+      />
 
       <section
         aria-labelledby="control-queue-heading"
@@ -572,15 +693,45 @@ export function ControlView({
           commitments={commitments}
           draft={state.reconciliationDraft}
           evidence={desk.evidence}
+          candidates={desk.candidates}
           pending={state.pending?.kind === "RECONCILIATION"}
           online={online}
           failure={state.failure}
           returnFocusId={state.returnFocusId}
           onSelectCommitment={handlers.selectReconciliationCommitment}
           onSelectEvidence={handlers.selectReconciliationEvidence}
+          onChange={handlers.changeReconciliationDraft}
           onClose={handlers.closeDialog}
           onSubmit={handlers.submitReconciliation}
           onAddBill={onAddBill}
+        />
+      ) : null}
+
+      {state.dialog?.kind === "OUTCOME" && dialogEntry ? (
+        <ControlOutcomeDialog
+          proposal={dialogEntry.proposal}
+          today={indiaCalendarDate()}
+          pending={state.pending?.kind === "OUTCOME"}
+          online={online}
+          failure={state.failure}
+          returnFocusId={state.returnFocusId}
+          onClose={handlers.closeDialog}
+          onSubmit={handlers.submitOutcome}
+        />
+      ) : null}
+
+      {state.dialog?.kind === "EXCEPTION_REVIEW" && dialogAttention ? (
+        <ControlExceptionReviewDialog
+          headline={dialogAttention.headline}
+          detail={dialogAttention.body}
+          targetKind={state.dialog.targetKind}
+          targetId={state.dialog.targetId}
+          pending={state.pending?.kind === "EXCEPTION_REVIEW"}
+          online={online}
+          failure={state.failure}
+          returnFocusId={state.returnFocusId}
+          onClose={handlers.closeDialog}
+          onSubmit={handlers.submitExceptionReview}
         />
       ) : null}
 
@@ -612,6 +763,6 @@ export function ControlView({
 
 function pendingKindFor(state: ControlState, proposalId: string): "DECISION" | "RECONCILIATION" | null {
   const pending = state.pending;
-  if (!pending || pending.kind === "PROPOSAL" || pending.kind === "POLICY") return null;
+  if (!pending || (pending.kind !== "DECISION" && pending.kind !== "RECONCILIATION")) return null;
   return pending.proposalId === proposalId ? pending.kind : null;
 }

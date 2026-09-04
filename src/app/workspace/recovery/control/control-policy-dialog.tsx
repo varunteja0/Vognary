@@ -65,7 +65,7 @@ export function ControlPolicyDialog({
       title={draft.step === "EDIT" ? "Compose the next policy version" : "Review before recording"}
       description={
         currentVersion === null
-          ? "This workspace has no policy yet. Recording creates version 1."
+          ? "This workspace has no policy yet. The limits below are a starting point to edit, not your numbers. Recording creates version 1."
           : `Version ${currentVersion} is published and stays unchanged. Recording creates version ${currentVersion + 1}.`
       }
       onClose={onClose}

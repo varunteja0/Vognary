@@ -1,6 +1,6 @@
 import { COMMITMENT_CONTROL_STEPS } from "./commitment-control-loop";
 
-export const agentLinkHeader = '</index.md>; rel="alternate"; type="text/markdown", </llms.txt>; rel="describedby"';
+export const agentLinkHeader = '</index.md>; rel="alternate"; type="text/markdown", </llms.txt>; rel="describedby", </demo.md>; rel="alternate"; type="text/markdown", </feed.json>; rel="alternate"; type="application/feed+json", </feed.xml>; rel="alternate"; type="application/atom+xml"';
 
 const commitmentControlLoopMarkdown = COMMITMENT_CONTROL_STEPS
   .map((step, index) => `${index + 1}. ${step}`)
@@ -21,9 +21,9 @@ The requested Vognary path does not exist.
 
 export const agentHomepageMarkdown = `# Vognary
 
-> Commitment Control for India-first 5–100 person AI-native companies.
+> Commitment Control for India-first 20–100 person AI-native companies.
 
-Vognary records a proposed obligation, cited existing exposure, and versioned policy, then a named human authorizes a frozen cap. Later Recovery receipts prove the observed outcome against that authorization. Proposal amounts are user-entered assumptions until evidence cites them. If the evidence does not support a financial fact, Vognary leaves it unknown.
+Vognary records a proposed obligation, cited existing exposure, and versioned policy, then a named human authorizes a frozen cap. Later Recovery receipts prove observed cost against that authorization. A separately labelled user-entered outcome observation can be compared with the frozen target; it is not independently verified evidence. Proposal amounts are user-entered assumptions until evidence cites them. If the evidence does not support a financial fact, Vognary leaves it unknown.
 
 This loop is the product. Vognary is not a live bank feed, mailbox-wide scanner, budgeting suite, procurement platform, or autonomous cancellation service. An authorization is a recorded human decision. It is not a purchase, a cancellation, or a payment.
 
@@ -39,7 +39,7 @@ ${commitmentControlLoopMarkdown}
 
 ## Best fit
 
-Vognary is designed for finance owners at India-first, 5–100 person AI-native companies that need a human decision before a new software, cloud, contractor, or campaign obligation exists.
+Vognary is designed for finance owners at India-first, 20–100 person AI-native companies that need a human decision before a new software, cloud, contractor, or campaign obligation exists.
 
 ## How to use it
 
@@ -56,6 +56,9 @@ Vognary does not cancel a service, move vendor money, ask for bank passwords, or
 ## Public resources
 
 - [Agent guide](https://www.vognary.com/llms.txt)
+- [Synthetic decision artifact in Markdown](https://www.vognary.com/demo.md)
+- [Public artifacts in JSON Feed](https://www.vognary.com/feed.json)
+- [Public artifacts in Atom](https://www.vognary.com/feed.xml)
 - [Public sitemap](https://www.vognary.com/sitemap.xml)
 - [About Vognary](https://www.vognary.com/about)
 - [Contact](https://www.vognary.com/contact)
@@ -67,7 +70,7 @@ Vognary does not cancel a service, move vendor money, ask for bank passwords, or
 
 export const llmsTxt = `# Vognary
 
-> Vognary is Commitment Control for India-first 5–100 person AI-native companies: proposed obligation, cited exposure, versioned policy, named human authorization, frozen cap, later Recovery evidence, exact reconciliation.
+> Vognary is Commitment Control for India-first 20–100 person AI-native companies: proposed obligation, cited exposure, versioned policy, named human authorization, frozen cap and expiry, later Recovery evidence, exact observed-cost reconciliation, and a separately labelled user-entered outcome observation.
 
 Important interpretation rules:
 
@@ -99,6 +102,9 @@ Important interpretation rules:
 
 - [Homepage in Markdown](https://www.vognary.com/index.md): Concise product identity, workflow, best fit, and boundaries.
 - [Walk a synthetic decision](https://www.vognary.com/demo): Read-only placeholder example of evidence, proposal, policy, human authorization, and later reconciliation.
+- [Synthetic decision artifact in Markdown](https://www.vognary.com/demo.md): Machine-readable identity, sequence, branch outcomes, and product boundaries for the same canonical example.
+- [Public artifacts in JSON Feed](https://www.vognary.com/feed.json): Machine-readable artifact identity, summary, and decision branches.
+- [Public artifacts in Atom](https://www.vognary.com/feed.xml): Syndication feed for the same canonical artifacts.
 - [Add a bill](https://www.vognary.com/start): No-account step for reviewing user-provided billing evidence.
 - [Vognary homepage](https://www.vognary.com/): Human-facing product overview and route into the synthetic demonstration or a user-provided bill.
 

@@ -13,11 +13,77 @@ import {
 import { getDatabasePool } from "../../src/lib/server/database";
 import { RecoveryServiceError } from "../../src/lib/server/recovery-api";
 import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
-import { completeControlPolicyRequest, futureControlTestDate } from "../commitment-control-policy-fixture";
+import { completeControlPolicyRequest, futureControlTestDate, testControlOutcome } from "../commitment-control-policy-fixture";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
 const futureFirstChargeDate = futureControlTestDate();
 process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "*";
+
+test("Commitment Control installs the complete authorization and outcome envelope", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const pool = getDatabasePool();
+  const columns = await pool.query<{ table_name: string; column_name: string }>(
+    `select table_name, column_name
+     from information_schema.columns
+     where table_schema = 'public'
+       and (table_name, column_name) in (
+         ('commitment_control_proposals', 'intended_outcome_metric'),
+         ('commitment_control_proposals', 'intended_outcome_direction'),
+         ('commitment_control_proposals', 'intended_outcome_target_value'),
+         ('commitment_control_proposals', 'intended_outcome_unit'),
+         ('commitment_control_proposals', 'intended_outcome_review_on'),
+         ('commitment_control_decisions', 'authorization_expires_on'),
+         ('commitment_control_reconciliations', 'observed_outcome_value'),
+         ('commitment_control_reconciliations', 'observed_outcome_on'),
+         ('commitment_control_reconciliations', 'observed_evidence_date'),
+         ('commitment_control_reconciliations', 'outcome_observation_basis'),
+         ('commitment_control_reconciliations', 'outcome_verdict')
+       )
+     order by table_name, column_name`,
+  );
+  assert.equal(columns.rows.length, 11);
+
+  const constraints = await pool.query<{ conname: string; definition: string }>(
+    `select conname, pg_get_constraintdef(oid) as definition from pg_constraint
+     where conname = any($1::text[])
+     order by conname`,
+    [[
+      "commitment_control_proposals_intended_outcome_check",
+      "commitment_control_decisions_authorization_window_check",
+      "commitment_control_reconciliations_outcome_check",
+      "cc_reconciliations_outcome_basis_check",
+      "cc_reconciliations_verdict_check",
+      "cc_reconciliations_cost_check",
+      "cc_proposals_outcome_value_check",
+    ]],
+  );
+  assert.deepEqual(constraints.rows.map((row) => row.conname), [
+    "cc_proposals_outcome_value_check",
+    "cc_reconciliations_cost_check",
+    "cc_reconciliations_outcome_basis_check",
+    "cc_reconciliations_verdict_check",
+    "commitment_control_decisions_authorization_window_check",
+    "commitment_control_proposals_intended_outcome_check",
+    "commitment_control_reconciliations_outcome_check",
+  ]);
+  const costConstraint = constraints.rows.find((row) => row.conname === "cc_reconciliations_cost_check")?.definition ?? "";
+  assert.match(costConstraint, /AUTHORIZATION_EXPIRED[\s\S]*observed_amount_minor IS NOT NULL[\s\S]*observed_currency IS NOT NULL[\s\S]*observed_evidence_date IS NOT NULL/i);
+
+  const staleConstraints = await pool.query<{ conname: string }>(
+    `select conname from pg_constraint
+     where conname = any($1::text[])
+     order by conname`,
+    [[
+      "commitment_control_reconciliations_verdict_check",
+      "commitment_control_reconciliations_check",
+      "commitment_control_proposals_intended_outcome_target_valu_check",
+      "commitment_control_reconciliati_outcome_observation_basis_check",
+      "commitment_control_reconciliations_outcome_observation_basis_ch",
+    ]],
+  );
+  assert.deepEqual(staleConstraints.rows, []);
+});
 
 test("selected Recovery exposure stays cited and currency-separated through persistence", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
@@ -78,6 +144,7 @@ test("selected Recovery exposure stays cited and currency-separated through pers
         firstChargeDate: "2026-09-01",
         cadence: "MONTHLY",
         existingCommitmentIds: commitments.rows.map((row) => row.id),
+        intendedOutcome: testControlOutcome(),
       },
       now: new Date("2026-08-25T09:00:00.000Z"),
     });
@@ -140,6 +207,7 @@ test("concurrent decisions serialize, and consented events do not duplicate on r
         firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
+        intendedOutcome: testControlOutcome(),
       },
     });
 
@@ -150,7 +218,7 @@ test("concurrent decisions serialize, and consented events do not duplicate on r
         proposalId: proposal.data.proposal.id,
         expectedVersion: proposal.workspaceVersion,
         idempotencyKey: `control-events-approve-${suffix}`,
-        request: { action: "APPROVE" },
+        request: { action: "APPROVE", authorizationExpiresOn: "2099-12-30" },
       }),
       decideCommitmentControlProposal({
         workspaceId,
@@ -219,6 +287,7 @@ test("deleting an actor nulls identity fields without mutating immutable financi
         firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
+        intendedOutcome: testControlOutcome(),
       },
     });
     const decision = await decideCommitmentControlProposal({
@@ -227,7 +296,11 @@ test("deleting an actor nulls identity fields without mutating immutable financi
       proposalId: proposal.data.proposal.id,
       expectedVersion: proposal.workspaceVersion,
       idempotencyKey: `control-erasure-decision-${suffix}`,
-      request: { action: "APPROVE_WITH_CAP", approvedCapMinor: "180000" },
+      request: {
+        action: "APPROVE_WITH_CAP",
+        approvedCapMinor: "180000",
+        authorizationExpiresOn: "2099-12-30",
+      },
     });
     const evidence = await submitRecoveryEvidence({
       workspaceId,
@@ -313,6 +386,7 @@ test("analytics failure cannot roll back or duplicate a frozen Control decision"
         firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
+        intendedOutcome: testControlOutcome(),
       },
     });
     await pool.query(`
@@ -342,7 +416,7 @@ test("analytics failure cannot roll back or duplicate a frozen Control decision"
       proposalId: proposal.data.proposal.id,
       expectedVersion: proposal.workspaceVersion,
       idempotencyKey: `control-event-failure-decision-${suffix}`,
-      request: { action: "APPROVE" as const },
+      request: { action: "APPROVE" as const, authorizationExpiresOn: "2099-12-30" },
     };
     const decision = await decideCommitmentControlProposal(decisionInput);
     assert.equal(decision.replayed, false);

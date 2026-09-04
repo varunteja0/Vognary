@@ -80,6 +80,15 @@ test("feature readiness checks every persistent capability migration with bounde
     "0057_commitment_control_v0",
     "0058_workspace_invites",
     "0059_control_authority_hardening",
+    "0060_control_outcome_authorization_window",
+    "0061_control_outcome_observation_honesty",
+    "0062_control_outcome_basis_constraint_name",
+    "0063_control_authorization_expiry_verdict",
+    "0064_control_expired_verdict_integrity",
+    "0065_control_attention_outbox",
+    "0066_control_attention_provider_events",
+    "0067_control_follow_through",
+    "0068_control_attention_target_identity",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -92,6 +101,21 @@ test("feature readiness checks every persistent capability migration with bounde
   assert.match(source, /max\(last_used_at\)/);
   assert.match(source, /metadata ->> 'ledgerAuthority'[\s\S]*<> 'RECOVERY_V1'/);
   assert.doesNotMatch(source, /select[^;]*(merchant|email|amount|token_hash|scopes)/i);
+  const controlAttentionCheck = source.slice(
+    source.indexOf("async function checkControlAttention"),
+    source.indexOf("async function checkPlatformApi"),
+  );
+  assert.match(controlAttentionCheck, /const migrationId = "0068_control_attention_target_identity"/);
+  assert.match(
+    source,
+    /controlAttention: \{[\s\S]*?migrationId: "0068_control_attention_target_identity" as const/,
+    "unconfigured readiness must name the complete attention scheduler schema",
+  );
+    assert.match(
+      source,
+      /controlAttention: \{ \.\.\.unavailable\.controlAttention, status: "migration-ledger-unavailable" as const \}/,
+      "migration-ledger failure must preserve aggregate Control attention readiness",
+    );
 });
 
 test("CI executes the production schema against PostgreSQL before application checks", () => {
@@ -277,7 +301,7 @@ test("Vercel builds never race Recovery cutover migrations ahead of worker retir
   assert.match(runbook, /Deploy the exact candidate SHA/);
   assert.match(runbook, /Wait at least five minutes after the last old sync, reminder, or savings-verification invocation finishes/);
   assert.match(runbook, /DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema/);
-  assert.match(runbook, /last row is `0057_commitment_control_v0`/);
+  assert.match(runbook, /last row is `0068_control_attention_target_identity`/);
 });
 
 test("CI browser journeys exercise the built Next.js production artifact", () => {
@@ -332,6 +356,9 @@ test("internal readiness distinguishes schema, observed evidence, and operator a
   assert.match(source, /configured-postgres/);
   assert.match(source, /getCommitmentControlEnrollmentReadiness/);
   assert.match(source, /commitmentControlEnrollment/);
+  assert.match(source, /commitmentControlAttention/);
+  assert.match(source, /deadLetters/);
+  assert.match(source, /delivery-observed/);
   assert.match(source, /release: \{ commitSha: deployedCommitSha \}/);
   assert.match(source, /VERCEL_GIT_COMMIT_SHA \|\| process\.env\.COMMITMENT_CONTROL_DEPLOYED_COMMIT_SHA/);
   assert.match(source, /payments: "retired-public-checkout"/);
@@ -398,6 +425,20 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.match(source, /applied\?\.includes\("0058_workspace_invites"\)/);
   assert.match(source, /required\?\.includes\("0059_control_authority_hardening"\)/);
   assert.match(source, /applied\?\.includes\("0059_control_authority_hardening"\)/);
+  assert.match(source, /required\?\.includes\("0060_control_outcome_authorization_window"\)/);
+  assert.match(source, /applied\?\.includes\("0060_control_outcome_authorization_window"\)/);
+  assert.match(source, /required\?\.includes\("0061_control_outcome_observation_honesty"\)/);
+  assert.match(source, /applied\?\.includes\("0061_control_outcome_observation_honesty"\)/);
+  assert.match(source, /required\?\.includes\("0062_control_outcome_basis_constraint_name"\)/);
+  assert.match(source, /applied\?\.includes\("0062_control_outcome_basis_constraint_name"\)/);
+  assert.match(source, /required\?\.includes\("0063_control_authorization_expiry_verdict"\)/);
+  assert.match(source, /applied\?\.includes\("0063_control_authorization_expiry_verdict"\)/);
+  assert.match(source, /required\?\.includes\("0064_control_expired_verdict_integrity"\)/);
+  assert.match(source, /applied\?\.includes\("0064_control_expired_verdict_integrity"\)/);
+  assert.match(source, /required\?\.includes\("0065_control_attention_outbox"\)/);
+  assert.match(source, /applied\?\.includes\("0065_control_attention_outbox"\)/);
+  assert.match(source, /required\?\.includes\("0068_control_attention_target_identity"\)/);
+  assert.match(source, /applied\?\.includes\("0068_control_attention_target_identity"\)/);
   assert.match(source, /betaReady: endpointReport\.every\(\(item\) => item\.ok\)/);
   assert.match(source, /envReport\.filter\(\(item\) => item\.launchBlocking\)/);
   assert.match(source, /activationProfile = "receipt-forwarding"/);

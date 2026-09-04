@@ -26,6 +26,7 @@ const decision: AuthorizedProposalDecision = {
   expectedAmountMinor: "12500",
   decidedByUserId: "c2000000-0000-4000-8000-000000000001",
   decidedAt: issuedAt,
+  authorizationExpiresOn: "2026-09-02",
   overrideReason: null,
 };
 
@@ -262,6 +263,7 @@ async function revocationAndAmbiguityProof() {
       evidenceId: "e2000000-0000-4000-8000-000000000001",
       amountMinor: "11000",
       currency: "USD",
+      evidenceDate: "2026-09-02",
     },
   });
   assert.equal(reconciliation.verdict, "OVER_CAP");

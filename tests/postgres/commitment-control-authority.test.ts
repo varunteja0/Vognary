@@ -10,7 +10,7 @@ import {
 import { getDatabasePool } from "../../src/lib/server/database";
 import { RecoveryServiceError } from "../../src/lib/server/recovery-api";
 import { submitRecoveryEvidence } from "../../src/lib/server/recovery-store";
-import { completeControlPolicyRequest, futureControlTestDate } from "../commitment-control-policy-fixture";
+import { completeControlPolicyRequest, futureControlTestDate, testControlOutcome } from "../commitment-control-policy-fixture";
 
 const databaseConfigured = Boolean(process.env.DATABASE_URL);
 const futureFirstChargeDate = futureControlTestDate();
@@ -86,6 +86,7 @@ test("Control policy refuses a no-op category set and outside-policy approve nee
         firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
+        intendedOutcome: testControlOutcome(),
       },
     });
     assert.equal(proposal.data.evaluation.status, "OUTSIDE_POLICY");
@@ -97,7 +98,7 @@ test("Control policy refuses a no-op category set and outside-policy approve nee
         proposalId: proposal.data.proposal.id,
         expectedVersion: proposal.workspaceVersion,
         idempotencyKey: `authority-silent-${desk.suffix}`,
-        request: { action: "APPROVE" },
+        request: { action: "APPROVE", authorizationExpiresOn: "2099-12-30" },
       }),
       (error: unknown) => error instanceof RecoveryServiceError && error.code === "INVALID_EVIDENCE",
     );
@@ -108,7 +109,11 @@ test("Control policy refuses a no-op category set and outside-policy approve nee
       proposalId: proposal.data.proposal.id,
       expectedVersion: proposal.workspaceVersion,
       idempotencyKey: `authority-override-${desk.suffix}`,
-      request: { action: "APPROVE", overrideReason: "Board-approved exception for this vendor." },
+      request: {
+        action: "APPROVE",
+        authorizationExpiresOn: "2099-12-30",
+        overrideReason: "Board-approved exception for this vendor.",
+      },
     });
     assert.equal(decided.data.decision.overrideReason, "Board-approved exception for this vendor.");
     assert.equal(decided.data.decision.decidedByDisplayName, "Authority owner");
@@ -172,6 +177,7 @@ test("eligible uncited exposure cannot be within policy, and irregular spend cit
         firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
+        intendedOutcome: testControlOutcome(),
       },
     });
     assert.equal(uncited.data.evaluation.status, "REVIEW_REQUIRED");
@@ -192,6 +198,7 @@ test("eligible uncited exposure cannot be within policy, and irregular spend cit
         firstChargeDate: futureFirstChargeDate,
         cadence: "MONTHLY",
         existingCommitmentIds: [commitment.rows[0]!.id],
+        intendedOutcome: testControlOutcome(),
       },
     });
     assert.equal(cited.data.evaluation.citedExposureBasis, "OBSERVATION_ONLY");

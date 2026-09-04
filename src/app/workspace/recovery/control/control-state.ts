@@ -2,16 +2,26 @@ import type {
   CommitmentControlBriefDto,
   ControlDecisionDto,
   ControlEvaluationDto,
+  ControlExceptionDisposition,
+  ControlExceptionReviewDto,
+  ControlExceptionTargetKind,
+  ControlOutcomeObservationDto,
   ControlPolicyDto,
   ControlProposalDto,
   ControlReconciliationDto,
   CreateControlProposalRequest,
   DecideControlProposalRequest,
   PutControlPolicyRequest,
+  ReconcileControlProposalRequest,
+  RecordControlExceptionReviewRequest,
+  RecordControlOutcomeObservationRequest,
 } from "@/lib/commitment-control/contracts";
 import type { ProposalDecisionAction } from "@/lib/commitment-control/decision";
+import { normalizeControlOutcomeValue, type ControlOutcomeDirection } from "@/lib/commitment-control/outcome";
+import { indiaCalendarDate } from "@/lib/date-only";
 import type { CategoryPosture, ProposalCategory } from "@/lib/commitment-control/policy";
 import type { ProposalCadence } from "@/lib/commitment-control/project";
+import type { AttentionProjectionStatus } from "@/lib/recovery/contracts";
 import type { RecoveryFailure } from "../state";
 import type { ResponseMeta, TransportFailure } from "../transport";
 import { formatControlMoney, isCalendarDate, parseControlAmount } from "./control-format";
@@ -37,14 +47,28 @@ export type ControlProposalDraft = {
   firstChargeDate: string;
   cadence: ProposalCadence;
   existingCommitmentIds: readonly string[];
+  outcomeMetric: string;
+  outcomeDirection: ControlOutcomeDirection;
+  outcomeTargetText: string;
+  outcomeUnit: string;
+  outcomeReviewOn: string;
 };
 
-export type ControlProposalField = "merchant" | "purpose" | "amountText" | "firstChargeDate";
+export type ControlProposalField =
+  | "merchant"
+  | "purpose"
+  | "amountText"
+  | "firstChargeDate"
+  | "outcomeMetric"
+  | "outcomeTargetText"
+  | "outcomeUnit"
+  | "outcomeReviewOn";
 export type ControlDraftErrors = Partial<Record<ControlProposalField, string>>;
 
 export type ControlDecisionDraft = {
   action: ProposalDecisionAction | null;
   capText: string;
+  authorizationExpiresOn: string;
   overrideReason: string;
   error: string | null;
 };
@@ -52,6 +76,19 @@ export type ControlDecisionDraft = {
 export type ControlReconciliationDraft = {
   commitmentId: string | null;
   evidenceId: string | null;
+  outcomeValueText: string;
+  outcomeObservedOn: string;
+  error: string | null;
+};
+
+export type ControlOutcomeObservationDraft = {
+  valueText: string;
+  observedOn: string;
+};
+
+export type ControlExceptionReviewDraft = {
+  disposition: ControlExceptionDisposition | null;
+  note: string;
 };
 
 export type ControlPolicyDraftLimit = {
@@ -71,12 +108,16 @@ export type ControlPolicyDraft = {
 export type ControlDialog =
   | { kind: "DECISION"; proposalId: string }
   | { kind: "RECONCILIATION"; proposalId: string }
+  | { kind: "OUTCOME"; proposalId: string }
+  | { kind: "EXCEPTION_REVIEW"; proposalId: string; targetKind: ControlExceptionTargetKind; targetId: string }
   | { kind: "POLICY" };
 
 export type ControlPending =
   | { kind: "PROPOSAL"; idempotencyKey: string }
   | { kind: "DECISION"; idempotencyKey: string; proposalId: string; action: ProposalDecisionAction }
   | { kind: "RECONCILIATION"; idempotencyKey: string; proposalId: string }
+  | { kind: "OUTCOME"; idempotencyKey: string; proposalId: string }
+  | { kind: "EXCEPTION_REVIEW"; idempotencyKey: string; proposalId: string }
   | { kind: "POLICY"; idempotencyKey: string };
 
 export type ControlIdempotencySlot = ControlPending["kind"];
@@ -97,12 +138,13 @@ export type ControlState = {
   pending: ControlPending | null;
   failure: RecoveryFailure | null;
   staleNotice: string | null;
+  attentionProjection: AttentionProjectionStatus | null;
   focusProposalId: string | null;
   idempotency: ControlIdempotencyStore;
   announcement: string;
 };
 
-export const emptyControlProposalDraft: ControlProposalDraft = {
+const emptyControlProposalDraft: ControlProposalDraft = {
   merchant: "",
   purpose: "",
   category: "AI_MODEL",
@@ -111,6 +153,11 @@ export const emptyControlProposalDraft: ControlProposalDraft = {
   firstChargeDate: "",
   cadence: "MONTHLY",
   existingCommitmentIds: [],
+  outcomeMetric: "",
+  outcomeDirection: "AT_LEAST",
+  outcomeTargetText: "",
+  outcomeUnit: "",
+  outcomeReviewOn: "",
 };
 
 export const initialControlState: ControlState = {
@@ -120,14 +167,15 @@ export const initialControlState: ControlState = {
   requestId: null,
   draft: emptyControlProposalDraft,
   draftErrors: {},
-  decisionDraft: { action: null, capText: "", overrideReason: "", error: null },
-  reconciliationDraft: { commitmentId: null, evidenceId: null },
+  decisionDraft: { action: null, capText: "", authorizationExpiresOn: "", overrideReason: "", error: null },
+  reconciliationDraft: { commitmentId: null, evidenceId: null, outcomeValueText: "", outcomeObservedOn: "", error: null },
   policyDraft: null,
   dialog: null,
   returnFocusId: null,
   pending: null,
   failure: null,
   staleNotice: null,
+  attentionProjection: null,
   focusProposalId: null,
   idempotency: {},
   announcement: "",
@@ -153,6 +201,12 @@ export type ControlAction =
   | { type: "RECONCILIATION_STARTED"; proposalId: string; idempotencyKey: string; signature: string }
   | { type: "RECONCILIATION_SAVED"; reconciliation: ControlReconciliationDto; meta: ResponseMeta }
   | { type: "RECONCILIATION_FAILED"; failure: TransportFailure }
+  | { type: "OUTCOME_STARTED"; proposalId: string; idempotencyKey: string; signature: string }
+  | { type: "OUTCOME_SAVED"; observation: ControlOutcomeObservationDto; meta: ResponseMeta }
+  | { type: "OUTCOME_FAILED"; failure: TransportFailure }
+  | { type: "EXCEPTION_REVIEW_STARTED"; proposalId: string; idempotencyKey: string; signature: string }
+  | { type: "EXCEPTION_REVIEW_SAVED"; review: ControlExceptionReviewDto; meta: ResponseMeta }
+  | { type: "EXCEPTION_REVIEW_FAILED"; failure: TransportFailure }
   | { type: "POLICY_DRAFT_CHANGED"; draft: Partial<ControlPolicyDraft> }
   | { type: "POLICY_STARTED"; idempotencyKey: string; signature: string }
   | { type: "POLICY_SAVED"; policy: ControlPolicyDto; meta: ResponseMeta }
@@ -192,6 +246,22 @@ export function controlProposalRequest(draft: ControlProposalDraft): { ok: true;
   const amount = parseControlAmount(draft.amountText, draft.currency);
   if (!amount.ok) errors.amountText = amount.message;
   if (!isCalendarDate(draft.firstChargeDate)) errors.firstChargeDate = "Choose the date of the first charge.";
+  const outcomeMetric = draft.outcomeMetric.trim();
+  const outcomeUnit = draft.outcomeUnit.trim();
+  if (!outcomeMetric) errors.outcomeMetric = "Name the measurable outcome.";
+  else if (outcomeMetric.length > 120) errors.outcomeMetric = "Use 120 characters or fewer.";
+  if (!outcomeUnit) errors.outcomeUnit = "Name the outcome unit.";
+  else if (outcomeUnit.length > 40) errors.outcomeUnit = "Use 40 characters or fewer.";
+  let outcomeTargetValue = "";
+  try {
+    outcomeTargetValue = normalizeControlOutcomeValue(draft.outcomeTargetText, "Outcome target value");
+  } catch {
+    errors.outcomeTargetText = "Use a non-negative number with up to six decimal places.";
+  }
+  if (!isCalendarDate(draft.outcomeReviewOn)) errors.outcomeReviewOn = "Choose when this outcome will be reviewed.";
+  else if (isCalendarDate(draft.firstChargeDate) && draft.outcomeReviewOn < draft.firstChargeDate) {
+    errors.outcomeReviewOn = "Review the outcome on or after the first charge date.";
+  }
   if (Object.keys(errors).length || !amount.ok) return { ok: false, errors };
   return {
     ok: true,
@@ -204,6 +274,13 @@ export function controlProposalRequest(draft: ControlProposalDraft): { ok: true;
       firstChargeDate: draft.firstChargeDate,
       cadence: draft.cadence,
       existingCommitmentIds: [...draft.existingCommitmentIds],
+      intendedOutcome: {
+        metric: outcomeMetric,
+        targetDirection: draft.outcomeDirection,
+        targetValue: outcomeTargetValue,
+        unit: outcomeUnit,
+        reviewOn: draft.outcomeReviewOn,
+      },
     },
   };
 }
@@ -216,6 +293,7 @@ export function controlDecisionRequest(
   draft: ControlDecisionDraft,
   proposal: ControlProposalDto,
   evaluation: ControlEvaluationDto | null,
+  authorizationAsOf = indiaCalendarDate(),
 ): { ok: true; request: DecideControlProposalRequest } | { ok: false; message: string } {
   if (!draft.action) return { ok: false, message: "Choose Approve, Approve with cap, or Decline." };
   const override = draft.overrideReason.trim();
@@ -225,14 +303,97 @@ export function controlDecisionRequest(
   const overrideField = override && evaluation?.status === "OUTSIDE_POLICY" && draft.action !== "DECLINE"
     ? { overrideReason: override }
     : {};
-  if (draft.action === "APPROVE") return { ok: true, request: { action: "APPROVE", ...overrideField } };
+  if (draft.action !== "DECLINE") {
+    if (proposal.intendedOutcome && proposal.intendedOutcome.reviewOn < authorizationAsOf) {
+      return { ok: false, message: "The outcome review date has passed. Decline this proposal or submit a new one." };
+    }
+    if (!isCalendarDate(draft.authorizationExpiresOn)) {
+      return { ok: false, message: "Choose when this authorization expires." };
+    }
+    if (draft.authorizationExpiresOn < authorizationAsOf) {
+      return { ok: false, message: "Authorization expiry cannot be before today." };
+    }
+    if (proposal.intendedOutcome && draft.authorizationExpiresOn > proposal.intendedOutcome.reviewOn) {
+      return { ok: false, message: "Authorization expiry cannot be after the outcome review date." };
+    }
+  }
+  const expiryField = draft.action === "DECLINE" ? {} : { authorizationExpiresOn: draft.authorizationExpiresOn };
+  if (draft.action === "APPROVE") return { ok: true, request: { action: "APPROVE", ...expiryField, ...overrideField } };
   if (draft.action === "DECLINE") return { ok: true, request: { action: "DECLINE" } };
   const cap = parseControlAmount(draft.capText, proposal.currency, "cap");
   if (!cap.ok) return { ok: false, message: cap.message };
   if (BigInt(cap.minor) > BigInt(proposal.amountMinor)) {
     return { ok: false, message: `The cap cannot be above the proposed ${formatControlMoney(proposal.amountMinor, proposal.currency)} per charge.` };
   }
-  return { ok: true, request: { action: "APPROVE_WITH_CAP", approvedCapMinor: cap.minor, ...overrideField } };
+  return { ok: true, request: { action: "APPROVE_WITH_CAP", approvedCapMinor: cap.minor, ...expiryField, ...overrideField } };
+}
+
+export function controlReconciliationRequest(
+  draft: ControlReconciliationDraft,
+  proposal: ControlProposalDto,
+  observedThrough = indiaCalendarDate(),
+): { ok: true; request: ReconcileControlProposalRequest } | { ok: false; message: string } {
+  if (!draft.evidenceId) return { ok: false, message: "Choose a receipt before reconciling." };
+  const value = draft.outcomeValueText.trim();
+  const observedOn = draft.outcomeObservedOn;
+  if (!value && !observedOn) return { ok: true, request: { evidenceId: draft.evidenceId } };
+  if (!value || !observedOn) return { ok: false, message: "Record both the observed outcome value and its date, or leave both blank." };
+  if (!isCalendarDate(observedOn)) return { ok: false, message: "Choose a real observed outcome date." };
+  if (observedOn > observedThrough) return { ok: false, message: "Observed outcome date cannot be in the future." };
+  if (proposal.intendedOutcome && observedOn < proposal.intendedOutcome.reviewOn) {
+    return { ok: false, message: "Observed outcome date cannot be before the intended review date." };
+  }
+  try {
+    return {
+      ok: true,
+      request: {
+        evidenceId: draft.evidenceId,
+        observedOutcome: {
+          value: normalizeControlOutcomeValue(value, "Observed outcome value"),
+          observedOn,
+        },
+      },
+    };
+  } catch {
+    return { ok: false, message: "Observed outcome must be a non-negative number with up to six decimal places." };
+  }
+}
+
+export function controlOutcomeObservationRequest(
+  draft: ControlOutcomeObservationDraft,
+  proposal: ControlProposalDto,
+  observedThrough = indiaCalendarDate(),
+): { ok: true; request: RecordControlOutcomeObservationRequest } | { ok: false; message: string } {
+  if (!proposal.intendedOutcome) return { ok: false, message: "This proposal has no frozen outcome target." };
+  if (!isCalendarDate(draft.observedOn)) return { ok: false, message: "Choose a real observed outcome date." };
+  if (draft.observedOn > observedThrough) return { ok: false, message: "Observed outcome date cannot be in the future." };
+  if (draft.observedOn < proposal.intendedOutcome.reviewOn) {
+    return { ok: false, message: "Observed outcome date cannot be before the intended review date." };
+  }
+  try {
+    return {
+      ok: true,
+      request: {
+        observedOutcome: {
+          value: normalizeControlOutcomeValue(draft.valueText, "Observed outcome value"),
+          observedOn: draft.observedOn,
+        },
+      },
+    };
+  } catch {
+    return { ok: false, message: "Observed outcome must be a non-negative number with up to six decimal places." };
+  }
+}
+
+export function controlExceptionReviewRequest(
+  draft: ControlExceptionReviewDraft,
+  target: { targetKind: ControlExceptionTargetKind; targetId: string },
+): { ok: true; request: RecordControlExceptionReviewRequest } | { ok: false; message: string } {
+  if (!draft.disposition) return { ok: false, message: "Choose what should happen after this exception." };
+  const note = draft.note.trim();
+  if (!note) return { ok: false, message: "Record why this disposition was chosen." };
+  if (note.length > 500) return { ok: false, message: "Use 500 characters or fewer for the review note." };
+  return { ok: true, request: { ...target, disposition: draft.disposition, note } };
 }
 
 export function controlPolicyRequest(draft: ControlPolicyDraft): { ok: true; request: PutControlPolicyRequest } | { ok: false; message: string } {
@@ -266,7 +427,16 @@ export function controlPolicyRequest(draft: ControlPolicyDraft): { ok: true; req
 }
 
 export function policyDraftFrom(policy: ControlPolicyDto | null, toMajor: (minor: string, currency: string) => string): ControlPolicyDraft {
-  const emptyLimit = { currency: "INR", maxPerChargeText: "", maxThirteenWeekText: "", maxAnnualText: "" };
+  // A first-run workspace cannot record a proposal until a policy exists, so an
+  // empty form is a wall in front of the product. These are visible starting
+  // points an owner reviews and edits before saving — never a saved policy, and
+  // never a claim about this company's real limits.
+  const starterLimit = {
+    currency: "INR",
+    maxPerChargeText: "100000",
+    maxThirteenWeekText: "1000000",
+    maxAnnualText: "4000000",
+  };
   return {
     categoryRules: policy
       ? [
@@ -287,7 +457,7 @@ export function policyDraftFrom(policy: ControlPolicyDto | null, toMajor: (minor
         maxThirteenWeekText: toMajor(limit.maxThirteenWeekMinor, limit.currency),
         maxAnnualText: toMajor(limit.maxAnnualMinor, limit.currency),
       }))
-      : [emptyLimit],
+      : [starterLimit],
     step: "EDIT",
     error: null,
   };
@@ -338,7 +508,14 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
     case "DRAFT_CHANGED": {
       const draftErrors = { ...state.draftErrors };
       for (const key of Object.keys(action.draft) as (keyof ControlProposalDraft)[]) {
-        if (key === "merchant" || key === "purpose" || key === "amountText" || key === "firstChargeDate") delete draftErrors[key];
+        if (key === "merchant"
+          || key === "purpose"
+          || key === "amountText"
+          || key === "firstChargeDate"
+          || key === "outcomeMetric"
+          || key === "outcomeTargetText"
+          || key === "outcomeUnit"
+          || key === "outcomeReviewOn") delete draftErrors[key];
       }
       // A currency change re-opens the amount question: the exponent may differ.
       if (action.draft.currency !== undefined) delete draftErrors.amountText;
@@ -380,6 +557,8 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
       const { proposal, submitted } = action;
       const citedUnchanged = submitted.existingCommitmentIds.length === state.draft.existingCommitmentIds.length
         && submitted.existingCommitmentIds.every((id) => state.draft.existingCommitmentIds.includes(id));
+      const outcomeUnchanged = proposal.intendedOutcome !== null
+        && JSON.stringify(proposal.intendedOutcome) === JSON.stringify(submitted.intendedOutcome);
       return {
         ...state,
         pending: null,
@@ -392,12 +571,16 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
           purpose: proposal.purpose === submitted.purpose ? "" : state.draft.purpose,
           amountText: proposal.amountMinor === submitted.amountMinor && proposal.currency === submitted.currency ? "" : state.draft.amountText,
           existingCommitmentIds: citedUnchanged ? [] : state.draft.existingCommitmentIds,
+          outcomeMetric: outcomeUnchanged ? "" : state.draft.outcomeMetric,
+          outcomeTargetText: outcomeUnchanged ? "" : state.draft.outcomeTargetText,
+          outcomeUnit: outcomeUnchanged ? "" : state.draft.outcomeUnit,
+          outcomeReviewOn: outcomeUnchanged ? "" : state.draft.outcomeReviewOn,
         },
         brief: state.brief
           ? {
             ...state.brief,
             proposals: [
-              { proposal: action.proposal, evaluation: action.evaluation, decision: null, reconciliations: [] },
+              { proposal: action.proposal, evaluation: action.evaluation, decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [] },
               ...state.brief.proposals.filter((entry) => entry.proposal.id !== action.proposal.id),
             ],
           }
@@ -406,6 +589,7 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
         requestId: action.meta.requestId,
         focusProposalId: action.proposal.id,
         staleNotice: null,
+        attentionProjection: action.meta.attentionProjection ?? null,
         announcement: `Evaluated against policy version ${action.evaluation.policyVersion}. A person still has to decide this.`,
       };
     }
@@ -426,8 +610,10 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
         dialog: action.dialog,
         returnFocusId: action.returnFocusId,
         failure: null,
-        decisionDraft: action.dialog.kind === "DECISION" ? { action: null, capText: "", overrideReason: "", error: null } : state.decisionDraft,
-        reconciliationDraft: action.dialog.kind === "RECONCILIATION" ? { commitmentId: null, evidenceId: null } : state.reconciliationDraft,
+        decisionDraft: action.dialog.kind === "DECISION" ? { action: null, capText: "", authorizationExpiresOn: "", overrideReason: "", error: null } : state.decisionDraft,
+        reconciliationDraft: action.dialog.kind === "RECONCILIATION"
+          ? { commitmentId: null, evidenceId: null, outcomeValueText: "", outcomeObservedOn: "", error: null }
+          : state.reconciliationDraft,
         policyDraft: action.dialog.kind === "POLICY" ? action.policyDraft ?? state.policyDraft : state.policyDraft,
       };
 
@@ -464,6 +650,7 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
         workspaceVersion: action.meta.workspaceVersion,
         requestId: action.meta.requestId,
         focusProposalId: action.decision.proposalId,
+        attentionProjection: action.meta.attentionProjection ?? null,
         announcement: "Decision recorded. No money was moved and nothing was purchased or cancelled.",
       };
 
@@ -478,7 +665,7 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
       };
 
     case "RECONCILIATION_DRAFT_CHANGED":
-      return { ...state, reconciliationDraft: { ...state.reconciliationDraft, ...action.draft } };
+      return { ...state, reconciliationDraft: { ...state.reconciliationDraft, ...action.draft, error: action.draft.error ?? null } };
 
     case "RECONCILIATION_STARTED":
       return {
@@ -509,6 +696,7 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
         workspaceVersion: action.meta.workspaceVersion,
         requestId: action.meta.requestId,
         focusProposalId: action.reconciliation.proposalId,
+        attentionProjection: action.meta.attentionProjection ?? null,
         announcement: "Observed evidence linked. The frozen cap is unchanged.",
       };
 
@@ -520,6 +708,88 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
         failure: asFailure(action.failure),
         staleNotice: isStale(action.failure) ? staleCopy : null,
         announcement: `Not linked. ${action.failure.error.message}`,
+      };
+
+    case "OUTCOME_STARTED":
+      return {
+        ...state,
+        pending: { kind: "OUTCOME", idempotencyKey: action.idempotencyKey, proposalId: action.proposalId },
+        idempotency: heldSlot(state.idempotency, "OUTCOME", action.signature, action.idempotencyKey),
+        failure: null,
+        staleNotice: null,
+        announcement: "Recording the user-entered outcome observation…",
+      };
+
+    case "OUTCOME_SAVED":
+      return {
+        ...state,
+        pending: null,
+        dialog: null,
+        idempotency: withoutSlot(state.idempotency, "OUTCOME"),
+        brief: state.brief
+          ? {
+            ...state.brief,
+            proposals: state.brief.proposals.map((entry) => entry.proposal.id === action.observation.proposalId
+              ? { ...entry, outcomeObservations: [action.observation, ...entry.outcomeObservations] }
+              : entry),
+          }
+          : state.brief,
+        workspaceVersion: action.meta.workspaceVersion,
+        requestId: action.meta.requestId,
+        focusProposalId: action.observation.proposalId,
+        attentionProjection: action.meta.attentionProjection ?? null,
+        announcement: "User-entered outcome recorded. No financial evidence was created.",
+      };
+
+    case "OUTCOME_FAILED":
+      return {
+        ...state,
+        pending: null,
+        idempotency: settleAfterFailure(state, "OUTCOME", action.failure),
+        failure: asFailure(action.failure),
+        staleNotice: isStale(action.failure) ? staleCopy : null,
+        announcement: `Outcome not recorded. ${action.failure.error.message}`,
+      };
+
+    case "EXCEPTION_REVIEW_STARTED":
+      return {
+        ...state,
+        pending: { kind: "EXCEPTION_REVIEW", idempotencyKey: action.idempotencyKey, proposalId: action.proposalId },
+        idempotency: heldSlot(state.idempotency, "EXCEPTION_REVIEW", action.signature, action.idempotencyKey),
+        failure: null,
+        staleNotice: null,
+        announcement: "Recording the human disposition…",
+      };
+
+    case "EXCEPTION_REVIEW_SAVED":
+      return {
+        ...state,
+        pending: null,
+        dialog: null,
+        idempotency: withoutSlot(state.idempotency, "EXCEPTION_REVIEW"),
+        brief: state.brief
+          ? {
+            ...state.brief,
+            proposals: state.brief.proposals.map((entry) => entry.proposal.id === action.review.proposalId
+              ? { ...entry, exceptionReviews: [action.review, ...entry.exceptionReviews] }
+              : entry),
+          }
+          : state.brief,
+        workspaceVersion: action.meta.workspaceVersion,
+        requestId: action.meta.requestId,
+        focusProposalId: action.review.proposalId,
+        attentionProjection: action.meta.attentionProjection ?? null,
+        announcement: "Exception disposition recorded. The original evidence and verdict are unchanged.",
+      };
+
+    case "EXCEPTION_REVIEW_FAILED":
+      return {
+        ...state,
+        pending: null,
+        idempotency: settleAfterFailure(state, "EXCEPTION_REVIEW", action.failure),
+        failure: asFailure(action.failure),
+        staleNotice: isStale(action.failure) ? staleCopy : null,
+        announcement: `Disposition not recorded. ${action.failure.error.message}`,
       };
 
     case "POLICY_DRAFT_CHANGED":

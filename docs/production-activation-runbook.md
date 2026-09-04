@@ -35,7 +35,7 @@ DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true \
 
 The command acquires the canonical migration advisory lock and refuses unless:
 
-- the local migration head is exactly `0056`, immediately after `0055`;
+- migration `0056` is immediately after `0055` in the local ordered migration set;
 - production ledger head is exactly `0055_recovery_decision_cycles`;
 - the recorded `0055` checksum matches this repository;
 - migration `0056` has checksum
@@ -89,7 +89,7 @@ Rollback before enrollment means leave `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS`
 unset. After enrollment, fail closed by removing those UUIDs; do not drop
 `0057` tables or rewrite immutable authorization rows.
 
-## Pending additive apply after `0057`: `0058` then `0059`
+## Pending additive apply after `0057`: `0058` through `0066`
 
 Do this only after the ledger head is exactly `0057_commitment_control_v0` with
 checksum `eb1145d8248f5044c38472870525209560122fad5b4aa3175fb26f6edc9afc4f`.
@@ -110,9 +110,18 @@ That command applies only unrecorded files in sorted order. After a successful
 | --- | --- |
 | `0058_workspace_invites` | `fa5c919f578376065d3db63e9efdc7cd06ac057a0882090583311b50eb9d27b9` |
 | `0059_control_authority_hardening` | `c9c873a20353690e14263a982a18cc95108f4887d76de777518e7a186375eaba` |
+| `0060_control_outcome_authorization_window` | `5fd24057ba422ea4fc8e06eba48520bd4674dfca9b74211acb976d34d791c944` |
+| `0061_control_outcome_observation_honesty` | `5e46f1d77a71f87776b81034368b1ad5e70c96824afe4f561b50d8d8e043f9b6` |
+| `0062_control_outcome_basis_constraint_name` | `05d46fb0d0dd93985360816b286ca1fd2fac99e2d55cbe22aa218c1d0d63f012` |
+| `0063_control_authorization_expiry_verdict` | `05ebecf4e21193a098231a8b810615262000684f3c9b7921c09689976bf5d8be` |
+| `0064_control_expired_verdict_integrity` | `45504f4be1aac017d1e23c923e8de382c18736bb6f20308ae0ce8798bbf2ca07` |
+| `0065_control_attention_outbox` | `5dd30214702e11cbeaff5458a78fa2d64c0df9fbe86e7e706b2c45e4fccee22b` |
+| `0066_control_attention_provider_events` | `65a1121069f4904b29c00b62352171581c8081d8b4a2fabe4bc424cdb2e92390` |
+| `0067_control_follow_through` | `d82bf65f09b697288b0aa3ba42136432c40816256b34ada0bc6867dd3ce9e4b3` |
+| `0068_control_attention_target_identity` | `b0fa0d7cc7c3ef08d2261fd0ab254bd7a522d9fb4c961cea89c639a163ff5f47` |
 
-Stop if either checksum drifts. Verify the resulting head is
-`0059_control_authority_hardening`. Then keep `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS` unset. Schema readiness does not
+Stop if any checksum drifts. Verify the resulting head is
+`0068_control_attention_target_identity`. If the command exits after applying only part of `0058`–`0068`, keep enrollment unset and rerun the same canonical command to completion; do not claim a verified backup or ready schema at an intermediate head. Then keep `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS` unset. Schema readiness does not
 authorize customer-data access or enrollment.
 
 Cleared payment and an independent security assessment with the current retest
@@ -140,7 +149,7 @@ npm run control:preflight -- --report-only https://www.vognary.com
 Remove `--report-only` for the blocking gate. `READY` requires all of the
 following at the target release:
 
-- authenticated internal readiness with migrations `0057`, `0058`, and `0059`;
+- authenticated internal readiness with migrations `0057` through `0068`;
 - exactly one enrolled workspace with cleared-payment and release-bound
 	independent-assessment evidence accepted by the existing enrollment guard;
 - a valid target release commit from authenticated readiness that exactly
@@ -155,6 +164,9 @@ following at the target release:
 	hash;
 - a passed monitoring delivery test, with observation date and restricted
 	record hash; and
+- provider-confirmed Control attention delivery with no queued, sending,
+  retrying, provider-accepted, failed, or dead-lettered notification rows in
+	authenticated readiness for every currently enrolled pilot workspace; and
 - an approved proposal-review procedure and record hash.
 
 The operations evidence commit is the immutable deployed Git SHA, not the local
@@ -168,11 +180,23 @@ actual deployment. It **does not prove legal applicability or compliance** and
 does not replace counsel. Keep it blank when scope, log location, retention,
 incident-reporting duty, Point-of-Contact filing, or clock evidence is unknown.
 
-Proposal email after a committed write is currently best-effort. The first
-pilot procedure must therefore name who reviews the Control desk and how often.
+Control attention uses a durable, consent-gated outbox after committed Control
+writes and accepted Recovery evidence. Email selects one highest-consequence
+item per proposal and recipient; the in-app desk retains the complete attention
+list. Sending retries with a bounded budget. Provider acceptance is not
+delivery: only a signed Resend event may set `DELIVERED`, and complaints disable
+future product email for that recipient. Authenticated readiness must report
+`commitmentControlAttention.status = delivery-observed`, `failed = 0`, and
+`deadLetters = 0` before preflight can pass. Any queued, sending, retrying, or
+provider-accepted row keeps status at `delivery-observed-work-pending`.
+Historical delivery from a workspace outside the current explicit enrollment
+cannot satisfy this gate.
+
+Email remains an aid, not the authority or a delivery guarantee. The first
+pilot procedure must still name who reviews the Control desk and how often.
 `COMMITMENT_CONTROL_PROPOSAL_REVIEW_PROCEDURE_STATUS=approved` proves only that
-the manual procedure was accepted; it never claims provider delivery. Do not
-add a second customer until observed notification/review evidence justifies it.
+the manual procedure was accepted. Do not add a second customer until observed
+notification and manual-review evidence justify it.
 
 ## Phase 0: Stop Conditions
 
@@ -180,7 +204,10 @@ Do not show the forwarding-first landing or set any receipt-inbox operator flag 
 
 Stop immediately when any of these is true:
 
-- An enrolled Commitment Control deployment is missing `0059_control_authority_hardening` (unenrolled deploys may remain on `0056`).
+- An enrolled Commitment Control deployment is missing `0068_control_attention_target_identity` (unenrolled deploys may remain on `0056`).
+- Authenticated readiness reports pending delivery work, any failed or
+	dead-lettered Control attention notification, or no provider-confirmed
+	Control attention delivery.
 - A signed Resend event cannot produce one canonical Recovery submission.
 - Replaying that event creates another submission, source, evidence row, or commitment.
 - A raw provider address, alias token, message subject, body, or attachment appears in logs or privacy export.
@@ -210,14 +237,14 @@ run it for the current incremental `0055` → `0056` apply above.
 DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema
 ```
 
-11. Query `schema_migrations` and verify the last row is `0057_commitment_control_v0` for the current candidate.
+11. Query `schema_migrations` and verify the last row is `0068_control_attention_target_identity` for the current candidate.
 12. Verify PostgreSQL still contains the three cutover guards plus `recovery_inbound_alias_milestones_immutable`. Re-run the zero-nonterminal legacy queries from step 5.
 13. Run the fresh and staged upgrade migration tests against disposable PostgreSQL 16. The staged rehearsal must begin at the production resume point and end at `0053` without losing aliases, inbound events, Recovery evidence, commitments, corrections, or provenance.
 
 Expected success:
 
 - `/api/readiness` reports `capabilities.schema.status = ready`.
-- `capabilities.schema.status` is `ready`, and `capabilities.schema.applied` ends at `0057_commitment_control_v0`.
+- `capabilities.schema.status` is `ready`, and `capabilities.schema.applied` ends at `0068_control_attention_target_identity`.
 - `capabilities.recoveryV1.status = schema-ready-clean-cutover`.
 
 Keep forwarding disabled and stop activation if the starting head is not exactly `0026`, the successful pre-`0053` backup/restore run is absent or stale, checksums differ, any cutover or milestone trigger is absent, a nonterminal legacy row remains, a fresh database fails, or an upgrade loses rows.

@@ -138,9 +138,14 @@ test("renewal scheduling and delivery source enforce opt-in, idempotency, bounde
   assert.match(store, /= '1_day' or decision\.decision is distinct from 'KEEP'/);
   assert.match(store, /item\.confidence_score >= 80/);
   assert.doesNotMatch(store, /exists \(select 1 from recurring_items item where item\.workspace_id = (?:preference|delivery)\.workspace_id\)/);
-  assert.doesNotMatch(mailer, /console\./);
-  assert.doesNotMatch(worker, /console\./);
-  assert.doesNotMatch(worker.slice(worker.indexOf("const sent =")), /delivery\.(email|merchant)/);
+    assert.doesNotMatch(mailer, /console\./);
+    assert.doesNotMatch(worker, /console\./);
+    assert.match(worker, /deliverControlAttentionNotifications/);
+    assert.match(worker, /explicitCommitmentControlWorkspaceIds/);
+    assert.match(worker, /controlAttention/);
+    assert.doesNotMatch(worker.slice(worker.indexOf("const sent =")), /delivery\.(email|merchant)/);
+    const responseProjection = worker.slice(worker.indexOf("return Response.json({", worker.indexOf("const sent =")));
+    assert.doesNotMatch(responseProjection, /recipientEmail|merchant/);
 });
 
 test("Vercel keeps Hobby-compatible daily worker schedules", () => {

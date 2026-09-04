@@ -4,6 +4,12 @@ const marketTestCells = [
   "FINOPS_AI_OPERATIONS",
 ];
 
+const ideaCandidates = [
+  "AI_SPEND_CHANGE_CONTROL",
+  "RECOVERY_FIRST_CONTROL",
+  "AGENT_SPEND_AUTHORIZATION",
+];
+
 const requiredHeaders = [
   "id",
   "contact_cohort",
@@ -18,6 +24,7 @@ const requiredHeaders = [
   "conversation_at",
   "repeated_job_status",
   "job_selected",
+  "idea_candidate_observed",
   "enforcement_requirement",
   "next_event_committed_at",
   "offer_at",
@@ -34,6 +41,7 @@ const closedVocabularies = {
   contact_channel: ["", "WARM_INTRO", "MANUAL_DIRECT", "REFERRAL", "PARTNER", "OTHER"],
   repeated_job_status: ["", "YES", "NO", "UNMEASURED"],
   job_selected: ["", "PRE_SPEND", "RECOVERY", "DECISION_TO_OUTCOME", "NONE", "UNMEASURED"],
+  idea_candidate_observed: ["", ...ideaCandidates, "NONE", "UNMEASURED"],
   enforcement_requirement: ["", "ADVISORY_ACCEPTED", "NEEDS_ENFORCEMENT", "UNMEASURED"],
   t5_status: ["", "PASS", "RESCUED", "FAIL", "NOT_YET_ELIGIBLE"],
 };
@@ -58,6 +66,12 @@ export function parseMarketTestCsv(input) {
       }
       if (present(row.founder_minutes) && !isNonNegativeInteger(row.founder_minutes)) {
         throw new Error(`Market CRM row ${rowNumber} has invalid founder_minutes.`);
+      }
+      if (present(row.idea_candidate_observed) && !present(row.conversation_at)) {
+        throw new Error(`Market CRM row ${rowNumber} idea_candidate_observed requires conversation_at.`);
+      }
+      if (isObservedIdeaCandidate(row.idea_candidate_observed) && !present(row.next_event_committed_at)) {
+        throw new Error(`Market CRM row ${rowNumber} idea_candidate_observed requires next_event_committed_at.`);
       }
       return row;
     });
@@ -101,6 +115,7 @@ export function summarizeMarketTest(rows) {
   const offers = countPresent(rows, "offer_at");
   const clearedPayments = countPresent(rows, "payment_received_at");
   const conversations = countPresent(rows, "conversation_at");
+  const ideaTournament = summarizeIdeaTournament(rows);
   const totalFounderMinutes = rows.reduce((total, row) => total + founderMinutes(row), 0);
   const contactedByChannel = {
     WARM_INTRO: 0,
@@ -117,6 +132,7 @@ export function summarizeMarketTest(rows) {
     totalRows: rows.length,
     unassignedRows: rows.filter((row) => !marketTestCells.includes(row.test_cell)).length,
     cells,
+    ideaTournament,
     contactedByChannel,
     founderEffort: {
       totalMinutes: totalFounderMinutes,
@@ -150,6 +166,16 @@ export function formatMarketTestReport(summary) {
     lines.push(`  jobs: ${value.selectedPreSpend} pre-spend · ${value.selectedRecovery} Recovery · ${value.selectedDecisionToOutcome} decision-to-outcome · boundary: ${value.advisoryAccepted} advisory accepted · ${value.needsEnforcement} needs enforcement`);
   }
   const channels = summary.contactedByChannel;
+  const ideaCandidatesSummary = ideaCandidates
+    .map((candidate) => `${candidate} ${summary.ideaTournament.candidates[candidate].observed}`)
+    .join(" · ");
+  const ideaWinners = summary.ideaTournament.winnerPairs.length
+    ? summary.ideaTournament.winnerPairs
+      .map(({ testCell, ideaCandidate }) => `${testCell} × ${ideaCandidate}`)
+      .join(" · ")
+    : "no buyer-cell × idea pair has cleared its evidence gate";
+  lines.push(`Idea candidates: ${ideaCandidatesSummary}`);
+  lines.push(`Idea gate ${summary.ideaTournament.status}: ${ideaWinners}`);
   lines.push(`Contacted channels: ${channels.WARM_INTRO} warm intro · ${channels.MANUAL_DIRECT} manual direct · ${channels.REFERRAL} referral · ${channels.PARTNER} partner · ${channels.OTHER} other · ${channels.UNMEASURED} unmeasured`);
   lines.push(`Founder effort: ${summary.founderEffort.totalMinutes} recorded min · ${formatMinutesRate(summary.founderEffort.minutesPerConversation, "conversation")} · ${formatMinutesRate(summary.founderEffort.minutesPerClearedPayment, "cleared payment")}`);
   lines.push(`Cohort gate ${summary.cohortGate.status}`);
@@ -174,6 +200,56 @@ function founderMinutes(row) {
   return present(row.founder_minutes) ? Number(row.founder_minutes) : 0;
 }
 
+function summarizeIdeaTournament(rows) {
+  const candidates = Object.fromEntries(ideaCandidates.map((candidate) => [
+    candidate,
+    summarizeIdeaRows(rows.filter((row) => row.idea_candidate_observed === candidate)),
+  ]));
+  const pairs = Object.fromEntries(marketTestCells.map((cell) => {
+    const cellRows = rows.filter((row) => row.test_cell === cell);
+    const completedCellConversations = countPresent(cellRows, "conversation_at");
+    return [cell, Object.fromEntries(ideaCandidates.map((candidate) => {
+      const value = summarizeIdeaRows(cellRows.filter((row) => row.idea_candidate_observed === candidate));
+      return [candidate, {
+        ...value,
+        directionalGate: completedCellConversations >= 5
+          && value.repeatedJobs >= 3
+          && value.committedEvents >= 2
+          && value.paymentOrInvoiceCommitments >= 1
+          ? "WIN_CANDIDATE"
+          : "INCOMPLETE",
+      }];
+    }))];
+  }));
+  const winnerPairs = marketTestCells.flatMap((testCell) => ideaCandidates
+    .filter((ideaCandidate) => pairs[testCell][ideaCandidate].directionalGate === "WIN_CANDIDATE")
+    .map((ideaCandidate) => ({ testCell, ideaCandidate })));
+
+  return {
+    candidates,
+    pairs,
+    winnerPairs,
+    status: winnerPairs.length === 1
+      ? "WIN_CANDIDATE"
+      : winnerPairs.length > 1
+        ? "MULTIPLE_CANDIDATES"
+        : "INCOMPLETE",
+  };
+}
+
+function summarizeIdeaRows(rows) {
+  return {
+    observed: rows.length,
+    repeatedJobs: rows.filter((row) => row.repeated_job_status === "YES").length,
+    committedEvents: countPresent(rows, "next_event_committed_at"),
+    paymentOrInvoiceCommitments: rows.filter((row) => present(row.payment_received_at) || present(row.invoice_commitment_at)).length,
+  };
+}
+
+function isObservedIdeaCandidate(value) {
+  return ideaCandidates.includes(value);
+}
+
 function formatMinutesRate(value, denominator) {
   return value === null ? `min/${denominator} unmeasured` : `${value} min/${denominator}`;
 }
@@ -188,7 +264,7 @@ function evidenceReadyForCell(row, cell) {
   return row.technology_spend_responsibility === "YES";
 }
 
-function parseCsvRows(input) {
+export function parseCsvRows(input) {
   const rows = [];
   let row = [];
   let field = "";

@@ -64,6 +64,15 @@ export function getCommitmentControlEnrollmentReadiness(options: EnrollmentOptio
   return { status: "ready" as const, enrolledWorkspaceCount: enrolled.ids.size };
 }
 
+/** Background workers cannot enumerate the local wildcard and fail closed on any malformed entry. */
+export function explicitCommitmentControlWorkspaceIds(
+  value: string | undefined = process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS,
+): readonly string[] {
+  if (!value?.trim() || value.trim() === "*") return [];
+  const parsed = parseWorkspaceIds(value);
+  return parsed.valid ? [...parsed.ids] : [];
+}
+
 function parseWorkspaceIds(value: string) {
   const entries = value
     .split(",")

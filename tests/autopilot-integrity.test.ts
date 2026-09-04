@@ -972,6 +972,9 @@ test("notice crash contracts hold unmatched recognized events, freeze the full R
   assert.match(route, /result\.status === "pending"/);
   assert.match(route, /503/);
   assert.match(route, /hasAutopilotNoticeTag/);
+  assert.match(route, /hasControlAttentionTag/);
+  assert.match(route, /applyControlAttentionProviderEvent/);
+  assert.match(route, /controlResult\.result === "pending"/);
   assert.match(mailer, /from: input\.from/);
   assert.match(mailer, /tags: input\.tags/);
   assert.match(funnel, /recovery_provider_disables/);
