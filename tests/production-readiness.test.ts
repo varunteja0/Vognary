@@ -26,6 +26,24 @@ test("main pushes require an explicit production deployment after release gates"
   assert.equal(config.git?.deploymentEnabled?.main, false);
 });
 
+test("CI receipt webhook configuration rejects unsigned input through the real verifier", async () => {
+  const workflow = parse(read(".github/workflows/ci.yml")) as {
+    jobs: { validate: { env: { RESEND_INBOUND_WEBHOOK_SECRET: string } } };
+  };
+  const { createResendInboundHandler } = await import("../src/lib/server/recovery-inbound-webhook");
+  const handler = createResendInboundHandler({
+    signingSecret: workflow.jobs.validate.env.RESEND_INBOUND_WEBHOOK_SECRET,
+    processReceived: async () => { throw new Error("Unsigned input must never reach processing"); },
+  });
+  const response = await handler(new Request("https://example.test/api/webhooks/resend/inbound", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ type: "email.received", data: {} }),
+  }));
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { status: "unauthorized" });
+});
+
 test("feature readiness checks every persistent capability migration with bounded aggregate evidence", () => {
   const source = read("src/lib/server/feature-readiness.ts");
   for (const migration of [

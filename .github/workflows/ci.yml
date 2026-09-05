@@ -18,7 +18,7 @@ jobs:
       POSTGRES_SSL: "false"
       SESSION_SECRET: ci-only-session-secret-0123456789abcdef0123456789abcdef01234567
       TOKEN_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-      RESEND_INBOUND_WEBHOOK_SECRET: whsec_receiving_test
+      RESEND_INBOUND_WEBHOOK_SECRET: whsec_Y2ktb25seS1yZWNlaXB0LWluYmJveC13ZWJob29rLXNlY3JldA==
     services:
       postgres:
         image: postgres:16.14@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b

@@ -10,9 +10,39 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## 2026-09-05 - release fixes published; Customer zero browser correction verified
+## 2026-09-05 - browser gates cleared; CI smoke signing fixture corrected
 
 **THIS BLOCK IS THE ONLY LIVE INSTRUCTION.**
+
+**Scoreboard row:** Backend Readiness and Production Activation; no score movement
+**Loop step:** human authorization
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. Release closure remains the agent-controlled action for the first finance-owner pilot; no product feature or production mutation is authorized by local test success.
+- The browser-test correction was committed and pushed as `da5c54a29bc0b60812d04b914910ca3955935098`. Hosted run `33945593195` passed all earlier code/database/Lighthouse gates and both browser stages: public `82 passed / 84 skipped`, signed-in `80 passed / 4 skipped`. Only the final smoke step failed.
+- The smoke failure was an unsigned receipt webhook returning `500` instead of `401`. CI's placeholder `whsec_receiving_test` is not valid Base64; the real Svix verifier threw before checking request headers. A focused test using the workflow's actual key reproduced `Base64Coder: incorrect characters for decoding`.
+- CI now has a valid synthetic signing secret, and that exact regression passes with an unauthorized `401` response and no processing. The unchanged complete smoke script passes against the built application with CI's synthetic configuration on a new local disposable database. Both temporary server and database were removed. No production key or application behavior changed, and the required smoke status remains `401`.
+- The prior release/mail fixes remain published in `52edd7a`. Automatic Vercel deployment of `main` remains disabled by founder authorization, and no deployment was created for either published commit. The latest verified production commit remains `f707d55`, with Control migrations pending and enrollment disabled.
+- Independent assessment/retest, required operations evidence, permitted buyer routes, actual offers, cleared payments, usage, and renewal remain external blockers. Recorded commercial counts and scores have not moved.
+
+**WHAT IS NOT TRUE**
+
+- The smoke-fixture successor has not yet passed hosted CI. A green local smoke test is not a complete hosted release, security assessment, production activation, or customer proof.
+- Separate public-artifact edits remain outside these scoped commits. No customer financial data, production schema, payment, or outreach state changed.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Supply one genuine existing relationship or opted-in buyer thread and its permitted channel; broad authority does not establish a relationship.
+2. Obtain independent assessment/retest clearance and approve the restricted operational evidence before production Control activation.
+
+**HARD STOP:** Keep `main` auto-deployment disabled. Require exact-SHA hosted CI and genuine operational/assurance evidence before production migration or customer-data enrollment. Do not waive unsigned-webhook rejection, publish unrelated work, or manufacture market progress.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - release fixes published; Customer zero browser correction verified
+
+> **SUPERSEDED 2026-09-05** - see the block above.
 
 **Scoreboard row:** Backend Readiness and Production Activation; no score movement
 **Loop step:** human authorization
