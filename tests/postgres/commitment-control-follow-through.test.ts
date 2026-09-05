@@ -6,6 +6,7 @@ import {
   createCommitmentControlProposal,
   decideCommitmentControlProposal,
   getCommitmentControlBrief,
+  getControlReconciliationCandidates,
   putCommitmentControlPolicy,
   recordCommitmentControlExceptionReview,
   recordCommitmentControlOutcomeObservation,
@@ -187,6 +188,12 @@ test("a scheduled renewal cannot substitute for an observed financial charge", {
     assert.equal(evidence.rowCount, 1);
     assert.equal(evidence.rows[0]!.observed_at, null);
     const versionBefore = await currentVersion(desk);
+    const candidates = await getControlReconciliationCandidates({
+      workspaceId: desk.workspaceId,
+      actorUserId: desk.ownerUserId,
+      proposalId: authorized.proposalId,
+    });
+    assert.deepEqual(candidates.data.candidates, []);
     await assert.rejects(() => reconcileCommitmentControlProposal({
       workspaceId: desk.workspaceId,
       actorUserId: desk.ownerUserId,

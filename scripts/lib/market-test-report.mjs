@@ -117,6 +117,8 @@ export function summarizeMarketTest(rows) {
   const conversations = countPresent(rows, "conversation_at");
   const ideaTournament = summarizeIdeaTournament(rows);
   const totalFounderMinutes = rows.reduce((total, row) => total + founderMinutes(row), 0);
+  const recordedEffortRows = rows.filter((row) => present(row.founder_minutes)).length;
+  const effortComplete = rows.length > 0 && recordedEffortRows === rows.length;
   const contactedByChannel = {
     WARM_INTRO: 0,
     MANUAL_DIRECT: 0,
@@ -135,9 +137,12 @@ export function summarizeMarketTest(rows) {
     ideaTournament,
     contactedByChannel,
     founderEffort: {
+      status: recordedEffortRows === 0 ? "UNMEASURED" : effortComplete ? "COMPLETE" : "PARTIAL",
+      recordedRows: recordedEffortRows,
+      unmeasuredRows: rows.length - recordedEffortRows,
       totalMinutes: totalFounderMinutes,
-      minutesPerConversation: conversations ? Number((totalFounderMinutes / conversations).toFixed(1)) : null,
-      minutesPerClearedPayment: clearedPayments ? Number((totalFounderMinutes / clearedPayments).toFixed(1)) : null,
+      minutesPerConversation: effortComplete && conversations ? Number((totalFounderMinutes / conversations).toFixed(1)) : null,
+      minutesPerClearedPayment: effortComplete && clearedPayments ? Number((totalFounderMinutes / clearedPayments).toFixed(1)) : null,
     },
     cohortGate: {
       status: marketTestCells.every((cell) => cells[cell].evidenceReadyCandidates >= 5) ? "READY" : "INCOMPLETE",
@@ -177,7 +182,10 @@ export function formatMarketTestReport(summary) {
   lines.push(`Idea candidates: ${ideaCandidatesSummary}`);
   lines.push(`Idea gate ${summary.ideaTournament.status}: ${ideaWinners}`);
   lines.push(`Contacted channels: ${channels.WARM_INTRO} warm intro · ${channels.MANUAL_DIRECT} manual direct · ${channels.REFERRAL} referral · ${channels.PARTNER} partner · ${channels.OTHER} other · ${channels.UNMEASURED} unmeasured`);
-  lines.push(`Founder effort: ${summary.founderEffort.totalMinutes} recorded min · ${formatMinutesRate(summary.founderEffort.minutesPerConversation, "conversation")} · ${formatMinutesRate(summary.founderEffort.minutesPerClearedPayment, "cleared payment")}`);
+  const effort = summary.founderEffort;
+  lines.push(effort.status === "UNMEASURED"
+    ? `Founder effort: UNMEASURED - 0/${summary.totalRows} rows have recorded time; missing time is not zero work.`
+    : `Founder effort: ${effort.totalMinutes} recorded min · ${effort.status} - ${effort.recordedRows}/${summary.totalRows} rows · ${formatMinutesRate(effort.minutesPerConversation, "conversation")} · ${formatMinutesRate(effort.minutesPerClearedPayment, "cleared payment")}`);
   lines.push(`Cohort gate ${summary.cohortGate.status}`);
   lines.push(`Company gate ${summary.companyGate.status}: ${summary.companyGate.offers}/10 offers · ${summary.companyGate.clearedPayments}/2 cleared payments`);
   lines.push("Invoice commitments, invoices, and pending payment do not count as cleared payment.");

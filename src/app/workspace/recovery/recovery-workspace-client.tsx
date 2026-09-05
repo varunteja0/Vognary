@@ -157,6 +157,32 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     return true;
   }, [transport]);
 
+  const peerRefresh = useRef({ workspaceId: null as string | null, recoveryVersion: -1, controlVersion: -1 });
+  const controlWorkspaceVersion = controlDesk.state.workspaceVersion;
+  const controlStatus = controlDesk.state.status.kind;
+  const controlPending = controlDesk.state.pending;
+  const reloadControl = controlDesk.reload;
+  const workspaceId = state.home?.workspace.id ?? null;
+
+  useEffect(() => {
+    if (peerRefresh.current.workspaceId !== workspaceId) {
+      peerRefresh.current = { workspaceId, recoveryVersion: -1, controlVersion: -1 };
+    }
+    if (!workspaceId || state.workspaceVersion === null || controlWorkspaceVersion === null
+      || state.status.kind !== "READY" || controlStatus !== "READY"
+      || state.pending || controlPending) return;
+    if (controlWorkspaceVersion > state.workspaceVersion
+      && peerRefresh.current.recoveryVersion < controlWorkspaceVersion) {
+      peerRefresh.current.recoveryVersion = controlWorkspaceVersion;
+      void loadSnapshot();
+    } else if (state.workspaceVersion > controlWorkspaceVersion
+      && peerRefresh.current.controlVersion < state.workspaceVersion) {
+      peerRefresh.current.controlVersion = state.workspaceVersion;
+      reloadControl();
+    }
+  }, [workspaceId, state.workspaceVersion, state.status.kind, state.pending,
+    controlWorkspaceVersion, controlStatus, controlPending, reloadControl, loadSnapshot]);
+
   const loadSources = useCallback(async () => {
     if (!receiptInboxPubliclyAvailable) return;
     dispatch({ type: "SOURCES_REQUESTED" });
@@ -851,6 +877,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
               <li key={view} className="min-w-0">
                 <button
                   type="button"
+                  disabled={state.status.kind === "LOADING"}
                   onClick={() => selectView(view)}
                   aria-current={state.view === view ? "page" : undefined}
                   className="truncate"
@@ -874,6 +901,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
                       <li key={view}>
                         <button
                           type="button"
+                          disabled={state.status.kind === "LOADING"}
                           onClick={() => selectView(view)}
                           aria-current={state.view === view ? "page" : undefined}
                         >

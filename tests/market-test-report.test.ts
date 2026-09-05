@@ -55,8 +55,11 @@ test("market report parses quoted private notes but returns cell aggregates only
   assert.equal(summary.cells.FRACTIONAL_FINANCE.needsEnforcement, 1);
   assert.equal(summary.companyGate.status, "INCOMPLETE");
   assert.equal(summary.founderEffort.totalMinutes, 60);
-  assert.equal(summary.founderEffort.minutesPerConversation, 12);
-  assert.equal(summary.founderEffort.minutesPerClearedPayment, 60);
+  assert.equal(summary.founderEffort.status, "PARTIAL");
+  assert.equal(summary.founderEffort.recordedRows, 2);
+  assert.equal(summary.founderEffort.unmeasuredRows, 4);
+  assert.equal(summary.founderEffort.minutesPerConversation, null);
+  assert.equal(summary.founderEffort.minutesPerClearedPayment, null);
   assert.deepEqual(summary.contactedByChannel, {
     WARM_INTRO: 1,
     MANUAL_DIRECT: 0,
@@ -68,9 +71,34 @@ test("market report parses quoted private notes but returns cell aggregates only
 
   const output = formatMarketTestReport(summary);
   assert.match(output, /DIRECT_FINANCE.*WIN_CANDIDATE/);
-  assert.match(output, /Founder effort: 60 recorded min.*12 min\/conversation.*60 min\/cleared payment/);
+  assert.match(output, /Founder effort: 60 recorded min.*PARTIAL.*2\/6 rows/);
+  assert.doesNotMatch(output, /12 min\/conversation|60 min\/cleared payment/);
   assert.match(output, /Contacted channels: 1 warm intro.*1 unmeasured/);
   assert.doesNotMatch(output, /Secret|Hidden|Private|P0[1-6]|quoted|First line/);
+});
+
+test("missing founder time never becomes measured zero effort", () => {
+  for (const rows of [[], [{ test_cell: "DIRECT_FINANCE", conversation_at: "2026-09-05", founder_minutes: "" }]]) {
+    const summary = summarizeMarketTest(rows);
+    assert.equal(summary.founderEffort.status, "UNMEASURED");
+    assert.equal(summary.founderEffort.minutesPerConversation, null);
+    assert.equal(summary.founderEffort.minutesPerClearedPayment, null);
+    assert.match(formatMarketTestReport(summary), /Founder effort: UNMEASURED/);
+    assert.doesNotMatch(formatMarketTestReport(summary), /Founder effort: 0 recorded min/);
+  }
+});
+
+test("complete effort coverage allows rates and distinguishes an explicit recorded zero", () => {
+  const summary = summarizeMarketTest([
+    { test_cell: "DIRECT_FINANCE", founder_minutes: "30", conversation_at: "2026-09-05", payment_received_at: "2026-09-06" },
+    { test_cell: "DIRECT_FINANCE", founder_minutes: "0", conversation_at: "2026-09-05" },
+  ]);
+  assert.equal(summary.founderEffort.status, "COMPLETE");
+  assert.equal(summary.founderEffort.recordedRows, 2);
+  assert.equal(summary.founderEffort.unmeasuredRows, 0);
+  assert.equal(summary.founderEffort.minutesPerConversation, 15);
+  assert.equal(summary.founderEffort.minutesPerClearedPayment, 30);
+  assert.match(formatMarketTestReport(summary), /30 recorded min.*COMPLETE.*2\/2 rows.*15 min\/conversation/);
 });
 
 test("company gate separates incomplete, rework, failure, and go using cleared payments", () => {

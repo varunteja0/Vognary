@@ -96,6 +96,7 @@ jobs:
         env:
           VOGNARY_E2E_DEV_LOGIN_EMAIL: founder@vognary.test
           VOGNARY_E2E_DEV_LOGIN_CODE: ci-dev-login-code
+          VOGNARY_E2E_CONTROL_DISPOSABLE: "true"
           PLAYWRIGHT_EXTERNAL_SERVER: "1"
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3005
         # Commitment Control and Recovery share one signed-in workspace shell.
@@ -104,7 +105,7 @@ jobs:
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
           npm run db:apply-schema
-          npm run test:e2e -- commitment-control-ui recovery-customer-zero recovery-ui-home recovery-ui-states
+          npm run test:e2e -- commitment-control-ui commitment-control-real recovery-customer-zero recovery-ui-home recovery-ui-states
       - name: Stop dev server
         if: always()
         run: |

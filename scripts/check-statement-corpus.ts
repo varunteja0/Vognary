@@ -76,9 +76,10 @@ async function main() {
 
   const realCases = cases.filter((fixture) => fixture.provenance === "consented-redacted-real");
   const realFixtureCount = realCases.length;
-  const score = combineCorpusScores(realCases.map((fixture) => fixture.score));
+  const score = realCases.length ? combineCorpusScores(realCases.map((fixture) => fixture.score)) : emptyScore();
   const thresholdActive = realFixtureCount >= minimumRealFixtures;
-  const qualityReady = thresholdActive && score.precision >= minimumPrecision && score.recall >= minimumRecall;
+  const qualityReady = thresholdActive && score.precision !== null && score.recall !== null
+    && score.precision >= minimumPrecision && score.recall >= minimumRecall;
   const status = qualityReady ? "ready" : thresholdActive ? "regression" : "collecting";
   await emitReport({
     status,
@@ -141,5 +142,5 @@ function thresholdSummary(active: boolean) {
 }
 
 function emptyScore() {
-  return { expected: 0, detected: 0, matched: 0, falsePositives: 0, falseNegatives: 0, precision: 1, recall: 1 };
+  return { expected: 0, detected: 0, matched: 0, falsePositives: 0, falseNegatives: 0, precision: null, recall: null };
 }

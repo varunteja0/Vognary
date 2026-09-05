@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
@@ -247,7 +248,8 @@ async function mockRecoveryApi(page: Page, options: { decision?: DecisionOutcome
 }
 
 async function signIn(page: Page) {
-  await page.context().setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${Math.floor(Math.random() * 180) + 50}` });
+  const identity = randomBytes(12).toString("hex").match(/.{4}/g)!.join(":");
+  await page.context().setExtraHTTPHeaders({ "x-forwarded-for": `2001:db8:${identity}` });
   await page.route("**/api/workspaces/current/control/brief", (route) => route.fulfill({
     status: 503,
     contentType: "application/json",
@@ -257,7 +259,10 @@ async function signIn(page: Page) {
   await page.getByText("Other ways to sign in").click();
   await page.getByPlaceholder("developer@example.com").fill(email!);
   await page.getByPlaceholder("Access code").fill(accessCode!);
+  const loginResponse = page.waitForResponse(response =>
+    new URL(response.url()).pathname === "/api/auth/login" && response.request().method() === "POST");
   await page.getByRole("button", { name: "Sign in as developer" }).click();
+  expect((await loginResponse).status()).toBe(200);
   await page.waitForURL(/\/app/);
 }
 

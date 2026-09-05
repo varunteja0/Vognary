@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { expect, test, type Page, type Request } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { evidencePath } from "./evidence";
@@ -450,18 +451,17 @@ async function mockWorkspace(page: Page, options: ControlMock = {}) {
 
 // Each sign-in gets its own rate-limit identity, so one test can never exhaust
 // the development-login budget of the next one.
-let signInIdentity = 0;
-const signInIpOffset = Number.parseInt(process.env.VOGNARY_E2E_IP_OFFSET ?? "0", 10);
-
 async function signIn(page: Page) {
-  signInIdentity += 1;
-  const lastOctet = ((signInIpOffset + signInIdentity) % 220) + 20;
-  await page.context().setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${lastOctet}` });
+  const identity = randomBytes(12).toString("hex").match(/.{4}/g)!.join(":");
+  await page.context().setExtraHTTPHeaders({ "x-forwarded-for": `2001:db8:${identity}` });
   await page.goto("/login");
   await page.getByText("Other ways to sign in").click();
   await page.getByPlaceholder("developer@example.com").fill(email!);
   await page.getByPlaceholder("Access code").fill(accessCode!);
+  const loginResponse = page.waitForResponse(response =>
+    new URL(response.url()).pathname === "/api/auth/login" && response.request().method() === "POST");
   await page.getByRole("button", { name: "Sign in as developer" }).click();
+  expect((await loginResponse).status()).toBe(200);
   await page.waitForURL(/\/app/);
   // Leave the signed-in page before the mocks are installed, so only requests
   // made by the page under test are recorded.
@@ -510,6 +510,44 @@ async function waitForCall(calls: Recorded[], predicate: (call: Recorded) => boo
   await expect.poll(() => calls.filter(predicate).length).toBeGreaterThan(0);
   return calls.find(predicate)!;
 }
+
+test("workspace navigation waits for startup and a late Control brief preserves the selected view", async ({ page }) => {
+  await signIn(page);
+  await mockWorkspace(page, {
+    brief: {
+      ...emptyBrief(),
+      proposals: [{ proposal, evaluation, decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [] }],
+    },
+  });
+  const heldBrief = Promise.withResolvers<void>();
+  await page.route("**/api/workspaces/current/control/brief", async (route) => {
+    await heldBrief.promise;
+    await route.fallback();
+  });
+  const heldSnapshot = Promise.withResolvers<void>();
+  await page.route("**/api/workspaces/current/brief", async (route) => {
+    await heldSnapshot.promise;
+    await route.fallback();
+  });
+  try {
+    await page.goto("/app", { waitUntil: "domcontentloaded" });
+    const navigation = page.getByRole("navigation", { name: "Primary" });
+    const today = navigation.getByRole("button", { name: /^Today(?: \(\d+\))?$/ });
+    await expect(today).toBeDisabled();
+    const requestedBrief = page.waitForRequest("**/api/workspaces/current/control/brief");
+    heldSnapshot.resolve();
+    await requestedBrief;
+    await today.click();
+    await expect(today).toHaveAttribute("aria-current", "page");
+    heldBrief.resolve();
+    await expect(navigation.getByRole("button", { name: /Decisions/ })).toContainText("(1)");
+    await expect(today).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { level: 2, name: "Today", exact: true })).toBeVisible();
+  } finally {
+    heldSnapshot.resolve();
+    heldBrief.resolve();
+  }
+});
 
 test("a workspace outside the private pilot keeps the Control destination and sees the loop as a labelled demonstration", async ({ page }) => {
   await signIn(page);
@@ -911,10 +949,11 @@ test("an in-flight brief, an empty ledger, a missing policy, and an offline devi
   await page.reload();
 
   await expect(page.getByText("Record the first policy version")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Evaluate proposal" })).toBeDisabled();
-  await expect(page.getByText("No policy version exists yet, so no proposal can be evaluated. A workspace owner or admin has to record one first.")).toBeVisible();
-  await expect(page.getByText("No proposal has been decided yet.")).toBeVisible();
-  await expect(page.getByText("No policy version has been recorded in this workspace.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Set the policy", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Evaluate proposal" })).toHaveCount(0);
+  await expect(page.getByLabel("Merchant or counterparty")).toHaveCount(0);
+  await expect(page.getByText("No proposal has been decided yet.")).toHaveCount(0);
+  await expect(page.getByText("No policy version has been recorded in this workspace.")).toHaveCount(0);
   await expectNoSeriousAxeViolations(page);
 
   await context.setOffline(true);

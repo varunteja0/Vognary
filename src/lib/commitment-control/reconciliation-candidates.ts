@@ -1,4 +1,5 @@
 import type { ControlDecisionDto } from "./contracts";
+import { calendarDateInTimeZone } from "./project";
 
 export type ControlReconciliationEvidenceInput = {
   evidenceId: string;
@@ -58,7 +59,7 @@ export function selectControlReconciliationCandidates(input: {
 }): readonly ControlReconciliationCandidate[] {
   const { decision } = input;
   if (decision.action === "DECLINE" || decision.authorizationExpiresOn === null) return [];
-  const decisionDate = decision.decidedAt.slice(0, 10);
+  const decisionDate = calendarDateInTimeZone(new Date(decision.decidedAt), "Asia/Kolkata");
 
   return input.evidence
     .flatMap((evidence): ControlReconciliationCandidate[] => {

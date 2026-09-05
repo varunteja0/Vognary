@@ -10,9 +10,71 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## 2026-09-05 - founder authorizes evidence-led product improvement and transfers frontend ownership
+## 2026-09-05 - full working-tree publication authorized; deployment remains blocked
 
 **THIS BLOCK IS THE ONLY LIVE INSTRUCTION.**
+
+**Scoreboard row:** Backend Readiness and Product UX source publication; no score movement
+**Loop step:** human authorization
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The founder explicitly authorized committing and pushing **all local Git-eligible changes across sessions**, not only this conversation's edits, to the existing `main` branch. This session is the Git owner for that publication operation. The observable publication proof is matching local HEAD and remote `main`, with no remaining tracked or unignored changes.
+- Before staging, the complete working tree contained `38` changed/new files. Scope includes public artifact routes and syndication, Control/Recovery UI and synchronization, India-calendar/evidence guards, corpus/effort reporting, CI and browser/domain regressions, synthetic evidence screenshots, and this handoff. No other owner's eligible work is excluded merely because it came from another session.
+- The checkout is on `main`, tracking `origin/main`, with parent `390fbbaa0ccb9a194b6ce19b2bdf36028cbe1a01`; the verified push destination is `github.com/varunteja0/Vognary`. The common credential-signature and sensitive-path check returned no flags in the eligible set. That bounded check is not an independent security assessment.
+- Existing ignore rules remain intact. Environment credentials, private CRM records, backups, dependencies, ignored output reports, local captures and `.fallow/` are not force-added. Automatic main-branch deployment remains disabled by `vercel.json`.
+- The previous block preserves the implementation and validation evidence. Final changed-file lint, typecheck, claims, whitespace and handoff-contract checks passed; the latest combined browser run remains **81 passed / 5 failed / 4 skipped**. The founder's Git publication instruction does not change those results. Hosted verification belongs only to the exact pushed SHA and is not assumed green in advance.
+
+**WHAT IS NOT TRUE**
+
+- This authorization is not permission to deploy, change production schema, enroll customer data, waive browser failures, rewrite Git history or claim a fully verified release. No commercial score, payment, customer outcome, validated pivot or security clearance is established by a push.
+- The five known browser failures are not erased by earlier passing checks. Ignored private/generated files are not part of the source-publication scope.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Establish the genuinely permitted buyer route required for the prepared event comparison; Git publication does not create buyer access or paid behavior.
+2. Obtain independent assessment/retest and release-bound legal/operational clearance before approving production activation. The release owner must separately resolve the known browser failures and verify the exact candidate.
+
+**HARD STOP:** Preserve the deployment guard, ignore rules, all owners' work and existing history. No force push, production deployment/migration, customer-data enrollment, invented verification or commercial claim. The current instruction authorizes source commit and push to `main`, not production activation.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - improvement pass closed; browser release gate remains unresolved
+
+> **SUPERSEDED 2026-09-05** - see the block above.
+
+**Scoreboard row:** Product UX and Backend Readiness implementation evidence; Business Validation and Distribution remain unproven; no score movement
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. One finance owner proposes an obligation, records a human decision, compares an actual observed charge with the frozen cap and retrieves the same record later. The founder transferred this bounded frontend pass to GitHub Copilot, confirmed no permitted buyer route, then requested that repeated verification loops stop and the work be closed correctly.
+- Implemented improvements include policy-first setup, a collapsed composer after records exist, authoritative Control/Recovery version refresh, disabled navigation during initial loading, India-calendar chronology and candidate guards, honest missing-effort/corpus metrics, and a real-handler Control browser journey wired into CI. Existing separately authored overlap and zero-window projection repairs are preserved, including forward migration `0069_control_projection_empty_windows`.
+- Full local code checks at `2026-09-05T06:30:28Z` to `06:39:13Z` passed lint (one existing profile-navigation warning), typecheck, claims, market claims, research, brand, tokens, `1306/1306` units, `209/209` disposable PostgreSQL tests, build and all `16` route budgets. This run predates the final startup-navigation/browser-test changes; it is not a release certificate for the final dirty tree.
+- Focused startup-navigation and real Customer #0 checks passed `4/4` across desktop/mobile. The last full signed-in run, starting `2026-09-05T07:31:16.037Z`, finished **81 passed / 5 failed / 4 skipped**. Both real Control journeys and both startup/late-response regressions passed. The receipt-inbox skips are not passes. Results and the dimension-by-dimension proof requirements are in the [audit improvement closeout](../output/vognary-company-adversarial-audit-2026-09-05.md#improvement-closeout---2026-09-05).
+- The five unresolved browser failures are Recovery's desktop empty state, mobile Control idempotency-conflict feedback, mobile Control evidence-linking login/navigation, mobile Customer #0 startup, and mobile Recovery changed-list rendering. Their complete causes are not established. Preserve the captured traces; the combined browser gate is not green. This pass is ending without another broad rerun or assertion/timeout weakening.
+- Closeout checkout is `main` at `390fbbaa0ccb9a194b6ce19b2bdf36028cbe1a01`, verified at `2026-09-05T07:51:14Z`. A separate Git owner advanced HEAD. This session made no commit, push, merge or deployment, and has not verified hosted CI for its remaining dirty patch. Other sessions' public-artifact edits and closure history remain intact.
+- The synthetic preview is retained at `http://127.0.0.1:3027`, with health HTTP 200 at closeout, backed only by disposable database `vognary_improve_20260905_1788587664288` through `0069`. External provider configuration is blanked. This is local test data, not a production or customer-data environment.
+- The founder-confirmed buyer-route blocker is unchanged. The event comparison packet is prepared, unsent and unrun; no new conversation, offer, payment, renewal, representative real-data corpus, independent assurance or operational clearance is established. The one-time INR 14,999 pilot-month offer is unchanged; a second month requires a separate purchase.
+
+**WHAT IS NOT TRUE**
+
+- The entire test suite is not green, the dirty patch is not release-approved, and a targeted pass does not erase full-run failures. The old exact-SHA CI and earlier local build must not be attributed to later unverified bytes.
+- No ten-out-of-ten rating, validated pivot, buyer value, defensibility, profitability, production activation or security certification has been earned by synthetic tests. Missing evidence is not success or proof of market failure.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Establish one genuine permitted relationship or opted-in event-holder thread and run the existing recent-variance/upcoming-obligation comparison. Keep private correspondence out of Git and chat; record only permitted aggregate/opaque evidence references.
+2. Obtain independent assessment/retest, actual legal and operational clearance, and explicit release authority before any production migration or real customer financial data. The designated release owner must separately close the browser failures and bind all gates to the approved exact candidate.
+3. Inspect the synthetic local workflow for human visual/usability acceptance. Any strategic pivot still needs observed buyer evidence and an explicit scope decision; the missed earlier company gate must remain visible.
+
+**HARD STOP:** Keep automatic `main` deployment disabled. Do not publish, deploy, migrate production, enroll customer data, send outreach through an unrecorded route, weaken tests, overwrite another owner's work, award scores or treat a synthetic demonstration as customer proof. No new product scope is justified by rerunning a broad gate until it happens to pass.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - founder authorizes evidence-led product improvement and transfers frontend ownership
+
+> **SUPERSEDED 2026-09-05** - see the block above.
 
 **Scoreboard row:** Product UX and Backend Readiness; Business Validation and Distribution proof remains required; no score movement
 **Loop step:** human authorization

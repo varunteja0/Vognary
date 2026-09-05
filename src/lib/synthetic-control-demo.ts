@@ -258,12 +258,7 @@ const DECISION_REASON: Record<SyntheticDemoBranch, string> = {
   DECLINE: "Reserve capacity from the existing monthly commitment instead.",
 };
 
-/**
- * Identity for evidence provenance. Hashing the declared inputs — not the
- * derived output — means a capture stops matching the moment a hand-written
- * fact moves, while an engine change is caught by the engine's own tests.
- */
-export const syntheticDemoIdentity = syntheticFixtureIdentity("SYNTHETIC_CC_V2", "2", {
+const syntheticDemoDeclaredInputs = {
   REQUEST,
   policy,
   EXISTING_EXPOSURE,
@@ -277,7 +272,25 @@ export const syntheticDemoIdentity = syntheticFixtureIdentity("SYNTHETIC_CC_V2",
   INTENDED_OUTCOME,
   DECISION_REASON,
   citedEvidence: syntheticDemoCitedEvidence,
-});
+} as const;
+
+/** Complete, versioned source inputs for independent public revision checks. */
+export const syntheticDemoSourceManifest = {
+  schemaVersion: "vognary.synthetic-control-demo-source.v1",
+  fixtureId: "SYNTHETIC_CC_V2",
+  fixtureVersion: "2",
+  declaredInputs: syntheticDemoDeclaredInputs,
+} as const;
+
+/**
+ * Compact identity for local fixture labelling. Public artifact revisions hash
+ * the complete source manifest above rather than trusting this short summary.
+ */
+export const syntheticDemoIdentity = syntheticFixtureIdentity(
+  syntheticDemoSourceManifest.fixtureId,
+  syntheticDemoSourceManifest.fixtureVersion,
+  syntheticDemoSourceManifest.declaredInputs,
+);
 
 const decisionIds: Record<SyntheticDemoBranch, string> = {
   APPROVE: IDS.decisionApprove,

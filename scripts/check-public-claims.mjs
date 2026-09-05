@@ -1,6 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import {
+  buildPublicArtifactJsonLd,
+  buildPublicArtifactMarkdown,
+  buildPublicArtifactsAtom,
+  buildPublicArtifactsJsonFeed,
+  publicArtifacts,
+} from "../src/lib/public-artifacts.ts";
+import { agentHomepageMarkdown, llmsTxt } from "../src/lib/agent-content.ts";
+
 const root = process.cwd();
 const publicSurfaces = [
   "README.md",
@@ -20,7 +29,10 @@ const publicSurfaces = [
   "src/app/workspace/recovery/control/control-view.tsx",
   "src/lib/recovery/source-catalog.ts",
   "src/lib/agent-content.ts",
+  "src/lib/commitment-control-loop.ts",
   "src/lib/public-artifacts.ts",
+  "src/lib/synthetic-control-demo.ts",
+  "src/lib/synthetic-fixture-identity.ts",
   "src/app/demo/page.tsx",
   "src/app/demo.md/route.ts",
   "src/app/feed.json/route.ts",
@@ -78,12 +90,25 @@ const prohibitedClaims = [
 ];
 
 const violations = [];
+const generatedPublicSurfaces = [
+  { name: "generated:feed.json", content: buildPublicArtifactsJsonFeed() },
+  { name: "generated:feed.xml", content: buildPublicArtifactsAtom() },
+  { name: "generated:index.md", content: agentHomepageMarkdown },
+  { name: "generated:llms.txt", content: llmsTxt },
+  ...publicArtifacts.flatMap((artifact) => [
+    { name: `generated:${artifact.slug}:markdown`, content: buildPublicArtifactMarkdown(artifact) },
+    { name: `generated:${artifact.slug}:manifest`, content: artifact.revisionManifest },
+    { name: `generated:${artifact.slug}:json-ld`, content: JSON.stringify(buildPublicArtifactJsonLd(artifact)) },
+  ]),
+];
 
 for (const file of publicSurfaces) {
   const content = await readFile(resolve(root, file), "utf8");
-  for (const rule of prohibitedClaims) {
-    if (rule.pattern.test(content)) violations.push(`${file}: ${rule.reason} (${rule.pattern})`);
-  }
+  scanSurface(file, content);
+}
+
+for (const surface of generatedPublicSurfaces) {
+  scanSurface(surface.name, surface.content);
 }
 
 if (violations.length) {
@@ -91,4 +116,10 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log(`Public claim check passed for ${publicSurfaces.length} user-facing surfaces.`);
+console.log(`Public claim check passed for ${publicSurfaces.length + generatedPublicSurfaces.length} user-facing surfaces.`);
+
+function scanSurface(name, content) {
+  for (const rule of prohibitedClaims) {
+    if (rule.pattern.test(content)) violations.push(`${name}: ${rule.reason} (${rule.pattern})`);
+  }
+}

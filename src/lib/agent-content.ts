@@ -1,10 +1,35 @@
 import { COMMITMENT_CONTROL_STEPS } from "./commitment-control-loop";
+import {
+  publicArtifacts,
+  syntheticDecisionArtifact,
+  type PublicArtifact,
+} from "./public-artifacts";
 
-export const agentLinkHeader = '</index.md>; rel="alternate"; type="text/markdown", </llms.txt>; rel="describedby", </demo.md>; rel="alternate"; type="text/markdown", </feed.json>; rel="alternate"; type="application/feed+json", </feed.xml>; rel="alternate"; type="application/atom+xml"';
+const featuredMarkdownPath = new URL(syntheticDecisionArtifact.markdownUrl).pathname;
+
+export const agentLinkHeader = [
+  '</index.md>; rel="alternate"; type="text/markdown"',
+  '</llms.txt>; rel="describedby"',
+  `<${featuredMarkdownPath}>; rel="related"; type="text/markdown"`,
+  '</feed.json>; rel="alternate"; type="application/feed+json"',
+  '</feed.xml>; rel="alternate"; type="application/atom+xml"',
+].join(", ");
 
 const commitmentControlLoopMarkdown = COMMITMENT_CONTROL_STEPS
   .map((step, index) => `${index + 1}. ${step}`)
   .join("\n");
+
+export function buildPublicArtifactAgentIndexMarkdown(
+  artifacts: readonly PublicArtifact[] = publicArtifacts,
+): string {
+  return artifacts.flatMap((artifact) => [
+    `- [${artifact.title}](${artifact.url}): canonical HTML for \`${artifact.id}\`.`,
+    `- [${artifact.title} in Markdown](${artifact.markdownUrl}): text representation of the same logical artifact.`,
+    `- [${artifact.title} revision manifest](${artifact.revisionUrl}): immutable canonical JSON with SHA-256 \`${artifact.revisionDigest}\`.`,
+  ]).join("\n");
+}
+
+const publicArtifactAgentIndexMarkdown = buildPublicArtifactAgentIndexMarkdown();
 
 export const agentNotFoundMarkdown = `# 404: Page not found
 
@@ -56,7 +81,6 @@ Vognary does not cancel a service, move vendor money, ask for bank passwords, or
 ## Public resources
 
 - [Agent guide](https://www.vognary.com/llms.txt)
-- [Synthetic decision artifact in Markdown](https://www.vognary.com/demo.md)
 - [Public artifacts in JSON Feed](https://www.vognary.com/feed.json)
 - [Public artifacts in Atom](https://www.vognary.com/feed.xml)
 - [Public sitemap](https://www.vognary.com/sitemap.xml)
@@ -66,6 +90,10 @@ Vognary does not cancel a service, move vendor money, ask for bank passwords, or
 - [Privacy](https://www.vognary.com/privacy)
 - [Terms](https://www.vognary.com/terms)
 - [Pay the private pilot](https://www.vognary.com/pay)
+
+## Public decision artifacts
+
+${publicArtifactAgentIndexMarkdown}
 `;
 
 export const llmsTxt = `# Vognary
@@ -102,11 +130,14 @@ Important interpretation rules:
 
 - [Homepage in Markdown](https://www.vognary.com/index.md): Concise product identity, workflow, best fit, and boundaries.
 - [Walk a synthetic decision](https://www.vognary.com/demo): Read-only placeholder example of evidence, proposal, policy, human authorization, and later reconciliation.
-- [Synthetic decision artifact in Markdown](https://www.vognary.com/demo.md): Machine-readable identity, sequence, branch outcomes, and product boundaries for the same canonical example.
 - [Public artifacts in JSON Feed](https://www.vognary.com/feed.json): Machine-readable artifact identity, summary, and decision branches.
 - [Public artifacts in Atom](https://www.vognary.com/feed.xml): Syndication feed for the same canonical artifacts.
 - [Add a bill](https://www.vognary.com/start): No-account step for reviewing user-provided billing evidence.
 - [Vognary homepage](https://www.vognary.com/): Human-facing product overview and route into the synthetic demonstration or a user-provided bill.
+
+## Public decision artifacts
+
+${publicArtifactAgentIndexMarkdown}
 
 ## Trust and policies
 

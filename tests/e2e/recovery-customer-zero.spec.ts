@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
@@ -34,7 +35,7 @@ const laterReceipt = [
 
 test.skip(!email || !accessCode, "database-backed development login env not configured");
 
-test("Customer #0 completes the Recovery and fail-closed mandate journey in the browser", async ({ page, isMobile }, testInfo) => {
+test("Customer #0 completes the Recovery and fail-closed mandate journey in the browser", async ({ page, isMobile }) => {
   test.setTimeout(180_000);
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", {
@@ -46,9 +47,9 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
       },
     });
   });
-  const addressBlock = testInfo.project.name.includes("mobile") ? "203.0.113" : "198.51.100";
+  const identity = randomBytes(12).toString("hex").match(/.{4}/g)!.join(":");
   await page.context().setExtraHTTPHeaders({
-    "x-forwarded-for": `${addressBlock}.${Math.floor(Math.random() * 180) + 50}`,
+    "x-forwarded-for": `2001:db8:${identity}`,
   });
   const runtimeFailures = collectRuntimeFailures(page);
   await resetCustomerZeroThroughUi(page);

@@ -183,7 +183,8 @@ test("CI executes the production schema against PostgreSQL before application ch
     "schema migrations must run before application validation",
   );
   assert.match(workflowSource, /COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS:\s*"\*"/);
-  assert.match(workflowSource, /npm run test:e2e -- commitment-control-ui recovery-customer-zero recovery-ui-home recovery-ui-states/);
+  assert.match(workflowSource, /npm run test:e2e -- commitment-control-ui commitment-control-real recovery-customer-zero recovery-ui-home recovery-ui-states/);
+  assert.match(workflowSource, /VOGNARY_E2E_CONTROL_DISPOSABLE: "true"/);
   assert.doesNotMatch(workflowSource, /signed-in-first-value|verified-savings-share|workspace-source-health|control-wiring-inventory|sample-workspace/);
 });
 

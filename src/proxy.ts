@@ -21,6 +21,8 @@ const publicPagePaths = new Set([
   "/verify",
 ]);
 
+const publicArtifactPathPattern = /^\/artifacts\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/markdown|\/revisions\/[a-f0-9]{64}\/manifest\.json)?$/;
+
 // Browsers, next/image and link-preview crawlers request assets with an Accept
 // header that carries no text/html, so the negotiated agent 404 below would
 // otherwise claim every real file under public/ and answer with Markdown.
@@ -85,6 +87,7 @@ export function proxy(request: NextRequest) {
 
   if (!isSensitiveProductPath) {
     if (!publicPagePaths.has(pathname)
+      && !(pathname.startsWith("/artifacts/") && publicArtifactPathPattern.test(pathname))
       && !staticAssetPathPattern.test(pathname)
       && !request.headers.has("rsc")
       && prefersAgentNotFound(request.headers.get("accept"))) {

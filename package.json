@@ -26,7 +26,7 @@
     "corpus:strict": "node --conditions=react-server --import=tsx scripts/check-statement-corpus.ts --strict",
     "receipt-corpus": "node --conditions=react-server --import=tsx scripts/check-receipt-corpus.ts",
     "receipt-corpus:strict": "node --conditions=react-server --import=tsx scripts/check-receipt-corpus.ts --strict",
-    "claims:check": "node scripts/check-public-claims.mjs",
+    "claims:check": "node --conditions=react-server --import=tsx scripts/check-public-claims.mjs",
     "funnel": "node --env-file-if-exists=.env.local scripts/report-funnel.mjs",
     "market:report": "node scripts/report-market-test.mjs",
     "market:cohort-gate": "node scripts/report-market-test.mjs --require-cohorts",

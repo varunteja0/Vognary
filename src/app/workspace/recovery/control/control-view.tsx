@@ -466,12 +466,12 @@ export function ControlView({
               ? "Nothing needs a decision right now."
               : `${awaitingDecision.length} ${awaitingDecision.length === 1 ? "proposal needs" : "proposals need"} a human decision.`}
         </p>
-        <p className="control-standing-note">
+        {policy !== null || brief.proposals.length > 0 ? <p className="control-standing-note">
           {policy !== null && awaitingDecision.length > 0
             ? `${brief.capabilities.canDecide ? "You can decide these." : "A workspace owner or admin decides these."} `
             : ""}
           {`${awaitingEvidence.length} awaiting evidence · ${authorized.length} authorized in total`}
-        </p>
+        </p> : null}
       </section>
 
       {state.staleNotice ? (
@@ -520,6 +520,7 @@ export function ControlView({
 
       {state.failure && !state.staleNotice ? <FailureBlock failure={state.failure} /> : null}
 
+      {policy !== null || brief.proposals.length > 0 ? <>
       <ControlAttention
         items={attention}
         canAct={brief.capabilities.canDecide}
@@ -600,12 +601,12 @@ export function ControlView({
 
       {/* Creation comes after attention. On an empty desk it opens itself,
           because then entering the first proposal is the work. */}
-      <ControlProposalComposer
+      {policy !== null ? <ControlProposalComposer
         draft={state.draft}
         errors={state.draftErrors}
         pending={state.pending?.kind === "PROPOSAL"}
         online={online}
-        primary={awaitingDecision.length === 0}
+        primary={brief.proposals.length === 0}
         blockedReason={blockedReason}
         eligibleCommitments={eligibleExposureCommitments(commitments)}
         handlers={{
@@ -613,7 +614,7 @@ export function ControlView({
           onToggleCommitment: handlers.toggleCommitment,
           onSubmit: handlers.submitProposal,
         }}
-      />
+      /> : null}
 
       <section
         aria-labelledby="control-policy-heading"
@@ -670,6 +671,7 @@ export function ControlView({
           <p className="control-note">No policy version has been recorded in this workspace.</p>
         )}
       </section>
+      </> : null}
 
       {state.dialog?.kind === "DECISION" && dialogEntry ? (
         <ControlDecisionDialog

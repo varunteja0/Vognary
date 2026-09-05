@@ -660,6 +660,7 @@ export async function getControlReconciliationCandidates(input: {
   workspaceId: string;
   actorUserId: string;
   proposalId: string;
+  now?: Date;
 }): Promise<{ data: ControlReconciliationCandidatesDto; workspaceVersion: number }> {
   assertControlEnrollment(input.workspaceId);
   const proposalId = requireUuid(input.proposalId, "Proposal id");
@@ -702,9 +703,11 @@ export async function getControlReconciliationCandidates(input: {
          on commitment.workspace_id = link.workspace_id and commitment.id = link.commitment_id
        where evidence.workspace_id = $1
          and evidence.amount_minor is not null
+         and evidence.observed_at is not null
          and evidence.currency = $3
          and evidence.evidence_date >= $4::date
          and evidence.evidence_date <= $5::date
+         and evidence.evidence_date <= $6::date
          and not exists (
            select 1 from commitment_control_reconciliations reconciliation
            where reconciliation.workspace_id = evidence.workspace_id
@@ -717,8 +720,9 @@ export async function getControlReconciliationCandidates(input: {
         input.workspaceId,
         proposalId,
         loaded.decision.currency,
-        loaded.decision.decidedAt.slice(0, 10),
+        calendarDateInTimeZone(new Date(loaded.decision.decidedAt), "Asia/Kolkata"),
         loaded.decision.authorizationExpiresOn,
+        calendarDateInTimeZone(input.now ?? new Date(), "Asia/Kolkata"),
       ],
     );
     const candidates = selectControlReconciliationCandidates({

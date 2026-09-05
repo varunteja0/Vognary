@@ -75,10 +75,13 @@ async function main() {
   }
 
   const realCases = cases.filter((fixture) => fixture.provenance === "consented-redacted-real");
-  const score = combine(realCases.map((fixture) => fixture.score));
-  const p95FirstResultMs = percentile(realCases.map((fixture) => fixture.firstResultMs), 0.95);
+  const score = realCases.length ? combine(realCases.map((fixture) => fixture.score)) : emptyScore();
+  const p95FirstResultMs = realCases.length ? percentile(realCases.map((fixture) => fixture.firstResultMs), 0.95) : null;
   const thresholdActive = realCases.length >= minimumRealFixtures;
   const qualityReady = thresholdActive
+    && score.precision !== null
+    && score.recall !== null
+    && p95FirstResultMs !== null
     && score.precision >= minimumPrecision
     && score.recall >= minimumRecall
     && p95FirstResultMs <= maximumP95FirstResultMs;
@@ -180,5 +183,5 @@ function thresholdSummary(active: boolean) {
 }
 
 function emptyScore() {
-  return { expected: 0, detected: 0, matched: 0, falsePositives: 0, falseNegatives: 0, precision: 1, recall: 1 };
+  return { expected: 0, detected: 0, matched: 0, falsePositives: 0, falseNegatives: 0, precision: null, recall: null };
 }

@@ -1,5 +1,6 @@
 import type { AuthorizedProposalDecision } from "./decision";
 import { normalizeCurrency, parseMinorUnits, parsePositiveMinorUnits, requireUuid } from "./money";
+import { calendarDateInTimeZone } from "./project";
 import {
   normalizeControlDateOnly,
   reconcileControlOutcome,
@@ -36,7 +37,7 @@ export function reconcileAuthorizedProposal(input: {
   if (input.decision.authorizationExpiresOn && observedEvidenceDate === null) {
     throw new Error("Observed financial evidence requires a date to evaluate the authorization window.");
   }
-  if (observedEvidenceDate && observedEvidenceDate < normalizeControlDateOnly(input.decision.decidedAt.slice(0, 10), "Decision date")) {
+  if (observedEvidenceDate && observedEvidenceDate < calendarDateInTimeZone(new Date(input.decision.decidedAt), "Asia/Kolkata")) {
     throw new Error("Observed financial evidence cannot predate the authorization decision.");
   }
   if (observedEvidenceDate && input.observedThrough

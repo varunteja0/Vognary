@@ -1,12 +1,12 @@
 import {
   buildPublicArtifactMarkdown,
-  publicArtifacts,
+  syntheticDecisionArtifact,
 } from "@/lib/public-artifacts";
 
 export const dynamic = "force-static";
 
 export function GET() {
-  return new Response(buildPublicArtifactMarkdown(publicArtifacts[0]), {
+  return new Response(buildPublicArtifactMarkdown(syntheticDecisionArtifact), {
     headers: {
       "cache-control": "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400",
       "content-type": "text/markdown; charset=utf-8",

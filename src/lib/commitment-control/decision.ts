@@ -1,6 +1,7 @@
 import type { ProposalPolicyEvaluation } from "./policy";
 import { normalizeCurrency, parsePositiveMinorUnits, requireUuid } from "./money";
 import { normalizeControlDateOnly } from "./outcome";
+import { calendarDateInTimeZone } from "./project";
 
 export const proposalDecisionActions = ["APPROVE", "APPROVE_WITH_CAP", "DECLINE"] as const;
 export type ProposalDecisionAction = typeof proposalDecisionActions[number];
@@ -68,7 +69,7 @@ export function authorizeProposalDecision(input: {
     if (input.authorizationExpiresOn !== undefined) throw new Error("DECLINE cannot carry an authorization expiry.");
   } else {
     authorizationExpiresOn = normalizeControlDateOnly(input.authorizationExpiresOn, "Authorization expiry");
-    if (authorizationExpiresOn < decidedAt.toISOString().slice(0, 10)) {
+    if (authorizationExpiresOn < calendarDateInTimeZone(decidedAt, "Asia/Kolkata")) {
       throw new Error("Authorization expiry cannot be before the decision date.");
     }
     if (input.outcomeReviewOn !== undefined) {
