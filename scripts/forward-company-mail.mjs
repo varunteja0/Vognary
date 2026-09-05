@@ -8,6 +8,7 @@ import {
 
 const resendApi = "https://api.resend.com";
 const maximumRawBytes = 20 * 1024 * 1024;
+const maximumHistoryPages = 10;
 const execute = process.argv.includes("--execute");
 
 if (process.argv.includes("--help")) {
@@ -22,7 +23,7 @@ Required env:
   RESEND_FROM_EMAIL
   COMPANY_MAIL_FORWARD_TO
 
-Dry-run is the default. Output contains counts only, never addresses, names, subjects, bodies, headers, attachments, links, or provider IDs.`);
+Dry-run is the default. Both histories must be complete within ten pages before forwarding is allowed. Output contains counts only, never addresses, names, subjects, bodies, headers, attachments, links, or provider IDs.`);
   process.exit(0);
 }
 
@@ -36,10 +37,10 @@ if (!apiKey || !from || !validEmail(destination)) {
 const destinationHash = companyMailForwardDestinationHash(destination);
 
 const headers = { authorization: `Bearer ${apiKey}` };
-const received = await getJson("/emails/receiving?limit=100");
+const received = await listMessages("/emails/receiving");
 const forwardedSourceHashes = await loadForwardedSourceHashes();
 const plan = selectCompanyMailForForwarding(
-  Array.isArray(received?.data) ? received.data : [],
+  received,
   forwardedSourceHashes,
 );
 
@@ -115,8 +116,8 @@ console.log(JSON.stringify({
 if (failed) process.exitCode = 1;
 
 async function loadForwardedSourceHashes() {
-  const sent = await getJson("/emails?limit=100");
-  const candidates = (Array.isArray(sent?.data) ? sent.data : [])
+  const sent = await listMessages("/emails");
+  const candidates = sent
     .filter((email) => (
       typeof email?.subject === "string"
       && email.subject.startsWith("Fwd: [")
@@ -129,6 +130,37 @@ async function loadForwardedSourceHashes() {
     details.push(detail);
   }
   return forwardedSourceHashesForDestination(details, destination);
+}
+
+async function listMessages(path) {
+  const messages = new Map();
+  const cursors = new Set();
+  let cursor = "";
+  for (let page = 0; page < maximumHistoryPages; page += 1) {
+    const query = new URLSearchParams({ limit: "100" });
+    if (cursor) query.set("after", cursor);
+    const response = await getJson(`${path}?${query}`);
+    if (!Array.isArray(response?.data) || typeof response.has_more !== "boolean") {
+      throw new Error("provider-history-invalid: forwarding requires complete provider history.");
+    }
+    for (const message of response.data) {
+      if (typeof message?.id !== "string" || !message.id.trim()) {
+        throw new Error("provider-history-invalid: a history record has no message identifier.");
+      }
+      messages.set(message.id, message);
+    }
+    if (!response.has_more) return [...messages.values()];
+    const nextCursor = response.data.at(-1)?.id;
+    if (!nextCursor) {
+      throw new Error("provider-history-invalid: the provider omitted a continuation cursor.");
+    }
+    if (cursors.has(nextCursor)) {
+      throw new Error("provider-history-cursor-repeated: forwarding stopped because history did not advance.");
+    }
+    cursors.add(nextCursor);
+    cursor = nextCursor;
+  }
+  throw new Error("provider-history-limit: review provider history before forwarding more than ten pages.");
 }
 
 async function getJson(path) {

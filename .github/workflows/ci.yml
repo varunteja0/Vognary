@@ -43,8 +43,12 @@ jobs:
       - name: Verify runtime contract
         run: test "$(node --version)" = "v22.23.2" && test "$(npm --version)" = "10.9.8"
       - run: npm ci
-      - run: npm audit --omit=dev --audit-level=high
-      - run: npm audit --audit-level=high
+      - name: Audit production dependencies
+        timeout-minutes: 7
+        run: node scripts/check-dependency-audit.mjs --omit=dev
+      - name: Audit all dependencies
+        timeout-minutes: 7
+        run: node scripts/check-dependency-audit.mjs
       - run: npm run ci:database
       - run: npm run lint
       - run: npm run typecheck

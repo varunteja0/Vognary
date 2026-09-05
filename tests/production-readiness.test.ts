@@ -19,6 +19,13 @@ const checkoutAction = "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af80
 const setupNodeAction = "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38";
 const uploadArtifactAction = "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02";
 
+test("main pushes require an explicit production deployment after release gates", () => {
+  const config = JSON.parse(read("vercel.json")) as {
+    git?: { deploymentEnabled?: Record<string, boolean> };
+  };
+  assert.equal(config.git?.deploymentEnabled?.main, false);
+});
+
 test("feature readiness checks every persistent capability migration with bounded aggregate evidence", () => {
   const source = read("src/lib/server/feature-readiness.ts");
   for (const migration of [
@@ -122,7 +129,7 @@ test("CI executes the production schema against PostgreSQL before application ch
   const workflowSource = read(".github/workflows/ci.yml");
   const workflow = parse(workflowSource) as {
     permissions?: { contents?: string };
-    jobs?: { validate?: { "timeout-minutes"?: number; services?: { postgres?: { image?: string } }; env?: { DATABASE_URL?: string }; steps?: Array<{ "timeout-minutes"?: number; run?: string; uses?: string; with?: { "node-version"?: string; "persist-credentials"?: boolean } }> } };
+    jobs?: { validate?: { "timeout-minutes"?: number; services?: { postgres?: { image?: string } }; env?: { DATABASE_URL?: string }; steps?: Array<{ name?: string; "timeout-minutes"?: number; run?: string; uses?: string; with?: { "node-version"?: string; "persist-credentials"?: boolean } }> } };
   };
   assert.equal(workflow.permissions?.contents, "read");
   assert.match(workflowSource, new RegExp(`uses: ${checkoutAction}`));
@@ -139,8 +146,15 @@ test("CI executes the production schema against PostgreSQL before application ch
   const commands = (validate?.steps ?? []).flatMap((step) => step.run ? [step.run] : []);
   assert.ok(commands.some((command) => command.includes(`node --version`) && command.includes(nodeVersion)));
   assert.ok(commands.includes("npm run tokens:check"));
-  assert.ok(commands.includes("npm audit --omit=dev --audit-level=high"));
-  assert.ok(commands.includes("npm audit --audit-level=high"));
+  for (const [name, command] of [
+    ["Audit production dependencies", "node scripts/check-dependency-audit.mjs --omit=dev"],
+    ["Audit all dependencies", "node scripts/check-dependency-audit.mjs"],
+  ] as const) {
+    const auditStep: { name?: string; "timeout-minutes"?: number; run?: string } | undefined =
+      (validate?.steps ?? []).find((step) => step.name === name);
+    assert.equal(auditStep?.["timeout-minutes"], 7);
+    assert.equal(auditStep?.run, command);
+  }
   assert.ok(commands.includes("npm run ci:database"));
   const playwrightInstall = (validate?.steps ?? []).find((step) => step.run === "npx playwright install chromium");
   assert.equal(playwrightInstall?.["timeout-minutes"], 10);

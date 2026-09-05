@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
@@ -82,4 +83,115 @@ test("forwarded source hashes are scoped to the exact destination", () => {
     companyMailForwardDestinationHash("new@example.com"),
     companyMailForwardDestinationHash("old@example.com"),
   );
+});
+
+type ProviderFixture = { body: unknown; status?: number };
+
+const receivedMessage = {
+  id: "security-message",
+  to: ["security@vognary.com"],
+  subject: "Synthetic assessment response",
+  created_at: "2026-09-03T10:00:00.000Z",
+};
+
+function runForwardingWithHistory(responses: Record<string, ProviderFixture>) {
+  return spawnSync(process.execPath, ["--input-type=module"], {
+    input: `
+      const responses = ${JSON.stringify(responses)};
+      globalThis.fetch = async (input, options = {}) => {
+        const url = new URL(String(input));
+        if (url.origin !== "https://api.resend.com" || (options.method && options.method !== "GET")) {
+          throw new Error("Unexpected provider mutation");
+        }
+        const fixture = responses[url.pathname + url.search];
+        if (!fixture) throw new Error("Unexpected provider request");
+        return new Response(JSON.stringify(fixture.body), { status: fixture.status ?? 200 });
+      };
+      await import(${JSON.stringify(new URL("../scripts/forward-company-mail.mjs", import.meta.url).href)});
+    `,
+    env: {
+      ...process.env,
+      RESEND_API_KEY: "synthetic-provider-key",
+      RESEND_FROM_EMAIL: "sender@example.test",
+      COMPANY_MAIL_FORWARD_TO: "founder@example.test",
+    },
+    encoding: "utf8",
+    timeout: 5_000,
+  });
+}
+
+test("forwarding finds previous copies beyond the first sent-history page", () => {
+  const result = runForwardingWithHistory({
+    "/emails/receiving?limit=100": { body: { data: [receivedMessage], has_more: false } },
+    "/emails?limit=100": { body: { data: [{ id: "recent-unrelated" }], has_more: true } },
+    "/emails?limit=100&after=recent-unrelated": {
+      body: {
+        data: [{ id: "earlier-forward", subject: "Fwd: [security@vognary.com] Synthetic response", to: ["founder@example.test"] }],
+        has_more: false,
+      },
+    },
+    "/emails/earlier-forward": {
+      body: {
+        to: ["founder@example.test"],
+        tags: [
+          { name: "purpose", value: "company_mail_forward" },
+          { name: "source_hash", value: companyMailForwardSourceHash(receivedMessage.id) },
+        ],
+      },
+    },
+  });
+
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), { mode: "dry-run", eligible: 0, previouslyForwarded: 1 });
+});
+
+test("forwarding reads received history completely and deduplicates page boundaries", () => {
+  const result = runForwardingWithHistory({
+    "/emails/receiving?limit=100": { body: { data: [receivedMessage], has_more: true } },
+    "/emails/receiving?limit=100&after=security-message": {
+      body: { data: [receivedMessage, { ...receivedMessage, id: "older-security-message" }], has_more: false },
+    },
+    "/emails?limit=100": { body: { data: [], has_more: false } },
+  });
+
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), { mode: "dry-run", eligible: 2, previouslyForwarded: 0 });
+});
+
+for (const scenario of [
+  { name: "missing pagination metadata", body: { data: [] }, expectedError: /provider-history-invalid/ },
+  { name: "missing continuation cursor", body: { data: [], has_more: true }, expectedError: /provider-history-invalid/ },
+  { name: "repeated continuation cursor", body: { data: [{ id: "recent-unrelated" }], has_more: true }, expectedError: /provider-history-cursor-repeated/ },
+  { name: "failed history request", body: {}, status: 503, expectedError: /provider-503/ },
+]) {
+  test(`forwarding stops on ${scenario.name} before suggesting a send`, () => {
+    const result = runForwardingWithHistory({
+      "/emails/receiving?limit=100": { body: { data: [receivedMessage], has_more: false } },
+      "/emails?limit=100": { body: { data: [{ id: "recent-unrelated" }], has_more: true } },
+      "/emails?limit=100&after=recent-unrelated": scenario,
+    });
+
+    assert.ifError(result.error);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stderr, scenario.expectedError);
+    assert.equal(result.stdout, "");
+  });
+}
+
+test("forwarding stops when complete history exceeds the bounded page budget", () => {
+  const responses: Record<string, ProviderFixture> = {
+    "/emails/receiving?limit=100": { body: { data: [receivedMessage], has_more: false } },
+  };
+  for (let page = 0; page < 10; page += 1) {
+    const query = page === 0 ? "" : `&after=page-${page - 1}`;
+    responses[`/emails?limit=100${query}`] = { body: { data: [{ id: `page-${page}` }], has_more: true } };
+  }
+  const result = runForwardingWithHistory(responses);
+
+  assert.ifError(result.error);
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stderr, /provider-history-limit/);
+  assert.equal(result.stdout, "");
 });

@@ -120,15 +120,13 @@ test("active mandate with no Recovery source is not a connected shadow-gate mand
 }, async () => {
   const { pool, ownerUserId, workspaceId, suffix } = await seedWorkspace();
   try {
-    const before = await measureShadowGate();
     await signStandingMandate({
       workspaceId,
       actorUserId: ownerUserId,
       expectedVersion: 0,
       idempotencyKey: `integrity-sign-${suffix}`,
     });
-    const after = await measureShadowGate();
-    assert.equal(after.connectedMandates, before.connectedMandates);
+    assert.equal(await workspaceHasConnectedMandate(pool, workspaceId), false);
   } finally {
     await pool.query(`delete from workspaces where id = $1`, [workspaceId]);
     await pool.query(`delete from users where id = $1`, [ownerUserId]);

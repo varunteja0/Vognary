@@ -1,4 +1,4 @@
-# CONTINUE HERE — live handoff (2026-09-04)
+# CONTINUE HERE — live handoff (2026-09-05)
 
 > **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
 > **Strategy rule: Take smart risks. Do not play safe.** Pursue asymmetric,
@@ -10,9 +10,111 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## 2026-09-04 — Commitment Control follow-through is complete locally
+## 2026-09-05 - scoped release and mail-safety fixes authorized for publication
 
 **THIS BLOCK IS THE ONLY LIVE INSTRUCTION.**
+
+**Scoreboard row:** Backend Readiness, Production Activation, and Distribution execution safety; no score movement
+**Loop step:** human authorization
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. One finance owner needs a trustworthy authorization-to-outcome loop. The current agent-controlled task is release closure and reliable incoming assessor mail, not another product feature.
+- The founder explicitly authorized committing and pushing only the validated CI, database-test, and company-mail fixes, leaving unrelated public-artifact work separate. The founder subsequently approved disabling automatic Vercel deployment for `main`; `vercel.json` now sets `git.deploymentEnabled.main` to `false`. Its regression failed before the setting and passes after it. Production promotion remains an explicit action after release authority and gates.
+- Hosted run `33851361343` attempt `2` on `f707d5576fa386f2f61095a25f4b6f4f0f53738a` passed both audits, then failed PostgreSQL `204/205` because the no-source mandate test compared global counts while other files changed them. The test now uses the existing workspace-scoped predicate. The exact test passes `1/1`, and the concurrent schema/PostgreSQL gate passes `205/205` on a newly created local disposable database, which was removed.
+- The separately authored structured dependency-audit runner and its CI wiring were reviewed together. Both live scopes report zero vulnerabilities; the audit-runner, readiness, and company-mail focused checks passed `43/43` before adding the passing deployment-guard test. Transient failures may retry at most three times; findings, malformed reports, unknown failures, and exhausted retries still fail closed.
+- Company-mail deduplication had lost six historical copies because it read only the newest 100 sent messages. Seven new regression cases failed against the old implementation. The forwarder now paginates sent and received histories, deduplicates page boundaries, and refuses incomplete, repeated-cursor, failed, or over-ten-page histories before any send. Tests pass `10/10`; the live dry-run changed from `6 eligible / 0 previouslyForwarded` to `0 eligible / 6 previouslyForwarded`. No duplicate mail was sent.
+- On the combined local working tree, Node `22.23.2` / npm `10.9.8`, both audits, lint, typecheck, public claims (`51` surfaces), market claims, research, brand, tokens (`76` components), database-unset unit tests (`1290/1290`), standalone build, and all `16` route budgets passed before the final deployment-guard addition. Lint has one pre-existing navigation warning. These combined-tree counts include uncommitted public-artifact work and are not an exact-SHA CI claim.
+- The refreshed private funnel is unchanged: 3 recorded contacts, 0 replies, conversations, offers, or payments; 12 first-touch drafts have no recorded permitted route. The assessor inbox has 7 messages, 0 needing review, and no message newer than `2026-09-03T13:03:48.871Z`. No buyer contact or new assessor message was sent in this continuation.
+- Hacker News currently prohibits generated or AI-edited text. Do not automate posts or replies there. The previous public artifact records remain historical; this continuation did not establish a fresh HN/X response count.
+- Authenticated Control preflight still has only target readiness READY and ten blocked gates. The correct non-mutating release preview is `npm run release:gate -- --plan https://www.vognary.com`; the earlier `--report-only` flag is unsupported. Non-strict corpus still reports `collection-required`, not accuracy proof.
+
+**WHAT IS NOT TRUE**
+
+- No new release SHA has passed hosted CI yet. Local tests do not establish production usability, independent security assurance, founder visual acceptance, buyer demand, payment, renewal, or a 9.9/10 rating.
+- No production schema, customer enrollment, customer financial data, outreach permission, price, or paid state changed. Broad execution authority does not establish a warm relationship or permit the paused cold-email/LinkedIn routes.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Identify one real existing relationship or opted-in buyer thread and its permitted channel; an agent cannot infer the relationship from a public profile or an address-book entry. Buyer decisions and cleared payments must remain externally evidenced.
+2. Obtain and approve the independent assessment/retest and restricted incident, legal/logging, restore, monitoring, and proposal-review evidence before production Control migration or customer-data enrollment.
+
+**HARD STOP:** Keep automatic `main` deployment disabled until explicitly authorized otherwise. Do not publish unrelated active work, waive CI or assurance, deploy or migrate production, enroll customer data, resend historical company mail from incomplete history, automate HN text, or invent outreach and commercial evidence.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - release audit repair verified locally; hosted release still blocked
+
+> **SUPERSEDED 2026-09-05** - see the block above.
+
+**Scoreboard row:** Backend Readiness and Production Activation; no score movement
+**Loop step:** human authorization
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. This work unblocks the first-pilot release, not a new capability. The intended user is one finance owner deciding whether to authorize a proposed obligation; proof requires the exact reviewed release to pass CI and the production Control gates before customer data enters.
+- The last verified local and remote `main` head is `f707d5576fa386f2f61095a25f4b6f4f0f53738a`. The repair remains uncommitted. Public-artifact, company-mail, and PostgreSQL-test changes are separately owned work in this checkout and were not edited by this continuation.
+- Authenticated read-only logs establish the original failure: run `33851361343`, job `100954672500`, received HTTP `503 Service Unavailable` from npm's audit endpoint. A timeout was an earlier hypothesis, not the logged error. A loopback experiment with the pinned npm client also established that `fetch-retries` does not retry these audit POST requests.
+- `.github/workflows/ci.yml` now invokes `scripts/check-dependency-audit.mjs` for production-only and full audits. The shared runner reads structured npm JSON, permits at most three attempts, bounds each attempt at 120 seconds, and retries only recognized transient HTTP/network failures or a process timeout. Findings, authorization failures, unknown failures, invalid reports, and exhausted retries remain non-zero; the high/critical threshold is unchanged. This supersedes the earlier timeout-only shell repair.
+- Deterministic audit-runner tests pass `16/16`; the workflow/readiness contracts pass `17/17`. An actual npm loopback test recovered after a failed HTTP 503 audit and rejected persistent 503s after exactly three attempts. Both live audits through the final runner report zero vulnerabilities.
+- Run `33851361343` attempt `2`, job `101243149050`, completed at `2026-09-05T03:47:14Z`: both hosted audits passed, then `ci:database` failed one global-count comparison in `tests/postgres/autopilot-integrity.test.ts` (`1 !== 0`). A concurrent agent replaced that racy comparison with the existing workspace-scoped check; that change is not this continuation's edit. The combined local database gate passed `205/205` on a newly created loopback-only disposable database. A subsequent focused no-source/connected-consent check passed `2/2` with the file byte-stable. Both temporary databases were removed; the shared development database and production schema were not changed.
+- Node `22.23.2` / npm `10.9.8`: final lint has zero errors and one pre-existing profile-navigation warning; typecheck, public claims (`51` surfaces), research, brand, tokens (`76` components), and database-unset unit tests (`1290/1290`, no failures or skips) pass. The workflow, audit runner, and their two test files remained byte-stable across the final unit run. The standalone build and all `16` route budgets passed earlier in this continuation, before the audit-only runner replacement; no application source was edited by this work.
+- The non-strict statement corpus reports `collection-required` with zero real fixtures. This is not accuracy evidence. Lighthouse, browser journeys, motion, load, and smoke were not rerun by this continuation; earlier counts are historical, not new proof for the current combined tree. Dependencies were not reinstalled in this shared checkout.
+- The refreshed production Control preflight reports only target readiness as READY. Migrations, paid-and-assessed enrollment, release-bound operations evidence, incident staffing/tabletop, legal/logging review, restore, monitoring, Control attention delivery, and proposal-review approval remain BLOCKED. `release:gate` did not start because disposable-test inputs were absent. Its supported preview flag is `--plan`, not `--report-only`; do not reuse the earlier report-only invocation as a safety control.
+
+**WHAT IS NOT TRUE**
+
+- No new immutable SHA containing this repair has passed hosted CI. Local test results do not close the failed hosted run or review other agents' active changes.
+- No production deployment, migration, customer enrollment, independent assessment/retest, customer-data use, UI acceptance, or 9.9/10 product/company rating was established.
+- No scoreboard, payment, renewal, business-validation, distribution, or company-composite score moved. A recoverable registry error is not a waived security gate.
+
+**NEXT HUMAN ACTIONS:**
+
+1. The designated Git owner must authorize and publish a reviewed release commit that includes the shared audit runner, both CI call sites, their tests, and the separately owned database-test correction. Keep unrelated active work separate; require the full hosted `validate` job on those exact bytes before release.
+2. The founder must supply independent assessment/retest clearance and approve the required incident, legal/logging, restore, monitoring, and proposal-review evidence before production migration or real customer financial data.
+
+**HARD STOP:** Do not claim a complete release or a 9.9 rating from local checks, commit or deploy without release-owner authority, weaken any gate, overwrite another agent's work, migrate production, or enroll real customer data before exact-SHA CI and the applicable production gates pass.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-04 — exact candidate committed; release proof remains red
+
+> **SUPERSEDED 2026-09-05** - see the block above.
+
+**Scoreboard row:** Backend Readiness and Production Activation; no score movement without exact-SHA CI, operations, production, and customer evidence
+**Loop step:** proposal → policy context → human authorization → approved cap → observed outcome → reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The one product area with the highest current leverage is first-pilot release closure for the complete Commitment Control loop, not another feature wave.
+- Commit `f707d5576fa386f2f61095a25f4b6f4f0f53738a` is the current local, `origin/main`, and remote `main` head. It consolidates the Control candidate that the superseded block below described as uncommitted.
+- GitHub Actions run `33851361343`, job `100954672500`, is the only check run for that exact SHA. It failed at `npm audit --omit=dev --audit-level=high`; every database, compile, claim, unit, build, performance, browser, and smoke step after it was skipped. The authenticated step log was unavailable, so the exact hosted npm error is not asserted.
+- The same committed lockfile returned `found 0 vulnerabilities` locally after exceeding the execution runner's initial 30-second window. That disproves a known production-dependency finding locally; it does not convert the failed hosted run into a pass.
+- The working tree now contains an uncommitted, fail-closed CI repair in `.github/workflows/ci.yml` plus its contract assertion in `tests/production-readiness.test.ts`. Each dependency audit attempt is bounded at 120 seconds, retries at most three times only after timeout exit `124`, and immediately preserves every other non-zero exit. The focused assertion passes `1/1`; the complete production-readiness contract file passes `17/17`; both touched files have zero editor diagnostics.
+- The current production Control preflight reaches authenticated target readiness and remains blocked on migrations `0057`–`0068`, exactly one paid-and-assessed enrollment, release-bound operations evidence, incident staffing, tabletop, legal/logging review, restore proof, monitoring delivery, provider-confirmed Control attention delivery, and the proposal-review procedure.
+- Separate public-artifact changes are active in the same checkout. They are not part of this release-integrity repair and were not edited or validated by this work.
+
+**WHAT IS NOT TRUE**
+
+- There is no green exact-SHA CI run for the current Control candidate. The local retry repair is not committed, pushed, reviewed, or exercised by GitHub Actions.
+- The candidate is not approved for release, deployed with the Control schema, enrolled for a paid workspace, independently assessed and retested, or proven with real customer financial data.
+- A local zero-vulnerability audit is not a complete CI pass. The retry logic cannot turn a vulnerability result or any non-timeout audit failure into success.
+- No Product UX, Backend Readiness, Production Activation, Business Validation, Distribution, payment, renewal, or company composite score moved.
+
+**NEXT HUMAN ACTIONS:**
+
+1. The release owner must review and commit the CI workflow plus contract test separately from the active public-artifact work, push one new immutable SHA, and require its complete `validate` job to pass.
+2. The founder must complete the independent assessment/retest and approve the restricted incident, legal/logging, restore, monitoring, and proposal-review records for that same deployed SHA before production Control migration or customer-data enrollment.
+
+**HARD STOP:** Do not add another Control capability, merge unrelated public-artifact work into the release-integrity repair, treat a retry as a waived audit, deploy or migrate production, enroll a customer, or enter real customer financial data until one exact SHA has green CI and every production preflight gate is genuinely ready.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-04 — Commitment Control follow-through is complete locally
+
+> **SUPERSEDED 2026-09-04** — see the block above.
+
+**Historical instruction; superseded 2026-09-04.**
 
 **Scoreboard row:** Product UX and Backend Readiness implementation; no score movement without production or customer evidence
 **Loop step:** proposal → policy context → human authorization → approved cap → observed outcome → reconciliation
