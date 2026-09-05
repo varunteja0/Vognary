@@ -110,6 +110,57 @@ test("a targeted migration refuses a fresh database before creating schema or le
   });
 });
 
+test("0069 preserves existing proposals and admits only nonnegative empty-window projections", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("control_projection_windows", async (connectionString) => {
+    const pool = createPool(connectionString);
+    try {
+      await seedSchemaThrough0022(pool);
+      runMigrations(connectionString, ["--through=0068_control_attention_target_identity"]);
+      const userId = randomUUID();
+      const workspaceId = randomUUID();
+      const proposalId = randomUUID();
+      await pool.query(`insert into users (id, email) values ($1, $2)`, [userId, `${userId}@projection.example.test`]);
+      await pool.query(`insert into workspaces (id, owner_user_id, name) values ($1, $2, 'Projection migration fixture')`, [workspaceId, userId]);
+      await pool.query(
+        `insert into commitment_control_proposals (
+          id, workspace_id, merchant, purpose, category, amount_minor, currency,
+          first_charge_date, cadence, as_of_date, projected_13_week_minor, projected_annual_minor,
+          intended_outcome_metric, intended_outcome_direction, intended_outcome_target_value,
+          intended_outcome_unit, intended_outcome_review_on
+        ) values ($1, $2, 'Synthetic Vendor', 'Migration fixture', 'AI_MODEL', 250000, 'INR',
+          '2026-09-05', 'ONE_TIME', '2026-09-05', 250000, 250000,
+          'Completed fixture tasks', 'AT_LEAST', '10', 'tasks', '2027-09-30')`,
+        [proposalId, workspaceId],
+      );
+      const before = (await pool.query<{ record: Record<string, unknown> }>(
+        `select to_jsonb(proposal) as record from commitment_control_proposals proposal where id = $1`, [proposalId],
+      )).rows[0]!.record;
+      const insertProjection = (overrides: Record<string, unknown>) => pool.query(
+        `insert into commitment_control_proposals select (jsonb_populate_record(null::commitment_control_proposals, $1::jsonb)).*`,
+        [JSON.stringify({ ...before, id: randomUUID(), first_charge_date: "2026-12-20", projected_13_week_minor: "0", ...overrides })],
+      );
+      await assert.rejects(() => insertProjection({}), { code: "23514" });
+
+      runMigrations(connectionString);
+      runMigrations(connectionString);
+      const after = (await pool.query<{ record: Record<string, unknown> }>(
+        `select to_jsonb(proposal) as record from commitment_control_proposals proposal where id = $1`, [proposalId],
+      )).rows[0]!.record;
+      assert.deepEqual(after, before);
+      await insertProjection({});
+      await insertProjection({ first_charge_date: "2027-09-05", projected_annual_minor: "0" });
+      for (const invalid of [{ projected_13_week_minor: "-1" }, { projected_annual_minor: "-1" }, { amount_minor: "0" }]) {
+        await assert.rejects(() => insertProjection(invalid), { code: "23514" });
+      }
+      assert.equal((await pool.query(`select id from commitment_control_proposals`)).rowCount, 3);
+    } finally {
+      await pool.end();
+    }
+  });
+});
+
 test("the bounded production 0055 to 0056 procedure refuses drift and preserves legacy cycles", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
@@ -291,15 +342,15 @@ test("the real migration runner installs and records the Recovery receipt inbox 
 }, async () => {
   await withDisposableDatabase("recovery_fresh", async (connectionString) => {
     const result = runMigrations(connectionString);
-    assert.equal(result.applied.at(-1)?.id, "0068_control_attention_target_identity");
+    assert.equal(result.applied.at(-1)?.id, "0069_control_projection_empty_windows");
 
     const pool = createPool(connectionString);
     try {
       const migrations = await pool.query<{ id: string }>(
         `select id from schema_migrations order by id`,
       );
-      assert.equal(migrations.rows.at(-1)?.id, "0068_control_attention_target_identity");
-      assert.equal(migrations.rows.length, 68);
+      assert.equal(migrations.rows.at(-1)?.id, "0069_control_projection_empty_windows");
+      assert.equal(migrations.rows.length, 69);
       await assertRecoveryRelations(pool);
       const phaseA = await pool.query<{
         milestone_columns: number;
@@ -639,6 +690,7 @@ test("the real migration runner upgrades an existing 0022 database through Recov
       { id: "0066_control_attention_provider_events", mode: "applied-migration" },
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
+      { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
     ]);
 
     const verifyPool = createPool(connectionString);
@@ -853,6 +905,7 @@ test("the real migration runner upgrades 0027 through 0028 without dropping Reco
       { id: "0066_control_attention_provider_events", mode: "applied-migration" },
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
+      { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -1346,6 +1399,7 @@ test("0029 installs over historical cross-workspace rows without rewriting owner
       { id: "0066_control_attention_provider_events", mode: "applied-migration" },
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
+      { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{ decision_workspace: string; item_workspace: string }>(
@@ -1604,6 +1658,7 @@ test("0030 leaves historical cross-workspace rows untouched and they remain cuto
       { id: "0066_control_attention_provider_events", mode: "applied-migration" },
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
+      { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{
@@ -1826,6 +1881,7 @@ test("upgrading from 0030 through 0033 cannot insert fee rows until 0034 sets fi
       { id: "0066_control_attention_provider_events", mode: "applied-migration" },
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
+      { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -2006,6 +2062,7 @@ test("upgrading a genuinely frozen 0037 notice retries through the real store an
       { id: "0066_control_attention_provider_events", mode: "applied-migration" },
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
+      { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
     ]);
     const retryOutput = execFileSync(
       process.execPath,
@@ -2180,6 +2237,7 @@ test("0042 purges legacy workspace.activated rows that 0041 would have preserved
       { id: "0066_control_attention_provider_events", mode: "applied-migration" },
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
+      { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
     ]);
 
     const helperOutput = execFileSync(
@@ -2291,6 +2349,7 @@ test("0043 requires a semantic-version marker so old-style activations cannot be
       { id: "0066_control_attention_provider_events", mode: "applied-migration" },
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
+      { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
     ]);
 
     const after = createPool(connectionString);
@@ -2484,6 +2543,7 @@ test("production-upgrade rehearsal from 0030 preserves Recovery facts through 00
       "0066_control_attention_provider_events",
       "0067_control_follow_through",
       "0068_control_attention_target_identity",
+      "0069_control_projection_empty_windows",
     ]);
 
     const after = createPool(connectionString);

@@ -10,9 +10,114 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## 2026-09-05 - browser gates cleared; CI smoke signing fixture corrected
+## 2026-09-05 - founder authorizes evidence-led product improvement and transfers frontend ownership
 
 **THIS BLOCK IS THE ONLY LIVE INSTRUCTION.**
+
+**Scoreboard row:** Product UX and Backend Readiness; Business Validation and Distribution proof remains required; no score movement
+**Loop step:** human authorization
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The founder requested substantial evidence-led improvement across the audit dimensions, including redesign when justified and a pivot only with proper validation. The target is one finance owner completing a real proposal-to-decision-to-observation workflow and returning to the same durable record. A rating target is an ambition, not measured evidence.
+- The founder explicitly selected "Transfer frontend ownership to this session; the other frontend work is stopped." GitHub Copilot now owns this non-production frontend improvement pass as well as its backend and test work. Preserve all existing edits; the transfer does not authorize reverting the separately authored overlap or policy-horizon repairs already present in the checkout.
+- The founder explicitly confirmed "No permitted buyer route yet." No relationship, outreach permission, conversation, offer acceptance, payment, or renewal may be inferred. The prepared buyer experiment remains unsent and unrun.
+- This pass will verify the current repairs, add real-handler browser proof for the complete Control journey, and improve observed first-use and evidence-selection failures. Any broader presentation change must preserve the name, product truth, exact money, assumptions/evidence distinction, human authority, immutable decisions, privacy, accessibility, and current service terms. A strategic pivot is not approved merely because it is proposed.
+- The preceding independent audit, local guard regressions, green committed candidate, production baseline, and limitations are retained in the superseded block below. No new verification or score increase is established by this authorization entry.
+
+### Parallel closure evidence - 2026-09-05
+
+- The release-closure session reproduced the reconciliation disclosure collision with intersecting DOM rectangles and removed fixed desktop grid rows. Non-overlap, overflow, and accessibility checks have passed at 1440, 1280, 720 (200% equivalent), 390, and 360 pixels; the initial 1440 timeout passed unchanged on rerun. Desktop and narrow captures were inspected. This is defect evidence, not visual acceptance or authority over the broader frontend pass.
+- Valid future proposals now accept exact zero projected-window totals through policy, DTO, and persistence while charge amounts and policy caps remain positive. New forward migration `0069_control_projection_empty_windows` has checksum `e15830e1ba218a72e792fa5871648985991aa208daa3efb1b5a9d6ca24755baf`; it changes only projected-total checks from positive to nonnegative. A disposable `0068` upgrade preserves rows, rejects negative projections and zero charges, and replays cleanly. No applied migration was rewritten or production schema changed.
+- The audit's prior-date, future-date, and observed-charge reconciliation guards were reviewed and preserved. Full schema/concurrent PostgreSQL tests pass `209/209`, no skips, on a new local disposable database, subsequently removed. Current backup/readiness checks pass `33/33` and require `0069`. New source type errors were corrected; the main checkout's remaining compile error is corrupted generated Next development output owned by another live server. Clean isolated build verification is still required.
+- These closure edits are not in the green `b9564da` release and do not include separate public-artifact or broader frontend work. No new exact-SHA CI, deployment, independent assessment, permitted buyer route, offer, payment, or enrollment is claimed. Latest assessor inbox remains 7 messages / 0 needing review, with no message newer than `2026-09-03T13:03:48.871Z`.
+
+**WHAT IS NOT TRUE**
+
+- A command to make every independent rating 10/10 does not establish customer value, security assurance, willingness to pay, retention, defensibility, or profitability. No failure-free or market-success guarantee is possible.
+- Frontend ownership does not authorize outreach, spending, commits, pushes, deployment, production migration, customer-data enrollment, new financial rails, or autonomous action. Automatic main-branch deployment remains disabled.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Establish one genuine permitted relationship or opted-in buyer thread for the existing event-based experiment; do not supply sensitive correspondence in Git or chat.
+2. Obtain independent assessment/retest clearance and release-bound operational evidence before real customer financial data or production Control activation.
+
+**HARD STOP:** Do not award ratings or readiness without evidence, overwrite existing work, contact prospects through an unrecorded route, publish or deploy without release authority, collect customer financial data before assurance clearance, waive any gate, or execute a pivot before its stated validation and explicit scope decision.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - independent audit and reconciliation evidence guards verified locally
+
+> **SUPERSEDED 2026-09-05** - see the block above.
+
+**Scoreboard row:** Business Validation and Distribution diagnosis; Backend Readiness and Production Activation correctness; no score movement
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. One finance owner authorizes a proposed obligation and later compares a genuinely observed charge with the original cap. The founder requested an independent AUDIT_THEN_ACT assessment; its single dated report is [the September 5 company audit](../output/vognary-company-adversarial-audit-2026-09-05.md). Its NARROW verdict is a recommendation, not an approved pivot, rename, new price, or change to the strict qualification rules.
+- During the audit, the separate release owner advanced `main` to `b9564da6def38bad370e174d74c02f8172d711e5`. Read-only GitHub verification confirms [run 33946616877](https://github.com/varunteja0/Vognary/actions/runs/33946616877) completed successfully on that exact SHA. The release history and measured committed-candidate results are preserved in the superseded block below. This audit did not commit or push.
+- Two real-store synthetic probes found material reconciliation errors despite the broad green baseline: a receipt dated before approval persisted as `MATCHED`, and a future renewal notice with no `observed_at` persisted as an observed `MATCHED` outcome. The local reconciliation boundary now rejects prior-dated and future-dated financial evidence, and requires an observed Recovery charge rather than a scheduled renewal. Source evidence remains available; rejected attempts cannot advance workspace version or change the frozen cap.
+- Four new failing-first regressions cover those boundaries at domain and PostgreSQL levels. Two existing erasure/export fixtures received consistent synthetic chronology without weakening any privacy or cap assertion. The six audit-owned backend/test changes remain uncommitted; there are no migration, public API vocabulary, frontend, automatic-matching, financial-authority, or production changes.
+- Final combined-tree checks under Node `22.23.2` / npm `10.9.8` passed: lint (one existing navigation warning), typecheck, public claims (`51` surfaces), market claims, tokens (`76` components), database-unset units `1294/1294`, disposable PostgreSQL `207/207`, standalone build, and all `16` route budgets. Research and brand checks also passed earlier. These dirty-tree counts include separately owned public-artifact work and are not `b9564da` exact-SHA counts.
+- On an isolated pre-repair source snapshot, the mocked Control browser suite passed `31/32`; its single cold-compilation desktop-login timeout passed the unchanged focused rerun. Unmocked synthetic policy/proposal/capped-decision writes, real-HTTP evidence ingestion, UI receipt selection, reconciliation, reload, and another session were observed. A fresh mobile read-back had zero Axe violations and zero overflow. The failed parser and audit-harness attempts remain explicitly documented; no post-patch browser or real-user acceptance claim is made.
+- A confirmed desktop defect remains with the frontend owner: the outcome disclaimer and financial-evidence metadata occupy the same grid cell in `workspace.css` and overlap. A separate valid proposal beyond the 13-week window is rejected because policy requires positive rather than non-negative window totals. These findings are documented, not silently marked fixed.
+- Authenticated production readiness at `2026-09-05T05:19:42Z` identified `f707d5576fa386f2f61095a25f4b6f4f0f53738a`, schema `0056_decision_cycle_expected_amount`, migrations pending, enrollment disabled, and zero enrolled Control workspaces. The Control preflight still has one ready check and ten blocked checks. Automatic Vercel deployment of `main` remains disabled.
+- Primary private-CRM aggregation confirmed 45 rows, 15 assigned candidates, 3 recorded contact attempts, and zero replies, conversations, committed events, offers, invoice commitments, invoices, payments, renewals, customer proposals, recorded permitted channels, and buyer-confirmed exposure thresholds. Empty founder-time fields are unmeasured effort, not zero work. Both real-data corpora remain empty. No commercial score moved.
+- The report includes an unsent, unrun event-based buyer experiment comparing pre-spend Control, post-spend variance review, and the buyer's existing workflow. Its immediate blocker is one genuine permitted relationship or opted-in thread. No outreach, assessor communication, purchase, terms acceptance, or customer-data collection occurred. The audit-only server was stopped and its uniquely named disposable database removed at `2026-09-05T05:32:14Z`; other sessions' servers/databases were not reset.
+
+**WHAT IS NOT TRUE**
+
+- The audit repair is not included in the green `b9564da` candidate, exact-SHA CI verified, deployed, independently assessed, or approved for customer data. Historical local or hosted passes cannot be applied to different bytes.
+- A citation ID does not prove the text is entailed; a scheduled notice is not an observed charge; same-day evidence cannot prove intraday order; a per-charge advisory cap is not an enforced budget or complete exposure inventory.
+- The independent ratings do not replace official scores, prove demand or market death, authorize a strategy rewrite, or establish payment, renewal, verified ROI, legal readiness, or production usability.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Identify one genuine existing relationship or opted-in buyer thread and its permitted channel, then run the report's 20-minute recent-variance/upcoming-commitment reconstruction. Agent preparation cannot create the relationship, buyer authority, event, offer acceptance, or cleared payment.
+2. Confirm the proposed event-first discovery sequencing and reconcile the active Phase A deadline without erasing the missed original gate. The current product truth, one-time INR 14,999 offer, qualification standards, and ownership remain unchanged unless explicitly amended.
+3. Obtain independent assessment/retest clearance and approve the restricted incident, tabletop, legal/logging, restore, monitoring and proposal-review evidence before authorizing production activation of a reviewed exact SHA. The Git owner must separately authorize publication of the audit repair and require its own hosted verification.
+
+**HARD STOP:** Keep automatic `main` deployment disabled. Do not deploy, migrate, or enroll customer data from local tests or the older green SHA; waive assurance; overwrite another session's work; edit Opus-owned frontend without authority; reuse old/scheduled evidence as observed outcomes; use paused cold-email/LinkedIn routes; automate HN text; or invent permission, customer behavior, payment, or score movement.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - exact committed candidate has green hosted CI; activation blocked
+
+> **SUPERSEDED 2026-09-05** - see the block above.
+
+**Scoreboard row:** Backend Readiness and Production Activation release evidence; no score movement
+**Loop step:** human authorization
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The named user remains one finance owner authorizing a proposed obligation and later checking its outcome. The code-controlled release verification for the committed candidate is complete; paid behavior and production activation remain unproven.
+- Local and remote `main` were verified at `b9564da6def38bad370e174d74c02f8172d711e5`. Hosted [CI run 33946616877](https://github.com/varunteja0/Vognary/actions/runs/33946616877), job `101253762991`, completed successfully at `2026-09-05T05:31:57Z` on that exact SHA.
+- That hosted job passed installation, both dependency-audit scopes, schema/PostgreSQL `205/205`, lint, typecheck, public claims, research, brand, tokens, unit tests `1287/1287` with no skips, non-strict corpus, build, all `16` route budgets, Lighthouse, public browser `82 passed / 84 skipped`, signed-in browser `80 passed / 4 skipped`, and production-build smoke. The existing profile-navigation lint warning remains. Skipped browser cases are not passes; the empty non-strict corpus is not accuracy evidence.
+- Published fixes are `52edd7a` (bounded structured audit retries, workspace-scoped mandate test, paginated company-mail history, explicit production deployment guard), `da5c54a` (current keyboard sign-in and explicit Recovery navigation in Customer #0), and `b9564da` (valid synthetic CI webhook key and real-verifier regression). No application domain logic or migration was changed by these commits.
+- The main-branch Vercel auto-deployment guard remains founder-authorized and enabled. The final production check still returned `f707d5576fa386f2f61095a25f4b6f4f0f53738a`, schema `migrations-pending`, and enrollment `disabled-no-workspaces`. GitHub records zero deployments for `b9564da`. No production migration or enrollment ran.
+- Company-mail pagination tests pass `10/10`; the verified live dry-run is `0 eligible / 6 previouslyForwarded`. The six older copies remain recognized and no duplicate or new message was sent.
+- Latest measured commercial evidence remains 3 contacts, 0 replies/conversations/offers/payments, and 12 drafts blocked on a permitted route. Assessor inbox remains 7 messages / 0 needing review, latest `2026-09-03T13:03:48.871Z`. This continuation did not establish a fresh HN/X response count. HN prohibits generated or AI-edited posts/replies.
+- Other sessions' uncommitted public-artifact and Control domain/store/privacy-test changes remain in this checkout. They were not included in these commits and are not covered by the green exact-SHA claim. This final handoff update is intentionally uncommitted so the named remote release candidate remains the SHA that passed CI.
+
+**WHAT IS NOT TRUE**
+
+- Green CI is not production Control activation, independent assessment/retest, founder visual acceptance, corpus accuracy, paid adoption, retention, or a 9.9/10 rating. The ten previously measured Control preflight blockers remain unresolved.
+- The current dirty working tree is not the immutable green candidate. Do not attribute `b9564da`'s checks to uncommitted changes or publish those changes without their own review and verification.
+- No buyer permission, payment, customer-data enrollment, production schema, scoreboard score, or company composite was advanced.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Identify one genuine existing relationship or opted-in buyer thread and its permitted channel. The agent can prepare and record an authorized action but cannot manufacture a warm relationship, buyer decision, or cleared payment.
+2. Obtain independent assessment/retest clearance and approve the required restricted incident, tabletop, legal/logging, restore, monitoring, and proposal-review evidence. Only then authorize production activation of the reviewed exact SHA and the required synthetic delivery proof before customer financial data.
+
+**HARD STOP:** Keep automatic `main` deployment disabled. Do not deploy, migrate, or enroll customer data on CI evidence alone; waive assurance; treat uncommitted work as green; use paused cold-email/LinkedIn routes; automate HN text; or invent commercial outcomes.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - browser gates cleared; CI smoke signing fixture corrected
+
+> **SUPERSEDED 2026-09-05** - see the block above.
 
 **Scoreboard row:** Backend Readiness and Production Activation; no score movement
 **Loop step:** human authorization

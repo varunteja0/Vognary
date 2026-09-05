@@ -36,6 +36,7 @@ export const requiredAutopilotIntegrityMigrations = [
   "0066_control_attention_provider_events",
   "0067_control_follow_through",
   "0068_control_attention_target_identity",
+  "0069_control_projection_empty_windows",
 ];
 export const pre0057IntegrityMigrations = requiredAutopilotIntegrityMigrations.filter(
   (migration) =>
@@ -50,7 +51,8 @@ export const pre0057IntegrityMigrations = requiredAutopilotIntegrityMigrations.f
     && migration !== "0065_control_attention_outbox"
     && migration !== "0066_control_attention_provider_events"
     && migration !== "0067_control_follow_through"
-    && migration !== "0068_control_attention_target_identity",
+    && migration !== "0068_control_attention_target_identity"
+    && migration !== "0069_control_projection_empty_windows",
 );
 export const requiredAutopilotIntegrityTriggers = [
   "commitment_control_decisions_immutable",
@@ -194,7 +196,7 @@ function verificationProfile(value) {
   }
   return {
     profile,
-    migrationHead: "0068_control_attention_target_identity",
+    migrationHead: "0069_control_projection_empty_windows",
     requiredMigrations: [requiredRecoveryMigration, ...requiredAutopilotIntegrityMigrations],
     integrityMigrations: requiredAutopilotIntegrityMigrations,
     requiredTriggers: requiredAutopilotIntegrityTriggers,

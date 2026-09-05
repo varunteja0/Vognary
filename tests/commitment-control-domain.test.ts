@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { authorizeProposalDecision } from "../src/lib/commitment-control/decision";
 import { evaluateProposalPolicy } from "../src/lib/commitment-control/policy";
+import { projectProposalExposure } from "../src/lib/commitment-control/project";
 import { reconcileAuthorizedProposal } from "../src/lib/commitment-control/reconcile";
 
 const proposal = {
@@ -72,6 +73,57 @@ test("evaluates cited exposure and proposal assumptions without making a decisio
   assert.deepEqual(evaluation.reasonCodes, []);
   assert.equal(evaluation.citedExposureBasis, "PROJECTED");
   assert.equal("decision" in evaluation, false);
+});
+
+test("policy accepts zero exposure outside the 13-week and annual projection windows", () => {
+  for (const [firstChargeDate, thirteenWeekMinor, annualMinor] of [
+    ["2026-12-04", "250000", "250000"],
+    ["2026-12-05", "0", "250000"],
+    ["2026-12-20", "0", "250000"],
+    ["2027-09-05", "0", "0"],
+  ]) {
+    const projection = projectProposalExposure([{ ...proposal, firstChargeDate, cadence: "ONE_TIME" }], { asOfDate: "2026-09-05" });
+    const projected = projection.proposals[0];
+    assert.equal(projected.thirteenWeekMinor, thirteenWeekMinor);
+    assert.equal(projected.annualMinor, annualMinor);
+    const evaluation = evaluateProposalPolicy({ proposal: { ...proposal, ...projected }, policy, existingExposure: [] });
+    assert.equal(evaluation.status, "WITHIN_POLICY");
+    assert.equal(evaluation.humanDecisionRequired, true);
+    assert.equal(evaluation.currencyResults[0].combinedThirteenWeekMinor, thirteenWeekMinor);
+    assert.equal(evaluation.currencyResults[0].combinedAnnualMinor, annualMinor);
+    assert.equal(evaluation.currencyResults[0].thirteenWeekHeadroomMinor, (BigInt(3000000) - BigInt(thirteenWeekMinor)).toString());
+    assert.equal(evaluation.currencyResults[0].annualHeadroomMinor, (BigInt(12000000) - BigInt(annualMinor)).toString());
+  }
+});
+
+test("zero projected exposure retains per-charge and currency policy checks", () => {
+  const outside = evaluateProposalPolicy({
+    proposal: { ...proposal, amountMinor: "600000", thirteenWeekMinor: "0", annualMinor: "0" },
+    policy,
+    existingExposure: [],
+  });
+  assert.equal(outside.status, "OUTSIDE_POLICY");
+  assert.deepEqual(outside.reasonCodes, ["PER_CHARGE_LIMIT_EXCEEDED"]);
+  assert.equal(outside.humanDecisionRequired, true);
+  const missingCurrency = evaluateProposalPolicy({
+    proposal: { ...proposal, currency: "USD", thirteenWeekMinor: "0", annualMinor: "0" },
+    policy,
+    existingExposure: [],
+  });
+  assert.equal(missingCurrency.status, "REVIEW_REQUIRED");
+  assert.deepEqual(missingCurrency.reasonCodes, ["CURRENCY_POLICY_MISSING"]);
+});
+
+test("zero projected exposure does not admit nonpositive charge amounts or invalid totals", () => {
+  const emptyProjection = { ...proposal, thirteenWeekMinor: "0", annualMinor: "0" };
+  for (const amountMinor of ["0", "-1", "1.5", "9223372036854775808"]) {
+    assert.throws(() => evaluateProposalPolicy({ proposal: { ...emptyProjection, amountMinor }, policy, existingExposure: [] }));
+  }
+  for (const field of ["thirteenWeekMinor", "annualMinor"]) {
+    for (const invalid of ["-1", "1.5", "9223372036854775808"]) {
+      assert.throws(() => evaluateProposalPolicy({ proposal: { ...emptyProjection, [field]: invalid }, policy, existingExposure: [] }));
+    }
+  }
 });
 
 test("returns review or outside-policy states deterministically and fails closed on uncited exposure", () => {
@@ -357,6 +409,64 @@ test("evidence after the authorization window is never treated as authorized spe
   });
   assert.equal(expired.verdict, "AUTHORIZATION_EXPIRED");
   assert.equal(expired.observedEvidenceDate, "2026-10-01");
+});
+
+test("evidence before the decision cannot retroactively satisfy an authorization", () => {
+  const evaluation = evaluateProposalPolicy({ proposal, policy, existingExposure: [] });
+  const decision = authorizeProposalDecision({
+    actorRole: "owner",
+    actorUserId: "b1000000-0000-4000-8000-000000000001",
+    evaluation,
+    action: "APPROVE",
+    authorizationExpiresOn: "2026-09-30",
+    decidedAt: "2026-08-25T10:00:00.000Z",
+  });
+  const evidence = {
+    evidenceId: "e1000000-0000-4000-8000-000000000001",
+    amountMinor: "250000",
+    currency: "INR",
+    evidenceDate: "2026-08-24",
+  };
+  const frozen = structuredClone(decision);
+
+  for (const authorizationExpiresOn of [decision.authorizationExpiresOn, null]) {
+    assert.throws(() => reconcileAuthorizedProposal({
+      decision: { ...decision, authorizationExpiresOn },
+      evidence,
+    }), /evidence cannot predate the authorization decision/i);
+  }
+  assert.equal(reconcileAuthorizedProposal({
+    decision,
+    evidence: { ...evidence, evidenceDate: "2026-08-25" },
+  }).verdict, "MATCHED");
+  assert.deepEqual(decision, frozen);
+});
+
+test("future-dated financial evidence cannot be treated as an observed charge", () => {
+  const decision = authorizeProposalDecision({
+    actorRole: "owner",
+    actorUserId: "b1000000-0000-4000-8000-000000000001",
+    evaluation: evaluateProposalPolicy({ proposal, policy, existingExposure: [] }),
+    action: "APPROVE",
+    authorizationExpiresOn: "2026-09-30",
+    decidedAt: "2026-08-25T10:00:00.000Z",
+  });
+  const evidence = {
+    evidenceId: "e1000000-0000-4000-8000-000000000001",
+    amountMinor: "250000",
+    currency: "INR",
+    evidenceDate: "2026-09-15",
+  };
+  assert.throws(() => reconcileAuthorizedProposal({
+    decision,
+    evidence,
+    observedThrough: "2026-09-05",
+  }), /financial evidence cannot be in the future/i);
+  assert.equal(reconcileAuthorizedProposal({
+    decision,
+    evidence,
+    observedThrough: "2026-09-15",
+  }).verdict, "MATCHED");
 });
 
 test("uncited eligible exposure cannot be within policy and outside-policy approve needs a written override", () => {

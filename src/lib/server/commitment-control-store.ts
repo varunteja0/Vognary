@@ -335,13 +335,16 @@ export async function reconcileCommitmentControlProposal(input: {
       if (loaded.decision.action === "DECLINE") {
         throw new RecoveryServiceError("CONFLICT", "A declined proposal cannot be reconciled to observed spend.");
       }
-      const evidence = await client.query<{ id: string; amount_minor: string | null; currency: string | null; evidence_date: Date | string | null }>(
-        `select id, amount_minor::text, currency, evidence_date
+      const evidence = await client.query<{ id: string; amount_minor: string | null; currency: string | null; evidence_date: Date | string | null; observed_at: Date | string | null }>(
+        `select id, amount_minor::text, currency, evidence_date, observed_at
          from recovery_evidence where workspace_id = $1 and id = $2`,
         [input.workspaceId, evidenceId],
       );
       const evidenceRow = evidence.rows[0];
       if (!evidenceRow) throw new RecoveryServiceError("NOT_FOUND");
+      if (evidenceRow.observed_at === null) {
+        throw new RecoveryServiceError("INVALID_EVIDENCE", "Reconciliation requires an observed financial charge, not a scheduled renewal.");
+      }
       const reconciled = reconcileAuthorizedProposal({
         decision: loaded.decision,
         evidence: {

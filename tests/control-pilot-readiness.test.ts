@@ -22,6 +22,7 @@ const requiredMigrations = [
   "0066_control_attention_provider_events",
   "0067_control_follow_through",
   "0068_control_attention_target_identity",
+  "0069_control_projection_empty_windows",
 ];
 const readyEnvironment = {
   COMMITMENT_CONTROL_INCIDENT_COMMANDER_STATUS: "assigned",
@@ -70,6 +71,20 @@ test("Control pilot readiness requires every independent customer-data proof", (
     "control-attention-delivery",
     "proposal-review-procedure",
   ]);
+});
+
+test("Control pilot readiness requires the empty-window projection migration", () => {
+  const result = evaluateControlPilotReadiness({
+    environment: readyEnvironment,
+    enrollment: { status: "ready", enrolledWorkspaceCount: 1 },
+    appliedMigrations: requiredMigrations.filter((migration) => migration !== "0069_control_projection_empty_windows"),
+    targetReadinessAuthenticated: true,
+    targetCommitSha: releaseSha,
+    targetAttention: readyAttention,
+    now: new Date("2026-09-02T00:00:00.000Z"),
+  });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.checks.find((check) => check.id === "control-migrations")?.ready, false);
 });
 
 test("blank evidence fails closed without exposing environment values", () => {

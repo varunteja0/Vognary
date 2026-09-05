@@ -409,6 +409,8 @@ function isFeatureMigrationsReady({ endpointPayloads }) {
     && capabilities.schema.applied?.includes("0067_control_follow_through") === true
     && capabilities.schema.required?.includes("0068_control_attention_target_identity") === true
     && capabilities.schema.applied?.includes("0068_control_attention_target_identity") === true
+    && capabilities.schema.required?.includes("0069_control_projection_empty_windows") === true
+    && capabilities.schema.applied?.includes("0069_control_projection_empty_windows") === true
     && capabilities.privacyLifecycle?.status !== "schema-query-failed"
     && capabilities.renewalAlerts?.status !== "schema-query-failed"
     && capabilities.commitmentDecisions?.status !== "schema-query-failed"

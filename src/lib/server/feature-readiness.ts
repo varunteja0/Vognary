@@ -74,6 +74,7 @@ export const productionFeatureMigrations = [
   "0066_control_attention_provider_events",
   "0067_control_follow_through",
   "0068_control_attention_target_identity",
+  "0069_control_projection_empty_windows",
 ] as const;
 
 type FeatureMigrationId = typeof productionFeatureMigrations[number];

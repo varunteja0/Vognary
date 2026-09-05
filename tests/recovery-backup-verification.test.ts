@@ -17,7 +17,7 @@ import {
 function verification(auditFacts: Record<string, string> = {}) {
   return {
     profile: "current",
-    migrationHead: "0068_control_attention_target_identity",
+    migrationHead: "0069_control_projection_empty_windows",
     requiredMigration: requiredRecoveryMigration,
     requiredIntegrityMigrations: [...requiredAutopilotIntegrityMigrations],
     integrityTriggers: [...requiredAutopilotIntegrityTriggers],

@@ -112,6 +112,100 @@ async function cleanUp(desk: Desk) {
   await desk.pool.query(`delete from users where id = any($1::uuid[])`, [[desk.ownerUserId, desk.memberUserId]]).catch(() => undefined);
 }
 
+test("prior-dated evidence cannot persist a retroactive authorization verdict", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const desk = await seedDesk("predated-evidence");
+  try {
+    const authorized = await authorizeProposal(desk, "predated-evidence");
+    await submitRecoveryEvidence({
+      workspaceId: desk.workspaceId,
+      actorUserId: desk.ownerUserId,
+      expectedVersion: await currentVersion(desk),
+      idempotencyKey: `follow-predated-evidence-${desk.suffix}`,
+      request: {
+        kind: "RECEIPT_PASTE",
+        receipts: [{
+          clientRef: "synthetic-prior-receipt",
+          text: `Synthetic Model Vendor invoice paid INR 1,800.00 on ${futureControlTestDate(-3)}. Monthly.`,
+        }],
+      },
+    });
+    const evidence = await desk.pool.query<{ id: string }>(
+      `select id from recovery_evidence where workspace_id = $1`,
+      [desk.workspaceId],
+    );
+    assert.equal(evidence.rowCount, 1);
+    const versionBefore = await currentVersion(desk);
+
+    await assert.rejects(() => reconcileCommitmentControlProposal({
+      workspaceId: desk.workspaceId,
+      actorUserId: desk.ownerUserId,
+      proposalId: authorized.proposalId,
+      expectedVersion: versionBefore,
+      idempotencyKey: `follow-predated-reconciliation-${desk.suffix}`,
+      request: { evidenceId: evidence.rows[0]!.id },
+    }), (error: unknown) => error instanceof RecoveryServiceError
+      && error.code === "INVALID_EVIDENCE"
+      && /cannot predate the authorization decision/i.test(error.message));
+
+    assert.equal(await currentVersion(desk), versionBefore);
+    const brief = await getCommitmentControlBrief({ workspaceId: desk.workspaceId, actorUserId: desk.ownerUserId });
+    assert.equal(brief.data.proposals[0]?.reconciliations.length, 0);
+    assert.equal(brief.data.proposals[0]?.decision?.id, authorized.decisionId);
+    assert.equal(brief.data.proposals[0]?.decision?.approvedCapMinor, "180000");
+    const retained = await desk.pool.query(`select id from recovery_evidence where workspace_id = $1`, [desk.workspaceId]);
+    assert.equal(retained.rowCount, 1);
+  } finally {
+    await cleanUp(desk);
+  }
+});
+
+test("a scheduled renewal cannot substitute for an observed financial charge", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const desk = await seedDesk("scheduled-evidence");
+  try {
+    const authorized = await authorizeProposal(desk, "scheduled-evidence");
+    await submitRecoveryEvidence({
+      workspaceId: desk.workspaceId,
+      actorUserId: desk.ownerUserId,
+      expectedVersion: await currentVersion(desk),
+      idempotencyKey: `follow-scheduled-evidence-${desk.suffix}`,
+      request: {
+        kind: "RECEIPT_PASTE",
+        receipts: [{
+          clientRef: "synthetic-scheduled-not-paid",
+          text: `Vendor: Synthetic Model Vendor; subscription INR 1,800.00 renews monthly on ${today}.`,
+        }],
+      },
+    });
+    const evidence = await desk.pool.query<{ id: string; observed_at: Date | null }>(
+      `select id, observed_at from recovery_evidence where workspace_id = $1`,
+      [desk.workspaceId],
+    );
+    assert.equal(evidence.rowCount, 1);
+    assert.equal(evidence.rows[0]!.observed_at, null);
+    const versionBefore = await currentVersion(desk);
+    await assert.rejects(() => reconcileCommitmentControlProposal({
+      workspaceId: desk.workspaceId,
+      actorUserId: desk.ownerUserId,
+      proposalId: authorized.proposalId,
+      expectedVersion: versionBefore,
+      idempotencyKey: `follow-scheduled-reconciliation-${desk.suffix}`,
+      request: { evidenceId: evidence.rows[0]!.id },
+    }), (error: unknown) => error instanceof RecoveryServiceError
+      && error.code === "INVALID_EVIDENCE"
+      && /observed financial charge/i.test(error.message));
+    assert.equal(await currentVersion(desk), versionBefore);
+    const brief = await getCommitmentControlBrief({ workspaceId: desk.workspaceId, actorUserId: desk.ownerUserId });
+    assert.equal(brief.data.proposals[0]?.reconciliations.length, 0);
+    assert.equal(brief.data.proposals[0]?.decision?.approvedCapMinor, "180000");
+  } finally {
+    await cleanUp(desk);
+  }
+});
+
 test("an outcome observation is recorded without any evidence and returns a deterministic MET or MISSED verdict", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {

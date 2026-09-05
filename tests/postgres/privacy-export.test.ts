@@ -206,6 +206,7 @@ test("privacy export includes held product data and excludes all credential mate
       expectedVersion: disconnected.workspaceVersion,
       idempotencyKey: `privacy-control-policy:${randomUUID()}`,
       request: completeControlPolicyRequest(),
+      now: new Date(`${recoveryDates.charged_on_1}T00:00:00.000Z`),
     });
     const controlProposal = await createCommitmentControlProposal({
       workspaceId,
@@ -218,11 +219,12 @@ test("privacy export includes held product data and excludes all credential mate
         category: "AI_MODEL",
         amountMinor: "199900",
         currency: "INR",
-        firstChargeDate: recoveryDates.renews_on,
+        firstChargeDate: recoveryDates.charged_on_1,
         cadence: "MONTHLY",
         existingCommitmentIds: [],
         intendedOutcome: testControlOutcome(),
       },
+      now: new Date(`${recoveryDates.charged_on_1}T00:00:00.000Z`),
     });
     const controlDecision = await decideCommitmentControlProposal({
       workspaceId,
@@ -235,6 +237,7 @@ test("privacy export includes held product data and excludes all credential mate
         approvedCapMinor: "180000",
         authorizationExpiresOn: "2099-12-30",
       },
+      now: new Date(`${recoveryDates.charged_on_1}T00:00:00.000Z`),
     });
     await pool.query(
       `insert into commitment_control_attention_notifications (

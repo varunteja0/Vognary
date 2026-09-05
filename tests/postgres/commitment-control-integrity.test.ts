@@ -164,6 +164,60 @@ test("selected Recovery exposure stays cited and currency-separated through pers
   }
 });
 
+test("future proposals persist exact zero exposure for windows before their first charge", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  const pool = getDatabasePool();
+  const ownerUserId = randomUUID();
+  const workspaceId = randomUUID();
+  const suffix = randomUUID().slice(0, 8);
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  await seedWorkspace(pool, { ownerUserId, workspaceId, suffix, label: "Future projection fixture" });
+  try {
+    const policy = await putCommitmentControlPolicy({
+      workspaceId,
+      actorUserId: ownerUserId,
+      expectedVersion: 0,
+      idempotencyKey: `future-policy-${suffix}`,
+      request: completeControlPolicyRequest(),
+      now,
+    });
+    let version = policy.workspaceVersion;
+    for (const [firstChargeDate, annualMinor] of [["2026-12-20", "250000"], ["2027-09-05", "0"]]) {
+      const created = await createCommitmentControlProposal({
+        workspaceId,
+        actorUserId: ownerUserId,
+        expectedVersion: version,
+        idempotencyKey: `future-proposal-${firstChargeDate}-${suffix}`,
+        request: {
+          merchant: "Synthetic Model Vendor",
+          purpose: "Future capacity reservation fixture",
+          category: "AI_MODEL",
+          amountMinor: "250000",
+          currency: "INR",
+          firstChargeDate,
+          cadence: "ONE_TIME",
+          existingCommitmentIds: [],
+          intendedOutcome: testControlOutcome(),
+        },
+        now,
+      });
+      version = created.workspaceVersion;
+      assert.equal(created.data.proposal.projectedThirteenWeekMinor, "0");
+      assert.equal(created.data.proposal.projectedAnnualMinor, annualMinor);
+      assert.equal(created.data.evaluation.status, "WITHIN_POLICY");
+      assert.equal(created.data.evaluation.humanDecisionRequired, true);
+      const brief = await getCommitmentControlBrief({ workspaceId, actorUserId: ownerUserId });
+      const saved = brief.data.proposals.find((entry) => entry.proposal.id === created.data.proposal.id);
+      assert.equal(saved?.proposal.projectedThirteenWeekMinor, "0");
+      assert.equal(saved?.proposal.projectedAnnualMinor, annualMinor);
+      assert.equal(saved?.decision, null);
+    }
+  } finally {
+    await eraseWorkspace(pool, workspaceId, [ownerUserId]);
+  }
+});
+
 test("concurrent decisions serialize, and consented events do not duplicate on replay", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {
@@ -309,9 +363,9 @@ test("deleting an actor nulls identity fields without mutating immutable financi
       idempotencyKey: `control-erasure-evidence-${suffix}`,
       request: {
         kind: "RECEIPT_PASTE",
-        receipts: [{ clientRef: "observed", text: "OpenAI invoice paid INR 1,999.00 on 1 September 2026. Monthly." }],
+        receipts: [{ clientRef: "observed", text: `OpenAI invoice paid INR 1,999.00 on ${futureControlTestDate(0)}. Monthly.` }],
       },
-      now: new Date("2026-09-01T09:00:00.000Z"),
+      now: new Date(),
     });
     const evidenceId = (await pool.query<{ id: string }>(
       `select id from recovery_evidence where workspace_id = $1 order by created_at desc limit 1`,

@@ -105,8 +105,8 @@ export function evaluateProposalPolicy(input: {
   }
 
   const proposalAmount = parsePositiveMinorUnits(proposal.amountMinor, "Proposal amount");
-  const proposedThirteenWeek = parsePositiveMinorUnits(proposal.thirteenWeekMinor, "Proposed 13-week exposure");
-  const proposedAnnual = parsePositiveMinorUnits(proposal.annualMinor, "Proposed annual exposure");
+  const proposedThirteenWeek = parseMinorUnits(proposal.thirteenWeekMinor, "Proposed 13-week exposure");
+  const proposedAnnual = parseMinorUnits(proposal.annualMinor, "Proposed annual exposure");
   const currencies = [...new Set([...exposureByCurrency.keys(), proposal.currency])].sort();
   const currencyResults = currencies.map((currency) => {
     const existing = exposureByCurrency.get(currency) ?? { thirteenWeekMinor: BigInt(0), annualMinor: BigInt(0) };
@@ -172,8 +172,8 @@ function normalizeProposal(proposal: ProposalForPolicy): ProposalForPolicy {
     amountMinor: parsePositiveMinorUnits(proposal.amountMinor, "Proposal amount").toString(),
     currency: normalizeCurrency(proposal.currency, "Proposal currency"),
     category: proposal.category,
-    thirteenWeekMinor: parsePositiveMinorUnits(proposal.thirteenWeekMinor, "Proposed 13-week exposure").toString(),
-    annualMinor: parsePositiveMinorUnits(proposal.annualMinor, "Proposed annual exposure").toString(),
+    thirteenWeekMinor: parseMinorUnits(proposal.thirteenWeekMinor, "Proposed 13-week exposure").toString(),
+    annualMinor: parseMinorUnits(proposal.annualMinor, "Proposed annual exposure").toString(),
   };
 }
 

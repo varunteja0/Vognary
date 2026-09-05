@@ -436,8 +436,8 @@ function isControlProposalDto(value: unknown): value is ControlProposalDto {
     && proposalCadences.includes(value.cadence as ProposalCadence)
     && isDateOnly(value.asOfDate)
     && value.firstChargeDate >= value.asOfDate
-    && isPositiveMinorUnits(value.projectedThirteenWeekMinor)
-    && isPositiveMinorUnits(value.projectedAnnualMinor)
+    && isMinorUnits(value.projectedThirteenWeekMinor)
+    && isMinorUnits(value.projectedAnnualMinor)
     && (value.intendedOutcome === null || isIntendedControlOutcome(value.intendedOutcome))
     && value.assumptionBasis === "USER_ENTERED_ASSUMPTION"
     && isTimestamp(value.createdAt);

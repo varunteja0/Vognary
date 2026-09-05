@@ -36,6 +36,13 @@ export function reconcileAuthorizedProposal(input: {
   if (input.decision.authorizationExpiresOn && observedEvidenceDate === null) {
     throw new Error("Observed financial evidence requires a date to evaluate the authorization window.");
   }
+  if (observedEvidenceDate && observedEvidenceDate < normalizeControlDateOnly(input.decision.decidedAt.slice(0, 10), "Decision date")) {
+    throw new Error("Observed financial evidence cannot predate the authorization decision.");
+  }
+  if (observedEvidenceDate && input.observedThrough
+    && observedEvidenceDate > normalizeControlDateOnly(input.observedThrough, "Observed through date")) {
+    throw new Error("Observed financial evidence cannot be in the future.");
+  }
   if (observedEvidenceDate && input.decision.authorizationExpiresOn && observedEvidenceDate > input.decision.authorizationExpiresOn) {
     return result(input.decision, evidenceId, input.evidence.amountMinor, input.evidence.currency, observedEvidenceDate, "AUTHORIZATION_EXPIRED", outcome);
   }

@@ -268,6 +268,38 @@ test("publishes one canonical endpoint contract for the Control transport", () =
   });
 });
 
+test("runtime guards accept future proposals with exact zero window totals", () => {
+  for (const annualMinor of ["199900", "0"]) {
+    const proposal = {
+      ...proposalDto,
+      firstChargeDate: annualMinor === "0" ? "2027-08-25" : "2026-12-20",
+      projectedThirteenWeekMinor: "0",
+      projectedAnnualMinor: annualMinor,
+      intendedOutcome: { ...proposalDto.intendedOutcome, reviewOn: "2027-09-30" },
+    };
+    const evaluation = {
+      ...evaluationDto,
+      currencyResults: [{
+        ...evaluationDto.currencyResults[0],
+        proposedThirteenWeekMinor: "0",
+        combinedThirteenWeekMinor: "0",
+        thirteenWeekHeadroomMinor: "3000000",
+        proposedAnnualMinor: annualMinor,
+        combinedAnnualMinor: annualMinor,
+        annualHeadroomMinor: (BigInt(12000000) - BigInt(annualMinor)).toString(),
+      }],
+    };
+    assert.equal(isControlProposalWriteDto({ proposal, evaluation }), true);
+    assert.equal(isCommitmentControlBriefDto({
+      policy: { policyVersion: 1, ...completeControlPolicyRequest(), createdByUserId: null, createdAt: proposalDto.createdAt },
+      proposals: [{ proposal, evaluation, decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [] }],
+      capabilities: { canSubmitProposal: true, canDecide: true, canConfigurePolicy: true },
+    }), true);
+    assert.equal(isControlProposalWriteDto({ proposal: { ...proposal, amountMinor: "0" }, evaluation }), false);
+    assert.equal(isControlProposalWriteDto({ proposal: { ...proposal, projectedThirteenWeekMinor: "-1" }, evaluation }), false);
+  }
+});
+
 test("runtime guards accept exact Control DTOs and reject malformed financial facts", () => {
   const policy = {
     policyVersion: 1,

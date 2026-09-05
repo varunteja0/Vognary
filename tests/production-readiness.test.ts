@@ -114,6 +114,7 @@ test("feature readiness checks every persistent capability migration with bounde
     "0066_control_attention_provider_events",
     "0067_control_follow_through",
     "0068_control_attention_target_identity",
+    "0069_control_projection_empty_windows",
   ]) {
     assert.match(source, new RegExp(`"${migration}"`));
   }
@@ -333,7 +334,7 @@ test("Vercel builds never race Recovery cutover migrations ahead of worker retir
   assert.match(runbook, /Deploy the exact candidate SHA/);
   assert.match(runbook, /Wait at least five minutes after the last old sync, reminder, or savings-verification invocation finishes/);
   assert.match(runbook, /DATABASE_URL='<production-postgres-url>' POSTGRES_SSL=true npm run db:apply-schema/);
-  assert.match(runbook, /last row is `0068_control_attention_target_identity`/);
+  assert.match(runbook, /last row is `0069_control_projection_empty_windows`/);
 });
 
 test("CI browser journeys exercise the built Next.js production artifact", () => {
@@ -471,6 +472,8 @@ test("activation probes are bounded and cover private lifecycle, renewal, decisi
   assert.match(source, /applied\?\.includes\("0065_control_attention_outbox"\)/);
   assert.match(source, /required\?\.includes\("0068_control_attention_target_identity"\)/);
   assert.match(source, /applied\?\.includes\("0068_control_attention_target_identity"\)/);
+  assert.match(source, /required\?\.includes\("0069_control_projection_empty_windows"\)/);
+  assert.match(source, /applied\?\.includes\("0069_control_projection_empty_windows"\)/);
   assert.match(source, /betaReady: endpointReport\.every\(\(item\) => item\.ok\)/);
   assert.match(source, /envReport\.filter\(\(item\) => item\.launchBlocking\)/);
   assert.match(source, /activationProfile = "receipt-forwarding"/);

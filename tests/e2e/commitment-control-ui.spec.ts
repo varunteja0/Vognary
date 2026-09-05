@@ -1019,7 +1019,7 @@ const capLineBrief = {
 };
 
 // 720x450 is the CSS viewport a 1440x900 desktop exposes at 200% browser zoom.
-for (const viewport of [{ label: "1440x900", width: 1440, height: 900 }, { label: "720x450-zoom200", width: 720, height: 450 }, { label: "390x844", width: 390, height: 844 }, { label: "360x800", width: 360, height: 800 }]) {
+for (const viewport of [{ label: "1440x900", width: 1440, height: 900 }, { label: "1280x800", width: 1280, height: 800 }, { label: "720x450-zoom200", width: 720, height: 450 }, { label: "390x844", width: 390, height: 844 }, { label: "360x800", width: 360, height: 800 }]) {
   test(`an observation of INR 1,700 against a frozen INR 1,350 cap reads as one record at ${viewport.label}`, async ({ page }, testInfo) => {
     await signIn(page);
     await mockWorkspace(page, { brief: capLineBrief });
@@ -1042,6 +1042,19 @@ for (const viewport of [{ label: "1440x900", width: 1440, height: 900 }, { label
     // Actor, policy version and evidence access sit in the same record.
     await expect(record.getByText(/Founder .* policy version 3/)).toBeVisible();
     await expect(record.getByRole("button", { name: "Open the observed receipt" })).toBeVisible();
+    await expect(ledger.locator(".ledger-verdict > .control-card-meta")).toHaveCount(2);
+    const disclosures = await ledger.locator(".ledger-verdict > .control-card-meta, .ledger-verdict > .link-quiet").evaluateAll((elements) => elements.map((element) => {
+      const bounds = element.getBoundingClientRect();
+      return { text: element.textContent, left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom };
+    }));
+    expect(disclosures).toHaveLength(3);
+    for (let first = 0; first < disclosures.length; first += 1) {
+      for (let second = first + 1; second < disclosures.length; second += 1) {
+        const horizontalIntersection = Math.min(disclosures[first].right, disclosures[second].right) - Math.max(disclosures[first].left, disclosures[second].left);
+        const verticalIntersection = Math.min(disclosures[first].bottom, disclosures[second].bottom) - Math.max(disclosures[first].top, disclosures[second].top);
+        expect(horizontalIntersection <= 0 || verticalIntersection <= 0, `${disclosures[first].text} overlaps ${disclosures[second].text}`).toBe(true);
+      }
+    }
 
     // Nothing invents a difference between the two figures.
     await expect(record.getByText(/INR\s*350/)).toHaveCount(0);
