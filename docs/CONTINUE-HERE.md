@@ -10,9 +10,40 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## 2026-09-05 - scoped release and mail-safety fixes authorized for publication
+## 2026-09-05 - release fixes published; Customer zero browser correction verified
 
 **THIS BLOCK IS THE ONLY LIVE INSTRUCTION.**
+
+**Scoreboard row:** Backend Readiness and Production Activation; no score movement
+**Loop step:** human authorization
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. One finance owner needs the current proposal-to-reconciliation loop to pass a reproducible release gate. No new capability is being added.
+- The nine-file release and mail-safety repair was committed and pushed as `52edd7a9b55d840ff7d48c6666d6664f287a5533` with explicit founder authority. It includes the structured audit runner, workspace-scoped PostgreSQL assertion, complete-history mail forwarding, their tests, this handoff, and the founder-approved `git.deploymentEnabled.main=false` guard. Separate public-artifact work remains uncommitted and was not included.
+- Authenticated readiness after that push still reported deployed commit `f707d5576fa386f2f61095a25f4b6f4f0f53738a`, migrations pending, and enrollment disabled. GitHub reported zero deployments for `52edd7a`; the production site and schema were not changed.
+- Hosted run `33944142435` passed dependency audits, schema/PostgreSQL, lint, typecheck, claims, research, brand, tokens, units, non-strict corpus, build, route budgets, Lighthouse, and the public browser suite (`82 passed / 84 skipped`). Signed-in journeys reached `78 passed / 4 skipped / 2 failed`; both failures were Customer #0 expecting the retired landing headline. Smoke did not run.
+- `tests/e2e/recovery-customer-zero.spec.ts` now asserts the committed headline, opens the Site menu by keyboard before Sign in, and explicitly chooses Today for Recovery checks so asynchronous Control availability cannot move it to Decisions. The complete real-handler desktop/mobile journey passes `2/2` on a fresh local disposable database, including evidence entry, corrections, persistence, export, and deletion. The temporary database and test server were removed. No UI or domain code changed.
+- Earlier local combined-tree validation passed `1291/1291` units, `205/205` PostgreSQL tests, both clean audits, lint/typecheck/claim gates, standalone build, and all `16` budgets. Company-mail regression tests pass `10/10`; live dry-run is `0 eligible / 6 previouslyForwarded`. Combined-tree counts are not exact-SHA hosted evidence.
+- Market and security evidence remain as recorded in the superseded block: no buyer reply, conversation, offer, or payment; twelve first touches have no recorded route; the assessor has not supplied a new proposal. Real customer financial data remains blocked.
+
+**WHAT IS NOT TRUE**
+
+- The Customer #0 correction has not yet passed the full hosted job. `52edd7a` is not a green release, and local browser proof cannot replace its successor's exact-SHA CI.
+- No production activation, assessment/retest, founder visual acceptance, customer adoption, renewal, or score increase has been established.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Identify one existing relationship or opted-in buyer thread and its permitted channel. Buyer decisions and payments require actual external evidence.
+2. Obtain independent assessment/retest clearance and approve the restricted incident, legal/logging, restore, monitoring, and proposal-review evidence before production Control migration or enrollment.
+
+**HARD STOP:** Do not auto-deploy `main`, publish unrelated active work, waive any gate, migrate production, enroll customer financial data, automate HN text, use paused cold-email/LinkedIn routes, or invent commercial evidence.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - scoped release and mail-safety fixes authorized for publication
+
+> **SUPERSEDED 2026-09-05** - see the block above.
 
 **Scoreboard row:** Backend Readiness, Production Activation, and Distribution execution safety; no score movement
 **Loop step:** human authorization

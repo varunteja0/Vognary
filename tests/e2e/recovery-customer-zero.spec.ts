@@ -55,12 +55,15 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 1-3. Open landing and establish a saved identity independently of provider activation.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Commitment Control: freeze the cap before the obligation exists.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Approve AI and cloud commitments before they become bills.");
+  await tabToAndActivate(page, "Menu");
+  await expect(page.getByRole("dialog", { name: "Site menu" })).toBeVisible();
   await tabToAndActivate(page, "Sign in");
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await loginAsDevelopmentUser(page);
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
+  await selectRecoveryView(page, "Today");
 
   // 4-7. Add bills from empty Home, not Gmail setup.
   await expect(page.getByRole("heading", { name: "Start with a software bill." })).toBeVisible();
@@ -177,6 +180,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
+  await selectRecoveryView(page, "Today");
   await expectNoHorizontalOverflow(page);
   // The next charge is months away, so Home stays calm instead of manufacturing urgency.
   await expect(page.getByRole("heading", { name: "You're caught up" })).toBeVisible();
