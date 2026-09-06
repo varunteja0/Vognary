@@ -10,9 +10,38 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## 2026-09-06 - synthetic demo CI assertion corrected for server composition
+## 2026-09-06 - founder re-enables automatic Vercel deployments from main
 
 **THIS BLOCK IS THE ONLY LIVE INSTRUCTION.**
+
+**Scoreboard row:** Production Activation deployment-trigger configuration; no score movement
+**Loop step:** human authorization and reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The founder reported that new GitHub commits did not reach the public site, then explicitly selected "Re-enable automatic deployments from main" after being told that Vercel can build independently of GitHub CI. This supersedes the earlier main-branch automatic-deployment guard, not the financial, privacy, enrollment or assurance requirements.
+- Diagnosis: local HEAD and GitHub `main` both matched `b56844a528266a988281f0e508b7a4c31fa24d3a`, but the committed `vercel.json` set `git.deploymentEnabled.main` to false. Vercel's documented behavior is to skip automatic deployments for that branch. The founder's Vercel overview identified production at `f707d55`; successful requests to that deployment did not prove newer code was live.
+- The configuration now explicitly enables `main`. Publishing this change is authorized so the connected Vercel Git integration can receive the next push. The build command, cron definitions, runtime requirements and customer-data gates are unchanged. A new deployment must still be observed before claiming that the public site updated.
+- [CI run 190](https://github.com/varunteja0/Vognary/actions/runs/34018570396) on `b56844a` passed dependency audits, database checks, lint, typecheck, claims, research, brand, tokens, units, corpus, build and route-size budgets. It then failed Enforce Lighthouse budgets; browser and smoke stages did not run. The original synthetic-label unit failure is repaired, but the full CI run is not green.
+- The existing untracked redesign prompt and all other owners' work remain preserved. This change is confined to the deployment trigger and the live handoff; it does not implement another redesign or claim that the earlier review defects were fixed.
+
+**WHAT IS NOT TRUE**
+
+- Enabling automatic deployment does not make GitHub Actions a required pre-deployment gate. A Vercel Ready status and a GitHub CI success are separate facts.
+- No completed new production deployment, domain update, founder acceptance, security clearance, customer-data activation or commercial evidence is claimed by this configuration change.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Keep release ownership explicit: future pushes to `main` can update production even while separate GitHub checks are running or failing.
+2. Provide the independent assessment/retest and legal/operational clearance needed before customer-data activation; the deployment-trigger override does not grant those approvals.
+
+**HARD STOP:** Preserve the authorized automatic-main setting unless the founder changes it again. Do not force-push, mutate production schema or secrets, enroll customer financial data, weaken performance tests, or report an unobserved deployment as successful. Keep the Lighthouse failure and prior product-review findings open.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-06 - synthetic demo CI assertion corrected for server composition
+
+> **SUPERSEDED 2026-09-06** - see the block above.
 
 **Scoreboard row:** Backend Readiness verification repair; no score movement
 **Loop step:** human authorization and reconciliation
