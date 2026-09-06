@@ -10,9 +10,38 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## 2026-09-06 - all Git-eligible local changes authorized for publication to main
+## 2026-09-06 - synthetic demo CI assertion corrected for server composition
 
 **THIS BLOCK IS THE ONLY LIVE INSTRUCTION.**
+
+**Scoreboard row:** Backend Readiness verification repair; no score movement
+**Loop step:** human authorization and reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The founder requested repair of the failed GitHub CI run and supplied the Vercel deployment list as context. The immediate decision is whether the published candidate clears its unit gate; the observable proof is the repaired assertion plus the new exact-commit CI result, not the older deployment's Ready status.
+- [CI run 189](https://github.com/varunteja0/Vognary/actions/runs/34017871819) on `9f5518a6de7d8c876bd459508b25a16675ad2c5f` completed with 1,305 passing units and one failure. The failing synthetic-demo test searched only the client source for a label that the latest server page now supplies through a rendered slot.
+- The repair changes only the test contract: it verifies that the server supplies `SyntheticStamp`, the client renders `stamp`, and neither the fixture, server page nor client calls the network. Financial assertions and the visible synthetic label remain unchanged; no gate was skipped or threshold lowered.
+- Local verification passed: focused synthetic-demo tests 9/9, scoped ESLint, and the complete database-unset unit suite 1,306/1,306 with zero failures or skips. Subsequent build, performance, browser and hosted results must be attributed to their own actual run; a local unit pass is not a complete release certificate.
+- The founder's pasted Vercel list identifies production at `f707d55`. The committed configuration still disables automatic main deployment. This CI repair does not itself deploy, change production data, or establish independent assurance. The existing untracked redesign prompt is outside this repair and remains preserved.
+
+**WHAT IS NOT TRUE**
+
+- The failure did not prove that the public demonstration lost its synthetic label. It exposed a test that no longer followed the server/client composition.
+- The open product-review findings, external assurance, customer-data gates, founder acceptance and commercial evidence are not resolved by a test correction or Git push.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Provide the independent assessment/retest and operational/legal clearance needed before customer-data activation; GitHub validation cannot manufacture these approvals.
+2. Keep the new frontend acceptance mandate separate from the current CI repair and judge the actual completed candidate rather than a test count.
+
+**HARD STOP:** Publish the scoped regression repair without discarding other work, bypassing gates or claiming an unobserved hosted/deployment result. Preserve the financial contracts, production data, ignore rules and automatic-deployment guard. No forced push or production migration.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-06 - all Git-eligible local changes authorized for publication to main
+
+> **SUPERSEDED 2026-09-06** - see the block above.
 
 **Scoreboard row:** Product UX and Backend Readiness source publication; no score movement
 **Loop step:** human authorization and reconciliation

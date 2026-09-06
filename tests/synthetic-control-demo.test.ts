@@ -13,6 +13,7 @@ import {
 } from "../src/lib/synthetic-control-demo";
 
 const fixtureSource = readFileSync("src/lib/synthetic-control-demo.ts", "utf8");
+const demoPage = readFileSync("src/app/demo/page.tsx", "utf8");
 const demoClient = readFileSync("src/app/demo/demo-client.tsx", "utf8");
 
 test("the synthetic brief satisfies the real Commitment Control contract at every stage", () => {
@@ -98,6 +99,7 @@ test("the three branches are distinct decisions, not three labels for one outcom
 
 test("nothing in the demonstration can be mistaken for a customer or reach the network", () => {
   assert.doesNotMatch(fixtureSource, /\bfetch\s*\(|XMLHttpRequest|navigator\.sendBeacon/);
+  assert.doesNotMatch(demoPage, /\bfetch\s*\(|XMLHttpRequest|navigator\.sendBeacon/);
   assert.doesNotMatch(demoClient, /\bfetch\s*\(|XMLHttpRequest|navigator\.sendBeacon/);
   // Every identity sits in one recognizable synthetic namespace.
   const brief = syntheticControlBrief("RECONCILED");
@@ -117,9 +119,8 @@ test("nothing in the demonstration can be mistaken for a customer or reach the n
   assert.match(entry.proposal.merchant, /placeholder/i);
   assert.match(String(entry.decision?.decidedByDisplayName), /placeholder/i);
   assert.equal(SYNTHETIC_DEMO_LABEL, "Synthetic demonstration");
-  // The demonstration stamps itself, whether by the constant directly or through
-  // the shared component that renders it.
-  assert.match(demoClient, /SYNTHETIC_DEMO_LABEL|SyntheticStamp/);
+  assert.match(demoPage, /\bstamp=\{<SyntheticStamp\b/, "the server page supplies the synthetic label");
+  assert.match(demoClient, /\{stamp\}/, "the client renders the server-supplied synthetic label");
 });
 
 test("exact money stays in minor units and is never recomputed for display", () => {
