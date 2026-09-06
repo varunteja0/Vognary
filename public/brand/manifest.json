@@ -3,14 +3,15 @@
   "identity": "Ledger to Authorization",
   "version": 3,
   "palette": {
-    "paper": "#F2EFE7",
-    "card": "#FBFAF6",
-    "ink": "#16140F",
-    "inkSoft": "#3C382F",
-    "authorizationGold": "#8A6A1F",
-    "citedEvidence": "#2F5D3F",
-    "review": "#7D5410",
-    "exceeded": "#A8321F"
+    "paper": "#F3F6F4",
+    "card": "#FFFFFF",
+    "ink": "#202E29",
+    "inkSoft": "#44564D",
+    "brand": "#173F35",
+    "identityAccent": "#D9ED8C",
+    "citedEvidence": "#285D68",
+    "review": "#3F527F",
+    "exceeded": "#AE3048"
   },
   "markPalette": {
     "graphite": "#08090C",

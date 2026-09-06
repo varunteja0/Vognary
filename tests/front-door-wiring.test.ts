@@ -21,7 +21,7 @@ test("the public page is a cacheable readiness-neutral shell", () => {
 test("the landing leads with the decision and keeps the guest evidence path second", () => {
   // One primary command to the demonstration, one quiet secondary to the
   // visitor's own evidence. The rejected hero form is gone for good.
-  assert.match(landingSource, /href="\/demo" className="btn btn-primary btn-lg"/);
+  assert.match(landingSource, /href="\/demo" className="btn btn-primary"/);
   assert.match(landingSource, /href="\/start" className="home-quiet"/);
   assert.match(landingSource, /href="\/pay" prefetch=\{false\}/);
   assert.doesNotMatch(landingSource, /LandingDecisionPreview|LandingSignalRail|control-index/);
@@ -50,10 +50,10 @@ test("the landing leads with the decision and keeps the guest evidence path seco
 test("the landing states concise evidence and action boundaries without unsupported claims", () => {
   // Every boundary survives the redesign. They are now stated where they answer
   // a live concern rather than as a column of limitations in the first viewport.
-  assert.match(publicFront, /never needs your bank\s*\n?\s*password or your mailbox/i);
+  assert.match(publicFront, /No bank passwords\. No mailbox access\./);
   assert.match(publicFront, /never auto-approves, purchases, provisions or moves money/);
-  assert.match(publicFront, /It never decides|No auto-approval/);
-  assert.match(publicFront, /It never moves money/);
+  assert.match(publicFront, /No automatic approval or decline/);
+  assert.match(publicFront, /No purchasing, provisioning, cancellation, or money movement/);
   assert.match(publicFront, /Payment is not activation/);
   // The desk is labelled synthetic and cannot be mistaken for customer activity.
   assert.match(workSource, /SYNTHETIC_DEMO_LABEL|SyntheticStamp/);

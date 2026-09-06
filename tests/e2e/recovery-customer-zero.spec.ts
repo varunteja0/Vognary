@@ -56,7 +56,7 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 1-3. Open landing and establish a saved identity independently of provider activation.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Approve AI and cloud commitments before they become bills.");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Vognary");
   await tabToAndActivate(page, "Menu");
   await expect(page.getByRole("dialog", { name: "Site menu" })).toBeVisible();
   await tabToAndActivate(page, "Sign in");
@@ -163,7 +163,11 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   await openAccount(page);
   await expect(page).toHaveURL(/\/profile$/);
   await expect(page.getByRole("heading", { level: 1, name: "Account settings" })).toBeVisible();
+  const logoutResponse = page.waitForResponse(response => new URL(response.url()).pathname === "/api/auth/logout" && response.request().method() === "POST");
+  const signedOutNavigation = page.waitForURL(url => url.pathname === "/login");
   await page.getByRole("button", { name: "Sign out" }).click();
+  expect((await logoutResponse).status()).toBe(200);
+  await signedOutNavigation;
   await expect(page).toHaveURL(/\/login/);
   await loginAsDevelopmentUser(page);
   await openCommitment(page, "OpenAI India");
@@ -240,9 +244,11 @@ async function loginAsDevelopmentUser(page: Page) {
   await page.getByText("Other ways to sign in").click();
   await page.getByLabel("Configured developer email").fill(email!);
   await page.getByLabel("Development access code").fill(accessCode!);
+  const loginResponse = page.waitForResponse(response => new URL(response.url()).pathname === "/api/auth/login" && response.request().method() === "POST");
+  const navigation = page.waitForURL(url => url.pathname === "/app", { waitUntil: "load" });
   await page.getByRole("button", { name: "Sign in as developer" }).click();
-  await page.waitForURL(/\/app$/);
-  await page.waitForLoadState("domcontentloaded");
+  expect((await loginResponse).status()).toBe(200);
+  await navigation;
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
 }
 
@@ -288,7 +294,9 @@ async function saveCorrection(
   const dialog = page.getByRole("dialog", { name: dialogName });
   await expect(dialog).toBeVisible();
   await edit(dialog);
+  const correctionResponse = page.waitForResponse(response => new URL(response.url()).pathname.endsWith("/corrections") && response.request().method() === "POST");
   await dialog.getByRole("button", { name: "Save correction" }).click();
+  expect((await correctionResponse).ok()).toBe(true);
   await expect(dialog).toHaveCount(0);
 }
 

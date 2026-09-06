@@ -105,6 +105,24 @@ export function ControlProposalRow({
         <p className="control-card-meta">Entered {formatMoment(proposal.createdAt)} · {proposal.submittedByDisplayName ? `by ${proposal.submittedByDisplayName}` : "submitter name not on record"} · basis {proposal.assumptionBasis === "USER_ENTERED_ASSUMPTION" ? "user entered" : proposal.assumptionBasis}</p>
       </header>
 
+      {!decision && evaluation ? (
+        <div className="control-card-actions">
+          {canDecide && onDecide ? (
+            <button
+              id={decideButtonId}
+              type="button"
+              className={lead ? "btn btn-primary" : "btn btn-ghost"}
+              disabled={pendingKind !== null || !online}
+              onClick={() => onDecide(proposal.id, decideButtonId)}
+            >
+              {pendingKind === "DECISION" ? "Recording…" : "Decide this proposal"}
+            </button>
+          ) : (
+            <p className="control-note">This proposal is waiting on a workspace owner or admin. No decision has been recorded yet.</p>
+          )}
+        </div>
+      ) : null}
+
       <dl className="control-facts">
         <ControlOutcomeFact outcome={proposal.intendedOutcome} />
       </dl>
@@ -270,26 +288,6 @@ export function ControlProposalRow({
       ) : (
         <p className="control-note">This proposal carries no evaluation, so there is no policy context to show.</p>
       )}
-
-      {!decision && evaluation ? (
-        <div className="control-card-actions">
-          {canDecide && onDecide ? (
-            <button
-              id={decideButtonId}
-              type="button"
-              className={lead ? "btn btn-primary" : "btn btn-ghost"}
-              disabled={pendingKind !== null || !online}
-              onClick={() => onDecide(proposal.id, decideButtonId)}
-            >
-              {pendingKind === "DECISION" ? "Recording…" : "Decide this proposal"}
-            </button>
-          ) : (
-            <p className="control-note">
-              This proposal is waiting on a workspace owner or admin. No decision has been recorded yet.
-            </p>
-          )}
-        </div>
-      ) : null}
 
       {decision && decision.action !== "DECLINE" ? (
         <div className="control-card-actions">

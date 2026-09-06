@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { CircleCheck, Ellipsis, Inbox, Layers3, Plus, ReceiptText, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import shell from "./workspace-shell.module.css";
 import {
   buildGuestAuditTransferBinding,
   guestAuditTransferBindingKey,
@@ -118,6 +120,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   const viewHeadingRef = useRef<HTMLHeadingElement>(null);
   const viewChangedRef = useRef(false);
   const viewChosenByReaderRef = useRef(false);
+  const billReturnRecord = useRef<{ workspaceId: string; proposalId: string } | null>(null);
 
   const loadControlEvidence = useCallback(async (commitmentId: string) => {
     const result = await transport.commitment(commitmentId, { evidenceLimit: recoveryLimits.maxCommitmentEvidencePageSize });
@@ -611,9 +614,10 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   }
 
   async function submitEvidence(mode: SourceType) {
-    if (state.workspaceVersion === null) return;
+    if (state.workspaceVersion === null || state.pending) return;
     const request = evidenceRequestFromDraft(state.evidenceDraft, mode);
     if (!request) return;
+    const returnRecord = billReturnRecord.current;
     dispatch({ type: "EVIDENCE_MODE_SELECTED", mode });
     const idempotencyKey = newIdempotencyKey();
     dispatch({ type: "EVIDENCE_SUBMIT_STARTED", idempotencyKey });
@@ -627,6 +631,15 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         total: result.data.commitmentTotal,
         meta: result.meta,
       });
+      if (returnRecord && billReturnRecord.current === returnRecord
+        && result.data.home.workspace.id === returnRecord.workspaceId
+        && result.data.submission.acceptedEvidenceCount > 0
+        && result.data.submission.results.every((entry) => entry.status === "ACCEPTED")
+        && state.evidenceDraft.imageDrafts.length === 0) {
+        billReturnRecord.current = null;
+        selectView("CONTROL");
+        controlDesk.handlers.focusProposal(returnRecord.proposalId);
+      }
     } else {
       dispatch({ type: "EVIDENCE_SUBMIT_FAILED", failure: result });
     }
@@ -829,50 +842,19 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   const availableViews = recoveryViews.filter((view) => view !== "MANDATE" || mandateAvailable);
   const primaryViews = availableViews.slice(0, recoveryPrimaryViewLimit);
   const overflowViews = availableViews.slice(recoveryPrimaryViewLimit);
-  const navCellCount = primaryViews.length + (overflowViews.length ? 1 : 0);
-  const navColumnsClass = navCellCount >= 5
-    ? "grid-cols-5"
-    : navCellCount === 4 ? "grid-cols-4" : "grid-cols-3";
   return (
-    <main id="recovery-workspace" className="relative px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-5 text-foreground sm:px-6 sm:pb-10 lg:px-8">
-      <div className="mx-auto w-full max-w-7xl lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-10">
-        <div className="workspace-rail">
-        <header className="flex flex-wrap items-center justify-between gap-3 lg:block">
-          <div className="rail-brand inline-flex items-center gap-2.5">
+    <main id="recovery-workspace" className={shell.workspace}>
+      <div className={shell.frame}>
+        <div className={shell.rail}>
+        <header>
+          <div className={shell.brand}>
             <VognaryMark size={24} />
-            <h1 className="font-display text-lg font-semibold text-(--ink)">Vognary</h1>
-          </div>
-          <div className="rail-actions flex items-center gap-2 lg:flex-col lg:items-stretch">
-            <p className="hidden font-data text-xs text-(--muted) sm:block lg:order-3">
-              {state.workspaceVersion === null ? "Loading your workspace…" : "Saved to Vognary"}
-            </p>
-            {showPersistentAdd ? (
-              <button
-                id="workspace-add-bill"
-                type="button"
-                aria-label="Add a bill"
-                className="btn btn-sm btn-primary lg:order-1 lg:w-full"
-                onClick={() => dispatch({ type: "ADD_BILLS_OPENED" })}
-              >
-                <span aria-hidden>+</span>
-                <span>Add bill</span>
-              </button>
-            ) : null}
-            <Link
-              href="/profile"
-              aria-label={accountEmail ? `Account for ${accountEmail}` : "Account"}
-              className="btn btn-sm btn-ghost lg:order-2 lg:justify-start"
-            >
-              <span aria-hidden className="grid size-6 place-items-center rounded-full bg-(--card-2) font-data text-xs text-(--ink)">
-                {accountEmail?.charAt(0).toUpperCase() ?? "A"}
-              </span>
-              <span className="hidden sm:inline">Account</span>
-            </Link>
+            <h1>Vognary</h1>
           </div>
         </header>
 
-        <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card px-2 py-2 sm:static sm:mt-5 sm:border-0 sm:bg-transparent sm:p-0">
-          <ul className={`viewnav ${navColumnsClass}`}>
+        <nav aria-label="Primary">
+          <ul className={shell.views}>
             {primaryViews.map((view) => (
               <li key={view} className="min-w-0">
                 <button
@@ -880,14 +862,14 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
                   disabled={state.status.kind === "LOADING"}
                   onClick={() => selectView(view)}
                   aria-current={state.view === view ? "page" : undefined}
-                  className="truncate"
                 >
+                  {view === "CONTROL" ? <CircleCheck aria-hidden /> : view === "HOME" ? <Inbox aria-hidden /> : view === "COMMITMENTS" ? <Layers3 aria-hidden /> : view === "MANDATE" ? <ShieldCheck aria-hidden /> : <ReceiptText aria-hidden />}
                   {recoveryViewLabels[view]}
                   {view === "CONTROL" && pendingDecisionCount > 0 ? (
-                    <span className="ml-1 font-data text-[11px] text-ember">({pendingDecisionCount})</span>
+                    <span className={shell.count}>({pendingDecisionCount})</span>
                   ) : null}
                   {view === "HOME" && nowDecisionCount > 0 ? (
-                    <span className="ml-1 font-data text-[11px] text-ember">({nowDecisionCount})</span>
+                    <span className={shell.count}>({nowDecisionCount})</span>
                   ) : null}
                 </button>
               </li>
@@ -895,7 +877,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
             {overflowViews.length ? (
               <li className="min-w-0">
                 <details className="viewnav-more">
-                  <summary aria-label="More destinations">More</summary>
+                  <summary aria-label="More destinations"><Ellipsis size={18} aria-hidden /><span>More</span></summary>
                   <ul>
                     {overflowViews.map((view) => (
                       <li key={view}>
@@ -915,12 +897,25 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
             ) : null}
           </ul>
         </nav>
+        <div className={shell.actions}>
+          {showPersistentAdd ? (
+            <button id="workspace-add-bill" type="button" aria-label="Add a bill" title="Add a bill" className={shell.add} onClick={() => dispatch({ type: "ADD_BILLS_OPENED" })}>
+              <Plus size={18} aria-hidden />
+              <span className={shell.addText}>Add bill</span>
+            </button>
+          ) : null}
+          <Link href="/profile" aria-label={accountEmail ? `Account for ${accountEmail}` : "Account"} title="Account" className={shell.account}>
+            <span aria-hidden className={shell.avatar}>{accountEmail?.charAt(0).toUpperCase() ?? "A"}</span>
+            <span className={shell.accountText}>Account</span>
+          </Link>
+          <p className={shell.saveState}>{state.workspaceVersion === null ? "Loading your workspace…" : "Saved to Vognary"}</p>
+        </div>
         </div>
 
-        <div className="workspace-measure min-w-0">
+        <div className={shell.content}>
         <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{state.announcement}</p>
 
-        <div className="mt-5 grid gap-4">
+        <div className={shell.notices}>
           {!state.online ? <OfflineBlock /> : null}
           <GuestTransferBlock
             status={guestTransferStatus}
@@ -954,16 +949,12 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           ref={viewHeadingRef}
           tabIndex={-1}
           data-focus-quiet
-          className={
-            state.view === "HOME" || state.view === "CONTROL"
-              ? "sr-only"
-              : "mt-6 w-fit font-display text-2xl font-semibold text-(--ink) outline-none"
-          }
+          className={shell.heading}
         >
           {recoveryViewLabels[state.view]}
         </h2>
 
-        <div className="mt-4">
+        <div className={shell.contentBody}>
           {state.status.kind === "AUTH_REQUIRED" ? (
             <AuthRequiredBlock />
           ) : state.status.kind === "LOADING" ? (
@@ -983,7 +974,10 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
       {state.addBillsOpen ? (
         <RecoveryOverlay
           title="Add a bill"
-          onClose={() => dispatch({ type: "ADD_BILLS_CLOSED" })}
+          onClose={() => {
+            billReturnRecord.current = null;
+            dispatch({ type: "ADD_BILLS_CLOSED" });
+          }}
           returnFocusId={null}
         >
           <RecoveryAddEvidence
@@ -1068,7 +1062,10 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
           commitments={state.commitments}
           online={state.online}
           onInspectEvidence={(evidenceId, buttonId) => inspectEvidence(null, evidenceId, buttonId)}
-          onAddBill={() => dispatch({ type: "ADD_BILLS_OPENED" })}
+          onAddBill={(proposalId) => {
+            billReturnRecord.current = state.home ? { workspaceId: state.home.workspace.id, proposalId } : null;
+            dispatch({ type: "ADD_BILLS_OPENED" });
+          }}
         />
       );
     }

@@ -21,20 +21,22 @@ export const metadata: Metadata = {
 
 /** Paper and ink: the record surface, and what is written on it. */
 const foundations: Array<[string, string, string]> = [
-  ["Paper", "#f4f1ea", "--paper"],
-  ["Paper, recessed", "#eae5da", "--paper-2"],
-  ["Card", "#fffdf8", "--card"],
-  ["Ink", "#17140f", "--ink"],
-  ["Ink, soft", "#453f34", "--ink-soft"],
-  ["Muted", "#6b6357", "--muted"],
+  ["Mist", "#f3f6f4", "--paper"],
+  ["Recessed surface", "#e7ece9", "--paper-2"],
+  ["White", "#ffffff", "--card"],
+  ["Ink", "#202e29", "--ink"],
+  ["Secondary ink", "#44564d", "--ink-soft"],
+  ["Muted", "#53665b", "--muted"],
+  ["Evergreen", "#173f35", "--brand"],
+  ["Citron", "#d9ed8c", "--citron"],
 ];
 
 /** Colour is spent on exactly these meanings and nothing else. */
 const signals: Array<[string, string, string, string]> = [
-  ["Limit crossed", "#b02d17", "--ember", "Vermilion. Past a policy limit or past a frozen cap."],
-  ["Human froze it", "#1c5240", "--frozen", "Forest. A named person set a boundary, or evidence proved an outcome."],
-  ["A rule is speaking", "#3a4a86", "--policy", "Slate-blue. A constraint narrowing a decision it can never make."],
-  ["Someone typed it", "#6b6357", "--assumption", "Muted. Unproven until a document cites it."],
+  ["Limit crossed", "#ae3048", "--ember", "Rose. Past a policy limit or past a frozen cap."],
+  ["Human froze it", "#286747", "--frozen", "Forest. A named person set a boundary."],
+  ["Policy context", "#3f527f", "--policy", "Blue. A policy result, never a human decision."],
+  ["Someone typed it", "#53665b", "--assumption", "Muted. Explicitly unverified."],
 ];
 
 export default function BrandPage() {
@@ -50,12 +52,12 @@ export default function BrandPage() {
         </div>
 
         <p className="inset mb-5 px-4 py-3 text-sm leading-6 text-(--ink-soft)">
-          <b className="text-(--ink)">Unaccepted candidate.</b> This is the &ldquo;Decision
-          Threshold v3.0&rdquo; frontend candidate. The founder has not accepted it, it is not a
+          <b className="text-(--ink)">Unaccepted candidate.</b> This is the Clearline
+          frontend candidate. The founder has not accepted it, it is not a
           released identity, and it must not be used externally or treated as final.
         </p>
 
-        <article className="panel overflow-hidden rise">
+        <article className="overflow-hidden border-y border-line rise">
           <div className="grid gap-0 md:grid-cols-[0.9fr_1.1fr]">
             <div className="flex items-center justify-center border-b border-line bg-(--card-2) p-12 md:border-b-0 md:border-r">
               <VognaryMark size={140} className="text-(--ink)" animated title="Vognary mark" />
@@ -73,14 +75,14 @@ export default function BrandPage() {
               </p>
               <p className="mt-3 text-sm leading-7 text-(--muted)">
                 The interface around the mark is a different question, and this candidate does
-                change that: warm paper, warm near-black ink, and colour spent on exactly four
-                meanings. Everything below describes what the product renders today.
+                change that: white and mist working surfaces, evergreen navigation, citron identity accents,
+                and separately labelled financial states. Everything below describes the local candidate.
               </p>
             </div>
           </div>
         </article>
 
-        <section className="panel mt-6 p-5 sm:p-6">
+        <section className="mt-6 border-b border-line py-6">
           <span className="folio" data-folio="Use">The mark in use</span>
           <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">One mark for every surface</h2>
           <p className="mt-1 text-sm leading-6 text-(--muted)">Two evidence tiers resolve into the authorization V. The silhouette stays recognizable on card, on the inverted register, on paper, and in one-color production.</p>
@@ -92,12 +94,12 @@ export default function BrandPage() {
           </div>
         </section>
 
-        <section className="panel mt-6 p-5 sm:p-6">
+        <section className="mt-6 border-b border-line py-6">
           <span className="folio" data-folio="Social">Platform-fit exports</span>
           <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">One system, three correct aspect ratios</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-(--muted)">
-            These are exports of the mark on its dark master, not screenshots of the interface —
-            the product surface is warm paper. The X profile header is a 3:1 composition with
+            These are candidate identity exports, not customer records or product evidence.
+            The X profile header is a 3:1 composition with
             critical copy outside the avatar-overlap zone. The square avatar is circle-crop safe.
             The 1200&times;630 card is only for shared links — never stretch it into a profile
             header.
@@ -126,13 +128,12 @@ export default function BrandPage() {
           </div>
         </section>
 
-        <section className="panel mt-6 p-5 sm:p-6">
+        <section className="mt-6 border-b border-line py-6">
           <span className="folio" data-folio="01">Palette</span>
-          <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Warm paper, warm ink, and four meanings</h2>
+          <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Identity and financial meaning are separate</h2>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-(--muted)">
-            The surface is a record, not a dashboard field. Beyond paper and ink, colour is spent
-            only on the four meanings below — and each one also carries a non-colour cue, so the
-            identity survives in grayscale. <code className="font-data text-xs">--gold</code> still
+            Evergreen and citron carry the identity. Financial states carry their own labels and
+            structural cues, so meaning survives grayscale. <code className="font-data text-xs">--gold</code> still
             exists as a legacy alias, but it now resolves to forest; the champagne gold survives
             only inside the mark.
           </p>
@@ -148,22 +149,21 @@ export default function BrandPage() {
           </div>
         </section>
 
-        <section className="panel mt-6 p-5 sm:p-6">
+        <section className="mt-6 border-b border-line py-6">
           <span className="folio" data-folio="02">Typography</span>
-          <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Newsreader, IBM Plex Sans, IBM Plex Mono</h2>
+          <h2 className="mt-2 font-display text-[1.25rem] font-semibold text-(--ink)">Bricolage Grotesque, Manrope, IBM Plex Mono</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="inset p-5">
-              <p className="eyebrow">Display &middot; Newsreader</p>
+              <p className="eyebrow">Display &middot; Bricolage Grotesque</p>
               <p className="mt-3 font-display text-3xl font-semibold text-(--ink)">Commitment Control</p>
               <p className="mt-2 text-sm text-(--muted)">
-                Newsreader carries headings and the wordmark. It has real optical sizing, so a
-                headline reads as something that was set rather than something that was configured.
+                Bricolage Grotesque gives headings and the wordmark a distinct, compact voice.
               </p>
             </div>
             <div className="inset p-5">
-              <p className="eyebrow">UI &middot; IBM Plex Sans</p>
+              <p className="eyebrow">UI &middot; Manrope</p>
               <p className="mt-3 text-3xl font-semibold text-(--ink)">Approve before it bills</p>
-              <p className="mt-2 text-sm text-(--muted)">Plex Sans carries every interface surface and all running copy.</p>
+              <p className="mt-2 text-sm text-(--muted)">Manrope carries the interface, form labels, and running copy.</p>
             </div>
             <div className="inset p-5 md:col-span-2">
               <p className="eyebrow">Data &middot; IBM Plex Mono</p>
@@ -176,7 +176,7 @@ export default function BrandPage() {
           </div>
         </section>
 
-        <section className="panel mt-6 p-5 sm:p-6">
+        <section className="mt-6 border-b border-line py-6">
           <span className="folio" data-folio="03">Assets &amp; usage</span>
           <div className="mt-4 grid gap-5 md:grid-cols-2">
             <div>

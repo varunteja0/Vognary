@@ -17,80 +17,43 @@
   --animate-*: initial;
 }
 
-/*
-  VOGNARY — "DECISION THRESHOLD" (v3.0)
-
-  One idea: an expensive request is a document on a desk, and the only thing
-  that resolves it is a named person drawing a line through it.
-
-  The surface is warm paper, not a cool dashboard field. Work happens on
-  something that looks like it holds a record. Ink is near-black and warm.
-  Colour is spent on exactly three meanings and nothing else:
-
-    vermilion  a limit was crossed
-    forest     a human froze a boundary
-    slate-blue a rule is speaking, and a rule cannot decide
-
-  Everything else is ink, paper and rule weight. The identity survives in
-  grayscale and with motion disabled, because hierarchy is carried by size,
-  weight, position and rule — never by hue alone.
-
-  Legacy token names are re-pointed here, so the whole product re-skins from
-  this one file. This is the only shared token source.
-*/
-
 :root {
-  /* ---- PAPER --------------------------------------------------------
-     Warm, low-chroma, slightly off-white. A record surface, not a field. */
-  --paper: #f4f1ea;
-  --paper-2: #eae5da;
-  --card: #fffdf8;
-  --card-2: #f8f5ee;
-  --card-3: #ece7dc;
-
-  /* Warm near-black. Reads as printed ink rather than UI grey. */
-  --ink: #17140f;
-  --ink-soft: #453f34;
-  --muted: #6b6357;
-
-  /* Rules separate registers, not every object. */
-  --line: rgba(23, 20, 15, 0.14);
-  --line-strong: rgba(23, 20, 15, 0.32);
-
-  /* ---- AUTHORITY ----------------------------------------------------
-     Forest is not decoration. Forest is "a named person froze this cap."
-     If it appears anywhere else a frozen cap stops meaning anything. */
-  --frozen: #1c5240;
-  --frozen-soft: #2b6b55;
-  --frozen-deep: #123a2c;
-  --frozen-line: rgba(28, 82, 64, 0.42);
-  --frozen-tint: rgba(28, 82, 64, 0.09);
-
-  /* ---- SEMANTIC STATE -----------------------------------------------
-     Each meaning is AA on paper and each carries a non-colour cue as well
-     (rule weight, bracket, position, label). */
-  --evidence: #1c5240;          /* proven: cited history, observed invoice */
-  --policy: #3a4a86;            /* constraint: narrows, never decides */
-  --ember: #b02d17;             /* breach: past a limit or past a cap */
-  --verdict: #1c5240;           /* resolved: landed inside authority */
-  --assumption: #6b6357;        /* unproven: someone typed this */
-
-  --evidence-tint: rgba(28, 82, 64, 0.09);
-  --policy-tint: rgba(58, 74, 134, 0.09);
-  --ember-tint: rgba(176, 45, 23, 0.09);
-  --verdict-tint: rgba(28, 82, 64, 0.09);
-
-  /* ---- INVERTED REGISTER --------------------------------------------
-     Used only where the page must stop being paper: the footer and the
-     single pilot band. Never a global inversion, never behind a figure. */
-  --field: #17140f;
-  --field-2: #211d16;
-  --field-3: #2d281f;
-  --field-ink: #f4f1ea;
-  --field-soft: #cdc5b6;
-  --field-muted: #a29889;
-  --field-line: rgba(244, 241, 234, 0.16);
-  --field-line-strong: rgba(244, 241, 234, 0.32);
+  --paper: #f3f6f4;
+  --paper-2: #e7ece9;
+  --card: #ffffff;
+  --card-2: #f7f9f8;
+  --card-3: #edf1ee;
+  --ink: #202e29;
+  --ink-soft: #44564d;
+  --muted: #53665b;
+  --line: #dce4de;
+  --line-strong: #a9b9ae;
+  --brand: #173f35;
+  --brand-hover: #235446;
+  --citron: #d9ed8c;
+  --citron-ink: #263515;
+  --frozen: #286747;
+  --frozen-soft: #3d7b58;
+  --frozen-deep: #174c32;
+  --frozen-line: #9abd9f;
+  --frozen-tint: #edf5ec;
+  --evidence: #285d68;
+  --policy: #3f527f;
+  --ember: #ae3048;
+  --verdict: #286747;
+  --assumption: #53665b;
+  --evidence-tint: #edf5f7;
+  --policy-tint: #eff1f8;
+  --ember-tint: #fbf0f2;
+  --verdict-tint: #edf5ec;
+  --field: #173f35;
+  --field-2: #204b40;
+  --field-3: #2b594c;
+  --field-ink: #ffffff;
+  --field-soft: #e0eae4;
+  --field-muted: #bfd1c5;
+  --field-line: #3b6253;
+  --field-line-strong: #719181;
   --dossier: var(--field);
 
   /* Legacy aliases, re-pointed so every route re-skins from this file. */
@@ -105,21 +68,17 @@
   --indigo: var(--policy);
   --indigo-tint: var(--policy-tint);
   --surface: var(--card);
-  --accent: var(--frozen);
-  --accent-strong: var(--frozen-deep);
-
-  /* Geometry. A record is a sheet with a hairline, not a rounded tile.
-     The radius is small enough that a framed object never reads as a
-     marketing card. */
-  --radius: 3px;
-  --radius-xs: 2px;
+    --accent: var(--brand);
+    --accent-strong: var(--brand-hover);
+    --radius: 6px;
+    --radius-xs: 4px;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
   --space-5: 1.5rem;
   --space-6: 2rem;
   --shadow-1: 0 1px 0 var(--line);
-  --shadow-2: 0 1px 0 var(--line), 0 18px 44px -30px rgba(23, 20, 15, 0.45);
+  --shadow-2: 0 12px 48px -20px rgb(23 63 53 / 24%);
 
   /* Motion. Durations are graded by how much area moves: press feedback lands
      inside the 100ms perception window, element changes read at 160ms, panels
@@ -156,11 +115,6 @@
 }
 
 html {
-  /* Vognary is deliberately one theme: warm paper under near-black ink. There
-     is no prefers-color-scheme branch anywhere in this codebase. Declaring it
-     stops a dark-mode OS from painting native select, date-picker and scrollbar
-     chrome dark inside a light page — the proposal composer's date field and
-     the desk's selects are on the decision path. */
   color-scheme: light;
   scroll-behavior: smooth;
 }
@@ -196,9 +150,9 @@ select {
    headline reads as set type rather than a configured web font. Falls back to
    the UI sans while it loads. */
 .font-display {
-  font-family: var(--font-display-serif), ui-serif, Georgia, serif;
-  letter-spacing: -0.015em;
-  font-weight: 400;
+  font-family: var(--font-display-serif), var(--font-grotesk), sans-serif;
+  letter-spacing: 0;
+  font-weight: 600;
 }
 
 .font-data {
@@ -256,12 +210,12 @@ select {
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  height: var(--tap);
+  min-height: var(--tap);
   padding: 0 1rem;
   border-radius: var(--radius-xs);
   border: 1px solid transparent;
-  font-size: 0.83rem;
-  font-weight: 500;
+  font-size: 0.875rem;
+  font-weight: 600;
   letter-spacing: 0;
   cursor: pointer;
   transition:
@@ -279,13 +233,13 @@ select {
    for authorization seals, so spending it on buttons would make a frozen cap
    mean less. No inner highlight: this world has no gloss. */
 .btn-primary {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
+  background: var(--brand);
+  color: var(--field-ink);
+  border-color: var(--brand);
 }
 .btn-primary:hover {
-  background: var(--ink-soft);
-  border-color: var(--ink-soft);
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
 }
 .btn-ghost {
   background: var(--card-3);
@@ -325,9 +279,9 @@ select {
   flex: none;
 }
 .btn-sm {
-  height: 2.15rem;
+  min-height: 2.375rem;
   padding: 0 0.7rem;
-  font-size: 0.76rem;
+  font-size: 0.8125rem;
 }
 .btn-lg {
   height: 2.95rem;
@@ -497,7 +451,7 @@ select {
   color: var(--muted);
   white-space: nowrap;
 }
-.money-data .money-amount { font-size: var(--text-fine); }
+.money-data .money-amount { font-size: var(--text-body); }
 .money-record .money-amount { font-size: var(--text-record); font-weight: 600; }
 .money-lead .money-amount { font-size: var(--text-page); font-weight: 600; }
 

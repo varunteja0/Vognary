@@ -280,7 +280,7 @@
   display: grid;
   gap: var(--space-3);
   padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--line-strong);
+  border-bottom: 0;
 }
 .control-masthead-top {
   display: flex;
@@ -291,14 +291,14 @@
 }
 .control-masthead-title {
   font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-size: var(--text-page);
-  font-weight: 500;
+  font-size: 2rem;
+  font-weight: 600;
   line-height: 1.15;
   letter-spacing: 0;
   color: var(--ink);
 }
 .control-masthead-stamp {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-family: var(--font-grotesk), sans-serif;
   font-size: var(--text-fine);
   color: var(--muted);
 }
@@ -306,23 +306,29 @@
    open on four numbers of unequal worth; one line carries the only figure that
    changes what the reader does next. */
 .control-standing {
-  margin: var(--space-3) 0 0;
-  font-family: var(--font-display), Georgia, serif;
+  margin: 0;
+  font-family: var(--font-grotesk), sans-serif;
   font-size: var(--text-lead);
   line-height: 1.2;
   color: var(--ink);
   text-wrap: balance;
 }
 .control-standing[data-waiting] {
-  padding-left: 0.7rem;
-  border-left: 2px solid var(--authority, var(--ember));
+  font-weight: 500;
 }
 .control-standing-note {
-  margin: 0.35rem 0 0;
-  font-family: var(--font-mono-data), ui-monospace, monospace;
+  margin: 0;
+  font-family: var(--font-grotesk), sans-serif;
   font-size: var(--text-fine);
   line-height: 1.45;
   color: var(--muted);
+}
+@media (max-width: 47.99rem) {
+  .control-masthead { gap: 0.5rem; padding-bottom: 0.25rem; }
+  .control-masthead-title { font-size: 1.5rem; }
+  .control-masthead-stamp { font-size: 0.75rem; }
+  .control-standing { font-size: 0.875rem; }
+  .control-desk { gap: 1rem; }
 }
 /* --- Bands ------------------------------------------------------------ */
 
@@ -360,11 +366,14 @@
   cursor: pointer;
   min-height: var(--tap);
   align-items: center;
+  padding: 0.75rem 0;
 }
+.control-composer-summary::after { content: "+"; margin-left: auto; font-size: 1.5rem; color: var(--brand); }
+.control-composer-shell[open] > .control-composer-summary::after { content: "-"; }
 .control-heading {
   font-family: var(--font-display-serif), var(--font-grotesk), ui-serif, serif;
-  font-size: var(--text-band);
-  font-weight: 500;
+  font-size: 1.125rem;
+  font-weight: 600;
   line-height: 1.2;
   letter-spacing: 0;
   color: var(--ink);
@@ -392,8 +401,9 @@
 .control-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
+  gap: 1.25rem;
   width: 100%;
+  padding: 1.25rem 0;
 }
 .control-field {
   display: block;
@@ -413,8 +423,8 @@
   .control-field-cadence { grid-column: span 3; }
   .control-field-amount { grid-column: span 3; }
   .control-field-currency { grid-column: span 3; }
-  .control-field-date { grid-column: span 4; }
-  .control-disclosure { grid-column: span 8; }
+  .control-field-date { grid-column: span 6; }
+  .control-disclosure { grid-column: span 12; }
   .control-form-actions { grid-column: span 12; }}
 
 @media (min-width: 40rem) and (max-width: 59.999rem) {
@@ -441,10 +451,8 @@
   min-width: 0;
 }
 .control-disclosure {
-  align-self: end;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background: var(--card-2);
+  align-self: start;
+  border-top: 1px solid var(--line);
 }
 .control-disclosure > summary {
   display: flex;
@@ -452,7 +460,7 @@
   justify-content: space-between;
   gap: var(--space-3);
   min-height: var(--tap);
-  padding: 0.35rem 0.85rem;
+  padding: 0.75rem 0;
   font-size: var(--text-body);
   color: var(--ink-soft);
   cursor: pointer;
@@ -462,8 +470,14 @@
   display: none;
 }
 .control-disclosure-body {
-  padding: 0 0.85rem 0.6rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 0.75rem 0 1rem;
 }
+.control-disclosure-body > .control-field { margin: 0; }
+.control-disclosure-body > :is(.field-hint, .control-note, .control-exposure-set) { grid-column: 1 / -1; }
+@media (max-width: 33.99rem) { .control-disclosure-body { grid-template-columns: minmax(0, 1fr); } }
 .control-exposure-set {
   display: grid;
   gap: 0;
@@ -547,7 +561,7 @@
   overflow-wrap: anywhere;
 }
 .control-card-meta {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-family: var(--font-grotesk), sans-serif;
   font-size: var(--text-fine);
   line-height: 1.5;
   color: var(--muted);
@@ -628,10 +642,10 @@
      Amounts still hold the column open: .money-amount never wraps. */
   grid-template-columns: minmax(0, 1fr) minmax(0, auto);
   align-items: baseline;
-  padding: 0.15rem 0.75rem 0.5rem 0.7rem;
+  padding: 0.75rem 1rem 1rem;
   border-left: 2px solid var(--truth-frozen);
   border-radius: 0 6px 6px 0;
-  background: var(--card-2);
+  background: var(--frozen-tint);
 }
 /* The list and each row are transparent to the grid, so every label and every
    amount lines up down the whole record whatever the label length. */
@@ -686,6 +700,13 @@
   font-weight: 500;
   color: var(--ink-soft);
 }
+@media (max-width: 33.99rem) {
+  .ledger { grid-template-columns: minmax(0, 1fr); }
+  .ledger .control-fact > dt { grid-column: 1; padding-bottom: 0.125rem; }
+  .ledger .control-fact > dd { grid-column: 1; border-top: 0; text-align: left; padding-top: 0.125rem; }
+  .ledger .money-amount { white-space: normal; font-size: var(--text-body); }
+  .ledger .money { justify-items: start; }
+}
 .ledger-rows[data-verdict="OVER_CAP"] .money-observed .money-amount,
 .ledger-rows[data-verdict="OVER_CAP"] .money-observed .money-provenance {
   color: var(--ember);
@@ -720,25 +741,7 @@
   display: grid;
   justify-items: start;
   gap: 0.4rem;
-  padding-top: 0.55rem;
-}
-/* Wide desks read the verdict and its paperwork side by side rather than as one
-  long column with a dead half. */
-@media (min-width: 56rem) {
-  .ledger-verdict {
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-    grid-auto-flow: row dense;
-    column-gap: var(--space-5);
-    align-items: start;
-  }
-  .ledger-verdict > .proof-head,
-  .ledger-verdict > .control-note {
-    grid-column: 1;
-  }
-  .ledger-verdict > .control-card-meta,
-  .ledger-verdict > .link-quiet {
-    grid-column: 2;
-  }
+  padding-top: 1rem;
 }
 /* The verdict sentence is the record's conclusion, so it reads at full ink
    rather than as a footnote. */
@@ -1055,74 +1058,6 @@
  * they are billed to the workspace.
  * ------------------------------------------------------------------ */
 
-@media (min-width: 40rem) {
-  .viewnav {
-    display: inline-flex;
-    padding: 3px;
-    background: var(--card-2);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-xs);
-  }
-  .viewnav > li > button {
-    height: 2.1rem;
-  }
-}
-
-@media (min-width: 40rem) and (pointer: coarse) {
-  .viewnav > li > button {
-    height: var(--tap);
-  }
-}
-
-@media (min-width: 64rem) {
-  .workspace-rail {
-    position: sticky;
-    top: 1.5rem;
-    align-self: start;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-  /* The header's box is dropped so the rail can order brand, index, then
-     account independently. Its children stay in the accessibility tree. */
-  .workspace-rail > header {
-    display: contents;
-  }
-  .workspace-rail .rail-brand { order: 1; }
-  .workspace-rail nav { order: 2; }
-  .workspace-rail .rail-actions { order: 3; }
-  /* A record is read, not scanned across a metre of glass. The desk keeps a
-     measure even when the window is wide. */
-  .workspace-measure {
-    max-width: 68rem;
-  }
-  .viewnav {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1px;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    border-top: 1px solid var(--line);
-  }
-  .viewnav > li > button {
-    height: auto;
-    min-height: var(--tap);
-    justify-content: flex-start;
-    padding: 0 0 0 0.7rem;
-    border-radius: 0;
-    border-bottom: 1px solid var(--line);
-    box-shadow: none;
-    font-size: 0.85rem;
-  }
-  .viewnav > li > button[aria-current="page"] {
-    background: transparent;
-    box-shadow: inset 2px 0 0 var(--gold-deep);
-    color: var(--ink);
-    font-weight: 600;
-  }
-}
-
 /* ------------------------------------------------------------------ *
  * Rubber-stamp verdict chips
  * ------------------------------------------------------------------ */
@@ -1264,38 +1199,6 @@
 }
 .authorization-loop-compact > li::after {
   top: 1.8rem;
-}
-
-/* Workspace view switcher. Deliberately not gold: gold marks the action a
-   founder can take, never the page they are already on. */
-.viewnav {
-  display: grid;
-  gap: 2px;
-}
-.viewnav > li > button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 2.75rem;
-  padding: 0 0.85rem;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.16s ease, color 0.16s ease;
-}
-.viewnav > li > button:hover {
-  color: var(--ink);
-}
-.viewnav > li > button[aria-current="page"] {
-  background: var(--card-3);
-  color: var(--ink);
-  box-shadow: var(--shadow-1);
 }
 
 /* Moved out of globals.css: next.config.ts enables experimental.inlineCss, so

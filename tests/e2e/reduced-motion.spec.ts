@@ -6,7 +6,7 @@ test("landing respects reduced motion", async ({ page }, testInfo) => {
   const surface = testInfo.project.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Approve AI and cloud commitments before they become bills." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Vognary", level: 1 })).toBeVisible();
 
   const motionState = await page.evaluate(() => ({
     rootScrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,

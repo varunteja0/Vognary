@@ -28,7 +28,7 @@ export function PublicDocument({
         <h1 className="mt-5 font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-5xl">{title}</h1>
         <p className="mt-4 font-data text-xs text-(--muted)">EFFECTIVE {effectiveDate.toUpperCase()}</p>
         <p className="mt-5 text-sm leading-7 text-(--ink-soft)">{summary}</p>
-        <details className="public-index mt-6">
+        <details className="public-index mt-6" open>
           <summary>In this document</summary>
           <ol>
             {sections.map((section, index) => (

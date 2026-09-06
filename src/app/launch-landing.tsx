@@ -1,10 +1,11 @@
 import Link from "next/link";
+import { ArrowDown, ArrowRight, FileCheck2, LockKeyhole, UserRoundCheck } from "lucide-react";
 import { PublicFooter, PublicHeader } from "./public-shell";
 import { DeskStrip } from "./desk-strip";
 import { FreezeSheet, RequestSheet } from "./record-sheet";
 import { MoneyValue } from "@/components/ui/money-value";
 import { commitmentControlPilotOffer } from "@/lib/pilot-offer";
-import "./home.css";
+import "./clearline-home.css";
 
 /**
  * Home — five bands, in the order a stranger needs them.
@@ -29,24 +30,29 @@ export default function LaunchLanding() {
     <>
       <PublicHeader />
       <main id="ledger-main" className="home">
-        {/* 1 — DECISION NOW */}
-        <section className="home-band home-decision" aria-labelledby="home-title">
-          <div className="home-measure home-decision-grid">
-            <div className="home-say">
+        <section className="home-entry" aria-labelledby="home-title">
+          <div className="home-measure">
+            <header className="home-intro">
               <p className="home-category">Commitment Control for India-first AI companies</p>
-              <h1 id="home-title" className="home-title font-display">
-                Approve AI and cloud commitments before they become bills.
-              </h1>
-              <p className="home-lead">
-                One request is waiting. Its history is cited, your rule is applied, and nothing
-                moves until a named person decides.
-              </p>
-              <div className="home-actions">
-                <Link href="/demo" className="btn btn-primary btn-lg">Review the synthetic request</Link>
-                <Link href="/start" className="home-quiet">Use your own evidence</Link>
+              <h1 id="home-title" className="home-title">Vognary<span aria-hidden>.</span></h1>
+              <p className="home-lead">Before the commitment. <br />A clear human decision.</p>
+            </header>
+            <div className="home-scene" aria-label="Synthetic commitment awaiting a human decision">
+              <div className="home-scene-rail">
+                <p className="home-scene-label">The decision desk</p>
+                <ol className="home-sequence">
+                  <li aria-current="step"><span>Proposed</span><small>User-entered assumption</small></li>
+                  <li><span>Authorized</span><small>A named person decides</small></li>
+                  <li><span>Observed</span><small>Later financial evidence</small></li>
+                </ol>
+                <Link href="/demo" className="btn btn-primary">Review the synthetic request <ArrowRight size={17} aria-hidden /></Link>
               </div>
+              <RequestSheet />
             </div>
-            <RequestSheet headingId="home-title" />
+            <div className="home-entry-foot">
+              <p>Policy gives context. Only you authorize.</p>
+              <a href="#home-freeze-title" aria-label="Explore the authorization record"><ArrowDown size={20} aria-hidden /></a>
+            </div>
           </div>
         </section>
 
@@ -54,13 +60,14 @@ export default function LaunchLanding() {
         <section className="home-band home-freeze" aria-labelledby="home-freeze-title">
           <div className="home-measure home-freeze-grid">
             <div className="home-say">
+              <p className="home-category">One decision. A lasting record.</p>
               <h2 id="home-freeze-title" className="home-section-heading font-display">
-                A rule can annotate. Only a person can decide.
+                The cap stays put.<br />The evidence speaks.
               </h2>
               <p className="home-lead">
-                The finance owner freezes a cap below what was asked for. Weeks later the invoice
-                arrives above it, and the gap is a fact instead of an argument.
+                A proposed amount is not a bill. A policy result is not approval. Your recorded decision keeps its original cap when later evidence arrives.
               </p>
+              <Link href="/demo" className="home-quiet">Follow the full example <ArrowRight size={17} aria-hidden /></Link>
             </div>
             <FreezeSheet headingId="home-freeze-title" />
           </div>
@@ -69,16 +76,10 @@ export default function LaunchLanding() {
         {/* 3 — DAILY OPERATION */}
         <section className="home-band home-week" aria-labelledby="home-week-title">
           <div className="home-measure">
-            <h2 id="home-week-title" className="home-section-heading font-display">
-              Six constructed records, one per state.
-            </h2>
-            <p className="home-lead home-lead-wide">
-              No customer has used Vognary yet, so nothing below was observed. These six records
-              were written by us and run through the same policy and reconciliation engines the
-              product uses, which is why the states and figures are real output and the companies
-              are not. Grouped by what would have to happen next, never ranked by a score no one
-              can audit.
-            </p>
+            <div className="home-band-heading">
+              <h2 id="home-week-title" className="home-section-heading font-display">A place for what needs you.</h2>
+              <p>Six synthetic records, computed by the product&apos;s policy and reconciliation engines. Not customer activity.</p>
+            </div>
             <DeskStrip headingId="home-week-title" />
           </div>
         </section>
@@ -87,30 +88,14 @@ export default function LaunchLanding() {
         <section className="home-band home-trust" aria-labelledby="home-trust-title">
           <div className="home-measure">
             <h2 id="home-trust-title" className="home-section-heading font-display">
-              What Vognary will not do.
+              Authority stays with you.
             </h2>
             <ul className="home-refusals">
-              <li>
-                <b>It never decides.</b> No auto-approval, no auto-denial, no threshold that
-                quietly says yes on your behalf.
-              </li>
-              <li>
-                <b>It never moves money.</b> No card, no wallet, no vendor contact, no purchase,
-                no cancellation.
-              </li>
-              <li>
-                <b>It never guesses a number.</b> Unknown renders as unknown. A figure you typed
-                is labelled an assumption until a document proves it.
-              </li>
-              <li>
-                <b>It never needs your bank password or your mailbox.</b> You bring one document
-                at a time.
-              </li>
+              <li><UserRoundCheck size={24} aria-hidden /><b>A person, not a threshold.</b><p>No automatic approval or decline. No purchasing, provisioning, cancellation, or money movement.</p></li>
+              <li><FileCheck2 size={24} aria-hidden /><b>Evidence, not invented certainty.</b><p>Assumptions stay labelled. Unknown stays unknown. Financial facts point back to their source.</p></li>
+              <li><LockKeyhole size={24} aria-hidden /><b>Access, with a boundary.</b><p>No bank passwords. No mailbox access. Real customer financial data stays blocked until independent security assessment and retest are complete.</p></li>
             </ul>
-            <p className="home-lead">
-              Real customer financial data stays blocked until an independent security assessment
-              and retest are complete. <Link href="/security">Read the current boundaries</Link>.
-            </p>
+            <Link href="/security" className="home-quiet">Read the current boundaries <ArrowRight size={17} aria-hidden /></Link>
           </div>
         </section>
 
@@ -118,6 +103,7 @@ export default function LaunchLanding() {
         <section className="home-band home-pilot" aria-labelledby="home-pilot-title">
           <div className="home-measure home-pilot-grid">
             <div>
+              <p className="home-category">For a named finance owner</p>
               <h2 id="home-pilot-title" className="home-section-heading font-display">
                 One pilot month.
               </h2>
@@ -130,16 +116,17 @@ export default function LaunchLanding() {
                 className="home-price"
               />
             </div>
-            <ul className="home-pilot-terms">
-              <li>Covers one pilot month. A second month is a separate purchase.</li>
-              <li>Payment reserves the pilot. Payment is not activation.</li>
-              <li>Nothing renews. There is no subscription to cancel.</li>
-              <li>Refundable before the pilot month starts.</li>
-            </ul>
-            <div className="home-pilot-action">
+            <div className="home-pilot-detail">
+              <ul className="home-pilot-terms">
+                <li>One policy setup and up to {commitmentControlPilotOffer.proposalLimit} proposals.</li>
+                <li>Up to {commitmentControlPilotOffer.reconciliationReviewLimit} weekly reconciliation reviews.</li>
+                <li>Payment reserves the pilot. Payment is not activation.</li>
+                <li>A second month requires a separate purchase.</li>
+              </ul>
               <Link href="/pay" prefetch={false} className="btn btn-primary btn-lg">
-                See the one-month pilot
+                See the one-month pilot <ArrowRight size={18} aria-hidden />
               </Link>
+              <Link href="/start" className="home-quiet">Use your own evidence</Link>
             </div>
           </div>
         </section>

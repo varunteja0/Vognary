@@ -4,7 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 test("canonical product entry keeps forwarding unavailable without seeded data", async ({ page }) => {
   const failures = collectRuntimeFailures(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "Approve AI and cloud commitments before they become bills." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/i)).toHaveCount(0);
   // The evidence path is offered, and the record that needs a human is present.
   await expect(page.getByRole("link", { name: "Use your own evidence" }).first()).toBeVisible();

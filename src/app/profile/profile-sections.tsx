@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 import type { useProfileSettings } from "./use-profile-settings";
+import styles from "./profile.module.css";
 
 type Settings = ReturnType<typeof useProfileSettings>;
 
@@ -16,15 +18,15 @@ export function ProfileGroup({
   defaultOpen?: boolean;
 }) {
   return (
-    <details className="panel group overflow-hidden" open={defaultOpen}>
-      <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 marker:content-none sm:px-6">
+    <details className={styles.group} open={defaultOpen}>
+      <summary className={styles.summary}>
         <span>
-          <span className="block font-display text-xl font-semibold text-(--ink)">{name}</span>
-          <span className="mt-1 block text-sm leading-5 text-(--muted)">{description}</span>
+          <span className={styles.name}>{name}</span>
+          <span className={styles.description}>{description}</span>
         </span>
-        <span aria-hidden="true" className="font-data text-xl text-(--muted) group-open:rotate-45">+</span>
+        <ChevronDown aria-hidden />
       </summary>
-      <div className="border-t border-line px-5 py-5 sm:px-6 sm:py-6">{children}</div>
+      <div className={styles.body}>{children}</div>
     </details>
   );
 }

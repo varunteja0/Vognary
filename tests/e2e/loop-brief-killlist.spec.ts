@@ -11,7 +11,7 @@ test("manual financial evidence is not exposed before sign-in", async ({ page })
 test("landing walkthrough is explicitly illustrative and never presented as customer proof", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Approve AI and cloud commitments before they become bills." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Vognary", level: 1 })).toBeVisible();
   // The example amount is on the page and is labelled an assumption, not proof.
   const proposed = page.locator(".sheet").first();
   await expect(proposed).toContainText("Model API vendor (placeholder)");

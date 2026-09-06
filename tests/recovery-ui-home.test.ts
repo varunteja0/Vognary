@@ -134,7 +134,7 @@ test("Control stays a primary destination at the enrollment boundary, and the ph
   assert.match(clientSource, /aria-current=\{state\.view === view \? "page" : undefined\}/);
   assert.match(clientSource, /href="\/profile"/);
   assert.doesNotMatch(clientSource, /state\.view === "PROFILE"/);
-  assert.match(clientSource, /viewnav \$\{navColumnsClass\}/);
+  assert.match(clientSource, /<ul className=\{shell\.views\}/);
 });
 
 test("a workspace without the pilot sees the whole loop rendered by the product's own components", () => {
@@ -153,20 +153,20 @@ test("a workspace without the pilot sees the whole loop rendered by the product'
 
 test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
   assert.match(landingSource, /Commitment Control for India-first AI companies/);
-  // The fixed public copy hypothesis: literal, active, specific, ≤12 words.
-  assert.match(landingSource, /Approve AI and cloud commitments before they become bills\./);
+  assert.match(landingSource, /<h1 id="home-title" className="home-title">Vognary/);
   assert.match(landingSource, /Review the synthetic request/);
   assert.match(landingSource, /Use your own evidence/);
   assert.match(landingSource, /See the one-month pilot/);
   // Human authority is stated on the first screen, not deferred to a later band.
-  assert.match(landingSource, /nothing\s*\n?\s*moves until a named person decides/);
-  assert.match(loginSource, /named human authorization before a new obligation exists/);
+  assert.match(landingSource, /Policy gives context\. Only you authorize\./);
+  assert.match(loginSource, /Sign in to Vognary/);
+  assert.match(loginSource, /Google is only for sign-in\. Vognary does not access Gmail\./);
   assert.match(allSource, /Start with a software bill/);
   assert.match(allSource, /Add a receipt to see the charge/);
   assert.doesNotMatch(landingSource, /Want it done for you\?/);
   assert.doesNotMatch(landingSource, /href="\/private-audit"/);
   assert.match(clientSource, />Vognary</);
-  assert.match(landingSource, /never needs your bank password or your mailbox/);
+  assert.match(landingSource, /No bank passwords\. No mailbox access\./);
   assert.doesNotMatch(landingSource, /redaction-first source plan|Private software renewal review/);
   assert.doesNotMatch(landingSource, /Set up billing forwarding once so matching mail keeps arriving/);
 });
@@ -407,10 +407,11 @@ test("landmarks, live status, and alerts are present for assistive technology", 
 });
 
 test("dialogs are modal, labelled, trapped, and give focus back", () => {
-  assert.match(dialogSource, /role="dialog"/);
+  assert.match(dialogSource, /<dialog/);
+  assert.match(dialogSource, /panel\.showModal\(\)/);
   assert.match(dialogSource, /aria-modal="true"/);
   assert.match(dialogSource, /aria-labelledby=\{titleId\}/);
-  assert.match(dialogSource, /event\.key === "Escape"/);
+  assert.match(dialogSource, /onCancel=\{event => \{ event\.preventDefault\(\); closeRef\.current\(\); \}\}/);
   assert.match(dialogSource, /event\.key !== "Tab"/);
   assert.match(dialogSource, /restoreTarget\?\.focus\(\)/);
 });

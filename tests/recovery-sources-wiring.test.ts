@@ -13,9 +13,10 @@ test("the workspace wires Sources and delegates account settings to the profile 
   assert.match(workspaceSource, /import \{ RecoverySources \} from "\.\/recovery-sources"/);
   assert.match(workspaceSource, /<RecoverySources/);
   assert.match(workspaceSource, /href="\/profile"/);
-  assert.match(workspaceSource, /const navCellCount = primaryViews\.length \+ \(overflowViews\.length \? 1 : 0\)/);
-  assert.match(workspaceSource, /navCellCount === 4 \? "grid-cols-4" : "grid-cols-3"/);
-  assert.match(workspaceSource, /viewnav \$\{navColumnsClass\}/);
+  assert.match(workspaceSource, /primaryViews = availableViews\.slice\(0, recoveryPrimaryViewLimit\)/);
+  assert.match(workspaceSource, /<ul className=\{shell\.views\}/);
+  const shellStyles = readFileSync(`${recoveryDir}/workspace-shell.module.css`, "utf8");
+  assert.match(shellStyles, /grid-auto-columns: minmax\(0, 1fr\)/);
   assert.doesNotMatch(workspaceSource, /grid-cols-6/);
   assert.doesNotMatch(workspaceSource, /RecoveryProfile/);
   assert.doesNotMatch(workspaceSource, /\bPROFILE\b/);

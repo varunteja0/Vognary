@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { AuthorizationLoop } from "@/app/authorization-loop";
 import { buildControlAttention } from "@/lib/commitment-control/attention";
-import { activeCommitmentControlStep } from "@/lib/commitment-control-loop";
 import { indiaCalendarDate } from "@/lib/date-only";
 import { controlDraftFromGuestProposal, readGuestProposalDraft } from "@/lib/guest-proposal-draft";
 import type {
@@ -16,7 +14,6 @@ import { currencyExponent, minorUnitsToDecimal } from "@/lib/recovery/domain";
 import { formatMoment } from "../labels";
 import { FailureBlock, LoadingBlock, StateBlock } from "../recovery-states";
 import type { TransportFailure } from "../transport";
-import { ControlAttention } from "./control-attention";
 import { ControlDecisionDialog } from "./control-decision-dialog";
 import { ControlExceptionReviewDialog } from "./control-exception-review-dialog";
 import {
@@ -27,7 +24,7 @@ import {
 } from "./control-format";
 import { ControlPolicyDialog } from "./control-policy-dialog";
 import { ControlProposalComposer } from "./control-proposal-composer";
-import { ControlProposalRow } from "./control-proposal-row";
+import { ControlRecordBrowser } from "./control-record-browser";
 import { ControlOutcomeDialog } from "./control-outcome-dialog";
 import {
   ControlReconciliationDialog,
@@ -134,6 +131,8 @@ export function useCommitmentControl({
   const [state, dispatch] = useReducer(controlReducer, initialControlState);
   const [evidence, setEvidence] = useState<ControlEvidenceState>({ kind: "IDLE" });
   const [candidates, setCandidates] = useState<ControlCandidateState>({ kind: "IDLE" });
+  const evidenceRequestSequence = useRef(0);
+  const candidateRequestSequence = useRef(0);
   // Mutation handlers read the committed state, never a render-time snapshot,
   // so a retry always sends the workspace version the reader actually saw.
   const stateRef = useRef(state);
@@ -296,6 +295,7 @@ export function useCommitmentControl({
   }, [loadBrief, transport]);
 
   const selectReconciliationCommitment = useCallback(async (commitmentId: string) => {
+    const requestSequence = ++evidenceRequestSequence.current;
     dispatch({ type: "RECONCILIATION_DRAFT_CHANGED", draft: { commitmentId: commitmentId || null, evidenceId: null } });
     if (!commitmentId) {
       setEvidence({ kind: "IDLE" });
@@ -303,15 +303,19 @@ export function useCommitmentControl({
     }
     setEvidence({ kind: "LOADING" });
     const result = await loadEvidence(commitmentId);
+    if (requestSequence !== evidenceRequestSequence.current || stateRef.current.dialog?.kind !== "RECONCILIATION") return;
     setEvidence(result.ok
       ? { kind: "READY", items: result.items }
       : { kind: "FAILED", failure: { error: result.failure.error, origin: result.failure.origin } });
   }, [loadEvidence]);
 
   const loadReconciliationCandidates = useCallback(async (proposalId: string) => {
+    const requestSequence = ++candidateRequestSequence.current;
     setCandidates({ kind: "LOADING" });
     const result = await transport.reconciliationCandidates(proposalId);
-    setCandidates(result.ok
+    if (requestSequence !== candidateRequestSequence.current || stateRef.current.dialog?.kind !== "RECONCILIATION"
+      || stateRef.current.dialog.proposalId !== proposalId) return;
+    setCandidates(result.ok && result.data.proposalId === proposalId
       ? { kind: "READY", items: result.data.candidates }
       : { kind: "FAILED" });
   }, [transport]);
@@ -329,6 +333,7 @@ export function useCommitmentControl({
       submitProposal: () => void submitProposal(),
       openDecision: (proposalId, returnFocusId) => dispatch({ type: "DIALOG_OPENED", dialog: { kind: "DECISION", proposalId }, returnFocusId }),
       openReconciliation: (proposalId, returnFocusId) => {
+        evidenceRequestSequence.current += 1;
         setEvidence({ kind: "IDLE" });
         setCandidates({ kind: "LOADING" });
         dispatch({ type: "DIALOG_OPENED", dialog: { kind: "RECONCILIATION", proposalId }, returnFocusId });
@@ -350,7 +355,11 @@ export function useCommitmentControl({
         returnFocusId,
         policyDraft: policyDraftFrom(stateRef.current.brief?.policy ?? null, toMajorUnits),
       }),
-      closeDialog: () => dispatch({ type: "DIALOG_CLOSED" }),
+      closeDialog: () => {
+        evidenceRequestSequence.current += 1;
+        candidateRequestSequence.current += 1;
+        dispatch({ type: "DIALOG_CLOSED" });
+      },
       changeDecisionDraft: (draft) => dispatch({ type: "DECISION_DRAFT_CHANGED", draft }),
       submitDecision: () => void submitDecision(),
       selectReconciliationCommitment: (commitmentId) => void selectReconciliationCommitment(commitmentId),
@@ -385,7 +394,7 @@ export function ControlView({
   commitments: readonly CommitmentSummaryDto[];
   online: boolean;
   onInspectEvidence: ((evidenceId: string, buttonId: string) => void) | null;
-  onAddBill?: () => void;
+  onAddBill?: (proposalId: string) => void;
 }) {
   const { state, handlers } = desk;
   const guestDraftApplied = useRef(false);
@@ -416,9 +425,6 @@ export function ControlView({
   const authorized = brief.proposals.filter((entry) => entry.decision !== null);
   const awaitingEvidence = authorized.filter((entry) => entry.decision?.action !== "DECLINE" && entry.reconciliations.length === 0);
   const attention = buildControlAttention(brief.proposals, { today: indiaCalendarDate() });
-  const pendingProposalId = state.pending && state.pending.kind !== "PROPOSAL" && state.pending.kind !== "POLICY"
-    ? state.pending.proposalId
-    : null;
   const dialogProposalId = state.dialog && state.dialog.kind !== "POLICY" ? state.dialog.proposalId : null;
   const dialogEntry = dialogProposalId
     ? brief.proposals.find((entry) => entry.proposal.id === dialogProposalId) ?? null
@@ -433,12 +439,6 @@ export function ControlView({
     : policy === null
       ? "No policy version exists yet, so no proposal can be evaluated. A workspace owner or admin has to record one first."
       : null;
-  const activeStep = activeCommitmentControlStep({
-    citedEvidence: commitments.some((commitment) => commitment.evidenceCount > 0),
-    hasPolicy: policy !== null,
-    awaitingHumanDecision: awaitingDecision.length > 0,
-    authorizedAwaitingEvidence: awaitingEvidence.length > 0,
-  });
 
   return (
     <div className="control-desk">
@@ -449,7 +449,7 @@ export function ControlView({
           version — nothing is derived, projected or estimated here. */}
       <section aria-labelledby="control-masthead-heading" className="control-masthead">
         <div className="control-masthead-top">
-          <h3 id="control-masthead-heading" className="control-masthead-title">Commitment Control</h3>
+          <h3 id="control-masthead-heading" className="control-masthead-title">Your decision desk</h3>
           <p className="control-masthead-stamp">
             {policy === null
               ? "No policy version recorded"
@@ -470,7 +470,7 @@ export function ControlView({
           {policy !== null && awaitingDecision.length > 0
             ? `${brief.capabilities.canDecide ? "You can decide these." : "A workspace owner or admin decides these."} `
             : ""}
-          {`${awaitingEvidence.length} awaiting evidence · ${authorized.length} authorized in total`}
+          {`${awaitingEvidence.length} awaiting evidence · ${authorized.length} decided in total`}
         </p> : null}
       </section>
 
@@ -521,83 +521,7 @@ export function ControlView({
       {state.failure && !state.staleNotice ? <FailureBlock failure={state.failure} /> : null}
 
       {policy !== null || brief.proposals.length > 0 ? <>
-      <ControlAttention
-        items={attention}
-        canAct={brief.capabilities.canDecide}
-        online={online}
-        pendingProposalId={pendingProposalId}
-        onDecide={handlers.openDecision}
-        onReconcile={handlers.openReconciliation}
-        onRecordOutcome={handlers.openOutcome}
-        onReviewException={handlers.openExceptionReview}
-        onReview={handlers.focusProposal}
-      />
-
-      <section
-        aria-labelledby="control-queue-heading"
-        className="control-band"
-        data-empty={awaitingDecision.length === 0 ? "true" : undefined}
-      >
-        <div className="control-band-head">
-          <h3 id="control-queue-heading" className="control-heading">Needs a decision</h3>
-        </div>
-        {awaitingDecision.length === 0 ? (
-          <p className="control-note">
-            {brief.proposals.length === 0
-              ? "No proposal has been entered yet. The first one you evaluate appears here."
-              : "Every evaluated proposal already carries a decision."}
-          </p>
-        ) : (
-          <div className="control-card-list enter-list">
-            {awaitingDecision.map((entry, index) => (
-              <ControlProposalRow
-                key={entry.proposal.id}
-                entry={entry}
-                canDecide={brief.capabilities.canDecide}
-                pendingKind={pendingKindFor(state, entry.proposal.id)}
-                focused={state.focusProposalId === entry.proposal.id}
-                lead={index === 0}
-                online={online}
-                onDecide={handlers.openDecision}
-                onReconcile={handlers.openReconciliation}
-                onInspectEvidence={onInspectEvidence}
-                onFocused={handlers.clearFocus}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section
-        aria-labelledby="control-authorized-heading"
-        className="control-band"
-        data-empty={authorized.length === 0 ? "true" : undefined}
-      >
-        <div className="control-band-head">
-          <h3 id="control-authorized-heading" className="control-heading">Authorized commitments</h3>
-        </div>
-        {authorized.length === 0 ? (
-          <p className="control-note">No proposal has been decided yet.</p>
-        ) : (
-          <div className="control-card-list">
-            {authorized.map((entry) => (
-              <ControlProposalRow
-                key={entry.proposal.id}
-                entry={entry}
-                canDecide={brief.capabilities.canDecide}
-                pendingKind={pendingKindFor(state, entry.proposal.id)}
-                focused={state.focusProposalId === entry.proposal.id}
-                lead={false}
-                online={online}
-                onDecide={handlers.openDecision}
-                onReconcile={handlers.openReconciliation}
-                onInspectEvidence={onInspectEvidence}
-                onFocused={handlers.clearFocus}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+      <ControlRecordBrowser desk={desk} online={online} onInspectEvidence={onInspectEvidence} />
 
       {/* Creation comes after attention. On an empty desk it opens itself,
           because then entering the first proposal is the work. */}
@@ -705,7 +629,7 @@ export function ControlView({
           onChange={handlers.changeReconciliationDraft}
           onClose={handlers.closeDialog}
           onSubmit={handlers.submitReconciliation}
-          onAddBill={onAddBill}
+          onAddBill={onAddBill ? () => { handlers.closeDialog(); onAddBill(dialogEntry.proposal.id); } : undefined}
         />
       ) : null}
 
@@ -751,20 +675,6 @@ export function ControlView({
         />
       ) : null}
 
-      {/* Orientation, not operation. It sits after the work so the desk opens
-          on what is owed rather than on an explanation of itself. */}
-      <details className="control-more">
-        <summary>The five steps this desk records</summary>
-        <div className="control-more-body">
-          <AuthorizationLoop compact activeStep={activeStep} />
-        </div>
-      </details>
     </div>
   );
-}
-
-function pendingKindFor(state: ControlState, proposalId: string): "DECISION" | "RECONCILIATION" | null {
-  const pending = state.pending;
-  if (!pending || (pending.kind !== "DECISION" && pending.kind !== "RECONCILIATION")) return null;
-  return pending.proposalId === proposalId ? pending.kind : null;
 }

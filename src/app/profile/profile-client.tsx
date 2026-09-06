@@ -3,6 +3,8 @@
 import "../ledger.css";
 
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import styles from "./profile.module.css";
 import { VognaryMark } from "../brand";
 import {
   AccountSection,
@@ -36,26 +38,25 @@ export default function ProfileClient() {
   }
 
   return (
-    <main id="ledger-main" className="relative px-4 py-6 text-foreground sm:px-6 sm:py-8 lg:px-8">
-      <div className="mx-auto w-full max-w-4xl">
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 font-display text-lg font-semibold text-(--ink)">
+    <main id="ledger-main" className={styles.page}>
+      <div className={styles.measure}>
+        <header className={styles.header}>
+          <Link href="/" className={styles.brand}>
             <VognaryMark size={22} />
             Vognary
           </Link>
           <nav aria-label="Account shortcuts" className="flex flex-wrap gap-2">
-            <Link href="/app" className="btn btn-primary">Back to app</Link>
+            <Link href="/app" className="btn btn-primary"><ArrowLeft size={16} aria-hidden />Back to app</Link>
             <Link href="/security" className="btn btn-ghost">Security</Link>
           </nav>
         </header>
 
-        <div className="mt-8 border-b border-line pb-6">
+        <div className={styles.title}>
           <p className="eyebrow">Settings</p>
-          <h1 className="mt-2 font-display text-4xl font-bold text-(--ink) sm:text-5xl">Account settings</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-(--muted)">Start with your account summary. Open notifications, privacy, or deletion only when you need them.</p>
+          <h1>Account settings</h1>
         </div>
 
-        <div className="mt-6 grid gap-3">
+        <div className={styles.sections}>
           <AccountSection settings={settings} />
           <PeopleSection settings={settings} />
           <NotificationsSection settings={settings} />

@@ -34,11 +34,11 @@ test("every colour the brand page documents is the value its token holds", () =>
 });
 
 test("the brand page names the typefaces the app actually loads", () => {
-  for (const family of ["Newsreader", "IBM_Plex_Sans", "IBM_Plex_Mono"]) {
+  for (const family of ["Bricolage_Grotesque", "Manrope", "IBM_Plex_Mono"]) {
     assert.match(layout, new RegExp(family), `layout.tsx should load ${family}`);
   }
-  assert.match(brandPage, /Newsreader/, "/brand must name Newsreader as the display face");
-  assert.match(brandPage, /IBM Plex Sans/, "/brand must name IBM Plex Sans");
+  assert.match(brandPage, /Bricolage Grotesque/, "/brand must name the display face");
+  assert.match(brandPage, /Manrope/, "/brand must name the interface face");
   assert.match(brandPage, /IBM Plex Mono/, "/brand must name IBM Plex Mono");
 });
 
@@ -46,7 +46,7 @@ test("the brand page never advertises a typeface the app does not load", () => {
   // Naming a dead face is the exact defect this file exists to catch. The
   // retrospective comment is allowed to say the word; the rendered page is not.
   const rendered = brandPage.replace(/\/\*[\s\S]*?\*\//g, "");
-  for (const dead of ["Fraunces", "Playfair", "Inter"]) {
+  for (const dead of ["Fraunces", "Playfair", "Inter", "Newsreader", "IBM Plex Sans"]) {
     assert.doesNotMatch(rendered, new RegExp(dead), `/brand still advertises ${dead}`);
     assert.doesNotMatch(layout, new RegExp(dead), `layout.tsx still loads ${dead}`);
   }

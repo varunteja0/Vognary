@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Menu, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import { VognaryMark } from "./brand";
@@ -55,7 +56,13 @@ export function PublicHeader() {
           <span>Vognary</span>
         </Link>
 
+        <nav aria-label="Main site" className="pshell-links">
+          <Link href="/demo" aria-current={pathname === "/demo" ? "page" : undefined}>The product</Link>
+          <Link href="/pay" prefetch={false} aria-current={pathname === "/pay" ? "page" : undefined}>Pilot</Link>
+          <Link href="/security" aria-current={pathname === "/security" ? "page" : undefined}>Security</Link>
+        </nav>
         <div className="pshell-commands">
+          <Link href="/login?next=/app" className="pshell-signin">Sign in</Link>
           <Link
             href={primary.href}
             className={`btn ${primary.quiet ? "btn-ghost" : "btn-primary"} btn-sm pshell-primary`}
@@ -72,8 +79,8 @@ export function PublicHeader() {
               setOpen(true);
             }}
           >
-            <MenuGlyph />
-            Menu
+            <Menu size={18} aria-hidden />
+            <span className="sr-only">Menu</span>
           </button>
         </div>
       </div>
@@ -81,8 +88,8 @@ export function PublicHeader() {
       <dialog ref={dialog} className="pshell-menu" onClose={() => setOpen(false)} aria-label="Site menu">
         <div className="pshell-menu-head">
           <p className="pshell-menu-title font-display">Where would you like to go?</p>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={close} autoFocus>
-            Close
+          <button type="button" className="btn btn-ghost btn-sm" onClick={close} aria-label="Close" title="Close" autoFocus>
+            <X size={18} aria-hidden />
           </button>
         </div>
         <nav aria-label="Public destinations">
@@ -149,10 +156,3 @@ export function PublicFooter() {
   );
 }
 
-function MenuGlyph() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-      <path d="M4 7h16M4 12h16M4 17h16" />
-    </svg>
-  );
-}

@@ -44,7 +44,8 @@ test("profile settings use the required progressive-disclosure groups in task or
     assert.ok(position > previous, `${group} should appear after the preceding group`);
     previous = position;
   }
-  assert.match(sections, /<details className="panel group overflow-hidden"/);
+  assert.match(sections, /<details className=\{styles\.group\} open=\{defaultOpen\}/);
+  assert.match(sections, /<summary className=\{styles\.summary\}/);
   assert.match(sections, /name="Account"/);
   assert.match(sections, /name="People"/);
   assert.match(sections, /name="Notifications"/);

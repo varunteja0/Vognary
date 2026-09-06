@@ -152,9 +152,10 @@ async function signIn(page: Page) {
   await page.getByLabel("Development access code").fill(accessCode!);
   const loginResponse = page.waitForResponse(response =>
     new URL(response.url()).pathname === "/api/auth/login" && response.request().method() === "POST");
+  const navigation = page.waitForURL(url => url.pathname === "/app", { waitUntil: "load" });
   await page.getByRole("button", { name: "Sign in as developer", exact: true }).click();
   expect((await loginResponse).status()).toBe(200);
-  await page.waitForURL(/\/app$/, { waitUntil: "domcontentloaded" });
+  await navigation;
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
 }
 

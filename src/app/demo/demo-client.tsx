@@ -1,18 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { VognaryMark } from "../brand";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { ArrowRight, Check, RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import { PublicHeader } from "../public-shell";
 import { MoneyValue } from "@/components/ui/money-value";
-import { RequestSheet, SyntheticStamp } from "../record-sheet";
-import {
-  syntheticControlBrief,
-  syntheticDemoBranchLabels,
-  syntheticDemoBranchOrder,
-  syntheticDemoBranchOutcomes,
-  syntheticDemoObservedEvidence,
-  type SyntheticDemoBranch,
-} from "@/lib/synthetic-control-demo";
+import type { ControlDecisionDto, ControlReconciliationDto } from "@/lib/commitment-control/contracts";
+import type { SyntheticDemoBranch } from "@/lib/synthetic-control-demo";
 import "./demo.css";
 
 /**
@@ -41,7 +35,12 @@ function label(value: string): string {
   return value.toLowerCase().replace(/_/g, " ");
 }
 
-export function DemoClient() {
+export function DemoClient({ branches, period, requestSheet, stamp }: {
+  branches: readonly { action: SyntheticDemoBranch; label: string; outcome: string; decision: ControlDecisionDto | null; reconciliation: ControlReconciliationDto | null }[];
+  period: string;
+  requestSheet: ReactNode;
+  stamp: ReactNode;
+}) {
   const [branch, setBranch] = useState<SyntheticDemoBranch | null>(null);
   const [observed, setObserved] = useState(false);
   const outcome = useRef<HTMLDivElement>(null);
@@ -62,47 +61,36 @@ export function DemoClient() {
     if (branch) outcome.current?.focus();
   }, [branch]);
 
-  const entry = branch
-    ? syntheticControlBrief(observed ? "RECONCILED" : "DECIDED", branch).proposals[0]
-    : null;
+  const entry = branches.find(choice => choice.action === branch);
   const decision = entry?.decision ?? null;
-  const reconciliation = entry?.reconciliations[0] ?? null;
+  const reconciliation = observed ? entry?.reconciliation ?? null : null;
   const refused = branch === "DECLINE";
 
   return (
     <div className="demo">
+      <PublicHeader />
       <header className="demo-top">
-        <Link href="/" className="demo-home" aria-label="Vognary home">
-          <VognaryMark size={24} />
-          <span>Vognary</span>
-        </Link>
-        <SyntheticStamp className="demo-stamp" />
+        <span className="demo-location">The decision desk / Example</span>
+        {stamp}
       </header>
 
       <main className="demo-body">
+        <div className="demo-say">
+          <h1 id="demo-title" className="font-display">Review a commitment.</h1>
+          <p>A proposed obligation, cited exposure, and a policy result. The next decision belongs to a person.</p>
+        </div>
         <div className="demo-grid">
           {/* Heading and record share a column so the decision panel can start
               at the top of the page instead of below the paragraph's measure. */}
           <div className="demo-lede">
-            <div className="demo-say">
-              <h1 id="demo-title" className="font-display">
-                A rule has said everything it can say. You decide the rest.
-              </h1>
-              <p>
-                This request crosses a per-charge limit the company wrote for itself. Vognary will not
-                approve it, will not refuse it, and will not wait for a threshold to decide. Choose, and
-                watch what your choice does to an invoice that has not arrived yet.
-              </p>
-            </div>
-
-            <RequestSheet headingId="demo-title" />
+            {requestSheet}
           </div>
 
           <div className="demo-panel">
             <section className="demo-decision" aria-labelledby="demo-decision-title">
               <h2 id="demo-decision-title">Your decision</h2>
               <div className="demo-choices" role="group" aria-describedby="demo-decision-title">
-                {syntheticDemoBranchOrder.map((action) => (
+                {branches.map(({ action, label: choiceLabel }) => (
                   <button
                     key={action}
                     type="button"
@@ -111,13 +99,15 @@ export function DemoClient() {
                     aria-pressed={branch === action}
                     onClick={() => decide(action)}
                   >
-                    <span className="demo-choice-label">{syntheticDemoBranchLabels[action]}</span>
+                    {action === "APPROVE_WITH_CAP" ? <SlidersHorizontal size={20} aria-hidden /> : action === "APPROVE" ? <Check size={20} aria-hidden /> : <X size={20} aria-hidden />}
+                    <span className="demo-choice-label">{choiceLabel}</span>
                     <span className="demo-choice-note">{CHOICE_NOTES[action]}</span>
                   </button>
                 ))}
               </div>
               {branch ? (
                 <button type="button" className="btn btn-ghost btn-sm demo-reset" onClick={reset}>
+                  <RotateCcw size={16} aria-hidden />
                   Clear and choose again
                 </button>
               ) : (
@@ -139,7 +129,7 @@ export function DemoClient() {
               ) : (
                 <>
                   <h2>{refused ? "Refused. No cap exists." : "Authorized. The cap is frozen."}</h2>
-                  <p className="demo-outcome-note">{syntheticDemoBranchOutcomes[branch]}</p>
+                  <p className="demo-outcome-note">{entry?.outcome}</p>
 
                   {decision?.approvedCapMinor ? (
                     <>
@@ -170,13 +160,14 @@ export function DemoClient() {
                       className="btn btn-primary demo-evidence-button"
                       onClick={() => setObserved(true)}
                     >
-                      Let the {syntheticDemoObservedEvidence.period} invoice arrive
+                      Let the {period} invoice arrive
+                      <ArrowRight size={17} aria-hidden />
                     </button>
                   ) : reconciliation ? (
                     <div className="demo-observed">
                       <dl className="demo-observed-rows">
                         <div>
-                          <dt>{syntheticDemoObservedEvidence.period} invoice</dt>
+                          <dt>{period} invoice</dt>
                           <dd>
                             <MoneyValue
                               minor={reconciliation.observedAmountMinor}

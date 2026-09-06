@@ -3,9 +3,11 @@
 import "../public.css";
 import "../ledger.css";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Check, Eye, EyeOff } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { guestAuditTransferKey } from "@/lib/guest-audit-transfer";
-import { VognaryMark } from "../brand";
+import { PublicHeader } from "../public-shell";
+import styles from "./login.module.css";
 
 type SessionPayload = {
   authenticated: boolean;
@@ -67,6 +69,7 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
   const [showCode, setShowCode] = useState(false);
   const nextPath = safeNextPath(initialNextPath ?? null);
   const [guestAuditWaiting, setGuestAuditWaiting] = useState(false);
+  const navigationStarted = useRef(false);
 
   useEffect(() => {
     queueMicrotask(() => setGuestAuditWaiting(Boolean(window.sessionStorage.getItem(guestAuditTransferKey))));
@@ -99,9 +102,9 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
   }, []);
 
   useEffect(() => {
-    if (!session?.authenticated) return;
-    const timer = setTimeout(() => window.location.assign(nextPath), 500);
-    return () => clearTimeout(timer);
+    if (!session?.authenticated || navigationStarted.current) return;
+    navigationStarted.current = true;
+    window.location.replace(nextPath);
   }, [session, nextPath]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -126,7 +129,10 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
         return;
       }
       setStatus({ tone: "success", text: `Signed in as ${payload.session.email}. Taking you to your workspace…` });
-      window.location.assign(nextPath);
+      if (!navigationStarted.current) {
+        navigationStarted.current = true;
+        window.location.replace(nextPath);
+      }
     } catch {
       setStatus({ tone: "error", text: "Login request failed. Please try again." });
       setSubmitting(false);
@@ -167,34 +173,17 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
   );
 
   return (
-    <main id="ledger-main" className="relative px-4 pb-12 text-foreground sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-6xl">
-        <nav className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-line py-3">
-          <Link href="/" className="brandmark">
-            <VognaryMark size={22} />
-            Vognary
-          </Link>
-          <Link href="/" className="btn btn-sm btn-ghost">Home</Link>
-        </nav>
-
-        <section className="public-ledger">
-          <header className="public-ledger-rail">
-          <span className="folio" data-folio="01">Sign in</span>
-          <h1 className="mt-5 font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-5xl">Decide what the company may commit to next</h1>
-          <p className="mt-5 text-sm leading-7 text-(--ink-soft)">Sign in with Google to remember cited bills, open the Control desk, and record a named human authorization before a new obligation exists.</p>
-          <ul className="mt-6 grid gap-2">
-            {trustPoints.map((point) => (
-              <li key={point} className="inline-flex items-center gap-2 font-data text-xs text-(--muted)">
-                <span aria-hidden className="inline-block h-px w-3 bg-(--gold)" />
-                {point}
-              </li>
-            ))}
-          </ul>
+    <div className={styles.page}>
+      <PublicHeader />
+      <main id="ledger-main" className={styles.stage}>
+        <section>
+          <header className={styles.intro}>
+          <span className={styles.identity}>Your workspace</span>
+          <h1>Sign in to Vognary.</h1>
+          <p>Commitments, decisions, and their evidence.</p>
           </header>
 
-          <div className="public-ledger-body">
-          <div className="public-band public-band-lead">
-          <p className="truth-label truth-authority">Identity and workspace memory</p>
+          <div className={styles.form}>
 
           {session.authenticated ? (
             <div className="mt-5 border-y border-line py-5" role="status" aria-live="polite">
@@ -235,7 +224,7 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
                         <label htmlFor="code-value" className="field-label">Development access code</label>
                         <div className="flex gap-2">
                           <input id="code-value" required type={showCode ? "text" : "password"} autoComplete="off" value={form.accessCode} onChange={(event) => setForm({ ...form, accessCode: event.target.value })} className="field" placeholder="Access code" />
-                          <button type="button" onClick={() => setShowCode((value) => !value)} aria-pressed={showCode} className="btn btn-ghost btn-sm shrink-0">{showCode ? "Hide" : "Show"}</button>
+                          <button type="button" onClick={() => setShowCode((value) => !value)} aria-pressed={showCode} aria-label={showCode ? "Hide access code" : "Show access code"} title={showCode ? "Hide access code" : "Show access code"} className="btn btn-ghost btn-sm shrink-0">{showCode ? <EyeOff size={18} aria-hidden /> : <Eye size={18} aria-hidden />}</button>
                         </div>
                       </div>
                       <button disabled={submitting} type="submit" className="btn btn-ghost btn-block mt-auto disabled:cursor-not-allowed disabled:opacity-60">{submitting ? "Signing in…" : "Sign in as developer"}</button>
@@ -252,10 +241,12 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
             By continuing you agree to our <Link href="/terms" className="legal-link">Terms</Link> and <Link href="/privacy" className="legal-link">Privacy Policy</Link>.
           </p>
           </div>
-          </div>
+          <ul className={styles.trust}>
+            {trustPoints.map(point => <li key={point}><Check size={14} aria-hidden />{point}</li>)}
+          </ul>
         </section>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
 

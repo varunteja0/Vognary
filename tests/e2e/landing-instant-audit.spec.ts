@@ -128,7 +128,7 @@ test("the landing demonstrates the decision loop and sends visitors to their own
 
   const heading = page.getByRole("heading", {
     level: 1,
-    name: "Approve AI and cloud commitments before they become bills.",
+    name: "Vognary",
   });
   await expect(heading).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
@@ -150,7 +150,8 @@ test("the landing demonstrates the decision loop and sends visitors to their own
   await expect(page.getByTestId("synthetic-demonstration-label").first()).toBeVisible();
 
   // The desk shows the shape of the job, and the pilot states its own terms.
-  await expect(page.getByRole("heading", { name: /Six constructed records, one per state\./ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "A place for what needs you." })).toBeVisible();
+  await expect(page.getByText(/Six synthetic records/)).toBeVisible();
   await expect(page.getByText("Needs a decision").first()).toBeVisible();
   await expect(page.getByText(/Payment is not activation/)).toBeVisible();
   await expect(page.getByText("INR 14,999").first()).toBeVisible();
@@ -158,7 +159,7 @@ test("the landing demonstrates the decision loop and sends visitors to their own
   // The desk must never read as customer activity. Six synthetic records cannot
   // be described as a week of observed work, as states records "arrive" in, or
   // as anything a customer has done, because no customer has used Vognary.
-  await expect(page.getByText(/no customer has used vognary yet/i).first()).toBeVisible();
+  await expect(page.getByText(/Not customer activity\./).first()).toBeVisible();
   await expect(page.getByText(/not observed from any customer/i).first()).toBeVisible();
   await expect(page.getByText(/this is a week|states they actually arrive|demonstration loop/i)).toHaveCount(0);
   await expect(page.getByText(/customers (?:use|have used|are using)|teams (?:use|trust)|companies use/i)).toHaveCount(0);
@@ -193,8 +194,8 @@ test("the mobile landing keeps the primary action visible without overflow", asy
 test("login presents one Google identity path without product detours", async ({ page }) => {
   await page.goto("/login?next=/app");
 
-  await expect(page.getByRole("heading", { level: 1, name: "Decide what the company may commit to next" })).toBeVisible();
-  await expect(page.getByText(/named human authorization before a new obligation exists/)).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in to Vognary." })).toBeVisible();
+  await expect(page.getByText("Commitments, decisions, and their evidence.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await expect(page.getByText("Google is only for sign-in. Vognary does not access Gmail.")).toBeVisible();
 
@@ -208,7 +209,7 @@ test("signed-out app entry returns to the canonical sign-in path", async ({ page
   await page.goto("/app");
 
   await expect(page).toHaveURL(/\/login\?next=(?:%2F|\/)app$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Decide what the company may commit to next" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in to Vognary." })).toBeVisible();
   await expect(page.getByLabel("Paste receipts or invoices")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "See a sample audit" })).toHaveCount(0);
 });

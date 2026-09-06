@@ -16,7 +16,7 @@ test("Journey 1 — a cold visitor reaches a frozen authorization and its outcom
   await page.goto("/");
   // Ten-second comprehension: category, the literal promise, one command.
   await expect(page.getByRole("heading", { level: 1 }))
-    .toContainText("Approve AI and cloud commitments before they become bills.");
+    .toContainText("Vognary");
   await expect(page.getByText("Commitment Control for India-first AI companies")).toBeVisible();
 
   // The product is the first-viewport subject: the live record, not a diagram.

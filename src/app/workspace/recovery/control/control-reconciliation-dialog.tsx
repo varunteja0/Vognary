@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus } from "lucide-react";
 import type { ControlDecisionDto, ControlProposalDto } from "@/lib/commitment-control/contracts";
 import type { ControlReconciliationCandidate } from "@/lib/commitment-control/reconciliation-candidates";
 import type { CommitmentSummaryDto, EvidenceDto } from "@/lib/recovery/contracts";
@@ -67,7 +68,7 @@ export function ControlReconciliationDialog({
   return (
     <RecoveryDialog
       title="Link observed evidence"
-      description="This is the last unique step: a later receipt is compared to the frozen cap. The authorization is never rewritten by what the receipt shows."
+      description="Choose the observed receipt. The saved authorization and cap stay unchanged."
       onClose={onClose}
       returnFocusId={returnFocusId}
       footer={
@@ -89,13 +90,6 @@ export function ControlReconciliationDialog({
       <div className="ledger mt-2">
         <dl className="ledger-rows">
           <ControlAuthorizationAmountFacts decision={decision} />
-        </dl>
-        <p className="ledger-line">
-          <span>Frozen before</span>
-          <span>Observed after</span>
-        </p>
-        <dl className="ledger-rows">
-          <ControlFact label="Observed" value="The receipt you pick below" observed />
         </dl>
       </div>
       <p className="control-card-meta mt-2">{proposal.merchant} · authorized in {decision.currency}</p>
@@ -140,10 +134,19 @@ export function ControlReconciliationDialog({
       ) : null}
 
       <div className="control-field mt-5">
-        <label className="field-label" htmlFor="control-reconcile-commitment">Saved bill to take the receipt from</label>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="field-label" htmlFor="control-reconcile-commitment">Saved bill to take the receipt from</label>
+          {onAddBill ? (
+            <button type="button" className="btn btn-sm btn-ghost" disabled={pending || !online} onClick={onAddBill}>
+              <Plus size={16} aria-hidden />Add a bill
+            </button>
+          ) : null}
+        </div>
+        {commitments.length === 0 ? <p className="control-note mt-2">No bills have been saved in this workspace yet.</p> : null}
         <select
           id="control-reconcile-commitment"
-          className="field"
+          className="field mt-2"
+          disabled={pending || commitments.length === 0}
           value={draft.commitmentId ?? ""}
           onChange={(event) => onSelectCommitment(event.target.value)}
         >
@@ -164,12 +167,7 @@ export function ControlReconciliationDialog({
         ) : evidence.kind === "FAILED" ? (
           <FailureBlock failure={evidence.failure} />
         ) : evidence.items.length === 0 ? (
-          <div>
-            <p className="control-note">This bill has no saved receipt to link.</p>
-            {onAddBill ? (
-              <button type="button" className="btn btn-ghost mt-3" onClick={onAddBill}>Add a bill</button>
-            ) : null}
-          </div>
+          <p className="control-note">This bill has no saved receipt to link.</p>
         ) : (
           <fieldset className="control-choice-set">
             <legend className="field-label">Receipt to compare</legend>

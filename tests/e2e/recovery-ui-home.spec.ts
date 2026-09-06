@@ -472,6 +472,7 @@ test("the workspace stays usable and keyboard-reachable on a 390px phone", async
   expect(overflow).toBe(false);
 
   const commitmentsTab = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" });
+  await expect(commitmentsTab).toBeEnabled();
   await commitmentsTab.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { level: 2, name: "Bills" })).toBeFocused();

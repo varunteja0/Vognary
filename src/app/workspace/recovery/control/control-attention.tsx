@@ -53,7 +53,6 @@ export function ControlAttention({
             <li key={attention.id}>
               <div className="min-w-0">
                 <p className="truth-label">{urgencyLabels[attention.urgency]} · due {attention.dueOn}</p>
-                <p className="control-card-meta">{attention.merchant}</p>
                 <h4 className="font-display text-base font-semibold text-(--ink)">{attention.headline}</h4>
                 <p className="control-note">{attention.body}</p>
               </div>

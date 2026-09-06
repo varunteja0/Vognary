@@ -1,17 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from "next/font/google";
+import { Bricolage_Grotesque, IBM_Plex_Mono, Manrope } from "next/font/google";
 import PwaRegister from "./pwa-register";
 import "./globals.css";
 
-// Plex carries the documentary record. Newsreader is the display voice: an
-// editorial serif with real optical sizing, so a headline reads as something
-// that was set rather than something that was configured.
-const grotesk = IBM_Plex_Sans({
+const grotesk = Manrope({
   variable: "--font-grotesk",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  display: "optional",
-  preload: false,
+  display: "swap",
 });
 
 const monoData = IBM_Plex_Mono({
@@ -22,12 +17,10 @@ const monoData = IBM_Plex_Mono({
   preload: false,
 });
 
-const display = Newsreader({
+const display = Bricolage_Grotesque({
   variable: "--font-display-serif",
   subsets: ["latin"],
-  display: "optional",
-  preload: false,
-  axes: ["opsz"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

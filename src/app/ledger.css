@@ -12,17 +12,21 @@
    screens so the command stays early and thumb-reachable. */
 .public-ledger {
   display: grid;
-  gap: 0;
+  gap: 1.5rem;
   padding-block: 2rem;
 }
 .public-ledger-rail {
   min-width: 0;
   padding-bottom: 2rem;
-  border-bottom: 2px solid var(--gold-deep);
+  border-bottom: 1px solid var(--line);
 }
+.public-ledger-rail h1 { font-size: 2rem; line-height: 1.2; font-weight: 600; }
+.public-ledger-rail > p:not(.public-price) { line-height: 1.65; }
 .public-ledger-body {
   min-width: 0;
 }
+.public-ledger-body h2 { font-size: 1.25rem; line-height: 1.35; }
+.public-ledger-body > .public-band { scroll-margin-top: 6rem; }
 .public-price {
   font-family: var(--font-mono-data), ui-monospace, monospace;
   font-size: 2.25rem;
@@ -33,7 +37,7 @@
 }
 .public-band {
   padding-block: 1.75rem;
-  border-bottom: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
 }
 .public-band-lead {
   padding-top: 2rem;
@@ -51,7 +55,7 @@
   border-bottom: 1px solid var(--line);
 }
 .public-facts dt {
-  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-family: var(--font-grotesk), sans-serif;
   font-size: var(--text-fine);
   color: var(--muted);
 }
@@ -121,14 +125,14 @@
   padding: 0 2rem 1rem 0;
 }
 .public-index {
-  border-top: 1px solid var(--line-strong);
-  border-bottom: 1px solid var(--line-strong);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 .public-index > summary {
   display: flex;
   align-items: center;
   min-height: var(--tap);
-  font-family: var(--font-mono-data), ui-monospace, monospace;
+  font-family: var(--font-grotesk), sans-serif;
   font-size: var(--text-fine);
   color: var(--ink-soft);
   cursor: pointer;
@@ -164,16 +168,15 @@
 }
 @media (min-width: 56rem) {
   .public-ledger {
-    grid-template-columns: minmax(17rem, 0.72fr) minmax(0, 1.28fr);
-    gap: 4rem;
+    grid-template-columns: minmax(16rem, 0.7fr) minmax(0, 1.5fr);
+    gap: 5rem;
     padding-block: 3.5rem;
   }
   .public-ledger-rail {
     position: sticky;
-    top: 2rem;
+    top: 6rem;
     align-self: start;
-    padding: 0 2rem 2rem 0;
-    border-right: 2px solid var(--gold-deep);
+    padding: 0 0 2rem;
     border-bottom: 0;
   }
   .public-band:first-child {
@@ -183,8 +186,8 @@
     font-size: 3.25rem;
   }
   .public-record-list > div {
-    grid-template-columns: minmax(12rem, 0.65fr) minmax(0, 1.35fr);
-    gap: 2rem;
+    grid-template-columns: minmax(8rem, 0.55fr) minmax(0, 1.45fr);
+    gap: 1.5rem;
   }
 }
 

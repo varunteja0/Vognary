@@ -48,7 +48,8 @@ export function DeskStrip({ headingId }: { headingId?: string }) {
               {rows.map((record) => {
                 const { proposal, decision, evaluation } = record.entry;
                 const outcome = record.entry.reconciliations[0] ?? null;
-                const shown = decision?.approvedCapMinor ?? proposal.amountMinor;
+                const shown = outcome ? outcome.observedAmountMinor : decision?.approvedCapMinor ?? proposal.amountMinor;
+                const shownCurrency = outcome ? outcome.observedCurrency : proposal.currency;
                 return (
                   <li key={record.key} className="desk-row" data-state={record.queueState}>
                     <span className="desk-row-name">
@@ -60,9 +61,11 @@ export function DeskStrip({ headingId }: { headingId?: string }) {
                     <span className="desk-row-figure">
                       <MoneyValue
                         minor={shown}
-                        currency={proposal.currency}
+                        currency={shownCurrency ?? proposal.currency}
                         provenance={
-                          outcome
+                          outcome && (shown === null || shownCurrency === null)
+                            ? { kind: "unknown", reason: "No comparable amount published" }
+                            : outcome
                             ? { kind: "observed" }
                             : decision?.approvedCapMinor
                               ? { kind: "frozen", label: "Cap" }
@@ -72,7 +75,7 @@ export function DeskStrip({ headingId }: { headingId?: string }) {
                         layout="stacked"
                       />
                       <span className={`desk-chip desk-chip-${chipTone(outcome?.verdict, record.queueState)}`}>
-                        {label(outcome?.verdict ?? evaluation?.status ?? "no policy")}
+                        {decision?.action === "DECLINE" ? "Declined" : label(outcome?.verdict ?? evaluation?.status ?? "no policy")}
                       </span>
                     </span>
                   </li>

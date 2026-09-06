@@ -470,6 +470,174 @@ async function signIn(page: Page) {
 
 const composerHeading = "What are you considering committing to?";
 
+test("record search, selection, browser Back and reload preserve the chosen commitment", async ({ page }) => {
+  await signIn(page);
+  const secondId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  await mockWorkspace(page, { brief: { policy, proposals: [
+    { proposal, evaluation, decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [] },
+    { proposal: { ...proposal, id: secondId, merchant: "Synthetic second record" }, evaluation: { ...evaluation, id: "ffffffff-ffff-4fff-8fff-ffffffffffff", proposalId: secondId }, decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [] },
+  ], capabilities: ownerCapabilities } });
+  await page.goto(`/app?proposal=${proposal.id}`);
+  await expect(page.getByRole("article", { name: "Anthropic" })).toBeVisible();
+  const browse = page.getByRole("button", { name: /Browse commitments/ });
+  if (await browse.isVisible()) await browse.click();
+  await page.getByRole("searchbox", { name: "Search commitments" }).fill("second record");
+  await expect(page.getByRole("list", { name: "Choose a commitment" }).getByRole("button")).toHaveCount(1);
+  await page.getByRole("searchbox", { name: "Search commitments" }).fill("not present");
+  await expect(page.getByText("No matching commitments.")).toBeVisible();
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await page.getByRole("list", { name: "Choose a commitment" }).getByRole("button", { name: /^Synthetic second record / }).click();
+  await expect(page.getByRole("article", { name: "Synthetic second record" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`proposal=${secondId}`));
+  await page.goBack();
+  await expect(page.getByRole("article", { name: "Anthropic" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("article", { name: "Anthropic" })).toBeVisible();
+});
+
+test("the largest exact amount and a long counterparty remain readable at 320px", async ({ page }) => {
+  await signIn(page);
+  const amount = "9223372036854775807";
+  const merchant = "Synthetic counterparty with a very long legal entity and department name";
+  await mockWorkspace(page, { brief: { policy, proposals: [{
+    proposal: { ...proposal, merchant, amountMinor: amount, projectedThirteenWeekMinor: amount, projectedAnnualMinor: amount },
+    evaluation: { ...evaluation, currencyResults: [{ ...currencyResult, existingThirteenWeekMinor: "0", proposedThirteenWeekMinor: amount, combinedThirteenWeekMinor: amount, existingAnnualMinor: "0", proposedAnnualMinor: amount, combinedAnnualMinor: amount }] },
+    decision: { ...decision, expectedAmountMinor: amount, approvedCapMinor: amount, action: "APPROVE" },
+    reconciliations: [{ ...overCapReconciliation, expectedAmountMinor: amount, approvedCapMinor: amount, observedAmountMinor: amount, verdict: "MATCHED" }],
+    outcomeObservations: [], exceptionReviews: [],
+  }], capabilities: ownerCapabilities } });
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto("/app");
+  const record = page.getByRole("article", { name: merchant });
+  await expect(record).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  const values = await record.locator(".ledger .money-amount").evaluateAll(elements => elements.map(element => {
+    const rect = element.getBoundingClientRect();
+    return { text: element.textContent, width: rect.width, right: rect.right, fontSize: Number.parseFloat(getComputedStyle(element).fontSize) };
+  }));
+  expect(values).toHaveLength(2);
+  for (const value of values) { expect(value.right).toBeLessThanOrEqual(320); expect(value.fontSize).toBeGreaterThanOrEqual(12); expect(value.text).toContain(".07"); }
+});
+
+test("a late receipt response cannot replace the currently selected bill", async ({ page }) => {
+  await signIn(page);
+  await mockWorkspace(page, { commitments: [merchantTextMatchCommitment, commitment], brief: {
+    policy, proposals: [{ proposal, evaluation, decision, reconciliations: [], outcomeObservations: [], exceptionReviews: [] }], capabilities: ownerCapabilities,
+  } });
+  const held = Promise.withResolvers<void>();
+  const started = Promise.withResolvers<void>();
+  await page.route(`**/commitments/${merchantTextMatchCommitment.id}?*`, async route => {
+    started.resolve();
+    await held.promise;
+    await route.fulfill({ json: { data: { ...detail, evidence: { ...detail.evidence, items: [{ ...evidence, excerpt: "Synthetic receipt A" }] } }, meta } });
+  });
+  await page.route(`**/commitments/${commitment.id}?*`, route => route.fulfill({ json: {
+    data: { ...detail, evidence: { ...detail.evidence, items: [{ ...evidence, excerpt: "Synthetic receipt B" }] } }, meta,
+  } }));
+  try {
+    await page.goto("/app");
+    await page.getByRole("article", { name: "Anthropic" }).getByRole("button", { name: "Link observed evidence" }).click();
+    const dialog = page.getByRole("dialog", { name: "Link observed evidence" });
+    await dialog.getByLabel("Saved bill to take the receipt from").selectOption(merchantTextMatchCommitment.id);
+    await started.promise;
+    await dialog.getByLabel("Saved bill to take the receipt from").selectOption(commitment.id);
+    await expect(dialog.getByText("Synthetic receipt B", { exact: true })).toBeVisible();
+    const oldResponse = page.waitForResponse(response => response.url().includes(`/commitments/${merchantTextMatchCommitment.id}?`));
+    held.resolve();
+    await (await oldResponse).finished();
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(dialog.getByText("Synthetic receipt B", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("Synthetic receipt A", { exact: true })).toHaveCount(0);
+  } finally { held.resolve(); }
+});
+
+test("a closed reconciliation cannot publish its candidates into another proposal", async ({ page }) => {
+  await signIn(page);
+  const secondId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const secondEvaluationId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  await mockWorkspace(page, { brief: { policy, proposals: [
+    { proposal, evaluation, decision, reconciliations: [], outcomeObservations: [], exceptionReviews: [] },
+    { proposal: { ...proposal, id: secondId, merchant: "Synthetic second authorization" }, evaluation: { ...evaluation, id: secondEvaluationId, proposalId: secondId }, decision: { ...decision, id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", proposalId: secondId, evaluationId: secondEvaluationId }, reconciliations: [], outcomeObservations: [], exceptionReviews: [] },
+  ], capabilities: ownerCapabilities } });
+  const held = Promise.withResolvers<void>();
+  const started = Promise.withResolvers<void>();
+  const candidate = (merchant: string) => ({ evidenceId, commitmentId: commitment.id, commitmentMerchant: merchant, observedAmountMinor: "5100000", observedCurrency: "INR", observedEvidenceDate: controlToday, basis: "SAME_CURRENCY_WITHIN_AUTHORIZATION_WINDOW", requiresHumanConfirmation: true });
+  await page.route(`**/control/proposals/${proposal.id}/reconciliation-candidates`, async route => {
+    started.resolve();
+    await held.promise;
+    await route.fulfill({ json: { data: { proposalId: proposal.id, matchingPerformed: false, candidates: [candidate("Synthetic candidate A")] }, meta } });
+  });
+  await page.route(`**/control/proposals/${secondId}/reconciliation-candidates`, route => route.fulfill({ json: {
+    data: { proposalId: secondId, matchingPerformed: false, candidates: [candidate("Synthetic candidate B")] }, meta,
+  } }));
+  try {
+    await page.goto("/app");
+    const browse = page.getByRole("button", { name: /Browse commitments/ });
+    await expect(page.getByRole("article")).toHaveCount(1);
+    if (await browse.isVisible()) await browse.click();
+    await page.getByRole("list", { name: "Choose a commitment" }).getByRole("button", { name: /^Anthropic / }).click();
+    await page.getByRole("article", { name: "Anthropic" }).getByRole("button", { name: "Link observed evidence" }).click();
+    await started.promise;
+    await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
+    if (await browse.isVisible()) await browse.click();
+    await page.getByRole("list", { name: "Choose a commitment" }).getByRole("button", { name: /^Synthetic second authorization / }).click();
+    await page.getByRole("article", { name: "Synthetic second authorization" }).getByRole("button", { name: "Link observed evidence" }).click();
+    const dialog = page.getByRole("dialog", { name: "Link observed evidence" });
+    await expect(dialog.getByText("Synthetic candidate B", { exact: true })).toBeVisible();
+    const oldResponse = page.waitForResponse(response => response.url().includes(`/proposals/${proposal.id}/reconciliation-candidates`));
+    held.resolve();
+    await (await oldResponse).finished();
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(dialog.getByText("Synthetic candidate B", { exact: true })).toBeVisible();
+    await expect(dialog.getByText("Synthetic candidate A", { exact: true })).toHaveCount(0);
+  } finally { held.resolve(); }
+});
+
+test("adding the first bill from reconciliation returns to the same authorization without selecting evidence", async ({ page }) => {
+  await signIn(page);
+  const brief = { policy, proposals: [{ proposal, evaluation, decision, reconciliations: [], outcomeObservations: [], exceptionReviews: [] }], capabilities: ownerCapabilities };
+  const { controlRequests } = await mockWorkspace(page, { commitments: [], brief,
+    candidateResponse: { status: 200, body: { data: { proposalId: proposal.id, matchingPerformed: false, candidates: [] }, meta } },
+  });
+  let saved = false;
+  await page.route("**/api/workspaces/current/control/brief", route => route.fulfill({ json: { data: brief, meta: { ...meta, workspaceVersion: saved ? 5 : 4 } } }));
+  await page.route("**/api/workspaces/current/evidence", route => {
+    saved = true;
+    return route.fulfill({ status: 201, json: { data: {
+      submission: { id: "99999999-9999-4999-8999-999999999999", type: "RECEIPT_PASTE", ingestedAt: new Date().toISOString(), acceptedEvidenceCount: 1, results: [{ clientRef: "receipt-paste-1", status: "ACCEPTED", code: null, message: null }] },
+      home: { ...home, workspace: { ...home.workspace, version: 5 } }, commitments: [commitment], commitmentTotal: 1,
+    }, meta: { ...meta, workspaceVersion: 5 } } });
+  });
+  await page.goto("/app");
+  const record = page.getByRole("article", { name: "Anthropic", exact: true });
+  await record.getByRole("button", { name: "Link observed evidence" }).click();
+  await expect(page.getByText("No bills have been saved in this workspace yet.")).toBeVisible();
+  await expect(page.getByRole("dialog").getByLabel("Saved bill to take the receipt from")).toBeDisabled();
+  await page.getByRole("dialog").getByRole("button", { name: "Add a bill", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Add a bill", exact: true })).toBeVisible();
+  await expect(page.locator("dialog[open]")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect(record).toBeVisible();
+  expect(saved).toBe(false);
+
+  await record.getByRole("button", { name: "Link observed evidence" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add a bill", exact: true }).click();
+  const intake = page.getByRole("dialog", { name: "Add a bill", exact: true });
+  await intake.getByRole("tab", { name: "Paste text" }).click();
+  await intake.getByLabel("Receipt or invoice text").fill(`Synthetic vendor invoice paid INR 100.00 on ${controlToday}.`);
+  await intake.getByRole("button", { name: "Add a bill", exact: true }).click();
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Decisions", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(record.getByRole("heading", { name: "Anthropic", exact: true })).toBeFocused();
+  await expect(record.getByText("INR 40,000", { exact: true })).toBeVisible();
+  await record.getByRole("button", { name: "Link observed evidence" }).click();
+  const reconciliation = page.getByRole("dialog", { name: "Link observed evidence", exact: true });
+  await expect(reconciliation.getByLabel("Saved bill to take the receipt from")).toHaveValue("");
+  await expect(reconciliation.getByRole("button", { name: "Link this receipt", exact: true })).toBeDisabled();
+  expect(controlRequests.some(request => request.url.endsWith("/reconciliations") && request.method === "POST")).toBe(false);
+});
+
 /** The composer collapses once the desk has records, so opening it is a step. */
 async function openComposer(page: Page) {
   const heading = page.getByRole("heading", { name: composerHeading });
@@ -608,8 +776,8 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
 
   await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Decisions" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("heading", { name: composerHeading })).toBeInViewport();
-  await expect(page.getByRole("heading", { name: "Needs a decision" })).toBeVisible();
-  await expect(page.getByText("No proposal has been entered yet. The first one you evaluate appears here.")).toBeVisible();
+  await expect(page.getByText("Nothing needs a decision right now.")).toBeVisible();
+  await expect(page.getByRole("article")).toHaveCount(0);
 
   await fillProposal(page);
   await page.getByRole("button", { name: "Evaluate proposal" }).click();
@@ -650,11 +818,9 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
   await expect(card.getByText(/\bapproved\b|\bsafe\b|\bcompliant\b|\brecommended\b/i)).toHaveCount(0);
   await expect(page.getByLabel("Merchant or counterparty")).toHaveValue("");
 
-  const controlAttention = page.getByRole("region", { name: "Needs you" });
-  await expect(controlAttention).toBeVisible();
-  await expect(controlAttention.getByText("Decision needed")).toBeVisible();
-  await expect(controlAttention.getByText("Anthropic", { exact: true })).toBeVisible();
-  await controlAttention.getByRole("button", { name: "Decide now" }).click();
+  await expect(page.getByRole("article")).toHaveCount(1);
+  await expect(card.getByRole("heading", { name: "Anthropic", exact: true })).toBeVisible();
+  await card.getByRole("button", { name: "Decide this proposal" }).click();
   const dialog = page.getByRole("dialog", { name: "Authorize this obligation" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("Vognary records your decision. It does not purchase, provision, cancel, or move any money.")).toBeVisible();
@@ -818,21 +984,25 @@ test("all three policy statuses read as policy context, never as an authorizatio
   const within = page.getByRole("article", { name: "Vercel" });
   const review = page.getByRole("article", { name: "Figma" });
   const outside = page.getByRole("article", { name: "Anthropic" });
-  // Only the proposal being decided is read in full; the rest of the queue
-  // keeps its verdict visible and opens the reasoning on demand.
-  for (const record of [review, outside]) {
-    const disclosure = record.locator("summary", { hasText: "INR 45,000" });
-    await expect(disclosure).toBeVisible();
-    await disclosure.click();
+  async function selectRecord(merchant: string) {
+    await expect(page.getByRole("article")).toHaveCount(1);
+    const browse = page.getByRole("button", { name: /Browse commitments/ });
+    if (await browse.isVisible() && await browse.getAttribute("aria-expanded") === "false") await browse.click();
+    await page.getByRole("list", { name: "Choose a commitment" }).getByRole("button", { name: new RegExp(`^${merchant} `) }).click();
+    await expect(page.getByRole("article")).toHaveCount(1);
+    await expect(page.getByText("Human decision required", { exact: true })).toHaveCount(1);
   }
+  await selectRecord("Vercel");
   await expect(within.getByText("Within policy")).toBeVisible();
   await expect(within.getByText("Policy found no limit or posture that this proposal crosses. It is not approved.")).toBeVisible();
   await expect(within.getByText("None cited, so the exposure below counts this proposal alone.")).toBeVisible();
+  await selectRecord("Figma");
   await expect(review.getByText("Review required")).toBeVisible();
   await expect(review.getByText("Policy marks this category for review.")).toBeVisible();
+  await selectRecord("Anthropic");
   await expect(outside.getByText("Outside policy")).toBeVisible();
   await expect(outside.getByText("The per-charge limit is exceeded.")).toBeVisible();
-  await expect(page.getByText("Human decision required")).toHaveCount(3);
+  await expect(page.getByText("Human decision required")).toHaveCount(1);
   await expect(page.getByText(/\bsafe\b|\bcompliant\b|\brecommended\b/i)).toHaveCount(0);
   await expectNoSeriousAxeViolations(page);
 });
@@ -1008,9 +1178,9 @@ test("Control honours reduced motion and fits a 390px viewport", async ({ page }
 
   // Attention before creation: on a populated desk the queue owns the first
   // screen and the composer waits behind its own disclosure.
-  await expect(page.getByRole("heading", { name: "Needs a decision" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: /Browse commitments/ })).toBeInViewport();
   await expect(page.getByRole("heading", { name: composerHeading })).toHaveCount(1);
-  await expect(page.getByRole("heading", { name: "Needs a decision" })).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "Needs you", exact: true })).toHaveCount(1);
 
   const motion = await page.evaluate(() => ({
     scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,

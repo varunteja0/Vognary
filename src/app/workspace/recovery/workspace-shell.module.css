@@ -1,0 +1,135 @@
+.workspace {
+  min-height: 100dvh;
+  background: var(--card);
+}
+.frame {
+  display: grid;
+  grid-template-columns: 13.5rem minmax(0, 1fr);
+  min-height: 100dvh;
+}
+.rail {
+  position: sticky;
+  top: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-content: start;
+  gap: 2rem;
+  height: 100dvh;
+  padding: 2rem 1rem 1.25rem;
+  background: var(--brand);
+  color: var(--field-ink);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 0.5rem;
+}
+.brand h1 {
+  font-family: var(--font-display-serif), sans-serif;
+  font-weight: 700;
+  font-size: 1.625rem;
+}
+.brand svg { flex: none; color: var(--citron); }
+.views {
+  display: grid;
+  gap: 0.375rem;
+  list-style: none;
+  padding: 0;
+}
+.views > li > button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 2.875rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  color: var(--field-soft);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+.views > li > button:hover { background: var(--field-2); }
+.views > li > button[aria-current="page"] {
+  background: var(--citron);
+  color: var(--citron-ink);
+  font-weight: 700;
+}
+.views button:disabled { cursor: progress; opacity: 0.65; }
+.views svg { width: 1.125rem; height: 1.125rem; flex: none; }
+.views :global(.viewnav-more > summary) { min-height: 2.875rem; justify-content: flex-start; gap: 0.75rem; padding: 0.625rem 0.875rem; color: var(--field-soft); }
+.views :global(.viewnav-more > ul) { color: var(--ink); }
+.count { margin-left: auto; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.actions {
+  display: grid;
+  gap: 0.75rem;
+  border-top: 1px solid var(--field-line);
+  padding-top: 1rem;
+}
+.saveState { color: var(--field-muted); font-size: 0.75rem; padding: 0.25rem 0.5rem; }
+.account {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  border-radius: var(--radius);
+}
+.account:hover { background: var(--field-2); }
+.avatar { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--field-3); font-size: 0.8125rem; }
+.add {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--field-line-strong);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.add:hover { background: var(--field-2); }
+.content {
+  min-width: 0;
+  width: 100%;
+  max-width: 100rem;
+  margin-inline: auto;
+  padding: 2rem 2.5rem 4rem;
+}
+.heading { display: flex; align-items: center; gap: 0.75rem; font-size: 0.875rem; font-weight: 600; color: var(--muted); margin-bottom: 1.5rem; outline: none; }
+.heading::before { content: ""; width: 0.5rem; height: 0.5rem; border: 1px solid var(--line-strong); border-radius: 2px; }
+.contentBody { min-width: 0; }
+.notices:empty { display: none; }
+.notices { display: grid; gap: 1rem; margin-bottom: 1rem; }
+.rail :focus-visible { outline-color: var(--citron); }
+@media (max-width: 74.99rem) {
+  .frame { grid-template-columns: 11.5rem minmax(0, 1fr); }
+  .content { padding: 1.5rem; }
+  .rail { padding-inline: 0.75rem; }
+  .brand h1 { font-size: 1.375rem; }
+}
+@media (max-width: 47.99rem) {
+  .frame { display: block; }
+  .rail { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; height: auto; padding: 0.875rem 1rem; }
+  .brand { padding: 0; gap: 0.5rem; }
+  .brand h1 { font-size: 1.5rem; }
+  .rail nav { position: fixed; inset: auto 0 0; z-index: 30; background: var(--card); color: var(--ink); border-top: 1px solid var(--line); padding: 0.5rem 0.5rem max(0.5rem, env(safe-area-inset-bottom)); }
+  .views { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0.25rem; }
+  .views > li > button { position: relative; flex-direction: column; justify-content: center; gap: 0.25rem; padding: 0.5rem 0.25rem; min-height: 3.25rem; color: var(--muted); font-size: 0.75rem; text-align: center; }
+  .views > li > button:hover { background: var(--card-3); }
+  .views > li > button[aria-current="page"] { background: var(--frozen-tint); color: var(--brand); }
+  .views :global(.viewnav-more > summary) { flex-direction: column; justify-content: center; min-height: 3.25rem; gap: 0.25rem; padding: 0.5rem 0.25rem; font-size: 0.75rem; color: var(--muted); }
+  .count { position: absolute; top: 0.25rem; right: 0.5rem; font-size: 0.625rem; }
+  .actions { display: flex; align-items: center; padding: 0; border: 0; gap: 0.5rem; }
+  .saveState, .accountText, .addText { display: none; }
+  .account { padding: 0; justify-content: center; width: 2.75rem; }
+  .add { width: 2.75rem; }
+  .content { padding: 1.25rem 1rem calc(6rem + env(safe-area-inset-bottom)); }
+  .heading { margin-bottom: 1.25rem; font-size: 0.8125rem; }
+  .rail nav :focus-visible { outline-color: var(--brand); }
+}
+@media (prefers-reduced-motion: reduce) { .views > li > button { transition: none; } }
+@media (forced-colors: active) { .views > li > button[aria-current="page"] { border: 2px solid Highlight; } }

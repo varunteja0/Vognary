@@ -94,11 +94,8 @@ test("public and desk surfaces express the same loop, and the lesson never resta
   // was removed, so its return is a regression.
   assert.doesNotMatch(demo, /STEP_LABELS|demo-steps|Demonstration steps/);
 
-  // A journey advances; it does not restart the same lesson on every page. The
-  // step rail survives in exactly one place: where the operator's current stage
-  // is the thing they need.
-  assert.match(control, /AuthorizationLoop/);
-  for (const source of [about, start, login, home, landing]) {
+  assert.match(control, /<ControlRecordBrowser/);
+  for (const source of [about, start, login, home, landing, control]) {
     assert.doesNotMatch(source, /AuthorizationLoop/);
   }
 });

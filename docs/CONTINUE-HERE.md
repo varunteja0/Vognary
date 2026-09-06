@@ -1,4 +1,4 @@
-# CONTINUE HERE — live handoff (2026-09-05)
+# CONTINUE HERE — live handoff (2026-09-06)
 
 > **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
 > **Strategy rule: Take smart risks. Do not play safe.** Pursue asymmetric,
@@ -10,9 +10,157 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## 2026-09-05 - full working-tree publication authorized; deployment remains blocked
+## 2026-09-06 - all Git-eligible local changes authorized for publication to main
 
 **THIS BLOCK IS THE ONLY LIVE INSTRUCTION.**
+
+**Scoreboard row:** Product UX and Backend Readiness source publication; no score movement
+**Loop step:** human authorization and reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The founder explicitly requested immediate commit and push of every local Git-eligible change to the existing `main` branch, including other sessions' changes. This session is the Git publication owner. The observable completion check is matching local HEAD and remote `main`, with no remaining tracked or unignored changes.
+- The inspected checkout is `main`, starting at `83ef1c69bb494de94ec3c4c9fba7b03c70d0a26a`. Publication includes the frontend candidate, shared styles and components, brand assets, package files, frontend tests, synthetic test screenshots and this handoff. No eligible work is excluded based on session authorship.
+- Existing ignore and data-protection rules remain in force. Credentials, environment files, private CRM records, dependencies, backups, ignored output reports, local runtimes and captures are not force-added. The two new tracked-candidate screenshots were visually checked and contain synthetic workflow data.
+- The preceding review remains applicable: unknown-save wording, guest-storage disclosure, new-proposal URL continuity, receipt pagination, malformed guest input and phone hierarchy findings are still open. Publication does not repair or dismiss them.
+- This is source publication, not release certification. Prior test/build results remain attached to their recorded runs. No new broad test, build or Lighthouse loop is required by this immediate publication instruction; automatic main-branch deployment remains disabled.
+
+**WHAT IS NOT TRUE**
+
+- A commit or push is not founder visual acceptance, an all-green release, independent assurance, product-market fit, production activation or commercial proof.
+- This authorization does not permit force push, history rewriting, production deployment or migration, customer-data enrollment, ignored private-file publication, or weakening any existing safeguard.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Select the bounded remediation scope for the open review findings, including authorization for protected backend edits where needed.
+2. Provide permitted buyer access and independent assessment/retest, legal and operational clearance before any customer-data activation.
+
+**HARD STOP:** Publish the complete Git-eligible snapshot without excluding another owner's work or force-adding private/generated artifacts. Preserve existing history, ignore rules and the deployment guard. Keep review findings open and do not claim release readiness from publication.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - critical review completed; trust and workflow defects remain open
+
+> **SUPERSEDED 2026-09-06** - see the block above.
+
+**Scoreboard row:** Product UX, Backend Readiness, Business Validation and Distribution reviewed; no official score movement
+**Loop step:** human authorization and reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The founder requested a deep, candid company/product review, not another implementation or theme pass. The named decision is whether the current finance-owner proposal-to-reconciliation workflow justifies launch and paid adoption. The [complete scored review](../output/vognary-company-product-review-2026-09-05.md) separates observed behavior, source safeguards, historical gates, subjective ratings and unmeasured commercial outcomes.
+- The exact reviewed checkout remains dirty `main` at `83ef1c69bb494de94ec3c4c9fba7b03c70d0a26a`; automatic main deployment remains disabled. The review-specific 796-file source/config/test digest is `e6cef33a63b0809da9d50d9d6abbdb23c2882b0141589e02767d065b1fb0f0f8`, with its scope documented in the report. Application code was not changed by this review.
+- Fresh typecheck passed; the bounded domain/projection/enrollment/UI-state test selection passed 42/42. One real local synthetic workflow persisted an INR 80 cap against INR 90 evidence with OVER_CAP and a separately labelled MISSED outcome. Reload and another browser context using the same identity confirmed the record. This is not a second-user/tenant test or commercial proof.
+- Open reproduced findings: a post-commit network fault is falsely reported as "Nothing was sent"; guest intake retains raw bill text in browser session storage despite its no-save wording; a newly saved proposal reloads the previous URL-selected record; a candidate receipt beyond the first 50 is unreachable; and JSON null crashes the guest audit endpoint. Current phone screenshots also show follow-up actions pushing record identity and money below the first screen. None was silently repaired during this review.
+- The fresh market reporter still shows 3 contacts, 0 replies/conversations/offers/payments, and unmeasured founder time. The independent assessment, customer-data boundary and release gates remain unresolved. No official scoreboard score was changed.
+- Preview remains <http://127.0.0.1:3037>. Ignored review artifacts are under `.fallow/frontend-reconstruction/company-review/`; two additional synthetic proposals and one synthetic bill were created for the bounded checks. The original server on port 3027 and all existing records were preserved. No new broad suite, build, Lighthouse loop, production operation, outreach or payment occurred.
+
+**WHAT IS NOT TRUE**
+
+- The review is not an independent security assessment, full button-by-state certification, founder acceptance, product-market fit, a production release, or proof of profitability. Its qualitative scores are not measured KPI changes.
+- Control enrollment alone does not prove that every guest or Recovery data-intake surface satisfies the assurance-before-customer-data rule. A labelled synthetic demonstration is not a real customer's saved workflow.
+- The recommendations are not permission for a pivot, unbounded feature work, protected backend changes, publication, deployment or real customer-data access. The older successful first-bill check does not close the newly identified defects.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Choose the bounded defect-remediation scope, including explicit authorization if the guest API or another protected backend boundary is to be edited.
+2. Supply genuinely permitted buyer access and execute the existing fixed-offer market test; record actual conversations, offers and cleared payments separately.
+3. Commission independent assessment/retest, establish accountable release/incident ownership, and provide legal/operational clearance before customer-data activation.
+
+**HARD STOP:** Treat the findings as open. Keep the delivery-first cadence: scoped repairs and their focused checks, then one consolidated exact-candidate release verification when implementation is settled. No repeat theme rewrite, invented readiness/revenue, weakened safeguards, production changes, publication, customer enrollment or real financial data under this review mandate.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - first-bill intake stays with the approved commitment
+
+> **SUPERSEDED 2026-09-05** - see the block above.
+
+**Scoreboard row:** Product UX workflow implementation; no score movement
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The founder asked to proceed under the delivery-first cadence. This continuation closes one concrete task for a finance owner: add the first bill while reviewing an approved commitment and return to that same authorization for receipt selection.
+- Reconciliation now offers Add a bill even when no saved bills exist. Confirmed, fully accepted intake returns to the originating Control record when no image drafts remain; cancellation clears the return target. Partial/failed intake retains its existing recovery behavior. Only one modal is open, and neither receipt selection nor reconciliation happens automatically.
+- The preview source is synchronized at <http://127.0.0.1:3037>. The focused first-bill browser check passed 2/2 across desktop and phone using mocked workspace contracts and real local development sign-in. It covers first-bill availability, cancellation, one modal, the original frozen cap, return focus, and the absence of an automatic reconciliation write.
+- Changes are confined to the canonical frontend and its focused browser test. Existing handlers, protected backend contracts, enrollment, and deployment guard remain unchanged. The candidate is still uncommitted on the existing checkout. No broad suite, build, Lighthouse run, or new gallery was performed in this continuation; the preceding block's manifest and gate results predate this patch.
+
+**WHAT IS NOT TRUE**
+
+- A focused mocked-contract browser pass is not new real-store integration proof, a full release pass, founder acceptance, customer demand, or a payment. The earlier unresolved Lighthouse and skipped browser evidence remain unresolved.
+- This workflow adds no automatic matching, automatic receipt choice, cap change, financial action, or customer-data authority.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Try an approved commitment's Link observed evidence -> Add a bill path using synthetic preview data and judge whether it preserves the task context.
+2. Provide actual buyer and acceptance evidence separately; independent assurance and release authority are still required before real customer financial data or deployment.
+
+**HARD STOP:** Continue with concrete unfinished customer tasks, not repeated broad tests or cosmetic rounds. No publication, deployment, production migration, customer enrollment, real financial data, outreach, purchases, protected-contract edits, or invented commercial results under this mandate. Keep broad verification deferred until implementation is settled and financial safeguards intact throughout.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - working frontend candidate available; delivery before further polish
+
+> **SUPERSEDED 2026-09-05** - see the block above.
+
+**Scoreboard row:** Product UX implementation evidence; no score movement
+**Loop step:** human authorization
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The founder explicitly redirected this session away from repeated testing: first make the useful product exist, improve it afterward, and consolidate broad verification after implementation is complete. Do not resume broad browser, Lighthouse, or visual-polish loops as a substitute for finishing the customer job. Focused checks required to protect correctness, privacy, and human authority remain mandatory.
+- GitHub Copilot remains the sole frontend integration owner under the issued September 5 reconstruction mandate. The named user is one finance owner facing an obligation before spending; the primary action is a human decision after inspecting assumptions, cited exposure, and policy, followed by later evidence against the frozen cap.
+- The Clearline candidate is implemented across public entry and demonstration, sign-in, the canonical Control/Recovery workspace, account controls, and shared commercial/legal presentation. It includes a searchable selected-record desk, compact phone navigation, native modal actions, exact-money reflow, and repaired stale receipt/candidate response handling. Protected backend/domain/API/store/authentication/migration contracts remain unchanged.
+- The synthetic local preview is <http://127.0.0.1:3037>; health returned HTTP 200 at `2026-09-05T12:08:31.906Z`. Local-only access instructions are in `.fallow/frontend-reconstruction/ACCESS.md`. The gallery is `.fallow/frontend-reconstruction/gallery/index.html` with 200 saved Chromium/WebKit captures. The [single frontend handoff](../output/clearline-frontend-handoff-2026-09-05.md) records scope, evidence, and limitations.
+- The checkout remains `main` at `83ef1c69bb494de94ec3c4c9fba7b03c70d0a26a`; the candidate is uncommitted. The application manifest digest is `f34b7fdfdcaa2b813c362ab1ff7433dd5628f7e32a9f2a916f47d784c959384f`, recorded in `.fallow/frontend-reconstruction/gates/final-tree.json`. The existing server on port 3027 remains untouched; no test process was active at closeout.
+- Recorded verification includes 1,306 passing units, passing source gates, a successful final isolated build at `2026-09-05T11:58:42.185Z`, and all 16 unchanged route-size budgets. The full browser run was 174 passed / 4 failed / 4 skipped; its four failures passed targeted follow-up checks. The latest demo server/client split passed six focused branch/read-only/keyboard cases. These are separate runs, not a new all-green release certificate. Lighthouse remains unresolved; its incomplete optimized log and prior failures are preserved.
+
+**WHAT IS NOT TRUE**
+
+- The candidate is not founder-accepted, customer-validated, deployed, security-cleared, or fully release-verified. An implemented workflow and synthetic tests do not prove willingness to pay, retained use, revenue, or a guaranteed company valuation.
+- Reduced verification cadence does not waive money correctness, evidence labels, role authorization, privacy, enrollment, or release gates. No new connector, automatic financial action, production change, or commercial score is authorized.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Use the local candidate to judge whether the finance-owner decision workflow solves the intended problem; founder visual and usability acceptance remains pending.
+2. Establish a permitted buyer interaction and observed paid behavior separately. Complete independent assurance and operational clearance before real customer financial data or production activation.
+
+**HARD STOP:** No more broad verification or cosmetic rounds before a concrete unfinished customer task is identified. No commit, push, merge, deployment, production migration, customer enrollment, real financial data, outreach, purchase, guaranteed-payment claim, weakened financial safeguard, or protected-contract change under this mandate. Keep automatic main deployment disabled.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - complete frontend reconstruction handed to this session
+
+> **SUPERSEDED 2026-09-05** - see the block above.
+
+**Scoreboard row:** Product UX candidate implementation; no score movement
+**Loop step:** human authorization
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The founder issued the complete [September 5 frontend reconstruction mandate](../output/astra-complete-frontend-reconstruction-prompt-2026-09-05.md) to this session and explicitly confirmed: "This session is the sole frontend owner; other frontend editing is stopped."
+- GitHub Copilot is the single frontend integration owner for this non-production candidate. This named authorization supersedes the earlier candidate's presentation constraints, named-model ownership, fixed identity, and concept-selection pauses. It does not change company strategy or protected contracts.
+- The user is one finance owner or authorized administrator, at the moment an obligation needs attention. The primary action is a human decision after inspecting assumptions, cited exposure, and policy. Observable local proof is the real-handler synthetic proposal-to-decision-to-reconciliation journey, durable reload and second-session read-back, plus desktop/mobile browser inspection.
+- The verified starting checkout is clean `main` at `83ef1c69bb494de94ec3c4c9fba7b03c70d0a26a`, tracking `origin/main`. Node `22.23.2`, npm `10.9.8`, installed Next.js documentation, and loopback PostgreSQL are available. An existing server on `127.0.0.1:3027` is not owned by this run and will not be stopped or overwritten.
+- Authorized work is frontend composition, identity, shared primitives, canonical workspace presentation, public/auth/legal presentation, frontend tests, and synthetic capture tooling. Backend/domain/API/store/authentication/migration/settlement/enrollment contracts remain read-only. Existing regression evidence, including the prior five browser failures, remains historical until this candidate is tested.
+
+**WHAT IS NOT TRUE**
+
+- No reconstructed candidate, new gate result, visual acceptance, target-user acceptance, commercial proof, or production readiness has yet been established. The prompt's model title does not identify the model running this session.
+- The previous publication permission is not permission to commit, push, merge, deploy, enable automatic deployment, or enroll customer data during this mandate.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Inspect and accept or reject the completed rendered candidate when local implementation and verification are delivered.
+2. Provide independent assurance, operational clearance, and separate release authority before production activation or real financial data.
+
+**HARD STOP:** No commit, push, merge, deployment, production migration, customer enrollment, real financial data, outreach, purchase, invented claims, weakened gates, or protected-contract changes. Preserve the main-branch deployment guard and other owners' work. All preview data must be isolated and synthetic.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-05 - full working-tree publication authorized; deployment remains blocked
+
+> **SUPERSEDED 2026-09-05** - see the block above.
 
 **Scoreboard row:** Backend Readiness and Product UX source publication; no score movement
 **Loop step:** human authorization
