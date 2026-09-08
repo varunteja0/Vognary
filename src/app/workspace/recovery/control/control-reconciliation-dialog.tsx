@@ -1,7 +1,11 @@
 "use client";
 
-import { Plus } from "lucide-react";
-import type { ControlDecisionDto, ControlProposalDto } from "@/lib/commitment-control/contracts";
+import { ChevronDown, Plus } from "lucide-react";
+import { useState } from "react";
+import type { ControlDecisionDto, ControlProposalDto, ControlReconciliationWriteDto } from "@/lib/commitment-control/contracts";
+import type { ResponseMeta } from "../transport";
+import { supportsProviderBill } from "./control-provider-bill-state";
+import { ControlProviderBillPicker } from "./control-provider-bill-picker";
 import type { ControlReconciliationCandidate } from "@/lib/commitment-control/reconciliation-candidates";
 import type { CommitmentSummaryDto, EvidenceDto } from "@/lib/recovery/contracts";
 import { formatDay } from "../labels";
@@ -17,7 +21,7 @@ import type { ControlReconciliationDraft } from "./control-state";
 export type ControlEvidenceState =
   | { kind: "IDLE" }
   | { kind: "LOADING" }
-  | { kind: "READY"; items: readonly EvidenceDto[] }
+  | { kind: "READY"; items: readonly EvidenceDto[]; total: number; nextCursor: string | null; loadingMore: boolean; pageFailure: RecoveryFailure | null }
   | { kind: "FAILED"; failure: RecoveryFailure };
 
 export type ControlCandidateState =
@@ -41,11 +45,15 @@ export function ControlReconciliationDialog({
   failure,
   returnFocusId,
   onSelectCommitment,
+  onLoadMoreEvidence,
   onSelectEvidence,
   onChange,
   onClose,
   onSubmit,
   onAddBill,
+  workspaceId,
+  initialSource,
+  onBillSaved,
 }: {
   proposal: ControlProposalDto;
   decision: ControlDecisionDto;
@@ -58,34 +66,46 @@ export function ControlReconciliationDialog({
   failure: RecoveryFailure | null;
   returnFocusId: string | null;
   onSelectCommitment: (commitmentId: string) => void;
+  onLoadMoreEvidence: () => void;
   onSelectEvidence: (evidenceId: string) => void;
   onChange: (draft: Partial<ControlReconciliationDraft>) => void;
   onClose: () => void;
   onSubmit: () => void;
   onAddBill?: () => void;
+  workspaceId?: string | null;
+  initialSource?: "RECEIPTS" | "ZOHO_BOOKS";
+  onBillSaved?: (data: ControlReconciliationWriteDto, meta: ResponseMeta) => void;
 }) {
+  const [source, setSource] = useState(initialSource ?? "RECEIPTS");
+  const [billHeld, setBillHeld] = useState(false);
+  const compatible = supportsProviderBill(proposal, decision) && Boolean(workspaceId && onBillSaved);
   const selectedCommitment = commitments.find((commitment) => commitment.id === draft.commitmentId) ?? null;
   return (
     <RecoveryDialog
-      title="Link observed evidence"
-      description="Choose the observed receipt. The saved authorization and cap stay unchanged."
+      title={compatible ? "Compare a bill" : "Link observed evidence"}
+      description={compatible ? "Select the evidence yourself. The saved authorization and cap stay unchanged." : "Choose the observed receipt. The saved authorization and cap stay unchanged."}
       onClose={onClose}
       returnFocusId={returnFocusId}
       footer={
         <>
           {draft.error ? <p role="alert" className="mr-auto text-sm text-ember">{draft.error}</p> : null}
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button
+          {source === "RECEIPTS" ? <button
             type="button"
             className="btn btn-primary"
             disabled={pending || !online || draft.evidenceId === null}
             onClick={onSubmit}
           >
             {pending ? "Comparing…" : "Link this receipt"}
-          </button>
+          </button> : null}
         </>
       }
     >
+      {compatible ? <fieldset className="flex flex-wrap gap-4 mb-4 text-sm"><legend className="field-label mb-2">Evidence source</legend>
+        <label className="flex gap-2 items-center"><input type="radio" name="control-evidence-source" checked={source === "RECEIPTS"} disabled={billHeld || pending} onChange={() => setSource("RECEIPTS")} />Saved receipts</label>
+        <label className="flex gap-2 items-center"><input type="radio" name="control-evidence-source" checked={source === "ZOHO_BOOKS"} disabled={billHeld || pending} onChange={() => setSource("ZOHO_BOOKS")} />Zoho Books</label>
+      </fieldset> : <p className="control-note mb-3">Amount basis not recorded. Use saved receipts.</p>}
+      {source === "ZOHO_BOOKS" && compatible && workspaceId && onBillSaved ? <ControlProviderBillPicker workspaceId={workspaceId} proposal={proposal} decision={decision} online={online} onSaved={onBillSaved} onHeldChange={setBillHeld} /> : <>
       <p className="truth-label truth-frozen">Frozen authorization · never rewritten</p>
       <div className="ledger mt-2">
         <dl className="ledger-rows">
@@ -165,7 +185,9 @@ export function ControlReconciliationDialog({
         ) : evidence.kind === "LOADING" ? (
           <LoadingBlock label="Opening the saved receipts…" />
         ) : evidence.kind === "FAILED" ? (
-          <FailureBlock failure={evidence.failure} />
+          <FailureBlock failure={evidence.failure}>
+            <button type="button" className="btn btn-sm btn-ghost" disabled={!online || !draft.commitmentId} onClick={() => draft.commitmentId && onSelectCommitment(draft.commitmentId)}>Retry saved receipts</button>
+          </FailureBlock>
         ) : evidence.items.length === 0 ? (
           <p className="control-note">This bill has no saved receipt to link.</p>
         ) : (
@@ -195,6 +217,17 @@ export function ControlReconciliationDialog({
             ))}
           </fieldset>
         )}
+        {evidence.kind === "READY" ? (
+          <div className="mt-3">
+            <p className="control-card-meta" role="status">{evidence.items.length} of {evidence.total} saved receipts</p>
+            {evidence.pageFailure ? <FailureBlock failure={evidence.pageFailure} /> : null}
+            {evidence.nextCursor ? (
+              <button type="button" className="btn btn-sm btn-ghost mt-2" disabled={pending || !online || evidence.loadingMore} onClick={onLoadMoreEvidence}>
+                <ChevronDown size={16} aria-hidden />{evidence.loadingMore ? "Loading older receipts..." : "Load older receipts"}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {proposal.intendedOutcome ? (
@@ -235,6 +268,7 @@ export function ControlReconciliationDialog({
 
       {failure ? <div className="mt-4"><FailureBlock failure={failure} /></div> : null}
       {!online ? <p className="control-note mt-3">This device is offline. Nothing will be sent until the connection returns.</p> : null}
+      </>}
     </RecoveryDialog>
   );
 }

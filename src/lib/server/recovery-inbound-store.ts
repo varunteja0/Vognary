@@ -1,4 +1,5 @@
 import "server-only";
+import { isCommitmentControlWorkspaceEnrolled } from "@/lib/commitment-control/enrollment";
 
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
@@ -509,6 +510,7 @@ export async function lockReceiptInboxAuthority(
   client: PoolClient,
   input: { workspaceId: string; aliasId: string },
 ): Promise<{ live: boolean; aliasStatus: string | null }> {
+  if (!isCommitmentControlWorkspaceEnrolled(input.workspaceId)) return { live: false, aliasStatus: null };
   const result = await client.query<{
     alias_status: string;
     account_status: string;

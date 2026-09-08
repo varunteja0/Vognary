@@ -21,6 +21,7 @@ export async function runReceiptInboxRoute(
 ) {
   return runRecoveryRoute(request, {
     namespace: options.namespace,
+    financialIntake: options.mutation && request.method !== "DELETE",
     limit: options.mutation ? 20 : 120,
     windowMs: 60_000,
   }, async ({ requestId, session }) => {

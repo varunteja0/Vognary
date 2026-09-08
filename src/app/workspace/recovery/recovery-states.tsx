@@ -48,8 +48,12 @@ export function LoadingBlock({ label }: { label: string }) {
 }
 
 export function FailureBlock({ failure, children }: { failure: RecoveryFailure; children?: ReactNode }) {
-  const { error, origin } = failure;
-  const copy = errorCopy[error.code];
+  const { error, origin, outcome } = failure;
+  const copy = outcome === "UNKNOWN"
+    ? { title: "Save result unconfirmed", detail: "This action may already be saved. Keep the entry unchanged and recover its result, or reload to inspect the saved record before starting a new action." }
+    : outcome === "NOT_ATTEMPTED"
+      ? { title: "Not sent", detail: "This request was cancelled before it was sent." }
+      : errorCopy[error.code];
   return (
     <div className="inset border border-ember p-4 sm:p-5" role="alert">
       <p className="eyebrow eyebrow-xs text-ember">{copy.title}</p>
@@ -64,7 +68,7 @@ export function FailureBlock({ failure, children }: { failure: RecoveryFailure; 
         <summary className="cursor-pointer font-data text-xs text-(--muted)">Technical details</summary>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-(--muted)">Reported message: {error.message}</p>
         <p className="mt-2 font-data text-xs text-(--muted)">
-          {origin === "SERVER" ? "Raised by the workspace" : "Raised on this device before the workspace answered"} · reference {error.requestId} · {error.retryable ? "safe to retry" : "retrying will not help"}
+          {origin === "SERVER" ? "Raised by the workspace" : "Observed on this device"} · reference {error.requestId} · {error.retryable ? "retry available" : "inspect the saved state before retrying"}
         </p>
       </details>
       {children ? <div className="mt-4 flex flex-wrap gap-2">{children}</div> : null}

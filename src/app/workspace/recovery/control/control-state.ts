@@ -25,6 +25,25 @@ import type { AttentionProjectionStatus } from "@/lib/recovery/contracts";
 import type { RecoveryFailure } from "../state";
 import type { ResponseMeta, TransportFailure } from "../transport";
 import { formatControlMoney, isCalendarDate, parseControlAmount } from "./control-format";
+import { buildControlAttention } from "@/lib/commitment-control/attention";
+
+export function controlAttentionForDisplay(entries: CommitmentControlBriefDto["proposals"], options: { today: string }) {
+  return buildControlAttention(entries, options).map(item => {
+    const entry = entries.find(candidate => candidate.proposal.id === item.proposalId);
+    const bill = item.targetKind === "RECONCILIATION" ? entry?.reconciliations.find(candidate => candidate.id === item.targetId && candidate.comparisonKind === "BILLED_AMOUNT_COMPARISON") : null;
+    if (bill && item.kind === "RECONCILIATION_EXCEPTION") {
+      const body = bill.verdict === "OVER_CAP" ? "The bill total is above the frozen cap. The authorization itself has not changed."
+        : bill.verdict === "CURRENCY_MISMATCH" ? "The bill and authorized currencies differ. No currency conversion was performed."
+        : bill.verdict === "AUTHORIZATION_EXPIRED" ? "The bill date is after the frozen authorization window."
+        : "This bill has no comparable amount and currency.";
+      return { ...item, headline: "Billed comparison needs review", body };
+    }
+    if (entry?.decision?.amountBasis === "GROSS_BILLED_TOTAL_PER_CHARGE" && item.kind === "EVIDENCE_DUE") {
+      return { ...item, headline: "A later bill is ready to compare when available", body: "Select a later bill or saved receipt yourself. Nothing is matched automatically." };
+    }
+    return item;
+  });
+}
 
 // Pure state for the Commitment Control desk. The server owns policy status,
 // headroom, exposure, verdicts, frozen amounts, and caps; this file owns only
@@ -44,6 +63,7 @@ export type ControlProposalDraft = {
   category: ProposalCategory;
   amountText: string;
   currency: string;
+  grossPerCharge?: boolean;
   firstChargeDate: string;
   cadence: ProposalCadence;
   existingCommitmentIds: readonly string[];
@@ -150,6 +170,7 @@ const emptyControlProposalDraft: ControlProposalDraft = {
   category: "AI_MODEL",
   amountText: "",
   currency: "INR",
+  grossPerCharge: false,
   firstChargeDate: "",
   cadence: "MONTHLY",
   existingCommitmentIds: [],
@@ -214,7 +235,7 @@ export type ControlAction =
   | { type: "FOCUS_SET"; proposalId: string }
   | { type: "FOCUS_CLEARED" };
 
-const asFailure = (failure: TransportFailure): RecoveryFailure => ({ error: failure.error, origin: failure.origin });
+const asFailure = (failure: TransportFailure): RecoveryFailure => ({ error: failure.error, origin: failure.origin, ...(failure.outcome ? { outcome: failure.outcome } : {}) });
 const isStale = (failure: TransportFailure) => failure.error.code === "STALE_STATE";
 const isConflict = (failure: TransportFailure) => failure.error.code === "CONFLICT";
 
@@ -271,6 +292,7 @@ export function controlProposalRequest(draft: ControlProposalDraft): { ok: true;
       category: draft.category,
       amountMinor: amount.minor,
       currency: draft.currency,
+      ...(draft.grossPerCharge === true ? { amountBasis: "GROSS_BILLED_TOTAL_PER_CHARGE" as const } : {}),
       firstChargeDate: draft.firstChargeDate,
       cadence: draft.cadence,
       existingCommitmentIds: [...draft.existingCommitmentIds],
@@ -476,7 +498,7 @@ function heldSlot(store: ControlIdempotencyStore, slot: ControlIdempotencySlot, 
 
 /** A failed mutation keeps a retryable key and drops one the server refused. */
 function settleAfterFailure(state: ControlState, slot: ControlIdempotencySlot, failure: TransportFailure): ControlIdempotencyStore {
-  return isStale(failure) || isConflict(failure) ? withoutSlot(state.idempotency, slot) : state.idempotency;
+  return failure.outcome !== "UNKNOWN" && (isStale(failure) || isConflict(failure)) ? withoutSlot(state.idempotency, slot) : state.idempotency;
 }
 
 export function controlReducer(state: ControlState, action: ControlAction): ControlState {
@@ -570,6 +592,7 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
           merchant: proposal.merchant === submitted.merchant ? "" : state.draft.merchant,
           purpose: proposal.purpose === submitted.purpose ? "" : state.draft.purpose,
           amountText: proposal.amountMinor === submitted.amountMinor && proposal.currency === submitted.currency ? "" : state.draft.amountText,
+          grossPerCharge: proposal.amountBasis === submitted.amountBasis ? false : state.draft.grossPerCharge,
           existingCommitmentIds: citedUnchanged ? [] : state.draft.existingCommitmentIds,
           outcomeMetric: outcomeUnchanged ? "" : state.draft.outcomeMetric,
           outcomeTargetText: outcomeUnchanged ? "" : state.draft.outcomeTargetText,
@@ -688,7 +711,7 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
             ...state.brief,
             proposals: state.brief.proposals.map((entry) => (
               entry.proposal.id === action.reconciliation.proposalId
-                ? { ...entry, reconciliations: [action.reconciliation, ...entry.reconciliations] }
+                ? { ...entry, reconciliations: [action.reconciliation, ...entry.reconciliations.filter(item => item.id !== action.reconciliation.id)] }
                 : entry
             )),
           }
@@ -697,7 +720,9 @@ export function controlReducer(state: ControlState, action: ControlAction): Cont
         requestId: action.meta.requestId,
         focusProposalId: action.reconciliation.proposalId,
         attentionProjection: action.meta.attentionProjection ?? null,
-        announcement: "Observed evidence linked. The frozen cap is unchanged.",
+        announcement: action.reconciliation.comparisonKind === "BILLED_AMOUNT_COMPARISON"
+          ? "Saved billed comparison. The frozen cap is unchanged."
+          : "Observed evidence linked. The frozen cap is unchanged.",
       };
 
     case "RECONCILIATION_FAILED":

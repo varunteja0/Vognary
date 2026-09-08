@@ -92,7 +92,7 @@ test("the pay page is server-priced and does not revive Standard Checkout or the
   assert.doesNotMatch(offer, /4_000_000/);
 
   for (const surface of [contact, terms, agentContent, trustSignals, invoiceMarkdown, invoiceHtml]) {
-    assert.match(surface, /₹14,999/);
+    assert.match(surface, /(?:₹|INR )14,999/);
     assert.match(surface, /one-time/i);
     assert.doesNotMatch(surface, /monthly Razorpay subscription|Subscription Link|auto-renew|auto-renewing|50 commitment evaluations|one-business-day response SLA/i);
   }

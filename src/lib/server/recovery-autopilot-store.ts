@@ -78,6 +78,7 @@ import {
   candidateCitedSourcesCurrentSql,
   currentSourceNotDisconnectedSql,
   currentlyConnectedSourceSql,
+  legacyRecoveryEvidenceSourceSql,
   standingMandateConsentExistsSql,
   standingMandateConsentPurpose,
 } from "@/lib/recovery/autopilot-funnel";
@@ -1036,6 +1037,7 @@ export async function loadRecoveryEvidenceSources(client: PoolClient, workspaceI
      left join recovery_source_disconnections disconnect
        on disconnect.workspace_id = source.workspace_id and disconnect.source_id = source.id
      where source.workspace_id = $1
+       and source.source_type in ('RECEIPT_PASTE','CSV_IMPORT','FORWARDED_EMAIL','GMAIL_OAUTH')
      order by source.ingested_at asc, source.id asc`,
     [workspaceId],
   );
@@ -2550,6 +2552,8 @@ export async function verifyCoveredWindow(input: {
        join recovery_sources source
          on source.workspace_id = evidence.workspace_id and source.id = evidence.source_id
        where link.workspace_id = $1 and link.commitment_id = $2
+         and source.source_type in ('RECEIPT_PASTE','CSV_IMPORT','FORWARDED_EMAIL','GMAIL_OAUTH')
+         and evidence.evidence_kind in ('TRANSACTION','RECEIPT')
        order by source.coverage_end desc nulls last`,
       [input.workspaceId, row.commitment_id],
     );
@@ -2572,6 +2576,7 @@ export async function verifyCoveredWindow(input: {
        join recovery_evidence evidence
          on evidence.workspace_id = link.workspace_id and evidence.id = link.evidence_id
        where link.workspace_id = $1 and link.commitment_id = $2
+         and evidence.evidence_kind in ('TRANSACTION','RECEIPT')
          and evidence.evidence_date is not null
          and evidence.amount_minor is not null
          and (evidence.direction is null or evidence.direction = 'debit')`,
@@ -3097,6 +3102,7 @@ async function recordConnectedMandateCohort(client: PoolClient, workspaceId: str
      join recovery_evidence evidence
        on evidence.workspace_id = source.workspace_id and evidence.source_id = source.id
      where mandate.workspace_id = $1 and mandate.status = 'ACTIVE'
+       and ${legacyRecoveryEvidenceSourceSql}
        and ${currentSourceNotDisconnectedSql}
        and ${standingMandateConsentExistsSql}
      group by mandate.signed_at

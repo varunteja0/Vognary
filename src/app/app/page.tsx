@@ -18,7 +18,7 @@ export default async function AppPage({ searchParams }: AppPageProps) {
   }
 
   const session = await readRequestSession();
-  if (!session) redirect("/login?next=/app");
+  if (!session) redirect(`/login?next=${encodeURIComponent(buildCanonicalAppUrl(params ?? {}))}`);
   const [recoveryCutover, receiptInboxPubliclyAvailable] = session?.workspaceId
     ? await Promise.all([
         getRecoveryCutoverStatus({ workspaceId: session.workspaceId, actorUserId: session.userId }),

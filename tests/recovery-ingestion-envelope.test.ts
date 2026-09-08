@@ -14,15 +14,18 @@ import {
   provenanceForSourceType,
   RecoveryCaptureNotReadyError,
   reservedRecoveryCaptureSourceTypes,
+  evidenceOnlyRecoverySourceTypes,
 } from "../src/lib/recovery/ingestion-envelope";
 
-test("every Recovery source is either an active capture path or an explicitly reserved fail-closed rail", () => {
+test("every Recovery source has an explicit active, reserved or internal evidence-only boundary", () => {
   assert.deepEqual(activeRecoveryCaptureSourceTypes, ["RECEIPT_PASTE", "CSV_IMPORT", "FORWARDED_EMAIL"]);
   assert.deepEqual(reservedRecoveryCaptureSourceTypes, ["GMAIL_OAUTH"]);
+  assert.deepEqual(evidenceOnlyRecoverySourceTypes, ["ZOHO_BOOKS"]);
   assert.deepEqual(
-    [...activeRecoveryCaptureSourceTypes, ...reservedRecoveryCaptureSourceTypes],
+    [...activeRecoveryCaptureSourceTypes, ...reservedRecoveryCaptureSourceTypes, ...evidenceOnlyRecoverySourceTypes],
     [...sourceTypes],
   );
+  assert.throws(() => assertActiveRecoveryCapture("ZOHO_BOOKS"), RecoveryCaptureNotReadyError);
   for (const sourceType of activeRecoveryCaptureSourceTypes) {
     assert.equal(isActiveRecoveryCaptureSource(sourceType), true);
     assert.doesNotThrow(() => assertActiveRecoveryCapture(sourceType));

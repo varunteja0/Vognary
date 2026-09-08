@@ -9,6 +9,7 @@ export type ActiveRecoveryCaptureSourceType = (typeof activeRecoveryCaptureSourc
 
 export const reservedRecoveryCaptureSourceTypes = ["GMAIL_OAUTH"] as const;
 export type ReservedRecoveryCaptureSourceType = (typeof reservedRecoveryCaptureSourceTypes)[number];
+export const evidenceOnlyRecoverySourceTypes = ["ZOHO_BOOKS"] as const;
 
 export type RecoveryIngestionEnvelope = {
   workspaceId: string;

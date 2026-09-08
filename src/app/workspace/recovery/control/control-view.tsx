@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { buildControlAttention } from "@/lib/commitment-control/attention";
 import { indiaCalendarDate } from "@/lib/date-only";
 import { controlDraftFromGuestProposal, readGuestProposalDraft } from "@/lib/guest-proposal-draft";
 import type {
   ControlExceptionTargetKind,
+  ControlReconciliationWriteDto,
   RecordControlExceptionReviewRequest,
   RecordControlOutcomeObservationRequest,
 } from "@/lib/commitment-control/contracts";
@@ -13,7 +13,8 @@ import type { CommitmentSummaryDto, EvidenceDto } from "@/lib/recovery/contracts
 import { currencyExponent, minorUnitsToDecimal } from "@/lib/recovery/domain";
 import { formatMoment } from "../labels";
 import { FailureBlock, LoadingBlock, StateBlock } from "../recovery-states";
-import type { TransportFailure } from "../transport";
+import type { ResponseMeta, TransportFailure } from "../transport";
+import { providerBillAttemptKey, restoreProviderBillAttempt, type ProviderBillAttempt } from "./control-provider-bill-state";
 import { ControlDecisionDialog } from "./control-decision-dialog";
 import { ControlExceptionReviewDialog } from "./control-exception-review-dialog";
 import {
@@ -33,6 +34,7 @@ import {
 } from "./control-reconciliation-dialog";
 import {
   controlDecisionRequest,
+  controlAttentionForDisplay,
   controlPolicyRequest,
   controlProposalRequest,
   controlReconciliationRequest,
@@ -77,11 +79,12 @@ const toMajorUnits = (minor: string, currency: string) => {
   }
 };
 
-export type ControlEvidenceLoader = (commitmentId: string) => Promise<
-  { ok: true; items: readonly EvidenceDto[] } | { ok: false; failure: TransportFailure }
+export type ControlEvidenceLoader = (commitmentId: string, evidenceCursor?: string) => Promise<
+  { ok: true; items: readonly EvidenceDto[]; total: number; nextCursor: string | null } | { ok: false; failure: TransportFailure }
 >;
 
 export type CommitmentControlDesk = {
+  workspaceId: string | null;
   state: ControlState;
   available: boolean;
   unavailable: boolean;
@@ -101,9 +104,11 @@ export type CommitmentControlDesk = {
     changeDecisionDraft: (draft: Partial<ControlDecisionDraft>) => void;
     submitDecision: () => void;
     selectReconciliationCommitment: (commitmentId: string) => void;
+    loadMoreReconciliationEvidence: () => void;
     selectReconciliationEvidence: (evidenceId: string) => void;
     changeReconciliationDraft: (draft: Partial<ControlReconciliationDraft>) => void;
     submitReconciliation: () => void;
+    providerBillSaved: (data: ControlReconciliationWriteDto, meta: ResponseMeta) => void;
     submitOutcome: (request: RecordControlOutcomeObservationRequest) => void;
     submitExceptionReview: (request: RecordControlExceptionReviewRequest) => void;
     changePolicyDraft: (draft: Partial<ControlPolicyDraft>) => void;
@@ -127,7 +132,7 @@ export function useCommitmentControl({
   workspaceId: string | null;
   loadEvidence: ControlEvidenceLoader;
 }): CommitmentControlDesk {
-  const transport = useMemo(() => createControlTransport(), []);
+  const transport = useMemo(() => createControlTransport(undefined, workspaceId ?? undefined), [workspaceId]);
   const [state, dispatch] = useReducer(controlReducer, initialControlState);
   const [evidence, setEvidence] = useState<ControlEvidenceState>({ kind: "IDLE" });
   const [candidates, setCandidates] = useState<ControlCandidateState>({ kind: "IDLE" });
@@ -305,9 +310,32 @@ export function useCommitmentControl({
     const result = await loadEvidence(commitmentId);
     if (requestSequence !== evidenceRequestSequence.current || stateRef.current.dialog?.kind !== "RECONCILIATION") return;
     setEvidence(result.ok
-      ? { kind: "READY", items: result.items }
+      ? { kind: "READY", items: result.items, total: result.total, nextCursor: result.nextCursor, loadingMore: false, pageFailure: null }
       : { kind: "FAILED", failure: { error: result.failure.error, origin: result.failure.origin } });
   }, [loadEvidence]);
+
+  const loadMoreReconciliationEvidence = useCallback(async () => {
+    const commitmentId = stateRef.current.reconciliationDraft.commitmentId;
+    if (!commitmentId || stateRef.current.dialog?.kind !== "RECONCILIATION"
+      || evidence.kind !== "READY" || evidence.loadingMore || !evidence.nextCursor) return;
+    const cursor = evidence.nextCursor;
+    const requestSequence = ++evidenceRequestSequence.current;
+    setEvidence({ ...evidence, loadingMore: true, pageFailure: null });
+    const result = await loadEvidence(commitmentId, cursor);
+    if (requestSequence !== evidenceRequestSequence.current || stateRef.current.dialog?.kind !== "RECONCILIATION"
+      || stateRef.current.reconciliationDraft.commitmentId !== commitmentId) return;
+    setEvidence((current) => {
+      if (current.kind !== "READY") return current;
+      if (!result.ok) return { ...current, loadingMore: false, pageFailure: { error: result.failure.error, origin: result.failure.origin } };
+      if (result.nextCursor === cursor) return {
+        ...current,
+        loadingMore: false,
+        pageFailure: { origin: "CLIENT", error: { code: "UNKNOWN", message: "The next receipt page did not advance. Reload this bill before continuing.", retryable: false, requestId: "client-device" } },
+      };
+      const items = [...new Map([...current.items, ...result.items].map((item) => [item.id, item])).values()];
+      return { kind: "READY", items, total: result.total, nextCursor: result.nextCursor, loadingMore: false, pageFailure: null };
+    });
+  }, [evidence, loadEvidence]);
 
   const loadReconciliationCandidates = useCallback(async (proposalId: string) => {
     const requestSequence = ++candidateRequestSequence.current;
@@ -321,6 +349,7 @@ export function useCommitmentControl({
   }, [transport]);
 
   return {
+    workspaceId,
     state,
     available: state.status.kind === "READY",
     unavailable: state.status.kind === "UNAVAILABLE",
@@ -363,9 +392,18 @@ export function useCommitmentControl({
       changeDecisionDraft: (draft) => dispatch({ type: "DECISION_DRAFT_CHANGED", draft }),
       submitDecision: () => void submitDecision(),
       selectReconciliationCommitment: (commitmentId) => void selectReconciliationCommitment(commitmentId),
+      loadMoreReconciliationEvidence: () => void loadMoreReconciliationEvidence(),
       selectReconciliationEvidence: (evidenceId) => dispatch({ type: "RECONCILIATION_DRAFT_CHANGED", draft: { evidenceId } }),
       changeReconciliationDraft: (draft) => dispatch({ type: "RECONCILIATION_DRAFT_CHANGED", draft }),
       submitReconciliation: () => void submitReconciliation(),
+      providerBillSaved: (data, meta) => {
+        dispatch({ type: "RECONCILIATION_SAVED", reconciliation: data.reconciliation, meta });
+        const url = new URL(window.location.href);
+        url.searchParams.set("proposal", data.proposal.id);
+        url.searchParams.set("comparison", data.reconciliation.id);
+        window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+        void loadBrief();
+      },
       submitOutcome: (request) => void submitOutcome(request),
       submitExceptionReview: (request) => void submitExceptionReview(request),
       changePolicyDraft: (draft) => dispatch({ type: "POLICY_DRAFT_CHANGED", draft }),
@@ -398,6 +436,24 @@ export function ControlView({
 }) {
   const { state, handlers } = desk;
   const guestDraftApplied = useRef(false);
+  const [resumeBill, setResumeBill] = useState<ProviderBillAttempt | null>(null);
+
+  useEffect(() => {
+    const workspaceId = desk.workspaceId;
+    if (!workspaceId || !state.brief) return;
+    let active = true;
+    void createControlTransport().providerBillIdentity().then(identity => {
+      if (!active || !identity || identity.workspaceId !== workspaceId) return;
+      let found: ProviderBillAttempt | null = null;
+      for (const entry of state.brief!.proposals) {
+        if (!entry.decision) continue;
+        try { found = restoreProviderBillAttempt(sessionStorage.getItem(providerBillAttemptKey(workspaceId, identity.actorId, entry.proposal.id)), { ...identity, proposalId: entry.proposal.id, decisionId: entry.decision.id }); } catch {}
+        if (found) break;
+      }
+      setResumeBill(found);
+    });
+    return () => { active = false; };
+  }, [desk.workspaceId, state.brief, state.dialog]);
 
   useEffect(() => {
     if (guestDraftApplied.current || state.status.kind !== "READY" || state.draft.merchant.trim()) return;
@@ -424,7 +480,7 @@ export function ControlView({
   const awaitingDecision = brief.proposals.filter((entry) => entry.evaluation !== null && entry.decision === null);
   const authorized = brief.proposals.filter((entry) => entry.decision !== null);
   const awaitingEvidence = authorized.filter((entry) => entry.decision?.action !== "DECLINE" && entry.reconciliations.length === 0);
-  const attention = buildControlAttention(brief.proposals, { today: indiaCalendarDate() });
+  const attention = controlAttentionForDisplay(brief.proposals, { today: indiaCalendarDate() });
   const dialogProposalId = state.dialog && state.dialog.kind !== "POLICY" ? state.dialog.proposalId : null;
   const dialogEntry = dialogProposalId
     ? brief.proposals.find((entry) => entry.proposal.id === dialogProposalId) ?? null
@@ -443,6 +499,7 @@ export function ControlView({
   return (
     <div className="control-desk">
       <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{state.announcement}</p>
+      {resumeBill ? <div role="status" className="grid gap-3 py-4"><p>An earlier billed comparison is unconfirmed. Recover its original result before selecting another bill.</p><button id="control-resume-bill" type="button" className="btn btn-sm btn-primary justify-self-start" onClick={() => handlers.openReconciliation(resumeBill.proposalId, "control-resume-bill")}>Check original billed comparison</button></div> : null}
 
       {/* What the desk already knows, before any new work is entered. Every
           figure below is a count of server records or a published policy
@@ -463,7 +520,7 @@ export function ControlView({
           {policy === null
             ? "No policy is in force, so no proposal can be evaluated yet."
             : awaitingDecision.length === 0
-              ? "Nothing needs a decision right now."
+              ? "No proposals are awaiting authorization."
               : `${awaitingDecision.length} ${awaitingDecision.length === 1 ? "proposal needs" : "proposals need"} a human decision.`}
         </p>
         {policy !== null || brief.proposals.length > 0 ? <p className="control-standing-note">
@@ -614,6 +671,10 @@ export function ControlView({
 
       {state.dialog?.kind === "RECONCILIATION" && dialogEntry?.decision ? (
         <ControlReconciliationDialog
+          key={dialogEntry.proposal.id}
+          workspaceId={desk.workspaceId}
+          initialSource={resumeBill?.proposalId === dialogEntry.proposal.id ? "ZOHO_BOOKS" : "RECEIPTS"}
+          onBillSaved={(data, meta) => { setResumeBill(null); handlers.providerBillSaved(data, meta); }}
           proposal={dialogEntry.proposal}
           decision={dialogEntry.decision}
           commitments={commitments}
@@ -625,6 +686,7 @@ export function ControlView({
           failure={state.failure}
           returnFocusId={state.returnFocusId}
           onSelectCommitment={handlers.selectReconciliationCommitment}
+          onLoadMoreEvidence={handlers.loadMoreReconciliationEvidence}
           onSelectEvidence={handlers.selectReconciliationEvidence}
           onChange={handlers.changeReconciliationDraft}
           onClose={handlers.closeDialog}

@@ -20,7 +20,7 @@ const channels = [
     heading: "Product and support",
     address: "support@vognary.com",
     body:
-      "Questions about reading a commitment, correcting an amount, a receipt that was not understood, or anything that looks wrong in your workspace. Include the merchant name and the date you expected, and say whether the evidence was pasted, uploaded, or forwarded. Do not send passwords, card numbers, or one-time codes — Vognary never needs them.",
+      "Questions about a saved decision, a bill-review evaluation, or a workspace error. Describe the action and error without financial contents or customer documents. Do not send passwords, card numbers, tokens or one-time codes.",
   },
   {
     heading: "Your data",
@@ -38,7 +38,7 @@ const channels = [
     heading: "Pilot payment",
     address: "support@vognary.com",
     body:
-      "Reserve the one-time ₹14,999 Commitment Control private pilot from /pay when online collection is configured. For an invoice and unique one-time payment link, email this address with the company legal name and GSTIN if any. Service starts only after the written activation conditions are met. Do not send card numbers, OTPs, or bank passwords — those stay with the payment provider.",
+      "The one-time INR 14,999 Commitment Control pilot covers one month, not a managed bill-review service. The bill-review example is a separate synthetic evaluation. For an invoice and unique one-time payment link, email this address with the company legal name and GSTIN if any. Service and customer-data access start only after assurance and written activation conditions are met. A second month requires a separate purchase. Payment details stay with the payment provider.",
   },
   {
     heading: "Legal",
@@ -68,9 +68,7 @@ export default function ContactPage() {
           <span className="folio" data-folio="Company">Contact</span>
           <h1 className="mt-5 font-display text-4xl font-semibold leading-tight text-(--ink) sm:text-5xl">Reach a person, not a queue</h1>
           <p className="mt-5 text-sm leading-7 text-(--ink-soft)">
-            Vognary is a small team building Commitment Control for India-first AI-native companies. Mail is read by
-            the people who build the product. Response time is not guaranteed and no support hours are published, because
-            promising a window Vognary cannot yet keep would be the same kind of unproven claim the product refuses to make.
+            Vognary is building Commitment Control for India-first AI-native companies. Contact the product team about evaluation, pilot terms or a problem. No response-time commitment is published.
           </p>
           <a className="btn btn-primary btn-lg mt-6 w-full" href="mailto:support@vognary.com">Email support@vognary.com</a>
           </header>

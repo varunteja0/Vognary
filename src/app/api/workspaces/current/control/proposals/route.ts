@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   if (crossSite) return recoveryFailureResponse(new RecoveryServiceError("FORBIDDEN"), createRecoveryRequestId());
   return runRecoveryRoute(request, {
     namespace: "commitment-control-proposal-write",
+    financialIntake: true,
     limit: 120,
     windowMs: 60 * 60_000,
   }, async ({ requestId, session }) => {

@@ -7,7 +7,7 @@ test("canonical product entry keeps forwarding unavailable without seeded data",
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/i)).toHaveCount(0);
   // The evidence path is offered, and the record that needs a human is present.
-  await expect(page.getByRole("link", { name: "Use your own evidence" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Try a synthetic bill-change review" }).first()).toBeVisible();
   await expect(page.getByText("INR 4,80,000").first()).toBeVisible();
   await expect(page.getByText(/sample audit/i)).toHaveCount(0);
   await expect(page.locator('a[href*="demo="], a[href*="guest="]')).toHaveCount(0);

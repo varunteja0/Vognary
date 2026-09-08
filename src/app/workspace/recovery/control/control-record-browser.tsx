@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
-import { buildControlAttention } from "@/lib/commitment-control/attention";
+import { controlAttentionForDisplay } from "./control-state";
 import { indiaCalendarDate } from "@/lib/date-only";
 import type { CommitmentControlDesk } from "./control-view";
 import { ControlAttention } from "./control-attention";
@@ -35,7 +35,7 @@ export function ControlRecordBrowser({
   }, []);
 
   if (!state.brief) return null;
-  const attention = buildControlAttention(state.brief.proposals, { today: indiaCalendarDate() });
+  const attention = controlAttentionForDisplay(state.brief.proposals, { today: indiaCalendarDate() });
   const attentionOrder = new Map<string, number>();
   attention.forEach((item, index) => { if (!attentionOrder.has(item.proposalId)) attentionOrder.set(item.proposalId, index); });
   const entries = state.brief.proposals.toSorted((first, second) =>
@@ -55,7 +55,9 @@ export function ControlRecordBrowser({
     setSelectedId(proposalId);
     setIndexOpen(false);
     const url = new URL(window.location.href);
+    if (url.searchParams.get("proposal") === proposalId) return;
     url.searchParams.set("proposal", proposalId);
+    url.searchParams.delete("comparison");
     window.history.pushState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
@@ -110,17 +112,6 @@ export function ControlRecordBrowser({
         </div>
       </aside>
       <div className={styles.detail} aria-live="polite">
-        {selected ? <ControlAttention
-          items={attention.filter(item => item.proposalId === selected.proposal.id && item.nextStep !== "DECIDE_PROPOSAL")}
-          canAct={state.brief.capabilities.canDecide}
-          online={online}
-          pendingProposalId={pending && "proposalId" in pending ? pending.proposalId : null}
-          onDecide={handlers.openDecision}
-          onReconcile={handlers.openReconciliation}
-          onRecordOutcome={handlers.openOutcome}
-          onReviewException={handlers.openExceptionReview}
-          onReview={handlers.focusProposal}
-        /> : null}
         {selected ? (
           <ControlProposalRow
             key={selected.proposal.id}
@@ -133,9 +124,20 @@ export function ControlRecordBrowser({
             onDecide={handlers.openDecision}
             onReconcile={handlers.openReconciliation}
             onInspectEvidence={onInspectEvidence}
-            onFocused={() => { setSelectedId(selected.proposal.id); setQuery(""); setFilter("ALL"); handlers.clearFocus(); }}
+            onFocused={() => { selectRecord(selected.proposal.id); setQuery(""); setFilter("ALL"); handlers.clearFocus(); }}
           />
         ) : <p className={styles.empty}>Choose another filter to return to your records.</p>}
+        {selected ? <ControlAttention
+          items={attention.filter(item => item.proposalId === selected.proposal.id && item.nextStep !== "DECIDE_PROPOSAL")}
+          canAct={state.brief.capabilities.canDecide}
+          online={online}
+          pendingProposalId={pending && "proposalId" in pending ? pending.proposalId : null}
+          onDecide={handlers.openDecision}
+          onReconcile={handlers.openReconciliation}
+          onRecordOutcome={handlers.openOutcome}
+          onReviewException={handlers.openExceptionReview}
+          onReview={handlers.focusProposal}
+        /> : null}
       </div>
     </section>
   );

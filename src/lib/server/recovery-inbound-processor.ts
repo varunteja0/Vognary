@@ -18,6 +18,7 @@ import {
 } from "@/lib/server/recovery-inbound-webhook";
 import { listKnownSenderDomains, materializeForwardedEmailEvidence } from "@/lib/server/recovery-store";
 import { getReceiptInboxTrustedAuthorities } from "@/lib/server/receipt-inbox-sender-trust";
+import { isCommitmentControlWorkspaceEnrolled } from "@/lib/commitment-control/enrollment";
 
 type ProcessorDependencies = {
   retrieveRawEmail?: (emailId: string) => Promise<string | Uint8Array>;
@@ -47,6 +48,7 @@ export async function processResendReceivedEvent(
   const existing = await findExistingInboundEvent(event);
   const alias = existing ?? await resolveReceiptInboxAlias(event.recipient);
   if (!alias) return { status: "ignored" };
+  if (!isCommitmentControlWorkspaceEnrolled(alias.workspaceId)) return { status: "ignored" };
 
   const reservation = await reserveInboundEvent(event, alias);
   if (!reservation) return { status: "duplicate" };

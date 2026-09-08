@@ -41,6 +41,33 @@ const receiptInboxEnvironment = {
 
 const baseUrl = "https://vognary.test";
 
+test("withdrawn intake clearance stops inbox retrieval before financial MIME is fetched", {
+  skip: !databaseConfigured,
+}, async () => {
+  const restoreEnvironment = setEnvironment({ ...receiptInboxEnvironment, COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS: "*" });
+  const pool = getDatabasePool();
+  const userId = randomUUID();
+  const workspaceId = randomUUID();
+  await pool.query("insert into users (id,email) values ($1,$2)", [userId, `synthetic-mail-gate-${userId}@example.test`]);
+  await pool.query("insert into workspaces (id,owner_user_id,name) values ($1,$2,'Synthetic gated inbox')", [workspaceId, userId]);
+  await pool.query("insert into workspace_members (workspace_id,user_id,role) values ($1,$2,'owner')", [workspaceId, userId]);
+  try {
+    const inbox = await provisionReceiptInbox({ workspaceId, actorUserId: userId });
+    process.env.COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS = "";
+    let retrieved = false;
+    await processResendReceivedEvent({ svixId: `msg_${randomUUID()}`, emailId: `email_${randomUUID()}`, recipient: inbox.alias!.address, payloadHash: "a".repeat(64), createdAt: "2026-09-06T00:00:00.000Z" }, {
+      retrieveRawEmail: async () => { retrieved = true; return "Synthetic mail"; },
+      reportProcessingFailure: async () => undefined,
+    });
+    assert.equal(retrieved, false);
+    assert.equal((await pool.query("select id from recovery_inbound_events where workspace_id=$1", [workspaceId])).rowCount, 0);
+  } finally {
+    await pool.query("delete from workspaces where id=$1", [workspaceId]);
+    await pool.query("delete from users where id=$1", [userId]);
+    restoreEnvironment();
+  }
+});
+
 test("receipt inbox provision, rotation, and revocation keep routing secret and canonical", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {

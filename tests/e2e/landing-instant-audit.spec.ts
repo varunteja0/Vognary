@@ -123,7 +123,7 @@ test("the server-rendered landing has no skipped heading levels", async ({ reque
   expect(headingLevels.every((level, index) => index === 0 || level <= (headingLevels[index - 1] ?? level) + 1)).toBe(true);
 });
 
-test("the landing demonstrates the decision loop and sends visitors to their own bill", async ({ page }) => {
+test("the landing demonstrates the decision loop and preserves the synthetic bill evaluation", async ({ page }) => {
   await page.goto("/");
 
   const heading = page.getByRole("heading", {
@@ -133,25 +133,28 @@ test("the landing demonstrates the decision loop and sends visitors to their own
   await expect(heading).toBeVisible();
   await expect(page.getByText(/Receipt forwarding is not active in this deployment/)).toHaveCount(0);
 
-  // One primary command, one quiet secondary, one pilot action. Nothing else.
-  await expect(page.getByRole("link", { name: "Review the synthetic request" }).first())
+  await expect(page.getByRole("link", { name: "Try a spending decision", exact: true }))
     .toHaveAttribute("href", "/demo");
-  await expect(page.getByRole("link", { name: "Use your own evidence" }).first())
+  await expect(page.getByRole("link", { name: "Follow the full example", exact: true }))
+    .toHaveAttribute("href", "/demo");
+  await expect(page.getByRole("link", { name: "Try a synthetic bill-change review" }).first())
     .toHaveAttribute("href", "/start");
   await expect(page.getByRole("link", { name: "See the one-month pilot" })).toHaveAttribute("href", "/pay");
 
-  // The product carries the promise: the live record, its cited history, the
-  // policy result and the named human are all on the page as real DOM.
+  const request = page.locator(".home-scene .sheet");
+  await expect(request.getByText("INR 4,80,000", { exact: true })).toBeVisible();
+  await expect(request.getByText("Assumption", { exact: true })).toBeVisible();
+  await request.getByText("Evidence and policy", { exact: true }).click();
+  await expect(request.getByText("INR 3,20,000", { exact: true })).toBeVisible();
+  await expect(request.getByText(/A rule cannot approve this/)).toBeVisible();
   await expect(page.getByText("INR 4,80,000").first()).toBeVisible();
-  await expect(page.getByText("INR 3,20,000").first()).toBeVisible();
-  await expect(page.getByText(/outside policy/i).first()).toBeVisible();
   await expect(page.getByText("INR 3,60,000").first()).toBeVisible();
   await expect(page.getByText("INR 4,72,000").first()).toBeVisible();
   await expect(page.getByTestId("synthetic-demonstration-label").first()).toBeVisible();
 
   // The desk shows the shape of the job, and the pilot states its own terms.
   await expect(page.getByRole("heading", { name: "A place for what needs you." })).toBeVisible();
-  await expect(page.getByText(/Six synthetic records/)).toBeVisible();
+  await expect(page.getByText(/Inside Commitment Control: six synthetic records/)).toBeVisible();
   await expect(page.getByText("Needs a decision").first()).toBeVisible();
   await expect(page.getByText(/Payment is not activation/)).toBeVisible();
   await expect(page.getByText("INR 14,999").first()).toBeVisible();
@@ -177,25 +180,30 @@ test("the landing demonstrates the decision loop and sends visitors to their own
 });
 
 test("the mobile landing keeps the primary action visible without overflow", async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto("/");
-
-  const primary = page.getByRole("link", { name: "Review the synthetic request" }).first();
-  await expect(primary).toBeVisible();
-  const actionBottom = await primary.evaluate((element) => element.getBoundingClientRect().bottom);
-  const metrics = await page.evaluate(() => ({
-    viewportHeight: window.innerHeight,
-    documentWidth: document.documentElement.scrollWidth,
-  }));
-  expect(metrics.documentWidth).toBeLessThanOrEqual(375 + 1);
-  expect(actionBottom).toBeLessThan(metrics.viewportHeight);
+  for (const viewport of [{ width: 320, height: 568 }, { width: 375, height: 812 }, { width: 844, height: 390 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    const primary = page.getByRole("link", { name: "Try a spending decision", exact: true });
+    await expect(primary).toBeVisible();
+    const actionBottom = await primary.evaluate((element) => element.getBoundingClientRect().bottom);
+    const nextSectionTop = await page.locator(".home-freeze").evaluate(element => element.getBoundingClientRect().top);
+    const metrics = await page.evaluate(() => ({
+      viewportHeight: window.innerHeight,
+      documentWidth: document.documentElement.scrollWidth,
+    }));
+    expect(metrics.documentWidth).toBeLessThanOrEqual(viewport.width);
+    expect(actionBottom).toBeLessThan(metrics.viewportHeight);
+    expect(nextSectionTop).toBeLessThan(metrics.viewportHeight - 16);
+    await expect(page.locator(".home-scene .sheet").getByText("INR 4,80,000", { exact: true })).toBeVisible();
+    await expect(page.locator(".home-scene .sheet").getByTestId("synthetic-demonstration-label")).toBeVisible();
+  }
 });
 
 test("login presents one Google identity path without product detours", async ({ page }) => {
   await page.goto("/login?next=/app");
 
   await expect(page.getByRole("heading", { level: 1, name: "Sign in to Vognary." })).toBeVisible();
-  await expect(page.getByText("Commitments, decisions, and their evidence.")).toBeVisible();
+  await expect(page.getByText("Your bill reviews and saved decisions.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await expect(page.getByText("Google is only for sign-in. Vognary does not access Gmail.")).toBeVisible();
 

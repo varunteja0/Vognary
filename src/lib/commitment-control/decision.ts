@@ -1,4 +1,4 @@
-import type { ProposalPolicyEvaluation } from "./policy";
+import { normalizeControlAmountBasis, type ControlAmountBasis, type ProposalPolicyEvaluation } from "./policy";
 import { normalizeCurrency, parsePositiveMinorUnits, requireUuid } from "./money";
 import { normalizeControlDateOnly } from "./outcome";
 import { calendarDateInTimeZone } from "./project";
@@ -14,6 +14,7 @@ export type AuthorizedProposalDecision = {
   approvedCapMinor: string | null;
   currency: string;
   expectedAmountMinor: string;
+  amountBasis?: ControlAmountBasis;
   decidedByUserId: string | null;
   decidedAt: string;
   authorizationExpiresOn: string | null;
@@ -51,6 +52,7 @@ export function authorizeProposalDecision(input: {
     }
   }
   const expectedAmount = parsePositiveMinorUnits(input.evaluation.proposal.amountMinor, "Expected proposal amount");
+  const amountBasis = normalizeControlAmountBasis(input.evaluation.proposal.amountBasis);
   let approvedCapMinor: string | null = null;
   if (input.action === "APPROVE") {
     if (input.approvedCapMinor !== undefined) throw new Error("APPROVE freezes the proposed per-charge amount and does not accept a separate cap.");
@@ -86,6 +88,7 @@ export function authorizeProposalDecision(input: {
     approvedCapMinor,
     currency: normalizeCurrency(input.evaluation.proposal.currency, "Decision currency"),
     expectedAmountMinor: expectedAmount.toString(),
+    ...(amountBasis ? { amountBasis } : {}),
     decidedByUserId: requireUuid(input.actorUserId, "Decision actor id"),
     decidedAt: decidedAt.toISOString(),
     authorizationExpiresOn,

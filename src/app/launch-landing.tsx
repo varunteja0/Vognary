@@ -35,22 +35,22 @@ export default function LaunchLanding() {
             <header className="home-intro">
               <p className="home-category">Commitment Control for India-first AI companies</p>
               <h1 id="home-title" className="home-title">Vognary<span aria-hidden>.</span></h1>
-              <p className="home-lead">Before the commitment. <br />A clear human decision.</p>
+              <p className="home-lead">Agree the limit.<br /> Keep the decision.</p>
             </header>
-            <div className="home-scene" aria-label="Synthetic commitment awaiting a human decision">
+            <div className="home-scene" aria-label="Synthetic spending request awaiting a human decision">
               <div className="home-scene-rail">
-                <p className="home-scene-label">The decision desk</p>
+                <p className="home-scene-label">A spending decision, kept with its evidence</p>
                 <ol className="home-sequence">
-                  <li aria-current="step"><span>Proposed</span><small>User-entered assumption</small></li>
-                  <li><span>Authorized</span><small>A named person decides</small></li>
-                  <li><span>Observed</span><small>Later financial evidence</small></li>
+                  <li aria-current="step"><span>Proposed</span><small>State the request</small></li>
+                  <li><span>Authorized</span><small>Record a human decision</small></li>
+                  <li><span>Compared</span><small>Check later evidence</small></li>
                 </ol>
-                <Link href="/demo" className="btn btn-primary">Review the synthetic request <ArrowRight size={17} aria-hidden /></Link>
+                <Link href="/demo" className="btn btn-primary">Try a spending decision <ArrowRight size={17} aria-hidden /></Link>
               </div>
-              <RequestSheet />
+              <RequestSheet headingId="home-title" compact />
             </div>
             <div className="home-entry-foot">
-              <p>Policy gives context. Only you authorize.</p>
+              <p>Fixed synthetic example. No account, provider access or financial action.</p>
               <a href="#home-freeze-title" aria-label="Explore the authorization record"><ArrowDown size={20} aria-hidden /></a>
             </div>
           </div>
@@ -60,7 +60,7 @@ export default function LaunchLanding() {
         <section className="home-band home-freeze" aria-labelledby="home-freeze-title">
           <div className="home-measure home-freeze-grid">
             <div className="home-say">
-              <p className="home-category">One decision. A lasting record.</p>
+              <p className="home-category">For a finance owner, before and after the decision</p>
               <h2 id="home-freeze-title" className="home-section-heading font-display">
                 The cap stays put.<br />The evidence speaks.
               </h2>
@@ -78,7 +78,7 @@ export default function LaunchLanding() {
           <div className="home-measure">
             <div className="home-band-heading">
               <h2 id="home-week-title" className="home-section-heading font-display">A place for what needs you.</h2>
-              <p>Six synthetic records, computed by the product&apos;s policy and reconciliation engines. Not customer activity.</p>
+              <p>Inside Commitment Control: six synthetic records, computed by the policy and reconciliation engines. Not customer activity.</p>
             </div>
             <DeskStrip headingId="home-week-title" />
           </div>
@@ -103,7 +103,7 @@ export default function LaunchLanding() {
         <section className="home-band home-pilot" aria-labelledby="home-pilot-title">
           <div className="home-measure home-pilot-grid">
             <div>
-              <p className="home-category">For a named finance owner</p>
+              <p className="home-category">Commitment Control / For a named finance owner</p>
               <h2 id="home-pilot-title" className="home-section-heading font-display">
                 One pilot month.
               </h2>
@@ -119,14 +119,16 @@ export default function LaunchLanding() {
             <div className="home-pilot-detail">
               <ul className="home-pilot-terms">
                 <li>One policy setup and up to {commitmentControlPilotOffer.proposalLimit} proposals.</li>
-                <li>Up to {commitmentControlPilotOffer.reconciliationReviewLimit} weekly reconciliation reviews.</li>
+                <li>Up to {commitmentControlPilotOffer.reconciliationReviewLimit} weekly 30-minute reconciliation reviews and {commitmentControlPilotOffer.additionalFounderSupportMinutes / 60} support hours.</li>
                 <li>Payment reserves the pilot. Payment is not activation.</li>
                 <li>A second month requires a separate purchase.</li>
               </ul>
+              <p>The bill-review example is an evaluation, not a separate purchased service.</p>
+              <p>Provider verification and customer-data activation remain pending. A compatible spending decision can be compared with an explicitly selected Books bill; a closed bill review alone does not create that comparison.</p>
               <Link href="/pay" prefetch={false} className="btn btn-primary btn-lg">
                 See the one-month pilot <ArrowRight size={18} aria-hidden />
               </Link>
-              <Link href="/start" className="home-quiet">Use your own evidence</Link>
+              <Link href="/start" className="home-quiet">Try a synthetic bill-change review <ArrowRight size={17} aria-hidden /></Link>
             </div>
           </div>
         </section>

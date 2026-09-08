@@ -7,6 +7,7 @@ import { Check, Eye, EyeOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { guestAuditTransferKey } from "@/lib/guest-audit-transfer";
 import { PublicHeader } from "../public-shell";
+import { finishLocalSignOut } from "../session-privacy";
 import styles from "./login.module.css";
 
 type SessionPayload = {
@@ -160,9 +161,11 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
 
   async function signOut() {
     setStatus({ tone: "info", text: "Signing out…" });
-    await fetch("/api/auth/logout", { method: "POST" });
-    setSession((current) => (current ? { ...current, authenticated: false, session: null } : current));
-    setStatus({ tone: "success", text: "Signed out." });
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) throw new Error();
+      finishLocalSignOut();
+    } catch { setStatus({ tone: "error", text: "Sign-out was not confirmed. Retry before leaving this device." }); }
   }
 
   const googleButton = (
@@ -180,7 +183,8 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
           <header className={styles.intro}>
           <span className={styles.identity}>Your workspace</span>
           <h1>Sign in to Vognary.</h1>
-          <p>Commitments, decisions, and their evidence.</p>
+          <p>Your bill reviews and saved decisions.</p>
+          <p>Sign-in is not pilot activation. Bill review is an evaluation; the paid offer is <Link href="/pay" className="link-quiet">Commitment Control</Link>.</p>
           </header>
 
           <div className={styles.form}>
@@ -207,7 +211,7 @@ export default function LoginClient({ initialGoogleReason, initialNextPath, init
                   </div>
                 ) : null}
                 {googleButton}
-                <p className="mt-3 text-xs leading-5 text-(--muted)">Google is only for sign-in. Vognary does not access Gmail.</p>
+                <p className="mt-3 text-xs leading-5 text-(--muted)">Google is only for sign-in. Vognary does not access Gmail. Connecting Zoho Books requires your separate permission after sign-in.</p>
                 <Notice banner={googleStatus} />
               </div>
 

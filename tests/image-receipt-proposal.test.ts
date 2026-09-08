@@ -12,7 +12,7 @@ import {
   RECEIPT_IMAGE_CLIENT_TIMEOUT_MS,
   sanitizeReceiptLineProposal,
 } from "../src/lib/recovery/image-receipt-proposal";
-import { POST } from "../src/app/api/receipt-image/propose/route";
+import { proposeReceiptLineFromImageFile } from "../src/lib/server/receipt-image-propose";
 
 const manageSubscriptionScreenshotText = [
   "Manage Subscription",
@@ -52,33 +52,17 @@ test("receipt-image propose stays fail-closed on an unreadable raster", async ()
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082",
     "hex",
   );
-  const body = new FormData();
-  body.append("file", new File([png], "blur.png", { type: "image/png" }));
-  const response = await POST(new Request("https://vognary.example/api/receipt-image/propose", {
-    method: "POST",
-    headers: { "x-forwarded-for": `receipt-image-${Date.now()}` },
-    body,
-  }) as never);
-  assert.equal(response.status, 200);
-  const payload = await response.json() as { proposal: null; reason: string };
+  const payload = await proposeReceiptLineFromImageFile(new File([png], "blur.png", { type: "image/png" }));
   assert.equal(payload.proposal, null);
   assert.equal(payload.reason, "unreadable");
 });
 
 test("receipt-image propose reads a mislabeled text receipt", async () => {
-  const body = new FormData();
-  body.append("file", new File(
+  const payload = await proposeReceiptLineFromImageFile(new File(
     ["Cursor invoice paid USD 20.00 on 2026-08-28.\n"],
     "cursor.png",
     { type: "image/png" },
   ));
-  const response = await POST(new Request("https://vognary.example/api/receipt-image/propose", {
-    method: "POST",
-    headers: { "x-forwarded-for": `receipt-image-text-${Date.now()}` },
-    body,
-  }) as never);
-  assert.equal(response.status, 200);
-  const payload = await response.json() as { proposal: { merchant: string; amount: string; currency: string; date: string } };
   assert.deepEqual(payload.proposal, {
     merchant: "Cursor",
     amount: "20.00",
@@ -88,15 +72,8 @@ test("receipt-image propose reads a mislabeled text receipt", async () => {
 });
 
 test("receipt-image propose prefills a ChatGPT billing screenshot without inventing ₹1999", async () => {
-  const body = new FormData();
-  body.append("file", new File([`${chatgptBillingText}\n`], "chatgpt.png", { type: "image/png" }));
-  const response = await POST(new Request("https://vognary.example/api/receipt-image/propose", {
-    method: "POST",
-    headers: { "x-forwarded-for": `receipt-image-chatgpt-${Date.now()}` },
-    body,
-  }) as never);
-  assert.equal(response.status, 200);
-  const payload = await response.json() as { proposal: { merchant: string; amount: string; currency: string; date: string; zeroPaidVisible?: boolean } };
+  const payload = await proposeReceiptLineFromImageFile(new File([`${chatgptBillingText}\n`], "chatgpt.png", { type: "image/png" }));
+  assert.ok(payload.proposal);
   assert.equal(payload.proposal.merchant, "ChatGPT Plus");
   assert.equal(payload.proposal.currency, "INR");
   assert.equal(payload.proposal.date, "2026-07-24");
@@ -228,19 +205,12 @@ test("a paid 0 beats an OCR guess of the plan price", () => {
 });
 
 test("receipt-image propose prefills a subscription screenshot without a next-cycle charge date", async () => {
-  const body = new FormData();
-  body.append("file", new File(
+  const payload = await proposeReceiptLineFromImageFile(new File(
     [`${manageSubscriptionScreenshotText}\n`],
     "subscription.png",
     { type: "image/png" },
   ));
-  const response = await POST(new Request("https://vognary.example/api/receipt-image/propose", {
-    method: "POST",
-    headers: { "x-forwarded-for": `receipt-image-subscription-${Date.now()}` },
-    body,
-  }) as never);
-  assert.equal(response.status, 200);
-  const payload = await response.json() as { proposal: { merchant: string; amount: string; currency: string; date: string; nextBillingDate?: string } };
+  assert.ok(payload.proposal);
   assert.equal(payload.proposal.merchant, "");
   assert.equal(payload.proposal.amount, "427");
   assert.equal(payload.proposal.currency, "INR");

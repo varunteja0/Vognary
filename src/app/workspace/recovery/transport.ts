@@ -40,11 +40,12 @@ import {
 export type FailureOrigin = "SERVER" | "CLIENT";
 export type ResponseMeta = ApiSuccess<unknown>["meta"];
 
-export type TransportFailure = { ok: false; origin: FailureOrigin; error: RecoveryError };
+export type WriteOutcome = "NOT_ATTEMPTED" | "REJECTED" | "UNKNOWN";
+export type TransportFailure = { ok: false; origin: FailureOrigin; error: RecoveryError; outcome?: WriteOutcome };
 export type TransportResult<T> = { ok: true; data: T; meta: ResponseMeta } | TransportFailure;
 export type TransportPayload<T> = { ok: true; data: T } | TransportFailure;
 
-export type MutationContext = { workspaceVersion: number; idempotencyKey: string };
+export type MutationContext = { workspaceVersion: number; idempotencyKey: string; workspaceId?: string };
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -55,22 +56,43 @@ export const clientFailureReference = "client-device";
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
-function clientFailure(message: string, retryable: boolean): TransportFailure {
-  return { ok: false, origin: "CLIENT", error: { code: "UNKNOWN", message, retryable, requestId: clientFailureReference } };
+function clientFailure(message: string, retryable: boolean, outcome?: WriteOutcome): TransportFailure {
+  return { ok: false, origin: "CLIENT", error: { code: "UNKNOWN", message, retryable, requestId: clientFailureReference }, ...(outcome ? { outcome } : {}) };
 }
 
-function unexplainedHttpFailure(status: number): TransportFailure {
+function isMutation(init?: RequestInit): boolean {
+  return !["GET", "HEAD"].includes((init?.method ?? "GET").toUpperCase());
+}
+
+function canReplayRequest(init?: RequestInit): boolean {
+  const headers = new Headers(init?.headers);
+  return isMutation(init) && Boolean(headers.get("Idempotency-Key") && headers.get("If-Match") && headers.get("X-Vognary-Workspace"))
+    && (init?.body === undefined || typeof init.body === "string");
+}
+
+function unknownWriteFailure(init?: RequestInit): TransportFailure {
+  return clientFailure(
+    canReplayRequest(init)
+      ? "We cannot confirm whether this action was saved. It may have been saved. Retry the unchanged action to recover its result."
+      : "We cannot confirm whether this action was saved. It may have been saved. Reload to inspect the workspace before trying again.",
+    canReplayRequest(init),
+    "UNKNOWN",
+  );
+}
+
+function unexplainedHttpFailure(status: number, init?: RequestInit): TransportFailure {
+  if (isMutation(init)) return unknownWriteFailure(init);
   if (status === 412) {
     return clientFailure("A change landed after this page loaded. Reload to see the saved truth before trying again.", false);
   }
   return clientFailure(
-    "The workspace could not complete that action. Nothing was changed. Try again, or reload if this page is out of date.",
+    "The workspace response could not be read. Try again, or reload if this page is out of date.",
     status >= 500,
   );
 }
 
-function serverFailure(error: RecoveryError): TransportFailure {
-  return { ok: false, origin: "SERVER", error };
+function serverFailure(error: RecoveryError, outcome?: WriteOutcome): TransportFailure {
+  return { ok: false, origin: "SERVER", error, ...(outcome ? { outcome } : {}) };
 }
 
 export function readContractFailure(payload: unknown): RecoveryError | null {
@@ -112,25 +134,38 @@ function readLegacyMessage(payload: unknown): string | null {
 
 type RequestJsonResult = { failure: TransportFailure } | { payload: unknown };
 
-async function requestJson(doFetch: FetchLike, path: string, init?: RequestInit): Promise<RequestJsonResult> {
+async function requestJsonOnce(doFetch: FetchLike, path: string, init?: RequestInit): Promise<RequestJsonResult> {
+  if (init?.signal?.aborted) {
+    return { failure: clientFailure("This request was cancelled before it was sent.", false, "NOT_ATTEMPTED") };
+  }
   let response: Response;
   try {
     response = await doFetch(path, { cache: "no-store", ...init });
   } catch {
-    return { failure: clientFailure("This device could not reach the workspace. Nothing was sent.", true) };
+    return { failure: isMutation(init) ? unknownWriteFailure(init) : clientFailure("This device could not reach the workspace. Try loading it again.", true) };
   }
   let payload: unknown;
   try {
     payload = await response.json();
   } catch {
-    return { failure: unexplainedHttpFailure(response.status) };
+    return { failure: unexplainedHttpFailure(response.status, init) };
   }
   const contractFailure = readContractFailure(payload);
-  if (contractFailure) return { failure: serverFailure(contractFailure) };
+  if (contractFailure) return { failure: serverFailure(contractFailure, isMutation(init) ? (response.status >= 500 ? "UNKNOWN" : "REJECTED") : undefined) };
   const legacyMessage = readLegacyMessage(payload);
-  if (legacyMessage) return { failure: { ok: false, origin: "SERVER", error: { code: "UNKNOWN", message: legacyMessage, retryable: response.status >= 500, requestId: clientFailureReference } } };
-  if (!response.ok) return { failure: unexplainedHttpFailure(response.status) };
+  if (legacyMessage) return { failure: serverFailure({ code: "UNKNOWN", message: legacyMessage, retryable: response.status >= 500, requestId: clientFailureReference }, isMutation(init) ? (response.status >= 500 ? "UNKNOWN" : "REJECTED") : undefined) };
+  if (!response.ok) return { failure: unexplainedHttpFailure(response.status, init) };
   return { payload };
+}
+
+async function requestJson(doFetch: FetchLike, path: string, init?: RequestInit): Promise<RequestJsonResult> {
+  const result = await requestJsonOnce(doFetch, path, init);
+  if ("failure" in result && result.failure.origin === "CLIENT" && result.failure.outcome === "UNKNOWN"
+    && canReplayRequest(init) && !init?.signal?.aborted) {
+    const replay = await requestJsonOnce(doFetch, path, init);
+    return "failure" in replay ? { failure: { ...replay.failure, outcome: "UNKNOWN" } } : replay;
+  }
+  return result;
 }
 
 async function call<T>(
@@ -142,14 +177,14 @@ async function call<T>(
   const outcome = await requestJson(doFetch, path, init);
   if ("failure" in outcome) return outcome.failure;
   const success = readSuccess<T>(outcome.payload, accept);
-  if (!success) return clientFailure("The workspace replied in a shape this app does not recognise. Nothing is assumed about your money.", false);
+  if (!success) return isMutation(init) ? unknownWriteFailure(init) : clientFailure("The workspace replied in a shape this app does not recognise. Nothing is assumed about your money.", false);
   return { ok: true, data: success.data, meta: success.meta };
 }
 
 async function callUnwrapped<T>(doFetch: FetchLike, path: string, accept: (payload: unknown) => payload is T, init?: RequestInit): Promise<TransportPayload<T>> {
   const outcome = await requestJson(doFetch, path, init);
   if ("failure" in outcome) return outcome.failure;
-  if (!accept(outcome.payload)) return clientFailure("The workspace replied in a shape this app does not recognise.", false);
+  if (!accept(outcome.payload)) return isMutation(init) ? unknownWriteFailure(init) : clientFailure("The workspace replied in a shape this app does not recognise.", false);
   return { ok: true, data: outcome.payload };
 }
 
@@ -157,11 +192,12 @@ export function workspaceVersionTag(version: number): WorkspaceVersionTag {
   return `"workspace:${version}"`;
 }
 
-function mutationHeaders({ workspaceVersion, idempotencyKey }: MutationContext): RecoveryMutationHeaders {
+function mutationHeaders({ workspaceVersion, idempotencyKey, workspaceId }: MutationContext): RecoveryMutationHeaders {
   return {
     "Content-Type": "application/json",
     "Idempotency-Key": idempotencyKey,
     "If-Match": workspaceVersionTag(workspaceVersion),
+    ...(workspaceId ? { "X-Vognary-Workspace": workspaceId } : {}),
   };
 }
 

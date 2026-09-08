@@ -21,6 +21,7 @@ const publicSurfaces = [
   "src/app/workspace/recovery/recovery-home.tsx",
   "src/app/workspace/recovery/recovery-commitments.tsx",
   "src/app/workspace/recovery/recovery-sources.tsx",
+  "src/app/workspace/recovery/zoho-books-panel.tsx",
   "src/app/workspace/recovery/recovery-billing-setup.tsx",
   "src/app/workspace/recovery/recovery-attention.tsx",
   "src/app/workspace/recovery/control/control-attention.tsx",

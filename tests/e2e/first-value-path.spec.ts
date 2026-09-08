@@ -5,13 +5,13 @@ test("the first-value path leads into the product without a cancel promise", asy
   await page.goto("/");
 
   const primary = page.getByRole("link", { name: "Review the synthetic request" }).first();
-  const evidence = page.getByRole("link", { name: "Use your own evidence" }).first();
+  const evidence = page.getByRole("link", { name: "Try a synthetic bill-change review" }).first();
   await expect(primary).toBeVisible();
   await expect(primary).toHaveAttribute("href", "/demo");
   await expect(evidence).toHaveAttribute("href", "/start");
   await evidence.click();
   await expect(page).toHaveURL(/\/start/);
-  await expect(page.getByRole("heading", { name: "See the charge. Sign in to authorize." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Supplier bill review", exact: true })).toBeVisible();
   await page.goto("/");
   await expect(page.getByRole("link", { name: "Request a private audit" })).toHaveCount(0);
   expect(failures).toEqual([]);

@@ -144,6 +144,7 @@ async function readGraphInputs(client: PoolClient, workspaceId: string) {
      left join recovery_source_disconnections disconnection
        on disconnection.workspace_id = source.workspace_id and disconnection.source_id = source.id
      where source.workspace_id = $1
+       and source.source_type in ('RECEIPT_PASTE','CSV_IMPORT','FORWARDED_EMAIL','GMAIL_OAUTH')
      group by source.id, disconnection.source_id, disconnection.reconnected_at
      order by source.id`,
     [workspaceId],
@@ -180,6 +181,7 @@ async function readGraphInputs(client: PoolClient, workspaceId: string) {
      left join recovery_inbound_sender_assessments assessment
        on assessment.workspace_id = evidence.workspace_id and assessment.source_id = evidence.source_id
      where link.workspace_id = $1
+       and evidence.evidence_kind in ('TRANSACTION','RECEIPT')
      order by link.commitment_id, evidence.evidence_date nulls last, evidence.id`,
     [workspaceId],
   );
@@ -642,6 +644,7 @@ export async function readCommitmentGraph(input: {
        join recovery_sources source
          on source.workspace_id = health.workspace_id and source.id = health.source_id
        where health.workspace_id = $1
+         and source.source_type in ('RECEIPT_PASTE','CSV_IMPORT','FORWARDED_EMAIL','GMAIL_OAUTH')
        order by health.source_id`,
       [input.workspaceId],
     );

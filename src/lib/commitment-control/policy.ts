@@ -5,6 +5,7 @@ const categoryPostures = ["ALLOW", "REVIEW", "OUTSIDE_POLICY"] as const;
 
 export type ProposalCategory = typeof proposalCategories[number];
 export type CategoryPosture = typeof categoryPostures[number];
+export type ControlAmountBasis = "GROSS_BILLED_TOTAL_PER_CHARGE";
 export type PolicyEvaluationStatus = "WITHIN_POLICY" | "REVIEW_REQUIRED" | "OUTSIDE_POLICY";
 export type PolicyReasonCode =
   | "CATEGORY_POLICY_MISSING"
@@ -30,6 +31,7 @@ export type ProposalPolicy = {
 export type ProposalForPolicy = {
   proposalId: string;
   amountMinor: string;
+  amountBasis?: ControlAmountBasis;
   currency: string;
   category: ProposalCategory;
   thirteenWeekMinor: string;
@@ -167,14 +169,22 @@ export function evaluateProposalPolicy(input: {
 
 function normalizeProposal(proposal: ProposalForPolicy): ProposalForPolicy {
   if (!proposalCategories.includes(proposal.category)) throw new Error("Proposal category is not supported.");
+  const amountBasis = normalizeControlAmountBasis(proposal.amountBasis);
   return {
     proposalId: requireUuid(proposal.proposalId, "Proposal id"),
     amountMinor: parsePositiveMinorUnits(proposal.amountMinor, "Proposal amount").toString(),
+    ...(amountBasis ? { amountBasis } : {}),
     currency: normalizeCurrency(proposal.currency, "Proposal currency"),
     category: proposal.category,
     thirteenWeekMinor: parseMinorUnits(proposal.thirteenWeekMinor, "Proposed 13-week exposure").toString(),
     annualMinor: parseMinorUnits(proposal.annualMinor, "Proposed annual exposure").toString(),
   };
+}
+
+export function normalizeControlAmountBasis(value: unknown): ControlAmountBasis | undefined {
+  if (value === undefined) return undefined;
+  if (value !== "GROSS_BILLED_TOTAL_PER_CHARGE") throw new Error("The amount basis must be gross billed total per charge or remain unspecified for the existing receipt path.");
+  return value;
 }
 
 export function normalizeProposalPolicy(policy: ProposalPolicy): ProposalPolicy {

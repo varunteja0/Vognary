@@ -36,6 +36,22 @@ const policy = {
   }],
 };
 
+test("explicit gross billed basis survives evaluation and authorization without reinterpreting legacy decisions", () => {
+  const compatible = { ...proposal, amountBasis: "GROSS_BILLED_TOTAL_PER_CHARGE" as const };
+  const evaluation = evaluateProposalPolicy({ proposal: compatible, policy, existingExposure: [] });
+  assert.deepEqual(evaluation.proposal, compatible);
+  const decision = authorizeProposalDecision({
+    actorRole: "owner", actorUserId: "b1000000-0000-4000-8000-000000000001", evaluation,
+    action: "APPROVE_WITH_CAP", approvedCapMinor: "200000", authorizationExpiresOn: "2026-09-30",
+    decidedAt: "2026-09-07T00:00:00.000Z",
+  });
+  assert.equal(Reflect.get(decision, "amountBasis"), "GROSS_BILLED_TOTAL_PER_CHARGE");
+  assert.equal(decision.approvedCapMinor, "200000");
+  const legacy = evaluateProposalPolicy({ proposal, policy, existingExposure: [] });
+  assert.equal(Reflect.get(legacy.proposal, "amountBasis"), undefined);
+  assert.throws(() => evaluateProposalPolicy({ proposal: { ...proposal, ...{ amountBasis: "NET_OF_TAX" } } as never, policy, existingExposure: [] }), /basis/i);
+});
+
 test("evaluates cited exposure and proposal assumptions without making a decision", () => {
   const evaluation = evaluateProposalPolicy({
     proposal,

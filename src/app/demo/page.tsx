@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { formatExactMinorUnits } from "@/components/ui/money-value";
 import {
   publicArtifactJsonLd,
   publicArtifactMetadata,
@@ -12,7 +13,12 @@ export const metadata: Metadata = publicArtifactMetadata;
 export default function DemoPage() {
   const branches = syntheticDemoBranchOrder.map(action => {
     const entry = syntheticControlBrief("RECONCILED", action).proposals[0];
-    return { action, label: syntheticDemoBranchLabels[action], outcome: syntheticDemoBranchOutcomes[action], decision: entry.decision, reconciliation: entry.reconciliations[0] ?? null };
+    const reconciliation = entry.reconciliations[0] ?? null;
+    const capDisplay = entry.decision?.approvedCapMinor
+      ? formatExactMinorUnits(entry.decision.approvedCapMinor, entry.decision.currency) : null;
+    const observedDisplay = reconciliation?.observedAmountMinor && reconciliation.observedCurrency
+      ? formatExactMinorUnits(reconciliation.observedAmountMinor, reconciliation.observedCurrency) : null;
+    return { action, label: syntheticDemoBranchLabels[action], outcome: syntheticDemoBranchOutcomes[action], decision: entry.decision, reconciliation, capDisplay, observedDisplay };
   });
   return (
     <>

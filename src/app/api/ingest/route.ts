@@ -12,6 +12,7 @@ import { convertSpreadsheetToCsv } from "@/lib/server/spreadsheet-ingest";
 import { getAiClient } from "@/lib/server/ai/client";
 import { extractLineItems } from "@/lib/server/ai/extract";
 import { readAiBudgetFromEnv, isAiBudgetOpen } from "@/lib/server/ai/budget-env";
+import { rejectUnclearedFinancialRequest } from "@/lib/server/financial-intake";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -35,6 +36,8 @@ export async function POST(request: NextRequest) {
 
   const limit = await rateLimit(request, { namespace: "ingest", limit: 10, windowMs: 5 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
+  const blocked = await rejectUnclearedFinancialRequest(request);
+  if (blocked) return blocked;
 
   let formData: FormData;
   try {

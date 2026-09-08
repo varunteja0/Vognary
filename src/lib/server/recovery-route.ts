@@ -13,6 +13,7 @@ import {
   UnsupportedContentTypeError,
 } from "@/lib/server/request-body";
 import { readCurrentSession, type AuthSession } from "@/lib/server/session";
+import { requireFinancialIntakeWorkspace } from "@/lib/server/financial-intake";
 
 type RecoveryRouteContext = {
   requestId: string;
@@ -23,6 +24,7 @@ type RecoveryRouteOptions = {
   namespace: string;
   limit: number;
   windowMs: number;
+  financialIntake?: boolean;
 };
 
 export async function runRecoveryRoute(
@@ -47,6 +49,8 @@ export async function runRecoveryRoute(
     const session = await readCurrentSession(request);
     if (!session) throw new RecoveryServiceError("AUTH_REQUIRED");
     if (!session.workspaceId) throw new RecoveryServiceError("FORBIDDEN");
+    assertRecoveryWorkspaceTarget(request, session.workspaceId);
+    if (options.financialIntake) requireFinancialIntakeWorkspace(session.workspaceId);
     return await handler({ requestId, session: { ...session, workspaceId: session.workspaceId } });
   } catch (error) {
     if (shouldReportRecoveryError(error)) {
@@ -64,6 +68,13 @@ export async function runRecoveryRoute(
       }).catch(() => undefined);
     }
     return recoveryFailureResponse(error, requestId);
+  }
+}
+
+export function assertRecoveryWorkspaceTarget(request: Request, workspaceId: string) {
+  const target = request.headers.get("X-Vognary-Workspace");
+  if (target !== null && target !== workspaceId) {
+    throw new RecoveryServiceError("FORBIDDEN", "This request belongs to another workspace. Return to the original workspace before retrying.");
   }
 }
 

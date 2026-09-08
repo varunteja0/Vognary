@@ -19,11 +19,11 @@ const checkoutAction = "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af80
 const setupNodeAction = "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38";
 const uploadArtifactAction = "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02";
 
-test("main pushes require an explicit production deployment after release gates", () => {
+test("main automatic deployment stays enabled under the September 6 founder authorization", () => {
   const config = JSON.parse(read("vercel.json")) as {
     git?: { deploymentEnabled?: Record<string, boolean> };
   };
-  assert.equal(config.git?.deploymentEnabled?.main, false);
+  assert.equal(config.git?.deploymentEnabled?.main, true);
 });
 
 test("CI receipt webhook configuration rejects unsigned input through the real verifier", async () => {

@@ -6,6 +6,8 @@ import { formatDay, formatMoment } from "../labels";
 import { ControlEvaluation, ControlFact } from "./control-evaluation";
 import { ControlAuthorizationAmountFacts } from "./control-authorization-facts";
 import { ControlOutcomeFact } from "./control-outcome-fact";
+import { supportsProviderBill } from "./control-provider-bill-state";
+import { ControlProviderBillResult } from "./control-provider-bill-result";
 import {
   controlDecisionRecordedLabels,
   controlExceptionDispositionLabels,
@@ -67,14 +69,19 @@ export function ControlProposalRow({
 
   useEffect(() => {
     if (!focused) return;
-    headingRef.current?.focus();
+    const comparisonId = new URL(window.location.href).searchParams.get("comparison");
+    const comparison = reconciliations.some(item => item.id === comparisonId)
+      ? document.getElementById(`control-comparison-${comparisonId}`) : null;
+    (comparison ?? headingRef.current)?.focus();
     onFocused?.();
-  }, [focused, onFocused]);
+  }, [focused, onFocused, reconciliations]);
 
   const decideButtonId = `control-decide-${proposal.id}`;
   const reconcileButtonId = `control-reconcile-${proposal.id}`;
   // The record's tone follows the most recent observation, never an average.
   const settledVerdict = reconciliations[0]?.verdict ?? null;
+  const hasBilledComparison = reconciliations.some(item => item.comparisonKind === "BILLED_AMOUNT_COMPARISON");
+  const entryMetadata = <p className="control-card-meta">Entered {formatMoment(proposal.createdAt)} · {proposal.submittedByDisplayName ? `by ${proposal.submittedByDisplayName}` : "submitter name not on record"} · basis {proposal.assumptionBasis === "USER_ENTERED_ASSUMPTION" ? "user entered" : proposal.assumptionBasis}</p>;
 
   return (
     <article
@@ -102,7 +109,7 @@ export function ControlProposalRow({
           ) : null}
         </div>
         <p className="control-card-purpose">{proposal.purpose}</p>
-        <p className="control-card-meta">Entered {formatMoment(proposal.createdAt)} · {proposal.submittedByDisplayName ? `by ${proposal.submittedByDisplayName}` : "submitter name not on record"} · basis {proposal.assumptionBasis === "USER_ENTERED_ASSUMPTION" ? "user entered" : proposal.assumptionBasis}</p>
+        {!decision ? entryMetadata : null}
       </header>
 
       {!decision && evaluation ? (
@@ -123,9 +130,9 @@ export function ControlProposalRow({
         </div>
       ) : null}
 
-      <dl className="control-facts">
+      {!decision ? <dl className="control-facts">
         <ControlOutcomeFact outcome={proposal.intendedOutcome} />
-      </dl>
+      </dl> : null}
 
       {decision ? (
         <section aria-label={`Authorization record for ${proposal.merchant}`} className="control-authority">
@@ -134,9 +141,10 @@ export function ControlProposalRow({
             {decision.decidedByDisplayName ?? "Deciding account not on record"} · {formatMoment(decision.decidedAt)} · policy version {decision.evaluationPolicyVersion}
             {decision.authorizationExpiresOn ? ` · expires ${decision.authorizationExpiresOn}` : " · expiry not recorded on this legacy decision"}
           </p>
+          {decision.amountBasis === "GROSS_BILLED_TOTAL_PER_CHARGE" ? <p className="control-note">Frozen basis: gross billed total per charge, including tax, discounts and adjustments.</p> : null}
 
-          <div className="ledger">
-            <dl className="ledger-rows">
+          <div className={hasBilledComparison ? undefined : "ledger"}>
+            {!hasBilledComparison ? <><dl className="ledger-rows">
               <ControlAuthorizationAmountFacts decision={decision} />
             </dl>
 
@@ -144,8 +152,9 @@ export function ControlProposalRow({
                 obligation existed; everything below arrived afterwards. */}
             <p className="ledger-line">
               <span>Frozen before</span>
-              <span>Observed after</span>
+              <span>{decision.amountBasis === "GROSS_BILLED_TOTAL_PER_CHARGE" ? "Compare later evidence" : "Observed after"}</span>
             </p>
+            </> : null}
 
             {decision.action === "DECLINE" ? (
               <p className="ledger-closed">
@@ -155,14 +164,14 @@ export function ControlProposalRow({
             ) : reconciliations.length === 0 ? (
               <>
                 <dl className="ledger-rows">
-                  <ControlFact label="Observed" value="Awaiting evidence" observed />
+                  <ControlFact label={decision.amountBasis === "GROSS_BILLED_TOTAL_PER_CHARGE" ? "Later evidence" : "Observed"} value="Awaiting evidence" observed />
                 </dl>
                 <p className="ledger-closed">
-                  No receipt has been linked to this authorization yet, so nothing has been observed against the frozen cap.
+                  {decision.amountBasis === "GROSS_BILLED_TOTAL_PER_CHARGE" ? "No later bill or saved receipt has been compared with this authorization yet." : "No receipt has been linked to this authorization yet, so nothing has been observed against the frozen cap."}
                 </p>
               </>
             ) : (
-              reconciliations.map((reconciliation, index) => (
+              reconciliations.map((reconciliation, index) => reconciliation.comparisonKind === "BILLED_AMOUNT_COMPARISON" ? <ControlProviderBillResult key={reconciliation.id} reconciliation={reconciliation} /> : (
                 <Fragment key={reconciliation.id}>
                   <dl className="ledger-rows" data-verdict={reconciliation.verdict}>
                     <ControlFact
@@ -220,6 +229,17 @@ export function ControlProposalRow({
             )}
           </div>
         </section>
+      ) : null}
+
+      {decision ? (
+        <details className="control-more">
+          <summary>Proposal assumptions and author</summary>
+          <div className="control-more-body">
+            {entryMetadata}
+            {decision.amountBasis !== "GROSS_BILLED_TOTAL_PER_CHARGE" ? <p className="control-note">Amount basis not recorded. Use saved receipts.</p> : null}
+            <dl className="control-facts"><ControlOutcomeFact outcome={proposal.intendedOutcome} /></dl>
+          </div>
+        </details>
       ) : null}
 
       {outcomeObservations.map((observation) => (
@@ -299,11 +319,11 @@ export function ControlProposalRow({
               disabled={pendingKind !== null || !online}
               onClick={() => onReconcile(proposal.id, reconcileButtonId)}
             >
-              {pendingKind === "RECONCILIATION" ? "Linking…" : "Link observed evidence"}
+              {pendingKind === "RECONCILIATION" ? "Linking…" : supportsProviderBill(proposal, decision) ? "Compare a bill" : "Link observed evidence"}
             </button>
           ) : null}
           <p className="control-note">
-            The frozen cap never changes. A later observation is appended below it, whatever it shows.
+            {decision.amountBasis === "GROSS_BILLED_TOTAL_PER_CHARGE" ? "The cap stays unchanged. Each selected bill receives its own saved comparison." : "The frozen cap never changes. A later observation is appended below it, whatever it shows."}
           </p>
         </div>
       ) : null}

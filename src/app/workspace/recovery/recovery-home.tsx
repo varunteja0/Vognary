@@ -68,7 +68,7 @@ export function RecoveryHome({
   onOpenSources: () => void;
   onSeeAllCommitments: () => void;
   onWorkspaceMutated?: () => void;
-  onDecide: (request: PutDecisionRequest) => void;
+  onDecide: (request: PutDecisionRequest) => Promise<boolean>;
   onSaveContext: (commitmentId: string, request: PutCommitmentContextRequest) => void;
   onReminderConsent?: () => void;
   onPaymentAsk?: (answer: "yes" | "no") => void;
@@ -79,9 +79,12 @@ export function RecoveryHome({
   const [lastHook, setLastHook] = useState<{ title: string; body: string; artefact: string } | null>(null);
   const [paymentAnswer, setPaymentAnswer] = useState<"unasked" | "yes" | "no">("unasked");
 
-  function rememberDecision(request: PutDecisionRequest) {
+  async function rememberDecision(request: PutDecisionRequest) {
     const card = home.decisionQueue.find((item) => item.commitmentId === request.commitmentId);
     const action = request.action ?? actionFromDecision(request.decision);
+    setLastHook(null);
+    const saved = await onDecide(request);
+    if (!saved) return;
     if (card && action) {
       const hook = decisionHookCopy({
         merchant: card.merchant,
@@ -90,7 +93,9 @@ export function RecoveryHome({
       });
       setLastHook({
         title: hook.title,
-        body: hook.body,
+        body: action === "REVIEW_LATER" && (card.daysAway === null || card.daysAway <= 0)
+          ? "The review is recorded, but no later review date is available before this charge. It remains in today's decisions. Nothing was cancelled."
+          : hook.body,
         artefact: decisionArtefactText({
           merchant: card.merchant,
           amountDisplay: card.charge.display,
@@ -100,7 +105,6 @@ export function RecoveryHome({
         }),
       });
     }
-    onDecide(request);
   }
 
   const verifiedOutcomes = home.decisionOutcomes.filter((outcome) => (
@@ -468,6 +472,7 @@ function DecisionCard({
         <div id={reviewPanelId} hidden={!reviewOpen}>
           {reviewOpen ? (
             <div className="settle mt-3 flex flex-wrap items-center gap-2">
+              {card.daysAway === null || card.daysAway <= 0 ? <p className="w-full text-sm text-(--muted)">A later review cannot be scheduled before this charge. It will remain due today.</p> : null}
               <span className="font-data text-xs text-(--muted)">{customerPhrases.reviewWhen}</span>
               {reviewSnoozes.map((snooze) => (
                 <button

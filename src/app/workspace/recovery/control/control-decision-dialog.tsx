@@ -62,6 +62,7 @@ export function ControlDecisionDialog({
         <ControlFact label="Merchant" value={proposal.merchant} />
         <ControlFact label="Purpose" value={proposal.purpose} />
         <ControlFact label="Assumption per charge" money={{ minor: proposal.amountMinor, currency: proposal.currency, provenance: { kind: "assumed" } }} />
+        <ControlFact label="Amount basis" value={proposal.amountBasis === "GROSS_BILLED_TOTAL_PER_CHARGE" ? "Gross billed total per charge, including tax, discounts and adjustments" : "Amount basis not recorded. Use saved receipts."} />
         <ControlOutcomeFact outcome={proposal.intendedOutcome} />
       </dl>
 

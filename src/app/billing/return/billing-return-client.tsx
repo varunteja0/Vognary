@@ -94,7 +94,7 @@ export default function BillingReturnClient({ checkoutId }: { checkoutId: string
       <StatusPanel tone="good" heading={`Payment settled — ${amount}`}>
         This {label} payment is confirmed by Razorpay&apos;s signed webhook.
         {isCurrentOffer
-          ? ` Activation is a founder step, not an automatic one: Vognary replies to the email used at checkout and enables Commitment Control within ${commitmentControlPilotOffer.activationDeadlineBusinessDays} business days. Nothing is enabled until that reply.`
+          ? ` This reserves one Commitment Control pilot month, not a managed bill-review service. Payment does not activate customer data: independent assessment, remediation and retest, eligibility and written activation conditions must be complete. The founder confirms activation separately. If activation cannot occur within ${commitmentControlPilotOffer.activationDeadlineBusinessDays} business days after payment, you may request a full refund. Another month requires a separate purchase.`
           : " This checkout belongs to an offer Vognary no longer sells. Email support@vognary.com with the checkout reference for its exact service status."}
       </StatusPanel>
     );

@@ -50,6 +50,8 @@ jobs:
         timeout-minutes: 7
         run: node scripts/check-dependency-audit.mjs
       - run: npm run ci:database
+        env:
+          COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS: "*"
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run claims:check
@@ -105,7 +107,7 @@ jobs:
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
           npm run db:apply-schema
-          npm run test:e2e -- commitment-control-ui commitment-control-real recovery-customer-zero recovery-ui-home recovery-ui-states
+          npm run test:e2e -- commitment-control-ui commitment-control-real recovery-customer-zero recovery-ui-home recovery-ui-states zoho-books-ui
       - name: Stop dev server
         if: always()
         run: |

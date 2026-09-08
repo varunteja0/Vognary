@@ -25,6 +25,7 @@ import { addMinorUnits, requireUuid } from "@/lib/commitment-control/money";
 import {
   evaluateProposalPolicy,
   normalizeProposalPolicy,
+  type ControlAmountBasis,
   type ExistingExposure,
   type ProposalCategory,
   type ProposalPolicy,
@@ -33,6 +34,10 @@ import {
 import { calendarDateInTimeZone, projectProposalExposure, type ProposalCadence } from "@/lib/commitment-control/project";
 import { reconcileControlOutcome } from "@/lib/commitment-control/outcome";
 import { reconcileAuthorizedProposal } from "@/lib/commitment-control/reconcile";
+import { compareAuthorizedProviderBill } from "@/lib/commitment-control/billed-comparison";
+import { normalizeControlProviderBillRequest, type ControlProviderBillCandidateQuery, type ControlProviderBillCandidatesDto } from "@/lib/commitment-control/provider-bill-contracts";
+import { listControlProviderBillCandidates, loadControlProviderBillResponsibilities } from "@/lib/server/control-provider-bill-service";
+import { loadAdmittedProviderBills, loadControlProviderBillSource, lockControlProviderBillSource, materializeProviderBillEvidenceOnly, providerBillSourceBlocker } from "@/lib/server/recovery-provider-bill-store";
 import {
   selectControlReconciliationCandidates,
   type ControlReconciliationCandidatesDto,
@@ -157,6 +162,7 @@ export async function createCommitmentControlProposal(input: {
         proposal: {
           proposalId,
           amountMinor: projected.amountMinor,
+          amountBasis: input.request.amountBasis,
           currency: projected.currency,
           category: input.request.category,
           thirteenWeekMinor: projected.thirteenWeekMinor,
@@ -176,36 +182,36 @@ export async function createCommitmentControlProposal(input: {
            amount_minor, currency, first_charge_date, cadence, as_of_date,
            projected_13_week_minor, projected_annual_minor, intended_outcome_metric,
            intended_outcome_direction, intended_outcome_target_value, intended_outcome_unit,
-           intended_outcome_review_on, created_at
+           intended_outcome_review_on, created_at, amount_basis
          ) values (
            $1, $2, $3, $4, $5, $6, $7, $8::bigint, $9, $10::date, $11, $12::date,
-           $13::bigint, $14::bigint, $15, $16, $17, $18, $19::date, $20
+           $13::bigint, $14::bigint, $15, $16, $17, $18, $19::date, $20, $21
          )
          returning id, submitted_by_user_id, submitted_by_display_name, merchant, purpose, category, amount_minor::text,
            currency, first_charge_date, cadence, as_of_date, projected_13_week_minor::text,
            projected_annual_minor::text, intended_outcome_metric, intended_outcome_direction,
            intended_outcome_target_value, intended_outcome_unit, intended_outcome_review_on,
-           assumption_basis, created_at`,
+           assumption_basis, created_at, amount_basis`,
         [
           proposalId, input.workspaceId, input.actorUserId, submittedByDisplayName, merchant, purpose, input.request.category,
           projected.amountMinor, projected.currency, projected.firstChargeDate, projected.cadence,
           asOfDate, projected.thirteenWeekMinor, projected.annualMinor, intendedOutcome.metric,
           intendedOutcome.targetDirection, intendedOutcome.targetValue, intendedOutcome.unit,
-          intendedOutcome.reviewOn, now,
+          intendedOutcome.reviewOn, now, evaluation.proposal.amountBasis ?? null,
         ],
       );
       const evaluationId = randomUUID();
       const evaluationResult = await client.query<EvaluationRow>(
         `insert into commitment_control_evaluations (
            id, workspace_id, proposal_id, policy_version, status, human_decision_required,
-           assumption_fields, reason_codes, currency_results, cited_exposure_basis, evaluated_at
-         ) values ($1, $2, $3, $4, $5, true, $6::text[], $7::text[], $8::jsonb, $9, $10)
+           assumption_fields, reason_codes, currency_results, cited_exposure_basis, evaluated_at, amount_basis
+         ) values ($1, $2, $3, $4, $5, true, $6::text[], $7::text[], $8::jsonb, $9, $10, $11)
          returning id, proposal_id, policy_version, status, human_decision_required,
-           assumption_fields, reason_codes, currency_results, cited_exposure_basis, evaluated_at`,
+           assumption_fields, reason_codes, currency_results, cited_exposure_basis, evaluated_at, amount_basis`,
         [
           evaluationId, input.workspaceId, proposalId, evaluation.policyVersion, evaluation.status,
           evaluation.assumptionFields, evaluation.reasonCodes, JSON.stringify(evaluation.currencyResults),
-          evaluation.citedExposureBasis, now,
+          evaluation.citedExposureBasis, now, evaluation.proposal.amountBasis ?? null,
         ],
       );
       for (const evidenceId of evaluation.citedEvidenceIds) {
@@ -283,16 +289,16 @@ export async function decideCommitmentControlProposal(input: {
         `insert into commitment_control_decisions (
            id, workspace_id, proposal_id, evaluation_id, action, expected_amount_minor,
            approved_cap_minor, currency, decided_by_user_id, decided_by_display_name,
-           override_reason, authorization_expires_on, decided_at
-         ) values ($1, $2, $3, $4, $5, $6::bigint, $7::bigint, $8, $9, $10, $11, $12::date, $13)
+           override_reason, authorization_expires_on, decided_at, amount_basis
+         ) values ($1, $2, $3, $4, $5, $6::bigint, $7::bigint, $8, $9, $10, $11, $12::date, $13, $14)
          returning id, proposal_id, evaluation_id, action, expected_amount_minor::text,
            approved_cap_minor::text, currency, decided_by_user_id, decided_by_display_name,
-           override_reason, authorization_expires_on, decided_at`,
+           override_reason, authorization_expires_on, decided_at, amount_basis`,
         [
           decisionId, input.workspaceId, proposalId, loaded.evaluation.id, authorized.action,
           authorized.expectedAmountMinor, authorized.approvedCapMinor, authorized.currency,
           input.actorUserId, decidedByDisplayName, authorized.overrideReason,
-          authorized.authorizationExpiresOn, authorized.decidedAt,
+          authorized.authorizationExpiresOn, authorized.decidedAt, authorized.amountBasis ?? null,
         ],
       );
       const row = result.rows[0];
@@ -322,7 +328,9 @@ export async function reconcileCommitmentControlProposal(input: {
   now?: Date;
 }) {
   const proposalId = requireUuid(input.proposalId, "Proposal id");
-  const evidenceId = requireUuid(input.request.evidenceId, "Evidence id");
+  if (input.request.source === "ZOHO_BOOKS") return reconcileControlProviderBill(input, proposalId);
+  const request = input.request;
+  const evidenceId = requireUuid(request.evidenceId, "Evidence id");
   return runControlMutation({
     ...input,
     minimumRole: "admin",
@@ -335,14 +343,14 @@ export async function reconcileCommitmentControlProposal(input: {
       if (loaded.decision.action === "DECLINE") {
         throw new RecoveryServiceError("CONFLICT", "A declined proposal cannot be reconciled to observed spend.");
       }
-      const evidence = await client.query<{ id: string; amount_minor: string | null; currency: string | null; evidence_date: Date | string | null; observed_at: Date | string | null }>(
-        `select id, amount_minor::text, currency, evidence_date, observed_at
+      const evidence = await client.query<{ id: string; evidence_kind: string; amount_minor: string | null; currency: string | null; evidence_date: Date | string | null; observed_at: Date | string | null }>(
+        `select id, evidence_kind, amount_minor::text, currency, evidence_date, observed_at
          from recovery_evidence where workspace_id = $1 and id = $2`,
         [input.workspaceId, evidenceId],
       );
       const evidenceRow = evidence.rows[0];
       if (!evidenceRow) throw new RecoveryServiceError("NOT_FOUND");
-      if (evidenceRow.observed_at === null) {
+      if (evidenceRow.observed_at === null || !["TRANSACTION", "RECEIPT"].includes(evidenceRow.evidence_kind)) {
         throw new RecoveryServiceError("INVALID_EVIDENCE", "Reconciliation requires an observed financial charge, not a scheduled renewal.");
       }
       const reconciled = reconcileAuthorizedProposal({
@@ -354,7 +362,7 @@ export async function reconcileCommitmentControlProposal(input: {
           evidenceDate: evidenceRow.evidence_date ? toDateOnly(evidenceRow.evidence_date) : null,
         },
         intendedOutcome: loaded.proposal.intendedOutcome ?? undefined,
-        observedOutcome: input.request.observedOutcome,
+        observedOutcome: request.observedOutcome,
         observedThrough: calendarDateInTimeZone(now, "Asia/Kolkata"),
       });
       const reconciliationId = randomUUID();
@@ -393,6 +401,57 @@ export async function reconcileCommitmentControlProposal(input: {
         },
         entityId: reconciliationId,
       };
+    },
+  });
+}
+
+async function reconcileControlProviderBill(input: {
+  workspaceId: string; actorUserId: string; proposalId: string; expectedVersion: number;
+  idempotencyKey: string; request: ReconcileControlProposalRequest; now?: Date;
+}, proposalId: string) {
+  const request = normalizeControlProviderBillRequest(input.request);
+  return runControlMutation({
+    ...input, minimumRole: "admin", operation: "commitment-control.reconcile-provider-bill", mutationKind: "CONTROL_RECONCILIATION",
+    requestForHash: { workspaceId: input.workspaceId, actorUserId: input.actorUserId, proposalId, expectedVersion: input.expectedVersion, ...request },
+    replayMinimumRole: "viewer",
+    beforeRecoveryLock: client => lockControlProviderBillSource(client, input.workspaceId, input.actorUserId),
+    write: async (client, now) => {
+      const loaded = await loadProposalEvaluation(client, input.workspaceId, proposalId);
+      if (!loaded?.decision) throw new RecoveryServiceError("NOT_FOUND", "An explicit gross billed authorization is required.");
+      const source = await loadControlProviderBillSource(client, input.workspaceId, request);
+      if (!source) throw new RecoveryServiceError("NOT_FOUND", "That exact source bill is not in this workspace and organization.");
+      if (source.revision !== request.expectedSourceVersion || source.latest_sequence !== request.expectedLatestSequence || source.sequence !== request.expectedLatestSequence) {
+        throw new RecoveryServiceError("STALE_STATE", "The selected source or latest bill changed. Reload before confirming.");
+      }
+      const blocker = providerBillSourceBlocker(source, now);
+      if (blocker) throw new RecoveryServiceError("INVALID_EVIDENCE", `Provider bill cannot be admitted: ${blocker}.`);
+      let comparison: ReturnType<typeof compareAuthorizedProviderBill>;
+      try {
+        comparison = compareAuthorizedProviderBill({
+          decision: loaded.decision,
+          evidence: { evidenceId: randomUUID(), evidenceBasis: source.bill.basis, totalMinor: source.bill.totalMinor, currency: source.bill.currency, billDate: source.bill.date, sourceObservedAt: source.observed_at.toISOString(), status: source.bill.status, changeKind: source.change_kind },
+          wholeCharge: request.wholeCharge, comparedOn: calendarDateInTimeZone(now, "Asia/Kolkata"),
+        });
+      } catch (error) {
+        throw new RecoveryServiceError("INVALID_EVIDENCE", error instanceof Error ? error.message : "The bill cannot be compared to this authorization.");
+      }
+      const admitted = await materializeProviderBillEvidenceOnly(client, { workspaceId: input.workspaceId, actorUserId: input.actorUserId, request, source, now });
+      const outcome = loaded.proposal.intendedOutcome ? reconcileControlOutcome(loaded.proposal.intendedOutcome) : null;
+      const reconciliationId = randomUUID();
+      const inserted = await client.query<ReconciliationRow>(`insert into commitment_control_reconciliations(
+        id,workspace_id,proposal_id,decision_id,evidence_id,verdict,expected_amount_minor,approved_cap_minor,authorization_currency,
+        observed_amount_minor,observed_currency,observed_evidence_date,outcome_observation_basis,outcome_verdict,reconciled_by_user_id,reconciled_at,
+        comparison_kind,decision_amount_basis,observed_evidence_basis,relation_basis,retention_notice)
+        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'BILLED_AMOUNT_COMPARISON','GROSS_BILLED_TOTAL_PER_CHARGE','PROVIDER_BILL_TOTAL',$17,$18)
+        returning *,expected_amount_minor::text,approved_cap_minor::text,observed_amount_minor::text`,
+        [reconciliationId,input.workspaceId,proposalId,loaded.decision.id,admitted.evidenceId,comparison.verdict,comparison.expectedAmountMinor,
+          comparison.approvedCapMinor,comparison.authorizationCurrency,comparison.observedAmountMinor,comparison.observedCurrency,comparison.observedEvidenceDate,
+          outcome?.observationBasis ?? null,outcome?.verdict ?? null,input.actorUserId,now,request.wholeCharge,request.retentionNotice]);
+      const reconciliation = { ...mapReconciliation(inserted.rows[0], loaded.proposal.intendedOutcome), providerBill: admitted.providerBill };
+      return { data: { proposal: loaded.proposal, decision: loaded.decision, reconciliation }, entityId: reconciliationId,
+        auditMetadata: { comparisonKind: comparison.comparisonKind, evidenceId: admitted.evidenceId, connectionId: request.connectionId,
+          organizationId: request.organizationId, billId: request.billId, sourceSequence: request.sourceSequence,
+          consentReference: admitted.providerBill.consentReference, wholeCharge: request.wholeCharge, retentionNotice: request.retentionNotice } };
     },
   });
 }
@@ -534,7 +593,7 @@ export async function recordCommitmentControlExceptionReview(input: {
   });
 }
 
-export async function getCommitmentControlBrief(input: { workspaceId: string; actorUserId: string }) {
+export async function getCommitmentControlBrief(input: { workspaceId: string; actorUserId: string; now?: Date }) {
   assertControlEnrollment(input.workspaceId);
   const client = await getDatabasePool().connect();
   try {
@@ -550,7 +609,7 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
          currency, first_charge_date, cadence, as_of_date, projected_13_week_minor::text,
         projected_annual_minor::text, intended_outcome_metric, intended_outcome_direction,
         intended_outcome_target_value, intended_outcome_unit, intended_outcome_review_on,
-        assumption_basis, created_at
+        assumption_basis, created_at, amount_basis
        from commitment_control_proposals where workspace_id = $1
        order by created_at desc, id`,
       [input.workspaceId],
@@ -558,7 +617,7 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
     const evaluations = await client.query<EvaluationRow & { cited_evidence_ids: string[] }>(
       `select evaluation.id, evaluation.proposal_id, evaluation.policy_version, evaluation.status,
          evaluation.human_decision_required, evaluation.assumption_fields, evaluation.reason_codes,
-         evaluation.currency_results, evaluation.cited_exposure_basis, evaluation.evaluated_at,
+         evaluation.currency_results, evaluation.cited_exposure_basis, evaluation.evaluated_at, evaluation.amount_basis,
          coalesce(array_agg(link.evidence_id order by link.evidence_id)
            filter (where link.evidence_id is not null), '{}') as cited_evidence_ids
        from commitment_control_evaluations evaluation
@@ -573,7 +632,7 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
       `select decision.id, decision.proposal_id, decision.evaluation_id, decision.action,
          decision.expected_amount_minor::text, decision.approved_cap_minor::text,
          decision.currency, decision.decided_by_user_id, decision.decided_by_display_name,
-         decision.override_reason, decision.authorization_expires_on, decision.decided_at,
+         decision.override_reason, decision.authorization_expires_on, decision.decided_at, decision.amount_basis,
          evaluation.policy_version
        from commitment_control_decisions decision
        join commitment_control_evaluations evaluation
@@ -585,7 +644,8 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
       `select id, proposal_id, decision_id, evidence_id, verdict, expected_amount_minor::text,
          approved_cap_minor::text, authorization_currency, observed_amount_minor::text,
          observed_currency, observed_evidence_date, observed_outcome_value, observed_outcome_on,
-        outcome_observation_basis, outcome_verdict, reconciled_by_user_id, reconciled_at
+        outcome_observation_basis, outcome_verdict, reconciled_by_user_id, reconciled_at,
+        comparison_kind, decision_amount_basis, observed_evidence_basis
        from commitment_control_reconciliations where workspace_id = $1
        order by reconciled_at desc, id`,
       [input.workspaceId],
@@ -609,9 +669,12 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
     const evaluationsByProposal = new Map(evaluations.rows.map((row) => [row.proposal_id, mapEvaluation(row, row.cited_evidence_ids)]));
     const decisionsByProposal = new Map(decisions.rows.map((row) => [row.proposal_id, mapDecision(row, row.policy_version)]));
     const reconciliationsByProposal = new Map<string, ControlReconciliationDto[]>();
+    const admittedBills = await loadAdmittedProviderBills(client, input.workspaceId, reconciliations.rows.filter(row => row.comparison_kind === "BILLED_AMOUNT_COMPARISON").map(row => row.evidence_id));
+    const providerResponsibilities = await loadControlProviderBillResponsibilities(client, input.workspaceId, [...admittedBills.values()], input.now ?? new Date());
     for (const row of reconciliations.rows) {
       const current = reconciliationsByProposal.get(row.proposal_id) ?? [];
-      current.push(mapReconciliation(row, proposalsById.get(row.proposal_id)?.intendedOutcome ?? null));
+      current.push({ ...mapReconciliation(row, proposalsById.get(row.proposal_id)?.intendedOutcome ?? null),
+        ...(admittedBills.has(row.evidence_id) ? { providerBill: admittedBills.get(row.evidence_id)!, providerBillSource: providerResponsibilities.get(row.evidence_id)! } : {}) });
       reconciliationsByProposal.set(row.proposal_id, current);
     }
     const observationsByProposal = new Map<string, ControlOutcomeObservationDto[]>();
@@ -656,12 +719,15 @@ export async function getCommitmentControlBrief(input: { workspaceId: string; ac
   }
 }
 
-export async function getControlReconciliationCandidates(input: {
+type ControlCandidateInput = {
   workspaceId: string;
   actorUserId: string;
   proposalId: string;
   now?: Date;
-}): Promise<{ data: ControlReconciliationCandidatesDto; workspaceVersion: number }> {
+};
+export function getControlReconciliationCandidates(input: ControlCandidateInput & { source: "ZOHO_BOOKS" } & ControlProviderBillCandidateQuery): Promise<{ data: ControlProviderBillCandidatesDto; workspaceVersion: number }>;
+export function getControlReconciliationCandidates(input: ControlCandidateInput & { source?: "RECOVERY" }): Promise<{ data: ControlReconciliationCandidatesDto; workspaceVersion: number }>;
+export async function getControlReconciliationCandidates(input: ControlCandidateInput & { source?: "RECOVERY" | "ZOHO_BOOKS" } & ControlProviderBillCandidateQuery): Promise<{ data: ControlReconciliationCandidatesDto | ControlProviderBillCandidatesDto; workspaceVersion: number }> {
   assertControlEnrollment(input.workspaceId);
   const proposalId = requireUuid(input.proposalId, "Proposal id");
   const client = await getDatabasePool().connect();
@@ -674,6 +740,13 @@ export async function getControlReconciliationCandidates(input: {
     );
     const loaded = await loadProposalEvaluation(client, input.workspaceId, proposalId);
     if (!loaded?.decision) throw new RecoveryServiceError("NOT_FOUND", "An authorized proposal decision is required before reviewing evidence.");
+    if (input.source === "ZOHO_BOOKS") {
+      const membership = await assertRole(client, input.actorUserId, input.workspaceId, "viewer");
+      const data = await listControlProviderBillCandidates(client, { workspaceId: input.workspaceId, proposalId,
+        decision: loaded.decision, canManage: roleRank[membership.role] >= roleRank.admin, now: input.now ?? new Date(), query: input });
+      await client.query("commit");
+      return { data, workspaceVersion: Number(state.rows[0]?.version ?? 0) };
+    }
     const evidence = await client.query<{
       evidence_id: string;
       commitment_id: string;
@@ -760,6 +833,8 @@ async function runControlMutation<T>(input: {
   mutationKind: ControlMutationKind;
   requestForHash: unknown;
   now?: Date;
+  beforeRecoveryLock?: (client: PoolClient) => Promise<void>;
+  replayMinimumRole?: WorkspaceRole;
   write: (client: PoolClient, now: Date, membership: { role: WorkspaceRole }) => Promise<{ data: T; entityId: string; auditMetadata?: Record<string, unknown> }>;
 }): Promise<{ data: T; workspaceVersion: number; replayed: boolean }> {
   assertControlEnrollment(input.workspaceId);
@@ -768,13 +843,15 @@ async function runControlMutation<T>(input: {
   let committed: { data: T; workspaceVersion: number; replayed: boolean } | null = null;
   try {
     await client.query("begin");
+    await input.beforeRecoveryLock?.(client);
     await client.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [`recovery:${input.workspaceId}`]);
-    const membership = await assertRole(client, input.actorUserId, input.workspaceId, input.minimumRole, true);
+    const membership = await assertRole(client, input.actorUserId, input.workspaceId, input.replayMinimumRole ?? input.minimumRole, true);
     const replay = await readIdempotent<T>(client, input.workspaceId, input.idempotencyKey, input.operation, requestHash);
     if (replay) {
       await client.query("commit");
       return { data: replay.response, workspaceVersion: replay.workspaceVersion, replayed: true };
     }
+    if (roleRank[membership.role] < roleRank[input.minimumRole]) throw new RecoveryServiceError("FORBIDDEN");
     const state = await ensureWorkspaceState(client, input.workspaceId);
     assertWorkspaceVersion(state, input.expectedVersion);
     const written = await input.write(client, input.now ?? new Date(), membership);
@@ -908,14 +985,14 @@ async function loadProposalEvaluation(client: PoolClient, workspaceId: string, p
        currency, first_charge_date, cadence, as_of_date, projected_13_week_minor::text,
        projected_annual_minor::text, intended_outcome_metric, intended_outcome_direction,
        intended_outcome_target_value, intended_outcome_unit, intended_outcome_review_on,
-       assumption_basis, created_at
+      assumption_basis, created_at, amount_basis
      from commitment_control_proposals where workspace_id = $1 and id = $2`,
     [workspaceId, proposalId],
   );
   const evaluationResult = await client.query<EvaluationRow & { cited_evidence_ids: string[] }>(
     `select evaluation.id, evaluation.proposal_id, evaluation.policy_version, evaluation.status,
        evaluation.human_decision_required, evaluation.assumption_fields, evaluation.reason_codes,
-       evaluation.currency_results, evaluation.cited_exposure_basis, evaluation.evaluated_at,
+      evaluation.currency_results, evaluation.cited_exposure_basis, evaluation.evaluated_at, evaluation.amount_basis,
        coalesce(array_agg(link.evidence_id order by link.evidence_id)
          filter (where link.evidence_id is not null), '{}') as cited_evidence_ids
      from commitment_control_evaluations evaluation
@@ -934,6 +1011,7 @@ async function loadProposalEvaluation(client: PoolClient, workspaceId: string, p
     proposal: {
       proposalId: proposal.id,
       amountMinor: proposal.amount_minor,
+      amountBasis: proposal.amount_basis ?? undefined,
       currency: proposal.currency,
       category: proposal.category,
       thirteenWeekMinor: proposal.projected_13_week_minor,
@@ -943,7 +1021,7 @@ async function loadProposalEvaluation(client: PoolClient, workspaceId: string, p
   const decisionResult = await client.query<DecisionRow>(
     `select id, proposal_id, evaluation_id, action, expected_amount_minor::text,
        approved_cap_minor::text, currency, decided_by_user_id, decided_by_display_name,
-       override_reason, authorization_expires_on, decided_at
+      override_reason, authorization_expires_on, decided_at, amount_basis
      from commitment_control_decisions where workspace_id = $1 and proposal_id = $2`,
     [workspaceId, proposalId],
   );
@@ -1101,6 +1179,7 @@ function mapProposal(row: ProposalRow): ControlProposalDto {
     purpose: row.purpose,
     category: row.category,
     amountMinor: row.amount_minor,
+    ...(row.amount_basis == null ? {} : { amountBasis: row.amount_basis }),
     currency: row.currency,
     firstChargeDate: toDateOnly(row.first_charge_date),
     cadence: row.cadence,
@@ -1125,6 +1204,7 @@ function mapEvaluation(row: EvaluationRow, citedEvidenceIds: string[]): ControlE
   return {
     id: row.id,
     proposalId: row.proposal_id,
+    ...(row.amount_basis == null ? {} : { amountBasis: row.amount_basis }),
     policyVersion: row.policy_version,
     status: row.status,
     humanDecisionRequired: true,
@@ -1147,6 +1227,7 @@ function mapDecision(row: DecisionRow, policyVersion: number): ControlDecisionDt
     approvedCapMinor: row.approved_cap_minor,
     currency: row.currency,
     expectedAmountMinor: row.expected_amount_minor,
+    ...(row.amount_basis == null ? {} : { amountBasis: row.amount_basis }),
     decidedByUserId: row.decided_by_user_id,
     decidedByDisplayName: row.decided_by_display_name ?? null,
     overrideReason: row.override_reason ?? null,
@@ -1184,6 +1265,11 @@ function mapReconciliation(
           },
     reconciledByUserId: row.reconciled_by_user_id,
     reconciledAt: row.reconciled_at.toISOString(),
+    ...(row.comparison_kind === "BILLED_AMOUNT_COMPARISON" ? {
+      comparisonKind: row.comparison_kind,
+      decisionAmountBasis: "GROSS_BILLED_TOTAL_PER_CHARGE" as const,
+      observedEvidenceBasis: "PROVIDER_BILL_TOTAL" as const,
+    } : {}),
   };
 }
 
@@ -1332,6 +1418,7 @@ type ProposalRow = {
   purpose: string;
   category: ProposalCategory;
   amount_minor: string;
+  amount_basis: ControlAmountBasis | null;
   currency: string;
   first_charge_date: Date | string;
   cadence: ProposalCadence;
@@ -1350,6 +1437,7 @@ type ProposalRow = {
 type EvaluationRow = {
   id: string;
   proposal_id: string;
+  amount_basis: ControlAmountBasis | null;
   policy_version: number;
   status: ProposalPolicyEvaluation["status"];
   human_decision_required: true;
@@ -1366,6 +1454,7 @@ type DecisionRow = {
   evaluation_id: string;
   action: ProposalDecisionAction;
   expected_amount_minor: string;
+  amount_basis: ControlAmountBasis | null;
   approved_cap_minor: string | null;
   currency: string;
   decided_by_user_id: string | null;
@@ -1393,6 +1482,9 @@ type ReconciliationRow = {
   outcome_verdict: NonNullable<ControlReconciliationDto["outcome"]>["verdict"] | null;
   reconciled_by_user_id: string | null;
   reconciled_at: Date;
+  comparison_kind?: "BILLED_AMOUNT_COMPARISON" | null;
+  decision_amount_basis?: ControlAmountBasis | null;
+  observed_evidence_basis?: "PROVIDER_BILL_TOTAL" | null;
 };
 
 type OutcomeObservationRow = {

@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, IBM_Plex_Mono, Manrope } from "next/font/google";
 import PwaRegister from "./pwa-register";
+import SessionPrivacy from "./session-privacy";
 import "./globals.css";
 
 const grotesk = Manrope({
   variable: "--font-grotesk",
   subsets: ["latin"],
-  display: "swap",
+  display: "optional",
 });
 
 const monoData = IBM_Plex_Mono({
@@ -20,7 +21,7 @@ const monoData = IBM_Plex_Mono({
 const display = Bricolage_Grotesque({
   variable: "--font-display-serif",
   subsets: ["latin"],
-  display: "swap",
+  display: "optional",
 });
 
 export const metadata: Metadata = {
@@ -88,6 +89,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <PwaRegister />
+        <SessionPrivacy />
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>

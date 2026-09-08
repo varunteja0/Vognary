@@ -9,6 +9,347 @@ This runbook activates the Recovery receipt-forwarding product. Direct Gmail rea
 
 Times in this runbook use IST.
 
+## Zoho Books A2 Local Preparation - 2026-09-08
+
+**Status:** locally approved implementation under
+[THE-LAW section 0.1.3](THE-LAW.md#013-founder-a2-billed-comparison-authorization---2026-09-07),
+not provider consent, an assessed release or launch. Main owns code/test repair,
+full verification, the live handoff and action crosswalk. Provider operation,
+human service acceptance, buyer value and customer-data activation remain
+BLOCKED. Preserve [vercel.json](../vercel.json) automatic `main` deployment;
+do not push as a substitute for release approval. Legacy sections below remain
+historical procedures, not the current A2 migration or activation checklist.
+
+Record what spending is agreed. Compare the later bill. Keep the answer.
+
+Books is optional for firms already using it. No Books purchase or learning is
+required for the Control demonstration or legacy receipt path. Stage remains
+**Make it work**, loop step **reconciliation**: one finance owner selects a later
+bill for one compatible human authorization and returns to the saved comparison.
+That observable task is the Product UX/Backend Readiness evidence gate; local
+implementation does not establish customer acceptance or move a scoreboard row.
+
+After source migrations `0070` through `0075_zoho_books_dispositions`, A2 adds
+[0076_control_provider_bills](../infra/postgres/migrations/0076_control_provider_bills.sql)
+and [0077_control_provider_bill_admission_guards](../infra/postgres/migrations/0077_control_provider_bill_admission_guards.sql).
+Current backup verification requires exact head
+`0077_control_provider_bill_admission_guards`, not `0075` or intermediate `0076`.
+This is the candidate requirement, not a claim about the production ledger.
+Include the existing six source connection/snapshot/record/review/incident/
+disposition tables, new grants and admitted-bill lineage, changed financial
+fields, row counts, immutable triggers and admission guards described below.
+Historical `pre-0053` and `pre-0057` profiles remain unchanged. Use the canonical
+migration runner only against a separately authorized target after an encrypted
+backup and demonstrated restore; this documentation update executes neither.
+
+### Configuration and Consent
+
+- Real external inputs are unavailable: Zoho client ID/secret, authorized
+  synthetic organization, account tier/read authority and provider operator;
+  Google identity client; and backup encryption key. Do not infer them from
+  synthetic fixtures or request secret values in chat.
+- Use an existing, permitted synthetic India organization only. Its authorized
+  owner registers a Zoho **Server-based Application**. No purchase, upgrade,
+  new organization or contract acceptance is authorized. A2's app origin is
+  `http://127.0.0.1:57610`; the exact registered callback must be
+  `http://127.0.0.1:57610/api/workspaces/current/sources/zoho-books/callback`.
+  [Configuration](../src/lib/server/zoho-books-configuration.ts) derives that
+  callback from `NEXT_PUBLIC_APP_URL`. Production separately requires HTTPS.
+  India uses `www.zohoapis.in/books/v3`; arbitrary hosts or other data centers
+  are not permitted.
+- Local secret template path: `.fallow/a2/provider.env.example`. The authorized
+  custodian supplies values only into `.fallow/a2/provider.env`, never chat or
+  Git. The [runtime whitelist](../.fallow/a2/runtime.mjs) accepts only
+  `ZOHO_BOOKS_CLIENT_ID`, `ZOHO_BOOKS_CLIENT_SECRET`,
+  `ZOHO_BOOKS_PILOT_WORKSPACE_IDS`, `ZOHO_BOOKS_OPERATOR_USER_ID`, `SENTRY_DSN`
+  and `BETTER_STACK_SOURCE_TOKEN`. No secret file or value is needed to read
+  this runbook. Main alone may restart A2 after scoped authority is supplied.
+- Production requires the same explicit workspace UUID in both
+  `COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS` and
+  `COMMITMENT_CONTROL_PAID_WORKSPACE_IDS`, cleared payment and passed
+  release-bound independent assessment/retest. Books additionally requires
+  `ZOHO_BOOKS_PILOT_WORKSPACE_IDS`; A2 comparison additionally requires
+  `CONTROL_PROVIDER_BILL_WORKSPACE_IDS`. Neither source nor comparison opt-in
+  bypasses canonical Control enrollment. Keep real-data enrollment disabled
+  until these gates clear. Production ignores `*`; only explicit
+  development/test environments may use local wildcard access. The worker
+  excludes blocked workspaces before claiming jobs. Login grants identity only.
+- The workspace owner/admin must authorize notice `zoho-books-read-v1`, with
+  only `ZohoBooks.settings.READ` and `ZohoBooks.bills.READ`, offline access,
+  then select the actual authorized organization. The callback state is
+  one-use, expires after ten minutes, and
+  is bound to the workspace and original actor. A new authorization requires
+  its own refresh token and immutable grant; it cannot inherit an older
+  account's token. Pre-`0076` grantless snapshots remain inspection-only, not
+  eligible A2 evidence; do not backfill grants or legacy amount bases.
+- Initial history is bills dated within the preceding 90 days. All later
+  queries preserve that lower bound. Older or unentered bills, other entities,
+  email, banking, provider usage and unrecorded obligations are excluded.
+
+The [OAuth](https://www.zoho.com/books/api/v3/oauth/),
+[organization/API](https://www.zoho.com/books/api/v3/introduction/) and
+[bills](https://www.zoho.com/books/api/v3/bills/) documentation was already checked
+for this setup. Documented capabilities are not actual consent, account-tier
+access or lifecycle evidence. No new provider research round is the unblocker.
+
+### Synchronization and Operations
+
+- The source action performs one initial page after organization selection.
+  Durable continuation is handled by the authenticated worker. Vercel is
+  configured to invoke it hourly at minute 15. A completed source next becomes
+  eligible after 24 hours; this is not real-time monitoring. Hosting-plan cron
+  availability and actual scheduler delivery require production verification.
+- A worker claims at most three connections, performs at most two bounded
+  steps per connection, reads at most 100 bills per page, and uses expiring
+  row-backed leases. Each network request is limited to eight seconds and a
+  one-MiB JSON response. Partial pages remain explicitly incomplete.
+- Incremental reads overlap the previous scan-start watermark by one day,
+  including when the original import took several days. A full rescan is due
+  after seven days. Missing known bills are checked individually. A JSON 404 is
+  not removal proof: Zoho's published 1002 example is invoice-specific, not a
+  verified bill-deletion contract. Unknown absence stops as `ABSENCE_UNCONFIRMED`
+  and retains the previous bill. Provider-confirmed removal remains blocked until
+  an authorized synthetic organization establishes the exact bill response.
+- Freshness advances only after the complete scan and verification checks succeed.
+  Source revisions are immutable, retain exact decimal values and transformation
+  version, and use stable organization/vendor/bill IDs. Duplicates and repeated
+  pages do not duplicate facts. A corrected or restored bill appends history,
+  including A-to-B-to-A corrections; it never points back to an older revision
+  just because the values recur.
+- Throttling and temporary failures use bounded backoff; five failures or an
+  unsupported schema leave a terminal `FAILED` item and durable incident. The
+  worker reports opaque IDs and sanitized reason through existing monitoring,
+  with bounded delivery attempts and a retained receipt or explicit failure.
+  Raw provider
+  bodies, bill text, OAuth tokens and callback codes must never be logged.
+- Operations owners: founder must name a primary operator and independent backup,
+  with accepted response, acknowledgement and escalation duties before
+  activation. Neither actual owner nor accepted obligation is supplied. Alert
+  on worker non-delivery, overdue queued work, repeated
+  `RETRY_WAIT`, `FAILED`, and freshness beyond the agreed coverage SLO. A worker
+  HTTP success with no eligible jobs is not proof that every source is current.
+- Correction from the A2 owner's 2026-09-08 handoff: an exact presence-only local
+  lookup reported `SENTRY_DSN=true`, meaning present, not a disclosed DSN value
+  or proof of delivery. The earlier absent-monitoring statement is not current.
+  A2's whitelisted runtime does **not** inherit this destination. Obtain
+  permission to supply the existing destination locally and send one bounded,
+  non-sensitive incident; do not use a secret merely because it exists.
+  The [monitoring interface](../src/lib/server/monitoring.ts) supports Sentry
+  or Better Stack. No new monitoring subscription is needed unless the existing
+  destination is unusable; any purchase still requires separate authority.
+- Recovery authority: configure `ZOHO_BOOKS_OPERATOR_USER_ID` to a specifically
+  authorized workspace owner/admin. An unassigned or failed notification can be
+  claimed/redelivered only by that configured operator using the audited
+  `ESCALATE` action. After actual monitoring delivery is recorded, `RESUME`
+  permits that assigned operator to restart only `PROVIDER_UNAVAILABLE` or
+  `THROTTLED` incidents with still-valid consent and workspace authority. History
+  and scan checkpoints are preserved; last-success time advances only after a
+  successful import. A new consent generation cannot reuse an older incident.
+- Schema, unknown absence, revoked consent and changed permissions are separate
+  stop states, not transient recovery. Investigate the specific cause and obtain
+  reconsent when required. No SQL reset, broad operator impersonation or automatic
+  terminal replay is part of the procedure. A monitoring HTTP receipt is not
+  proof of human alert receipt or response; those remain required external drills.
+
+The permitted provider owner must supply actual consent, initial import,
+unattended change, token refresh/expiry, paging, throttling, changed permission,
+revocation and reconnect evidence from that synthetic organization. An unknown
+404 and the invoice-specific 1002 example are insufficient deletion proof;
+obtain bill-specific absence evidence before claiming removal. Agents make no
+provider writes. The incident drill separately requires a stopped source,
+preserved checkpoint/history, actual external alert receipt, human
+acknowledgement, authorized resume and a fresh completed import. A local
+synthetic mock or HTTP 2xx is neither real provider nor person proof.
+
+### Human Review and Intake
+
+The Bill review desk records `FOLLOW_UP` or `RESOLVED` dispositions bound to an
+immutable source sequence, actor and time. Follow-ups have a responsible actor
+and due date; a later source amendment has no inherited disposition, and an older
+open follow-up remains visible. `RESOLVED` means the human closed that review,
+not that a payment, saving or supplier action occurred. Acknowledgement is a
+separate exact-observation workspace-wide reading record. Legacy global review
+watermarks are not used to infer which revisions were actually seen.
+
+Guest intake accepts only the fixed server-owned demonstration or an empty
+request; arbitrary financial input requires an eligible authenticated workspace.
+Uploads/OCR, Recovery/Control financial writes, questions and inbox ingestion
+enforce clearance before parsing or provider retrieval. Local synthetic test
+allowances do not grant production or customer-data access. No provider approval
+process is assumed without checking the provider's actual terms.
+
+### A2 Admission and Data Inventory
+
+The [typed provider-bill contract](../src/lib/commitment-control/provider-bill-contracts.ts)
+and additive migrations above define this evidence-only Recovery path. It does
+not alter A1's policy-free bill inspection or authorize automatic matching.
+
+| Stored area | A2 meaning and inventory |
+| --- | --- |
+| Control proposals, evaluations and decisions | New explicit opt-in freezes `amount_basis=GROSS_BILLED_TOTAL_PER_CHARGE` throughout the chain, with exact money, currency, cap and expiry. It is a whole-charge gross billed limit, not a cumulative budget or spend enforcement. Legacy null/unspecified bases and the receipt path retain their meaning without backfill. |
+| Books source and original consent | Existing source records plus immutable `zoho_books_grants`; connections gain `active_grant_id`, snapshots gain `grant_id` and `organization_id`. Retain original authorizer/time, generation, authorized organizations, India region, exact read scopes and notice. The exact selected sequence/schema version/fingerprint and organization must bind to that original grant. |
+| Recovery evidence and detached lineage | Source `ZOHO_BOOKS`, kind `PROVIDER_BILL`, basis `PROVIDER_BILL_TOTAL`; exact positive total and currency, bill date and minimized identifying fields. Legacy `recovery_evidence.observed_at` remains `NULL`, and provider-bill excerpt is null. New immutable `recovery_provider_bill_links` retains connection/organization/bill IDs, sequence/version/fingerprint, original grant/consent, source revision, completed-sync time, human selector/time, whole-charge relationship and retention notice. |
+| Separate times | `sourceObservedAt` is source capture, not a charge or payment; `providerModifiedAt`, `billDate`, `selectedAt` and the frozen decision time remain distinct. Do not copy source capture into legacy charge `observed_at`. |
+| Saved comparison | `commitment_control_reconciliations` gains `comparison_kind=BILLED_AMOUNT_COMPARISON`, `decision_amount_basis`, `observed_evidence_basis`, `relation_basis` and `retention_notice`. Freeze both bases, exact selected amount/currency/date, original expected amount/cap/expiry and actor/time; do not rewrite earlier decisions or comparisons. No provider-derived usage/outcome observation is created. |
+
+- Admission requires an eligible owner/admin to select one exact server-reloaded
+  snapshot and explicitly acknowledge both
+  `wholeCharge=USER_CONFIRMED_SAME_CHARGE` and
+  `retentionNotice=control-provider-bill-retention-v1`. A review closure is not
+  that confirmation. Client-edited money, another tenant/organization/revision,
+  multi-obligation bills and missing grant/basis cannot be substituted.
+- Require a completed successful sync no more than 24 hours old and an error-free
+  `READY` source with valid consent and schedule: `next_run_at` is not before
+  admission and not beyond `last_success_at + 24 hours`. Partial, stale,
+  unavailable or ambiguously absent sources cannot admit a new comparison.
+- `0077` requires exact chronology `sourceObservedAt >= decidedAt`, including
+  within the same calendar day. Bill-date and India-calendar authorization
+  expiry checks still apply; future/pre-authorization evidence is refused and
+  evidence beyond expiry is labelled `AUTHORIZATION_EXPIRED`. New gross
+  approvals and billed comparisons require non-null positive frozen caps.
+  Admission locks the live original grant authorizer and selecting/reconciling
+  owner/admin user and membership rows, rejecting deleted or demoted authority.
+- Admission and comparison are atomic under source/Control version, tenant and
+  role checks. Workspace/actor/original-request identity and payload hash bind
+  retries: replay returns the originally committed result, never a newer bill;
+  a changed payload conflicts. Duplicate requests cannot partly admit evidence
+  or append another comparison for the same decision/snapshot. A permitted
+  historical read-back is not permission for a new admission after withdrawal.
+- Provider bills remain excluded from legacy Autopilot, recurring commitment
+  materialization, exposure, charge/payment and savings paths, including later
+  ordinary receipt/CSV ingestion. No bill allocation, revision summing, credit
+  netting, FX, usage inference or autonomous financial action is authorized.
+
+### Revocation and Data Handling
+
+Disconnect acquires the source lock, invalidates leases/generation, clears
+local credentials and stops future reads before requesting provider token
+revocation. HTTP 200 alone is not confirmation: the provider response must
+explicitly report success. A provider revocation failure is `UNCONFIRMED` and the owner must
+remove Vognary in Zoho Connected Apps. Revocation cannot recall an already
+in-flight authorized response, but no later scheduled read may start after
+the local disconnect completes. Removing the author's owner/admin role also
+stops unattended access.
+
+Source snapshots remain until explicit source deletion or workspace erasure;
+they are separate from Recovery's receipt retention setting. This retention
+must be accepted in the source notice and reviewed legally before customer data.
+Deleting the Books source erases its imports, grants, reviews and source history,
+but retains the minimized explicitly admitted Recovery financial record,
+detached original lineage and immutable comparison. Retained results must show
+the erased/withdrawn source condition, not current coverage. No live source
+foreign-key cascade may silently erase or rewrite that admitted chain.
+
+Before source deletion with admitted records, require notice
+`control-provider-bill-retention-v1`, `retainAdmitted=true` and the exact current
+`retainedAdmissionCount`; a stale count is not consent. Admission already
+requires acknowledgement of the same retention notice. Whole-workspace erasure
+removes the entire source, grant, admission, lineage and comparison chain.
+Neither operation deletes anything in Zoho. These implemented semantics do not
+clear a legal retention policy or authorize real-data erasure.
+
+Privacy export includes retained source revisions, acknowledgements, incidents,
+dispositions and grants, plus new amount bases, admitted evidence/lineage and
+comparison fields even after Books source deletion. OAuth state, encrypted
+credential payloads and tokens remain excluded from privacy export. Encrypted
+database backup must cover the new tables/fields and integrity guards too;
+privacy-export exclusions are not database-backup omissions. Backups follow a
+separately approved retention/deletion policy; instant removal from previously
+created backups is not promised.
+
+### Metric and Release Contract
+
+Bill total is the provider's gross bill total, including its taxes, discounts and
+adjustments; balance is its recorded outstanding amount. Neither proves cash
+paid, company-wide burn, runway, revenue, recurring revenue or savings. Removed
+records show retained historical amounts. No FX conversion, cross-source sum,
+automatic merchant matching, automatic approval or financial execution exists.
+Recovery remains the sole financial reconciliation authority. A2 permits only
+the explicitly selected compatible billed comparison above, not automatic
+bill-to-Control reconciliation. A provider `paid` status is not observed payment;
+a saved comparison is not savings, actual usage or a verified business outcome.
+
+The unchanged offer is a one-time **INR 14,999 for one pilot month**: one policy
+setup, up to ten proposals, up to four weekly 30-minute reconciliation reviews
+and up to two additional founder-support hours. Existing activation/refund terms
+remain unchanged; another month requires a separate purchase. Synthetic
+evaluation is not purchase, activation or a new bill-review service offer.
+
+### Baseline-First Evaluation and Unsent Recruitment
+
+1. Obtain a named, permitted finance owner and session/channel authority; keep
+  identities and notes private, outside Git. First observe or reconstruct the
+  owner's existing approval/accountant/native-Books task and how they retrieve
+  its answer. Do not import real financial records into the uncleared app.
+2. Use the equivalent synthetic task: record the human authorization, select
+  its later whole bill, compare and return to the saved answer without coaching.
+  Bill-only inspection remains available without Control policy setup; owners
+  not using Books can evaluate Control with the existing demo/receipt path.
+3. Capture complete customer, colleague and operator effort, setup/consent work,
+  refusals, errors, rescues and an uncoached return. Keep failed attempts and
+  help time in the result. No improvement over the existing task, or a refusal
+  to use it, is evidence to rework the job, not grounds to discard the attempt.
+4. Keep evaluation participation, price-specific response, explicit offer,
+  invoice, cleared payment, actual usage and separately purchased renewal as
+  distinct evidence. Willingness to pay, retention and scores remain unmeasured
+  by this preparation.
+
+Unsent low-cost recruitment options are permission-based community posts,
+CA/fractional-finance introductions and eligible opt-in invitations. Before
+any contact, the founder names the channel/recipient owner, grants permission
+and bounds time, participant count and cash spend for one narrow evaluation.
+No scraped mass DMs, purchases or outreach are authorized here. Traffic and
+replies are not task success, demand or retention proof. The USD 1 billion
+annual-revenue ambition is not a valuation claim or forecast. The next unblocker
+is a permitted task, not another strategy or research round.
+
+### Exact A2 Release and Recovery Gates
+
+All actual owners below remain unnamed and externally accepted obligations
+remain absent. Role labels are assignments to obtain, not staffing or clearance.
+Evidence must identify the exact candidate release, schema checksums and tested
+configuration; historical A1/local mocks and configured flags cannot replace it.
+
+| Gate | Required A2 scope and proof | Owner to appoint |
+| --- | --- | --- |
+| Independent assessment and retest | Exact-release OAuth/scopes/organization and tenant isolation; dual enrollment and comparison opt-in; grant-bound exact snapshots; live original authorizer/selector locks; gross money, positive caps, chronology/expiry; atomic admission, replay/duplicate/stale races; revocation/reconnect; legacy Autopilot exclusion; minimized retention/export/erasure; migrations `0076`/`0077` and recovery. Independent retest closes every Critical/High and data-impacting Medium finding. | Founder, independent assessor and retest owner |
+| Privacy and lawful basis | Written review of actual data inventory, purpose/lawful basis, provider terms/read consent, processors/residency, source-versus-workspace deletion, admitted-history retention period and exact-count acknowledgement, export, logging, encrypted-backup retention and deletion handling. An implemented notice or flag is not legal clearance. | Accountable privacy/legal owner |
+| Identity and customer eligibility | Actual Google identity client and verified sign-in/session/role lifecycle; cleared payment, release-bound passed Control assessment/retest, both exact Control enrollment lists, Books source list and `CONTROL_PROVIDER_BILL_WORKSPACE_IDS`. Synthetic login, payment or local wildcard access is insufficient. | Identity/enrollment and release owners |
+| Scheduler and incident response | Hosting-tier scheduler delivery and fresh complete imports; actual provider lifecycle/absence proof above; existing monitored destination authorized for bounded non-sensitive incident delivery; external alert receipt and human acknowledgement/resume. Named primary/backup accept coverage, response/acknowledgement deadlines, escalation and manual review duties. A successful HTTP receipt does not accept those duties. | Provider owner, primary operator and independent backup |
+| Migration and encrypted recovery | Canonical ordered/checksummed apply through exact head `0077`, populated retained/erased chain verification, tested fail-closed rollback/forward recovery and retrieval/decryption/restore of the actual encrypted stored object from the intended backup destination. Local restores are not production stored-object recovery. | Database/backup custodian and release owner |
+
+The [local populated-restore checks](../.fallow/a2/gates/2026-09-07T18-40-32.234Z-database/fresh-artifact-directory.log)
+restore admitted chains with the Books source both retained and erased, then
+verify whole-workspace erasure on each restored copy. They do not prove that
+an older stored backup cannot restore subsequently erased data; production
+erasure replay and retention procedures must address that separately. The
+current backup profile head is `0077_control_provider_bill_admission_guards`.
+A production encryption
+key and successful restore of the actual encrypted stored object are still
+required, with restricted evidence of head/checksums, row counts, grant/lineage,
+comparison/amount-basis fields and immutable/admission guards.
+
+For a separately authorized apply, verify the starting ledger and encrypted
+restore point, then apply pending migrations with the canonical runner. A
+partial apply stopping at `0076` does not clear A2 admission: keep the comparison
+and source enrollment disabled, resolve the failure and forward-apply `0077`,
+then verify the exact head and guards. Rollback means stop new reads/admissions
+with the affected allowlists and a known-compatible application release; retain
+frozen records. Do not drop A2 tables, rewrite caps/bases, remove immutable
+guards or use old code that could reinterpret provider bills as charges. Test
+forward recovery and any authorized full restore in isolation before touching
+production, including retained comparisons and erased-workspace state; an older
+backup must not silently reactivate erased data or withdrawn consent.
+
+Cleared payment plus exact-release independent assurance establish eligibility
+for a **restricted assessed pilot**, with the privacy, identity/enrollment,
+operations and recovery gates above and explicit release authority also required.
+That evaluated pilot is where actual value and return use can be observed; do
+not require retention before the first evaluated pilot. Broad launch additionally
+requires observed customer value, return use and supportable operations/economics.
+Neither pilot nor broad launch is authorized now: no publication, deployment or
+real-financial-data activation follows from this local preparation.
+
 ## Completed bounded schema-only apply: `0055` → `0056`
 
 Production completed the one-time Recovery cutover and the incremental `0056`

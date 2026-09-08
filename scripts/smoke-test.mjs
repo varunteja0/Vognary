@@ -131,10 +131,9 @@ const auditResponse = await fetch(`${baseUrl}/api/audit`, {
 });
 const auditBackendUnavailable = allowUnconfigured && auditResponse.status === 503;
 if (!auditBackendUnavailable) {
-  if (!auditResponse.ok) throw new Error(`Audit endpoint returned ${auditResponse.status}`);
+  if (auditResponse.status !== 403) throw new Error(`Arbitrary guest financial input returned ${auditResponse.status} instead of refused`);
   const audit = await auditResponse.json();
-  if (!audit.audit?.summary) throw new Error("Audit endpoint did not return a summary");
-  if (!audit.timeline || !Array.isArray(audit.timeline.events)) throw new Error("Audit endpoint did not return a renewal timeline");
+  if (audit.code !== "FINANCIAL_INTAKE_LOCKED") throw new Error("Guest financial refusal did not identify the clearance boundary");
 }
 
 const receiptAuditResponse = await fetch(`${baseUrl}/api/audit`, {
@@ -149,9 +148,22 @@ const receiptAuditResponse = await fetch(`${baseUrl}/api/audit`, {
 if (auditBackendUnavailable) {
   if (receiptAuditResponse.status !== 503) throw new Error(`Receipt audit returned ${receiptAuditResponse.status} while audit backend was unavailable`);
 } else {
-  if (!receiptAuditResponse.ok) throw new Error(`Receipt audit request returned ${receiptAuditResponse.status}`);
+  if (receiptAuditResponse.status !== 403) throw new Error(`Guest receipt input returned ${receiptAuditResponse.status} instead of refused`);
   const receiptAudit = await receiptAuditResponse.json();
-  if (!receiptAudit.audit?.recurringItems?.length) throw new Error("Receipt texts did not produce recurring candidates");
+  if (receiptAudit.code !== "FINANCIAL_INTAKE_LOCKED") throw new Error("Guest receipt refusal did not identify the clearance boundary");
+}
+
+const demonstration = await fetch(`${baseUrl}/api/audit`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ fixture: "SUPPLIER_BILL_DEMO_V1" }),
+});
+if (auditBackendUnavailable) {
+  if (demonstration.status !== 503) throw new Error(`Synthetic demonstration returned ${demonstration.status} while the shared backend was unavailable`);
+} else {
+  if (!demonstration.ok) throw new Error(`Synthetic demonstration returned ${demonstration.status}`);
+  const payload = await demonstration.json();
+  if (payload.mode !== "fixed-synthetic-demo" || !payload.audit?.summary || !payload.cards?.length || !Array.isArray(payload.timeline?.events)) throw new Error("Fixed synthetic demonstration response is incomplete");
 }
 
 const invalidAuditResponse = await fetch(`${baseUrl}/api/audit`, {

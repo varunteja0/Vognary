@@ -20,7 +20,7 @@ type PrimaryCommand = { href: string; label: string; quiet?: boolean };
 
 const DESTINATIONS: readonly { href: string; label: string; note: string }[] = [
   { href: "/demo", label: "Review the synthetic request", note: "A synthetic request from asked to answered" },
-  { href: "/start", label: "Use your own evidence", note: "Cite one charge you already hold" },
+  { href: "/start", label: "Try the bill-review example", note: "A fixed synthetic bill change, separate from the paid pilot" },
   { href: "/pay", label: "The pilot", note: "Scope, price and what activation means" },
   { href: "/security", label: "Security", note: "Boundaries, data flow and open questions" },
   { href: "/about", label: "About", note: "Why this product refuses to decide for you" },
@@ -29,7 +29,7 @@ const DESTINATIONS: readonly { href: string; label: string; note: string }[] = [
 
 /** The one command that is worth interrupting for, per route. */
 function primaryFor(pathname: string): PrimaryCommand {
-  if (pathname === "/demo") return { href: "/start", label: "Use your own evidence" };
+  if (pathname === "/demo") return { href: "/pay", label: "Pilot details" };
   // Home's hero already owns this exact command. A second filled button for the
   // same destination gives the first screen two primaries and no hierarchy, so
   // here the header keeps the shortcut but yields the emphasis.
@@ -131,7 +131,7 @@ export function PublicFooter() {
         <div>
           <p className="pfoot-label">Experience</p>
           <Link href="/demo">Review the synthetic request</Link>
-          <Link href="/start">Use your own evidence</Link>
+          <Link href="/start">Try the bill-review example</Link>
           <Link href="/pay" prefetch={false}>The pilot</Link>
         </div>
         <div>

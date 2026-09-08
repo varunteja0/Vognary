@@ -36,7 +36,7 @@ function label(value: string): string {
 }
 
 export function DemoClient({ branches, period, requestSheet, stamp }: {
-  branches: readonly { action: SyntheticDemoBranch; label: string; outcome: string; decision: ControlDecisionDto | null; reconciliation: ControlReconciliationDto | null }[];
+  branches: readonly { action: SyntheticDemoBranch; label: string; outcome: string; decision: ControlDecisionDto | null; reconciliation: ControlReconciliationDto | null; capDisplay: string | null; observedDisplay: string | null }[];
   period: string;
   requestSheet: ReactNode;
   stamp: ReactNode;
@@ -131,12 +131,11 @@ export function DemoClient({ branches, period, requestSheet, stamp }: {
                   <h2>{refused ? "Refused. No cap exists." : "Authorized. The cap is frozen."}</h2>
                   <p className="demo-outcome-note">{entry?.outcome}</p>
 
-                  {decision?.approvedCapMinor ? (
+                  {decision?.approvedCapMinor && entry?.capDisplay ? (
                     <>
                       <div className="demo-cap-rule" aria-hidden="true" />
                       <MoneyValue
-                        minor={decision.approvedCapMinor}
-                        currency={decision.currency}
+                        display={entry.capDisplay}
                         provenance={{ kind: "frozen", label: `Frozen by ${decision.decidedByDisplayName}` }}
                         size="lead"
                         layout="stacked"
@@ -170,9 +169,8 @@ export function DemoClient({ branches, period, requestSheet, stamp }: {
                           <dt>{period} invoice</dt>
                           <dd>
                             <MoneyValue
-                              minor={reconciliation.observedAmountMinor}
-                              currency={reconciliation.observedCurrency ?? "INR"}
-                              provenance={{ kind: "observed" }}
+                              display={entry?.observedDisplay ?? "Not yet known"}
+                              provenance={entry?.observedDisplay ? { kind: "observed" } : { kind: "unknown" }}
                               size="data"
                             />
                           </dd>
@@ -191,13 +189,13 @@ export function DemoClient({ branches, period, requestSheet, stamp }: {
 
                   <div className="demo-next-action">
                     {refused ? (
-                      <Link href="/start" className="btn btn-primary">Use your own evidence</Link>
+                      <Link href="/pay" prefetch={false} className="btn btn-primary">See the one-month pilot</Link>
                     ) : observed ? (
                       <>
                         <Link href="/pay" prefetch={false} className="btn btn-primary">
                           See the one-month pilot
                         </Link>
-                        <Link href="/start" className="demo-quiet">Use your own evidence</Link>
+                        <Link href="/start" className="demo-quiet">Try the bill-review example</Link>
                       </>
                     ) : null}
                   </div>

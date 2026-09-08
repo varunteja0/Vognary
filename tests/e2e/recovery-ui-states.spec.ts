@@ -144,7 +144,7 @@ async function openAddBills(page: Page) {
 test("an empty workspace offers exactly one obvious add-bills action", async ({ page }) => {
   await signIn(page);
   const { activationCalls } = await mockEmptyWorkspace(page);
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   await expect(page.getByRole("heading", { name: "Start with a software bill." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add a bill" })).toBeVisible();
@@ -160,7 +160,7 @@ test("an empty workspace offers exactly one obvious add-bills action", async ({ 
 test("one observed charge asks for a matching receipt instead of rendering an all-clear", async ({ page }) => {
   await signIn(page);
   const { activationCalls } = await mockEmptyWorkspace(page, oneObservationHome);
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   const observed = page.getByRole("region", { name: "Not enough history yet" });
   await expect(observed.getByRole("heading", { name: "Not enough history yet" })).toBeVisible();
@@ -238,7 +238,8 @@ test("receipt onboarding shows proven forwarding, backfill, and sender trust", a
     }),
   }));
 
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
+  await page.getByRole("navigation", { name: "Primary" }).getByLabel("Records", { exact: true }).click();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Evidence" }).click();
   await expect(page.getByRole("heading", { name: "Stay up to date" })).toBeVisible();
   await expect(page.getByText("Status: On")).toBeVisible();
@@ -248,6 +249,7 @@ test("receipt onboarding shows proven forwarding, backfill, and sender trust", a
   await expect(page.getByRole("link", { name: "Google's attachment instructions" })).toHaveAttribute("href", /answer\/9261412/);
   await expectNoSeriousAxeViolations(page, "receipt onboarding");
 
+  await page.getByRole("navigation", { name: "Primary" }).getByLabel("Records", { exact: true }).click();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Today" }).click();
   await expect(page.getByRole("heading", { name: "Not enough history yet" })).toBeVisible();
 });
@@ -287,7 +289,7 @@ test("submitted evidence reports accepted, invalid, unreadable, and duplicate re
       }),
     }),
   );
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
   const overlay = await openAddBills(page);
 
   await overlay.getByLabel("Receipt or invoice text").fill("OpenAI invoice paid INR 1,999 on 2026-07-06. Renews monthly.");
@@ -314,7 +316,7 @@ test("an unreachable saved workspace is stated plainly and never faked", async (
   await page.route("**/api/workspaces/current/commitments**", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { items: [], nextCursor: null }, meta }) }),
   );
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   await expect(page.getByText("Saved workspace unavailable")).toBeVisible();
   await expect(page.getByText("Your saved workspace could not be reached. Nothing was changed.")).toBeVisible();
@@ -333,7 +335,7 @@ test("a signed-out session shows the sign-in state instead of an empty ledger", 
       body: JSON.stringify({ authenticated: false, configuration: { status: "ready", cookieName: "vognary_session" }, session: null }),
     }),
   );
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   await expect(page.getByText("This workspace is not open on this device")).toBeVisible();
   await expect(page.getByRole("link", { name: "Sign in to continue" })).toHaveAttribute("href", "/login?next=/app");
@@ -342,7 +344,7 @@ test("a signed-out session shows the sign-in state instead of an empty ledger", 
 test("going offline is stated before any action is attempted", async ({ page }) => {
   await signIn(page);
   await mockEmptyWorkspace(page);
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
   await openAddBills(page);
 
   await page.context().setOffline(true);
@@ -355,7 +357,7 @@ test("going offline is stated before any action is attempted", async ({ page }) 
 test("account access leaves Recovery for the canonical profile route", async ({ page }) => {
   await signIn(page);
   await mockEmptyWorkspace(page);
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   const account = page.getByRole("link", { name: `Account for ${email}` });
   await expect(account).toHaveAttribute("href", "/profile");
@@ -370,7 +372,7 @@ test("empty Home and the add-bills overlay fit a 390px phone", async ({ page }) 
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page);
   await mockEmptyWorkspace(page);
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
   await expect(page.getByRole("heading", { name: "Start with a software bill." })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   await page.getByRole("button", { name: "Add a bill" }).click();
@@ -412,7 +414,8 @@ test("Gmail wizard step 1 fits a 390px phone", async ({ page }) => {
       meta,
     }),
   }));
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
+  await page.getByRole("navigation", { name: "Primary" }).getByLabel("Records", { exact: true }).click();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Evidence" }).click();
   await expect(page.getByRole("heading", { name: "Stay up to date" })).toBeVisible();
   await page.getByRole("button", { name: "Continue setup" }).click();

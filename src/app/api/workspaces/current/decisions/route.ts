@@ -51,6 +51,7 @@ export async function PUT(request: Request) {
   if (crossSite) return recoveryFailureResponse(new RecoveryServiceError("FORBIDDEN"), createRecoveryRequestId());
   return runRecoveryRoute(request, {
     namespace: "recovery-decisions-write",
+    financialIntake: true,
     limit: 120,
     windowMs: 60 * 60_000,
   }, async ({ requestId, session }) => {

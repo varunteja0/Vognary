@@ -5,6 +5,7 @@ import { askWorkspaceProofGraph } from "@/lib/server/proof-question-store";
 import { readLimitedJson, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 import { requireSession, requireWorkspaceRole } from "@/lib/server/workspace-auth";
+import { rejectUnclearedFinancialRequest } from "@/lib/server/financial-intake";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,6 +23,8 @@ export async function POST(request: Request) {
   if (!isDatabaseConfigured()) return Response.json({ status: "not-configured" }, { status: 501, headers: noStoreHeaders });
   const authorization = await requireWorkspaceRole(request, session.workspaceId, "viewer");
   if (authorization instanceof Response) return authorization;
+  const blocked = await rejectUnclearedFinancialRequest(request);
+  if (blocked) return blocked;
 
   try {
     const body = await readLimitedJson<{ question?: unknown }>(request, 4 * 1024);

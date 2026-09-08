@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { CircleCheck, Ellipsis, Inbox, Layers3, Plus, ReceiptText, ShieldCheck } from "lucide-react";
+import dynamic from "next/dynamic";
+import { CircleCheck, Ellipsis, Inbox, Layers3, Plus, ReceiptText, RefreshCw, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import shell from "./workspace-shell.module.css";
 import {
@@ -56,6 +57,8 @@ import {
 } from "./state";
 import { clientFailureReference, createRecoveryTransport, type RecoveryTransport, type TransportFailure } from "./transport";
 import { recordCitedPictureActivationWithRetry, workspaceActivationGate } from "./activation-attempt";
+import { createMutationRetryTracker } from "./mutation-retry";
+const BillReviewDesk = dynamic(() => import("./bill-review-desk"), { loading: () => <LoadingBlock label="Opening bill reviews..." /> });
 
 const newIdempotencyKey = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `recovery-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -109,6 +112,7 @@ async function readRecoverySnapshot(transport: RecoveryTransport): Promise<Recov
 export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable }: { receiptInboxPubliclyAvailable: boolean }) {
   const [state, dispatch] = useReducer(recoveryReducer, initialRecoveryState);
   const transport = useMemo(() => createRecoveryTransport(), []);
+  const mutationRetry = useMemo(() => createMutationRetryTracker(newIdempotencyKey), []);
   const [correctionError, setCorrectionError] = useState<string | null>(null);
   const [loadingMoreCommitments, setLoadingMoreCommitments] = useState(false);
   const [guestTransferStatus, setGuestTransferStatus] = useState<GuestTransferStatus>({ kind: "IDLE" });
@@ -118,13 +122,13 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   const [inspectedEvidenceFailure, setInspectedEvidenceFailure] = useState<TransportFailure | null>(null);
   const [inspectingEvidence, setInspectingEvidence] = useState(false);
   const viewHeadingRef = useRef<HTMLHeadingElement>(null);
-  const viewChangedRef = useRef(false);
+  const previousViewRef = useRef(state.view);
   const viewChosenByReaderRef = useRef(false);
   const billReturnRecord = useRef<{ workspaceId: string; proposalId: string } | null>(null);
 
-  const loadControlEvidence = useCallback(async (commitmentId: string) => {
-    const result = await transport.commitment(commitmentId, { evidenceLimit: recoveryLimits.maxCommitmentEvidencePageSize });
-    return result.ok ? { ok: true as const, items: result.data.evidence.items } : { ok: false as const, failure: result };
+  const loadControlEvidence = useCallback(async (commitmentId: string, evidenceCursor?: string) => {
+    const result = await transport.commitment(commitmentId, { evidenceLimit: recoveryLimits.maxCommitmentEvidencePageSize, evidenceCursor });
+    return result.ok ? { ok: true as const, ...result.data.evidence } : { ok: false as const, failure: result };
   }, [transport]);
 
   const controlDesk = useCommitmentControl({
@@ -132,7 +136,6 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     workspaceId: state.home?.workspace.id ?? null,
     loadEvidence: loadControlEvidence,
   });
-  const controlAvailable = controlDesk.available;
   const pendingDecisionCount = controlDesk.state.brief?.proposals.filter((entry) => entry.evaluation && !entry.decision).length ?? 0;
   const nowDecisionCount = state.home?.decisionQueue.length ?? 0;
   const awaitingControlEvidence = Boolean(
@@ -507,14 +510,11 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   }, [inspectedEvidenceId, state.workspaceVersion, transport]);
 
   useEffect(() => {
-    if (!viewChangedRef.current) {
-      viewChangedRef.current = true;
-      return;
-    }
-    viewHeadingRef.current?.focus();
+    if (previousViewRef.current === state.view) return;
+    previousViewRef.current = state.view;
+    if (state.view !== "CONTROL" || !new URLSearchParams(window.location.search).get("comparison")) viewHeadingRef.current?.focus();
   }, [state.view]);
 
-  const controlDefaultRef = useRef(false);
   const urlDeepLinkRef = useRef(false);
   useEffect(() => {
     if (urlDeepLinkRef.current || typeof window === "undefined") return;
@@ -522,22 +522,30 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     const params = new URLSearchParams(window.location.search);
     const view = params.get("view");
     const proposal = params.get("proposal");
-    if (view === "CONTROL" || proposal) {
+    if (proposal || (view && recoveryViews.includes(view as RecoveryView))) {
       viewChosenByReaderRef.current = true;
-      dispatch({ type: "VIEW_SELECTED", view: "CONTROL" });
+      dispatch({ type: "VIEW_SELECTED", view: proposal ? "CONTROL" : view as RecoveryView });
     }
     if (proposal) controlDesk.handlers.focusProposal(proposal);
   }, [controlDesk.handlers]);
   useEffect(() => {
-    if (controlDefaultRef.current || !controlAvailable) return;
-    controlDefaultRef.current = true;
-    if (viewChosenByReaderRef.current || state.view !== "HOME") return;
-    viewChangedRef.current = false;
-    dispatch({ type: "VIEW_SELECTED", view: "CONTROL" });
-  }, [controlAvailable, state.view]);
-
+    const onHistory = () => {
+      const params = new URLSearchParams(window.location.search);
+      const view = params.get("view");
+      if (view && recoveryViews.includes(view as RecoveryView)) {
+        viewChosenByReaderRef.current = true;
+        dispatch({ type: "VIEW_SELECTED", view: view as RecoveryView });
+      }
+    };
+    window.addEventListener("popstate", onHistory);
+    return () => window.removeEventListener("popstate", onHistory);
+  }, []);
   function selectView(view: RecoveryView) {
     viewChosenByReaderRef.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", view);
+    if (view !== "CONTROL") { url.searchParams.delete("proposal"); url.searchParams.delete("comparison"); }
+    window.history.pushState(null, "", url);
     dispatch({ type: "VIEW_SELECTED", view });
   }
 
@@ -558,70 +566,73 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   }
 
   async function decide(request: PutDecisionRequest) {
-    if (state.workspaceVersion === null) return;
+    if (state.workspaceVersion === null || !state.home) return false;
     const commitment = state.commitments.find((item) => item.id === request.commitmentId)
       ?? (state.detail?.id === request.commitmentId ? state.detail : null);
-    if (!commitment) return;
-    const idempotencyKey = newIdempotencyKey();
+    if (!commitment) return false;
+    const context = mutationRetry.context(state.home.workspace.id, "DECISION", request, state.workspaceVersion);
+    const { idempotencyKey } = context;
     dispatch({ type: "DECISION_STARTED", commitmentId: request.commitmentId, decision: request.decision, previous: commitment.decision, idempotencyKey });
-    const result = await transport.putDecision(
-      request,
-      { workspaceVersion: state.workspaceVersion, idempotencyKey },
-    );
+    const result = await transport.putDecision(request, context);
+    mutationRetry.settle(context, result);
     if (result.ok) dispatch({ type: "DECISION_SAVED", commitment: result.data.commitment, home: result.data.home, meta: result.meta });
     else dispatch({ type: "MUTATION_FAILED", failure: result });
+    return result.ok;
   }
 
   async function saveContext(commitmentId: string, request: PutCommitmentContextRequest) {
-    if (state.workspaceVersion === null) return;
-    const idempotencyKey = newIdempotencyKey();
+    if (state.workspaceVersion === null || !state.home) return;
+    const context = mutationRetry.context(state.home.workspace.id, "CONTEXT", { commitmentId, request }, state.workspaceVersion);
+    const { idempotencyKey } = context;
     dispatch({ type: "CONTEXT_STARTED", commitmentId, idempotencyKey });
-    const result = await transport.putCommitmentContext(commitmentId, request, { workspaceVersion: state.workspaceVersion, idempotencyKey });
+    const result = await transport.putCommitmentContext(commitmentId, request, context);
+    mutationRetry.settle(context, result);
     if (result.ok) dispatch({ type: "CONTEXT_SAVED", detail: result.data.commitment, home: result.data.home, meta: result.meta });
     else dispatch({ type: "MUTATION_FAILED", failure: result });
   }
 
   async function submitCorrection() {
     const dialog = state.dialog;
-    if (dialog?.kind !== "CORRECTION" || state.workspaceVersion === null) return;
+    if (dialog?.kind !== "CORRECTION" || state.workspaceVersion === null || !state.home) return;
     const patch = correctionPatchFromDraft(state.correctionDraft);
     if (!patch) {
       setCorrectionError("Enter a complete value before saving this correction.");
       return;
     }
     setCorrectionError(null);
-    const idempotencyKey = newIdempotencyKey();
+    const request = { patch, ...(state.correctionDraft.reason.trim() ? { reason: state.correctionDraft.reason.trim() } : {}) };
+    const context = mutationRetry.context(state.home.workspace.id, "CORRECTION", { commitmentId: dialog.commitmentId, request }, state.workspaceVersion);
+    const { idempotencyKey } = context;
     dispatch({ type: "CORRECTION_STARTED", commitmentId: dialog.commitmentId, field: dialog.field, idempotencyKey });
-    const result = await transport.createCorrection(
-      dialog.commitmentId,
-      { patch, ...(state.correctionDraft.reason.trim() ? { reason: state.correctionDraft.reason.trim() } : {}) },
-      { workspaceVersion: state.workspaceVersion, idempotencyKey },
-    );
+    const result = await transport.createCorrection(dialog.commitmentId, request, context);
+    mutationRetry.settle(context, result);
     if (result.ok) dispatch({ type: "CORRECTION_SAVED", detail: result.data.commitment, home: result.data.home, meta: result.meta });
     else dispatch({ type: "MUTATION_FAILED", failure: result });
   }
 
   async function reverseCorrection(correction: CorrectionDto) {
-    if (state.workspaceVersion === null) return;
-    const idempotencyKey = newIdempotencyKey();
+    if (state.workspaceVersion === null || !state.home) return;
+    const context = mutationRetry.context(state.home.workspace.id, "CORRECTION_REVERSAL", { commitmentId: correction.commitmentId, correctionId: correction.id }, state.workspaceVersion);
+    const { idempotencyKey } = context;
     dispatch({ type: "CORRECTION_REVERSAL_STARTED", commitmentId: correction.commitmentId, correctionId: correction.id, idempotencyKey });
-    const result = await transport.reverseCorrection(correction.commitmentId, correction.id, {
-      workspaceVersion: state.workspaceVersion,
-      idempotencyKey,
-    });
+    const result = await transport.reverseCorrection(correction.commitmentId, correction.id, context);
+    mutationRetry.settle(context, result);
     if (result.ok) dispatch({ type: "CORRECTION_SAVED", detail: result.data.commitment, home: result.data.home, meta: result.meta });
     else dispatch({ type: "MUTATION_FAILED", failure: result });
   }
 
   async function submitEvidence(mode: SourceType) {
-    if (state.workspaceVersion === null || state.pending) return;
+    if (state.workspaceVersion === null || state.pending || !state.home) return;
     const request = evidenceRequestFromDraft(state.evidenceDraft, mode);
     if (!request) return;
     const returnRecord = billReturnRecord.current;
     dispatch({ type: "EVIDENCE_MODE_SELECTED", mode });
-    const idempotencyKey = newIdempotencyKey();
+    const observedVersion = Math.max(state.workspaceVersion, controlDesk.state.workspaceVersion ?? state.workspaceVersion);
+    const context = mutationRetry.context(state.home.workspace.id, "EVIDENCE", request, observedVersion);
+    const { idempotencyKey } = context;
     dispatch({ type: "EVIDENCE_SUBMIT_STARTED", idempotencyKey });
-    const result = await transport.submitEvidence(request, { workspaceVersion: state.workspaceVersion, idempotencyKey });
+    const result = await transport.submitEvidence(request, context);
+    mutationRetry.settle(context, result);
     if (result.ok) {
       dispatch({
         type: "EVIDENCE_SUBMITTED",
@@ -832,6 +843,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   const showPersistentAdd = state.status.kind === "READY"
     && state.home !== null
     && !hasGuidedAddStep
+    && state.view !== "BILL_REVIEW"
     && (state.view !== "CONTROL" || awaitingControlEvidence);
   const mandateAvailable = Boolean(state.home?.autopilot?.mandate)
     || state.home?.autopilot?.noticeReadiness.state === "proven-ready";
@@ -876,15 +888,16 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
             ))}
             {overflowViews.length ? (
               <li className="min-w-0">
-                <details className="viewnav-more">
-                  <summary aria-label="More destinations"><Ellipsis size={18} aria-hidden /><span>More</span></summary>
+                <details className="viewnav-more" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }}>
+                  <summary aria-label="Records" aria-current={state.view !== "BILL_REVIEW" ? "page" : undefined} onKeyDown={event => { if (event.key === "Escape") { const menu = event.currentTarget.closest("details"); if (menu) menu.open = false; } }}><Ellipsis size={18} aria-hidden /><span>Records</span></summary>
                   <ul>
                     {overflowViews.map((view) => (
                       <li key={view}>
                         <button
                           type="button"
                           disabled={state.status.kind === "LOADING"}
-                          onClick={() => selectView(view)}
+                          onClick={event => { const menu = event.currentTarget.closest("details"); if (menu) menu.open = false; selectView(view); }}
+                          onKeyDown={event => { if (event.key === "Escape") { const menu = event.currentTarget.closest("details"); if (menu) { menu.open = false; menu.querySelector("summary")?.focus(); } } }}
                           aria-current={state.view === view ? "page" : undefined}
                         >
                           {recoveryViewLabels[view]}
@@ -940,7 +953,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
               tone="caution"
             />
           ) : null}
-          {state.rollback ? <RollbackAlert state={state} onDismiss={() => dispatch({ type: "ROLLBACK_DISMISSED" })} /> : null}
+          {state.rollback ? <RollbackAlert state={state} onReload={() => void loadSnapshot()} onDismiss={() => dispatch({ type: "ROLLBACK_DISMISSED" })} /> : null}
         </div>
 
         {/* Focus target for view changes. It is never Tab-reachable, so the
@@ -1049,6 +1062,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
   );
 
   function renderView() {
+    if (state.view === "BILL_REVIEW") return <BillReviewDesk key={state.home?.workspace.id} workspaceId={state.home?.workspace.id ?? ""} />;
     if (state.view === "CONTROL") {
       // Enrollment gates the live desk, never the explanation of it. A workspace
       // without the pilot still sees the whole loop — rendered by these same
@@ -1073,6 +1087,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
     if (state.view === "ADD_EVIDENCE") {
       return (
         <RecoverySources
+          workspaceId={state.home?.workspace.id ?? ""}
           receiptInboxPubliclyAvailable={receiptInboxPubliclyAvailable}
           receiptInbox={state.receiptInbox}
           sourceStatus={state.sourceStatus}
@@ -1125,7 +1140,7 @@ export default function RecoveryWorkspaceClient({ receiptInboxPubliclyAvailable 
         onAddEvidence={() => dispatch({ type: "ADD_BILLS_OPENED" })}
         onOpenSources={() => selectView("ADD_EVIDENCE")}
         onSeeAllCommitments={() => selectView("COMMITMENTS")}
-        onDecide={(request) => void decide(request)}
+        onDecide={decide}
         onReminderConsent={() => void consentReminder()}
         onPaymentAsk={(answer) => {
           try {
@@ -1195,7 +1210,7 @@ function GuestTransferBlock({
   );
 }
 
-function RollbackAlert({ state, onDismiss }: { state: RecoveryState; onDismiss: () => void }) {
+function RollbackAlert({ state, onReload, onDismiss }: { state: RecoveryState; onReload: () => void; onDismiss: () => void }) {
   const rollback = state.rollback;
   if (!rollback) return null;
   const { mutation, failure } = rollback;
@@ -1212,13 +1227,16 @@ function RollbackAlert({ state, onDismiss }: { state: RecoveryState; onDismiss: 
 
   return (
     <div role="alert" className="inset border border-ember p-4">
-      <p className="eyebrow eyebrow-xs text-ember">Rolled back</p>
+      <p className="eyebrow eyebrow-xs text-ember">{failure.outcome === "UNKNOWN" ? "Save result unconfirmed" : "Rolled back"}</p>
       <p className="mt-2 text-sm leading-6 text-(--ink)">
-        {attempted} was not saved. The workspace is {restored}, exactly as the server last reported it.
+        {failure.outcome === "UNKNOWN"
+          ? `${attempted} may already be saved. This screen shows the last confirmed state. Reload the saved record before changing the entry or starting another action.`
+          : `${attempted} was not saved. The workspace is ${restored}, exactly as the server last reported it.`}
       </p>
       <p className="mt-1 text-sm leading-6 text-(--muted)">
         {failure.error.message} · reference {failure.error.requestId} · {failure.origin === "SERVER" ? "raised by the workspace" : "raised on this device"}
       </p>
+      {failure.outcome === "UNKNOWN" ? <button type="button" onClick={onReload} className="btn btn-sm btn-ghost mt-3"><RefreshCw size={16} aria-hidden />Reload saved state</button> : null}
       <button type="button" onClick={onDismiss} className="btn btn-sm btn-ghost mt-3">Dismiss</button>
     </div>
   );

@@ -1,23 +1,38 @@
 import { expect, test } from "@playwright/test";
 
-test("an unauthenticated first session can carry cited evidence to authorization", async ({ page }) => {
+test("an unauthenticated first session uses fixed synthetic bill review without accepting financial input", async ({ page }) => {
+  const financialWrites: string[] = [];
+  page.on("request", request => { if (request.method() === "POST" && /\/api\/(audit|ingest|receipt-image)/.test(request.url())) financialWrites.push(request.url()); });
   await page.goto("/start");
-  await expect(page.getByRole("heading", { name: "See the charge. Sign in to authorize." })).toBeVisible();
-  await expect(page.getByText(/Nothing is saved until you sign in/)).toBeVisible();
-  await page.getByLabel("Or paste the receipt").fill([
-    "Cursor",
-    "Invoice paid USD 20.00",
-    "Payment date: 28 August 2026",
-    "Cursor Pro renews monthly on 28 September 2026.",
-  ].join("\n"));
-  await page.getByRole("button", { name: "Check this bill" }).click();
-  // The result leads with cited merchant and amount; authorization remains signed-in.
-  await expect(page.getByRole("heading", { name: /^Cursor · \$20\.00$/ })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(/Cursor charges \$20\.00\. Charges in/i)).toHaveCount(0);
-  await expect(page.getByText("From your receipt", { exact: true })).toBeVisible();
-  await expect(page.getByText(/next unique step is the Control desk/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Keep", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Plan to cancel" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Sign in to remember this evidence" })).toHaveAttribute("href", "/login?next=/app");
-  await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Supplier bill review", exact: true })).toBeVisible();
+  await expect(page.getByText("Fixed synthetic example / No provider reads")).toBeVisible();
+  await expect(page.getByRole("textbox")).toHaveCount(0);
+  await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  await page.getByRole("button", { name: "Close synthetic review" }).click();
+  await expect(page.getByText("Synthetic review closed", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Simulate a later bill amendment" }).click();
+  await expect(page.getByText(/Revision 3 needs its own review/)).toBeVisible();
+  await expect(page.getByText("Revision 2: review closed")).not.toBeVisible();
+  await page.getByText("Synthetic review history", { exact: true }).click();
+  await expect(page.getByText("Revision 2: review closed")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Bill review" })).toHaveAttribute("href", "/login?next=%2Fapp%3Fview%3DBILL_REVIEW");
+  expect(financialWrites).toEqual([]);
+  await page.reload();
+  expect(await page.evaluate(() => sessionStorage.getItem("vognary.guest-audit-transfer.v1"))).toBeNull();
+});
+
+test("a reloaded guest can discard an older tab transfer and its workspace binding", async ({ page }) => {
+  await page.goto("/start");
+  await page.evaluate(() => {
+    sessionStorage.setItem("vognary.guest-audit-transfer.v1", JSON.stringify({ receiptText: "Synthetic old receipt" }));
+    sessionStorage.setItem("vognary.guest-audit-transfer-binding.v1", JSON.stringify({ workspaceId: "synthetic-workspace" }));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Discard tab evidence" }).click();
+  const stored = await page.evaluate(() => [
+    sessionStorage.getItem("vognary.guest-audit-transfer.v1"),
+    sessionStorage.getItem("vognary.guest-audit-transfer-binding.v1"),
+  ]);
+  expect(stored).toEqual([null, null]);
+  await expect(page.getByText("Tab evidence discarded. No receipt is queued for sign-in.")).toBeVisible();
 });

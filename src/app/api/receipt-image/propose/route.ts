@@ -4,6 +4,7 @@ import { sanitizeKnownMerchants } from "@/lib/recovery/monthly-loop";
 import { assertContentType, readLimitedBytes, RequestBodyTooLargeError, UnsupportedContentTypeError } from "@/lib/server/request-body";
 import { rejectCrossSiteMutation } from "@/lib/server/request-security";
 import { proposeReceiptLineFromImageFile } from "@/lib/server/receipt-image-propose";
+import { rejectUnclearedFinancialRequest } from "@/lib/server/financial-intake";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,6 +19,8 @@ export async function POST(request: NextRequest) {
 
   const limit = await rateLimit(request, { namespace: "receipt-image-propose", limit: 20, windowMs: 5 * 60_000 });
   if (!limit.allowed) return rateLimitExceeded(limit);
+  const blocked = await rejectUnclearedFinancialRequest(request);
+  if (blocked) return blocked;
 
   let formData: FormData;
   try {

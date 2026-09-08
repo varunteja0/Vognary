@@ -116,10 +116,11 @@ test("every contract enum has presentation copy, so a contract change cannot ren
   }
 });
 
-test("Control stays a primary destination at the enrollment boundary, and the phone bar never carries more than four direct labels", () => {
-  assert.deepEqual([...recoveryViews], ["CONTROL", "HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"]);
-  assert.deepEqual(Object.values(recoveryViewLabels), ["Decisions", "Today", "Bills", "Evidence", "Automation"]);
-  assert.equal(recoveryPrimaryViewLimit, 4);
+test("bill review is primary while Control and existing evidence tools remain in Records", () => {
+  assert.deepEqual([...recoveryViews], ["BILL_REVIEW", "CONTROL", "HOME", "ADD_EVIDENCE", "COMMITMENTS", "MANDATE"]);
+  assert.deepEqual(Object.values(recoveryViewLabels), ["Bill review", "Decisions", "Today", "Bills", "Evidence", "Automation"]);
+  assert.equal(recoveryPrimaryViewLimit, 1);
+  assert.equal(recoveryViews[0], "BILL_REVIEW");
   assert.match(clientSource, /<nav aria-label="Primary"/);
   // The product the public site sells is never removed from navigation. Only
   // the desk behind it is gated.
@@ -131,6 +132,7 @@ test("Control stays a primary destination at the enrollment boundary, and the ph
   assert.match(clientSource, /noticeReadiness\.state === "proven-ready"/);
   assert.match(clientSource, /primaryViews\.map/);
   assert.match(clientSource, /viewnav-more/);
+  assert.match(clientSource, /summary aria-label="Records"/);
   assert.match(clientSource, /aria-current=\{state\.view === view \? "page" : undefined\}/);
   assert.match(clientSource, /href="\/profile"/);
   assert.doesNotMatch(clientSource, /state\.view === "PROFILE"/);
@@ -151,14 +153,14 @@ test("a workspace without the pilot sees the whole loop rendered by the product'
   assert.doesNotMatch(locked, /fetch\(|useCommitmentControl/);
 });
 
-test("landing, login, and empty Home tell one receipts-to-decision product story", () => {
+test("landing illustrates Control while login and bill review preserve evidence and authority boundaries", () => {
   assert.match(landingSource, /Commitment Control for India-first AI companies/);
   assert.match(landingSource, /<h1 id="home-title" className="home-title">Vognary/);
-  assert.match(landingSource, /Review the synthetic request/);
-  assert.match(landingSource, /Use your own evidence/);
+  assert.match(landingSource, /Try a spending decision/);
+  assert.match(landingSource, /Try a synthetic bill-change review/);
   assert.match(landingSource, /See the one-month pilot/);
-  // Human authority is stated on the first screen, not deferred to a later band.
-  assert.match(landingSource, /Policy gives context\. Only you authorize\./);
+  assert.match(landingSource, /provider verification and customer-data activation remain pending/i);
+  assert.match(landingSource, /A policy result is not approval/);
   assert.match(loginSource, /Sign in to Vognary/);
   assert.match(loginSource, /Google is only for sign-in\. Vognary does not access Gmail\./);
   assert.match(allSource, /Start with a software bill/);
@@ -258,7 +260,7 @@ test("canonical Recovery advertises the receipt inbox only behind public launch 
   assert.match(clientSource, /if \(!receiptInboxPubliclyAvailable\) return/);
   assert.match(homeSource, /receiptInboxPubliclyAvailable/);
   assert.match(sourcesSource, /if \(!receiptInboxPubliclyAvailable\)/);
-  assert.match(sourcesSource, /Automatic forwarding is not available yet/);
+  assert.match(sourcesSource, /optional receipt inbox is not available yet/);
 });
 
 test("one observation is coached toward a second matching receipt instead of rendering a false all-clear", () => {
@@ -462,7 +464,8 @@ test("evidence inspection exposes every fact the reader needs to check a rupee",
 });
 
 test("motion is left to the token layer, so reduced motion is honoured globally", () => {
-  assert.doesNotMatch(allSource, /scrollIntoView|requestAnimationFrame|behavior: "smooth"/);
+  assert.doesNotMatch(allSource, /scrollIntoView|behavior: "smooth"/);
+  assert.match(sourceOf("bill-review-desk.tsx"), /window\.scrollTo\(\{ top: context\.scroll, behavior: "instant" \}\)/);
   const globals = readFileSync("src/app/globals.css", "utf8");
   assert.match(globals, /@media \(prefers-reduced-motion: reduce\)/);
   // Reduced motion removes animation outright. A near-zero duration still runs a

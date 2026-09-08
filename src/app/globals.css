@@ -363,6 +363,8 @@ select {
   display: inline-flex;
   align-items: center;
   min-height: var(--tap);
+  max-width: calc(100vw - 2rem);
+  overflow-wrap: anywhere;
   padding: 0 1.05rem;
   border-radius: var(--radius-xs);
   background: var(--ink);

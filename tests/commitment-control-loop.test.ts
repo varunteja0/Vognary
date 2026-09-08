@@ -71,7 +71,7 @@ test("step labels stay numbered from the same five sentences", () => {
   assert.equal(commitmentControlStepLabel(4), "4 · A named owner or admin freezes a cap, or declines.");
 });
 
-test("public and desk surfaces express the same loop, and the lesson never restarts", () => {
+test("Control entry preserves the separate bill review without restarting a lesson", () => {
   const landing = readFileSync("src/app/launch-landing.tsx", "utf8");
   const sheet = readFileSync("src/app/record-sheet.tsx", "utf8");
   const demo = readFileSync("src/app/demo/demo-client.tsx", "utf8");
@@ -82,11 +82,13 @@ test("public and desk surfaces express the same loop, and the lesson never resta
   const control = readFileSync("src/app/workspace/recovery/control/control-view.tsx", "utf8");
   const agent = readFileSync("src/lib/agent-content.ts", "utf8");
 
-  // The public front door renders the loop as one record moving through its
-  // own stages, from the canonical fixture — it never re-prints the five
-  // sentences as a lecture.
   assert.match(sheet, /syntheticControlBrief/);
-  assert.match(landing, /RequestSheet/);
+  assert.match(landing, /Synthetic spending request awaiting a human decision/);
+  assert.match(landing, /Commitment Control for India-first AI companies/);
+  assert.match(landing, /bill-review example is an evaluation, not a separate purchased service/);
+  assert.match(landing, /explicitly selected Books bill/);
+  assert.match(landing, /a closed bill review alone does not create that comparison/);
+  assert.match(landing, /href="\/demo"/);
   assert.match(landing, /FreezeSheet/);
   assert.match(agent, /COMMITMENT_CONTROL_STEPS/);
 

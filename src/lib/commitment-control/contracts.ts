@@ -9,9 +9,10 @@ import {
   type ControlOutcomeReconciliation,
   type IntendedControlOutcome,
 } from "./outcome";
-import type { CategoryPosture, PolicyReasonCode, ProposalCategory, ProposalPolicy, ProposalPolicyEvaluation } from "./policy";
-import { assertRecordableControlPolicy } from "./policy";
+import type { CategoryPosture, ControlAmountBasis, PolicyReasonCode, ProposalCategory, ProposalPolicy, ProposalPolicyEvaluation } from "./policy";
+import { assertRecordableControlPolicy, normalizeControlAmountBasis } from "./policy";
 import { proposalCadences, type ProposalCadence } from "./project";
+import { isControlProviderBillProvenanceDto, normalizeControlProviderBillRequest, type ControlProviderBillProvenanceDto, type ControlProviderBillSourceStateDto, type ReconcileControlProviderBillRequest } from "./provider-bill-contracts";
 import {
   boundedControlText as boundedText,
   isCanonicalControlDateOnly as isDateOnly,
@@ -25,6 +26,7 @@ export type CreateControlProposalRequest = {
   purpose: string;
   category: ProposalCategory;
   amountMinor: string;
+  amountBasis?: ControlAmountBasis;
   currency: string;
   firstChargeDate: string;
   cadence: ProposalCadence;
@@ -38,9 +40,10 @@ export type DecideControlProposalRequest = {
   overrideReason?: string;
 };
 export type ReconcileControlProposalRequest = {
+  source?: "RECOVERY";
   evidenceId: string;
   observedOutcome?: ControlOutcomeObservation;
-};
+} | ReconcileControlProviderBillRequest;
 export type RecordControlOutcomeObservationRequest = {
   observedOutcome: ControlOutcomeObservation;
 };
@@ -64,6 +67,7 @@ export type ControlProposalDto = {
   purpose: string;
   category: ProposalCategory;
   amountMinor: string;
+  amountBasis?: ControlAmountBasis;
   currency: string;
   firstChargeDate: string;
   cadence: ProposalCadence;
@@ -78,6 +82,7 @@ export type ControlProposalDto = {
 export type ControlEvaluationDto = Omit<ProposalPolicyEvaluation, "proposal"> & {
   id: string;
   proposalId: string;
+  amountBasis?: ControlAmountBasis;
   evaluatedAt: string;
 };
 
@@ -90,6 +95,7 @@ export type ControlDecisionDto = {
   approvedCapMinor: string | null;
   currency: string;
   expectedAmountMinor: string;
+  amountBasis?: ControlAmountBasis;
   decidedByUserId: string | null;
   decidedByDisplayName: string | null;
   overrideReason: string | null;
@@ -112,6 +118,11 @@ export type ControlReconciliationDto = {
   outcome: ControlOutcomeReconciliation | null;
   reconciledByUserId: string | null;
   reconciledAt: string;
+  comparisonKind?: "BILLED_AMOUNT_COMPARISON";
+  decisionAmountBasis?: ControlAmountBasis;
+  observedEvidenceBasis?: "PROVIDER_BILL_TOTAL";
+  providerBill?: ControlProviderBillProvenanceDto;
+  providerBillSource?: ControlProviderBillSourceStateDto;
 };
 
 export const controlExceptionTargetKinds = ["RECONCILIATION", "OUTCOME_OBSERVATION"] as const;
@@ -430,6 +441,7 @@ function isControlProposalDto(value: unknown): value is ControlProposalDto {
     && typeof value.category === "string"
     && proposalCategories.includes(value.category as ProposalCategory)
     && isPositiveMinorUnits(value.amountMinor)
+    && isOptionalAmountBasis(value.amountBasis)
     && isCurrency(value.currency)
     && isDateOnly(value.firstChargeDate)
     && typeof value.cadence === "string"
@@ -447,6 +459,7 @@ function isControlEvaluationDto(value: unknown): value is ControlEvaluationDto {
   if (!isRecord(value)
     || !isUuid(value.id)
     || !isUuid(value.proposalId)
+    || !isOptionalAmountBasis(value.amountBasis)
     || !isPositiveInteger(value.policyVersion)
     || !["WITHIN_POLICY", "REVIEW_REQUIRED", "OUTSIDE_POLICY"].includes(String(value.status))
     || value.humanDecisionRequired !== true
@@ -482,6 +495,7 @@ function isControlEvaluationDto(value: unknown): value is ControlEvaluationDto {
 function evaluationMatchesProposal(evaluation: ControlEvaluationDto, proposal: ControlProposalDto) {
   const proposalCurrency = evaluation.currencyResults.find((result) => result.currency === proposal.currency);
   return evaluation.proposalId === proposal.id
+    && (evaluation.amountBasis ?? null) === (proposal.amountBasis ?? null)
     && proposalCurrency !== undefined
     && proposalCurrency.proposedThirteenWeekMinor === proposal.projectedThirteenWeekMinor
     && proposalCurrency.proposedAnnualMinor === proposal.projectedAnnualMinor;
@@ -496,6 +510,7 @@ function isControlDecisionDto(value: unknown): value is ControlDecisionDto {
     || typeof value.action !== "string"
     || !proposalDecisionActions.includes(value.action as ProposalDecisionAction)
     || !isPositiveMinorUnits(value.expectedAmountMinor)
+    || !isOptionalAmountBasis(value.amountBasis)
     || !isNullableMinorUnits(value.approvedCapMinor)
     || !isCurrency(value.currency)
     || !isNullableUuid(value.decidedByUserId)
@@ -526,6 +541,16 @@ function isControlReconciliationDto(value: unknown): value is ControlReconciliat
     || !(value.outcome === null || isControlOutcomeReconciliation(value.outcome))
     || !isNullableUuid(value.reconciledByUserId)
     || !isTimestamp(value.reconciledAt)) return false;
+  if (value.comparisonKind !== undefined) {
+    if (value.comparisonKind !== "BILLED_AMOUNT_COMPARISON" || value.decisionAmountBasis !== "GROSS_BILLED_TOTAL_PER_CHARGE"
+      || value.observedEvidenceBasis !== "PROVIDER_BILL_TOTAL" || !isControlProviderBillProvenanceDto(value.providerBill)
+      || value.providerBill.source !== "ZOHO_BOOKS" || value.providerBill.evidenceId !== value.evidenceId
+      || value.providerBill.totalMinor !== value.observedAmountMinor || value.providerBill.currency !== value.observedCurrency
+      || value.providerBill.billDate !== value.observedEvidenceDate
+      || value.providerBill.relationBasis !== "USER_CONFIRMED_SAME_CHARGE"
+      || value.providerBill.retentionNotice !== "control-provider-bill-retention-v1"
+      || (isRecord(value.outcome) && value.outcome.verdict !== "NOT_OBSERVED")) return false;
+  } else if (value.decisionAmountBasis !== undefined || value.observedEvidenceBasis !== undefined || value.providerBill !== undefined) return false;
   if (value.verdict === "AUTHORIZATION_EXPIRED") {
     return value.observedEvidenceDate !== null
       && value.observedAmountMinor !== null
@@ -543,6 +568,7 @@ function isControlReconciliationDto(value: unknown): value is ControlReconciliat
 }
 
 function decisionMatchesProposalEnvelope(decision: ControlDecisionDto, proposal: ControlProposalDto) {
+  if ((decision.amountBasis ?? null) !== (proposal.amountBasis ?? null)) return false;
   if (proposal.intendedOutcome === null) return true;
   if (decision.action === "DECLINE") return decision.authorizationExpiresOn === null;
   return decision.authorizationExpiresOn !== null
@@ -554,6 +580,7 @@ function reconciliationMatchesDecisionWindow(
   reconciliation: ControlReconciliationDto,
   decision: ControlDecisionDto,
 ) {
+  if (reconciliation.comparisonKind === "BILLED_AMOUNT_COMPARISON" && decision.amountBasis !== reconciliation.decisionAmountBasis) return false;
   if (decision.authorizationExpiresOn !== null
     && reconciliation.observedAmountMinor !== null
     && reconciliation.observedCurrency !== null
@@ -596,6 +623,10 @@ const adverseReconciliationVerdicts = new Set<ControlReconciliationDto["verdict"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Object.prototype.toString.call(value) === "[object Object]";
+}
+
+function isOptionalAmountBasis(value: unknown) {
+  return value == null || value === "GROSS_BILLED_TOTAL_PER_CHARGE";
 }
 
 function isUuid(value: unknown): value is string {
@@ -683,7 +714,8 @@ export function normalizeControlPolicyRequest(value: unknown): PutControlPolicyR
 
 export function normalizeControlProposalRequest(value: unknown): CreateControlProposalRequest {
   const record = requireRecord(value, "Proposal request");
-  rejectUnknown(record, ["merchant", "purpose", "category", "amountMinor", "currency", "firstChargeDate", "cadence", "existingCommitmentIds", "intendedOutcome"], "proposal request");
+  rejectUnknown(record, ["merchant", "purpose", "category", "amountMinor", "amountBasis", "currency", "firstChargeDate", "cadence", "existingCommitmentIds", "intendedOutcome"], "proposal request");
+  const amountBasis = normalizeControlAmountBasis(record.amountBasis);
   if (typeof record.category !== "string" || !proposalCategories.includes(record.category as ProposalCategory)) {
     throw new Error("Proposal category is not supported.");
   }
@@ -705,6 +737,7 @@ export function normalizeControlProposalRequest(value: unknown): CreateControlPr
     purpose: boundedText(record.purpose, "Proposal purpose", 1, 500),
     category: record.category as ProposalCategory,
     amountMinor: parsePositiveMinorUnits(record.amountMinor, "Proposal amount").toString(),
+    ...(amountBasis === undefined ? {} : { amountBasis }),
     currency: normalizeCurrency(record.currency, "Proposal currency"),
     firstChargeDate: record.firstChargeDate,
     cadence: record.cadence as (typeof proposalCadences)[number],
@@ -745,8 +778,11 @@ export function normalizeControlDecisionRequest(value: unknown): DecideControlPr
 
 export function normalizeControlReconciliationRequest(value: unknown): ReconcileControlProposalRequest {
   const record = requireRecord(value, "Reconciliation request");
-  rejectUnknown(record, ["evidenceId", "observedOutcome"], "reconciliation request");
+  if (record.source === "ZOHO_BOOKS") return normalizeControlProviderBillRequest(record);
+  rejectUnknown(record, ["source", "evidenceId", "observedOutcome"], "reconciliation request");
+  if (record.source !== undefined && record.source !== "RECOVERY") throw new Error("Select a supported reconciliation source.");
   return {
+    ...(record.source === "RECOVERY" ? { source: "RECOVERY" as const } : {}),
     evidenceId: requireUuid(record.evidenceId, "Evidence id"),
     ...(record.observedOutcome === undefined
       ? {}

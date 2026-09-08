@@ -1,4 +1,4 @@
-# CONTINUE HERE — live handoff (2026-09-06)
+# CONTINUE HERE — live handoff (2026-09-08)
 
 > **Operating sequence: Make it work. Make it perfect. Make it fast. Make it cheap.**
 > **Strategy rule: Take smart risks. Do not play safe.** Pursue asymmetric,
@@ -10,9 +10,515 @@
 > Loop WPs: [`docs/execution/phase-b-loop-shipping.md`](execution/phase-b-loop-shipping.md).
 > History: [`docs/execution/scoreboard.md`](execution/scoreboard.md) and `docs/archive/`.
 
-## 2026-09-06 - founder re-enables automatic Vercel deployments from main
+## 2026-09-08 - Founder-authorized publication of all local Git changes
 
 **THIS BLOCK IS THE ONLY LIVE INSTRUCTION.**
+
+**Scoreboard row:** Publication state only; no numeric score or commercial evidence movement
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage: Make it work.** On 2026-09-08 the founder explicitly requested committing and pushing every local repository change to `main` immediately. This supersedes the preceding task's no-commit/no-push restriction for this publication. The owner is the founder, the action is complete source publication, and its observable proof is equality between the committed local HEAD and the remote `main` SHA after push.
+- The pre-commit inventory contains **165 changed files: 106 tracked modifications and 59 non-ignored new files**. The publication includes the preceding local source, frontend, backend, migrations, tests, workflow, documentation and prompt changes from all sessions, not only the last A2 edits. A fetch of `origin/main` showed no ahead/behind difference before committing. The push target was verified as `varunteja0/Vognary`.
+- A bounded credential check scanned every candidate file for sensitive paths, high-confidence credential patterns and copies of configured local secrets, with no findings and no secret values printed. Production environment secrets were not read. This check is not an independent security assessment.
+- Repository ignore rules remain in force: local environment files, private CRM/outreach records, backups, dependency/build caches, parked worktrees, audit captures and ignored output/runtime evidence stay local. Do not force-add those files to interpret "all changes" as publication of secrets or private financial records.
+- Automatic `main` deployment remains enabled in [vercel.json](../vercel.json). The founder-requested push can trigger Vercel deployment independently of CI. This handoff records authorization and the candidate's evidence limits; it does not assert that the remote push, hosted CI or deployment has already succeeded. Verify their actual receipts.
+- The preceding A2 implementation and scoped local evidence remain unchanged: PostgreSQL 318/318, units 1390/1390, 274 distinct passing browser cases with four inbox skips, source/build/size/motion and local-unconfigured smoke passes. They are not an exact-commit hosted CI result. **Strict Lighthouse remains failed** on `/start` trace validity and valid login LCP/performance budgets. No gate was bypassed or weakened, and publication does not turn those failures green.
+- Provider permission, customer-data eligibility, actual monitoring responders, buyer value, independent assessment/retest, lawful retention and production migration/recovery clearance remain blocked as recorded in the A2 evidence below and [operating runbook](production-activation-runbook.md). No real-data enrollment or production database migration is part of this Git request.
+
+**WHAT IS NOT TRUE**
+
+- A source push or automatic deployment is not an all-green release, a successful migration, provider verification, independent clearance, customer acceptance or launch/data-activation approval.
+- Ignored secrets, private records, dumps and generated local artifacts are not missing source changes; they are intentionally excluded from Git publication. Existing local files and historical evidence must not be deleted.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Supply the previously identified provider, operator, buyer and release-owner permissions/evidence before real financial-data activation. Publishing this code does not supply those inputs.
+
+**HARD STOP:** Commit and normal push to `main` are authorized. No force push, credentials/private-data publication, production database mutation, enrollment, purchase, outreach or autonomous financial action. Preserve automatic deployment configuration, existing financial safeguards and the known failing-gate record.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-08 - A2 implemented locally; performance and external acceptance remain blocked
+
+> **SUPERSEDED 2026-09-08** - Git publication is now authorized in the block above; this block preserves the A2 implementation and verification evidence.
+
+**Scoreboard row:** Product UX and Backend Readiness evidence; no numeric score, Business Validation or Distribution movement
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage: Make it work.** The founder-approved A2 contract under [THE-LAW section 0.1.3](THE-LAW.md#013-founder-a2-billed-comparison-authorization---2026-09-07) is implemented. GitHub Copilot is the integrated owner; all delegates used `GPT-6 Astra (copilot)`. One finance owner selects one later whole bill for one compatible human authorization and returns to the exact saved billed comparison. Target-customer value is still unproven.
+- **The product in plain language:** record what spending is agreed, compare the later bill, and keep the answer. Books is optional for companies already using it, not a purchase or learning requirement for the Control demo or legacy receipt path. The one-time INR 14,999 pilot-month offer, deliverables, activation/refund terms and separate purchase for another month are unchanged. The USD 1 billion annual-revenue ambition is not a forecast, valuation claim or observed market size.
+- **Financial implementation:** new explicit `GROSS_BILLED_TOTAL_PER_CHARGE` basis freezes through proposal/evaluation/decision. Evidence has source `ZOHO_BOOKS`, kind `PROVIDER_BILL` and basis `PROVIDER_BILL_TOTAL`; `BILLED_AMOUNT_COMPARISON` retains both bases. Legacy null/unspecified bases and receipt semantics are unchanged. Provider bills keep legacy `recovery_evidence.observed_at` null; bill date, source capture, provider modification, authorization and human selection times remain distinct. Bills never become payment, savings, usage, recurring exposure or business-outcome proof.
+- **Selection and durability:** server-reloaded exact organization/bill/snapshot/original-grant provenance, owner/admin whole-charge and retention acknowledgements, completed-source freshness, positive caps, transactionally atomic admission/comparison/audit/version/replay and duplicate protection are implemented. Original authorized read-back survives response loss, amendments, consent withdrawal and source erasure without admitting a newer bill. New admission still requires current authority. Multi-obligation allocation, FX, credit netting, aggregate caps, automatic matching and external financial action remain absent.
+- **Privacy:** source erasure deletes Books imports/reviews/grants but retains minimized explicitly admitted financial records and detached immutable provenance/comparisons, with the current retained-count acknowledgement. Whole-workspace erasure removes the complete chain. Export and populated dump/restore cover retained and erased-source cases, amount bases, lineage and integrity. This is implemented behavior, not legal retention clearance or production stored-object recovery.
+- Additive [0076](../infra/postgres/migrations/0076_control_provider_bills.sql) and [0077](../infra/postgres/migrations/0077_control_provider_bill_admission_guards.sql) are applied only to disposable/local A2 databases. Original 0076 checksum `3fd16013c9b35444a526107d8236bd97f126457a2387525325c8372bbbbed26b` is preserved; 0077 checksum is `4fb8a83a8bf2dbffa14bcc11446dd445aded85dbb93b7c2a43305c1b52640269`. The [four red-first review repairs](../.fallow/a2/critical-fixes/resume-20260907-Hdx5Lu/evidence-index.json) cover exact same-day capture chronology, live locked original grant authority, legacy Autopilot exclusions and non-null positive gross caps. No old financial meaning was backfilled.
+- **A1 remains available:** policy-free bill inspection, result-first closed reviews, earlier unresolved work, exact money, deep links, search/sort/page snapshots, drafts, uncertain retries and sign-out privacy. A2 adds the explicit source picker, saved billed result, source-change responsibility and retention confirmation. The public capability sentence now describes explicit selection; the Control header says no proposals await authorization, not that all work is clear. Startup heading focus now follows actual view changes instead of replayed mount effects.
+- **Local verification:** the complete disposable PostgreSQL gate passed **318/318**, and **1,390 database-unset unit tests** passed. Source checks, final isolated build and all **16 unchanged size budgets** pass. Empty non-strict corpus execution passes with precision/recall **not measured**. Motion passed on its first phone/desktop attempts at **57.5/58.7 fps**, with zero long tasks at 4x CPU. Smoke passes only explicit **local-unconfigured** mode.
+- Complete final browser groups contain **274 distinct passing cases and four inbox-configuration skips**, with no failed/flaky cases in those selected groups: public 92, Control 52, Recovery/source 56 plus four skips, bills 72, isolated account lifecycles four. Customer #0 occurs in two groups and is counted once. The final authorization-headline-only change follows those groups, units, motion and smoke; its two focused desktop/phone full-loop tests, final read-only inspection and source/build/size checks pass afterward. The full database run precedes only a test-artifact-directory fix checked by four real-handler/restore cases. These are scoped results, **not one exact-tree all-green CI run**.
+- **Strict Lighthouse FAILED on the A2 build:** `/start` sample 1 is invalid `NO_NAVSTART`, so no passing median exists for that route. Valid `/login?next=/app` medians are **2,339 ms LCP** against 2,000 ms and **88 performance** against 95. Read-only retained-trace analysis found slow initial native layout and later script tasks but no justified source fix. This separate measured slowdown is not dismissed as the missing-event problem. [Raw samples](../.fallow/a2/gates/2026-09-07T18-55-21.669Z-lighthouse/samples/run-h8bL2D) and [prior minimal reproducer](../.fallow/a2/lighthouse/REPORT.md) remain; no thresholds, validity rules, samples or lucky reruns changed. This run precedes only signed-in focus/headline edits, not a login repair.
+- All failed and interrupted attempts remain in the [existing action crosswalk's A2 extension](../output/vognary-value-closure-action-crosswalk-2026-09-07.json). Consolidation exposed test-global cohort/backup races, repaired by a file-owned disposable database while preserving assertions. One Control focus failure was repaired. A bill run failed because the synthetic helper rejected the final evidence path and Customer #0 had erased the preview's disposable identity; both deletion suites now use a separate disposable runtime. A **new** preview was created through the actual UI with new IDs. The old A2 link is not current; historical captures/JSON are preserved.
+- The [final 925-file source manifest](../.fallow/a2/gates/final-proof/final-tree.json) has digest `ae600af4251abe7b958efe1d428aacf9be21869b8ed940efb232f8856bbdc767`: 41 changed and 15 added files relative to A1, with all 513 application/public files matching A2 dev and production copies. All 505 incumbent A1 application/public files still match their separate source/production copies. Dirty `main`, preceding owners' changes, historical crosswalk and automatic-main deployment `true` are preserved. No commit, push or deployment occurred.
+- **Current inspection:** [Control example](http://127.0.0.1:57610/demo), [saved A2 comparison](http://127.0.0.1:57610/app?view=CONTROL&proposal=0a80c3f7-e986-4eef-9021-503a70072138&comparison=f54d26dd-bce8-4953-910c-894311ef4929), [bill review](http://127.0.0.1:57610/app?view=BILL_REVIEW&bill=908000002), [local-only access](../.fallow/a2/ACCESS.md). New fixture: INR 80 cap, selected INR 90 bill, later unconfirmed INR 95 revision. [Final desktop/phone inspection](../.fallow/a2/frontend/final-inspection-1788813469250/observations.json) verified this with no financial writes or runtime errors. The independent A1 runtime remains on 53155; do not restart or erase older runtimes merely to tidy them.
+- The [existing operating runbook](production-activation-runbook.md#zoho-books-a2-local-preparation---2026-09-08) now covers exact OAuth setup/callback, migration head 0077, bases/retention, source/operator drills, baseline-first buyer evaluation, unsent permission-based recruitment and release/recovery requirements. Exact presence-only inspection found **local Sentry configuration**, correcting the earlier absent-monitoring statement, but it is not inherited by the A2 runtime or proof of delivery. No actual provider organization/client, permitted buyer, accepted operator duties or independent release clearance was supplied.
+
+### Current A2 Dependencies
+
+This is the single live dependency ledger; all ledgers below are historical.
+
+| Outcome / status | Exact remaining input or defect | Next bounded action | Accountable owner | Proof required |
+| --- | --- | --- | --- | --- |
+| Local decision-to-bill workflow - IMPLEMENTED, LOCALLY VERIFIED | No known failing functional assertion in final scoped runs; target-user acceptance absent | Use current synthetic preview and recorded baseline-first task; preserve legacy boundaries | Copilot locally; founder/buyer owner externally | Actual uncoached task and later return, not a test count or automatic 10/10 |
+| Source retention/erasure - IMPLEMENTED, LOCALLY VERIFIED | Real-data retention period, lawful basis and backup deletion policy not cleared | Legal/privacy owner reviews minimized retained history, exact-count consent, export and whole-workspace erasure | Founder appoints legal/privacy owner | Written clearance for actual data handling; current tests are not that clearance |
+| Provider lifecycle - BLOCKED | Authorized synthetic India organization ID, tier/read authority and server OAuth client absent | Existing permitted organization only; Server-based Application with exact callback `http://127.0.0.1:57610/api/workspaces/current/sources/zoho-books/callback`; settings.READ/bills.READ offline consent; credentials enter `.fallow/a2/provider.env`, never chat | Founder/provider owner not named | Actual consent/import/unattended update/refresh/paging/permission/revoke/reconnect and bill-specific absence records |
+| Operator service - BLOCKED | Existing Sentry destination needs scoped use/drill permission; primary/backup and accepted acknowledgement/response/escalation duties absent | Use existing service if permitted; configure A2 destination/operator, then one bounded non-sensitive source-stop/delivery/ack/resume drill | Founder names primary and backup | Real external alert receipt, human acknowledgement, preserved checkpoint and authorized fresh import; HTTP 2xx is insufficient |
+| Buyer evaluation/distribution - BLOCKED | Named relevant finance owner and permitted session/channel absent | Existing-process baseline first, then equivalent synthetic task and uncoached return; prepared opt-in/community/CA introduction routes remain unsent | Founder/buyer owner not named | All participant/operator effort, refusals/rescues, task/return result and price-specific response; offer/payment/use/renewal separate |
+| Release trust - BLOCKED | Exact-release assessor/retest, legal/privacy, Google identity/enrollment, database/backup/incident/release owners and evidence absent | Use A2 assessment inventory, exact checksums, canonical paid/assessed/source/comparison enrollment, encrypted stored-object restore and forward-recovery procedure | Founder appoints accountable owners | Independent clearance, lawful policy, verified identity/eligibility, functioning operations/recovery and specific release authority |
+| Strict Lighthouse - FAILED / OPEN | `/start` missing navigation-start sample; valid login LCP/performance exceed unchanged budgets | Retain missing-event minimal repro; predeclare a bounded native-layout profile for the separate login cause before any repair/recheck | Copilot/test-tooling owner | Causal supported repair and unchanged full valid gate; no sample replacement or lucky rerun |
+
+**WHAT IS NOT TRUE**
+
+- This is not a live provider connection, successful human operating service, independently assessed release, buyer-validated differentiation, willingness to pay, retention or a 10/10 product. Native Books approvals/PO/audit and other spend tools remain credible alternatives; the new local chain alone does not establish superiority.
+- A provider bill or paid status is not an observed charge/payment, savings, usage or verified business outcome. Review closure is not source admission; admission is not new financial authorization; no action moves money or changes a frozen cap.
+- **Synthetic local evaluation: GO with limits. Assessed paid customer-data pilot: NO-GO. Broad launch: NO-GO.** Mandatory blocked outcomes are not complete. Earlier green runs and local configured flags cannot clear them.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Try the Control example or current saved comparison using the local access note. Authorize one named finance-owner session/channel for the prepared baseline-first synthetic evaluation; no raw customer financial data enters the uncleared app.
+2. When available, supply authorized synthetic India Books configuration through the scoped local secret file, appoint the provider owner and primary/backup responders, and permit use of the existing monitoring destination for the bounded drill. No new service purchase is assumed.
+3. Appoint independent assessment/retest, privacy/legal, identity/enrollment, recovery and release owners. Supply actual exact-release evidence and specific publication/deployment/data authority only after the required gates clear.
+
+**HARD STOP:** Local approved A2 only. No publication, commit, push, deployment, production mutation, purchase, contract acceptance, outreach or customer-data activation. No provider writes, second connector, autonomous action, fabricated payment/charge, legacy semantic backfill, weakened gate or historical evidence rewrite. Do not run account-deletion suites against the inspection runtime.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-07 - A2 local implementation approved; evidence work in progress
+
+> **SUPERSEDED 2026-09-08** - see the block above.
+
+**Scoreboard row:** Product UX and Backend Readiness; no commercial metric or numeric score movement
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage: Make it work.** The founder issued the complete-A2 execution mandate and approved the [recorded A2 contract](#a2-contract-addendum---proposed-not-approved) for local implementation through [THE-LAW section 0.1.3](THE-LAW.md). The historical addendum title describes its former status; this explicit approval supersedes that hold. GitHub Copilot remains the integrated editor. One owner/admin selects one exact bill and confirms its relationship to one compatible authorized charge, then retrieves a durable billed-amount comparison after returning.
+- This session verified dirty `main`, tracking `origin/main`, and all 910 entries in the A1 scoped source manifest match. A1 is the incumbent, not work to redo. Previews on 53155 and 57965 returned HTTP 200; 3037 and 65033 did not respond to the bounded check and are not restarted or deleted. Other owners' edits, historical captures and enabled automatic-main deployment remain preserved.
+- **Approved A2:** freeze new explicit decision/evaluation/proposal basis `GROSS_BILLED_TOTAL_PER_CHARGE`; retain `PROVIDER_BILL_TOTAL` evidence and both frozen comparison bases. Legacy records and receipt path remain unchanged. Bill source observation never becomes legacy charge `observed_at`. Require server-owned exact organization/bill/snapshot/consent provenance, explicit human whole-charge association, atomic evidence-only admission/comparison, original-request replay and duplicate/stale/tenant protection. No recurring materialization, financial execution, allocation, inferred payment/savings/usage or automatic matching.
+- **Preserve A1:** direct bill-review access without Control policy setup; exact money, links, Back, search/filter/page snapshots, focus, drafts and uncertain retries; result-first closed review and older unresolved work. Keep the one-time INR 14,999 pilot-month offer and its existing terms. New scope includes additive migrations, source/workspace erasure semantics, export/backup/recovery tests and complete local UI/handler/database proof.
+- A presence-only inspection of `.env.local` found no Zoho client, provider operator or monitoring destination. No production environment or secret value was read into chat. [Official OAuth instructions](https://www.zoho.com/books/api/v3/oauth/) confirm a Server-based Application, exact redirect match and offline consent; [organization/API documentation](https://www.zoho.com/books/api/v3/introduction/) specifies India `www.zohoapis.in/books/v3`, settings.READ organization access and tier-specific limits. An actual permitted synthetic organization/client is still required.
+- The founder's follow-up asks for a clearer useful finance product, rapid low-cost broad/targeted distribution and a USD 1 billion annual-revenue ambition, with **GPT-6 Astra subagents only**. Three read-only Astra reviews were used; their recommendations are not buyer or independent security evidence. No actual provider organization/client, named operator, buyer or release owner was supplied. The authorized implementation remains the explicit decision-to-bill job, not a silent connector/renewal/pivot expansion. No reach, demand or revenue is promised.
+- **Source-erasure implementation decision, before migration:** retain only the minimized, explicitly admitted Recovery bill and immutable comparison/consent/selection history after deleting Books imports. Store detached original provenance, validate the live source relationship at admission, and do not use a deletion cascade from Books imports into Control. Before admission and source erasure, disclose this retention and the number retained; a source with admitted records requires explicit acknowledgement of that notice. Whole-workspace erasure removes the full chain. The existing source-erasure dialog already excludes frozen Control records; its broad observation-deletion wording must be made precise. This is not legal retention clearance or permission to erase real data.
+- Safe local setup created `.fallow/a2/runtime.mjs` with an isolated database and callback `http://127.0.0.1:57610/api/workspaces/current/sources/zoho-books/callback`. The allowed local secret template is `.fallow/a2/provider.env.example`; only India Books client/workspace/operator and existing Sentry/Better Stack fields may be supplied in `provider.env`, never in chat. All those fields are currently absent. The first red financial regression proved gross basis was discarded by policy normalization; the repair and all 15 nearby domain tests pass without changing legacy results.
+- Existing A1 verification and earlier action crosswalk are historical baseline evidence, not new A2 results. Strict Lighthouse retains its invalid `NO_NAVSTART` failure pending a bounded diagnostic; no thresholds or valid-sample requirements change. Scoped usability targets are not automatic 10/10 certification.
+
+### A2 Dependency Ledger
+
+This is the single live dependency ledger. Local work continues while external rows are pending; each resolved row needs actual proof, not a configured flag.
+
+| Blocker / status | Exact missing input and why | Available resolution / next action | Owner | Proof of resolution |
+| --- | --- | --- | --- | --- |
+| Provider lifecycle - BLOCKED | Authorized synthetic India organization ID, account tier/read authority and server OAuth client; no local configuration supplied | Founder uses Zoho API Console, Server-based Application, exact A2 loopback callback supplied with local setup, and settings.READ/bills.READ offline consent; credentials enter approved secret file only. Agent validates scoped reads and lifecycle after permission | Founder/provider owner not named; Copilot setup | Actual consent/import/unattended update/refresh/paging/permission/revoke/reconnect records; bill-specific absence evidence |
+| Operator service - BLOCKED | Named primary/backup, accepted response duties and monitored destination with delivery authority | Inspect existing monitoring contract, prepare exact configuration, request owner/destination and permission for bounded incident drill once; no provider writes or human receipt inferred | Founder appoints operator/backup | Stopped source, checkpoint/history, external alert, human acknowledgement, authorized resume and fresh import |
+| Buyer evaluation - BLOCKED | Named relevant buyer, permitted channel/session and private note handling | Prepare existing-process-first task using native Books/accountant/ticket baseline, then synthetic equivalent; request recipient/channel authority once | Founder/buyer owner | Actual uncoached attempt/effort/return and price-specific response; no raw customer records in uncleared app |
+| Release trust - BLOCKED | Assessor/retest, legal/privacy/retention, identity/enrollment, release/database/incident owners and exact-release evidence | Prepare precise A2 assessment/data inventory/recovery scope and request named owners; no publication or production mutation implied | Founder appoints accountable owners | Independent clearance, lawful retention, verified identity/eligibility, scheduler/monitoring, encrypted restore and migration recovery |
+| Source erasure semantics - DECIDED, NOT YET IMPLEMENTED | Source import erasure must not silently remove admitted immutable financial records | Retain detached minimized admissions/results with explicit retained-count acknowledgement; delete source imports/reviews; whole-workspace erasure removes full chain | Copilot; legal owner for real-data policy | Source/workspace erasure, retained-result/export and concurrency tests; real retention policy separately cleared |
+| Strict Lighthouse - OPEN LOCAL | Retained failed traces lack matching main-frame navigation start; not proof of slow routes | Correlate main-document loader/frame/process and tracing start in retained valid/invalid samples; one discriminating experiment, no lucky reruns | Copilot | Causal reproduction/repair plus unchanged valid 7-route/3-sample gate, or explicit unresolved evidence |
+
+**WHAT IS NOT TRUE**
+
+- Implementation approval is not provider consent, customer-data eligibility, an actual operator or buyer commitment, a changed offer, independent assessment, publication or launch. No active provider organization or accepted service obligation is invented.
+- A bill, a review closure, a human relationship confirmation and a cost comparison are not observed payment, savings, usage or a verified business outcome. No old cap, meaning or history may be silently rewritten.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Respond to the prepared non-sensitive provider/operator/buyer and release-owner requests when issued; secrets belong in the approved local secret store, not chat. Independent local implementation continues.
+2. Decide a source-erasure amendment only if the inspected retention boundary leaves a material unresolved choice; no destructive behavior will be selected silently.
+
+**HARD STOP:** Local approved A2 only. No publication, commit, push, deployment, production mutation, purchase, contract acceptance, outreach or customer-data activation without specific authority. No provider writes, second connector, autonomous action, fabricated charge/payment, legacy semantic backfill, weakened gate or loss of A1 behavior/history.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-07 - A1 delivered locally; A2 contract awaiting founder approval
+
+> **SUPERSEDED 2026-09-07** - see the block above.
+
+**Scoreboard row:** Product UX; no numeric score, Business Validation or Distribution movement
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage: Make it work.** The founder approved the Decision-to-Bill direction in stages and authorized A1 local usability/proposition work only. GitHub Copilot remains the integrated editing owner. One finance owner should recognize a saved review and any remaining responsibility, then return to the exact record without reconstructing context. Customer acceptance is not observed.
+- This session verified dirty `main`, tracking `origin/main`. Preserve all preceding edits, historical evidence, existing previews and the enabled automatic-main deployment setting. No publication, commit, push, deployment, purchase, provider write, external contact or customer-data activation is authorized.
+- **Approved A1 contract:** result-first open/closed bill review, compact task-focused desktop/phone layout, and a coherent Control proposition and synthetic example. Preserve the working bill-review experience, exact deep links, source consent, role/tenant checks, financial safeguards, immutable histories, prior unanswered material changes, follow-ups, uncertain-write identity and sign-out privacy. Do not require Control policy setup to inspect bills. Keep the one-time INR 14,999 pilot-month offer, deliverables, activation/refund terms and separate purchase for another month unchanged.
+- **A2 is NOT approved for implementation.** No new evidence kind, amount basis, source admission, financial API, store or migration is authorized. The addendum below is a proposal for a separate founder decision, not an implemented capability or source/financial permission.
+- Authorized synthetic Zoho Books India access, a named provider owner/operator and permitted baseline-first buyer participation were requested immediately. The founder answered **not available yet; continue local A1** for both. Provider lifecycle, human alert receipt and buyer participation remain BLOCKED; no credentials or customer financial records were requested in chat.
+- The proposed usability thresholds remain **scoped evaluation targets**, not automatic 10/10 certification: ten unfamiliar target users, at least nine successful uncoached comprehension/task/return attempts, the proposed 30-second initial understanding/task-location and 60-second later-return targets, plus the recorded responsive/accessibility checks. Preserve every failed/rescued attempt. Local implementation, local verification, provider verification and external acceptance remain separate.
+- **A1 is implemented and locally verified for the touched workflows.** The homepage now leads to the existing synthetic Control decision and its later evidence, with a compact exact-money request preview and evidence/policy disclosure. Menu/footer/example links no longer promise personal evidence input at the fixed synthetic `/start` route. The separate bill-review evaluation, direct sign-in/record URLs and unchanged paid offer remain reachable. Public copy explicitly says Books reviews do not currently supply evidence to Control; no A2 capability is implied.
+- Closed bill reviews now show their saved result and Return to bills before historical comparison/changed fields. Earlier unanswered material responsibility still takes precedence. The register places records before connection administration, keeps coverage status and its focusable recovery shortcut visible, and retains search, saved sort/currency, pagination and full source times through disclosures. Phone/landscape hierarchy, long exact amounts, 320px/200% text, keyboard, reduced motion, failure/retry and cross-tab privacy are covered locally. No policy setup was added to bill inspection.
+- **Final local checks:** source gates passed; **1,365 database-unset units passed**; isolated production build and **all 16 unchanged size budgets passed**. Complete affected browser groups passed **92 public and 48 bill cases, zero failed/skipped/flaky in those runs**. Those complete groups precede only the final short-height homepage CSS adjustment; the two strengthened viewport cases, final six-viewport capture probe, source/build/budgets and motion follow it. This is per-slice A1 evidence, not one full exact-tree hosted CI run or buyer acceptance. Motion passed on the first attempt for phone and desktop with zero long tasks under 4x CPU throttling.
+- The [final 910-file scoped manifest](../.fallow/a1/gates/2026-09-07T10-35-44.548Z-final-proof/final-tree.json) has digest `78823b6300b0eb556a9605c4ab64f8479f0a8df40450690484738c9f9e3dd6d1`. Its 505 application/public files match both the A1 preview and isolated production source copies. Seventeen frontend/test files differ from the incumbent manifest; backend/domain/API/store/migrations, package files, gate scripts, historical evidence and automatic-main deployment are unchanged. This scope excludes handoff/output/ignored runtime files and is not a deployed SHA.
+- Original failed attempts are retained: result-order regressions on both viewports; initial cold development compilation and dependent missing-closure failure; register hierarchy regressions; selected-record response timing; three old copy/motion unit assertions; two old public-fixture assertions; and the first short-landscape spacing failure. Repairs preserved financial assertions, test timeouts, budgets and failed artifacts. The ignored capture helper's duplicate draft also failed syntax validation before execution, was repaired, then passed. No failure is relabelled as a pass.
+- Local preview: <http://127.0.0.1:53155/>; [Control example](http://127.0.0.1:53155/demo), [preserved bill example](http://127.0.0.1:53155/start), [saved synthetic review](http://127.0.0.1:53155/app?view=BILL_REVIEW&bill=906000001&billView=ALL), [local-only access](../.fallow/a1/ACCESS.md). This runtime has its own loopback database and source/build/captures; existing 3037, 65033 and 57965 previews remain intact.
+- The [preceding delivery](../output/vognary-value-operation-launch-closure-2026-09-07.md) is historical evidence, not a fresh gate: disposable PostgreSQL, dependency audits, corpus, broader authenticated Control/Recovery/account suites and smoke were not rerun in this presentation-only A1 stage. **Strict Lighthouse remains FAILED** on the inherited invalid `NO_NAVSTART` traces; it was neither rerun nor weakened. Inherited profile lint, unused CSS export and historical Markdown-spacing diagnostics remain. No all-green release, independent design/security acceptance, observed user-effort reduction or numeric score is claimed.
+
+### A1 Evidence And Acceptance
+
+| Outcome | Current evidence | Status / remaining acceptance |
+| --- | --- | --- |
+| Coherent proposition and both evaluation paths | [Public group 92/92](../.fallow/a1/gates/2026-09-07T10-05-08.814Z-public/report.json); [retained original public failure](../.fallow/a1/gates/2026-09-07T09-58-34.650Z-public/report.json) | LOCALLY VERIFIED; unfamiliar-buyer comprehension BLOCKED |
+| Saved result, exact links, source status and policy-free bills | [Bill group 48/48](../.fallow/a1/gates/2026-09-07T10-08-34.286Z-bills/report.json); [red result-order captures](../.fallow/a1/focused-before); [red register captures](../.fallow/a1/register-before) | LOCALLY VERIFIED; real provider/buyer acceptance BLOCKED |
+| Final responsive composition and source shortcut | [Six-viewport observations and captures](../.fallow/a1/final-captures/2026-09-07T10-29-51.929Z/observations.json); [focused short-viewport pass](../.fallow/a1/short-viewport-repair); [retained short-viewport failure](../.fallow/a1/short-viewport) | LOCALLY VERIFIED in Chromium/emulation; no real-device or independent visual certification |
+| Source, financial compatibility regressions and build | [Final source checks](../.fallow/a1/gates/2026-09-07T10-28-03.174Z-source/results.json); [units 1365](../.fallow/a1/gates/2026-09-07T09-56-09.154Z-units/results.json); [original unit failures](../.fallow/a1/gates/2026-09-07T09-54-07.610Z-units/results.json); [final build/budgets](../.fallow/a1/gates/2026-09-07T10-28-41.713Z-build/results.json); [motion](../.fallow/a1/gates/2026-09-07T10-31-41.259Z-motion/results.json) | Scoped A1 checks PASS; full release/strict Lighthouse and external clearance remain BLOCKED |
+| A2 provider-bill comparison | Contract addendum below only; protected files unchanged in final manifest | NOT IMPLEMENTED; requires separate founder approval |
+
+### A2 Contract Addendum - Proposed, Not Approved
+
+The [existing capture contract](../src/lib/recovery/ingestion-envelope.ts), [source snapshot contract](../src/lib/zoho-books/contracts.ts), [Recovery materializer](../src/lib/server/recovery-store.ts) and [Control reconciliation](../src/lib/server/commitment-control-store.ts) are the controlling boundaries. A2 would require a separate additive migration and typed implementation after approval; A1 must leave them unchanged.
+
+| Contract area | Proposed persisted meaning and acceptance boundary |
+| --- | --- |
+| Decision and legacy basis | New explicitly opted-in proposals/evaluations/decisions freeze `amount_basis=GROSS_BILLED_TOTAL_PER_CHARGE`, expected amount, currency, cap and expiry. It is a per-charge gross billed limit, not a spend-enforcement or cumulative budget. Existing immutable records retain their existing basis, with null/absent meaning unspecified; no backfill or reinterpretation. They keep the existing receipt path and cannot silently enter the provider-bill path. |
+| Evidence and result basis | Persist a distinct `ZOHO_BOOKS` source, `PROVIDER_BILL` evidence kind and `PROVIDER_BILL_TOTAL` evidence basis; reconciliation freezes both the decision basis and selected evidence basis/amount/date. Store bill capture time as `source_observed_at` in provider lineage, not as an observed charge: do not populate legacy charge `observed_at` to pass its current check. A separately typed billed-comparison branch must validate provider lineage. A match means the billed amount matches the frozen amount, not payment, fulfillment, actual usage or independently verified cost. |
+| Exact provenance | Immutable, same-workspace lineage includes connection ID and consent generation/reference, India organization ID, provider bill ID, exact source sequence/schema version/fingerprint, provider modification time, bill date and source observation time. Each selection/reconciliation separately records actor, time and the human-confirmed same-charge relationship. Server reloads the snapshot; client identifiers never replace authoritative money/name/currency. Same bill IDs in other organizations/workspaces cannot share evidence. |
+| Selection and admission | Owner/admin selects one exact snapshot and confirms that the whole bill corresponds to that authorized charge. Use the existing Control reconciliation namespace with an explicit source discriminator and bounded snapshot pagination, without a fictitious recurring commitment. A transaction-aware evidence-only Recovery materializer creates the canonical source/evidence/lineage; it never calls receipt parsing, recurrence/merchant matching, renewal scheduling, savings verification or autonomous-candidate materialization. Later ordinary ingestion and legacy readers must also exclude provider-bill evidence. |
+| Atomicity and duplicates | One confirmation atomically admits/reuses evidence and appends the comparison under current tenant/role/eligibility and source/Control version checks. Workspace/actor/request identity and payload hash bind retries; the same request returns the original result after response loss, never a newer revision. Deduplicate canonical evidence by workspace/connection/exact snapshot, and enforce one comparison for the same proposal/decision/snapshot even under another request key. Changed payload under a used key conflicts; stale or concurrent choices cannot partly admit or overwrite a result. |
+| Tax, currency and time | Compare only an explicitly compatible gross whole-bill total including provider taxes/discounts/adjustments; no inferred tax recovery, net conversion or missing line allocation. Currency mismatch cannot pass as matched and no FX conversion occurs. Provider bill date, capture time and human action time stay distinct. Reject future or pre-authorization evidence; evidence after the original India-calendar expiry is labelled expired, never authorized by capture timing. Missing or incompatible basis/date produces an explicit cannot-compare state. |
+| Amendments, voids and multiple bills | Each material later revision creates a new review responsibility against the unchanged authorization; retain earlier evidence/comparisons and unresolved work. Informational updates do not close old questions. Draft/pending, void or confirmed removed bills cannot produce a new valid billed comparison; ambiguous absence remains uncertainty, not removal or zero. Different bill IDs require separate human association. No sum of revisions/bills, split bills, partial allocations, credit netting, service-period matching or cumulative-cap inference; a multi-obligation bill remains review-only. |
+| Consent and privacy | Withdrawal stops provider reads and new admission; erases credentials and invalidates pending authority. A permission-checked read-back may reveal a previously committed result but cannot perform a new admission. Lawfully retained immutable history stays labelled with original source/basis and withdrawal status, not current coverage. Export and whole-workspace privacy erasure cover source/evidence/lineage/selection/results under existing deletion rules; no direct financial-history rewrite. Disclose approved encrypted-backup retention, not instant deletion from every backup. |
+| Required negative proof | Red-first domain/real-store/API/browser tests must reject cross-tenant/organization/revision substitution, client-edited money, unknown legacy basis, gross/net mismatch, currency/date/expiry errors, multi-bill allocation, void/ambiguous absence, consent loss and concurrent/lost-response duplication. A provider `paid` status and a captured bill must fail charge/payment/savings/recurrence/renewal/execution paths, including direct legacy reconciliation and a later ordinary receipt/CSV import. Assert no cap/history mutation, recurring commitment, forecast, saving or financial action results; verify export/erasure and migration recovery. |
+
+**WHAT IS NOT TRUE**
+
+- Approval of A1 does not approve A2, a new provider-backed financial meaning, a changed price/service, a commercial pivot, a live integration, customer-data eligibility or launch. Bill review remains usable without policy setup and does not approve spending.
+- Synthetic source fixtures and local tests cannot establish provider operation, buyer value, payment, retention or independent acceptance. No score is awarded by reaching a test count or usability threshold.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Approve or amend the A2 addendum before any A2 code, schema or source-admission work. The completed local A1 candidate remains available for evaluation.
+2. Supply authorized synthetic India Books configuration through the approved secret store, name the provider owner/operator, and permit the bounded read-only lifecycle drill when available.
+3. Permit a named target buyer and channel for baseline-first observation and an uncoached synthetic task; no customer financial data enters the uncleared product.
+4. Name assessment/retest, legal/privacy, identity/enrollment, operations/recovery and release owners and supply actual release-specific evidence before customer-data activation.
+
+**HARD STOP:** A1 local presentation/usability only. No A2 implementation, backend/domain/API/store/migration changes, automatic evidence admission, matching, provider writes, publication, commit, push, deployment, purchase, customer enrollment or unpermitted contact. Preserve all financial/privacy safeguards, histories, failed attempts, performance thresholds and automatic-main deployment.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-07 - local value delivery verified; external and trace gates blocked
+
+> **SUPERSEDED 2026-09-07** - see the block above.
+
+**Scoreboard row:** Product UX and Backend Readiness evidence; no score or commercial metric movement
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage: Make it work.** GitHub Copilot is the sole integration/editing owner for this local assignment. One finance owner already using Books returns to a changed supplier bill, distinguishes an actionable question from routine history, and records or retrieves the human answer without re-entering imported facts. Buyer value is a hypothesis, not observed evidence.
+- Dirty `main` remains up to date with `origin/main`. Before this assignment's first edit, all 908 entries in the preceding source manifest matched. Historical evidence, other owners' changes and automatic-main deployment (`true`) are preserved. No commit, push, deployment, production mutation, purchase, provider write, customer enrollment or external contact is authorized.
+- **Founder commercial decision in this session:** retain the one-time INR 14,999 Commitment Control offer for one pilot month, with its existing deliverables, activation/refund terms and separate purchase for another month. Clearly distinguish the synthetic bill-review evaluation from that purchased service. No bill-review service or company pivot is approved.
+- **Founder attention amendment in this session:** unchanged initial baselines remain available and unreviewed without a task. New bills and changes to total, currency, supplier, bill number or date require review. A same-identity, same-total bill becoming overdue with unchanged valid balance, or progressing from open/overdue/partially-paid to partially-paid/paid with a decreasing consistent balance, is informational. Balance increases, inconsistent balances, approval-state changes/reversals, voids, confirmed removals and restorations remain material. Combinations take the stricter result. Earlier unresolved material reviews and explicit follow-ups survive later informational updates. Every financial snapshot remains; no acknowledgement, disposition, payment proof or external work is manufactured.
+- **Source boundary is unchanged:** India Books settings/bills READ only. Same-bill revisions are not cross-month subscription comparisons. No line items, tax breakdown, quantity, service period, usage, renewal or cancellation inference is authorized. Missing facts remain unknown.
+- The legacy upcoming-charge test now passes its existing August 26 scenario time through `getRecoveryHome.generatedAt`, with all financial assertions intact. The complete disposable PostgreSQL gate passes **248/248 with zero skips**. Source gates, both audits, **1,365 database-unset units**, non-strict empty corpus, isolated production build and all 16 size budgets pass. The initial three copy-assertion unit failures and their repairs remain recorded separately.
+- The approved attention projection is implemented without a schema change: informational revisions do not create tasks, earlier unanswered material revisions and follow-ups remain reachable, and a material revision during a partial initial import cannot become another baseline. Empty/unchanged/partial imports, missing permissions, stale/unavailable/unconfigured reads and ordinary returns pass **18 desktop/phone cases**. Counts describe available source records, not total company spend or complete coverage.
+- Local public/account copy distinguishes synthetic bill-review evaluation from the unchanged Control purchase and activation terms. Four focused offer/confirmation browser checks pass; confirmation is a mocked local state, not a payment. Exact changed fields precede human judgment, informational review is optional and draft/history details remain on demand.
+- Complete browser groups are **90 public, 52 Control, 56 Recovery/source plus four inbox-configuration skips, two real account and 46 bill/first-value/privacy cases: 246 passed / four skipped / zero failed or flaky within those runs**. Public/Control/Recovery preceded the final privacy-marker repair; final account/bill and focused privacy checks followed it. This is per-slice local evidence, not one exact-tree all-green CI run. Original failures and an interrupted run remain in the [crosswalk](../output/vognary-value-closure-action-crosswalk-2026-09-07.json).
+- Final verification reproduced and repaired a missed-sign-out race: a tab hydrating after a broadcast retained a draft. The privacy listener now reconciles persisted markers on hydration, focus, visibility and page restoration. Red-first desktop/phone regressions, real cross-tab sign-out, final account/bill groups, final source gates, 1,365 units, build and all 16 budgets pass after the repair. Motion passes at 4x CPU with zero long tasks; smoke passes only explicit local-unconfigured mode, never configured production.
+- **Strict Lighthouse remains FAILED:** `/demo` sample 3, `/pay` sample 2 and `/verify` sample 2 are invalid `NO_NAVSTART`. All raw reports/traces are retained. A fixed implicit-target versus explicit-page experiment returned six valid traces and did not support its hypothesis. Invalid final traces contain main-frame commit/paint but no matching navigation-start event. No route-speed defect or causal fix is claimed, no samples are combined across runs and no further lucky rerun is authorized by the result.
+- The current [delivery record](../output/vognary-value-operation-launch-closure-2026-09-07.md) covers every mandate and A/B/C acceptance requirement, source-field extension limits, the unsent buyer message, native-Books counterexamples, privacy-safe funnel readiness and all-in economics inputs. New local runtime: <http://127.0.0.1:57965/start>; [local access](../.fallow/value-closure/ACCESS.md). Its database/source/build/captures are isolated; the older 3037 and 65033 runtimes are preserved.
+- Authorized synthetic Zoho access, a named operator and a permitted buyer session were requested immediately. The founder confirmed that none is available; independent local work continues. No provider lifecycle, human alert receipt, buyer result or production clearance is claimed.
+- The founder also confirmed that named assessment/retest, legal/data-policy, production identity/enrollment, monitoring/incident, backup/migration and release owners/evidence are unavailable. Each is explicitly BLOCKED with the founder responsible for appointing an owner and supplying the release-specific evidence. No production-affecting step is authorized.
+- The final [910-file scoped manifest](../.fallow/value-closure/gates/final-tree.json) SHA-256 is `35dbae50c5e2e4460aad092730bf7f089420edba63fe6548bac11880c4573822`; application/public bytes match this assignment's dev and production copies. Historical evidence and earlier crosswalk remain unchanged. **Synthetic local evaluation GO with limits; assessed paid customer-data pilot and broad launch NO-GO.** Provider operation, human service receipt, buyer value, independent assurance and production readiness are not externally verified. No numeric score or commercial metric moved.
+
+### R1-R8 Completion Matrix
+
+This is the only live completion matrix. `IMPLEMENTED`, `LOCALLY VERIFIED`, `EXTERNALLY VERIFIED` and `BLOCKED` are distinct evidence states; no mandatory externally blocked outcome is complete.
+
+| Finding / customer outcome | Implementation boundary | Acceptance / current evidence | Status | Owner | Next action |
+| --- | --- | --- | --- | --- | --- |
+| R1: visitors receive the approved artifact | Local routes only; deployment separately authorized | Exact-tree build/browser evidence, then deployed version and configured identity/source checks | BLOCKED | Copilot locally; founder/release owner externally | Settle local candidate; obtain release-specific authority and evidence |
+| R2: understand evaluation versus purchase | Existing offer, public entry, sign-in, workspace, support and confirmation copy | Four focused rendered cases and final public 90/90; price/activation unchanged | LOCALLY VERIFIED; actual service BLOCKED | Copilot / founder | Buyer comprehension and actual approved activation service |
+| R3: know the exact difference and unknown cause | Existing normalized source fields, no new source contract | Exact changed-field display and honest causal limits pass in new browser cases | LOCALLY VERIFIED; buyer benefit unmeasured | Copilot; buyer owner not named | Baseline-first buyer test; no source extension without decision |
+| R4: routine updates do not create or erase human work | Read-time attention projection; immutable source/dispositions | 25-case matrix, prior responsibility, removal/restoration and partial-import checks pass in 248-test database gate | LOCALLY VERIFIED; customer relevance unmeasured | Copilot / founder | Measure actual unnecessary work with permitted buyer |
+| R5: connection and operating service actually work | Authorized synthetic provider only, no provider writes | Existing local contract tests; no actual provider or human receipt | BLOCKED | Founder must name provider owner and operator | Configure approved synthetic organization and monitored recipient; permit lifecycle drill |
+| R6: useful first and return visit without a selected exception | Existing bill register/detail and source status | Final 46 bill cases and two account lifecycles; desktop/phone/keyboard/reflow/copy/drafts/failure/return verified | LOCALLY VERIFIED; provider/buyer outcome BLOCKED | Copilot; buyer owner not named | Observe permitted buyer's native baseline and uncoached return |
+| R7: trustworthy release | Local tests/tooling; external assurance/operations separate | DB 248/248, units 1365, source/build/budgets/motion/local smoke pass; strict Lighthouse fails three invalid traces | BLOCKED | Copilot/test-tooling locally; founder must name assessor/legal/release owners | Resolve missing navigation-start trace collection and exact-release external gates; no lucky rerun or threshold change |
+| R8: supported job removes buyer work at viable cost | Permitted research protocol and existing private measurement tools only | No buyer/operator effort, new offers, payment, funnel or economics evidence | BLOCKED | Founder | Permit baseline-first buyer task and attributable evaluation recruitment; no outreach yet |
+
+**WHAT IS NOT TRUE**
+
+- This assignment is not a commercial pivot, a managed bill-resolution service, an external assessment, production identity verification, customer-data eligibility, a deployed release or a launch approval. Engineering success cannot supply external clearance.
+- A provider paid status is not verified payment. A recorded follow-up date is not a reminder or supplier contact. An empty attention queue does not establish complete coverage or an all-clear.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Supply authorized synthetic Zoho access through the approved secret store and name the provider owner and monitoring operator; no credentials in chat.
+2. Permit a named buyer's baseline-first workflow reconstruction and synthetic task through an approved channel. No customer financial data may enter the uncleared product.
+3. Name independent assessment/retest, legal/retention/residency, production identity/source, customer-data eligibility and release owners; provide scheduler/monitoring, incident response, restore and migration recovery evidence before activation.
+
+**HARD STOP:** No commit, push, deployment, production mutation, purchase, customer enrollment, unpermitted contact, second connector or provider write. Preserve exact money, immutable evidence, tenant isolation, human authority, privacy, consent, historical captures, other runtimes and all gate thresholds. Automatic-main deployment remains enabled and unchanged.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-07 - connected first value ready for bounded synthetic evaluation
+
+> **SUPERSEDED 2026-09-07** - see the block above.
+
+**Scoreboard row:** Product UX and Backend Readiness evidence; no official score or commercial metric movement
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. One unfamiliar finance owner reviews a sourced bill amendment, records a human explanation or dated follow-up, closes it and returns without retyping imported facts. GitHub Copilot remains the sole editing owner. No other agent or independent reviewer was dispatched and no requested model identity is asserted.
+- The completed source-to-resolution candidate is preserved on dirty `main`, tracking `origin/main`. No commit, push, deployment, production mutation, purchase, customer enrollment or external contact occurred. Automatic-main deployment remains enabled and unchanged by this assignment.
+- The public primary journey is now fixed synthetic bill review; sign-in preserves exact selected-record/register URLs. Bill review is the one primary workspace destination; Control, Today, evidence and manual intake remain in Records. Source permissions, background reads, retention and disconnection consequences are contextual; unrelated policy setup is not required.
+- Closed review shows its saved result and Return to bills. Further review, reading acknowledgement and audit history are distinct and on demand. Selected detail prioritizes identity and exact old/new money. Current same-workspace display names are permitted; former-member names are not projected, and immutable actor IDs remain in audit details.
+- The founder-approved attention decision is implemented: unchanged initial-import baselines stay imported and not reviewed in All bills without creating Needs review work or writing an acknowledgement/disposition. Later revisions and open follow-ups retain attention. Server search is literal; sorts are whitelisted; exact currency values are never converted or added; snapshot pages contain at most 50 rows.
+- The synthetic register fixture contains one review bill plus 340 synthetic baselines. Disposable account-erasure tests remove the evaluation identity by design; the fixtures are recreated afterward, without touching the separate shared preview or historical evidence. Tests cover large exact values, long labels, 340-record stable pagination across an amendment, filters, copied pages and same-session page history. A copied forward-cursor page has First page; Previous is disabled without a known predecessor.
+- Draft/retry context is actor/workspace/revision-bound. Explicit labels remain stable after reload; selected-detail and returned-row focus are verified. Successful sign-out clears transient data across tabs but does not revoke source consent; failed sign-out is not success. Phone, 320px, 200% text, reduced motion and Axe checks pass for the changed bill surfaces.
+- Final source gates, 1,364 database-unset units, non-strict empty corpus, production build and all 16 unchanged size budgets pass. Both dependency audits, 4x-CPU motion and explicit local-unconfigured smoke pass. Final complete browser groups total **222 passed / four inbox-configuration skips / zero failures / zero flaky cases**: public 86, Control 52, Recovery/source 56, account two, bills 26. The final [14-capture desktop/phone journey](../.fallow/connected-first-value/after/2026-09-07T02-53-06.457Z/observations.json), [action crosswalk](../output/vognary-connected-first-value-action-crosswalk-2026-09-07.json), exact runs and retained original failures are in the [delivery record](../output/vognary-connected-first-value-delivery-2026-09-07.md). No all-gates-green or hosted CI claim is made.
+- **Synthetic evaluation GO with limits:** <http://127.0.0.1:65033/start>; [saved synthetic bill](http://127.0.0.1:65033/app?view=BILL_REVIEW&bill=906000001&billView=ALL); [local-only access instructions](../.fallow/source-resolution/ACCESS.md). Provider reads are visibly unconfigured. Assessed paid customer-data pilot and broad launch remain **NO-GO**. Local engineering is delivered; real provider, operator and buyer outcomes are not complete.
+- The [908-file scoped source manifest](../.fallow/connected-first-value/gates/final-tree.json), SHA-256 `d26afccc8d5b1ee17047d1c8ed9619311f5ff8d1493266f8c6ada9d8bd455132`, matches source/public files in the browser and production-build snapshots. It is not a deployed SHA. Two focused captures that wrote default historical image paths were archived and the initially clean original images restored byte-for-byte.
+- **Open technical gates:** the disposable PostgreSQL run is 241 passed / one failed / zero skips. The untouched legacy `autopilot-loop` final upcoming-charge assertion uses today's clock against September 1-6 fixtures; it failed on September 7. The changed Books/store tests pass. Strict Lighthouse is still FAILED: `/demo` sample 1 is invalid `NO_NAVSTART`. One fixed browser-version comparison produced six valid traces and did not explain it; the subsequent unchanged seven-route gate failed. No lucky reruns, sample aggregation across runs or relaxed thresholds.
+- Authorized synthetic Zoho access through the approved secret store, a named operator and a permitted buyer workflow session were requested at the start; the founder confirmed they are not available. Provider lifecycle, bill-specific absence semantics, actual human alert receipt, buyer/colleague/operator effort and commercial acceptance remain externally unverified. Local tests do not fill those gaps.
+
+### 2026-09-07 Completion Matrix
+
+This is the only live completion matrix for this assignment. Previous matrices below are historical.
+
+| Outcome | Implemented | Verified | Externally blocked | Owner | Next action |
+| --- | --- | --- | --- | --- | --- |
+| First arrival and sign-in | Bill-first public entry; copied destinations preserved | Final public 86/86; copied-link desktop/phone | Actual Google/Zoho lifecycle absent | Copilot / founder | Permitted baseline-first evaluation |
+| Setup and source controls | Contextual read-only consent; organization selection; no policy prerequisite | Existing local provider/store cases pass | Synthetic Zoho organization/client absent | Founder / provider owner | Supply approved secret-store access |
+| Daily register | Literal search, exact currency sorts, bounded snapshot pages, responsible display names | 340-record store test; final bill group 26/26, 341-record rendered register | Buyer workflow fit unmeasured | Copilot / buyer owner | Uncoached same-job evaluation |
+| Completion and return | Saved result first; further work, reading and history on demand | Final bill group 26/26; final desktop/phone before/after journey | Buyer acceptance absent | Copilot / founder | Observe actual return and follow-through in permitted evaluation |
+| Failure and privacy | Draft preservation, original uncertain request, role checks, cross-tab sign-out | Account 2/2; source/Recovery 56 passed, four config skips; focused sign-out passes | Real provider loss/revoke/human receipt absent | Copilot / operator | Actual authorized provider drill |
+| Accessibility and long content | Stable labels/focus; header/skip-link text reflow; Records dismisses after selection/Escape | 320px/200% text/reduced-motion/Axe checks; public and Control groups pass | Actual assistive-technology user acceptance unobserved | Copilot / buyer owner | Uncoached permitted evaluation |
+| Source lifecycle and accountable recovery | Existing immutable import, stopped incidents, bounded recovery preserved | Synthetic handlers/database, not provider evidence | Authorized Zoho access and named operator absent | Founder / provider owner / operator | Actual provider lifecycle and observed alert-response drill |
+| Buyer effort and price | Baseline-first protocol prepared; one-time INR 14,999 pilot-month offer unchanged | No buyer/colleague/operator effort, objections or commercial outcome observed | Buyer session not permitted | Founder | Authorize same-job native-Books/candidate comparison |
+| Technical gates | Settled application candidate built; final evidence complete | Source/units/build/budgets/motion/local smoke pass; PostgreSQL and strict Lighthouse fail as described | No external excuse for local failures | Copilot / test-tooling owner | Separate legacy fixture-clock repair and controlled trace-collection investigation before release; never relax gates |
+| Assessed paid pilot and broad launch | Activation settings unchanged | NO-GO | Assurance/retest, legal, operations, buyer/provider proof and release authority absent | Founder / assessor | Release-specific evidence and explicit authority |
+
+**WHAT IS NOT TRUE**
+
+- The candidate is not an all-gates-green release, a provider-verified integration, buyer acceptance, measured effort reduction, recurring revenue, a product pivot or a launch approval. Bills are not payments, company burn, contractual renewal coverage or usage/waste evidence.
+- Closure records a human disposition of an exact revision. It does not approve spending, pay, contact a supplier, remove a subscription or silently review an imported baseline. Sign-out does not revoke background source authorization.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Authorize one named baseline-first evaluation of this bill-change job, supplying a synthetic Zoho organization/client through the approved secret store, an accountable operator and a permitted buyer session. Never put credentials or private customer records in chat.
+2. Supply independent release assessment/retest, legal/retention and operations evidence before any customer-data activation; evaluation authority is not launch authority.
+
+**HARD STOP:** Preserve existing/historical work, exact money, tenant isolation, human authority, immutable decisions, privacy, consent, gate thresholds and automatic-main deployment. No commit, push, deployment, production mutation, purchase, real customer-data enrollment, unpermitted contact, second connector, merchant matching or provider write.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-06 - connected first value and buyer acceptance in progress
+
+> **SUPERSEDED 2026-09-07** - see the block above.
+
+**Scoreboard row:** Product UX and Backend Readiness evidence; Business Validation and Distribution remain unmeasured
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The founder authorized local UX simplification and supporting engineering for connected first value within the existing bill-review domain. GitHub Copilot is the sole editing owner; no other editor or reviewer is dispatched. The requested model name is not evidence of the model serving this session.
+- This is dirty `main`, tracking `origin/main`. The completed source-to-resolution implementation, original tests, financial safeguards and historical evidence are the starting point and are preserved. No commit, push, deployment, purchase, customer enrollment or external contact is authorized. The enabled automatic-main deployment setting must remain unchanged.
+- **User and proof:** one unfamiliar finance owner inspects a sourced supplier-bill amendment, records a human explanation or dated follow-up, and returns without retyping imported fields or reconstructing context. Local synthetic execution is not buyer acceptance or provider verification.
+- **Approved local scope:** simplify public entry, sign-in continuity, source setup, the primary work area, completion and return; add bounded server-side register search/sort using existing bill evidence; preserve old routes and capabilities. No second connector, merchant matching, provider writes, financial authorization, automatic Recovery promotion or changed offer. Material evidence/attention contract changes must be proposed explicitly before implementation.
+- **Explicit attention decision:** the founder approved excluding unchanged initial-import baselines from Needs review. They remain in All bills as imported and not reviewed; no acknowledgement or disposition is written. Later new/amended/voided/removed revisions and open follow-ups remain eligible for attention. Register reads use literal search, whitelisted sorts, separate currencies and bounded snapshot pagination. The founder confirmed synthetic provider access, a named operator and a buyer session are still unavailable.
+- The current desktop and phone journey was inspected before editing. A saved closed synthetic review still displays another explanation form, reading acknowledgement and expanded history. The public primary path still leads to the pre-spend example. Baseline captures and observations are in `.fallow/connected-first-value/before/`; these are synthetic rendered observations, not measured human effort.
+- Authorized synthetic Zoho organization/client access through the approved secret store, a named operator and a permitted buyer workflow session were requested at the start of this assignment. None has been supplied to this session. Local work continues; external actions stay blocked.
+- Strict Lighthouse is inherited as **FAILED on invalid NO_NAVSTART traces**, not proven slow routes. Its validity rules and thresholds remain unchanged. No new final-candidate gate result is claimed yet.
+
+### Connected First Value Completion Matrix
+
+This is the only live completion matrix for this assignment. Earlier matrices below are historical.
+
+| Outcome | Implemented | Verified | Externally blocked | Owner | Next action |
+| --- | --- | --- | --- | --- | --- |
+| First arrival, sign-in and source setup | Existing candidate; simplification pending | Before journey captured | Real OAuth authority absent | Copilot / founder | Align entry and preserve destinations |
+| Daily bill review and records | Existing exact-revision workflow | Previous run is historical evidence | None for local work | Copilot | Bounded register and one primary work area |
+| Completion and return | Durable dispositions exist | Closed-form clutter confirmed in both viewports | Buyer acceptance absent | Copilot | Focused completion regression and repair |
+| Large histories and exact money | Existing paginated history | New register checks pending | None for synthetic tests | Copilot | Test hundreds of records and currency isolation |
+| Permissions, failures and accessibility | Existing safeguards preserved | Changed-state checks pending | Actual identity/provider lifecycle absent | Copilot | Focused checks, then consolidated browser groups |
+| Source lifecycle | Local adapter and recovery already implemented | Synthetic evidence only | Authorized Zoho access and bill-specific absence evidence absent | Founder / provider owner | Configure approved synthetic access |
+| Accountable recovery | Durable incidents already implemented | Local receipt is not human receipt | Named operator and observed notification/response absent | Founder / operator | Assign operator and permit lifecycle drill |
+| Buyer effort and price | Existing one-time INR 14,999 pilot-month offer unchanged | No buyer, colleague or operator effort observed | Buyer session not permitted yet | Founder | Arrange baseline-first same-job evaluation |
+| Technical gate | Previous implementation retained | Strict Lighthouse remains failed; final gates pending | None established for local tooling | Copilot | One controlled trace experiment, then settled-candidate gates |
+| Paid pilot and broad launch | No activation changes | NO-GO remains | Assurance/retest, legal, operations, buyer/source proof and release authority absent | Founder / assessor | Supply release-specific evidence |
+
+**WHAT IS NOT TRUE**
+
+- This assignment does not establish provider readiness, a product pivot, customer value, recurring revenue, complete subscription coverage or launch approval. Bills are not payments, company burn, renewal contracts or usage/waste evidence.
+- Closed means a person closed that exact review. Reading, disposition, a follow-up, provider action and financial authorization remain distinct. Imported baselines are not silently reviewed or resolved.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Supply authorized synthetic Zoho access through the approved secret store and name the accountable operator; no credentials in chat.
+2. Permit one buyer workflow session and its recipient/channel, observing the current repeated job before an uncoached candidate test. No external contact is implied.
+
+**HARD STOP:** Preserve existing work, historical evidence, exact money, privacy, consent, tenant isolation, immutable decisions and all gate thresholds. No commit, push, deployment, production mutation, purchase, customer-data enrollment, unpermitted contact, second connector, matching or provider write. Preserve automatic-main deployment.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-06 - source-to-resolution workflow delivered for synthetic evaluation
+
+> **SUPERSEDED 2026-09-06** - see the block above.
+
+**Scoreboard row:** Product UX and Backend Readiness; no measured Business Validation or Distribution movement
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The founder issued Section 8 of the [mandate review](../output/vognary-mandate-fulfillment-review-2026-09-06.md) as an implementation assignment, explicitly authorizing local F1-F4 remediation and requiring a complete, coherent source-to-resolution candidate.
+- The founder confirmed GitHub Copilot as sole integrated editor and paused other editing. The verified checkout is dirty `main`, up to date with `origin/main`. All preceding candidate changes and `.github/prompts/` are preserved; no commit, push or deployment is authorized.
+- **Repair scope:** replace unsafe global review acknowledgement with an explicit presented-observation contract; fail closed on ambiguous provider absence; enforce assurance/synthetic-only rules at financial intake boundaries; retain bounded retry with accountable escalation and permission-checked recovery. Domain/store repairs require failing regressions before implementation and focused validation immediately afterward.
+- One finance owner returns after a supplier bill amendment, inspects exact sourced differences and records a human disposition. The founder explicitly approved the minimal local domain, APIs, persistence and end-to-end UX contract presented in this session. This extends the read-only preparation surface under THE-LAW section 0.1.2, without a commercial pivot. No second connector, automatic Recovery promotion, matching, cap mutation or financial action is permitted.
+- The founder confirmed that authorized synthetic provider access is **not available yet** and no buyer interaction or external contact is authorized. Founder will arrange both; local synthetic work continues. No named production operator, external assessment or release authority has been supplied.
+- This assignment reproduced F1/F2/F3/F4 regressions before their repairs. The settled source/database gates passed: 239 disposable PostgreSQL tests, 1,364 database-unset units, lint/typecheck/claims/research/brand/tokens, non-strict empty corpus, production build and all 16 size budgets. Both dependency audits passed. Final ordered browser groups completed with 206 passed, four inbox-configuration skips, zero failures and zero flaky cases. Motion and explicit local-unconfigured production smoke passed. Original failures and reruns remain separate in `.fallow/source-resolution/gates/`.
+- **Open technical gate:** strict Lighthouse remains FAILED because `/start` and `/pay` each had an invalid `NO_NAVSTART` trace in the last run. Fresh-browser-per-sample isolation and cleanup tests did not eliminate the trace issue. All samples must be valid; no threshold or sample requirement was weakened, and no complete Lighthouse pass is claimed.
+- **Synthetic evaluation GO with limits:** <http://127.0.0.1:65033/start> and the [saved synthetic bill](http://127.0.0.1:65033/app?view=BILL_REVIEW&bill=906000001&billView=ALL); [local access](../.fallow/source-resolution/ACCESS.md). **Assessed customer-data pilot and broad launch remain NO-GO.** The [delivery record](../output/vognary-source-resolution-delivery-2026-09-06.md) contains the workflow, action mapping, intake inventory, before/after usability limits, per-gate logs and human dependencies. No official scoreboard row or commercial metric moved.
+- Final [907-file scoped manifest](../.fallow/source-resolution/gates/final-tree.json) SHA-256 is `7e7f8facace7026551fc9afbea72970943bf25086743c19c69cd01fabe838de5`. Scope/exclusions are explicit; browser and production-build application source snapshots match. This is not a deployed SHA. The last build predates only the later Lighthouse verification-script change, not application changes.
+- Checkout remains dirty `main`, tracking `origin/main`, with no commit/push/deployment. Existing `.github/prompts/`, prior source work and automatic-main deployment are preserved. Browser-generated historical screenshot overwrites were archived under this assignment and the initially clean originals restored; historical evidence was not replaced by newer captures.
+
+### Approved Local Resolution Contract
+
+- **Job:** explain an imported bill change and either close its human review with a recorded explanation or retain an actor-owned dated follow-up. No repeat entry of imported financial fields.
+- **Evidence:** immutable Books snapshots and exact differences only. A bill is not payment evidence. Resolved means a human closed the review, not that payment, savings or external work occurred. Reading and disposition remain separate.
+- **Permissions:** workspace members read; owners/admins acknowledge, record dispositions and close follow-ups. Source consent and assurance rules remain independent.
+- **Durability:** append-only actor/time/source-revision dispositions, responsible actor and due date when follow-up is required; new amendments need a new disposition. Idempotency and expected event/source versions protect retries and concurrent sessions.
+- **APIs:** existing source endpoint plus bill-detail/history reads and disposition writes within the same source namespace. No Recovery or Control contract change.
+- **Acceptance:** source change -> disposition -> follow-up/closure -> reload/copied URL/another session -> new amendment; stale-state, lost-response, role/tenant, privacy erasure and exact-money negatives. Provider and buyer proof remain blocked separately.
+
+### Completion Matrix
+
+This is the single live implementation/verification matrix for this assignment. Test evidence is synthetic unless explicitly labelled otherwise.
+
+| Gate | Implemented | Verified | Blocked | Next |
+| --- | --- | --- | --- | --- |
+| G1 / F1: exact review | Exact workspace observation acknowledgements; legacy watermark no longer used | Race/paging/concurrent/API/privacy regressions pass in final 239-test database run | No local blocker | Preserve exact-revision contract in provider evaluation |
+| G1 / F2: provider absence | Ambiguous 404 stops as ABSENCE_UNCONFIRMED; prior history retained | Red full-scan failure, then 7/7 store and 6/6 client checks | Zoho bill-specific deletion contract and actual provider lifecycle unavailable | Verify missing-bill signal with authorized provider; never extrapolate invoice example |
+| G2 / F4: recovery | Durable incidents, bounded delivery, assigned-operator redelivery/resume, preserved cursor/freshness | Red regressions, then 5/5 lifecycle checks including real loopback delivery, real handler, schema/revocation negatives | Named real operator and externally received alert not supplied | Configure operator and monitored sink; real delivery/recovery drill |
+| G3 / F3: intake | Guest fixed fixture only; uploads/OCR/Recovery/Control/questions/inbox clearance before parsing or retrieval | Guest/upload 27/27; real-handler enabled/blocked workspace, target mismatch and inbox withdrawal tests pass in the 239-test database run | Independent assurance absent | Release-specific external clearance; no customer-data activation |
+| G4: useful resolution | Immutable exact-revision dispositions, actor-owned dated follow-up, closure, paginated history, idempotent API and privacy export | Real-store/API lifecycle and all 10 bill-browser cases pass, including response loss across newer revision | Buyer value unmeasured | Permitted target-user evaluation; no further domain expansion before evidence |
+| G5: provider | Local adapter exists | Synthetic handlers only | Authorized synthetic Zoho access absent | Founder supplies access through secret store |
+| G6: coherent journey | Synthetic public entry -> direct Bill review sign-in -> source setup -> attention/detail/disposition/follow-up/return; phone totals precede source setup | Final desktop/phone workflow, keyboard, Axe, first-viewport money and reduced-motion checks pass; local responsiveness measured separately | Buyer/founder acceptance unmeasured | Founder/target user evaluates the rendered job; no customer-effort claim |
+| G7: action evidence | [Delivery ledger](../output/vognary-source-resolution-delivery-2026-09-06.md) and [383-control historical crosswalk](../output/vognary-source-resolution-action-crosswalk-2026-09-06.json) map roles/states/tests with partial and blocked limits | Final public 86/86; Control 52/52; Recovery/source 56 passed/4 configuration skips; account 2/2; bill controls 10/10 | Actual provider/inbox browser configuration and some unrelated optional control states are not certified | Exercise provider-dependent controls when authorized; do not call a structural count universal coverage |
+| G8: final candidate | Implementation settled; exact application source proof recorded | 239 database tests, 1,364 units, source gates/build/16 budgets, motion and local-unconfigured smoke pass; final browser 206/0/4 | Strict Lighthouse FAILED on invalid NO_NAVSTART traces | Investigate valid navigation traces in a controlled browser environment; no full release sign-off |
+| G9: buyer value | No new commercial execution | No baseline/after measurement | No permitted buyer interaction | Founder arranges same-job reconstruction and offer test |
+| G10: activation | Customer-data pilot remains NO-GO | No new external clearance | Assessment/retest, operations, legal and release authority absent | Accountable human owners provide release-specific evidence |
+
+**WHAT IS NOT TRUE**
+
+- Issuing the assignment is not approval of a new financial evidence meaning, a commercial pivot, an actual provider lifecycle, a paid outcome or launch. Local synthetic tests cannot establish customer effort savings or external alert delivery.
+- Existing passing checks are not certification of the changed candidate. The public automatic-main setting remains authorized and must not be changed; a later push can affect production.
+
+### Local Operator Procedure
+
+- Configure `ZOHO_BOOKS_OPERATOR_USER_ID` to a real accountable workspace owner/admin through the secret/configuration store and configure the existing monitoring sink. Neither is supplied or asserted ready by this session.
+- Exhausted transient reads stop in `FAILED` with an incident. Unassigned or undelivered incidents stay visibly unconfirmed. The configured operator may explicitly take the incident and retry its bounded notification delivery; source reads remain stopped.
+- After delivery is recorded, only that configured, assigned owner/admin may resume a transient `PROVIDER_UNAVAILABLE` or `THROTTLED` incident. The source stays stale until a successful scan completes. Schema, unknown absence, lost authority and revoked consent require their specific repair/reconsent; resume does not bypass them.
+- A monitoring HTTP receipt is not proof that an on-call person received or acknowledged an alert. External alert delivery and human response require a separate drill. No manual SQL recovery or infinite retry is part of this procedure.
+- Zoho's [published error reference](https://www.zoho.com/books/api/v3/errors/) calls HTTP 404 URL Not Found and gives code 1002 for an invoice example, not a bill-specific deletion contract. Ambiguous bill absence is stopped as `ABSENCE_UNCONFIRMED`; provider-confirmed removal acceptance remains blocked pending authorized bill-specific evidence.
+
+### Evaluation Runtime
+
+- Existing synthetic preview and records remain preserved at <http://127.0.0.1:3037>. Additive source migrations and a clearly synthetic bill were applied locally only.
+- A separate disposable synthetic verification runtime is running at <http://127.0.0.1:65033>. Its test-only identity and credentials are held in ignored local runtime configuration; no production environment was loaded. Account-erasure browser tests ran only against this second runtime. Bill `906000001` is a synthetic source fixture, not a provider-verified import.
+- The authenticated 4x-CPU warm development-server probe recorded median bill-detail readiness of 2,516ms desktop and 2,055ms phone across three samples each, with no overflow. These are local automation/runtime observations, not production INP, a passed customer speed target, or human effort savings.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Supply authorized synthetic Zoho access through local secret configuration, never chat, and arrange the permitted buyer reconstruction.
+2. Name operating/assessment/release owners and obtain the independent assurance, legal, retention and operational evidence before customer data.
+
+**HARD STOP:** No commit, push, deployment, production mutation, purchase, customer-data enrollment, external contact without explicit authority, second connector, invented evidence or weakened gate. Preserve other work and the automatic-main setting.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-06 - bounded low-effort candidate implemented and verified locally
+
+> **SUPERSEDED 2026-09-06** - see the block above.
+
+**Scoreboard row:** Product UX and Backend Readiness evidence; Business Validation and Distribution remain unproven; no official score movement
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. One finance owner returns after a new or amended supplier bill, inspects attributable evidence and makes an explicit human decision. Local proof is no repeat entry for covered synthetic Books updates plus durable exact-money/authorization/read-back behavior. Actual total customer/operator effort is still unmeasured.
+- **Decision:** NARROW the local candidate; INSUFFICIENT EVIDENCE for a commercial pivot. The bounded Zoho Books India READ source contract in the preceding authorization block remains the selected scope under THE-LAW section 0.1.2. The one-time INR 14,999 pilot-month offer is unchanged; a second month needs a separate purchase.
+- GitHub Copilot implemented the local source client/store/worker/handlers/UI, migrations 0070/0071, privacy export and backup verification. Consent, organization selection, encrypted refresh, resumable pages, scan-start watermarks, immutable amendments/removals/restoration, throttling, role loss, revoke and erase have synthetic real-handler/database coverage. No provider writes, automatic matching, Recovery promotion, cap mutation or financial execution were added.
+- Source allowlisting alone cannot enable production access. Canonical paid-pilot enrollment and release-bound independent assessment are also required, including before worker claims. Actual Zoho credentials, authorized sandbox, provider approval, production configuration and observed provider operation remain absent/BLOCKED.
+- Reproduced guest-input/tab-privacy, lost-save/tenant-retry, record-history, evidence-pagination, phone-context, stale-version and premature decision-receipt defects are repaired. Unknown outcomes remain unknown; unchanged uncertain mutations retain original request identity. Detailed scope, counterexamples, ratings, effort/economics limits and commercial queue are in the [transformation report](../output/vognary-low-effort-transformation-2026-09-06.md).
+- Final source gates passed on Node 22.23.2/npm 10.9.8: 1,354 unit tests and 220 fresh disposable PostgreSQL tests, zero skips; lint with one existing profile navigation warning; typecheck; claims (52 surfaces), market claims, research, brand and tokens. Both dependency audits reported zero vulnerabilities. Non-strict corpus has zero real fixtures and null precision/recall, not validated accuracy.
+- Final isolated production build and all 16 size budgets passed. Strict Lighthouse passed all seven routes with all 21 samples valid: performance 97-98, median LCP 940-1,074ms, accessibility/best practices 100. The gate now rejects invalid samples instead of silently accepting a median around them. Original failed/invalid runs remain documented. Post-repair desktop/phone motion passed at about 59fps with zero long tasks under 4x CPU throttling.
+- Earlier consolidated browser result was 109 passed/3 failed/4 skipped. Each reproduced failure was repaired and passed its focused rerun; this is not a rewritten all-green full run. Earlier public checks passed 68/68. Final public/demo/source checks passed 40/40 across desktop and phone, including responsive/reduced-motion/Axe checks. Local production-build smoke passed only in explicit unconfigured-loopback mode; no configured-production or hosted CI result is claimed.
+- Checkout remains uncommitted `main`, tracking `origin/main`; existing `.github/prompts/` is untouched. `vercel.json` retains `git.deploymentEnabled.main=true`. No commit, push, deployment, production migration, customer enrollment, purchase or external contact occurred. A later push can affect production independently of GitHub CI.
+- The [action inventory](../output/vognary-action-inventory-2026-09-06.json) contains 129 page/API files and 383 structural control instances, not all-state runtime certification. The [897-file scoped manifest](../.fallow/low-effort/gates/tree.json) has SHA-256 `75642eccefd2b7415c737946a3aa022adb17fb8f0bc27896d09f94873e7471c4`; scope/exclusions are explicit and it is not a deployed SHA.
+- **Synthetic preview GO for evaluation:** <http://127.0.0.1:3037>; [local access details](../.fallow/frontend-reconstruction/ACCESS.md). Books is honestly unconfigured there; connected screenshots are synthetic fixtures. **Assessed customer-data pilot and broad launch: NO-GO.** Market evidence remains three contacts and zero replies/conversations/offers/payments, with founder time unmeasured. No specialist agents or independent reviewers were dispatched.
+
+**WHAT IS NOT TRUE**
+
+- This completes a bounded local implementation, not the entire company transformation, a validated pivot, real provider lifecycle, measured customer effort reduction, paid demand, retention, profitability or independent assessment.
+- Bills and balances are not payments, complete company exposure, savings or causal ROI. A later bill cannot create earlier intent; Books observations do not automatically reconcile Control. Manual proposal, judgment, outcome and uncovered-source work remain.
+- Passing local tests does not establish founder/customer acceptance, production scheduling/monitoring/restore, legal/residency approval or every role/state/browser combination. The full signed-in suite was not repeated after targeted repairs; skipped coverage stays disclosed.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Provide one genuinely permitted buyer relationship or opted-in channel; reconstruct the same recurring job and record buyer, colleague and operator effort before considering a second connector or changed offer.
+2. Supply an explicitly authorized synthetic Zoho organization/client through the secret store, not chat, and verify actual scopes, tier, OAuth, unattended imports, refresh, changed permissions and revocation.
+3. Commission the independent assessment/remediation/retest for the exact release; approve retention/residency and name release/on-call ownership, including scheduler/alert and terminal-recovery/restore proof, before customer data.
+4. Judge the synthetic candidate and separately authorize any publication or release. The mandate did not grant that authority.
+
+**HARD STOP:** No commit, push, deployment, production mutation, real customer financial data, unpermitted outreach, purchase, autonomous financial action, silent matching, invented evidence or weakened gate. Preserve automatic-main deployment and other owners' work. No second connector before buyer/source fit evidence.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-06 - low-effort full-stack transformation authorized locally
+
+> **SUPERSEDED 2026-09-06** - see the block above.
+
+**Scoreboard row:** Product UX and Backend Readiness; Business Validation and Distribution remain unproven; no score movement
+**Loop step:** reconciliation
+
+<!-- markdownlint-disable MD036 -->
+**WHAT IS TRUE**
+
+- **Stage:** Make it work. The founder issued the complete low-effort product and company transformation mandate to this session. GitHub Copilot is the integration owner for this local candidate; the mandate's requested model name is not evidence of the model used. No specialists have been dispatched.
+- The user is one finance owner returning to a proposed or approved obligation. The decision is an explicit human authorization or selection of later evidence. Local acceptance requires accurate write outcomes, durable record continuity and reachable evidence without recreating context; commercial acceptance still requires actual buyer behavior.
+- The initial scope amendment is recorded in THE-LAW section 0.1.2. Backend repairs are now authorized through this scope, not constrained to the earlier presentation-only pass. Integration research is authorized; an integration must have a recorded bounded contract before implementation. No material pivot has been validated or selected.
+- The verified checkout is this repository on `main`, up to date with `origin/main`, with only the existing untracked `.github/prompts/` before this work. Node 22.23.2, npm 10.9.8, installed Next 16 documentation and a loopback PostgreSQL listener are available. Existing changes and records will be preserved.
+- `vercel.json` currently has `git.deploymentEnabled.main=true`. This setting remains unchanged. A push can affect production independently of GitHub CI; this mandate does not authorize one.
+- The September 5 review is reported history, not proof that findings remain open or repaired. The first code boundary inspected is the guest audit handler; malformed-input regressions will precede its repair. No new gate result, customer contact or connector readiness is claimed yet.
+
+### Selected Source Contract - Local Candidate Only
+
+- **Scope decision:** Under the founder's September 6 mandate and THE-LAW section 0.1.2, implement one read-only Zoho Books India observation workflow. The candidate user is a finance owner already using Zoho Books, returning to see new or amended supplier bills without re-entering them. Actual buyer use of Zoho and willingness to pay remain unmeasured; this is not a validated company pivot or a change to the existing offer.
+- **Sources and permissions:** Only `accounts.zoho.in` and `www.zohoapis.in`; OAuth server authorization with `ZohoBooks.settings.READ` and `ZohoBooks.bills.READ`, explicit organization selection and owner/admin consent. No email, banking, purchasing, payment, cancellation or provider-write scope. A Vognary login is not source authorization. Other data centers remain explicitly unsupported by this first candidate.
+- **Metric contract:** A provider bill total is the amount on that supplier bill, including the provider's taxes, discounts and adjustments. Balance is the provider's outstanding balance, not cash paid. Preserve currency and exact decimal source values. Neither is company-wide spend, revenue, burn, runway or savings. Zero bills in the selected coverage does not establish zero company exposure.
+- **Authority boundary:** Stable provider organization, vendor and bill identifiers identify observations. No merchant-name matching, cross-source summation, automated evidence selection, cap mutation or silent promotion into Recovery. The bill-change feed is a separate read-only preparation surface; the existing human-authorized Control loop remains canonical. Connecting Books does not make Control's manual proposal intake automated.
+- **Lifecycle and retention:** Initial bounded history, paginated checkpoints, recurring background reads, encrypted tokens, refresh, capability probes, throttling/backoff, correction snapshots, honest partial/failed states, explicit disconnection and erasure. Source snapshots must preserve the inputs needed to reproduce a displayed change. Provider deletion and lost permission must be distinguished. Revocation must invalidate queued work and prevent later credentials use; no frozen authorization may be rewritten.
+- **Acceptance:** Real local handlers plus a disposable synthetic database must show initial import and a subsequent unattended update with no repeat bill entry, duplicate/corrected event safety, stale-workspace refusal, interrupted paging, permission loss, refresh, reconnect, revoke and delete. Authorized provider sandbox, production configuration and observed production operation remain separate BLOCKED gates until actually supplied and exercised. An HTTP fixture is contract testing, never provider readiness.
+- **Evidence so far:** Guest audit regressions pass 23/23; transport suites pass after the response-loss repair; reducer uncertainty, tenant-target and retry-context regressions pass. Focused browser checks pass for guest discard, new-record URL history, older-receipt recovery and phone financial context. These are separate targeted runs, not final candidate release certification. Aggregate market reporting still has 3 contacts and zero conversations, offers and payments; founder time is unmeasured.
+
+**WHAT IS NOT TRUE**
+
+- A local reconstruction, synthetic test, source adapter or design judgment is not a working provider integration, observed effort reduction for customers, demand, payment, independent assurance or release approval.
+- Earlier positive ratings and failed browser/Lighthouse results are not silently inherited or cleared. Login does not authorize financial access. A later bill cannot establish a pre-spend proposal.
+
+**NEXT HUMAN ACTIONS:**
+
+1. Provide one genuinely permitted buyer relationship or opted-in channel for the existing event-based job comparison; contacts, conversations, offers and cleared payments must remain separate.
+2. Supply explicit organizational sandbox authority for any selected provider, without sharing secrets in chat, and commission independent assessment/retest and operational/legal clearance before customer-data activation.
+3. Decide any evidence-supported material pivot and separately authorize publication or release after reviewing the actual candidate and its blockers.
+
+**HARD STOP:** No commit, push, deployment, production mutation, customer financial data, outreach without recipient/channel authority, purchase, autonomous financial action, silent matching, invented evidence or weakened gate. Preserve automatic-main deployment and all other owners' work.
+<!-- markdownlint-enable MD036 -->
+
+## 2026-09-06 - founder re-enables automatic Vercel deployments from main
+
+> **SUPERSEDED 2026-09-06** - see the block above.
 
 **Scoreboard row:** Production Activation deployment-trigger configuration; no score movement
 **Loop step:** human authorization and reconciliation

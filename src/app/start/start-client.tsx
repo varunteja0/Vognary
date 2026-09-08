@@ -3,8 +3,9 @@
 import "../public.css";
 import "../ledger.css";
 import Link from "next/link";
+import { Trash2 } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
-import { buildGuestAuditSnapshot, guestAuditTransferKey, type TransferStatementSource } from "@/lib/guest-audit-transfer";
+import { buildGuestAuditSnapshot, guestAuditTransferBindingKey, guestAuditTransferKey, type TransferStatementSource } from "@/lib/guest-audit-transfer";
 import {
   formatDraftInr,
   getGuestProposalDraftServerSnapshot,
@@ -89,8 +90,24 @@ export default function StartClient() {
     try {
       window.sessionStorage.setItem(guestAuditTransferKey, JSON.stringify(snapshot));
     } catch {
-      // Sign-in can still proceed; the workspace will ask for the bills again.
+      setStatus("This browser could not keep a tab copy. The analysis is shown, but sign-in will not transfer it.");
     }
+  }
+
+  function discardTabEvidence() {
+    try {
+      window.sessionStorage.removeItem(guestAuditTransferKey);
+      window.sessionStorage.removeItem(guestAuditTransferBindingKey);
+    } catch {
+      setStatus("This browser did not allow the tab copy to be cleared. Clear this site's browser storage before signing in.");
+      return;
+    }
+    for (const image of imageDrafts) if (image.previewUrl) URL.revokeObjectURL(image.previewUrl);
+    setReceiptText("");
+    setStatementSources([]);
+    setImageDrafts([]);
+    setCards([]);
+    setStatus("Tab evidence discarded. No receipt is queued for sign-in.");
   }
 
   async function addFiles(files: readonly File[]) {
@@ -184,13 +201,22 @@ export default function StartClient() {
             Upload or paste a receipt. Vognary cites the merchant, amount, and date. Sign in to remember the evidence and open the Control desk.
           </p>
           <p className="mt-2 text-sm leading-6 text-(--muted)">
-            No account needed. Nothing is saved until you sign in.
+            No account needed. No workspace record is saved until you sign in.
           </p>
         </>
       ) : null}
       </header>
 
       <div className="public-ledger-body">
+
+      <div className="public-band">
+        <p className="text-sm leading-6 text-(--muted)">
+          Analysis runs on Vognary&apos;s server without saving a guest record. Successful receipt text is kept in this browser tab for transfer after sign-in. Discard clears that tab copy.
+        </p>
+        <button type="button" className="btn btn-sm btn-ghost mt-3" disabled={pending} onClick={discardTabEvidence}>
+          <Trash2 size={16} aria-hidden />Discard tab evidence
+        </button>
+      </div>
 
       {/* Once a bill is cited the decision is the page; the form steps aside. */}
       <details open={!cards.length} className="public-band public-band-lead">
@@ -256,7 +282,7 @@ export default function StartClient() {
           </article>
           ))}
           <p className="text-sm leading-6 text-(--muted)">
-            Sign in to remember this evidence. The next unique step is the Control desk: a named owner or admin freezes a cap before a new obligation exists. That is not Keep or Plan to cancel.
+            Sign in to remember this evidence. In the Control desk, a named owner or admin can record a cap before a new obligation exists. A saved receipt is not a human authorization.
           </p>
           <Link href="/login?next=/app" className="btn btn-primary btn-lg justify-self-start">
             Sign in to remember this evidence

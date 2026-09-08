@@ -102,6 +102,61 @@ const reconciliationDto = {
   reconciledAt: "2026-09-01T09:00:00.000Z",
 } as const;
 
+test("proposal requests explicitly opt into gross billed per-charge basis without changing legacy requests", () => {
+  const request = {
+    merchant: "Synthetic bill supplier",
+    purpose: "Synthetic authorized capacity",
+    category: "AI_MODEL",
+    amountMinor: "199900",
+    currency: "INR",
+    firstChargeDate: "2026-09-01",
+    cadence: "MONTHLY",
+    existingCommitmentIds: [],
+    intendedOutcome: proposalDto.intendedOutcome,
+  };
+  assert.deepEqual(normalizeControlProposalRequest(request), request);
+  assert.deepEqual(normalizeControlProposalRequest({
+    ...request, amountBasis: "GROSS_BILLED_TOTAL_PER_CHARGE",
+  }), { ...request, amountBasis: "GROSS_BILLED_TOTAL_PER_CHARGE" });
+  for (const amountBasis of [null, "NET_TOTAL", "PROVIDER_BILL_TOTAL", true]) {
+    assert.throws(() => normalizeControlProposalRequest({ ...request, amountBasis }), /basis/i);
+  }
+});
+
+test("provider reconciliation accepts only exact source selection and explicit whole-charge retention confirmation", () => {
+  const request = {
+    source: "ZOHO_BOOKS",
+    connectionId: "a2000000-0000-4000-8000-000000000001",
+    organizationId: "100001",
+    billId: "200001",
+    sourceSequence: "11",
+    expectedLatestSequence: "11",
+    expectedSourceVersion: "3",
+    wholeCharge: "USER_CONFIRMED_SAME_CHARGE",
+    retentionNotice: "control-provider-bill-retention-v1",
+  };
+  assert.deepEqual(normalizeControlReconciliationRequest(request), request);
+  for (const extra of [
+    { totalMinor: "12345" }, { currency: "INR" }, { billDate: "2026-09-01" }, { merchant: "Synthetic override" },
+    { evidenceId: reconciliationDto.evidenceId }, { observedOutcome: { value: "10", observedOn: "2026-09-07" } },
+    { allocations: [{ sourceSequence: "11", totalMinor: "1" }] }, { bills: ["200001"] },
+  ]) assert.throws(() => normalizeControlReconciliationRequest({ ...request, ...extra }), /unknown/i);
+  for (const invalid of [
+    { source: "UNSUPPORTED" }, { organizationId: "foreign" }, { connectionId: "foreign" },
+    { sourceSequence: "0" }, { sourceSequence: "9223372036854775808" }, { expectedSourceVersion: 3 },
+    { wholeCharge: false }, { wholeCharge: "SPLIT" }, { retentionNotice: undefined }, { retentionNotice: "old-notice" },
+  ]) assert.throws(() => normalizeControlReconciliationRequest({ ...request, ...invalid }));
+  assert.deepEqual(normalizeControlReconciliationRequest({ source: "RECOVERY", evidenceId: reconciliationDto.evidenceId }), { source: "RECOVERY", evidenceId: reconciliationDto.evidenceId });
+});
+
+test("Control DTOs reject explicit basis mismatch and accept matching gross or absent legacy bases", () => {
+  const proposal = { ...proposalDto, amountBasis: "GROSS_BILLED_TOTAL_PER_CHARGE" };
+  const evaluation = { ...evaluationDto, amountBasis: "GROSS_BILLED_TOTAL_PER_CHARGE" };
+  assert.equal(isControlProposalWriteDto({ proposal, evaluation }), true);
+  assert.equal(isControlProposalWriteDto({ proposal, evaluation: evaluationDto }), false);
+  assert.equal(isControlProposalWriteDto({ proposal: { ...proposal, amountBasis: "NET_TOTAL" }, evaluation }), false);
+});
+
 test("normalizes the complete Commitment Control request boundary", () => {
   assert.deepEqual(normalizeControlPolicyRequest({
     ...completeControlPolicyRequest(),

@@ -247,7 +247,7 @@ async function mockRecoveryApi(page: Page, options: { decision?: DecisionOutcome
   return { activationResponses };
 }
 
-async function signIn(page: Page) {
+async function signIn(page: Page, destination = "/app") {
   const identity = randomBytes(12).toString("hex").match(/.{4}/g)!.join(":");
   await page.context().setExtraHTTPHeaders({ "x-forwarded-for": `2001:db8:${identity}` });
   await page.route("**/api/workspaces/current/control/brief", (route) => route.fulfill({
@@ -255,7 +255,7 @@ async function signIn(page: Page) {
     contentType: "application/json",
     body: JSON.stringify({ error: { code: "FEATURE_UNAVAILABLE", message: "not enrolled", retryable: false, requestId: "recovery-home-control-gate" } }),
   }));
-  await page.goto("/login");
+  await page.goto(`/login?next=${encodeURIComponent(destination)}`);
   await page.getByText("Other ways to sign in").click();
   await page.getByPlaceholder("developer@example.com").fill(email!);
   await page.getByPlaceholder("Access code").fill(accessCode!);
@@ -263,7 +263,7 @@ async function signIn(page: Page) {
     new URL(response.url()).pathname === "/api/auth/login" && response.request().method() === "POST");
   await page.getByRole("button", { name: "Sign in as developer" }).click();
   expect((await loginResponse).status()).toBe(200);
-  await page.waitForURL(/\/app/);
+  await page.waitForURL(url => url.pathname === "/app");
 }
 
 test("home renders attention, upcoming charges, and receipt freshness without inventing changes", async ({ page }) => {
@@ -279,15 +279,20 @@ test("home renders attention, upcoming charges, and receipt freshness without in
   });
   await signIn(page);
   const { activationResponses } = await mockRecoveryApi(page);
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   await expect(page.getByRole("heading", { level: 1, name: "Vognary" })).toBeVisible();
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 
   const nav = page.getByRole("navigation", { name: "Primary" });
-  for (const label of ["Today", "Decisions", "Bills", "Evidence"]) {
+  await expect(nav.getByRole("button", { name: "Bill review", exact: true })).toBeEnabled();
+  await nav.getByLabel("Records", { exact: true }).click();
+  for (const label of ["Today", "Decisions", "Bill review", "Evidence"]) {
     await expect(nav.getByRole("button", { name: label })).toBeVisible();
   }
+  await expect(nav.getByLabel("Records", { exact: true })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Bills", exact: true })).toBeVisible();
+  await nav.getByLabel("Records", { exact: true }).click();
   await expect(nav.getByRole("button", { name: "Automation" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: `Account for ${email}` })).toHaveAttribute("href", "/profile");
   const addBill = page.locator("#workspace-add-bill");
@@ -348,7 +353,7 @@ test("later evidence produces a genuine changed list instead of a baseline", asy
   await page.route("**/api/workspaces/current/commitments**", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { items: [commitment], total: 1, nextCursor: null }, meta: { requestId: "request-compared-list", workspaceVersion: 5 } }) }),
   );
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   await expect(page.getByRole("heading", { name: "What changed" })).toBeVisible();
   const changedBox = await page.getByRole("heading", { name: "What changed" }).boundingBox();
@@ -362,9 +367,9 @@ test("later evidence produces a genuine changed list instead of a baseline", asy
 test("a commitment exposes its exact evidence and returns focus after inspection", async ({ page }) => {
   await signIn(page);
   await mockRecoveryApi(page);
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
+  await (await openOverflowDestination(page, "Bills")).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   await expect(page.getByRole("heading", { name: "OpenAI" })).toBeVisible();
@@ -394,14 +399,14 @@ test("a commitment exposes its exact evidence and returns focus after inspection
 test("Now keeps the three primary choices; Bills routes decisions back to Now", async ({ page }) => {
   await signIn(page);
   await mockRecoveryApi(page);
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   const nowChoices = page.getByRole("group", { name: "Your choice" });
   for (const label of ["Keep", "Plan to cancel", "Review later"]) {
     await expect(nowChoices.getByRole("button", { name: new RegExp(`^${label}`) })).toBeVisible();
   }
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
+  await (await openOverflowDestination(page, "Bills")).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
   await expect(page.getByRole("group", { name: "Your choice" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Decide on Now" })).toBeVisible();
@@ -416,7 +421,7 @@ test("Now keeps the three primary choices; Bills routes decisions back to Now", 
   await expect(page.getByText("Saved to Vognary")).toHaveText("Saved to Vognary");
 });
 
-test("a rejected decision rolls back visibly and states what the workspace still holds", async ({ page }) => {
+test("an unconfirmed decision rolls back the browser without claiming the server rejected it", async ({ page }) => {
   await signIn(page);
   await mockRecoveryApi(page, {
     decision: {
@@ -425,23 +430,43 @@ test("a rejected decision rolls back visibly and states what the workspace still
       body: { error: { code: "SAVE_FAILED", message: "The change did not save.", retryable: true, requestId: "request-rollback" } },
     },
   });
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   await page.getByRole("group", { name: "Your choice" }).getByRole("button", { name: /^Plan to cancel/ }).click();
 
-  const alert = page.getByRole("alert").filter({ hasText: "Rolled back" });
+  const alert = page.getByRole("alert").filter({ hasText: "Save result unconfirmed" });
   await expect(alert).toBeVisible();
-  await expect(alert.getByText(/“Plan to cancel” for OpenAI was not saved/)).toBeVisible();
-  await expect(alert.getByText(/still without a recorded decision/)).toBeVisible();
+  await expect(alert).toContainText("may already be saved");
+  await expect(alert).not.toContainText("was not saved");
   await expect(alert.getByText(/request-rollback/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "OpenAI — plan to cancel is recorded" })).toHaveCount(0);
+});
+
+test("a pending decision cannot display a remembered receipt before the server confirms it", async ({ page }) => {
+  await signIn(page);
+  await mockRecoveryApi(page);
+  let release: () => void = () => {};
+  const responseGate = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/api/workspaces/current/decisions", async route => {
+    await responseGate;
+    await route.fulfill({ status: 403, json: { error: { code: "FORBIDDEN", message: "Synthetic explicit rejection.", retryable: false, requestId: "rejected-decision" } } });
+  });
+  await page.goto("/app?view=HOME");
+  const requested = page.waitForRequest(request => request.method() === "PUT" && new URL(request.url()).pathname.endsWith("/decisions"));
+  await page.getByRole("group", { name: "Your choice" }).getByRole("button", { name: /^Plan to cancel/ }).click();
+  await requested;
+  await expect(page.getByRole("heading", { name: "OpenAI — plan to cancel is recorded" })).toHaveCount(0);
+  release();
+  await expect(page.getByRole("alert").filter({ hasText: "Rolled back" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "OpenAI — plan to cancel is recorded" })).toHaveCount(0);
 });
 
 test("correcting a commitment offers every contract field and shows reversible history", async ({ page }) => {
   await signIn(page);
   await mockRecoveryApi(page);
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" }).click();
+  await (await openOverflowDestination(page, "Bills")).click();
   await page.getByRole("button", { name: /OpenAI/ }).first().click();
 
   await page.getByText("Something wrong?").click();
@@ -465,13 +490,17 @@ test("the workspace stays usable and keyboard-reachable on a 390px phone", async
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page);
   await mockRecoveryApi(page);
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   expect(overflow).toBe(false);
 
-  const commitmentsTab = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills" });
+  const more = page.getByRole("navigation", { name: "Primary" }).getByLabel("Records", { exact: true });
+  if (await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills", exact: true }).isVisible()) await more.click();
+  await more.focus();
+  await page.keyboard.press("Enter");
+  const commitmentsTab = page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Bills", exact: true });
   await expect(commitmentsTab).toBeEnabled();
   await commitmentsTab.focus();
   await page.keyboard.press("Enter");
@@ -481,7 +510,7 @@ test("the workspace stays usable and keyboard-reachable on a 390px phone", async
 test("Mandate stays hidden until notice delivery is proven", async ({ page }) => {
   await signIn(page);
   await mockRecoveryApi(page);
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Automation" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "I accept this standing mandate" })).toHaveCount(0);
@@ -530,12 +559,12 @@ test("existing authority is isolated to Automation while Now stays decision-led"
   await page.route("**/api/workspaces/current/brief", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: autopilotHome, meta }) }),
   );
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   const automation = await openOverflowDestination(page, "Automation");
   await expect(page.getByRole("heading", { name: "This workspace has an active standing mandate" })).toHaveCount(0);
   await expect(page.getByText("Exception-only home")).toHaveCount(0);
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Today" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Today", exact: true })).toBeVisible();
   await automation.click();
   await expect(page.getByText("This workspace has an active standing mandate", { exact: true })).toBeVisible();
   await expect(page.getByText("Off — no cancellation is executed")).toBeVisible();
@@ -602,7 +631,7 @@ test("an active mandate does not restore the retired spend strip on Now", async 
   await page.route("**/api/workspaces/current/brief", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: autopilotHome, meta }) }),
   );
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
 
   await expect(page.getByText("Exception-only home")).toHaveCount(0);
   await openOverflowDestination(page, "Automation");
@@ -650,7 +679,7 @@ test("Home posts activation only after a cited recurring-spend picture actually 
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: { items: [], total: 0, nextCursor: null }, meta }) }),
   );
 
-  await signIn(page);
+  await signIn(page, "/app?view=HOME");
   await expect(page.getByRole("heading", { level: 2, name: "Today" })).toBeVisible();
   await expect(page.getByText("Software commitments")).toHaveCount(0);
   expect(activationCalls).toEqual([]);
@@ -666,7 +695,7 @@ test("Home posts activation only after a cited recurring-spend picture actually 
       : { data: detail, meta };
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
   await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   await page.reload();
@@ -703,14 +732,14 @@ test("Home records activation after analytics opt-in on a tab that previously re
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
 
-  await signIn(page);
+  await signIn(page, "/app?view=HOME");
   await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   expect(activationCalls[0]).toEqual({ status: 202 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
 
   consented = true;
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
   await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(2);
   expect(activationCalls[1]).toEqual({ status: 201 });
@@ -754,14 +783,14 @@ test("Home records activation after a 401 once the tab can authenticate again", 
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
 
-  await signIn(page);
+  await signIn(page, "/app?view=HOME");
   await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(1);
   expect(activationCalls[0]).toEqual({ status: 401 });
   expect(await page.evaluate((key) => sessionStorage.getItem(key), `vognary.workspace-activation.settled:${home.workspace.id}`)).toBeNull();
 
   authenticated = true;
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
   await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
   await expect.poll(() => activationCalls.length).toBe(2);
   expect(activationCalls[1]).toEqual({ status: 201 });
@@ -869,7 +898,7 @@ test("unproven notice delivery stays off Now and fails closed in Automation", as
   await page.route("**/api/workspaces/current/brief", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: noticeHome, meta }) }),
   );
-  await page.goto("/app");
+  await page.goto("/app?view=HOME");
   await expect(page.getByRole("heading", { name: "Delivery pending" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "48-hour veto window" })).toHaveCount(0);
   const automation = await openOverflowDestination(page, "Automation");
@@ -936,8 +965,8 @@ test("Sources tab disconnects cited Recovery sources without rotating the receip
       }),
     });
   });
-  await page.goto("/app");
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Evidence" }).click();
+  await page.goto("/app?view=HOME");
+  await (await openOverflowDestination(page, "Evidence")).click();
   await page.getByText("Advanced").click();
   await expect(page.getByText("Pasted OpenAI receipt")).toBeVisible();
   await expect(page.getByText("Pasted bill · Connected")).toBeVisible();
@@ -963,18 +992,18 @@ test("Sources tab disconnects cited Recovery sources without rotating the receip
     }),
   );
   await page.reload();
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Evidence" }).click();
+  await (await openOverflowDestination(page, "Evidence")).click();
   await page.getByText("Advanced").click();
   await expect(page.getByText("Pasted bill · Disconnected")).toBeVisible();
   await page.getByRole("button", { name: "Reconnect source" }).click();
   await expect.poll(() => reconnectCalls).toEqual(["POST"]);
 });
 
-/** Automation is the fifth destination, so the phone bar keeps it behind More. */
 async function openOverflowDestination(page: Page, label: string) {
   const nav = page.getByRole("navigation", { name: "Primary" });
-  await nav.getByRole("group").filter({ hasText: "More" }).first().click();
+  await expect(nav.getByRole("button", { name: "Bill review", exact: true })).toBeEnabled();
   const destination = nav.getByRole("button", { name: label });
+  if (!(await destination.isVisible())) await nav.getByLabel("Records", { exact: true }).click();
   await expect(destination).toBeVisible();
   return destination;
 }

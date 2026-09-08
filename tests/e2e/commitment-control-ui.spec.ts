@@ -495,6 +495,103 @@ test("record search, selection, browser Back and reload preserve the chosen comm
   await expect(page.getByRole("article", { name: "Anthropic" })).toBeVisible();
 });
 
+test("a newly saved proposal owns its URL through reload and browser Back", async ({ page }) => {
+  await signIn(page);
+  const originalId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const original = {
+    proposal: { ...proposal, id: originalId, merchant: "Synthetic original record" },
+    evaluation: { ...evaluation, proposalId: originalId },
+    decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [],
+  };
+  const created = { proposal, evaluation, decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [] };
+  let saved = false;
+  await mockWorkspace(page);
+  await page.route("**/api/workspaces/current/control/brief", route => route.fulfill({ json: {
+    data: { policy, proposals: saved ? [created, original] : [original], capabilities: ownerCapabilities }, meta,
+  } }));
+  await page.route("**/api/workspaces/current/control/proposals", route => {
+    saved = true;
+    return route.fulfill({ status: 201, json: { data: { proposal, evaluation }, meta } });
+  });
+  await page.goto(`/app?proposal=${originalId}`);
+  await expect(page.getByRole("article", { name: "Synthetic original record" })).toBeVisible();
+  await openComposer(page);
+  await fillProposal(page);
+  await page.getByRole("button", { name: "Evaluate proposal" }).click();
+  await expect(page.getByRole("article", { name: "Anthropic" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`proposal=${proposal.id}`));
+  await page.goBack();
+  await expect(page.getByRole("article", { name: "Synthetic original record" })).toBeVisible();
+  await page.goForward();
+  await page.reload();
+  await expect(page.getByRole("article", { name: "Anthropic" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`proposal=${proposal.id}`));
+});
+
+test("older receipts remain reachable after a page failure without choosing evidence automatically", async ({ page }) => {
+  await signIn(page);
+  const firstPage = Array.from({ length: 50 }, (_, index) => ({
+    ...evidence,
+    id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(index + 1).padStart(12, "0")}`,
+    excerpt: `Synthetic page-one receipt ${index + 1}`,
+  }));
+  let olderAttempts = 0;
+  const { controlRequests } = await mockWorkspace(page, { brief: {
+    policy, proposals: [{ proposal, evaluation, decision, reconciliations: [], outcomeObservations: [], exceptionReviews: [] }], capabilities: ownerCapabilities,
+  } });
+  await page.route(`**/api/workspaces/current/commitments/${commitment.id}?**`, route => {
+    const cursor = new URL(route.request().url()).searchParams.get("evidenceCursor");
+    if (cursor && ++olderAttempts === 1) return route.fulfill({ status: 503, json: {
+      error: { code: "UNKNOWN", message: "Synthetic older-page failure", retryable: true, requestId: "synthetic-page-failure" },
+    } });
+    return route.fulfill({ json: { data: { ...detail, evidence: {
+      items: cursor ? [evidence] : firstPage, total: 51, nextCursor: cursor ? null : "older-page",
+    } }, meta } });
+  });
+  await page.goto(`/app?proposal=${proposal.id}`);
+  await page.getByRole("article", { name: "Anthropic" }).getByRole("button", { name: "Link observed evidence" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Review this saved bill" }).click();
+  await expect(dialog.getByRole("radio")).toHaveCount(50);
+  await expect(dialog.locator("input[type=radio]:checked")).toHaveCount(0);
+  await dialog.getByRole("radio").first().check();
+  await dialog.getByRole("button", { name: "Load older receipts" }).click();
+  await dialog.getByText("Technical details", { exact: true }).click();
+  await expect(dialog.getByText("Synthetic older-page failure")).toBeVisible();
+  await expect(dialog.getByRole("radio").first()).toBeChecked();
+  await dialog.getByRole("button", { name: "Load older receipts" }).click();
+  await expect(dialog.getByRole("radio")).toHaveCount(51);
+  await expect(dialog.getByText("51 of 51 saved receipts")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Load older receipts" })).toHaveCount(0);
+  await expect(dialog.getByRole("radio").first()).toBeChecked();
+  await dialog.locator(`#control-evidence-choice-${evidence.id}`).check();
+  await dialog.getByRole("button", { name: "Link this receipt" }).click();
+  const linked = await waitForCall(controlRequests, call => call.method === "POST" && call.url.endsWith("/reconciliations"));
+  expect(JSON.parse(linked.body ?? "{}").evidenceId).toBe(evidence.id);
+});
+
+test("phone authorization identity and financial comparison precede exception actions", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn(page);
+  await mockWorkspace(page, { brief: {
+    policy, proposals: [{ proposal, evaluation, decision, reconciliations: [overCapReconciliation], outcomeObservations: [], exceptionReviews: [] }], capabilities: ownerCapabilities,
+  } });
+  await page.goto(`/app?proposal=${proposal.id}`);
+  const record = page.getByRole("article", { name: "Anthropic" });
+  await expect(record).toBeVisible();
+  const observed = record.locator(".ledger-rows").filter({ hasText: "Observed" }).first().locator("dd");
+  const action = page.getByRole("button", { name: "Record disposition", exact: true }).first();
+  await expect(action).toBeVisible();
+  const observedBox = await observed.boundingBox();
+  const actionBox = await action.boundingBox();
+  expect(observedBox).not.toBeNull();
+  expect(actionBox).not.toBeNull();
+  expect(observedBox!.y + observedBox!.height).toBeLessThan(actionBox!.y);
+  expect(observedBox!.y + observedBox!.height).toBeLessThan(756);
+  await page.screenshot({ path: testInfo.outputPath("phone-record-context.png"), fullPage: true });
+  await expectNoHorizontalOverflow(page);
+});
+
 test("the largest exact amount and a long counterparty remain readable at 320px", async ({ page }) => {
   await signIn(page);
   const amount = "9223372036854775807";
@@ -507,7 +604,7 @@ test("the largest exact amount and a long counterparty remain readable at 320px"
     outcomeObservations: [], exceptionReviews: [],
   }], capabilities: ownerCapabilities } });
   await page.setViewportSize({ width: 320, height: 800 });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
   const record = page.getByRole("article", { name: merchant });
   await expect(record).toBeVisible();
   await expectNoHorizontalOverflow(page);
@@ -535,7 +632,7 @@ test("a late receipt response cannot replace the currently selected bill", async
     data: { ...detail, evidence: { ...detail.evidence, items: [{ ...evidence, excerpt: "Synthetic receipt B" }] } }, meta,
   } }));
   try {
-    await page.goto("/app");
+    await page.goto("/app?view=CONTROL");
     await page.getByRole("article", { name: "Anthropic" }).getByRole("button", { name: "Link observed evidence" }).click();
     const dialog = page.getByRole("dialog", { name: "Link observed evidence" });
     await dialog.getByLabel("Saved bill to take the receipt from").selectOption(merchantTextMatchCommitment.id);
@@ -571,7 +668,7 @@ test("a closed reconciliation cannot publish its candidates into another proposa
     data: { proposalId: secondId, matchingPerformed: false, candidates: [candidate("Synthetic candidate B")] }, meta,
   } }));
   try {
-    await page.goto("/app");
+    await page.goto("/app?view=CONTROL");
     const browse = page.getByRole("button", { name: /Browse commitments/ });
     await expect(page.getByRole("article")).toHaveCount(1);
     if (await browse.isVisible()) await browse.click();
@@ -608,7 +705,7 @@ test("adding the first bill from reconciliation returns to the same authorizatio
       home: { ...home, workspace: { ...home.workspace, version: 5 } }, commitments: [commitment], commitmentTotal: 1,
     }, meta: { ...meta, workspaceVersion: 5 } } });
   });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
   const record = page.getByRole("article", { name: "Anthropic", exact: true });
   await record.getByRole("button", { name: "Link observed evidence" }).click();
   await expect(page.getByText("No bills have been saved in this workspace yet.")).toBeVisible();
@@ -628,7 +725,7 @@ test("adding the first bill from reconciliation returns to the same authorizatio
   await intake.getByLabel("Receipt or invoice text").fill(`Synthetic vendor invoice paid INR 100.00 on ${controlToday}.`);
   await intake.getByRole("button", { name: "Add a bill", exact: true }).click();
   await expect(page.locator("dialog[open]")).toHaveCount(0);
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Decisions", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { level: 2, name: "Decisions", exact: true })).toBeVisible();
   await expect(record.getByRole("heading", { name: "Anthropic", exact: true })).toBeFocused();
   await expect(record.getByText("INR 40,000", { exact: true })).toBeVisible();
   await record.getByRole("button", { name: "Link observed evidence" }).click();
@@ -651,7 +748,7 @@ async function fillProposal(page: Page) {
   await page.getByLabel("Purpose").fill("Claude API for the product loop");
   await page.getByLabel("Category").selectOption("AI_MODEL");
   await page.getByLabel("Cadence").selectOption("MONTHLY");
-  await page.getByLabel("Amount per charge").fill("45000.00");
+  await page.getByLabel("Amount per charge", { exact: true }).fill("45000.00");
   await page.getByLabel("Currency").selectOption("INR");
   await page.getByLabel("First charge date").fill(controlToday);
   await page.getByLabel("Metric").fill("Resolved support cases");
@@ -700,16 +797,20 @@ test("workspace navigation waits for startup and a late Control brief preserves 
   try {
     await page.goto("/app", { waitUntil: "domcontentloaded" });
     const navigation = page.getByRole("navigation", { name: "Primary" });
+    await navigation.getByLabel("Records", { exact: true }).click();
     const today = navigation.getByRole("button", { name: /^Today(?: \(\d+\))?$/ });
     await expect(today).toBeDisabled();
     const requestedBrief = page.waitForRequest("**/api/workspaces/current/control/brief");
     heldSnapshot.resolve();
     await requestedBrief;
+    await expect(navigation.getByRole("button", { name: "Bill review", exact: true })).toBeEnabled();
+    if (!(await today.isVisible())) await navigation.getByLabel("Records", { exact: true }).click();
     await today.click();
-    await expect(today).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { level: 2, name: "Today", exact: true })).toBeVisible();
+    const completedBrief = page.waitForResponse("**/api/workspaces/current/control/brief");
     heldBrief.resolve();
-    await expect(navigation.getByRole("button", { name: /Decisions/ })).toContainText("(1)");
-    await expect(today).toHaveAttribute("aria-current", "page");
+    await (await completedBrief).finished();
+    await expect(navigation.getByLabel("Records", { exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("heading", { level: 2, name: "Today", exact: true })).toBeVisible();
   } finally {
     heldSnapshot.resolve();
@@ -730,6 +831,9 @@ test("a workspace outside the private pilot keeps the Control destination and se
   // The product the public site sells stays in navigation. Only the live desk
   // is gated, and the gate is never bypassed.
   const nav = page.getByRole("navigation", { name: "Primary" });
+  await expect(nav.getByRole("button", { name: "Bill review", exact: true })).toBeEnabled();
+  await expect(page.getByRole("heading", { level: 2, name: "Bill review", exact: true })).toBeVisible();
+  await nav.getByLabel("Records", { exact: true }).click();
   await expect(nav.getByRole("button", { name: "Today" })).toBeVisible();
   await expect(nav.getByRole("button", { name: "Decisions" })).toBeVisible();
 
@@ -772,11 +876,11 @@ test("an enrolled owner runs proposal, evaluation, capped authorization, and an 
       },
     },
   });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
 
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Decisions" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { level: 2, name: "Decisions", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: composerHeading })).toBeInViewport();
-  await expect(page.getByText("Nothing needs a decision right now.")).toBeVisible();
+  await expect(page.getByText("No proposals are awaiting authorization.")).toBeVisible();
   await expect(page.getByRole("article")).toHaveCount(0);
 
   await fillProposal(page);
@@ -911,7 +1015,7 @@ test("an owner records a business outcome without attaching a receipt", async ({
       capabilities: ownerCapabilities,
     },
   });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
 
   await page.getByRole("button", { name: "Record outcome" }).click();
   const dialog = page.getByRole("dialog", { name: "Record the observed outcome" });
@@ -940,7 +1044,7 @@ test("a member may propose but never sees a decision or policy command", async (
       capabilities: memberCapabilities,
     },
   });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
 
   await expect(page.getByRole("heading", { name: composerHeading })).toBeVisible();
   await openComposer(page);
@@ -979,7 +1083,7 @@ test("all three policy statuses read as policy context, never as an authorizatio
       capabilities: ownerCapabilities,
     },
   });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
 
   const within = page.getByRole("article", { name: "Vercel" });
   const review = page.getByRole("article", { name: "Figma" });
@@ -1039,7 +1143,7 @@ test("all six observed verdicts render without false success or failure language
       capabilities: ownerCapabilities,
     },
   });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
 
   for (const label of [
     "Matched the frozen amount",
@@ -1069,7 +1173,7 @@ test("a stale workspace keeps the unsent entry and asks for a review before rese
       body: { error: { code: "STALE_STATE", message: "moved on", retryable: true, requestId: "request-stale", currentVersion: 9 } },
     },
   });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
   await expect(page.getByRole("heading", { name: composerHeading })).toBeVisible();
 
   await fillProposal(page);
@@ -1078,7 +1182,7 @@ test("a stale workspace keeps the unsent entry and asks for a review before rese
 
   await expect(page.getByText("Your entry was kept, not sent")).toBeVisible();
   await expect(page.getByLabel("Merchant or counterparty")).toHaveValue("Anthropic");
-  await expect(page.getByLabel("Amount per charge")).toHaveValue("45000.00");
+  await expect(page.getByLabel("Amount per charge", { exact: true })).toHaveValue("45000.00");
   // The desk reloads the brief once, and never silently resends the proposal.
   await expect.poll(() => controlRequests.filter((call) => call.url.endsWith("/control/brief")).length).toBe(briefReadsBeforeSubmit + 1);
   expect(controlRequests.filter((call) => call.method === "POST").length).toBe(1);
@@ -1093,7 +1197,7 @@ test("a replayed key with a different payload is reported, never rendered as sav
       body: { error: { code: "CONFLICT", message: "key reused", retryable: false, requestId: "request-conflict" } },
     },
   });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
 
   await fillProposal(page);
   await page.getByRole("button", { name: "Evaluate proposal" }).click();
@@ -1106,12 +1210,11 @@ test("a replayed key with a different payload is reported, never rendered as sav
 test("an in-flight brief, an empty ledger, a missing policy, and an offline device all stay honest", async ({ page, context }) => {
   await signIn(page);
   await mockWorkspace(page, { blockBrief: true });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
 
-  // While the brief is in flight the destination exists but stays quiet: Home is
-  // still the first screen, and nothing about the desk is claimed yet.
-  await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "Decisions" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Decisions", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary" }).getByLabel("Records", { exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("button", { name: "Evaluate proposal" })).toHaveCount(0);
   await expect(page.getByText("Live decisions unlock with pilot enrollment")).toHaveCount(0);
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
@@ -1137,7 +1240,7 @@ test("the composer and dialog are usable with a keyboard alone", async ({ page }
   await mockWorkspace(page, {
     brief: { policy, proposals: [{ proposal, evaluation, decision: null, reconciliations: [], outcomeObservations: [], exceptionReviews: [] }], capabilities: ownerCapabilities },
   });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
 
   // A populated desk keeps the composer collapsed so the queue is reached first,
   // so a keyboard user opens it before typing, exactly as the pointer user does.
@@ -1174,7 +1277,7 @@ test("Control honours reduced motion and fits a 390px viewport", async ({ page }
     },
   });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
 
   // Attention before creation: on a populated desk the queue owns the first
   // screen and the composer waits behind its own disclosure.
@@ -1233,7 +1336,7 @@ for (const viewport of [{ label: "1440x900", width: 1440, height: 900 }, { label
     await signIn(page);
     await mockWorkspace(page, { brief: capLineBrief });
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await page.goto("/app");
+    await page.goto("/app?view=CONTROL");
 
     const record = page.getByRole("article", { name: "Cursor Pro" });
     await expect(record).toBeVisible();
@@ -1289,7 +1392,7 @@ test("linking evidence appends an observation without changing the frozen cap", 
       },
     },
   });
-  await page.goto("/app");
+  await page.goto("/app?view=CONTROL");
 
   const record = page.getByRole("article", { name: "Cursor Pro" });
   const capRow = record.locator(".ledger .control-fact", { hasText: "Authorized cap" });

@@ -24,14 +24,16 @@ test("Journey 1 — a cold visitor reaches a frozen authorization and its outcom
   const sheet = page.locator(".sheet").first();
   await expect(sheet).toBeVisible();
   await expect(sheet).toContainText("INR 4,80,000");
+  await expect(sheet).toContainText("Assumption");
+  await expect(sheet).toContainText("Synthetic demonstration");
   await expect(page.locator(".afield")).toHaveCount(0);
   await expect(page.locator(".landing-signal-track")).toHaveCount(0);
   await expect(page.locator("#control-index")).toHaveCount(0);
   await expect(page.locator("main form")).toHaveCount(0);
 
-  const primary = page.getByRole("link", { name: "Review the synthetic request" }).first();
-  await expect(primary).toBeVisible();
-  await primary.click();
+  const authorizationExample = page.getByRole("link", { name: "Try a spending decision", exact: true });
+  await expect(authorizationExample).toBeVisible();
+  await authorizationExample.click();
   await expect(page).toHaveURL(/\/demo$/);
 
   // The demonstration says what it is, on the first frame and every frame after.

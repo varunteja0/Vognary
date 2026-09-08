@@ -178,6 +178,11 @@ export function ControlProposalComposer({
           />
         </ControlField>
 
+        <label className="control-disclosure flex items-start gap-3 py-3 text-sm">
+          <input type="checkbox" className="tick" checked={draft.grossPerCharge === true} disabled={pending} onChange={event => handlers.onChange({ grossPerCharge: event.target.checked })} />
+          This is the gross amount per charge, including tax, discounts and adjustments
+        </label>
+
         <details className="control-disclosure" open>
           <summary>Outcome this commitment must prove</summary>
           <div className="control-disclosure-body">

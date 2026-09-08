@@ -1435,6 +1435,97 @@ async function buildAccessExport(client: PoolClient, input: {
   const commitmentControl = commitmentControlResult.rows[0];
   if (!commitmentControl) throw new Error("Commitment Control privacy export query returned no row.");
   const workspaceInvites = await loadWorkspaceInvitesPrivacyExport(query, input.workspaceId);
+  const zohoBooks = { connections: [] as Array<Record<string, unknown>>, snapshots: [] as Array<Record<string, unknown>>, records: [] as Array<Record<string, unknown>>, reviews: [] as Array<Record<string, unknown>>, incidents: [] as Array<Record<string, unknown>>, dispositions: [] as Array<Record<string, unknown>>, grants: [] as Array<Record<string, unknown>> };
+  const providerBillInstalled = Boolean((await query<{ installed: string | null }>("select to_regclass('recovery_provider_bill_links')::text as installed")).rows[0]?.installed);
+  let providerBillLinks: Array<Record<string, unknown>> = [];
+  if (providerBillInstalled) {
+    providerBillLinks = (await query<{ record: Record<string, unknown> }>(`select (to_jsonb(link)-'source_fingerprint') || jsonb_build_object(
+      'sourceContentDigest',source_fingerprint,'source_sequence',source_sequence::text,'consent_generation',consent_generation::text,
+      'connection_revision',connection_revision::text,'total_minor',total_minor::text) as record
+      from recovery_provider_bill_links link where workspace_id=$1 order by selected_at,evidence_id limit $2`, [input.workspaceId, exportRowLimits.recoveryRecords + 1])).rows.map(row => row.record);
+    assertWithinExportLimit("recoveryRecords", providerBillLinks.length);
+    for (const [table, records] of [
+      ["commitment_control_proposals", commitmentControl.proposals], ["commitment_control_evaluations", commitmentControl.evaluations],
+      ["commitment_control_decisions", commitmentControl.decisions],
+    ] as const) {
+      const rows = await query<{ id: string; amountBasis: string | null }>(`select id,amount_basis as "amountBasis" from ${table} where workspace_id=$1 order by id limit $2`, [input.workspaceId, exportRowLimits.recoveryRecords + 1]);
+      assertWithinExportLimit("recoveryRecords", rows.rows.length);
+      const byId = new Map(rows.rows.map(row => [row.id, row.amountBasis]));
+      for (const record of records) record.amountBasis = byId.get(String(record.id)) ?? null;
+    }
+    const comparisons = (await query<{ id: string; comparisonKind: string | null; decisionAmountBasis: string | null; observedEvidenceBasis: string | null; relationBasis: string | null; retentionNotice: string | null }>(`select id,comparison_kind as "comparisonKind",decision_amount_basis as "decisionAmountBasis",
+      observed_evidence_basis as "observedEvidenceBasis",relation_basis as "relationBasis",retention_notice as "retentionNotice"
+      from commitment_control_reconciliations where workspace_id=$1 order by id limit $2`, [input.workspaceId, exportRowLimits.recoveryRecords + 1])).rows;
+    assertWithinExportLimit("recoveryRecords", comparisons.length);
+    const comparisonById = new Map(comparisons.map(row => [row.id, row]));
+    for (const record of commitmentControl.reconciliations) Object.assign(record, comparisonById.get(String(record.id)));
+    const bases = (await query<{ id: string; evidenceBasis: string | null }>(`select id,evidence_basis as "evidenceBasis" from recovery_evidence where workspace_id=$1 order by id limit $2`, [input.workspaceId, exportRowLimits.recoveryRecords + 1])).rows;
+    assertWithinExportLimit("recoveryRecords", bases.length);
+    const basisById = new Map(bases.map(row => [row.id, row.evidenceBasis]));
+    for (const record of recovery.evidence) record.evidenceBasis = basisById.get(String(record.id)) ?? null;
+  }
+  const zohoInstalled = await query<{ installed: string | null }>("select to_regclass('zoho_books_connections')::text as installed");
+  if (zohoInstalled.rows[0]?.installed) {
+    zohoBooks.connections = (await query(
+      `select id, organization_id as "organizationId", organization_name as "organizationName",
+              ${providerBillInstalled ? `active_grant_id as "activeGrantId",` : ""}
+              organization_currency as "organizationCurrency", authorized_by_user_id as "authorizedByUserId",
+              status, revision::text, coverage_start as "coverageStart", last_success_at as "lastSuccessfulSyncAt",
+              next_run_at as "nextScheduledAt", last_error_code as "failureCode", provider_revocation as "providerRevocation",
+              reviewed_through::text as "reviewedThrough", created_at as "createdAt", updated_at as "updatedAt"
+       from zoho_books_connections where workspace_id=$1`, [input.workspaceId],
+    )).rows;
+    zohoBooks.snapshots = (await query(
+      `select sequence::text, connection_id as "connectionId", bill_id as "billId", bill,
+              ${providerBillInstalled ? `grant_id as "grantId",organization_id as "organizationId",fingerprint as "sourceContentDigest",` : ""}
+              change_kind as "changeKind", observed_at as "observedAt"
+       from zoho_books_snapshots where workspace_id=$1 order by sequence limit $2`, [input.workspaceId, exportRowLimits.recoveryRecords + 1],
+    )).rows;
+    if (providerBillInstalled) {
+      zohoBooks.grants = (await query(`select id,workspace_id as "workspaceId",connection_id as "connectionId",consent_generation::text as "consentGeneration",
+        authorized_by_user_id as "authorizedByUserId",authorized_at as "authorizedAt",notice_version as "noticeVersion",scopes,region,authorized_organization_ids as "authorizedOrganizationIds"
+        from zoho_books_grants where workspace_id=$1 order by authorized_at,id limit $2`, [input.workspaceId, exportRowLimits.recoveryRecords + 1])).rows;
+      assertWithinExportLimit("recoveryRecords", zohoBooks.grants.length);
+    }
+    zohoBooks.records = (await query(
+      `select connection_id as "connectionId", bill_id as "billId", latest_sequence::text as "latestSequence",
+              provider_modified_at as "providerModifiedAt", deleted
+       from zoho_books_records where workspace_id=$1 order by bill_id limit $2`, [input.workspaceId, exportRowLimits.recoveryRecords + 1],
+    )).rows;
+    const exactReviewsInstalled = await query<{ installed: string | null }>("select to_regclass('zoho_books_reviews')::text as installed");
+    if (exactReviewsInstalled.rows[0]?.installed) {
+      zohoBooks.reviews = (await query(
+        `select connection_id as "connectionId", bill_id as "billId", sequence::text,
+                reviewed_by_user_id as "reviewedByUserId", reviewed_at as "reviewedAt"
+         from zoho_books_reviews where workspace_id=$1 order by sequence limit $2`, [input.workspaceId, exportRowLimits.recoveryRecords + 1],
+      )).rows;
+    }
+    assertWithinExportLimit("recoveryRecords", zohoBooks.snapshots.length);
+    assertWithinExportLimit("recoveryRecords", zohoBooks.records.length);
+    assertWithinExportLimit("recoveryRecords", zohoBooks.reviews.length);
+    const incidentsInstalled = await query<{ installed: string | null }>("select to_regclass('zoho_books_incidents')::text as installed");
+    if (incidentsInstalled.rows[0]?.installed) {
+      zohoBooks.incidents = (await query(
+        `select id,connection_id as "connectionId",failure_code as "failureCode",
+                assigned_operator_user_id as "assignedOperatorUserId",delivery_status as "deliveryStatus",
+                delivery_attempts as "deliveryAttempts",delivery_receipt as "deliveryReceipt",
+                created_at as "createdAt",delivered_at as "deliveredAt",resumed_by_user_id as "resumedByUserId",
+                resumed_at as "resumedAt",recovered_at as "recoveredAt"
+         from zoho_books_incidents where workspace_id=$1 order by created_at,id limit $2`, [input.workspaceId, exportRowLimits.recoveryRecords + 1],
+      )).rows;
+      assertWithinExportLimit("recoveryRecords", zohoBooks.incidents.length);
+    }
+    const dispositionsInstalled = await query<{ installed: string | null }>("select to_regclass('zoho_books_dispositions')::text as installed");
+    if (dispositionsInstalled.rows[0]?.installed) {
+      zohoBooks.dispositions = (await query(
+        `select id,event_sequence::text as "eventSequence",connection_id as "connectionId",bill_id as "billId",
+                source_sequence::text as "sourceSequence",version::text,actor_user_id as "actorUserId",kind,note,
+                follow_up_on::text as "followUpOn",responsible_user_id as "responsibleUserId",basis,created_at as "createdAt"
+         from zoho_books_dispositions where workspace_id=$1 order by event_sequence limit $2`, [input.workspaceId, exportRowLimits.recoveryRecords + 1],
+      )).rows;
+      assertWithinExportLimit("recoveryRecords", zohoBooks.dispositions.length);
+    }
+  }
   for (const records of [
     recovery.versions,
     recovery.submissions,
@@ -1501,6 +1592,42 @@ async function buildAccessExport(client: PoolClient, input: {
   assertWithinExportLimit("savingReceipts", savingReceiptResult.rows.length);
   assertWithinExportLimit("successFeeInvoices", successFeeInvoiceResult.rows.length);
   assertWithinExportLimit("auditHistory", auditResult.rows.length);
+
+  const recoveryExport = {
+    workspaceState: recovery.workspace_state,
+    versions: recovery.versions,
+    submissions: recovery.submissions,
+    sources: recovery.sources,
+    commitments: recovery.commitments,
+    evidence: recovery.evidence,
+    providerBillLinks,
+    commitmentEvidence: recovery.commitment_evidence,
+    corrections: recovery.corrections,
+    decisions: recovery.decisions,
+    commitmentContext: recovery.commitment_context,
+    decisionCycles: recovery.decision_cycles,
+    changes: recovery.changes,
+    inboundAliases: recovery.inbound_aliases,
+    inboundEvents: recovery.inbound_events,
+    inboundSenderAssessments: recovery.inbound_sender_assessments,
+    standingMandates: recovery.standing_mandates,
+    actionCandidates: recovery.action_candidates,
+    coveredWindows: recovery.covered_windows,
+    feeLedger: recovery.fee_ledger,
+    billingYearAnchors: recovery.billing_year_anchors,
+    mandateEvents: recovery.mandate_events,
+    classificationSnapshots: recovery.classification_snapshots,
+    candidateEvents: recovery.candidate_events,
+    vetoNotices: recovery.veto_notices,
+    executionAttempts: recovery.execution_attempts,
+    executions: recovery.executions,
+    operatorActions: recovery.operator_actions,
+    noticeDeliveryEvents: recovery.notice_delivery_events,
+    deadLetters: recovery.dead_letters,
+    providerControls: recovery.provider_controls,
+    connectedMandateCohort: recovery.connected_mandate_cohort,
+    sourceDisconnections: recovery.source_disconnections,
+  } satisfies NonNullable<Parameters<typeof buildPrivacyExportDocument>[0]["recovery"]> & { providerBillLinks: Array<Record<string, unknown>> };
 
   return buildPrivacyExportDocument({
     requestId: input.requestId,
@@ -1604,40 +1731,7 @@ async function buildAccessExport(client: PoolClient, input: {
       createdAt: row.created_at.toISOString(),
     })),
     workspaceState: mapWorkspaceState(workspaceStateResult.rows[0], input.workspaceId),
-    recovery: {
-      workspaceState: recovery.workspace_state,
-      versions: recovery.versions,
-      submissions: recovery.submissions,
-      sources: recovery.sources,
-      commitments: recovery.commitments,
-      evidence: recovery.evidence,
-      commitmentEvidence: recovery.commitment_evidence,
-      corrections: recovery.corrections,
-      decisions: recovery.decisions,
-      commitmentContext: recovery.commitment_context,
-      decisionCycles: recovery.decision_cycles,
-      changes: recovery.changes,
-      inboundAliases: recovery.inbound_aliases,
-      inboundEvents: recovery.inbound_events,
-      inboundSenderAssessments: recovery.inbound_sender_assessments,
-      standingMandates: recovery.standing_mandates,
-      actionCandidates: recovery.action_candidates,
-      coveredWindows: recovery.covered_windows,
-      feeLedger: recovery.fee_ledger,
-      billingYearAnchors: recovery.billing_year_anchors,
-      mandateEvents: recovery.mandate_events,
-      classificationSnapshots: recovery.classification_snapshots,
-      candidateEvents: recovery.candidate_events,
-      vetoNotices: recovery.veto_notices,
-      executionAttempts: recovery.execution_attempts,
-      executions: recovery.executions,
-      operatorActions: recovery.operator_actions,
-      noticeDeliveryEvents: recovery.notice_delivery_events,
-      deadLetters: recovery.dead_letters,
-      providerControls: recovery.provider_controls,
-      connectedMandateCohort: recovery.connected_mandate_cohort,
-      sourceDisconnections: recovery.source_disconnections,
-    },
+    recovery: recoveryExport,
     commitmentControl: {
       policies: commitmentControl.policies,
       proposals: commitmentControl.proposals,
@@ -1650,6 +1744,7 @@ async function buildAccessExport(client: PoolClient, input: {
       attentionNotifications: commitmentControl.attention_notifications,
       workspaceInvites,
     },
+    zohoBooks,
     productEvents: productEventResult.rows.map((row) => ({
       id: row.id,
       userId: row.user_id,

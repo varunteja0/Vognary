@@ -105,13 +105,18 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
   // Save one immutable decision on Now for the first recurring commitment.
   await page.getByRole("button", { name: "Decide on Now" }).click();
   const reviewChoice = page.getByRole("group", { name: "Your choice" }).getByRole("button", { name: "Review later", exact: true });
+  const canReviewAfterToday = !await page.getByRole("heading", { name: /OpenAI charges.*Charges today/ }).isVisible();
   await reviewChoice.click();
   await page.getByRole("button", { name: "Tomorrow" }).click();
   await expect(page.getByRole("status")).toContainText("Saved. OpenAI is now Review later.");
-  // The decision is remembered for this cycle, so Home stops asking for it.
-  await expect(page.getByRole("heading", { name: "Your decisions are saved" })).toBeVisible();
+  if (canReviewAfterToday) {
+    await expect(page.getByRole("heading", { name: "Your decisions are saved" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Decide now" })).toHaveCount(0);
+  } else {
+    await expect(page.getByText(/It remains in today's decisions/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Decide now" })).toBeVisible();
+  }
   await expect(page.getByRole("heading", { name: "OpenAI — review later" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Decide now" })).toHaveCount(0);
   await openCommitment(page, "OpenAI");
 
   // 16-20. Correct every contract field through the modal UI.
@@ -143,7 +148,9 @@ test("Customer #0 completes the Recovery and fail-closed mandate journey in the 
 
   // 21. Reverse the amount correction so later evidence can produce a real comparison.
   const amountHistory = page.locator("li").filter({ hasText: "Amount" }).filter({ hasText: "₹1,750.00" });
+  const reversal = page.waitForResponse(response => response.request().method() === "DELETE" && new URL(response.url()).pathname.includes("/corrections/"));
   await amountHistory.getByRole("button", { name: "Reverse this correction" }).click();
+  expect((await reversal).status()).toBe(200);
   await expect(amountHistory.getByText("Reversed", { exact: true })).toBeVisible();
 
   // The cycle decision is frozen; detail shows it without offering a rewrite.
@@ -218,7 +225,9 @@ async function resetCustomerZeroThroughUi(page: Page) {
   await page.context().clearCookies();
   await page.goto("/login?next=/app");
   await loginAsDevelopmentUser(page);
+  const profile = page.waitForResponse(response => response.request().method() === "GET" && new URL(response.url()).pathname === "/api/profile");
   await page.goto("/profile#delete-account");
+  expect((await profile).status()).toBe(200);
   await page.getByText("Danger Zone", { exact: true }).click();
   const confirmation = page.getByLabel(/Type DELETE MY VOGNARY DATA to confirm/);
   await expect(confirmation).toBeVisible();
@@ -253,7 +262,10 @@ async function loginAsDevelopmentUser(page: Page) {
 }
 
 async function selectRecoveryView(page: Page, name: "Today" | "Bills" | "Evidence" | "Automation") {
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name }).click();
+  const navigation = page.getByRole("navigation", { name: "Primary" });
+  const target = navigation.getByRole("button", { name, exact: true });
+  if (!(await target.isVisible())) await navigation.getByLabel("Records", { exact: true }).click();
+  await target.click();
 }
 
 async function openAddBills(page: Page) {

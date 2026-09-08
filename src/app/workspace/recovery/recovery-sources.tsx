@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useState, type ReactNode } from "react";
 import type { ReceiptInboxStatusDto, RecoveryEvidenceSourceDto } from "@/lib/recovery/contracts";
 import { customerInboxStatus, customerInboxStatusLabel, customerPhrases, gmailWizardStep, inboxFailureCopy, type CustomerInboxStatus } from "./present";
@@ -9,7 +10,13 @@ import { AuthRequiredBlock, LoadingBlock, StateBlock } from "./recovery-states";
 import type { LoadState, PendingMutation } from "./state";
 import { formatMoment, sourceLabels } from "./labels";
 
-export function RecoverySources({
+const ZohoBooksPanel = dynamic(() => import("./zoho-books-panel"), { loading: () => <LoadingBlock label="Opening billing sources..." /> });
+
+export function RecoverySources(props: Parameters<typeof ReceiptSources>[0] & { workspaceId: string }) {
+  return <div className="grid w-full max-w-2xl gap-6"><ZohoBooksPanel workspaceId={props.workspaceId} /><ReceiptSources {...props} /></div>;
+}
+
+function ReceiptSources({
   receiptInboxPubliclyAvailable,
   receiptInbox,
   sourceStatus,
@@ -62,7 +69,7 @@ export function RecoverySources({
         <div className="stack-page">
           <StayUpToDateHeading />
           <p className="text-sm leading-6 text-(--muted)">
-            Automatic forwarding is not available yet. Add a bill manually. {customerPhrases.trustOnce}{" "}
+            The optional receipt inbox is not available yet. Manual evidence remains available for other sources. {customerPhrases.trustOnce}{" "}
             <Link href="/security" className="link-quiet">See how your data is handled</Link>
           </p>
           <ManualAdd onAddBills={onAddBills} />

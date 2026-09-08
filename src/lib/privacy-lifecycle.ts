@@ -125,6 +125,11 @@ export type PrivacyExportDocument = {
     attentionNotifications: Array<Record<string, unknown>>;
     workspaceInvites: Array<Record<string, unknown>>;
   };
+  zohoBooks?: {
+    connections: Array<Record<string, unknown>>;
+    snapshots: Array<Record<string, unknown>>;
+    records: Array<Record<string, unknown>>;
+  };
   productEvents: Array<Record<string, unknown>>;
   renewalAlertPreferences: Array<Record<string, unknown>>;
   renewalAlertDeliveries: Array<Record<string, unknown>>;

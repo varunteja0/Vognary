@@ -37,6 +37,14 @@ export const requiredAutopilotIntegrityMigrations = [
   "0067_control_follow_through",
   "0068_control_attention_target_identity",
   "0069_control_projection_empty_windows",
+  "0070_zoho_books_observations",
+  "0071_zoho_books_watermark_guards",
+  "0072_zoho_books_exact_reviews",
+  "0073_zoho_books_recovery_incidents",
+  "0074_zoho_books_incident_generations",
+  "0075_zoho_books_dispositions",
+  "0076_control_provider_bills",
+  "0077_control_provider_bill_admission_guards",
 ];
 export const pre0057IntegrityMigrations = requiredAutopilotIntegrityMigrations.filter(
   (migration) =>
@@ -52,9 +60,22 @@ export const pre0057IntegrityMigrations = requiredAutopilotIntegrityMigrations.f
     && migration !== "0066_control_attention_provider_events"
     && migration !== "0067_control_follow_through"
     && migration !== "0068_control_attention_target_identity"
-    && migration !== "0069_control_projection_empty_windows",
+    && migration !== "0069_control_projection_empty_windows"
+    && migration !== "0070_zoho_books_observations"
+    && migration !== "0071_zoho_books_watermark_guards"
+    && migration !== "0072_zoho_books_exact_reviews"
+    && migration !== "0073_zoho_books_recovery_incidents"
+    && migration !== "0074_zoho_books_incident_generations"
+    && migration !== "0075_zoho_books_dispositions"
+    && migration !== "0076_control_provider_bills"
+    && migration !== "0077_control_provider_bill_admission_guards",
 );
 export const requiredAutopilotIntegrityTriggers = [
+  "control_evaluation_amount_basis",
+  "control_decision_amount_basis",
+  "control_gross_approval_cap",
+  "control_provider_comparison_admission",
+  "control_provider_comparison_valid",
   "commitment_control_decisions_immutable",
   "commitment_control_evaluation_evidence_immutable",
   "commitment_control_evaluations_immutable",
@@ -80,9 +101,23 @@ export const requiredAutopilotIntegrityTriggers = [
   "recovery_operator_actions_immutable",
   "recovery_standing_mandate_events_immutable",
   "recovery_standing_mandates_immutable",
-];
+  "zoho_books_disposition_immutable",
+  "zoho_books_review_immutable",
+  "zoho_books_snapshot_immutable",
+  "zoho_books_grant_valid",
+  "zoho_books_grant_immutable",
+  "zoho_books_source_identity",
+  "zoho_books_snapshot_grant_valid",
+  "recovery_provider_bill_link_valid",
+  "recovery_provider_bill_authority",
+  "recovery_provider_bill_link_immutable",
+  "recovery_provider_bill_lineage_required",
+  "recovery_provider_bill_no_commitment",
+  "recovery_provider_bill_no_evaluation",
+].sort();
 export const pre0057IntegrityTriggers = requiredAutopilotIntegrityTriggers.filter(
-  (trigger) => !trigger.startsWith("commitment_control_"),
+  (trigger) => !trigger.startsWith("commitment_control_") && !trigger.startsWith("zoho_books_")
+    && !trigger.startsWith("control_") && !trigger.startsWith("recovery_provider_bill_"),
 );
 
 export const requiredAutopilotAuditCountKeys = [
@@ -104,8 +139,10 @@ export const requiredCommitmentControlCountKeys = [
   "commitment_control_outcome_observations",
   "commitment_control_exception_reviews",
 ];
+export const requiredProviderBillCountKeys = ["recovery_provider_bill_links"];
 
 export const backupVerificationProfiles = ["pre-0053", "pre-0057", "current"];
+export const requiredZohoBooksCountKeys = ["zoho_books_connections", "zoho_books_snapshots", "zoho_books_records", "zoho_books_reviews", "zoho_books_incidents", "zoho_books_dispositions", "zoho_books_grants"];
 
 export function normalizeBackupVerificationProfile(value) {
   const profile = value?.trim() || "current";
@@ -171,6 +208,8 @@ export function requiredRecoveryTablesForProfile(value) {
     "commitment_control_reconciliations",
     "commitment_control_outcome_observations",
     "commitment_control_exception_reviews",
+    "recovery_provider_bill_links",
+    ...requiredZohoBooksCountKeys,
   ];
 }
 
@@ -196,7 +235,7 @@ function verificationProfile(value) {
   }
   return {
     profile,
-    migrationHead: "0069_control_projection_empty_windows",
+    migrationHead: "0077_control_provider_bill_admission_guards",
     requiredMigrations: [requiredRecoveryMigration, ...requiredAutopilotIntegrityMigrations],
     integrityMigrations: requiredAutopilotIntegrityMigrations,
     requiredTriggers: requiredAutopilotIntegrityTriggers,
@@ -313,7 +352,15 @@ const pre0057CountQuery =
       (select count(*)::text from commitment_control_decisions) as commitment_control_decisions,
       (select count(*)::text from commitment_control_reconciliations) as commitment_control_reconciliations,
       (select count(*)::text from commitment_control_outcome_observations) as commitment_control_outcome_observations,
-      (select count(*)::text from commitment_control_exception_reviews) as commitment_control_exception_reviews`;
+      (select count(*)::text from commitment_control_exception_reviews) as commitment_control_exception_reviews,
+      (select count(*)::text from zoho_books_connections) as zoho_books_connections,
+      (select count(*)::text from zoho_books_snapshots) as zoho_books_snapshots,
+      (select count(*)::text from zoho_books_records) as zoho_books_records,
+      (select count(*)::text from zoho_books_reviews) as zoho_books_reviews,
+      (select count(*)::text from zoho_books_incidents) as zoho_books_incidents,
+      (select count(*)::text from zoho_books_dispositions) as zoho_books_dispositions,
+      (select count(*)::text from zoho_books_grants) as zoho_books_grants,
+      (select count(*)::text from recovery_provider_bill_links) as recovery_provider_bill_links`;
 
 export function recoveryBackupVerificationMatches(expected, actual) {
   if (!expected || expected.requiredMigration !== requiredRecoveryMigration) return false;
@@ -338,7 +385,7 @@ export function recoveryBackupVerificationMatches(expected, actual) {
     }
   }
   if (profile.profile === "current") {
-    for (const key of requiredCommitmentControlCountKeys) {
+    for (const key of [...requiredCommitmentControlCountKeys, ...requiredZohoBooksCountKeys, ...requiredProviderBillCountKeys]) {
       if (!(key in expectedCounts) || !(key in actualCounts)) return false;
     }
   }

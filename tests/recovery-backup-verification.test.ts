@@ -9,24 +9,68 @@ import {
   recoveryBackupVerificationMatches,
   requiredAutopilotAuditCountKeys,
   requiredCommitmentControlCountKeys,
+  requiredZohoBooksCountKeys,
+  requiredProviderBillCountKeys,
   requiredAutopilotIntegrityMigrations,
   requiredAutopilotIntegrityTriggers,
   requiredRecoveryMigration,
+  requiredRecoveryTablesForProfile,
 } from "../scripts/lib/recovery-backup-verification.mjs";
 
 function verification(auditFacts: Record<string, string> = {}) {
   return {
     profile: "current",
-    migrationHead: "0069_control_projection_empty_windows",
+    migrationHead: "0077_control_provider_bill_admission_guards",
     requiredMigration: requiredRecoveryMigration,
     requiredIntegrityMigrations: [...requiredAutopilotIntegrityMigrations],
     integrityTriggers: [...requiredAutopilotIntegrityTriggers],
     recoveryWorkspaceCounts: Object.fromEntries(
-      [...requiredAutopilotAuditCountKeys, ...requiredCommitmentControlCountKeys]
+      [...requiredAutopilotAuditCountKeys, ...requiredCommitmentControlCountKeys, ...requiredZohoBooksCountKeys, ...requiredProviderBillCountKeys]
         .map((key) => [key, auditFacts[key] ?? "0"]),
     ),
   };
 }
+
+test("source resolution backup requires exact reviews, incidents and immutable dispositions", () => {
+  for (const table of ["zoho_books_reviews", "zoho_books_incidents", "zoho_books_dispositions"]) assert.ok(requiredZohoBooksCountKeys.includes(table));
+  assert.ok(requiredAutopilotIntegrityMigrations.includes("0075_zoho_books_dispositions"));
+  assert.ok(requiredAutopilotIntegrityTriggers.includes("zoho_books_disposition_immutable"));
+});
+
+test("A2 backup inventory includes detached admissions and original grants without changing historical profiles", () => {
+  assert.ok(requiredAutopilotIntegrityMigrations.includes("0076_control_provider_bills"));
+  for (const table of ["zoho_books_grants", "recovery_provider_bill_links"]) {
+    assert.ok(requiredRecoveryTablesForProfile("current").includes(table));
+    assert.equal(requiredRecoveryTablesForProfile("pre-0057").includes(table), false);
+    assert.equal(requiredRecoveryTablesForProfile("pre-0053").includes(table), false);
+  }
+  for (const trigger of ["zoho_books_grant_immutable", "zoho_books_snapshot_grant_valid", "recovery_provider_bill_link_valid",
+    "recovery_provider_bill_link_immutable", "recovery_provider_bill_lineage_required", "control_provider_comparison_valid",
+    "recovery_provider_bill_no_commitment", "recovery_provider_bill_no_evaluation", "control_decision_amount_basis"]) {
+    assert.ok(requiredAutopilotIntegrityTriggers.includes(trigger), trigger);
+    assert.equal(pre0057IntegrityTriggers.includes(trigger), false, trigger);
+  }
+});
+
+test("0077 backup integrity requires gross-cap, source-authority and comparison-admission guards", () => {
+  const migration = "0077_control_provider_bill_admission_guards";
+  const guards = ["control_gross_approval_cap", "recovery_provider_bill_authority", "control_provider_comparison_admission"];
+  assert.ok(requiredAutopilotIntegrityMigrations.includes(migration));
+  assert.equal(pre0057IntegrityMigrations.includes(migration), false);
+  const complete = verification();
+  assert.equal(recoveryBackupVerificationMatches(complete, complete), true);
+  for (const guard of guards) {
+    assert.ok(requiredAutopilotIntegrityTriggers.includes(guard), guard);
+    assert.equal(pre0057IntegrityTriggers.includes(guard), false, guard);
+    const missing = { ...complete, integrityTriggers: complete.integrityTriggers.filter(trigger => trigger !== guard) };
+    assert.equal(recoveryBackupVerificationMatches(complete, missing), false, guard);
+    assert.equal(recoveryBackupVerificationMatches(missing, missing), false, guard);
+  }
+  const prior = { ...complete, migrationHead: "0076_control_provider_bills",
+    requiredIntegrityMigrations: complete.requiredIntegrityMigrations.filter(value => value !== migration),
+    integrityTriggers: complete.integrityTriggers.filter(value => !guards.includes(value)) };
+  assert.equal(recoveryBackupVerificationMatches(prior, prior), false);
+});
 
 function pre0053Verification(counts: Record<string, string> = {}) {
   return {
@@ -106,6 +150,9 @@ test("backup verification rejects missing or mismatched required audit counts", 
   const missingControl = verification({ candidate_events: "2" });
   delete missingControl.recoveryWorkspaceCounts.commitment_control_decisions;
   assert.equal(recoveryBackupVerificationMatches(expected, missingControl), false);
+  const missingBooks = verification();
+  delete missingBooks.recoveryWorkspaceCounts.zoho_books_snapshots;
+  assert.equal(recoveryBackupVerificationMatches(verification(), missingBooks), false);
 });
 
 test("backup verification rejects missing integrity migrations or triggers", () => {

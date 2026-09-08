@@ -18,20 +18,19 @@ test("the public page is a cacheable readiness-neutral shell", () => {
   assert.doesNotMatch(pageSource, /force-dynamic|isReceiptInboxPubliclyAvailable/);
 });
 
-test("the landing leads with the decision and keeps the guest evidence path second", () => {
-  // One primary command to the demonstration, one quiet secondary to the
-  // visitor's own evidence. The rejected hero form is gone for good.
+test("the landing leads with the approved Control example and preserves separate bill evaluation", () => {
   assert.match(landingSource, /href="\/demo" className="btn btn-primary"/);
   assert.match(landingSource, /href="\/start" className="home-quiet"/);
+  assert.match(landingSource, /href="\/demo" className="home-quiet"/);
   assert.match(landingSource, /href="\/pay" prefetch=\{false\}/);
   assert.doesNotMatch(landingSource, /LandingDecisionPreview|LandingSignalRail|control-index/);
   assert.doesNotMatch(landingSource, /<form|<input|<textarea/);
-  // The product is above the promise-copy, not an abstract diagram: the first
-  // band renders the canonical record itself.
-  assert.match(landingSource, /<RequestSheet/);
+  assert.match(landingSource, /Synthetic spending request awaiting a human decision/);
+  assert.match(landingSource, /explicitly selected Books bill/);
+  assert.match(landingSource, /a closed bill review alone does not create that comparison/);
   assert.ok(
     landingSource.indexOf("<RequestSheet") < landingSource.indexOf("home-freeze"),
-    "the live request appears in the first band, before the explanatory band",
+    "the synthetic request appears before its later authorization outcome",
   );
   // The rejected visual era does not come back through a side door.
   assert.doesNotMatch(publicFront, /AuthorityField|authority-field|home-field-narrative/);
@@ -71,7 +70,8 @@ test("the landing states concise evidence and action boundaries without unsuppor
 
 test("the app route is signed-only and strips retired guest query modes", () => {
   assert.match(appPageSource, /Object\.hasOwn\(params, "demo"\).*Object\.hasOwn\(params, "guest"\)/);
-  assert.match(appPageSource, /if \(!session\) redirect\("\/login\?next=\/app"\)/);
+  assert.match(appPageSource, /if \(!session\) redirect\(`\/login\?next=\$\{encodeURIComponent\(buildCanonicalAppUrl\(params \?\? \{\}\)\)\}`\)/);
+  assert.match(appPageSource, /key === "demo" \|\| key === "guest"/);
   assert.doesNotMatch(experienceSource, /GuestAuditClient|gmailConnect/);
 });
 

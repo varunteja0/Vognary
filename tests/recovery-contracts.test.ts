@@ -275,7 +275,7 @@ const allChangeVariants = [
 test("Recovery v1 freezes every product enum exhaustively", () => {
   assert.deepEqual(decisions, ["KEEP", "MONITOR", "DOWNGRADE", "CANCEL", "INVESTIGATE"]);
   assert.deepEqual(cadences, ["WEEKLY", "BIWEEKLY", "SEMIMONTHLY", "MONTHLY", "BIMONTHLY", "QUARTERLY", "YEARLY", "IRREGULAR"]);
-  assert.deepEqual(sourceTypes, ["RECEIPT_PASTE", "CSV_IMPORT", "FORWARDED_EMAIL", "GMAIL_OAUTH"]);
+  assert.deepEqual(sourceTypes, ["RECEIPT_PASTE", "CSV_IMPORT", "FORWARDED_EMAIL", "GMAIL_OAUTH", "ZOHO_BOOKS"]);
   assert.deepEqual(commitmentStatuses, ["ACTIVE", "NOT_RECURRING"]);
   assert.deepEqual(confidenceStates, ["HIGH", "MEDIUM", "LOW", "UNKNOWN"]);
   assert.deepEqual(correctionFields, ["MERCHANT", "AMOUNT", "NEXT_EXPECTED_DATE", "CADENCE", "IS_RECURRING"]);

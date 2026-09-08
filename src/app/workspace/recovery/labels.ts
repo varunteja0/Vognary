@@ -139,6 +139,7 @@ export const sourceLabels: Record<SourceType, string> = {
   CSV_IMPORT: "Uploaded file",
   FORWARDED_EMAIL: "Forwarded email",
   GMAIL_OAUTH: "Gmail (not yet proven)",
+  ZOHO_BOOKS: "Zoho Books bill",
 };
 
 export const commitmentStatusLabels: Record<CommitmentStatus, string> = {

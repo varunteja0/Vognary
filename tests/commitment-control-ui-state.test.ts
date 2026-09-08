@@ -13,6 +13,7 @@ import type {
 } from "../src/lib/commitment-control/contracts";
 import {
   controlDecisionRequest,
+  controlAttentionForDisplay,
   controlExceptionReviewRequest,
   controlOutcomeObservationRequest,
   controlPolicyRequest,
@@ -29,6 +30,8 @@ import {
 import { formatControlMoney, parseControlAmount } from "../src/app/workspace/recovery/control/control-format";
 import type { TransportFailure } from "../src/app/workspace/recovery/transport";
 import { completeControlCategoryRules } from "./commitment-control-policy-fixture";
+import { a2Attempt, a2CandidatePage, a2ComparisonResponse, a2Ids } from "./e2e/fixtures/a2-provider-bill";
+import { providerBillRequest, restoreProviderBillAttempt, supportsProviderBill } from "../src/app/workspace/recovery/control/control-provider-bill-state";
 
 const meta = { requestId: "request-1", workspaceVersion: 7 };
 
@@ -245,6 +248,53 @@ test("an unchanged retry keeps one idempotency key and a changed body takes a ne
   assert.equal(resolveIdempotencyKey(store, "PROPOSAL", "a", newKey), "key-original");
   assert.equal(resolveIdempotencyKey(store, "PROPOSAL", "b", newKey), "key-1");
   assert.equal(resolveIdempotencyKey({}, "DECISION", "a", newKey), "key-2");
+});
+
+test("gross per-charge bill basis is sent only after explicit proposal opt-in", () => {
+  const compatible = controlProposalRequest({ ...draft, grossPerCharge: true });
+  assert.equal(compatible.ok, true);
+  if (compatible.ok) assert.equal(compatible.request.amountBasis, "GROSS_BILLED_TOTAL_PER_CHARGE");
+
+  for (const legacyDraft of [draft, { ...draft, grossPerCharge: false }]) {
+    const legacy = controlProposalRequest(legacyDraft);
+    assert.equal(legacy.ok, true);
+    if (legacy.ok) assert.equal(Object.hasOwn(legacy.request, "amountBasis"), false);
+  }
+});
+
+test("A2 requires two explicit acknowledgements and restores only the original identity-bound attempt", () => {
+  const candidate = a2CandidatePage.candidates[0];
+  assert.equal(providerBillRequest(candidate, false, true), null);
+  assert.equal(providerBillRequest(candidate, true, false), null);
+  assert.equal(providerBillRequest({ ...candidate, canSelect: false }, true, true), null);
+  assert.deepEqual(providerBillRequest(candidate, true, true), a2Attempt.request);
+  const identity = { workspaceId: a2Ids.workspace, actorId: a2Ids.actor, proposalId: a2Ids.proposal, decisionId: a2Ids.decision };
+  assert.deepEqual(restoreProviderBillAttempt(JSON.stringify(a2Attempt), identity), a2Attempt);
+  for (const key of Object.keys(identity)) assert.equal(restoreProviderBillAttempt(JSON.stringify(a2Attempt), { ...identity, [key]: proposal.id }), null);
+  assert.equal(restoreProviderBillAttempt(JSON.stringify({ ...a2Attempt, request: { ...a2Attempt.request, sourceSequence: "136" } }), identity), null);
+  assert.equal(restoreProviderBillAttempt(JSON.stringify({ ...a2Attempt, request: { ...a2Attempt.request, totalMinor: "1" } }), identity), null);
+  assert.equal(supportsProviderBill(proposal, decision), false);
+  assert.equal(supportsProviderBill(a2ComparisonResponse.proposal, a2ComparisonResponse.decision), true);
+});
+
+test("A2 result is appended once with a billed comparison announcement and no changed cap", () => {
+  const entry = { proposal: a2ComparisonResponse.proposal, evaluation: null, decision: a2ComparisonResponse.decision, reconciliations: [a2ComparisonResponse.reconciliation], outcomeObservations: [], exceptionReviews: [] };
+  const saved = controlReducer(ready({ brief: { ...brief, proposals: [entry] } }), { type: "RECONCILIATION_SAVED", reconciliation: a2ComparisonResponse.reconciliation, meta });
+  assert.equal(saved.brief?.proposals[0].reconciliations.length, 1);
+  assert.equal(saved.brief?.proposals[0].decision?.approvedCapMinor, "12345");
+  assert.match(saved.announcement, /Saved billed comparison/);
+});
+
+test("A2 attention describes bills while receipt attention keeps its original meaning", () => {
+  const billed = { ...a2ComparisonResponse.reconciliation, verdict: "OVER_CAP" as const };
+  const entries = [
+    { proposal: a2ComparisonResponse.proposal, evaluation: null, decision: a2ComparisonResponse.decision, reconciliations: [billed], outcomeObservations: [], exceptionReviews: [] },
+    { proposal, evaluation, decision, reconciliations: [reconciliation], outcomeObservations: [], exceptionReviews: [] },
+  ];
+  const items = controlAttentionForDisplay(entries, { today: "2026-09-07" });
+  assert.equal(items.find(item => item.targetId === billed.id)?.headline, "Billed comparison needs review");
+  assert.match(items.find(item => item.targetId === billed.id)?.body ?? "", /bill total/i);
+  assert.match(items.find(item => item.targetId === reconciliation.id)?.body ?? "", /observed cost/i);
 });
 
 test("a 503 FEATURE_UNAVAILABLE brief hides the desk for the session without a retryable failure", () => {

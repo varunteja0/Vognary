@@ -568,7 +568,11 @@ test("persisted private-pilot loop reaches cited picture, mandate, delivered vet
     assert.equal(fee.verifiedSavingMinor, BigInt(0));
     assert.equal(fee.retainedMinor, BigInt(0));
 
-    const home = await getRecoveryHome({ workspaceId, actorUserId: ownerUserId });
+    const home = await getRecoveryHome({
+      workspaceId,
+      actorUserId: ownerUserId,
+      generatedAt: new Date("2026-08-26T01:00:00.000Z"),
+    });
     assert.equal(home.autopilot?.mandate?.status, "ACTIVE");
     assert.ok(home.monthlyTotals.length >= 1);
     assert.ok(home.next.length >= 1);

@@ -4,6 +4,10 @@ import { canonicalProvenProviderIds } from "@/lib/recovery/provider-registry";
 
 export const standingMandateConsentPurpose = "standing-mandate-autopilot";
 
+export const legacyRecoveryEvidenceSourceSql = `
+source.source_type in ('RECEIPT_PASTE','CSV_IMPORT','FORWARDED_EMAIL','GMAIL_OAUTH')
+and evidence.evidence_kind in ('TRANSACTION','RECEIPT')`;
+
 export const currentSourceNotDisconnectedSql = `
 not exists (
   select 1 from recovery_source_disconnections disconnected
@@ -19,6 +23,7 @@ exists (
   join recovery_evidence evidence
     on evidence.workspace_id = source.workspace_id and evidence.source_id = source.id
   where source.workspace_id = mandate.workspace_id
+    and ${legacyRecoveryEvidenceSourceSql}
     and ${currentSourceNotDisconnectedSql}
 )`;
 
@@ -32,7 +37,8 @@ and (
     on evidence.workspace_id = candidate.workspace_id and evidence.id = cited.id
   join recovery_sources source
     on source.workspace_id = evidence.workspace_id and source.id = evidence.source_id
-  where ${currentSourceNotDisconnectedSql}
+  where ${legacyRecoveryEvidenceSourceSql}
+    and ${currentSourceNotDisconnectedSql}
 ) = cardinality(snapshot.evidence_ids)
 `;
 

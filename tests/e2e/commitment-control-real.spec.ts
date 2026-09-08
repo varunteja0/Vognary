@@ -169,7 +169,15 @@ async function deleteAccount(page: Page) {
 }
 
 async function selectView(page: Page, name: "Decisions" | "Evidence") {
-  await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name, exact: true }).click();
+  const navigation = page.getByRole("navigation", { name: "Primary" });
+  await expect(navigation.getByRole("button", { name: "Bill review", exact: true })).toBeEnabled();
+  const destination = navigation.getByRole("button", { name, exact: true, includeHidden: true });
+  if (await destination.getAttribute("aria-current") === "page") {
+    await expect(page.getByRole("heading", { level: 2, name, exact: true })).toBeVisible();
+    return;
+  }
+  if (!(await destination.isVisible())) await navigation.getByLabel("Records", { exact: true }).click();
+  await destination.click();
 }
 
 async function submit(page: Page, button: Locator, suffix: string) {

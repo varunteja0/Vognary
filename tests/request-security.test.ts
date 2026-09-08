@@ -63,6 +63,8 @@ const guardedMutationRoutes: Array<[string, number]> = [
   ["src/app/api/workspaces/current/autopilot/sources/[sourceId]/reconnect/route.ts", 1],
   ["src/app/api/workspaces/current/sources/receipt-inbox/route.ts", 2],
   ["src/app/api/workspaces/current/sources/receipt-inbox/rotate/route.ts", 1],
+  ["src/app/api/workspaces/current/sources/zoho-books/route.ts", 1],
+  ["src/app/api/workspaces/current/sources/zoho-books/bills/[billId]/route.ts", 1],
   ["src/app/api/workspaces/current/connectors/[accountId]/route.ts", 1],
   ["src/app/api/workspaces/current/connectors/[accountId]/sync/route.ts", 1],
   ["src/app/api/workspaces/route.ts", 1],
@@ -85,12 +87,14 @@ const mutationExceptions = [
   "src/app/api/internal/sync-jobs/[id]/run/route.ts",
   "src/app/api/internal/sync-jobs/due/run/route.ts",
   "src/app/api/internal/sync-jobs/route.ts",
+  "src/app/api/internal/zoho-books/due/run/route.ts",
 ];
 
 const callbackExceptions = [
   "src/app/api/auth/google/callback/route.ts",
   "src/app/api/auth/magic-link/verify/route.ts",
   "src/app/api/integrations/gmail/callback/route.ts",
+  "src/app/api/workspaces/current/sources/zoho-books/callback/route.ts",
 ];
 
 test("allows safe requests regardless of Origin", () => {

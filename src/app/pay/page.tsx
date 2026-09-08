@@ -102,6 +102,7 @@ export default function PayPage() {
           <section className="public-band public-band-lead">
             <p className="truth-label truth-authority">What the payment reserves</p>
             <h2 className="mt-3 font-display text-2xl font-semibold text-(--ink)">One bounded month, with a human in control.</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-(--ink-soft)">This purchases the Commitment Control pilot, not a managed bill-review service. The synthetic bill-review example is a separate evaluation; it does not include provider access or customer-data activation.</p>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-(--muted)">
               Vognary records a proposed obligation, shows cited existing exposure, records who approved what limit, and later checks observed evidence against that decision. It never auto-approves, auto-denies, purchases, provisions, cancels, or moves vendor money.
             </p>
@@ -136,6 +137,7 @@ export default function PayPage() {
             <ul className="reason-list mt-4">
               {included.map((item) => <li key={item}>{item}</li>)}
             </ul>
+            <p className="mt-4 text-sm leading-7 text-(--muted)">You provide the proposal, make the financial decision, authorize eligible sources and handle supplier contact or payment. Vognary preserves the decision and supports the included reconciliation reviews. A bill follow-up date does not send a reminder.</p>
           </section>
 
           <section className="public-band">
@@ -161,7 +163,7 @@ export default function PayPage() {
               </div>
             )}
             <dl className="public-facts mt-6">
-              <div><dt>Customer data</dt><dd>Blocked until assurance exit</dd></div>
+              <div><dt>Customer data</dt><dd>Blocked until independent assessment, remediation and retest, written activation conditions and eligibility approval</dd></div>
               <div><dt>Activation</dt><dd>Within {commitmentControlPilotOffer.activationDeadlineBusinessDays} business days or full-refund request</dd></div>
               <div><dt>Month two</dt><dd>Requires a separate active purchase</dd></div>
             </dl>

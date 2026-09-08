@@ -760,6 +760,9 @@ export async function getRecoveryEvidence(input: {
     );
     const evidence = result.rows[0];
     if (!evidence) throw new RecoveryServiceError("NOT_FOUND");
+    if (!["TRANSACTION", "RECEIPT"].includes(evidence.evidence_kind)) {
+      throw new RecoveryServiceError("INVALID_EVIDENCE", "Provider bills are available through their typed Control comparison, not the receipt evidence path.");
+    }
     return { evidence: toEvidenceDto(evidence), workspaceVersion: Number(state?.version ?? 0) };
   });
 }
@@ -1839,6 +1842,7 @@ async function analyzePersistedEvidence(client: PoolClient, workspaceId: string,
       transactions.set(row.source_id, [...(transactions.get(row.source_id) ?? []), row]);
       continue;
     }
+    if (row.evidence_kind !== "RECEIPT") continue;
     if (!row.amount_minor || !row.currency || !row.cadence_hint || !row.next_expected_date) continue;
     const amountDecimal = minorUnitsToDecimal(row.amount_minor, currencyExponent(row.currency));
     manualItems.push({
@@ -2209,6 +2213,7 @@ async function linkCanonicalEvidence(client: PoolClient, workspaceId: string, it
   const evidence = await loadAllEvidenceRows(client, workspaceId);
   const byKey = new Map<string, EvidenceRow[]>();
   for (const row of evidence) {
+    if (!["TRANSACTION", "RECEIPT"].includes(row.evidence_kind)) continue;
     const key = evidenceMatchKey(
       sourceEngineName(row.source_id),
       row.evidence_kind === "RECEIPT" ? toDateOnly(row.next_expected_date) : toDateOnly(row.evidence_date),
@@ -2245,6 +2250,7 @@ async function linkCanonicalEvidence(client: PoolClient, workspaceId: string, it
          select $1, $2, evidence.id
          from recovery_evidence evidence
          where evidence.workspace_id = $1 and evidence.id = $3::uuid
+           and evidence.evidence_kind in ('TRANSACTION','RECEIPT')
          on conflict (workspace_id, commitment_id, evidence_id) do nothing`,
         [workspaceId, commitment.id, citedEvidenceId],
       );
@@ -2646,7 +2652,9 @@ async function loadCoverageSources(client: PoolClient, workspaceId: string): Pro
      from recovery_sources source
      left join recovery_evidence evidence
        on evidence.workspace_id = source.workspace_id and evidence.source_id = source.id
+         and evidence.evidence_kind in ('TRANSACTION','RECEIPT')
      where source.workspace_id = $1
+       and source.source_type in ('RECEIPT_PASTE','CSV_IMPORT','FORWARDED_EMAIL','GMAIL_OAUTH')
      group by source.id
      order by source.ingested_at asc, source.id asc`,
     [workspaceId],
@@ -2877,6 +2885,8 @@ async function loadAllEvidenceRows(client: PoolClient, workspaceId: string) {
        limit 1
      ) sender_assessment on true
      where evidence.workspace_id = $1
+       and evidence.evidence_kind in ('TRANSACTION','RECEIPT')
+       and source.source_type in ('RECEIPT_PASTE','CSV_IMPORT','FORWARDED_EMAIL','GMAIL_OAUTH')
      order by evidence.created_at asc, evidence.id asc`,
     [workspaceId],
   );

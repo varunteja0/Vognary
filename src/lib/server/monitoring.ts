@@ -57,7 +57,7 @@ export async function sendMonitoringTestEvent(source: string): Promise<Monitorin
   );
 }
 
-async function deliverServerError(
+export async function deliverServerError(
   error: unknown,
   request: MonitoringErrorRequest,
   context: MonitoringErrorContext,

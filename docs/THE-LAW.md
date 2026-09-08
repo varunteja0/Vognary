@@ -159,6 +159,58 @@ The work may not commit, deploy, launch, use real customer data, invent proof, o
 raise Business Validation or Distribution. The resulting identity remains a
 candidate until the founder accepts the complete rendered result.
 
+### 0.1.2 Founder low-effort full-stack candidate authorization - 2026-09-06
+
+The founder issued the low-effort product and company transformation mandate
+on 2026-09-06. It supersedes the presentation-only restriction for this local
+candidate: GitHub Copilot owns the integrated frontend, backend, tests and
+operating evidence. Preserve other owners' changes and the current authorized
+automatic-main deployment setting. No commit, push, deployment, purchase,
+customer enrollment or irreversible external action is authorized by this work.
+
+The first approved technical scope is trustworthy proposal-to-reconciliation
+continuity: validate input, recover uncertain writes with their original request
+identity, preserve selected-record navigation, make all saved evidence reachable,
+and accurately disclose temporary data storage. Research source integrations and
+up to three alternative jobs against total recurring customer and operator work.
+Record each selected integration's source, consent, metric, retention, lifecycle
+and acceptance contract in the live handoff before implementing it. This permits
+bounded lawful integration development through that explicit scope decision; it
+does not authorize every candidate connector or revive autonomous execution.
+
+A material product pivot still requires observed buyer evidence and an explicit
+founder scope decision. Until then the one-time INR 14,999 pilot offer and
+Commitment Control product truth remain unchanged. Exact money, tenant isolation,
+human financial authority, immutable decisions, cite-or-shut-up, independent
+assurance before customer financial data, and failing-test-first domain work
+remain mandatory. Automated preparation may not silently choose evidence,
+approve an obligation, alter a cap, or imply complete financial coverage.
+
+### 0.1.3 Founder A2 billed-comparison authorization - 2026-09-07
+
+The founder approved the recorded A2 addendum for local implementation on
+2026-09-07. This permits explicitly selected India Books bill snapshots to be
+admitted through an evidence-only Recovery path and compared with a newly
+explicitly compatible, human-authorized gross per-charge decision. The live
+handoff owns the exact approved contract, dependency ledger and current proof.
+
+New compatible proposals, evaluations and decisions freeze
+`GROSS_BILLED_TOTAL_PER_CHARGE`; source evidence retains
+`PROVIDER_BILL_TOTAL`, and the comparison freezes both bases. A captured bill
+is not an observed charge or payment. It must not populate legacy charge
+`observed_at` to pass an old check. Existing immutable decisions retain their
+meaning and receipt path without semantic backfill. Source observation, bill
+date, provider modification and human selection times remain distinct.
+
+This scope includes supporting frontend/backend changes, additive migrations,
+privacy/retention and recovery coverage, red-first regressions and local
+operating preparation. It does not authorize recurring materialization,
+automatic matching, multiple-bill allocations, another connector, a pivot,
+provider writes, outreach, purchases, contract acceptance, publication,
+deployment or customer-data activation. A1's policy-free bill inspection and
+the existing pilot offer remain unchanged. Real provider, operator, buyer and
+independent release evidence retain their separate permissions and gates.
+
 ---
 
 ## 1. One-line identity (every feature must serve this)

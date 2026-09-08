@@ -38,7 +38,8 @@ test("Sources stays available for manual evidence when receipt forwarding is not
   assert.match(inboundStore, /state: "UNAVAILABLE"/);
   assert.match(sourcesSource, /if \(!receiptInboxPubliclyAvailable\)/);
   assert.match(sourcesSource, /onAddBills/);
-  assert.match(sourcesSource, /Automatic forwarding is not available yet/);
+  assert.match(sourcesSource, /optional receipt inbox is not available yet/);
+  assert.match(sourcesSource, /Manual evidence remains available for other sources/);
 });
 
 test("Sources describes forwarding without pretending sender intent or inbox access is enforced", () => {

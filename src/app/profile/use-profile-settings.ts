@@ -1,5 +1,5 @@
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { finishLocalSignOut } from "../session-privacy";
 import { guestAuditTransferBindingKey, guestAuditTransferKey } from "@/lib/guest-audit-transfer";
 import {
   fetchConsentRecords,
@@ -27,7 +27,6 @@ const initialStatuses: ProfileStatuses = {
   danger: "",
 };
 export function useProfileSettings() {
-  const router = useRouter();
   const [profile, setProfile] = useState<ProfilePayload | null>(null);
   const [statuses, setStatuses] = useState<ProfileStatuses>(initialStatuses);
   const [deleteText, setDeleteText] = useState("");
@@ -60,11 +59,11 @@ export function useProfileSettings() {
         const payload = await response.json().catch(() => ({}));
         if (cancelled) return;
         if (!response.ok) {
-          setStatus("account", payload.message ?? payload.error ?? "Could not load account.");
+          setStatuses(current => current.account === initialStatuses.account ? { ...current, account: payload.message ?? payload.error ?? "Could not load account." } : current);
           return;
         }
         setProfile(payload);
-        setStatus("account", "Account loaded.");
+        setStatuses(current => current.account === initialStatuses.account ? { ...current, account: "Account loaded." } : current);
         const role = payload.activeWorkspace?.role;
         if (role === "owner" || role === "admin") {
           const peopleResponse = await fetch("/api/workspaces/current/members", { cache: "no-store" });
@@ -78,7 +77,7 @@ export function useProfileSettings() {
         }
       })
       .catch(() => {
-        if (!cancelled) setStatus("account", "Could not load account. Check your connection and retry.");
+        if (!cancelled) setStatuses(current => current.account === initialStatuses.account ? { ...current, account: "Could not load account. Check your connection and retry." } : current);
       });
     return () => { cancelled = true; };
   }, []);
@@ -143,8 +142,7 @@ export function useProfileSettings() {
         setStatus("account", "Could not sign out. Please retry.");
         return;
       }
-      router.replace("/login");
-      router.refresh();
+      finishLocalSignOut();
     } catch {
       setStatus("account", "Could not sign out. Check your connection and retry.");
     }

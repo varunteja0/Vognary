@@ -58,7 +58,7 @@ export function SyntheticStamp({ className = "" }: { className?: string }) {
  * history around it, the limit it crosses, and the fact that only a person can
  * settle it.
  */
-export function RequestSheet({ headingId }: { headingId?: string }) {
+export function RequestSheet({ headingId, compact = false }: { headingId?: string; compact?: boolean }) {
   const { proposal, evaluation } = PROPOSED;
   const limit = evaluation?.currencyResults.find((entry) => entry.currency === proposal.currency);
   // Read off the policy, never typed here: a presentation component that carries
@@ -66,18 +66,8 @@ export function RequestSheet({ headingId }: { headingId?: string }) {
   const perCharge = syntheticDemoPolicy.currencyLimits
     .find((entry) => entry.currency === proposal.currency)?.maxPerChargeMinor ?? null;
 
-  return (
-    <article className="sheet" aria-labelledby={headingId}>
-      <SheetHead left={proposal.merchant} right={proposal.submittedByDisplayName ?? "—"} />
-
-      <MoneyValue
-        minor={proposal.amountMinor}
-        currency={proposal.currency}
-        provenance={{ kind: "assumed" }}
-        size="lead"
-        layout="stacked"
-        className="sheet-figure"
-      />
+  const context = (
+    <>
       <p className="sheet-purpose">{proposal.purpose}</p>
 
       <dl className="sheet-rows">
@@ -130,7 +120,21 @@ export function RequestSheet({ headingId }: { headingId?: string }) {
           </span>
         </p>
       ) : null}
+    </>
+  );
 
+  return (
+    <article className="sheet" aria-labelledby={headingId}>
+      <SheetHead left={proposal.merchant} right={proposal.submittedByDisplayName ?? "—"} />
+      <MoneyValue
+        minor={proposal.amountMinor}
+        currency={proposal.currency}
+        provenance={{ kind: "assumed" }}
+        size="lead"
+        layout="stacked"
+        className="sheet-figure"
+      />
+      {compact ? <details className="home-request-context"><summary>Evidence and policy</summary>{context}</details> : context}
       <SyntheticStamp />
     </article>
   );

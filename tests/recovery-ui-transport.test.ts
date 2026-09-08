@@ -239,6 +239,107 @@ test("a bare legacy error message is shown without inventing a contract code", a
   assert.equal(result.error.message, "Attach at least one statement export or PDF file as files.");
 });
 
+test("a lost write acknowledgement is recovered once with the identical request identity", async () => {
+  const saved = new Map<string, unknown>();
+  const { calls, fetchImpl } = recorder(({ init }) => {
+    const key = new Headers(init?.headers).get("Idempotency-Key")!;
+    if (!saved.has(key)) {
+      saved.set(key, { decision: { value: "KEEP" }, commitment, home });
+      throw new TypeError("Synthetic response lost after commit");
+    }
+    return json({ data: saved.get(key), meta: { requestId: "replayed-write", workspaceVersion: 5 } });
+  });
+  const result = await createRecoveryTransport(fetchImpl).putDecision(
+    { commitmentId: "commitment-1", decision: "KEEP" },
+    { workspaceVersion: 4, idempotencyKey: "same-write-after-response-loss", workspaceId: "workspace-1" },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(saved.size, 1);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1], calls[0]);
+});
+
+test("bounded write recovery reports unknown, never unsent, when both acknowledgements are lost", async () => {
+  const { calls, fetchImpl } = recorder(() => { throw new TypeError("Synthetic network loss"); });
+  const result = await createRecoveryTransport(fetchImpl).putDecision(
+    { commitmentId: "commitment-1", decision: "KEEP" },
+    { workspaceVersion: 4, idempotencyKey: "unknown-write", workspaceId: "workspace-1" },
+  );
+
+  assert.equal(calls.length, 2);
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.outcome, "UNKNOWN");
+  assert.match(result.error.message, /may have been saved|cannot confirm/i);
+  assert.doesNotMatch(result.error.message, /nothing was (sent|changed)|not saved/i);
+  assert.equal(result.error.retryable, true);
+});
+
+test("unkeyed writes are never automatically repeated after response loss", async () => {
+  const { calls, fetchImpl } = recorder(() => { throw new TypeError("Synthetic network loss"); });
+  const result = await createRecoveryTransport(fetchImpl).provisionReceiptInbox();
+
+  assert.equal(calls.length, 1);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.outcome, "UNKNOWN");
+});
+
+test("unreadable success and gateway responses do not establish that a write failed", async () => {
+  for (const httpStatus of [200, 502]) {
+    const { calls, fetchImpl } = recorder(() => new Response("<html>synthetic gateway</html>", { status: httpStatus }));
+    const result = await createRecoveryTransport(fetchImpl).putDecision(
+      { commitmentId: "commitment-1", decision: "KEEP" },
+      { workspaceVersion: 4, idempotencyKey: `unreadable-${httpStatus}`, workspaceId: "workspace-1" },
+    );
+    assert.equal(calls.length, 2);
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.outcome, "UNKNOWN");
+      assert.doesNotMatch(result.error.message, /nothing was (sent|changed)/i);
+    }
+  }
+});
+
+test("an idempotent write without a workspace target is not automatically replayed", async () => {
+  const { calls, fetchImpl } = recorder(() => { throw new TypeError("Synthetic network loss"); });
+  const result = await createRecoveryTransport(fetchImpl).putDecision(
+    { commitmentId: "commitment-1", decision: "KEEP" },
+    { workspaceVersion: 4, idempotencyKey: "untargeted-write" },
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.outcome, "UNKNOWN");
+});
+
+test("explicit server rejection is not retried or labelled an unknown write", async () => {
+  const { calls, fetchImpl } = recorder(() => json({
+    error: { code: "FORBIDDEN", message: "Synthetic owner permission required.", retryable: false, requestId: "rejected-write" },
+  }, 403));
+  const result = await createRecoveryTransport(fetchImpl).putDecision(
+    { commitmentId: "commitment-1", decision: "KEEP" },
+    { workspaceVersion: 4, idempotencyKey: "rejected-write" },
+  );
+
+  assert.equal(calls.length, 1);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.outcome, "REJECTED");
+});
+
+test("a rejected replay cannot prove that the original unacknowledged write was rejected", async () => {
+  let attempts = 0;
+  const { fetchImpl } = recorder(() => {
+    if (++attempts === 1) throw new TypeError("Synthetic response lost after commit");
+    return json({ error: { code: "FORBIDDEN", message: "The active workspace changed.", retryable: false, requestId: "replay-forbidden" } }, 403);
+  });
+  const result = await createRecoveryTransport(fetchImpl).putDecision(
+    { commitmentId: "commitment-1", decision: "KEEP" },
+    { workspaceVersion: 4, idempotencyKey: "same-original-write", workspaceId: "workspace-1" },
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.outcome, "UNKNOWN");
+});
+
 test("evidence-source disconnect and reconnect use the canonical Recovery endpoints", async () => {
   const payload = {
     sourceId: "source 1",

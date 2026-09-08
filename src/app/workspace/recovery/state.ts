@@ -29,13 +29,14 @@ import { decimalToMinorUnits, minorUnitsToDecimal } from "@/lib/recovery/domain"
 // task in the buyer's words, not a container, a time of day, or an abstraction.
 // "Decisions" leads because a human authorization is the job this product does;
 // "Bills" matches the customer copy the workspace already speaks ("See all bills").
-export const recoveryViews = ["CONTROL", "HOME", "COMMITMENTS", "ADD_EVIDENCE", "MANDATE"] as const;
+export const recoveryViews = ["BILL_REVIEW", "CONTROL", "HOME", "ADD_EVIDENCE", "COMMITMENTS", "MANDATE"] as const;
 export type RecoveryView = (typeof recoveryViews)[number];
 
 /** Never more than four of these reach the mobile bar; the rest go to More. */
-export const recoveryPrimaryViewLimit = 4;
+export const recoveryPrimaryViewLimit = 1;
 
 export const recoveryViewLabels: Record<RecoveryView, string> = {
+  BILL_REVIEW: "Bill review",
   CONTROL: "Decisions",
   HOME: "Today",
   COMMITMENTS: "Bills",
@@ -43,7 +44,7 @@ export const recoveryViewLabels: Record<RecoveryView, string> = {
   MANDATE: "Automation",
 };
 
-export type RecoveryFailure = { error: RecoveryError; origin: FailureOrigin };
+export type RecoveryFailure = { error: RecoveryError; origin: FailureOrigin; outcome?: TransportFailure["outcome"] };
 
 export type LoadState =
   | { kind: "IDLE" }
@@ -159,7 +160,7 @@ const emptyCorrectionDraft: CorrectionDraft = {
 };
 
 export const initialRecoveryState: RecoveryState = {
-  view: "HOME",
+  view: "BILL_REVIEW",
   addBillsOpen: false,
   online: true,
   session: null,
@@ -243,7 +244,7 @@ export type RecoveryAction =
 
 const authRequired = (failure: TransportFailure) => failure.error.code === "AUTH_REQUIRED";
 const needsReload = (failure: TransportFailure) => failure.error.code === "STALE_STATE" || failure.error.code === "CONFLICT";
-const asFailure = (failure: TransportFailure): RecoveryFailure => ({ error: failure.error, origin: failure.origin });
+const asFailure = (failure: TransportFailure): RecoveryFailure => ({ error: failure.error, origin: failure.origin, ...(failure.outcome ? { outcome: failure.outcome } : {}) });
 
 function replaceCommitment(commitments: readonly CommitmentSummaryDto[], next: CommitmentSummaryDto) {
   // Server order is authoritative: the updated row is swapped in place, never re-sorted.

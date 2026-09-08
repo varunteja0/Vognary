@@ -8,6 +8,7 @@ import {
   isStaleWorkspace,
 } from "../src/app/workspace/recovery/control/control-transport";
 import type { FetchLike } from "../src/app/workspace/recovery/transport";
+import { a2Attempt, a2CandidatePage, a2ComparisonResponse, a2Evaluation, a2Ids } from "./e2e/fixtures/a2-provider-bill";
 
 type Call = { path: string; init: RequestInit | undefined };
 
@@ -285,4 +286,73 @@ test("mutation success data must satisfy its exact Control DTO guard", async () 
 
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.origin, "CLIENT");
+});
+
+test("A2 pages send literal bounded source queries and never mutation headers", async () => {
+  const { calls, fetchImpl } = recorder(() => json({ data: a2CandidatePage, meta }));
+  const result = await createControlTransport(fetchImpl, a2Ids.workspace).providerBillCandidates(a2Ids.proposal, { search: "%_ Synthetic", sort: "AMOUNT_DESC", currency: "INR", cursor: "opaque+cursor" });
+  assert.equal(result.ok, true);
+  const url = new URL(calls[0].path, "http://localhost");
+  assert.equal(url.searchParams.get("source"), "ZOHO_BOOKS");
+  assert.equal(url.searchParams.get("search"), "%_ Synthetic");
+  assert.equal(url.searchParams.get("cursor"), "opaque+cursor");
+  assert.equal(new Headers(calls[0].init?.headers).get("Idempotency-Key"), null);
+  assert.equal(new Headers(calls[0].init?.headers).get("X-Vognary-Workspace"), a2Ids.workspace);
+  assert.equal(calls[0].init?.cache, "no-store");
+});
+
+test("A2 refuses malformed money, lineage, permissions, freshness and claimed matching before render", async () => {
+  const invalid = [
+    { ...a2CandidatePage, matchingPerformed: true },
+    { ...a2CandidatePage, proposalId },
+    { ...a2CandidatePage, total: -1 },
+    { ...a2CandidatePage, freshness: { ...a2CandidatePage.freshness, status: "STALE" } },
+    { ...a2CandidatePage, canConfirm: false },
+    ...[{ totalMinor: 12345 }, { totalMinor: "1.2" }, { sourceFingerprint: "bad" }, { billDate: "2026-02-30" }, { billReviewPath: "https://untrusted.invalid" }, { organizationId: "999" }, { consentReference: null }, { prospectiveVerdict: null }].map(patch => ({ ...a2CandidatePage, candidates: [{ ...a2CandidatePage.candidates[0], ...patch }] })),
+  ];
+  for (const page of invalid) {
+    const { fetchImpl } = recorder(() => json({ data: page, meta }));
+    const result = await createControlTransport(fetchImpl).providerBillCandidates(a2Ids.proposal);
+    assert.equal(result.ok, false, JSON.stringify(page));
+  }
+});
+
+test("A2 unchanged replay checks current identity and returns only the original snapshot result", async () => {
+  const { calls, fetchImpl } = recorder(call => call.path === "/api/auth/session"
+    ? json({ authenticated: true, session: { workspaceId: a2Ids.workspace, userId: a2Ids.actor } })
+    : json({ data: a2ComparisonResponse, meta }));
+  const result = await createControlTransport(fetchImpl).reconcileProviderBill(a2Attempt);
+  assert.equal(result.ok, true);
+  assert.equal(calls.length, 2);
+  const headers = new Headers(calls[1].init?.headers);
+  assert.equal(headers.get("If-Match"), '"workspace:3"');
+  assert.equal(headers.get("Idempotency-Key"), a2Attempt.idempotencyKey);
+  assert.equal(headers.get("X-Vognary-Workspace"), a2Ids.workspace);
+  assert.deepEqual(JSON.parse(String(calls[1].init?.body)), a2Attempt.request);
+  assert.equal(Object.hasOwn(JSON.parse(String(calls[1].init?.body)), "totalMinor"), false);
+});
+
+test("A2 blocks a changed identity before a write and refuses substituted snapshot responses", async () => {
+  const mismatch = recorder(() => json({ authenticated: true, session: { workspaceId: a2Ids.workspace, userId: proposalId } }));
+  const refused = await createControlTransport(mismatch.fetchImpl).reconcileProviderBill(a2Attempt);
+  assert.equal(refused.ok, false);
+  assert.equal(mismatch.calls.length, 1);
+  for (const patch of [{ billId: "9999" }, { sourceSequence: "136" }, { workspaceId: proposalId }, { selectedByUserId: proposalId }, { sourceFingerprint: "a".repeat(64) }]) {
+    const { fetchImpl } = recorder(call => call.path === "/api/auth/session"
+      ? json({ authenticated: true, session: { workspaceId: a2Ids.workspace, userId: a2Ids.actor } })
+      : json({ data: { ...a2ComparisonResponse, reconciliation: { ...a2ComparisonResponse.reconciliation, providerBill: { ...a2ComparisonResponse.reconciliation.providerBill, ...patch } } }, meta }));
+    const result = await createControlTransport(fetchImpl).reconcileProviderBill(a2Attempt);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.outcome, "UNKNOWN");
+  }
+});
+
+test("A2 explicit proposal basis must be echoed by both proposal and evaluation", async () => {
+  const { amountBasis: proposalBasis, ...legacyProposal } = a2ComparisonResponse.proposal;
+  const { amountBasis: evaluationBasis, ...legacyEvaluation } = a2Evaluation;
+  assert.equal(proposalBasis, evaluationBasis);
+  const { fetchImpl } = recorder(() => json({ data: { proposal: legacyProposal, evaluation: legacyEvaluation }, meta }));
+  const result = await createControlTransport(fetchImpl).createProposal({ ...proposalRequest, amountBasis: "GROSS_BILLED_TOTAL_PER_CHARGE" }, { workspaceVersion: 3, idempotencyKey: "synthetic-basis" });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.outcome, "UNKNOWN");
 });

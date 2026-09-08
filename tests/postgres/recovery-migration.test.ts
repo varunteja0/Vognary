@@ -148,7 +148,7 @@ test("0069 preserves existing proposals and admits only nonnegative empty-window
       const after = (await pool.query<{ record: Record<string, unknown> }>(
         `select to_jsonb(proposal) as record from commitment_control_proposals proposal where id = $1`, [proposalId],
       )).rows[0]!.record;
-      assert.deepEqual(after, before);
+      assert.deepEqual(after, { ...before, amount_basis: null });
       await insertProjection({});
       await insertProjection({ first_charge_date: "2027-09-05", projected_annual_minor: "0" });
       for (const invalid of [{ projected_13_week_minor: "-1" }, { projected_annual_minor: "-1" }, { amount_minor: "0" }]) {
@@ -158,6 +158,174 @@ test("0069 preserves existing proposals and admits only nonnegative empty-window
     } finally {
       await pool.end();
     }
+  });
+});
+
+test("0076 preserves legacy meaning, leaves prior Books captures unbound, and retries a rolled-back additive apply", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("a2_upgrade", async connectionString => {
+    const pool = createPool(connectionString);
+    try {
+      await seedSchemaThrough0022(pool);
+      runMigrations(connectionString, ["--through=0075_zoho_books_dispositions"]);
+      const userId = randomUUID();
+      const workspaceId = randomUUID();
+      const proposalId = randomUUID();
+      const connectionId = randomUUID();
+      await pool.query("insert into users(id,email) values($1,$2)", [userId, `synthetic-a2-upgrade-${userId}@example.test`]);
+      await pool.query("insert into workspaces(id,owner_user_id,name) values($1,$2,'Synthetic A2 upgrade')", [workspaceId, userId]);
+      await pool.query("insert into workspace_members(workspace_id,user_id,role) values($1,$2,'owner')", [workspaceId, userId]);
+      await pool.query(`insert into commitment_control_proposals(id,workspace_id,merchant,purpose,category,amount_minor,currency,first_charge_date,cadence,
+        as_of_date,projected_13_week_minor,projected_annual_minor) values($1,$2,'Synthetic supplier','Synthetic prior proposal','SOFTWARE',12345,'INR','2026-09-02','ONE_TIME','2026-09-01',12345,12345)`, [proposalId, workspaceId]);
+      await pool.query(`insert into zoho_books_connections(id,workspace_id,authorized_by_user_id,status,organization_id,coverage_start,last_success_at,next_run_at)
+        values($1,$2,$3,'READY','100001','2026-06-01','2026-09-07T00:00:00Z','2026-09-08T00:00:00Z')`, [connectionId, workspaceId, userId]);
+      const bill = { version: 1, billId: "200001", vendorId: "300001", vendorName: "Synthetic prior supplier", billNumber: "SYNTHETIC-PRIOR",
+        date: "2026-09-02", status: "open", currency: "INR", totalMinor: "12345", balanceMinor: "12345", sourceTotal: "123.45", sourceBalance: "123.45",
+        modifiedAt: "2026-09-02T00:00:00.000Z", basis: "PROVIDER_BILL_TOTAL" };
+      const sequence = (await pool.query(`insert into zoho_books_snapshots(connection_id,workspace_id,bill_id,fingerprint,bill,change_kind,observed_at)
+        values($1,$2,'200001',$3,$4,'BASELINE','2026-09-07T00:00:00Z') returning sequence`, [connectionId, workspaceId, "a".repeat(64), bill])).rows[0].sequence;
+      await pool.query("insert into zoho_books_records(connection_id,workspace_id,bill_id,latest_sequence,provider_modified_at) values($1,$2,'200001',$3,'2026-09-02T00:00:00Z')", [connectionId, workspaceId, sequence]);
+      const before = (await pool.query("select to_jsonb(proposal) as proposal,(select to_jsonb(snapshot) from zoho_books_snapshots snapshot where sequence=$2) as snapshot from commitment_control_proposals proposal where id=$1", [proposalId, sequence])).rows[0];
+      const sql = readFileSync(path.join(root, "infra/postgres/migrations/0076_control_provider_bills.sql"), "utf8");
+      const client = await pool.connect();
+      try {
+        await client.query("begin");
+        await client.query(sql);
+        await assert.rejects(() => client.query("select 1/0"), { code: "22012" });
+        await client.query("rollback");
+      } finally { client.release(); }
+      assert.equal((await pool.query("select to_regclass('recovery_provider_bill_links') as relation")).rows[0].relation, null);
+      assert.equal((await pool.query("select count(*)::text as count from information_schema.columns where table_name='commitment_control_proposals' and column_name='amount_basis'")).rows[0].count, "0");
+      assert.equal(runMigrations(connectionString).applied.at(-1)?.id, "0077_control_provider_bill_admission_guards");
+      assert.deepEqual(runMigrations(connectionString).applied, []);
+      const after = (await pool.query("select to_jsonb(proposal) as proposal,(select to_jsonb(snapshot) from zoho_books_snapshots snapshot where sequence=$2) as snapshot from commitment_control_proposals proposal where id=$1", [proposalId, sequence])).rows[0];
+      assert.deepEqual(after.proposal, { ...before.proposal, amount_basis: null });
+      assert.deepEqual(after.snapshot, { ...before.snapshot, grant_id: null, organization_id: null });
+      assert.equal((await pool.query("select * from zoho_books_grants")).rowCount, 0);
+      await assert.rejects(() => pool.query("update zoho_books_snapshots set grant_id=gen_random_uuid(),organization_id='100001' where sequence=$1", [sequence]), /immutable/i);
+      await assert.rejects(() => pool.query("update commitment_control_proposals set amount_basis='GROSS_BILLED_TOTAL_PER_CHARGE' where id=$1", [proposalId]), /cannot be updated/i);
+      const backup = await readRecoveryBackupVerification(pool);
+      assert.equal(backup.migrationHead, "0077_control_provider_bill_admission_guards");
+      assert.equal(backup.recoveryWorkspaceCounts.recovery_provider_bill_links, "0");
+      assert.equal(backup.recoveryWorkspaceCounts.zoho_books_grants, "0");
+    } finally { await pool.end(); }
+  });
+});
+
+test("0077 preserves 0076 history and refuses new null-cap comparisons against otherwise valid provider lineage", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("a2_admission_upgrade", async connectionString => {
+    const pool = createPool(connectionString);
+    try {
+      await seedSchemaThrough0022(pool);
+      runMigrations(connectionString, ["--through=0076_control_provider_bills"]);
+      const userId = randomUUID();
+      const workspaceId = randomUUID();
+      const connectionId = randomUUID();
+      const grantId = randomUUID();
+      const evidenceId = randomUUID();
+      const sourceId = randomUUID();
+      const submissionId = randomUUID();
+      const observedAt = "2026-09-07T08:18:00.000Z";
+      const selectedAt = "2026-09-07T08:19:00.000Z";
+      await pool.query("insert into users(id,email) values($1,$2)", [userId, `synthetic-a2-cap-${userId}@example.test`]);
+      await pool.query("insert into workspaces(id,owner_user_id,name) values($1,$2,'Synthetic A2 cap migration')", [workspaceId, userId]);
+      await pool.query("insert into workspace_members(workspace_id,user_id,role) values($1,$2,'owner')", [workspaceId, userId]);
+      await pool.query("insert into commitment_control_policies(workspace_id,version,category_rules,currency_limits,created_by_user_id) values($1,1,'[]','[]',$2)", [workspaceId, userId]);
+      const insertDecision = async (action: string, expectedAmount: string, cap: string | null, basis: string | null = "GROSS_BILLED_TOTAL_PER_CHARGE") => {
+        const proposalId = randomUUID();
+        const evaluationId = randomUUID();
+        const decisionId = randomUUID();
+        await pool.query(`insert into commitment_control_proposals(id,workspace_id,submitted_by_user_id,merchant,purpose,category,amount_minor,
+          currency,first_charge_date,cadence,as_of_date,projected_13_week_minor,projected_annual_minor,amount_basis,created_at)
+          values($1,$2,$3,'Synthetic cap supplier','Synthetic migration charge','SOFTWARE',$4,'INR','2026-09-07','ONE_TIME','2026-09-07',$4,$4,$5,'2026-09-07T08:00:00Z')`,
+          [proposalId, workspaceId, userId, expectedAmount, basis]);
+        await pool.query(`insert into commitment_control_evaluations(id,workspace_id,proposal_id,policy_version,status,assumption_fields,currency_results,amount_basis,evaluated_at)
+          values($1,$2,$3,1,'WITHIN_POLICY',array['amountMinor','currency','category','thirteenWeekMinor','annualMinor'],'[]',$4,'2026-09-07T08:01:00Z')`,
+          [evaluationId, workspaceId, proposalId, basis]);
+        await pool.query(`insert into commitment_control_decisions(id,workspace_id,proposal_id,evaluation_id,action,expected_amount_minor,approved_cap_minor,
+          currency,decided_by_user_id,decided_at,authorization_expires_on,amount_basis)
+          values($1,$2,$3,$4,$5,$6,$7,'INR',$8,'2026-09-07T08:02:00Z',$9,$10)`,
+          [decisionId, workspaceId, proposalId, evaluationId, action, expectedAmount, cap, userId, action === "DECLINE" ? null : "2026-09-20", basis]);
+        return { proposalId, decisionId, expectedAmount, cap };
+      };
+      const nullApproved = await insertDecision("APPROVE", "12345", null);
+      const nullCapped = await insertDecision("APPROVE_WITH_CAP", "13000", null);
+      const originalDecision = await insertDecision("APPROVE", "12345", "12345");
+      await insertDecision("APPROVE", "12345", null, null);
+      const bill = { version: 1, billId: "200001", vendorId: "300001", vendorName: "Synthetic cap supplier", billNumber: "SYNTHETIC-CAP",
+        date: "2026-09-07", status: "open", currency: "INR", totalMinor: "12345", balanceMinor: "12345", sourceTotal: "123.45", sourceBalance: "123.45",
+        modifiedAt: "2026-09-07T08:17:00.000Z", basis: "PROVIDER_BILL_TOTAL" };
+      await pool.query(`insert into zoho_books_connections(id,workspace_id,authorized_by_user_id,status,organization_id,organizations,coverage_start,refresh_secret)
+        values($1,$2,$3,'AUTHORIZING','100001','[{"id":"100001","active":true}]','2026-06-01','{"synthetic":true}')`, [connectionId, workspaceId, userId]);
+      await pool.query(`insert into zoho_books_grants(id,workspace_id,connection_id,consent_generation,authorized_by_user_id,authorized_at,notice_version,scopes,authorized_organization_ids,region)
+        values($1,$2,$3,1,$4,'2026-09-07T08:10:00Z','zoho-books-read-v1',array['ZohoBooks.settings.READ','ZohoBooks.bills.READ'],array['100001'],'IN')`, [grantId, workspaceId, connectionId, userId]);
+      await pool.query("update zoho_books_connections set active_grant_id=$2,status='AWAITING_ORGANIZATION' where id=$1", [connectionId, grantId]);
+      await pool.query("update zoho_books_connections set status='QUEUED' where id=$1", [connectionId]);
+      await pool.query("update zoho_books_connections set status='READY',last_success_at=$2,next_run_at=$2::timestamptz+interval '24 hours' where id=$1", [connectionId, observedAt]);
+      const sequence = (await pool.query(`insert into zoho_books_snapshots(connection_id,workspace_id,bill_id,fingerprint,bill,change_kind,observed_at,grant_id,organization_id)
+        values($1,$2,'200001',$3,$4,'BASELINE',$5,$6,'100001') returning sequence`, [connectionId, workspaceId, "a".repeat(64), bill, observedAt, grantId])).rows[0].sequence;
+      await pool.query("insert into zoho_books_records(connection_id,workspace_id,bill_id,latest_sequence,provider_modified_at) values($1,$2,'200001',$3,$4)", [connectionId, workspaceId, sequence, bill.modifiedAt]);
+      const client = await pool.connect();
+      try {
+        await client.query("begin");
+        await client.query("insert into recovery_submissions(id,workspace_id,submitted_by_user_id,source_type,accepted_evidence_count,ingested_at) values($1,$2,$3,'ZOHO_BOOKS',1,$4)", [submissionId, workspaceId, userId, selectedAt]);
+        await client.query(`insert into recovery_sources(id,workspace_id,submission_id,source_type,client_ref,label,content_hash,raw_evidence,ingested_at)
+          values($1,$2,$3,'ZOHO_BOOKS','synthetic-cap','Synthetic cap',$4,'{"synthetic":true}',$5)`, [sourceId, workspaceId, submissionId, "b".repeat(64), selectedAt]);
+        await client.query(`insert into recovery_evidence(id,workspace_id,source_id,fingerprint,evidence_kind,evidence_basis,row_number,observed_at,excerpt,
+          merchant,normalized_merchant,category,amount_minor,currency,evidence_date,direction,provenance_kind,provenance_reference,confidence_state,created_at)
+          values($1,$2,$3,$4,'PROVIDER_BILL','PROVIDER_BILL_TOTAL',1,null,null,'Synthetic cap supplier','Synthetic cap supplier','UNCLASSIFIED',12345,
+          'INR','2026-09-07','unknown','PROVIDER_RECEIVED','synthetic-cap-migration','UNKNOWN',$5)`, [evidenceId, workspaceId, sourceId, "b".repeat(64), selectedAt]);
+        await client.query("insert into recovery_provider_bill_links select (jsonb_populate_record(null::recovery_provider_bill_links,$1::jsonb)).*", [JSON.stringify({
+          workspace_id: workspaceId, evidence_id: evidenceId, connection_id: connectionId, organization_id: "100001", bill_id: bill.billId,
+          source_sequence: sequence, source_version: 1, source_fingerprint: "a".repeat(64), source_observed_at: observedAt,
+          provider_modified_at: bill.modifiedAt, bill_date: bill.date, bill_status: bill.status, change_kind: "BASELINE", total_minor: bill.totalMinor,
+          currency: bill.currency, source_total: bill.sourceTotal, vendor_name: bill.vendorName, bill_number: bill.billNumber, consent_reference: grantId,
+          consent_generation: 1, consent_notice_version: "zoho-books-read-v1", consent_scopes: ["ZohoBooks.settings.READ", "ZohoBooks.bills.READ"],
+          consent_authorized_by_user_id: userId, consent_authorized_at: "2026-09-07T08:10:00.000Z", region: "IN", connection_revision: 1,
+          last_successful_sync_at: observedAt, selected_by_user_id: userId, selected_at: selectedAt, relation_basis: "USER_CONFIRMED_SAME_CHARGE",
+          retention_notice: "control-provider-bill-retention-v1",
+        })]);
+        await client.query("commit");
+      } catch (error) { await client.query("rollback"); throw error; }
+      finally { client.release(); }
+      const insertComparison = (decision: typeof originalDecision, verdict: string) => pool.query(`insert into commitment_control_reconciliations(
+        workspace_id,proposal_id,decision_id,evidence_id,verdict,expected_amount_minor,approved_cap_minor,authorization_currency,observed_amount_minor,
+        observed_currency,observed_evidence_date,reconciled_by_user_id,reconciled_at,comparison_kind,decision_amount_basis,observed_evidence_basis,relation_basis,retention_notice)
+        values($1,$2,$3,$4,$5,$6,$7,'INR',12345,'INR','2026-09-07',$8,$9,'BILLED_AMOUNT_COMPARISON','GROSS_BILLED_TOTAL_PER_CHARGE',
+          'PROVIDER_BILL_TOTAL','USER_CONFIRMED_SAME_CHARGE','control-provider-bill-retention-v1')`,
+        [workspaceId, decision.proposalId, decision.decisionId, evidenceId, verdict, decision.expectedAmount, decision.cap, userId, selectedAt]);
+      await insertComparison(originalDecision, "MATCHED");
+      const frozenTables = ["commitment_control_proposals", "commitment_control_evaluations", "commitment_control_decisions", "commitment_control_reconciliations", "recovery_evidence", "recovery_provider_bill_links", "zoho_books_snapshots", "zoho_books_grants"];
+      const history = async () => Object.fromEntries(await Promise.all(frozenTables.map(async table => [table,
+        (await pool.query(`select to_jsonb(record) as record from ${table} record where workspace_id=$1 order by to_jsonb(record)::text`, [workspaceId])).rows])));
+      const before = await history();
+      const oldChecksum = (await pool.query("select checksum from schema_migrations where id='0076_control_provider_bills'")).rows[0].checksum;
+      assert.equal(oldChecksum, "3fd16013c9b35444a526107d8236bd97f126457a2387525325c8372bbbbed26b");
+      const rollback = await pool.connect();
+      try {
+        await rollback.query("begin");
+        await rollback.query(readFileSync(path.join(root, "infra/postgres/migrations/0077_control_provider_bill_admission_guards.sql"), "utf8"));
+        await assert.rejects(() => rollback.query("select 1/0"), { code: "22012" });
+        await rollback.query("rollback");
+      } finally { rollback.release(); }
+      assert.equal((await pool.query("select to_regproc('validate_control_gross_approval_cap') as guard")).rows[0].guard, null);
+      assert.deepEqual(await history(), before);
+      assert.deepEqual(runMigrations(connectionString).applied, [{ id: "0077_control_provider_bill_admission_guards", mode: "applied-migration" }]);
+      assert.deepEqual(runMigrations(connectionString).applied, []);
+      assert.deepEqual(await history(), before);
+      assert.equal((await pool.query("select checksum from schema_migrations where id='0076_control_provider_bills'")).rows[0].checksum, oldChecksum);
+      await assert.rejects(() => insertComparison(nullApproved, "MATCHED"), { code: "23514" });
+      await assert.rejects(() => insertComparison(nullCapped, "WITHIN_CAP"), { code: "23514" });
+      assert.deepEqual(await history(), before);
+      await insertDecision("APPROVE", "12345", null, null);
+      await insertDecision("DECLINE", "12345", null);
+      const valid = await insertDecision("APPROVE_WITH_CAP", "13000", "12500");
+      await insertComparison(valid, "WITHIN_CAP");
+      assert.equal((await pool.query("select observed_at from recovery_evidence where id=$1", [evidenceId])).rows[0].observed_at, null);
+    } finally { await pool.end(); }
   });
 });
 
@@ -342,15 +510,15 @@ test("the real migration runner installs and records the Recovery receipt inbox 
 }, async () => {
   await withDisposableDatabase("recovery_fresh", async (connectionString) => {
     const result = runMigrations(connectionString);
-    assert.equal(result.applied.at(-1)?.id, "0069_control_projection_empty_windows");
+      assert.equal(result.applied.at(-1)?.id, "0077_control_provider_bill_admission_guards");
 
     const pool = createPool(connectionString);
     try {
       const migrations = await pool.query<{ id: string }>(
         `select id from schema_migrations order by id`,
       );
-      assert.equal(migrations.rows.at(-1)?.id, "0069_control_projection_empty_windows");
-      assert.equal(migrations.rows.length, 69);
+        assert.equal(migrations.rows.at(-1)?.id, "0077_control_provider_bill_admission_guards");
+      assert.equal(migrations.rows.length, 77);
       await assertRecoveryRelations(pool);
       const phaseA = await pool.query<{
         milestone_columns: number;
@@ -691,6 +859,14 @@ test("the real migration runner upgrades an existing 0022 database through Recov
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
       { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
+      { id: "0070_zoho_books_observations", mode: "applied-migration" },
+      { id: "0071_zoho_books_watermark_guards", mode: "applied-migration" },
+      { id: "0072_zoho_books_exact_reviews", mode: "applied-migration" },
+      { id: "0073_zoho_books_recovery_incidents", mode: "applied-migration" },
+      { id: "0074_zoho_books_incident_generations", mode: "applied-migration" },
+      { id: "0075_zoho_books_dispositions", mode: "applied-migration" },
+      { id: "0076_control_provider_bills", mode: "applied-migration" },
+      { id: "0077_control_provider_bill_admission_guards", mode: "applied-migration" },
     ]);
 
     const verifyPool = createPool(connectionString);
@@ -906,6 +1082,14 @@ test("the real migration runner upgrades 0027 through 0028 without dropping Reco
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
       { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
+      { id: "0070_zoho_books_observations", mode: "applied-migration" },
+      { id: "0071_zoho_books_watermark_guards", mode: "applied-migration" },
+      { id: "0072_zoho_books_exact_reviews", mode: "applied-migration" },
+      { id: "0073_zoho_books_recovery_incidents", mode: "applied-migration" },
+      { id: "0074_zoho_books_incident_generations", mode: "applied-migration" },
+      { id: "0075_zoho_books_dispositions", mode: "applied-migration" },
+      { id: "0076_control_provider_bills", mode: "applied-migration" },
+      { id: "0077_control_provider_bill_admission_guards", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -1400,6 +1584,14 @@ test("0029 installs over historical cross-workspace rows without rewriting owner
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
       { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
+      { id: "0070_zoho_books_observations", mode: "applied-migration" },
+      { id: "0071_zoho_books_watermark_guards", mode: "applied-migration" },
+      { id: "0072_zoho_books_exact_reviews", mode: "applied-migration" },
+      { id: "0073_zoho_books_recovery_incidents", mode: "applied-migration" },
+      { id: "0074_zoho_books_incident_generations", mode: "applied-migration" },
+      { id: "0075_zoho_books_dispositions", mode: "applied-migration" },
+      { id: "0076_control_provider_bills", mode: "applied-migration" },
+      { id: "0077_control_provider_bill_admission_guards", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{ decision_workspace: string; item_workspace: string }>(
@@ -1659,6 +1851,14 @@ test("0030 leaves historical cross-workspace rows untouched and they remain cuto
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
       { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
+      { id: "0070_zoho_books_observations", mode: "applied-migration" },
+      { id: "0071_zoho_books_watermark_guards", mode: "applied-migration" },
+      { id: "0072_zoho_books_exact_reviews", mode: "applied-migration" },
+      { id: "0073_zoho_books_recovery_incidents", mode: "applied-migration" },
+      { id: "0074_zoho_books_incident_generations", mode: "applied-migration" },
+      { id: "0075_zoho_books_dispositions", mode: "applied-migration" },
+      { id: "0076_control_provider_bills", mode: "applied-migration" },
+      { id: "0077_control_provider_bill_admission_guards", mode: "applied-migration" },
       ]);
 
       const ownership = await pool.query<{
@@ -1882,6 +2082,14 @@ test("upgrading from 0030 through 0033 cannot insert fee rows until 0034 sets fi
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
       { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
+      { id: "0070_zoho_books_observations", mode: "applied-migration" },
+      { id: "0071_zoho_books_watermark_guards", mode: "applied-migration" },
+      { id: "0072_zoho_books_exact_reviews", mode: "applied-migration" },
+      { id: "0073_zoho_books_recovery_incidents", mode: "applied-migration" },
+      { id: "0074_zoho_books_incident_generations", mode: "applied-migration" },
+      { id: "0075_zoho_books_dispositions", mode: "applied-migration" },
+      { id: "0076_control_provider_bills", mode: "applied-migration" },
+      { id: "0077_control_provider_bill_admission_guards", mode: "applied-migration" },
     ]);
     const pool = createPool(connectionString);
     try {
@@ -2063,6 +2271,14 @@ test("upgrading a genuinely frozen 0037 notice retries through the real store an
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
       { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
+      { id: "0070_zoho_books_observations", mode: "applied-migration" },
+      { id: "0071_zoho_books_watermark_guards", mode: "applied-migration" },
+      { id: "0072_zoho_books_exact_reviews", mode: "applied-migration" },
+      { id: "0073_zoho_books_recovery_incidents", mode: "applied-migration" },
+      { id: "0074_zoho_books_incident_generations", mode: "applied-migration" },
+      { id: "0075_zoho_books_dispositions", mode: "applied-migration" },
+      { id: "0076_control_provider_bills", mode: "applied-migration" },
+      { id: "0077_control_provider_bill_admission_guards", mode: "applied-migration" },
     ]);
     const retryOutput = execFileSync(
       process.execPath,
@@ -2238,6 +2454,14 @@ test("0042 purges legacy workspace.activated rows that 0041 would have preserved
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
       { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
+      { id: "0070_zoho_books_observations", mode: "applied-migration" },
+      { id: "0071_zoho_books_watermark_guards", mode: "applied-migration" },
+      { id: "0072_zoho_books_exact_reviews", mode: "applied-migration" },
+      { id: "0073_zoho_books_recovery_incidents", mode: "applied-migration" },
+      { id: "0074_zoho_books_incident_generations", mode: "applied-migration" },
+      { id: "0075_zoho_books_dispositions", mode: "applied-migration" },
+      { id: "0076_control_provider_bills", mode: "applied-migration" },
+      { id: "0077_control_provider_bill_admission_guards", mode: "applied-migration" },
     ]);
 
     const helperOutput = execFileSync(
@@ -2350,6 +2574,14 @@ test("0043 requires a semantic-version marker so old-style activations cannot be
       { id: "0067_control_follow_through", mode: "applied-migration" },
       { id: "0068_control_attention_target_identity", mode: "applied-migration" },
       { id: "0069_control_projection_empty_windows", mode: "applied-migration" },
+      { id: "0070_zoho_books_observations", mode: "applied-migration" },
+      { id: "0071_zoho_books_watermark_guards", mode: "applied-migration" },
+      { id: "0072_zoho_books_exact_reviews", mode: "applied-migration" },
+      { id: "0073_zoho_books_recovery_incidents", mode: "applied-migration" },
+      { id: "0074_zoho_books_incident_generations", mode: "applied-migration" },
+      { id: "0075_zoho_books_dispositions", mode: "applied-migration" },
+      { id: "0076_control_provider_bills", mode: "applied-migration" },
+      { id: "0077_control_provider_bill_admission_guards", mode: "applied-migration" },
     ]);
 
     const after = createPool(connectionString);
@@ -2544,6 +2776,14 @@ test("production-upgrade rehearsal from 0030 preserves Recovery facts through 00
       "0067_control_follow_through",
       "0068_control_attention_target_identity",
       "0069_control_projection_empty_windows",
+      "0070_zoho_books_observations",
+      "0071_zoho_books_watermark_guards",
+      "0072_zoho_books_exact_reviews",
+      "0073_zoho_books_recovery_incidents",
+      "0074_zoho_books_incident_generations",
+      "0075_zoho_books_dispositions",
+      "0076_control_provider_bills",
+      "0077_control_provider_bill_admission_guards",
     ]);
 
     const after = createPool(connectionString);

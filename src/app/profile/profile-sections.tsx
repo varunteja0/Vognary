@@ -46,6 +46,7 @@ export function AccountSection({ settings }: { settings: Settings }) {
         <button type="button" onClick={settings.signOut} className="btn btn-ghost shrink-0">Sign out</button>
       </div>
       <StatusMessage message={settings.statuses.account} />
+      <p className="mt-3 text-xs leading-5 text-(--muted)">Signing out ends this session. Zoho Books background access continues until you disconnect it in Bill review.</p>
 
       {profile?.activeWorkspace ? (
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
