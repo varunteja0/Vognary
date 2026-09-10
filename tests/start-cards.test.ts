@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { spokenChargeWhenLine } from "../src/lib/recovery/decision-cycle";
+import { PROVISIONAL_RISK_TAG } from "../src/lib/recovery/provisional-receipt";
 import { startCardsFromRecurringItems } from "../src/lib/recovery/start-cards";
 import { matchStartDecision, unmatchedStartDecisions } from "../src/lib/recovery/start-session";
 import { keepIsPrimary } from "../src/lib/recovery/wow-first-session";
@@ -117,6 +118,42 @@ test("a future cited evidence date is the start-card due date, not stored next p
   assert.ok(card);
   assert.equal(card?.dueDate, "2026-09-20");
   assert.doesNotMatch(card?.excerpt ?? "", /invoice paid/);
+});
+
+test("a provisional receipt never promotes an inferred next date to a scheduled charge", () => {
+  for (const provenance of [{ provisional: true }, { riskTags: [PROVISIONAL_RISK_TAG] }]) {
+    const [card] = startCardsFromRecurringItems([{
+      id: "synthetic-single-receipt",
+      merchant: "Synthetic supplier",
+      currency: "INR",
+      amountDecimal: "120.00",
+      nextExpectedDate: "2026-10-09",
+      evidence: [{ description: "Synthetic supplier paid INR 120.00 on 2026-09-09.", amountDecimal: "120.00", date: "2026-09-09" }],
+      ...provenance,
+    }], "2026-09-09");
+    assert.ok(card);
+    assert.equal(card.provisional, true);
+    assert.equal(card.dueDate, null);
+    assert.equal(card.whenLine, spokenChargeWhenLine("2026-09-09", null));
+    assert.doesNotMatch(card.whenLine, /charges (?:in|on|today|tomorrow)/i);
+    assert.ok(card.reasonKeys.includes("PROVISIONAL_SINGLE"));
+    assert.equal(card.amountDisplay, "₹120.00");
+  }
+});
+
+test("a provisional card preserves a directly cited future billing date", () => {
+  const [card] = startCardsFromRecurringItems([{
+    id: "synthetic-scheduled-bill",
+    merchant: "Synthetic supplier",
+    currency: "INR",
+    amountDecimal: "120.00",
+    provisional: true,
+    nextExpectedDate: "2026-10-20",
+    evidence: [{ description: "Synthetic supplier next billing INR 120.00 on 2026-09-20.", amountDecimal: "120.00", date: "2026-09-20" }],
+  }], "2026-09-09");
+  assert.ok(card);
+  assert.equal(card.dueDate, "2026-09-20");
+  assert.equal(card.whenLine, spokenChargeWhenLine("2026-09-09", "2026-09-20"));
 });
 
 test("start-session replay matches Cursor Pro to Cursor and reports unmatched merchants", () => {

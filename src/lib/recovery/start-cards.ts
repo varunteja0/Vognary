@@ -72,10 +72,10 @@ export function startCardsFromRecurringItems(items: readonly RecurringItemLike[]
     const latestDate = typeof latestCited?.date === "string" && /^\d{4}-\d{2}-\d{2}/.test(latestCited.date)
       ? latestCited.date.slice(0, 10)
       : "";
+    const provisional = item.provisional === true || (item.riskTags ?? []).some((tag) => tag === PROVISIONAL_RISK_TAG || /provisional/i.test(tag));
     const dueDate = latestDate && latestDate > today
       ? latestDate
-      : (item.nextExpectedDate && item.nextExpectedDate >= today ? item.nextExpectedDate : null);
-    const provisional = item.provisional === true || (item.riskTags ?? []).some((tag) => tag === PROVISIONAL_RISK_TAG || /provisional/i.test(tag));
+      : (!provisional && item.nextExpectedDate && item.nextExpectedDate >= today ? item.nextExpectedDate : null);
     return [{
       id: item.id ?? `${merchant}-${index}`,
       merchant,

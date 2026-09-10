@@ -126,6 +126,32 @@ forwards them to the ignored `COMPANY_MAIL_FORWARD_TO` destination while
 retaining originals in Resend. The command excludes synthetic tests and uses
 provider tags to prevent duplicate forwarding.
 
+## Market and customer operations
+
+The existing private CRM drives a read-only operating view from buyer replies
+through invoice, payment, activation review, first decision, reconciliation,
+workflow rescue and separately purchased repeat use:
+
+```bash
+npm run market:desk -- --report-only
+npm run market:desk -- --customer-actions-only
+```
+
+The first command writes nothing. The second writes only the private
+[customer-actions guide](.fallow/outreach-2026-09-03/customer-actions.txt), leaving
+existing outreach drafts, send logs and CRM evidence unchanged. Owner roles are
+required human handoffs, not accepted duties or authorization. Generated counts
+describe work to review, not independently verified customers or revenue.
+Neither command sends messages, schedules follow-ups, charges money, activates
+data or clears a release gate. A recorded contact channel is not permission.
+
+The default `market:desk` command still regenerates draft material, so review
+existing edits before using it. Paid, progressed and closed records do not enter
+new prospecting drafts. Existing saved drafts were not retroactively authorized
+or updated by the customer-actions-only command; current lane permissions and
+native receipts control any actual contact. Current research and execution are
+linked from [CONTINUE-HERE](docs/CONTINUE-HERE.md).
+
 ## Canonical documentation
 
 1. [THE-LAW](docs/THE-LAW.md) — company, product, and agent directive

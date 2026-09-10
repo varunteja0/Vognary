@@ -64,6 +64,31 @@ test("a hosted link stays unavailable unless the operator records one-time colle
   }, "subscription");
 });
 
+test("a hosted link stays closed without exact-offer verification evidence", () => {
+  const href = "https://rzp.io/i/synthetic-verified-pilot";
+  withPaymentLink(href, () => {
+    delete process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_VERIFICATION;
+    assert.deepEqual(getPilotPaymentLink(), { status: "unavailable" });
+    for (const invalid of [
+      "not-json",
+      JSON.stringify({}),
+      JSON.stringify({ ...verifiedOffer(href), href: "https://rzp.io/i/other-link" }),
+      JSON.stringify({ ...verifiedOffer(href), amountMinor: "1" }),
+      JSON.stringify({ ...verifiedOffer(href), currency: "USD" }),
+      JSON.stringify({ ...verifiedOffer(href), billingMode: "RECURRING" }),
+      JSON.stringify({ ...verifiedOffer(href), providerMode: "TEST" }),
+      JSON.stringify({ ...verifiedOffer(href), offerVersion: 2 }),
+      JSON.stringify({ ...verifiedOffer(href), termsVersion: "old-terms" }),
+      JSON.stringify({ ...verifiedOffer(href), evidenceSha256: "unverified" }),
+      JSON.stringify({ ...verifiedOffer(href), verifiedAt: "not-a-date" }),
+      JSON.stringify({ ...verifiedOffer(href), status: "REVOKED" }),
+    ]) {
+      process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_VERIFICATION = invalid;
+      assert.deepEqual(getPilotPaymentLink(), { status: "unavailable" });
+    }
+  });
+});
+
 test("retired /api/checkout stays 410 after the pilot pay page exists", async () => {
   const response = await checkoutGet();
   assert.equal(response.status, 410);
@@ -123,18 +148,33 @@ test("founder operations collect once and keep Control unenrolled until payment 
 function withPaymentLink(value: string | undefined, run: () => void, mode: string | null = value === undefined ? null : "one-time") {
   const previous = process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL;
   const previousMode = process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE;
+  const previousVerification = process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_VERIFICATION;
   try {
     if (value === undefined) delete process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL;
     else process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL = value;
     if (mode === null) delete process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE;
     else process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE = mode;
+    if (value === undefined) delete process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_VERIFICATION;
+    else process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_VERIFICATION = JSON.stringify(verifiedOffer(value));
     run();
   } finally {
     if (previous === undefined) delete process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL;
     else process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL = previous;
     if (previousMode === undefined) delete process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE;
     else process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE = previousMode;
+    if (previousVerification === undefined) delete process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_VERIFICATION;
+    else process.env.COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_VERIFICATION = previousVerification;
   }
+}
+
+function verifiedOffer(href: string) {
+  return {
+    status: "VERIFIED", href, amountMinor: String(commitmentControlPilotOffer.amountMinor),
+    currency: commitmentControlPilotOffer.currency, billingMode: commitmentControlPilotOffer.billingMode,
+    providerMode: "LIVE", offerVersion: commitmentControlPilotOffer.version,
+    termsVersion: commitmentControlPilotOffer.termsVersion,
+    verifiedAt: "2026-09-09T00:00:00.000Z", evidenceSha256: "a".repeat(64),
+  };
 }
 
 function source(path: string) {

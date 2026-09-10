@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { commitmentControlPilotOffer } from "../src/lib/pilot-offer";
 import { getPublicTrustSignals } from "../src/lib/server/trust-signals";
 
 const names = [
@@ -37,6 +38,7 @@ const names = [
   "APP_URL",
   "COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL",
   "COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE",
+  "COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_VERIFICATION",
   "COMMITMENT_CONTROL_PILOT_WORKSPACE_IDS",
   "COMMITMENT_CONTROL_PAID_WORKSPACE_IDS",
   "COMMITMENT_CONTROL_SECURITY_ASSESSMENT_STATUS",
@@ -181,10 +183,27 @@ test("backup readiness refuses a bare passed status without a restricted record 
   });
 });
 
-test("a valid Razorpay Payment Link configures private-pilot collection without proving a paid customer", () => {
+test("an unverified hosted URL cannot claim configured private-pilot collection", () => {
   withEnvironment({
     COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL: "https://rzp.io/l/vognary-pilot",
     COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE: "one-time",
+  }, () => {
+    const signal = getPublicTrustSignals().find(entry => entry.id === "pilot-payment-collection");
+    assert.equal(signal?.state, "not-yet-proven");
+  });
+});
+
+test("a verified Razorpay Payment Link configures collection without proving a paid customer", () => {
+  withEnvironment({
+    COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL: "https://rzp.io/l/vognary-pilot",
+    COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE: "one-time",
+    COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_VERIFICATION: JSON.stringify({
+      status: "VERIFIED", href: "https://rzp.io/l/vognary-pilot",
+      amountMinor: String(commitmentControlPilotOffer.amountMinor), currency: commitmentControlPilotOffer.currency,
+      billingMode: commitmentControlPilotOffer.billingMode, providerMode: "LIVE",
+      offerVersion: commitmentControlPilotOffer.version, termsVersion: commitmentControlPilotOffer.termsVersion,
+      verifiedAt: "2026-09-09T00:00:00.000Z", evidenceSha256: "a".repeat(64),
+    }),
   }, () => {
     const byId = new Map(getPublicTrustSignals().map((signal) => [signal.id, signal]));
     assert.equal(byId.get("pilot-payment-collection")?.state, "configured");

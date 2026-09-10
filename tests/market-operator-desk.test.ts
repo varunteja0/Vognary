@@ -83,6 +83,150 @@ test("regenerating the desk preserves recorded send and reply evidence", () => {
   assert.match(output, /P01,DIRECT_FINANCE,WARM_INTRO,FIRST_TOUCH,AI_SPEND_CHANGE_CONTROL,,2026-09-03,2026-09-04,"No, timing is wrong",DECLINED/);
 });
 
+test("market desk keeps paid and closed customers out of prospecting drafts", () => {
+  const rows = [
+    selectedRow({ id: "P21", status: "paid-pilot", payment_received_at: "2026-09-08T09:00:00.000Z" }),
+    selectedRow({ id: "P22", status: "active-pilot", payment_received_at: "2026-09-08T09:00:00.000Z", contacted_at: "2026-09-01T09:00:00.000Z" }),
+    selectedRow({ id: "P23", status: "closed-lost", loss_reason: "NO_PAIN" }),
+    selectedRow({ id: "P24", status: "refunded", contacted_at: "2026-09-01T09:00:00.000Z" }),
+    selectedRow({ id: "P25", status: "renewed", renewal_paid_at: "2026-09-08T09:00:00.000Z" }),
+  ];
+  const before = structuredClone(rows);
+
+  const desk = buildMarketOperatorDesk(rows);
+
+  assert.deepEqual(desk.firstTouches, []);
+  assert.deepEqual(desk.followUps, []);
+  assert.deepEqual(desk.logEntries, []);
+  assert.deepEqual(rows, before);
+});
+
+test("market desk routes a recorded payment to human activation review, not automatic access", () => {
+  const desk = buildMarketOperatorDesk([
+    selectedRow({
+      id: "P21",
+      status: "paid-pilot",
+      payment_received_at: "2026-09-08T09:00:00.000Z",
+      payment_amount_inr: "14999",
+    }),
+  ]);
+
+  assert.equal(desk.customerActions.length, 1);
+  assert.equal(desk.customerActions[0].id, "P21");
+  assert.equal(desk.customerActions[0].action, "REVIEW_ACTIVATION_GATES");
+  assert.equal(desk.customerActions[0].automatic, false);
+  assert.match(desk.customerActions[0].instruction, /payment does not activate/i);
+  assert.match(desk.customerActions[0].instruction, /independent assessment.*retest/i);
+  assert.match(desk.customerActions[0].instruction, /capacity/i);
+});
+
+test("market desk follows the customer journey without creating customer evidence", () => {
+  const qualifiedConversation = {
+    conversation_at: "2026-09-07T09:00:00.000Z",
+    repeated_job_status: "YES",
+    next_event_committed_at: "2026-09-08T09:00:00.000Z",
+    buying_role: "BUYER",
+    enforcement_requirement: "ADVISORY_ACCEPTED",
+    spend_threshold_confirmed_at: "2026-09-07T09:00:00.000Z",
+  };
+  const recordedPayment = {
+    payment_received_at: "2026-09-08T09:00:00.000Z",
+    payment_amount_inr: "14999",
+  };
+  const cases: Array<{ row: Record<string, string>; action: string }> = [
+    { row: { replied_at: "2026-09-07T09:00:00.000Z" }, action: "QUALIFY_RELEVANT_JOB" },
+    { row: qualifiedConversation, action: "REVIEW_FIXED_OFFER" },
+    { row: { ...qualifiedConversation, repeated_job_status: "NO" }, action: "REVIEW_JOB_FIT" },
+    { row: { ...qualifiedConversation, buying_role: "UNKNOWN" }, action: "QUALIFY_RELEVANT_JOB" },
+    { row: { ...qualifiedConversation, enforcement_requirement: "NEEDS_ENFORCEMENT" }, action: "REVIEW_JOB_FIT" },
+    { row: { offer_at: "2026-09-07T09:00:00.000Z" }, action: "REVIEW_OFFER_RESPONSE" },
+    { row: { invoice_commitment_at: "2026-09-07T09:00:00.000Z" }, action: "PREPARE_VERIFIED_INVOICE" },
+    { row: { invoice_sent_at: "2026-09-07T09:00:00.000Z" }, action: "RECONCILE_PAYMENT" },
+    { row: { ...recordedPayment, status: "active-pilot", proposal_count: "0" }, action: "REVIEW_FIRST_DECISION" },
+    { row: { ...recordedPayment, status: "active-pilot", proposal_count: "1", t5_status: "NOT_YET_ELIGIBLE" }, action: "REVIEW_RECONCILIATION" },
+    { row: { ...recordedPayment, status: "active-pilot", proposal_count: "1", t5_status: "RESCUED" }, action: "REPAIR_CUSTOMER_WORKFLOW" },
+    { row: { ...recordedPayment, status: "active-pilot", proposal_count: "1", t5_status: "FAIL" }, action: "REPAIR_CUSTOMER_WORKFLOW" },
+    { row: { ...recordedPayment, status: "active-pilot", proposal_count: "1", t5_status: "PASS" }, action: "REVIEW_VALUE_AND_REPURCHASE" },
+    { row: { ...recordedPayment, status: "active-pilot", renewal_offered_at: "2026-09-09T09:00:00.000Z" }, action: "RECONCILE_REPEAT_PURCHASE" },
+    { row: { ...recordedPayment, status: "renewed", renewal_paid_at: "2026-09-09T09:00:00.000Z" }, action: "REVIEW_REPEAT_USE" },
+    { row: { ...recordedPayment, status: "refunded" }, action: "RECONCILE_REFUND" },
+    { row: { status: "closed-lost" }, action: "REVIEW_LOSS" },
+  ];
+
+  for (const scenario of cases) {
+    const row = selectedRow(scenario.row);
+    const before = structuredClone(row);
+    const desk = buildMarketOperatorDesk([row]);
+    assert.equal(desk.customerActions[0]?.action, scenario.action);
+    assert.equal(desk.customerActions[0].automatic, false);
+    assert.ok(desk.customerActions[0].ownerRole);
+    assert.deepEqual(desk.firstTouches, []);
+    assert.deepEqual(desk.followUps, []);
+    assert.deepEqual(row, before);
+  }
+});
+
+test("market desk holds incomplete or inconsistent customer records for reconciliation", () => {
+  const cases: Array<Record<string, string>> = [
+    { status: "active-pilot", payment_received_at: "not-a-date", payment_amount_inr: "14999" },
+    { status: "paid-pilot", payment_received_at: "2026-09-08T09:00:00.000Z", payment_amount_inr: "1" },
+    { status: "active-pilot", payment_received_at: "2026-09-08T09:00:00.000Z" },
+    { status: "renewed" },
+    { status: "offered" },
+    { status: "unexpected-status" },
+  ];
+  for (const overrides of cases) {
+    const desk = buildMarketOperatorDesk([selectedRow(overrides)]);
+    assert.match(desk.customerActions[0]?.action ?? "", /^RECONCILE_(PAYMENT_EVIDENCE|CUSTOMER_RECORD)$/);
+    assert.deepEqual(desk.firstTouches, []);
+    assert.deepEqual(desk.followUps, []);
+  }
+
+  const unassigned = buildMarketOperatorDesk([selectedRow({
+    test_cell: "",
+    replied_at: "2026-09-07T09:00:00.000Z",
+  })]);
+  assert.equal(unassigned.customerActions[0].action, "RECONCILE_CUSTOMER_RECORD");
+  assert.match(unassigned.customerActions[0].instruction, /current.*thesis/i);
+});
+
+test("market desk reports human work rather than certified customers or revenue", () => {
+  const desk = buildMarketOperatorDesk([selectedRow({
+    status: "paid-pilot",
+    payment_received_at: "2026-09-08T09:00:00.000Z",
+    payment_amount_inr: "14999",
+  })]);
+
+  assert.equal(desk.summary.customerActionCounts.REVIEW_ACTIVATION_GATES, 1);
+  assert.match(desk.customerGuide, /recorded CRM.*not independently verified/i);
+  assert.match(desk.customerGuide, /no.*automatic.*renewal/i);
+  assert.match(desk.customerGuide, /not ARR/i);
+  assert.match(desk.customerGuide, /P01/);
+  assert.doesNotMatch(desk.customerGuide, /Private Company|example\.test/);
+  assert.match(formatMarketOperatorDeskSummary(desk.summary), /customer actions: 1.*human review/i);
+});
+
+test("market desk drafts use text-first discovery and the full unchanged offer boundary", () => {
+  const desk = buildMarketOperatorDesk([
+    selectedRow({ id: "P01" }),
+    selectedRow({ id: "P02", contacted_at: "2026-09-01T09:00:00.000Z" }),
+  ]);
+
+  for (const draft of [...desk.firstTouches, ...desk.followUps]) {
+    assert.match(draft.content, /reply by text/i);
+    assert.match(draft.content, /call is optional/i);
+    assert.match(draft.content, /do not submit real financial/i);
+    assert.match(draft.content, /permission.*duplicate/i);
+    assert.doesNotMatch(draft.content, /real customer financial data remains blocked/i);
+  }
+  assert.match(desk.firstTouches[0].content, /second month requires a separate purchase/i);
+  assert.match(desk.firstTouches[0].content, /ten business days/i);
+  assert.match(desk.interviewGuide, /TEXT FIRST/);
+  assert.match(desk.interviewGuide, /call is optional/i);
+  assert.match(desk.interviewGuide, /do not submit real financial/i);
+  assert.match(desk.interviewGuide, /capacity/i);
+});
+
 function selectedRow(overrides: Record<string, string>) {
   return {
     id: "P01",

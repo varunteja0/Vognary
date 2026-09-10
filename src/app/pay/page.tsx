@@ -6,6 +6,7 @@ import { VognaryMark } from "../brand";
 import { formatExactMinorUnits } from "@/components/ui/money-value";
 import { commitmentControlPilotOffer, pilotOfferMajorUnits } from "@/lib/pilot-offer";
 import { getPilotPaymentLink } from "@/lib/pilot-payment-link";
+import InvoiceRequest from "./invoice-request";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +82,7 @@ export default function PayPage() {
             </h1>
             <p className="public-price mt-6">{price}</p>
             <p className="mt-1 font-data text-xs text-(--muted)">ONE PAYMENT · ONE PILOT MONTH</p>
+            <p className="mt-2 text-xs leading-5 text-(--muted)">Before applicable GST. Your invoice states the final tax and payable amount.</p>
             <p className="mt-5 text-sm leading-7 text-(--ink-soft)">
               Reserve a founder-delivered control desk for proposed obligations, named human decisions, frozen caps, and later reconciliation.
             </p>
@@ -89,9 +91,7 @@ export default function PayPage() {
                 Reserve for {price}
               </a>
             ) : (
-              <a className="btn btn-primary btn-lg mt-6 w-full" href="mailto:support@vognary.com?subject=Commitment%20Control%20pilot%20invoice">
-                Request the one-time invoice
-              </a>
+              <InvoiceRequest />
             )}
             <p className="mt-4 text-xs leading-5 text-(--muted)">
               No automatic renewal. Payment does not bypass activation or security gates.
@@ -146,7 +146,7 @@ export default function PayPage() {
             {payment.status === "ready" ? (
               <>
                 <p className="mt-2 text-sm leading-7 text-(--muted)">
-                  The payment command opens a founder-configured hosted page for exactly {price}. It must request one payment only. Card, UPI, and bank details stay with the payment provider. Keep the provider&apos;s confirmation and email{" "}
+                  The payment command opens a hosted page checked by the founder against the one-time {price} pilot offer. Confirm the final amount and any tax against your invoice before paying. Card, UPI, and bank details stay with the payment provider. Keep the provider&apos;s confirmation and email{" "}
                   <a className="link-quiet" href="mailto:support@vognary.com">support@vognary.com</a> if you need a Vognary letterhead receipt.
                 </p>
                 <p className="mt-2 text-sm leading-7 text-(--muted)">

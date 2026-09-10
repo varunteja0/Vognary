@@ -560,6 +560,7 @@ export async function migrateLegacyRecovery(pool: Pool): Promise<LegacyRecoveryM
     });
     await reconcileMigratedRecoveryRecords(client, items, evidence);
 
+    await client.query(`delete from commitment_decisions where workspace_id = any($1::uuid[])`, [workspaceIds]);
     await client.query(`delete from recurring_items where workspace_id = any($1::uuid[])`, [workspaceIds]);
     await client.query(`delete from data_sources where workspace_id = any($1::uuid[])`, [workspaceIds]);
     await client.query(`delete from workspace_states where workspace_id = any($1::uuid[])`, [workspaceIds]);

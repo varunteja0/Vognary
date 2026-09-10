@@ -41,6 +41,24 @@ test("public bill-example links describe fixed synthetic input, including the me
   await expect(page.getByRole("link", { name: "Continue to your bill desk", exact: true })).toHaveAttribute("href", "/login?next=%2Fapp%3Fview%3DBILL_REVIEW");
 });
 
+test("invoice fallback copies the contact address without claiming a sent request", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/pay");
+  const copy = page.getByRole("button", { name: "Copy invoice email address" });
+  await copy.click();
+  await expect(page.getByRole("status")).toHaveText("Email address copied. No request has been sent.");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("support@vognary.com");
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.clipboard, "writeText", {
+      configurable: true,
+      value: async () => { throw new DOMException("Synthetic clipboard denial", "NotAllowedError"); },
+    });
+  });
+  await copy.click();
+  await expect(page.getByRole("status")).toHaveText("Copy unavailable. Email support@vognary.com. No request has been sent.");
+  await expect(page.getByRole("link", { name: "Request the one-time invoice" })).toHaveAttribute("href", /^mailto:support@vognary\.com/);
+});
+
 test("a synthetic paid confirmation does not grant activation or sell bill review", async ({ page }) => {
   const checkoutId = "11111111-1111-4111-8111-111111111111";
   await page.route(`**/api/checkout/${checkoutId}`, route => route.fulfill({ json: { status: "paid", plan: "commitment-control-private-pilot", currency: "INR", amountMinor: 1499900, paidAt: "2026-09-07T00:00:00.000Z", refundedAt: null } }));

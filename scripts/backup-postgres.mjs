@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import pg from "pg";
 import { backupObjectKey, getBackupStorageConfig, uploadBackupObject } from "./lib/backup-storage.mjs";
-import { normalizeBackupVerificationProfile, readRecoveryBackupVerification } from "./lib/recovery-backup-verification.mjs";
+import { readRecoveryBackupVerification, resolveBackupVerificationProfile } from "./lib/recovery-backup-verification.mjs";
 import {
   encryptFile,
   parseBackupEncryptionKey,
@@ -24,7 +24,6 @@ if (process.argv.includes("--help")) {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const databaseUrl = requireEnv("DATABASE_URL");
-const verificationProfile = normalizeBackupVerificationProfile(process.env.BACKUP_VERIFICATION_PROFILE);
 const backupKey = parseBackupEncryptionKey(process.env.BACKUP_ENCRYPTION_KEY);
 const backupDir = path.resolve(root, process.env.BACKUP_DIR || "backups/postgres");
 const createdAt = new Date().toISOString();
@@ -44,6 +43,7 @@ const verificationPool = new Pool({
 });
 let verification;
 try {
+  const verificationProfile = await resolveBackupVerificationProfile(verificationPool, process.env.BACKUP_VERIFICATION_PROFILE);
   verification = await readRecoveryBackupVerification(verificationPool, verificationProfile);
 } finally {
   await verificationPool.end();
@@ -138,6 +138,7 @@ try {
 
   console.log(JSON.stringify({
     status: "ok",
+    verificationProfile: verification.profile,
     encryptedDump: manifest.files.encryptedDump,
     manifest: manifest.files.manifest,
     plaintextBytes: manifest.dump.plaintextBytes,

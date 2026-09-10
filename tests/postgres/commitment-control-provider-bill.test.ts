@@ -62,7 +62,7 @@ before(async () => {
 after(async () => {
   try {
     await fixturePool?.end();
-    if (fixtureDatabaseCreated) await fixtureAdmin!.query(`drop database "${fixtureDatabaseName}" with (force)`);
+    if (fixtureDatabaseCreated) await fixtureAdmin!.query(`drop database "${fixtureDatabaseName}"`);
   } finally {
     await fixtureAdmin?.end();
     if (originalDatabaseUrl) process.env.DATABASE_URL = originalDatabaseUrl;
@@ -1146,7 +1146,7 @@ test("current backup and restore preserve populated A2 admissions, bases and int
         writeFileSync(join(directory, "verification.json"), JSON.stringify({ synthetic: true, sourceErased: erased, expected, actual, exactLineagePreserved: true, workspaceErasurePassed: true }, null, 2));
       } finally {
         await restored?.end();
-        await pool.query(`drop database "${targetName}" with (force)`);
+        await pool.query(`drop database "${targetName}"`);
       }
       console.log(`Synthetic A2 populated restore artifact: ${directory}`);
     });

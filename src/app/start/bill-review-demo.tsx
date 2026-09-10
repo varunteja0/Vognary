@@ -13,12 +13,21 @@ export default function BillReviewDemo() {
   const [disposition, setDisposition] = useState<"RESOLVED" | "FOLLOW_UP" | null>(null);
   const [history, setHistory] = useState<Array<{ revision: number; disposition: "RESOLVED" | "FOLLOW_UP" }>>([]);
   const [reason, setReason] = useState("EXPLAINED");
-  const [discarded, setDiscarded] = useState(false);
+  const [discardStatus, setDiscardStatus] = useState<string | null>(null);
   const previous = revision === 2 ? "12000" : "13000";
   const current = revision === 2 ? "13000" : "14000";
   function record(next: "RESOLVED" | "FOLLOW_UP") {
     setDisposition(next);
     setHistory(items => [...items, { revision, disposition: next }]);
+  }
+  function discardTabEvidence() {
+    try {
+      sessionStorage.removeItem("vognary.guest-audit-transfer.v1");
+      sessionStorage.removeItem("vognary.guest-audit-transfer-binding.v1");
+      setDiscardStatus("Tab evidence discarded. No receipt is queued for sign-in.");
+    } catch {
+      setDiscardStatus("Tab evidence could not be cleared. Retry or clear this site's browser data before signing in.");
+    }
   }
   return <main className="public-page min-h-screen px-4 py-6 sm:px-8">
     <div className="mx-auto grid max-w-5xl gap-8">
@@ -40,8 +49,8 @@ export default function BillReviewDemo() {
           </div>
         </div>
       </section>
-      <footer className="flex flex-wrap justify-between gap-4 border-t border-line pt-4 text-sm text-(--muted)"><Link className="link-quiet" href="/demo">Pre-spend Commitment Control</Link><Link className="link-quiet" href="/security">Customer-data restrictions</Link><Link className="link-quiet" href="/login?next=%2Fapp%3Fview%3DBILL_REVIEW">Continue to your bill desk</Link><button type="button" className="btn btn-sm btn-ghost" onClick={() => { sessionStorage.removeItem("vognary.guest-audit-transfer.v1"); sessionStorage.removeItem("vognary.guest-audit-transfer-binding.v1"); setDiscarded(true); }}><Trash2 size={16} aria-hidden />Discard tab evidence</button></footer>
-      {discarded ? <p role="status">Tab evidence discarded. No receipt is queued for sign-in.</p> : null}
+      <footer className="flex flex-wrap justify-between gap-4 border-t border-line pt-4 text-sm text-(--muted)"><Link className="link-quiet" href="/demo">Pre-spend Commitment Control</Link><Link className="link-quiet" href="/security">Customer-data restrictions</Link><Link className="link-quiet" href="/login?next=%2Fapp%3Fview%3DBILL_REVIEW">Continue to your bill desk</Link><button type="button" className="btn btn-sm btn-ghost" onClick={discardTabEvidence}><Trash2 size={16} aria-hidden />Discard tab evidence</button></footer>
+      {discardStatus ? <p role="status">{discardStatus}</p> : null}
     </div>
   </main>;
 }

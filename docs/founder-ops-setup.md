@@ -239,7 +239,7 @@ This gate also needs a real Postgres (`DATABASE_URL`), a token key, and a sessio
 **C. Backup + restore drill**
 1. `npm run secrets:generate-backup-key` → set `BACKUP_ENCRYPTION_KEY` and the `BACKUP_KEY_FINGERPRINT` it prints.
 2. (optional offsite) create an S3/R2 bucket → set `BACKUP_STORAGE_BUCKET`, `BACKUP_STORAGE_ENDPOINT`, `BACKUP_STORAGE_REGION`, `BACKUP_STORAGE_ACCESS_KEY_ID`, `BACKUP_STORAGE_SECRET_ACCESS_KEY`.
-3. Run a backup: `npm run backup:postgres`.
+3. Run a backup: `npm run backup:postgres`. An explicit `BACKUP_VERIFICATION_PROFILE` remains strict. The scheduled workflow uses `deployed`, which resolves only exact supported heads: 0026 to `pre-0053`, 0056 to `pre-0057`, and 0077 to `current`. Missing or intermediate heads fail closed; all migration, trigger and data-count checks still run. The manifest records the resolved profile. Do not advance production schema merely to match the newest source profile.
 4. Run a **restore drill** into a throwaway DB: set `RESTORE_DATABASE_URL=<disposable pg>` and `RESTORE_CONFIRM_DISPOSABLE=true`, then `npm run backup:restore-drill`.
 5. Only **after an observed durable-storage restore drill**: retain and hash the restricted result, then set `BACKUP_RESTORE_DRILL_STATUS`, `BACKUP_RESTORE_DRILL_AT=<ISO date>`, and `BACKUP_RESTORE_DRILL_RECORD_SHA256` together (status and date show on the trust pages).
 
@@ -271,16 +271,61 @@ Then set:
 ```
 COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_URL=https://rzp.io/i/your-one-time-payment
 COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_MODE=one-time
+COMMITMENT_CONTROL_PILOT_PAYMENT_LINK_VERIFICATION=
 ```
 
-in `.env.local` and in Vercel Production. The exact lowercase `one-time` mode is
-an operator attestation that the URL was reviewed and creates no recurring
-mandate; any other value keeps `/pay` unavailable. Use one unique link per accepted
-prospect. Blank or invalid URL → honest “not configured.” A configured link is
-not an offer, payment, customer, security clearance, or enrollment. Mark payment
-only after settlement, and keep real customer financial data out of Vognary
-until the independent assessment and activation gates close. Historical
-settlement handling lives in `docs/billing-activation-runbook.md`.
+only in the authorized environment. The exact lowercase `one-time` mode and an
+allowlisted HTTPS URL are necessary but insufficient. The verification value is
+one JSON object whose fields match the actual checked offer:
+
+| Field | Required recorded value |
+| --- | --- |
+| `status` | `VERIFIED`; change to `REVOKED` to withdraw the link |
+| `href` | Exact hosted URL checked by the founder |
+| `amountMinor` | String `1499900` |
+| `currency` / `billingMode` / `providerMode` | `INR` / `ONE_TIME` / `LIVE` |
+| `offerVersion` / `termsVersion` | Number `3` / `terms-2026-09-01` |
+| `verifiedAt` | Actual UTC verification timestamp in ISO format with milliseconds |
+| `evidenceSha256` | SHA-256 of the privately retained provider/offer verification record |
+
+Do not populate this from the example, a test fixture, a URL alone or assumptions.
+Missing, malformed, revoked, mismatched or old-offer evidence keeps the hosted
+link unavailable. This is a checked operator attestation, not live provider
+introspection or settlement proof. A changed link, price or terms version needs
+new verification. Confirm seller identity, disabled partial payments/recurrence,
+final tax and payable amount, expiry, return behavior and the actual refund path.
+If tax makes the provider total differ from the fixed public collection contract,
+keep public collection closed and resolve the invoice with the legal/tax owner.
+
+Send prospect-specific links privately only after the explicit offer is accepted;
+never publish a link containing customer details or an invoice payable by only one
+customer on the public page. A public hosted link must be suitable for that public
+audience. Keep the invoice fallback active when that is not established.
+
+For each accepted pilot, the founder owns this minimal record in the existing
+private CRM/operating desk: request received; human acknowledgement; agreed terms
+and capacity; invoice issued with exact tax/amount; provider-confirmed settlement;
+Vognary receipt; assurance/eligibility check; written activation date; and any
+refund request and completed refund. Record actual timestamps and references,
+not inferred states. Opening a mail app or copying the support address sends
+nothing. A provider return URL never establishes settlement. Agree an achievable
+response target and name a backup owner rather than publish an unstaffed SLA.
+
+Rehearse success, cancel/failure, duplicate submission, receipt and refund handling
+using a separately approved test scope. No live charge or refund follows from
+code readiness. A configured link is not an offer, payment, customer, security
+clearance or enrollment. Keep real customer data blocked until the independent
+assessment and activation gates close. Historical settlement handling remains in
+`docs/billing-activation-runbook.md`.
+
+### Hosting prerequisite
+
+The Books worker in `vercel.json` is hourly. Vercel's [cron limits](https://vercel.com/docs/cron-jobs/usage-and-pricing)
+reject that schedule on Hobby; [Hobby terms](https://vercel.com/docs/plans/hobby)
+also restrict the plan to personal, non-commercial use. The failed September 8
+deployment links to those cron limits. The founder must verify/select a suitable
+commercial hosting plan before deployment. Do not silently reduce job frequency,
+purchase a plan, or mistake a local build for a successful deployment.
 
 ---
 

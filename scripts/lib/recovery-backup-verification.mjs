@@ -152,6 +152,17 @@ export function normalizeBackupVerificationProfile(value) {
   return profile;
 }
 
+export async function resolveBackupVerificationProfile(client, value) {
+  if (value?.trim() !== "deployed") return normalizeBackupVerificationProfile(value);
+  const head = await client.query(`select id from schema_migrations order by id desc limit 1`);
+  const migrationHead = head.rows[0]?.id ?? null;
+  const profile = backupVerificationProfiles.find(candidate => verificationProfile(candidate).migrationHead === migrationHead);
+  if (!profile) {
+    throw new Error(`No supported backup verification profile for database migration head ${migrationHead ?? "missing"}. Verify the migration ledger and add an exact reviewed profile before backing up.`);
+  }
+  return profile;
+}
+
 export function requiredRecoveryTablesForProfile(value) {
   const profile = normalizeBackupVerificationProfile(value);
   const base = [

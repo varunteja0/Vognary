@@ -6,7 +6,9 @@ import {
   pre0053IntegrityMigrations,
   pre0057IntegrityMigrations,
   pre0057IntegrityTriggers,
+  readRecoveryBackupVerification,
   recoveryBackupVerificationMatches,
+  resolveBackupVerificationProfile,
   requiredAutopilotAuditCountKeys,
   requiredCommitmentControlCountKeys,
   requiredZohoBooksCountKeys,
@@ -30,6 +32,37 @@ function verification(auditFacts: Record<string, string> = {}) {
     ),
   };
 }
+
+test("scheduled backup resolves only an exact supported deployed schema head", async () => {
+  for (const [head, profile] of [
+    ["0026_recovery_inbound_retention", "pre-0053"],
+    ["0056_decision_cycle_expected_amount", "pre-0057"],
+    ["0077_control_provider_bill_admission_guards", "current"],
+  ]) {
+    const queries: string[] = [];
+    const client = { query: async (sql: string) => { queries.push(sql); return { rows: [{ id: head }] }; } };
+    assert.equal(await resolveBackupVerificationProfile(client, "deployed"), profile);
+    assert.equal(queries.length, 1);
+    assert.match(queries[0], /select id from schema_migrations order by id desc limit 1/);
+  }
+});
+
+test("deployed backup profile refuses missing, intermediate and unknown migration heads", async () => {
+  for (const head of [null, "0057_commitment_control_v0", "0076_control_provider_bills", "9999_unknown"]) {
+    const client = { query: async () => ({ rows: head ? [{ id: head }] : [] }) };
+    await assert.rejects(resolveBackupVerificationProfile(client, "deployed"), /No supported backup verification profile/);
+  }
+});
+
+test("profile selection never downgrades an explicit request or skips integrity checks", async () => {
+  const head = "0056_decision_cycle_expected_amount";
+  const client = { query: async (sql: string) => ({ rows: sql.includes("order by id desc") ? [{ id: head }] : [] }) };
+  assert.equal(await resolveBackupVerificationProfile(client, "current"), "current");
+  await assert.rejects(readRecoveryBackupVerification(client, "current"), /current backup requires 0077/);
+  const selected = await resolveBackupVerificationProfile(client, "deployed");
+  await assert.rejects(readRecoveryBackupVerification(client, selected), /missing required migrations/);
+  await assert.rejects(resolveBackupVerificationProfile(client, "arbitrary"), /Unknown backup verification profile/);
+});
 
 test("source resolution backup requires exact reviews, incidents and immutable dispositions", () => {
   for (const table of ["zoho_books_reviews", "zoho_books_incidents", "zoho_books_dispositions"]) assert.ok(requiredZohoBooksCountKeys.includes(table));

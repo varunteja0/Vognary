@@ -9,6 +9,7 @@ on:
         default: current
         type: choice
         options:
+          - deployed
           - current
           - pre-0057
           - pre-0053
@@ -118,7 +119,7 @@ jobs:
       - name: Create encrypted backup and upload to object storage
         run: npm run backup:postgres
         env:
-          BACKUP_VERIFICATION_PROFILE: ${{ inputs.verification_profile || 'current' }}
+          BACKUP_VERIFICATION_PROFILE: ${{ inputs.verification_profile || 'deployed' }}
           POSTGRES_SSL: "true"
           POSTGRES_CLIENT_MODE: docker
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
@@ -151,7 +152,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: encrypted-postgres-backup-${{ inputs.verification_profile || 'current' }}
+          name: encrypted-postgres-backup-${{ inputs.verification_profile || 'deployed' }}
           path: backups/postgres/*
           if-no-files-found: ignore
           retention-days: 90

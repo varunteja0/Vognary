@@ -398,7 +398,7 @@ test("concurrent reviewers acknowledge exact workspace observations and reject s
   }
 });
 
-test("terminal outage delivers an operator incident and audited resume preserves history and freshness", { skip: !process.env.DATABASE_URL }, async () => {
+test("terminal outage delivers an operator incident and audited resume preserves history and freshness", { skip: !process.env.DATABASE_URL }, async context => {
   const received: Array<Record<string, unknown>> = [];
   const receiver = createServer(async (request, response) => {
     const chunks: Buffer[] = [];
@@ -441,6 +441,7 @@ test("terminal outage delivers an operator incident and audited resume preserves
       const savedEnvironment = Object.fromEntries(Object.keys(configuration).map(key => [key, process.env[key]]));
       Object.assign(process.env, configuration);
       try {
+        context.mock.timers.enable({ apis: ["Date"], now: new Date("2026-09-08T00:00:00.000Z") });
         const { POST } = await import("../../src/app/api/workspaces/current/sources/zoho-books/route");
         const { createSessionCookie } = await import("../../src/lib/server/session");
         const cookie = await createSessionCookie({ userId: ownerId, workspaceId });

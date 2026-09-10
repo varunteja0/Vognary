@@ -36,3 +36,29 @@ test("a reloaded guest can discard an older tab transfer and its workspace bindi
   expect(stored).toEqual([null, null]);
   await expect(page.getByText("Tab evidence discarded. No receipt is queued for sign-in.")).toBeVisible();
 });
+
+test("discard reports denied storage honestly and can recover on retry", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto("/start");
+  await page.evaluate(() => {
+    sessionStorage.setItem("vognary.guest-audit-transfer.v1", "Synthetic old receipt");
+    sessionStorage.setItem("vognary.guest-audit-transfer-binding.v1", "Synthetic binding");
+    Object.defineProperty(sessionStorage, "removeItem", {
+      configurable: true,
+      value: () => { throw new DOMException("Synthetic storage denial", "SecurityError"); },
+    });
+  });
+  await page.getByRole("button", { name: "Discard tab evidence" }).click();
+  await expect(page.getByRole("status")).toContainText("Tab evidence could not be cleared");
+  await expect(page.getByText("Tab evidence discarded. No receipt is queued for sign-in.")).toHaveCount(0);
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => sessionStorage.getItem("vognary.guest-audit-transfer.v1"))).toBe("Synthetic old receipt");
+  await page.evaluate(() => Reflect.deleteProperty(sessionStorage, "removeItem"));
+  await page.getByRole("button", { name: "Discard tab evidence" }).click();
+  await expect(page.getByRole("status")).toHaveText("Tab evidence discarded. No receipt is queued for sign-in.");
+  expect(await page.evaluate(() => [
+    sessionStorage.getItem("vognary.guest-audit-transfer.v1"),
+    sessionStorage.getItem("vognary.guest-audit-transfer-binding.v1"),
+  ])).toEqual([null, null]);
+});

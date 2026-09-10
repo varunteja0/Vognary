@@ -1388,6 +1388,39 @@ test("cross-workspace evidence and decision relationships block cutover and pres
   });
 });
 
+test("legacy cutover removes verified copied decisions before restrictive parent deletion", {
+  skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
+}, async () => {
+  await withDisposableDatabase("legacy_restrictive_cleanup", async connectionString => {
+    runMigrations(connectionString);
+    const pool = createPool(connectionString);
+    const tenants = twoTenants();
+    try {
+      await seedTenants(pool, tenants);
+      await seedManualLedger(pool, {
+        userId: tenants.ownerA, workspaceId: tenants.workspaceA, sourceId: tenants.sourceA,
+        itemId: tenants.itemA, merchant: "Synthetic restrictive cleanup",
+      });
+      await pool.query(`alter table commitment_decisions
+        drop constraint commitment_decisions_recurring_item_id_fkey,
+        add constraint commitment_decisions_recurring_item_id_fkey
+          foreign key (recurring_item_id) references recurring_items(id) on delete restrict`);
+      const migrated = await migrateLegacyRecovery(pool);
+      assert.equal(migrated.status, "migrated");
+      assert.equal(migrated.decisionsMigrated, 1);
+      assert.equal((await pool.query("select id from commitment_decisions where workspace_id=$1", [tenants.workspaceA])).rowCount, 0);
+      assert.equal((await pool.query("select id from recurring_items where workspace_id=$1", [tenants.workspaceA])).rowCount, 0);
+      const copied = await pool.query("select decision.workspace_id from recovery_decisions decision join recovery_commitments commitment on commitment.id=decision.commitment_id where commitment.identity_key=$1", [`legacy:${tenants.itemA}`]);
+      assert.deepEqual(copied.rows, [{ workspace_id: tenants.workspaceA }]);
+    } finally {
+      await pool.query("delete from commitment_decisions where workspace_id=any($1::uuid[])", [[tenants.workspaceA, tenants.workspaceB]]);
+      await pool.query("delete from workspaces where id=any($1::uuid[])", [[tenants.workspaceA, tenants.workspaceB]]);
+      await pool.query("delete from users where id=any($1::uuid[])", [[tenants.ownerA, tenants.ownerB]]);
+      await pool.end();
+    }
+  });
+});
+
 test("valid same-workspace evidence and decisions migrate into the original tenant and stay isolated", {
   skip: databaseConfigured ? false : "DATABASE_URL is required for PostgreSQL integration tests.",
 }, async () => {

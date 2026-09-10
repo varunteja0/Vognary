@@ -15,25 +15,33 @@ const followUpDirectory = join(outputDirectory, "follow-ups");
 const sendLogPath = join(outputDirectory, "send-log.csv");
 
 try {
+  const arguments_ = process.argv.slice(2);
+  if (arguments_.length > 1
+    || arguments_.some((argument) => !["--report-only", "--customer-actions-only"].includes(argument))) {
+    throw new Error("Usage: npm run market:desk -- [--report-only | --customer-actions-only]. Choose one mode; neither sends messages.");
+  }
+  const reportOnly = arguments_.includes("--report-only");
+  const customerActionsOnly = arguments_.includes("--customer-actions-only");
   const rows = parseMarketTestCsv(await readFile(crmPath, "utf8"));
   const desk = buildMarketOperatorDesk(rows);
-  await Promise.all([
-    mkdir(outputDirectory, { recursive: true }),
-    mkdir(followUpDirectory, { recursive: true }),
-  ]);
-
-  for (const draft of desk.firstTouches) {
-    await writePrivateFile(join(outputDirectory, `${draft.cell}-${safeFilePart(draft.id)}.txt`), draft.content);
+  if (!reportOnly) {
+    await mkdir(outputDirectory, { recursive: true });
+    if (!customerActionsOnly) {
+      await mkdir(followUpDirectory, { recursive: true });
+      for (const draft of desk.firstTouches) {
+        await writePrivateFile(join(outputDirectory, `${draft.cell}-${safeFilePart(draft.id)}.txt`), draft.content);
+      }
+      for (const draft of desk.followUps) {
+        await writePrivateFile(join(followUpDirectory, `${draft.cell}-${safeFilePart(draft.id)}.txt`), draft.content);
+      }
+      const existingSendLog = await readOptionalFile(sendLogPath);
+      await Promise.all([
+        writePrivateFile(sendLogPath, mergeMarketSendLog(existingSendLog, desk.logEntries)),
+        writePrivateFile(join(outputDirectory, "interview-guide.txt"), desk.interviewGuide),
+      ]);
+    }
+    await writePrivateFile(join(outputDirectory, "customer-actions.txt"), desk.customerGuide);
   }
-  for (const draft of desk.followUps) {
-    await writePrivateFile(join(followUpDirectory, `${draft.cell}-${safeFilePart(draft.id)}.txt`), draft.content);
-  }
-
-  const existingSendLog = await readOptionalFile(sendLogPath);
-  await Promise.all([
-    writePrivateFile(sendLogPath, mergeMarketSendLog(existingSendLog, desk.logEntries)),
-    writePrivateFile(join(outputDirectory, "interview-guide.txt"), desk.interviewGuide),
-  ]);
   console.log(formatMarketOperatorDeskSummary(desk.summary));
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Market operator desk generation failed.");
